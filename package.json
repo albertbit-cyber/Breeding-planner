@@ -2,7 +2,7 @@
   "name": "breeding-planner",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://albertbit-cyber.github.io/Breeding-planner/",
+  "homepage": ".",
   "main": "electron/main.js",
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
@@ -22,7 +22,7 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "craco build",
+    "build": "INLINE_RUNTIME_CHUNK=false PUBLIC_URL=. craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
