@@ -3053,7 +3053,7 @@ export default function BreedingPlannerApp() {
   const [groupFilter, setGroupFilter] = useState('all');
   const [showGroups, setShowGroups] = useState([]);
   const [hiddenGroups, setHiddenGroups] = useState([]);
-  const [statusFilter /*, setStatusFilter */] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [groups, setGroups] = useState(() => [...DEFAULT_GROUPS]);
   const [theme, setTheme] = useState('blue');
   const [breederInfo, setBreederInfo] = useState(() => {
@@ -4501,6 +4501,30 @@ export default function BreedingPlannerApp() {
               />
             ) : (
               <Card title={animalsCardTitle}>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Status</span>
+                  <TabButton
+                    theme={theme}
+                    active={statusFilter === 'all'}
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    All statuses
+                  </TabButton>
+                  <TabButton
+                    theme={theme}
+                    active={statusFilter === 'active'}
+                    onClick={() => setStatusFilter('active')}
+                  >
+                    Active only
+                  </TabButton>
+                  <TabButton
+                    theme={theme}
+                    active={statusFilter === 'inactive'}
+                    onClick={() => setStatusFilter('inactive')}
+                  >
+                    Resting / in grow-out
+                  </TabButton>
+                </div>
                 <GroupCheckboxes
                   groups={groups}
                   showGroups={showGroups}
@@ -6089,43 +6113,6 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
   const logs = snake.logs || {};
   const usableWidth = pageW - left * 2;
 
-  // compute columns dynamically from rows: union of keys, ordered by preferred list
-  // eslint-disable-next-line no-unused-vars
-  function computeColumnsFromRows(rows, preferredOrder=[]) {
-    const keySet = new Set();
-    (rows || []).forEach(r => { if (r && typeof r === 'object') Object.keys(r).forEach(k => keySet.add(k)); });
-    let keys = Array.from(keySet);
-    // if no keys found, fallback to some sensible defaults
-    if (!keys.length) {
-      keys = ['date', 'notes'];
-    }
-    // Order keys: put preferred first in order if present
-    const ordered = [];
-    for (const p of preferredOrder) if (keySet.has(p)) { ordered.push(p); keySet.delete(p); }
-    // then remaining keys alphabetically
-    const rest = Array.from(keySet).sort();
-    const finalKeys = [...ordered, ...rest];
-
-    // compute widths: give some default widths for common fields, remaining equally share leftover
-    const widths = {};
-    const reserved = {};
-  // total not used directly; keep calculation of column widths below
-    // reserve widths
-    finalKeys.forEach(k => {
-      if (/date$/i.test(k) || k === 'date') { widths[k] = 30; reserved[k] = 30; }
-      else if (/weight|grams|weightGrams/i.test(k)) { widths[k] = 30; reserved[k] = 30; }
-      else if (k === 'feed' || k === 'drug' || k === 'item') { widths[k] = 50; reserved[k] = 50; }
-      else if (k === 'size' || k === 'dose') { widths[k] = 30; reserved[k] = 30; }
-    });
-    const reservedTotal = Object.values(reserved).reduce((a,b)=>a+b,0);
-    const remainingKeys = finalKeys.filter(k => typeof widths[k] === 'undefined');
-    const remainingWidth = Math.max(usableWidth - reservedTotal, 40);
-    const defaultWidth = Math.floor(remainingWidth / Math.max(1, remainingKeys.length));
-    remainingKeys.forEach(k => widths[k] = defaultWidth);
-
-    return finalKeys.map(k => ({ title: k, key: k, width: widths[k] }));
-  }
-
   const bottomLimit = pageH - margin - 6; // leave small margin inside frame
   function ensureSpace(addHeight, onNewPage) {
     if (y + addHeight > bottomLimit) {
@@ -6503,6 +6490,34 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
   const cardRef = useRef(null);
   const geneticsTokens = useMemo(() => combineMorphsAndHetsForDisplay(s?.morphs, s?.hets), [s?.morphs, s?.hets]);
   const normalizedSex = useMemo(() => normalizeSexValue(s?.sex), [s?.sex]);
+  const weightHistory = useMemo(() => {
+    const entries = Array.isArray(s?.logs?.weights) ? s.logs.weights : [];
+    const mapped = entries
+      .map((entry, index) => {
+        const rawGrams = typeof entry?.grams === 'number'
+          ? entry.grams
+          : typeof entry?.weightGrams === 'number'
+            ? entry.weightGrams
+            : typeof entry?.weight === 'number'
+              ? entry.weight
+              : Number(entry?.grams ?? entry?.weightGrams ?? entry?.weight ?? entry?.value);
+        if (!Number.isFinite(rawGrams)) return null;
+        const dateInput = entry?.date || entry?.loggedAt || entry?.createdAt || null;
+        const parsedYmd = typeof dateInput === 'string' ? parseYmd(dateInput) : null;
+        const parsed = parsedYmd || (dateInput ? new Date(dateInput) : null);
+        if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return null;
+        return {
+          grams: rawGrams,
+          date: parsed,
+          label: formatDateForDisplay(parsed) || parsed.toLocaleDateString(),
+          rawDate: dateInput || parsed.toISOString(),
+          index,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    return mapped.slice(-12);
+  }, [s?.logs?.weights]);
   const coverPhotoUrl = useMemo(() => {
     if (s?.imageUrl) return s.imageUrl;
     if (Array.isArray(s?.photos) && s.photos.length) {
@@ -6857,12 +6872,18 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
                   </div>
                 </>
               )}
-              {quickTagOpen.toLowerCase().includes('weight') && (
-                <div>
-                  <div className="text-xs text-neutral-500">Grams</div>
-                  <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
-                </div>
-              )}
+                      {quickTagOpen.toLowerCase().includes('weight') && (
+                        <>
+                          <div>
+                            <div className="text-xs text-neutral-500">Grams</div>
+                            <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                          </div>
+                          <div>
+                            <div className="text-xs text-neutral-500">Recent progress</div>
+                            <WeightTrendMiniChart data={weightHistory} />
+                          </div>
+                        </>
+                      )}
               {quickTagOpen.toLowerCase().includes('med') && (
                 <>
                   <div>
@@ -6995,6 +7016,124 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
           onClose={() => setShowPairingsModal(false)}
           onOpenPairing={(pid) => { setShowPairingsModal(false); if (onOpenPairing) onOpenPairing(pid); }}
         />
+      )}
+    </div>
+  );
+}
+
+function WeightTrendMiniChart({ data = [] }) {
+  const accent = '#0ea5e9';
+  const chartWidth = 320;
+  const chartHeight = 140;
+  const padding = { top: 18, right: 28, bottom: 32, left: 42 };
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  const gradientId = useMemo(() => `weight-gradient-${Math.random().toString(36).slice(2, 8)}`, []);
+
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="mt-2 border rounded-lg bg-neutral-50 px-3 py-4 text-xs text-neutral-500">
+        No weight history yet. Log a weight to start tracking progress.
+      </div>
+    );
+  }
+
+  const gramsValues = data.map(d => d.grams);
+  const minValue = Math.min(...gramsValues);
+  const maxValue = Math.max(...gramsValues);
+  const range = maxValue - minValue || 1;
+  const baselineY = padding.top + innerHeight;
+  const formatNumber = (value) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+
+  const pointCoords = data.map((entry, idx) => {
+    const ratio = data.length === 1 ? 0.5 : idx / (data.length - 1);
+    const x = padding.left + innerWidth * ratio;
+    const y = padding.top + innerHeight - ((entry.grams - minValue) / range) * innerHeight;
+    return { x, y, grams: entry.grams, label: entry.label || '' };
+  });
+
+  const linePath = pointCoords
+    .map((pt, idx) => `${idx === 0 ? 'M' : 'L'}${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`)
+    .join(' ');
+
+  const areaPath = pointCoords.length > 1
+    ? `${linePath} L${pointCoords[pointCoords.length - 1].x.toFixed(2)} ${baselineY.toFixed(2)} L${pointCoords[0].x.toFixed(2)} ${baselineY.toFixed(2)} Z`
+    : null;
+
+  const latest = pointCoords[pointCoords.length - 1];
+  const first = pointCoords[0];
+  const diff = latest.grams - first.grams;
+  const diffLabel = `${diff >= 0 ? '+' : ''}${formatNumber(diff)} g`;
+
+  return (
+    <div className="mt-2 border rounded-lg bg-neutral-50 p-3">
+      <svg
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+        role="img"
+        aria-label="Weight trend chart"
+        className="w-full h-32"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={accent} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={accent} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <rect
+          x={padding.left}
+          y={padding.top}
+          width={innerWidth}
+          height={innerHeight}
+          fill="#f8fafc"
+          rx={12}
+        />
+        <line
+          x1={padding.left}
+          y1={baselineY}
+          x2={padding.left + innerWidth}
+          y2={baselineY}
+          stroke="#e2e8f0"
+          strokeDasharray="4 4"
+        />
+        {areaPath ? (
+          <path d={areaPath} fill={`url(#${gradientId})`} />
+        ) : null}
+        <path
+          d={linePath}
+          fill="none"
+          stroke={accent}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {pointCoords.map((pt, idx) => (
+          <circle
+            key={`weight-point-${idx}`}
+            cx={pt.x}
+            cy={pt.y}
+            r={4}
+            fill="#fff"
+            stroke={accent}
+            strokeWidth={2}
+          />
+        ))}
+      </svg>
+      <div className="mt-2 text-[11px] text-neutral-600 grid grid-cols-2 gap-y-1">
+        <div>
+          <span className="font-semibold text-neutral-700">Latest:</span> {formatNumber(latest.grams)} g
+        </div>
+        <div className="text-right">
+          <span className="font-semibold text-neutral-700">Change:</span> {diffLabel}
+        </div>
+        <div className="col-span-2 text-neutral-500">
+          {pointCoords.length > 1 ? `From ${first.label} to ${latest.label}` : `Logged on ${latest.label}`}
+        </div>
+      </div>
+      {pointCoords.length > 1 && (
+        <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wide text-neutral-400">
+          <span>{data[0].label}</span>
+          <span>{data[data.length - 1].label}</span>
+        </div>
       )}
     </div>
   );
