@@ -6486,7 +6486,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
   const [showPairingsModal, setShowPairingsModal] = useState(false);
   const [quickTagOpen, setQuickTagOpen] = useState(null);
   const [quickDraft, setQuickDraft] = useState({ date: localYMD(new Date()), notes: '', grams: 0, feed: 'Mouse', size: 'pinky', sizeDetail: '', form: '', formDetail: '', drug: '', dose: '' });
-  const [quickTagPos, setQuickTagPos] = useState({ left: null, top: null });
   const cardRef = useRef(null);
   const geneticsTokens = useMemo(() => combineMorphsAndHetsForDisplay(s?.morphs, s?.hets), [s?.morphs, s?.hets]);
   const normalizedSex = useMemo(() => normalizeSexValue(s?.sex), [s?.sex]);
@@ -6551,12 +6550,12 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
     // compute position near the activity grid (place under top area)
     try {
       const card = cardRef.current;
-      const rect = card.getBoundingClientRect();
-      // position the quick-add near the card; fall back to small offsets
-      const left = Math.max(8, Math.round(rect.left + 8));
-      const top = Math.max(24, Math.round(rect.top + 48));
-      setQuickTagPos({ left, top });
-    } catch(e) { setQuickTagPos({ left: null, top: null }); }
+      if (card) {
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    } catch (e) {
+      // ignore positioning errors
+    }
     // prefill based on key; for feeds, prefer shared lastFeedDefaults (do not bring grams)
     const activity = tagToActivity(fakeTag);
     if (activity.key === 'feeds' && lastFeedDefaults) {
@@ -6578,7 +6577,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
     setQuickTagOpen(fakeTag);
   }
 
-  function closeQuickAdd() { setQuickTagOpen(null); setQuickTagPos({ left: null, top: null }); }
+  function closeQuickAdd() { setQuickTagOpen(null); }
 
   function submitQuickAdd(tag) {
     if (!setSnakes) { alert('Editing not enabled'); closeQuickAdd(); return; }
@@ -6806,13 +6805,27 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
       </div>
       {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
       {quickTagOpen && (
-        <div className="fixed inset-0 z-50 pointer-events-none">
-          <div style={{ left: quickTagPos.left || 24, top: quickTagPos.top || 96 }} className="pointer-events-auto absolute bg-white border rounded-lg p-3 shadow-md w-80">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-medium">Add {quickTagOpen}</div>
-              <button className="text-sm text-neutral-500" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>✕</button>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            closeQuickAdd();
+          }}
+        >
+          <div
+            className="pointer-events-auto w-full max-w-md bg-white border rounded-xl shadow-2xl p-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-base font-semibold">Add {quickTagOpen}</div>
+              <button
+                className="text-sm px-2 py-1 border rounded-lg text-neutral-500 hover:text-neutral-700"
+                onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}
+              >
+                Close
+              </button>
             </div>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <div>
                 <div className="text-xs text-neutral-500">Date</div>
                 <input className="w-full px-2 py-1 border rounded" type="date" value={quickDraft.date} onChange={(e)=>setQuickDraft(d=>({...d, date: e.target.value}))} />
