@@ -29,6 +29,19 @@
 }
 
 /* Theme-driven button colors: root variables are set from React based on selected theme */
+.app-root {
+  min-height: 100vh;
+  background-color: #f4f4f5 !important;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(24, 24, 27, 0.05) 0, rgba(24, 24, 27, 0.05) 18%, transparent 19%),
+    radial-gradient(circle at 75% 25%, rgba(24, 24, 27, 0.05) 0, rgba(24, 24, 27, 0.05) 18%, transparent 19%),
+    radial-gradient(circle at 25% 75%, rgba(24, 24, 27, 0.07) 0, rgba(24, 24, 27, 0.07) 20%, transparent 21%),
+    radial-gradient(circle at 75% 75%, rgba(24, 24, 27, 0.07) 0, rgba(24, 24, 27, 0.07) 20%, transparent 21%);
+  background-size: 140px 140px;
+  background-position: 0 0, 70px 0, 0 70px, 70px 70px;
+  background-attachment: fixed;
+}
+
 .app-root button {
   background: var(--primary) !important;
   color: var(--primary-contrast, #fff) !important;
