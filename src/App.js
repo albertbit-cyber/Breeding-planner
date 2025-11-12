@@ -1089,6 +1089,8 @@ const BORIS_PREVIEW_DEFAULTS = {
 
 const seedPairings = [];
 const DEFAULT_GROUPS = ["Breeders", "Holdbacks", "Hatchlings 2024", "Hatchlings 2025"];
+const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', 'Quarantine', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
+const SCAN_MODE_STORAGE_KEY = 'breedingPlannerScanMode';
 
 function createFreshSnakes() {
   return seedSnakes.map(s => {
@@ -1213,13 +1215,14 @@ function withPairingLifecycleDefaults(pairing = {}) {
 }
 
 function initSnakeDraft(s) {
-  if (!s) return { name:'', sex:'F', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null };
+  if (!s) return { name:'', sex:'F', status:'Active', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null };
   const existingSequence = Number(s?.idSequence);
   const resolvedSequence = Number.isFinite(existingSequence) && existingSequence > 0
     ? existingSequence
     : (extractSequenceFromId(s?.id) || null);
   return {
     ...s,
+    status: (typeof s?.status === 'string' && s.status.trim()) ? s.status.trim() : 'Active',
     idSequence: resolvedSequence,
     sex: ensureSex(s.sex, 'F'),
     morphs: s.morphs || [],
@@ -1238,6 +1241,7 @@ function createEmptyNewAnimalDraft() {
     idSequence: null,
     name: "",
     sex: "F",
+  status: "Active",
     morphHetInput: "",
     morphs: [],
     hets: [],
@@ -2917,9 +2921,75 @@ function getHeaderValues(row = [], headerIndex = {}, key) {
 }
 
 // Add Animal modal form
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, onCancel, onAdd, theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, theme='blue' }) {
   const canSubmit = Boolean(newAnimal.name && newAnimal.name.trim().length);
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
+  const [statusTagInput, setStatusTagInput] = useState('');
+  const customTagLookup = useMemo(() => new Set(customStatusTags.map(tag => tag.toLowerCase())), [customStatusTags]);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (!statusMenuRef.current) return;
+      if (!statusMenuRef.current.contains(event.target)) {
+        setStatusMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [statusMenuOpen]);
+
+  useEffect(() => {
+    setStatusMenuOpen(false);
+  }, [statusOptions]);
+
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (!statusMenuRef.current) return;
+      if (!statusMenuRef.current.contains(event.target)) {
+        setStatusMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [statusMenuOpen]);
+
+  const handleAddStatusTag = useCallback(() => {
+    const trimmed = (statusTagInput || '').trim();
+    if (!trimmed) return;
+    const created = typeof onCreateStatusTag === 'function' ? onCreateStatusTag(trimmed) : trimmed;
+    if (!created) return;
+    setNewAnimal(a => ({ ...a, status: created }));
+    setStatusTagInput('');
+  }, [statusTagInput, onCreateStatusTag, setNewAnimal]);
+
+  const handleSelectStatus = useCallback((tag) => {
+    setNewAnimal(a => ({ ...a, status: tag }));
+    setStatusMenuOpen(false);
+  }, [setNewAnimal]);
+
+  const handleClearStatus = useCallback(() => {
+    setNewAnimal(a => ({ ...a, status: '' }));
+    setStatusMenuOpen(false);
+  }, [setNewAnimal]);
+
+  const handleDeleteStatus = useCallback((tag) => {
+    if (typeof onDeleteStatusTag === 'function') {
+      onDeleteStatusTag(tag);
+    }
+    setStatusMenuOpen(false);
+    setNewAnimal(a => {
+      if (!a) return a;
+      const current = (a.status || '').trim();
+      if (current.toLowerCase() === tag.toLowerCase()) {
+        return { ...a, status: '' };
+      }
+      return a;
+    });
+  }, [onDeleteStatusTag, setNewAnimal]);
 
   return (
     <div className="p-4">
@@ -2947,6 +3017,98 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, onCancel,
                 <option value="F">Female</option>
                 <option value="M">Male</option>
               </select>
+            </div>
+            <div ref={statusMenuRef} className="relative">
+              <label className="text-xs font-medium">Tag</label>
+              <button
+                type="button"
+                className="mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                onClick={() => setStatusMenuOpen(open => !open)}
+              >
+                <span>{(newAnimal.status || '').trim() || 'No tag'}</span>
+                <span className="text-[10px] text-neutral-500">v</span>
+              </button>
+              {statusMenuOpen && (
+                <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                    onClick={handleClearStatus}
+                  >
+                    No tag
+                  </button>
+                  <div className="border-t border-neutral-100" />
+                  {statusOptions.length ? (
+                    statusOptions.map(option => (
+                      <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
+                        <button
+                          type="button"
+                          className="flex-1 text-left"
+                          onClick={() => handleSelectStatus(option)}
+                        >
+                          {option}
+                        </button>
+                        <button
+                          type="button"
+                          className="ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                          onClick={() => handleDeleteStatus(option)}
+                          title="Delete tag"
+                        >
+                          -
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-neutral-400">No tags available yet.</div>
+                  )}
+                </div>
+              )}
+              <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <input
+                  className="w-full border rounded-lg px-2 py-1 text-sm"
+                  value={statusTagInput}
+                  onChange={e => setStatusTagInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddStatusTag(); } }}
+                  placeholder="Create new tag"
+                />
+                <button
+                  type="button"
+                  className={cx('px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', statusTagInput.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+                  onClick={handleAddStatusTag}
+                  disabled={!statusTagInput.trim()}
+                >
+                  Add tag
+                </button>
+              </div>
+              {Array.isArray(statusOptions) && statusOptions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {statusOptions.map(tag => {
+                    const isCustom = customTagLookup.has(tag.toLowerCase());
+                    return (
+                      <span
+                        key={tag}
+                        className={cx(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px]',
+                          isCustom ? 'border border-neutral-200 bg-neutral-50 text-neutral-600' : 'border border-neutral-100 bg-white text-neutral-500'
+                        )}
+                      >
+                        <span>{tag}</span>
+                        {typeof onDeleteStatusTag === 'function' && (
+                          <button
+                            type="button"
+                            className="h-4 w-4 rounded-full border border-neutral-300 text-[10px] leading-[10px] text-neutral-500 hover:border-rose-400 hover:text-rose-500"
+                            title="Delete tag"
+                            onClick={() => onDeleteStatusTag(tag)}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="mt-1 text-[11px] text-neutral-500">Tags let you group animals for availability. Removing a tag clears it from any animals using it.</div>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium">Genetics (morphs &amp; hets)</label>
@@ -3053,7 +3215,9 @@ export default function BreedingPlannerApp() {
   const [groupFilter, setGroupFilter] = useState('all');
   const [showGroups, setShowGroups] = useState([]);
   const [hiddenGroups, setHiddenGroups] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedStatusTags, setSelectedStatusTags] = useState([]);
+  const [customStatusTags, setCustomStatusTags] = useState([]);
+  const [removedStatusTags, setRemovedStatusTags] = useState([]);
   const [groups, setGroups] = useState(() => [...DEFAULT_GROUPS]);
   const [theme, setTheme] = useState('blue');
   const [breederInfo, setBreederInfo] = useState(() => {
@@ -3074,6 +3238,95 @@ export default function BreedingPlannerApp() {
   const [returnToGroupsAfterEdit, setReturnToGroupsAfterEdit] = useState(false);
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [pairingGuard, setPairingGuard] = useState(null);
+
+  // edit snake
+  const [editSnake, setEditSnake] = useState(null);
+  const [editSnakeDraft, setEditSnakeDraft] = useState(null);
+  const [qrFor, setQrFor] = useState(null);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
+  const [hatchWizard, setHatchWizard] = useState(null);
+  const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
+  const editCameraInputRef = useRef(null);
+  const editUploadInputRef = useRef(null);
+  const [editUploadingPhoto, setEditUploadingPhoto] = useState(false);
+  const [editStatusTagInput, setEditStatusTagInput] = useState('');
+  const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
+  const editStatusMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!editStatusMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (!editStatusMenuRef.current) return;
+      if (!editStatusMenuRef.current.contains(event.target)) {
+        setEditStatusMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [editStatusMenuOpen]);
+
+  const handleCreateStatusTag = useCallback((tag) => {
+    const trimmed = (tag || '').trim();
+    if (!trimmed) return '';
+    const isDefaultTag = DEFAULT_STATUS_TAGS.some(t => t.toLowerCase() === trimmed.toLowerCase());
+    setCustomStatusTags(prev => {
+      const existsInCustom = prev.some(t => t.toLowerCase() === trimmed.toLowerCase());
+      if (isDefaultTag) {
+        return existsInCustom ? prev.filter(t => t.toLowerCase() !== trimmed.toLowerCase()) : prev;
+      }
+      if (existsInCustom) return prev;
+      return [...prev, trimmed];
+    });
+    setRemovedStatusTags(prev => prev.filter(t => t.toLowerCase() !== trimmed.toLowerCase()));
+    return trimmed;
+  }, [setCustomStatusTags, setRemovedStatusTags]);
+
+  const handleDeleteStatusTag = useCallback((tag) => {
+    const trimmed = (tag || '').trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    setCustomStatusTags(prev => prev.filter(t => t.toLowerCase() !== lower));
+    setRemovedStatusTags(prev => prev.some(t => t.toLowerCase() === lower) ? prev : [...prev, trimmed]);
+    setSelectedStatusTags(prev => prev.filter(t => t.toLowerCase() !== lower));
+    setSnakes(prev => prev.map(s => {
+      const current = typeof s?.status === 'string' ? s.status.trim() : '';
+      if (!current || current.toLowerCase() !== lower) return s;
+      return { ...s, status: '' };
+    }));
+    setNewAnimal(prev => {
+      if (!prev) return prev;
+      const current = (prev.status || '').trim();
+      if (!current || current.toLowerCase() !== lower) return prev;
+      return { ...prev, status: '' };
+    });
+    setEditSnakeDraft(prev => {
+      if (!prev) return prev;
+      const current = (prev.status || '').trim();
+      if (!current || current.toLowerCase() !== lower) return prev;
+      return { ...prev, status: '' };
+    });
+  }, [setCustomStatusTags, setRemovedStatusTags, setSelectedStatusTags, setSnakes, setNewAnimal, setEditSnakeDraft]);
+
+  const toggleStatusTagFilter = useCallback((tag) => {
+    const trimmed = (tag || '').trim();
+    if (!trimmed) return;
+    setSelectedStatusTags(prev => {
+      const set = new Set(prev);
+      if (set.has(trimmed)) {
+        set.delete(trimmed);
+      } else {
+        set.add(trimmed);
+      }
+      return Array.from(set);
+    });
+  }, []);
+
+  const clearStatusTagFilters = useCallback(() => {
+    setSelectedStatusTags([]);
+  }, []);
 
   // last feed defaults (persisted) - store feed/form/size/etc but not grams
   const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
@@ -3371,20 +3624,62 @@ export default function BreedingPlannerApp() {
 
   // inline pairing focus
   const [focusedPairingId, setFocusedPairingId] = useState(null);
+  const editDraftStatusValue = typeof editSnakeDraft?.status === 'string' ? editSnakeDraft.status : '';
+  const statusTagOptions = useMemo(() => {
+    const set = new Set(DEFAULT_STATUS_TAGS);
+    customStatusTags.forEach(tag => {
+      const trimmed = (tag || '').trim();
+      if (trimmed) set.add(trimmed);
+    });
+    snakes.forEach(s => {
+      const value = typeof s?.status === 'string' ? s.status.trim() : '';
+      if (value) set.add(value);
+    });
+    const newDraftTag = typeof newAnimal?.status === 'string' ? newAnimal.status.trim() : '';
+    if (newDraftTag) set.add(newDraftTag);
+    const editTag = typeof editDraftStatusValue === 'string' ? editDraftStatusValue.trim() : '';
+    if (editTag) set.add(editTag);
+    const removedSet = new Set(removedStatusTags.map(tag => tag.toLowerCase()));
+    return Array.from(set)
+      .filter(option => !removedSet.has(option.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b));
+  }, [customStatusTags, removedStatusTags, snakes, newAnimal.status, editDraftStatusValue]);
+  const customStatusTagLookup = useMemo(() => new Set(customStatusTags.map(tag => tag.toLowerCase())), [customStatusTags]);
+  const currentEditStatus = (editDraftStatusValue || '').trim();
+  const handleAddEditStatusTag = useCallback(() => {
+    const trimmed = (editStatusTagInput || '').trim();
+    if (!trimmed) return;
+    const created = handleCreateStatusTag(trimmed);
+    if (!created) return;
+    setEditSnakeDraft(prev => prev ? ({ ...prev, status: created }) : prev);
+    setEditStatusTagInput('');
+  }, [editStatusTagInput, handleCreateStatusTag]);
 
-  // edit snake
-  const [editSnake, setEditSnake] = useState(null);
-  const [editSnakeDraft, setEditSnakeDraft] = useState(null);
-  const [qrFor, setQrFor] = useState(null);
-  const [qrDataUrl, setQrDataUrl] = useState(null);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
-  const [hatchWizard, setHatchWizard] = useState(null);
-  const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
-  const editCameraInputRef = useRef(null);
-  const editUploadInputRef = useRef(null);
-  const [editUploadingPhoto, setEditUploadingPhoto] = useState(false);
+  useEffect(() => {
+    setEditStatusMenuOpen(false);
+  }, [statusTagOptions]);
+
+  const handleSelectEditStatus = useCallback((tag) => {
+    setEditSnakeDraft(prev => (prev ? { ...prev, status: tag } : prev));
+    setEditStatusMenuOpen(false);
+  }, [setEditSnakeDraft, setEditStatusMenuOpen]);
+
+  const handleClearEditStatus = useCallback(() => {
+    setEditSnakeDraft(prev => (prev ? { ...prev, status: '' } : prev));
+    setEditStatusMenuOpen(false);
+  }, [setEditSnakeDraft, setEditStatusMenuOpen]);
+
+  const handleDeleteEditStatus = useCallback((tag) => {
+    handleDeleteStatusTag(tag);
+    setEditStatusMenuOpen(false);
+  }, [handleDeleteStatusTag]);
+
+  useEffect(() => {
+    if (!editSnake) {
+      setEditStatusTagInput('');
+      setEditStatusMenuOpen(false);
+    }
+  }, [editSnake]);
 
   useEffect(() => {
     setSnakes(prev => {
@@ -3521,8 +3816,10 @@ export default function BreedingPlannerApp() {
   const filterSnakesByCriteria = useCallback((inputList) => {
     let base = Array.isArray(inputList) ? inputList.slice() : [];
     base = filterSnakes(base, query, tag);
-    if (statusFilter === 'active') base = base.filter(s => s.status === 'Active');
-    if (statusFilter === 'inactive') base = base.filter(s => s.status !== 'Active');
+    if (Array.isArray(selectedStatusTags) && selectedStatusTags.length) {
+      const allowed = new Set(selectedStatusTags.map(tagValue => String(tagValue || '').trim()).filter(Boolean));
+      base = base.filter(s => allowed.size === 0 ? true : allowed.has(String(s?.status || '').trim())) ;
+    }
 
     const hasShowGroups = Array.isArray(showGroups) && showGroups.length > 0;
     const hasHiddenGroups = Array.isArray(hiddenGroups) && hiddenGroups.length > 0;
@@ -3545,7 +3842,7 @@ export default function BreedingPlannerApp() {
     }
 
     return base;
-  }, [query, tag, statusFilter, showGroups, hiddenGroups, groupFilter, showUnassigned]);
+  }, [query, tag, selectedStatusTags, showGroups, hiddenGroups, groupFilter, showUnassigned]);
 
   const filteredAll = useMemo(() => filterSnakesByCriteria(snakes), [filterSnakesByCriteria, snakes]);
 
@@ -3892,6 +4189,7 @@ export default function BreedingPlannerApp() {
     const groupList = normalizeSingleGroupValue(newAnimal.groups);
     const draftPhotos = normalizeSnakePhotos(newAnimal.photos);
     const coverImage = newAnimal.imageUrl?.trim() || (draftPhotos.length ? draftPhotos[draftPhotos.length - 1].url : undefined);
+    const normalizedStatus = (newAnimal.status || '').trim() || 'Active';
     const snake = {
       id: resolvedId,
       name: newAnimal.name.trim() || (sex === "F" ? "New Female" : "New Male"),
@@ -3903,7 +4201,7 @@ export default function BreedingPlannerApp() {
   birthDate: normalizedBirthDate || null,
       tags:   [],
       groups: groupList,
-      status: "Active",
+      status: normalizedStatus,
       imageUrl: coverImage,
       photos: draftPhotos,
       logs: cloneLogs(newAnimal.logs),
@@ -4501,29 +4799,59 @@ export default function BreedingPlannerApp() {
               />
             ) : (
               <Card title={animalsCardTitle}>
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Status</span>
-                  <TabButton
-                    theme={theme}
-                    active={statusFilter === 'all'}
-                    onClick={() => setStatusFilter('all')}
-                  >
-                    All statuses
-                  </TabButton>
-                  <TabButton
-                    theme={theme}
-                    active={statusFilter === 'active'}
-                    onClick={() => setStatusFilter('active')}
-                  >
-                    Active only
-                  </TabButton>
-                  <TabButton
-                    theme={theme}
-                    active={statusFilter === 'inactive'}
-                    onClick={() => setStatusFilter('inactive')}
-                  >
-                    Resting / in grow-out
-                  </TabButton>
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Tags</span>
+                    {statusTagOptions.length > 0 && (
+                      <span className="text-[11px] text-neutral-500">
+                        {selectedStatusTags.length ? `${selectedStatusTags.length} selected` : 'Showing all'}
+                      </span>
+                    )}
+                    {selectedStatusTags.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-[11px] px-2 py-1 border rounded-lg bg-white hover:bg-neutral-50"
+                        onClick={clearStatusTagFilters}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {statusTagOptions.length ? (
+                      statusTagOptions.map(option => {
+                        const checked = selectedStatusTags.includes(option);
+                        return (
+                          <div key={option} className="flex items-center gap-1">
+                            <label
+                              className={cx(
+                                'inline-flex items-center gap-1 px-2 py-1 border rounded-lg text-[12px] bg-white transition-colors',
+                                checked ? 'border-sky-500 text-sky-700 bg-sky-50' : 'border-neutral-200 text-neutral-700 hover:border-sky-400'
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                className="w-3 h-3"
+                                checked={checked}
+                                onChange={() => toggleStatusTagFilter(option)}
+                              />
+                              <span>{option}</span>
+                            </label>
+                            <button
+                              type="button"
+                              className="h-5 w-5 inline-flex items-center justify-center rounded-full border border-neutral-200 text-[11px] leading-none text-neutral-500 hover:border-rose-400 hover:text-rose-500"
+                              title="Delete tag"
+                              onClick={() => handleDeleteStatusTag(option)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-xs text-neutral-500">No tags yet. Add one from an animal card.</div>
+                    )}
+                  </div>
                 </div>
                 <GroupCheckboxes
                   groups={groups}
@@ -4781,6 +5109,10 @@ export default function BreedingPlannerApp() {
               setNewAnimal={setNewAnimal}
               groups={groups}
               setGroups={setGroups}
+              statusOptions={statusTagOptions}
+              customStatusTags={customStatusTags}
+              onCreateStatusTag={handleCreateStatusTag}
+              onDeleteStatusTag={handleDeleteStatusTag}
               onCancel={()=>setShowAddModal(false)}
               onAdd={addAnimalFromForm}
               theme={theme}
@@ -5087,8 +5419,9 @@ export default function BreedingPlannerApp() {
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
+                              const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
-                              setSnakes(prev => prev.map(s => s.id === oldId ? ({ ...editSnakeDraft, id: newId, sex: normalizedSex, groups: normalizedGroups }) : s));
+                              setSnakes(prev => prev.map(s => s.id === oldId ? ({ ...editSnakeDraft, id: newId, sex: normalizedSex, status: normalizedStatus, groups: normalizedGroups }) : s));
                               setPairings(prev => prev.map(p => ({
                                 ...p,
                                 maleId: p.maleId === oldId ? newId : p.maleId,
@@ -5144,6 +5477,96 @@ export default function BreedingPlannerApp() {
                     <option value="F">Female</option>
                     <option value="M">Male</option>
                   </select>
+                </div>
+                <div ref={editStatusMenuRef} className="relative">
+                  <label className="text-xs font-medium">Tag</label>
+                  <button
+                    type="button"
+                    className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                    onClick={() => setEditStatusMenuOpen(open => !open)}
+                  >
+                    <span>{currentEditStatus || 'No tag'}</span>
+                    <span className="text-[10px] text-neutral-500">v</span>
+                  </button>
+                  {editStatusMenuOpen && (
+                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                        onClick={handleClearEditStatus}
+                      >
+                        No tag
+                      </button>
+                      <div className="border-t border-neutral-100" />
+                      {statusTagOptions.length ? (
+                        statusTagOptions.map(option => (
+                          <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
+                            <button
+                              type="button"
+                              className="flex-1 text-left"
+                              onClick={() => handleSelectEditStatus(option)}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              className="ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                              onClick={() => handleDeleteEditStatus(option)}
+                              title="Delete tag"
+                            >
+                              -
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-neutral-400">No tags available yet.</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <input
+                      className="w-full border rounded-lg px-2 py-1 text-sm"
+                      value={editStatusTagInput}
+                      onChange={e => setEditStatusTagInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
+                      placeholder="Create new tag"
+                    />
+                    <button
+                      type="button"
+                      className={cx('px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', editStatusTagInput.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+                      onClick={handleAddEditStatusTag}
+                      disabled={!editStatusTagInput.trim()}
+                    >
+                      Add tag
+                    </button>
+                  </div>
+                  {statusTagOptions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {statusTagOptions.map(tag => {
+                        const isCustom = customStatusTagLookup.has(tag.toLowerCase());
+                        return (
+                          <span
+                            key={tag}
+                            className={cx(
+                              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px]',
+                              isCustom ? 'border border-neutral-200 bg-neutral-50 text-neutral-600' : 'border border-neutral-100 bg-white text-neutral-500'
+                            )}
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded-full border border-neutral-300 text-[10px] leading-[10px] text-neutral-500 hover:border-rose-400 hover:text-rose-500"
+                              title="Delete tag"
+                              onClick={() => handleDeleteStatusTag(tag)}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-neutral-500 mt-1">Create and assign custom tags to track sales channels or availability. Removing a tag clears it from any animals using it.</div>
                 </div>
                 <div>
                   <label className="text-xs font-medium">Birth date</label>
@@ -5344,6 +5767,45 @@ export {
       const scannerRef = useRef(null);
       const manualInputRef = useRef(null);
       const [manualValue, setManualValue] = useState('');
+      const suggestedMode = useMemo(() => {
+        if (typeof navigator === 'undefined') return 'camera';
+        const ua = navigator.userAgent || '';
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+        return isMobile ? 'camera' : 'scanner';
+      }, []);
+      const [scanMode, setScanMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+          try {
+            const stored = window.localStorage.getItem(SCAN_MODE_STORAGE_KEY);
+            if (stored === 'camera' || stored === 'scanner') return stored;
+          } catch (err) {
+            // ignore storage errors
+          }
+        }
+        return suggestedMode;
+      });
+      const isCameraMode = scanMode === 'camera';
+
+      const teardownScanner = useCallback(async () => {
+        const instance = scannerRef.current;
+        if (!instance) return;
+        scannerRef.current = null;
+        const tasks = [];
+        if (typeof instance.stop === 'function') tasks.push(instance.stop().catch(() => {}));
+        if (typeof instance.clear === 'function') tasks.push(instance.clear().catch(() => {}));
+        if (typeof instance.close === 'function') tasks.push(instance.close().catch(() => {}));
+        if (tasks.length) {
+          await Promise.allSettled(tasks);
+        }
+      }, []);
+
+      const handleModeChange = useCallback((mode) => {
+        if (mode !== 'camera' && mode !== 'scanner') return;
+        setScanMode(prev => (prev === mode ? prev : mode));
+        if (mode !== 'camera') {
+          teardownScanner().catch(() => {});
+        }
+      }, [teardownScanner]);
 
       const ensureQrModule = useCallback(async () => {
         if (qrModuleRef.current) return qrModuleRef.current;
@@ -5368,7 +5830,16 @@ export {
       useEffect(() => {
         let isMounted = true;
 
+        if (!isCameraMode) {
+          teardownScanner().catch(() => {});
+          return () => {
+            isMounted = false;
+            teardownScanner().catch(() => {});
+          };
+        }
+
         const startScanner = async () => {
+          await teardownScanner().catch(() => {});
           const module = await ensureQrModule();
           if (!isMounted) return;
           if (!module) {
@@ -5388,8 +5859,7 @@ export {
                 const id = extractSnakeIdFromPayload(decoded);
                 if (!id) return;
                 if (isMounted) onFound(id);
-                scannerRef.current = null;
-                instance.clear().catch(() => {});
+                teardownScanner().catch(() => {});
               }, () => {});
             } else if (Html5Qrcode) {
               const instance = new Html5Qrcode('qr-scan-root');
@@ -5401,15 +5871,7 @@ export {
                   const id = extractSnakeIdFromPayload(decoded);
                   if (!id) return;
                   if (isMounted) onFound(id);
-                  const current = scannerRef.current;
-                  scannerRef.current = null;
-                  if (current) {
-                    const stopPromise = typeof current.stop === 'function' ? current.stop().catch(() => {}) : Promise.resolve();
-                    stopPromise.then(() => {
-                      if (typeof current.clear === 'function') current.clear().catch(() => {});
-                      if (typeof current.close === 'function') current.close().catch(() => {});
-                    });
-                  }
+                  teardownScanner().catch(() => {});
                 },
                 () => {}
               );
@@ -5426,19 +5888,32 @@ export {
 
         return () => {
           isMounted = false;
-          const instance = scannerRef.current;
-          scannerRef.current = null;
-          if (instance) {
-            const tasks = [];
-            if (typeof instance.stop === 'function') tasks.push(instance.stop().catch(() => {}));
-            if (typeof instance.clear === 'function') tasks.push(instance.clear().catch(() => {}));
-            if (typeof instance.close === 'function') tasks.push(instance.close().catch(() => {}));
-            if (tasks.length) {
-              Promise.allSettled(tasks).catch(() => {});
-            }
-          }
+          teardownScanner().catch(() => {});
         };
-      }, [ensureQrModule, onFound]);
+      }, [ensureQrModule, isCameraMode, onFound, teardownScanner]);
+
+      useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+          window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
+        } catch (err) {
+          // ignore storage errors
+        }
+      }, [scanMode]);
+
+      useEffect(() => {
+        if (scanMode !== 'scanner') return;
+        const node = manualInputRef.current;
+        if (!node) return;
+        try {
+          node.focus({ preventScroll: true });
+        } catch (err) {
+          try { node.focus(); } catch (_) { /* ignore */ }
+        }
+        if (typeof node.select === 'function') {
+          try { node.select(); } catch (err) { /* ignore */ }
+        }
+      }, [scanMode]);
 
       const handleFile = async (e) => {
         const f = e.target.files && e.target.files[0];
@@ -5514,28 +5989,71 @@ export {
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium text-lg">Scan QR Code</div>
-                <div className="text-xs text-neutral-500 mt-1">Point your device camera at a QR code printed from this app. Allow camera access when prompted.</div>
+                <div className="text-xs text-neutral-500 mt-1">Choose how you'd like to scan. Cameras shine on mobile; USB readers are handy on desktop.</div>
               </div>
               <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>✕</button>
             </div>
 
             <div className="mt-3">
-              <div id="qr-scan-root" className="w-full h-56 rounded-lg border-2 border-dashed border-neutral-200 flex items-center justify-center bg-neutral-50">
-                <div className="text-center text-sm text-neutral-500">Align the QR inside the box</div>
+              <div className="text-xs font-medium text-neutral-600">Scan method</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('camera')}
+                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', isCameraMode ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
+                >
+                  Device camera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('scanner')}
+                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', !isCameraMode ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
+                >
+                  USB / handheld scanner
+                </button>
+              </div>
+              <div className="mt-1 text-[11px] text-neutral-500">
+                {isCameraMode
+                  ? 'Camera starts automatically. Switch if you prefer a USB reader.'
+                  : 'Input field below is ready for your USB reader. Switch if you need the device camera.'}
+                {' '}Your choice is remembered. Suggested default: {suggestedMode === 'camera' ? 'device camera (mobile).' : 'USB / handheld scanner (desktop).'}
               </div>
             </div>
 
-            <div className="mt-3 text-xs text-neutral-500">Tip: For best results, hold the camera steady and ensure the code is well-lit. If your device can't use the camera, upload a photo of the QR below.</div>
+            <div className="mt-3">
+              <div
+                id="qr-scan-root"
+                key={scanMode}
+                className={cx(
+                  'w-full h-56 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors',
+                  isCameraMode ? 'border-neutral-200 bg-neutral-50' : 'border-neutral-300 bg-neutral-100'
+                )}
+              >
+                {isCameraMode ? (
+                  <div className="text-center text-sm text-neutral-500 px-4">Align the QR inside the box</div>
+                ) : (
+                  <div className="text-center text-sm text-neutral-500 px-4">Camera disabled. Trigger your USB scanner and the scanned text will appear below.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 text-xs text-neutral-500">
+              {isCameraMode
+                ? 'Tip: Hold the camera steady and ensure the code is well-lit. If the camera is blocked, upload a photo instead.'
+                : 'Tip: USB readers usually act like keyboards. If the field below loses focus, click it once before scanning.'}
+            </div>
 
             <div className="mt-3 flex items-center gap-2">
-              <label className="text-sm">Or upload image:</label>
+              <label className="text-sm">Upload image:</label>
               <input type="file" accept="image/*" onChange={handleFile} />
             </div>
 
             <div className="mt-4 border-t border-neutral-200 pt-4">
-              <div className="text-sm font-medium">Using a USB / handheld scanner?</div>
+              <div className="text-sm font-medium">{isCameraMode ? 'Using a USB / handheld scanner?' : 'Scanner input'}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Most external QR readers act like keyboards. Click the field below, then trigger your scanner to fill it.
+                {isCameraMode
+                  ? 'Most external QR readers act like keyboards. Click the field below, then trigger your scanner to fill it.'
+                  : 'We focused this field so your USB reader can type the QR value automatically. You can also paste a code manually.'}
               </div>
               <div className="mt-2 flex flex-col sm:flex-row gap-2">
                 <input
@@ -5545,9 +6063,10 @@ export {
                   onChange={(e) => setManualValue(e.target.value)}
                   onKeyDown={handleManualKeyDown}
                   className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
-                  placeholder="Scan or paste the QR contents here"
+                  placeholder={isCameraMode ? 'Scan or paste the QR contents here' : 'Scanner-ready: trigger your reader or paste the QR contents here'}
                   inputMode="text"
                   autoComplete="off"
+                  autoFocus={scanMode === 'scanner'}
                 />
                 <button
                   type="button"
@@ -6489,6 +7008,10 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
   const cardRef = useRef(null);
   const geneticsTokens = useMemo(() => combineMorphsAndHetsForDisplay(s?.morphs, s?.hets), [s?.morphs, s?.hets]);
   const normalizedSex = useMemo(() => normalizeSexValue(s?.sex), [s?.sex]);
+  const displayStatus = useMemo(() => {
+    const raw = typeof s?.status === 'string' ? s.status.trim() : '';
+    return raw || 'Active';
+  }, [s?.status]);
   const weightHistory = useMemo(() => {
     const entries = Array.isArray(s?.logs?.weights) ? s.logs.weights : [];
     const mapped = entries
@@ -6945,8 +7468,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
         </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <StatusDot status={s.status} />
-        <div className="text-xs">{s.status}</div>
+        <StatusDot status={displayStatus} />
+        <div className="text-xs">{displayStatus}</div>
       </div>
 
       {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
