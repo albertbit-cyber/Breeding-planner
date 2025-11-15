@@ -1,15 +1,12 @@
-const { contextBridge } = require('electron');
+// Simple preload script
+// Basic event listener setup
+window.addEventListener('DOMContentLoaded', () => {
+  const replaceText = (selector, text) => {
+    const element = document.getElementById(selector);
+    if (element) element.innerText = text;
+  };
 
-contextBridge.exposeInMainWorld('breedingPlanner', {
-  version: appVersion(),
-});
-
-function appVersion() {
-  try {
-    // Lazy load to avoid requiring during unit tests
-    const pkg = require('../package.json');
-    return pkg.version;
-  } catch (err) {
-    return 'dev';
+  for (const dependency of ['chrome', 'node', 'electron']) {
+    replaceText(`${dependency}-version`, process.versions[dependency]);
   }
-}
+});

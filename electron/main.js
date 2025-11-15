@@ -10,7 +10,7 @@ let mainWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1280,
+    width: 1200,
     height: 800,
     backgroundColor: '#f4f4f5',
     webPreferences: {
