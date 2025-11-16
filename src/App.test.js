@@ -18,7 +18,7 @@ import {
   DEFAULT_PAIRING_EXPORT_FIELDS,
   buildAnimalExportDataset,
   buildPairingExportDataset,
-} from './App';
+} from './App.jsx';
 
 describe('splitMorphHetInput', () => {
   it('parses morphs separated by spaces', () => {

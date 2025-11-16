@@ -45,11 +45,11 @@ You can wrap the React build inside a lightweight Electron shell and generate na
    ```
    This pulls in `electron`, `electron-builder`, `concurrently`, etc.
 
-2. **Run the desktop shell in development** (starts CRA + Electron together):
+2. **Run the desktop shell in development** (starts Vite + Electron together):
    ```bash
    npm run electron-dev
    ```
-   - The CRA dev server still listens on port 3000.
+   - Vite serves the renderer on http://localhost:5173.
    - Electron opens a window pointing at that dev server. Quit with `Ctrl+C`.
 
 3. **Generate installers**:
@@ -61,5 +61,5 @@ You can wrap the React build inside a lightweight Electron shell and generate na
 Each `dist:*` command runs `npm run build` to produce the React assets, then packages `build/` together with the Electron main process found in `electron/main.js`. Outputs land in `dist/`.
 
 Extra tips:
-- Provide a custom Windows icon by placing `public/icon.ico` (256x256) before running `dist:*`.
+- Provide a custom Windows icon by updating `public/app-icons/icon_512x512.png` before running `dist:*`.
 - When cross-building Windows installers from macOS/Linux, install `brew install --cask wine-stable` (or your distro equivalent) so `electron-builder` can produce `.exe`.

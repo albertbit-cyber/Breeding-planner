@@ -1,0 +1,9 @@
+{
+  "risk_rules":[
+    {"pattern":"Spider x Spider","flag":"Suspect super","penalty":0.8},
+    {"pattern":"Champagne x Champagne","flag":"Suspect super","penalty":0.8},
+    {"pattern":"Woma x Woma","flag":"Suspect super","penalty":0.8},
+    {"pattern":"Cinnamon x Cinnamon","flag":"Deformity risk in supers","penalty":0.3},
+    {"pattern":"BlackPastel x BlackPastel","flag":"Deformity risk in supers","penalty":0.3}
+  ]
+}

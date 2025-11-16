@@ -2,8 +2,9 @@ const path = require('path');
 const { app, BrowserWindow } = require('electron');
 
 const isDev = process.env.NODE_ENV === 'development';
+const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 const APP_URL = process.env.ELECTRON_START_URL || (isDev
-  ? 'http://localhost:3000'
+  ? DEV_SERVER_URL
   : `file://${path.join(__dirname, '../build/index.html')}`);
 
 let mainWindow = null;
