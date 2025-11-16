@@ -7717,6 +7717,17 @@ function BreederSection({
   }, []);
 
   const [setupTab, setSetupTab] = useState('info');
+  const repoUrl = 'https://github.com/AlbertBit-Cyber/Breeding-planner';
+  const repoZipUrl = `${repoUrl}/archive/refs/heads/main.zip`;
+  const buildGuideUrl = `${repoUrl}/blob/main/BUILD_AND_SERVE.md`;
+  const baseHref = typeof import.meta !== 'undefined' && import.meta?.env?.BASE_URL ? import.meta.env.BASE_URL : '/';
+  const normalizedBaseHref = baseHref.endsWith('/') ? baseHref : `${baseHref}/`;
+  const offlineBundleHref = `${normalizedBaseHref}offline/BreedingPlannerOffline.zip`;
+  const offlineBundleName = 'BreedingPlannerOffline.zip';
+  const runningFromGithubPages = typeof window !== 'undefined'
+    && !!window.location
+    && window.location.hostname.includes('github.io');
+  const hostedOrigin = runningFromGithubPages && typeof window !== 'undefined' ? window.location.origin : '';
   const [backupFeedback, setBackupFeedback] = useState(null);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
   const restoreInputRef = useRef(null);
@@ -8321,9 +8332,10 @@ function BreederSection({
     <Card title="Setup">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>Breeder info</TabButton>
-  <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>ID wizard</TabButton>
-  <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>Data exports</TabButton>
-  <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>Backups</TabButton>
+        <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>ID wizard</TabButton>
+        <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>Data exports</TabButton>
+        <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>Backups</TabButton>
+        <TabButton theme={theme} active={setupTab === 'local'} onClick={() => setSetupTab('local')}>Work locally</TabButton>
       </div>
 
       {setupTab === 'info' && (
@@ -8957,6 +8969,94 @@ function BreederSection({
               Restoring replaces everything in the app. Download a backup first to stay safe.
             </div>
           </div>
+        </div>
+      )}
+
+      {setupTab === 'local' && (
+        <div className="border-t pt-4 space-y-4">
+          <div className="space-y-2 text-sm">
+            <div className="font-semibold text-base">Work locally</div>
+            <p>Download the planner and run it directly on this computer for faster performance and offline access.</p>
+          </div>
+
+          {runningFromGithubPages && (
+            <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-xs">
+              You're currently using the hosted demo{' '}
+              {hostedOrigin ? <span className="font-semibold">{hostedOrigin}</span> : 'on GitHub Pages'}.
+              Follow the steps below to keep everything on this device.
+            </div>
+          )}
+
+          <div className="space-y-3 rounded-2xl border bg-white/60 p-4 shadow-sm">
+            <div>
+              <div className="font-semibold text-sm">One-click offline bundle</div>
+              <div className="text-xs text-neutral-500 mt-0.5">
+                Download everything needed to use Breeding Planner offline without cloning the repo.
+              </div>
+            </div>
+            <ol className="list-decimal list-inside text-sm space-y-1 text-neutral-700">
+              <li>Download <code>{offlineBundleName}</code>.</li>
+              <li>Unzip it anywhere on this computer.</li>
+              <li>Open <code>build/index.html</code> in your browser.</li>
+            </ol>
+            <a
+              className={cx('inline-flex items-center justify-center px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))}
+              href={offlineBundleHref}
+              download={offlineBundleName}
+            >
+              Download offline bundle
+            </a>
+            <div className="text-[11px] text-neutral-500">
+              Keep the extracted folder handy if you want instant offline access in the future—no installer required.
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-wide text-neutral-500 font-semibold">Developer workflow (optional)</p>
+            <ol className="list-decimal list-inside text-sm space-y-2 text-neutral-700">
+              <li>Download or clone the repository from GitHub.</li>
+              <li>Install Node.js 20+ and run <code>npm install</code> once.</li>
+              <li>Use <code>npm start</code> for a dev server or <code>npm run build</code> then open <code>build/index.html</code>.</li>
+              <li>Optional: run <code>npm run electron-dev</code> or <code>npm run dist:win</code> for a desktop build.</li>
+            </ol>
+            <pre className="bg-neutral-900 text-neutral-100 text-xs rounded-xl p-3 overflow-auto">
+git clone https://github.com/AlbertBit-Cyber/Breeding-planner.git
+cd Breeding-planner
+npm install
+npm start
+            </pre>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-sm">
+            <a
+              className="px-3 py-2 rounded-lg border hover:bg-neutral-50"
+              href={repoZipUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub ZIP
+            </a>
+            <a
+              className="px-3 py-2 rounded-lg border hover:bg-neutral-50"
+              href={repoUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open GitHub repo
+            </a>
+            <a
+              className="px-3 py-2 rounded-lg border hover:bg-neutral-50"
+              href={buildGuideUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Build &amp; serve guide
+            </a>
+          </div>
+
+          <p className="text-xs text-neutral-500">
+            All breeder data already lives on your device. Use the Backups tab whenever you need to move information between computers.
+          </p>
         </div>
       )}
     </Card>

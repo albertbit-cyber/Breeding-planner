@@ -6,22 +6,26 @@ import { fileURLToPath } from "node:url";
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
 const resolveBase = (publicUrl: string | undefined): string => {
-  if (!publicUrl) {
-    return "/";
+  const ensureTrailingSlash = (value: string): string =>
+    value.endsWith("/") ? value : `${value}/`;
+
+  if (!publicUrl || publicUrl === "/") {
+    return "./";
   }
 
   try {
     const { pathname } = new URL(publicUrl, "http://localhost");
     if (!pathname || pathname === "/") {
-      return "/";
+      return "./";
     }
-    return pathname.endsWith("/") ? pathname : `${pathname}/`;
+    return ensureTrailingSlash(pathname);
   } catch {
-    return publicUrl.endsWith("/") ? publicUrl : `${publicUrl}/`;
+    return ensureTrailingSlash(publicUrl);
   }
 };
 
 const base = resolveBase(process.env.PUBLIC_URL);
+const disableCodeSplitting = true;
 
 export default defineConfig({
   base,
@@ -42,16 +46,19 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
+      inlineDynamicImports: disableCodeSplitting,
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          if (id.includes("pdfjs-dist")) return "pdfjs";
-          if (id.includes("html2canvas")) return "html2canvas";
-          if (id.includes("jspdf")) return "jspdf";
-          if (id.includes("xlsx")) return "xlsx";
-          if (id.includes("react")) return "vendor-react";
-          return "vendor";
-        },
+        manualChunks: disableCodeSplitting
+          ? undefined
+          : (id) => {
+              if (!id.includes("node_modules")) return;
+              if (id.includes("pdfjs-dist")) return "pdfjs";
+              if (id.includes("html2canvas")) return "html2canvas";
+              if (id.includes("jspdf")) return "jspdf";
+              if (id.includes("xlsx")) return "xlsx";
+              if (id.includes("react")) return "vendor-react";
+              return "vendor";
+            },
       },
     },
   },
