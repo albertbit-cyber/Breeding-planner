@@ -4,6 +4,8 @@
   "private": true,
   "homepage": ".",
   "main": "electron/main.js",
+  "description": "Breeding Planner app with Electron and Capacitor support.",
+  "author": "albertbit-cyber <albertbit@gmail.com>",
   "dependencies": {
     "@capacitor/android": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
