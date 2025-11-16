@@ -4,6 +4,8 @@
   "private": true,
   "homepage": ".",
   "main": "electron/main.js",
+  "description": "Breeding Planner app with Electron and Capacitor support.",
+  "author": "albertbit-cyber <albertbit@gmail.com>",
   "dependencies": {
     "better-sqlite3": "^9.4.0",
     "html5-qrcode": "^2.3.8",
