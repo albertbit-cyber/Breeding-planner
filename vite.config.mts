@@ -44,10 +44,10 @@ export default defineConfig({
   build: {
     outDir: "build",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
-      inlineDynamicImports: disableCodeSplitting,
       output: {
+        inlineDynamicImports: disableCodeSplitting,
         manualChunks: disableCodeSplitting
           ? undefined
           : (id) => {

@@ -8,6 +8,9 @@
   "author": "albertbit-cyber <albertbit@gmail.com>",
   "dependencies": {
     "better-sqlite3": "^9.4.0",
+    "canvg": "^4.0.2",
+    "dompurify": "^3.1.7",
+    "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.1",
     "jsqr": "^1.4.0",
@@ -36,6 +39,7 @@
     "demo": "ts-node scripts/demo.ts"
   },
   "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "4.53.2",
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^22.8.6",
     "@vitejs/plugin-react": "^4.7.0",

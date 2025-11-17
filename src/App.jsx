@@ -3347,6 +3347,81 @@ export default function BreedingPlannerApp() {
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [pairingGuard, setPairingGuard] = useState(null);
   const [showAdvisor, setShowAdvisor] = useState(false);
+  const [electronDataReady, setElectronDataReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (!bridge?.loadData) {
+      setElectronDataReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    bridge
+      .loadData()
+      .then((payload) => {
+        if (cancelled || !payload || typeof payload !== 'object') return;
+
+        if (Array.isArray(payload.snakes)) {
+          const sanitized = payload.snakes.map(sanitizeSnakeRecord).filter(Boolean);
+          setSnakes(sanitized);
+        }
+        if (Array.isArray(payload.pairings)) {
+          const sanitizedPairings = payload.pairings.map(sanitizePairingRecord).filter(Boolean);
+          setPairings(sanitizedPairings);
+        }
+        if (Array.isArray(payload.groups)) {
+          setGroups(payload.groups);
+        }
+        if (Array.isArray(payload.showGroups)) {
+          setShowGroups(payload.showGroups);
+        }
+        if (Array.isArray(payload.hiddenGroups)) {
+          setHiddenGroups(payload.hiddenGroups);
+        }
+        if (Array.isArray(payload.customStatusTags)) {
+          setCustomStatusTags(payload.customStatusTags);
+        }
+        if (Array.isArray(payload.removedStatusTags)) {
+          setRemovedStatusTags(payload.removedStatusTags);
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'theme')) {
+          setTheme(typeof payload.theme === 'string' ? payload.theme : 'blue');
+        }
+        if (payload.breederInfo && typeof payload.breederInfo === 'object') {
+          setBreederInfo(normalizeBreederInfo(payload.breederInfo));
+        }
+        if (payload.backupSettings && typeof payload.backupSettings === 'object') {
+          setBackupSettings(normalizeBackupSettings(payload.backupSettings));
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'autoBackupSnapshot')) {
+          if (payload.autoBackupSnapshot && typeof payload.autoBackupSnapshot === 'object') {
+            setAutoBackupSnapshot(normalizeBackupSnapshot(payload.autoBackupSnapshot));
+          } else {
+            setAutoBackupSnapshot(null);
+          }
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'backupVault')) {
+          const vaultValue = Array.isArray(payload.backupVault) ? payload.backupVault : [];
+          setBackupVault(normalizeBackupVault(vaultValue));
+        }
+        if (payload.lastFeedDefaults && typeof payload.lastFeedDefaults === 'object') {
+          setLastFeedDefaults((prev) => ({ ...prev, ...payload.lastFeedDefaults }));
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load persisted Breeding Planner data', error);
+      })
+      .finally(() => {
+        if (!cancelled) setElectronDataReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // edit snake
   const [editSnake, setEditSnake] = useState(null);
@@ -3460,6 +3535,52 @@ export default function BreedingPlannerApp() {
   useEffect(() => { saveStoredJson(STORAGE_KEYS.lastFeedDefaults, lastFeedDefaults); }, [lastFeedDefaults]);
 
   useEffect(() => { saveStoredJson(STORAGE_KEYS.breeder, normalizeBreederInfo(breederInfo)); }, [breederInfo]);
+
+  useEffect(() => {
+    if (!electronDataReady) return;
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (!bridge?.saveData) return;
+    const payload = {
+      snakes,
+      pairings,
+      groups,
+      showGroups,
+      hiddenGroups,
+      customStatusTags,
+      removedStatusTags,
+      theme,
+      breederInfo,
+      backupSettings,
+      autoBackupSnapshot,
+      backupVault,
+      lastFeedDefaults,
+    };
+
+    const saveTimer = setTimeout(() => {
+      bridge.saveData(payload).catch((error) => {
+        console.error('Failed to save Breeding Planner data', error);
+      });
+    }, 300);
+
+    return () => {
+      clearTimeout(saveTimer);
+    };
+  }, [
+    autoBackupSnapshot,
+    backupSettings,
+    backupVault,
+    breederInfo,
+    customStatusTags,
+    electronDataReady,
+    groups,
+    hiddenGroups,
+    lastFeedDefaults,
+    pairings,
+    removedStatusTags,
+    showGroups,
+    snakes,
+    theme,
+  ]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
