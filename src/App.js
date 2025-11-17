@@ -72,9 +72,7 @@ const VAULT_LIMIT_OPTIONS = [5, 10, 20, 50, 100, 200, 'unlimited'];
 
 const ANIMAL_EXPORT_FIELD_DEFS = [
   {
-    key: 'id',
-    label: 'Animal ID',
-    section: 'Identity',
+        {/* QR removed from snake card per request */}
     getter: snake => snake?.id || '',
   },
   {
@@ -4791,7 +4789,6 @@ export default function BreedingPlannerApp() {
                       s={s}
                       groups={groups}
                       setSnakes={setSnakes}
-                      setQrFor={setQrFor}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onDelete={requestDeleteSnake}
@@ -6874,7 +6871,7 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, setQrFor, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults }) {
+function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults }) {
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
   const hasDelete = typeof onDelete === "function";
@@ -7073,9 +7070,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
             Pair
           </button>
         )}
-        <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => { if (typeof setQrFor === 'function') setQrFor(s.id); }}>
-          QR
-        </button>
         {hasDelete && (
           <button
             className="text-[11px] px-2 py-0.5 border rounded-lg text-rose-600"

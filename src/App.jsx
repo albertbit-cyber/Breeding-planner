@@ -3867,6 +3867,27 @@ export default function BreedingPlannerApp() {
     maleId:"", femaleId:"", goals:[], notes:"",
     startDate: localYMD(new Date())
   });
+  const [maleSearchQuery, setMaleSearchQuery] = useState("");
+  const [femaleSearchQuery, setFemaleSearchQuery] = useState("");
+  const [pairingSearchTarget, setPairingSearchTarget] = useState(null);
+  const maleSearchInputRef = useRef(null);
+  const femaleSearchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!showPairingModal) return;
+    if (pairingSearchTarget === 'male' && maleSearchInputRef.current) {
+      maleSearchInputRef.current.focus();
+    } else if (pairingSearchTarget === 'female' && femaleSearchInputRef.current) {
+      femaleSearchInputRef.current.focus();
+    }
+  }, [showPairingModal, pairingSearchTarget]);
+
+  useEffect(() => {
+    if (showPairingModal) return;
+    setPairingSearchTarget(null);
+    setMaleSearchQuery("");
+    setFemaleSearchQuery("");
+  }, [showPairingModal]);
 
   // inline pairing focus
   const [focusedPairingId, setFocusedPairingId] = useState(null);
@@ -3968,6 +3989,20 @@ export default function BreedingPlannerApp() {
     () => snakes.filter(isMaleSnake).filter(isBreederGroupMember),
     [snakes, isBreederGroupMember]
   );
+
+  const maleSearchResults = useMemo(() => {
+    const source = Array.isArray(males) ? males : [];
+    if (!source.length) return [];
+    const list = maleSearchQuery ? filterSnakes(source, maleSearchQuery, 'all') : source;
+    return list.slice(0, 25);
+  }, [males, maleSearchQuery]);
+
+  const femaleSearchResults = useMemo(() => {
+    const source = Array.isArray(females) ? females : [];
+    if (!source.length) return [];
+    const list = femaleSearchQuery ? filterSnakes(source, femaleSearchQuery, 'all') : source;
+    return list.slice(0, 25);
+  }, [females, femaleSearchQuery]);
 
   const pairingsPartition = useMemo(() => {
     const active = [];
@@ -4159,8 +4194,11 @@ export default function BreedingPlannerApp() {
       notes: "",
       startDate: localYMD(new Date())
     });
+    setMaleSearchQuery("");
+    setFemaleSearchQuery("");
+    setPairingSearchTarget(isMaleSnake(snake) ? "female" : isFemaleSnake(snake) ? "male" : "male");
     setShowPairingModal(true);
-  }, [setDraft, setShowPairingModal]);
+  }, [setDraft, setShowPairingModal, setFemaleSearchQuery, setMaleSearchQuery, setPairingSearchTarget, isFemaleSnake, isMaleSnake]);
 
   const startPairingWithSnake = useCallback((snake) => {
     if (!snake) return;
@@ -4362,6 +4400,9 @@ export default function BreedingPlannerApp() {
       notes: "",
       startDate: localYMD(new Date())
     });
+    setMaleSearchQuery("");
+    setFemaleSearchQuery("");
+    setPairingSearchTarget("male");
     setPairingsView('active');
     setShowPairingModal(true);
   }
@@ -5165,7 +5206,6 @@ export default function BreedingPlannerApp() {
                       s={s}
                       groups={groups}
                       setSnakes={setSnakes}
-                      setQrFor={setQrFor}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onDelete={requestDeleteSnake}
@@ -5651,8 +5691,8 @@ export default function BreedingPlannerApp() {
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-auto">
               {(() => {
-                const breederMales = males.filter(isBreeder);
-                const breederFemales = females.filter(isBreeder);
+                const breederMales = males;
+                const breederFemales = females;
                 const showBreederHint = !breederMales.length || !breederFemales.length;
                 return (
                   <>
@@ -5663,25 +5703,127 @@ export default function BreedingPlannerApp() {
                     )}
                     <div>
                       <label className="text-xs font-medium">Male</label>
-                      <select className="mt-1 w-full border rounded-xl px-3 py-2 bg-white" value={draft.maleId||""} onChange={e=>setDraft(d=>({...d,maleId:e.target.value}))}>
-                        <option value="">Select male</option>
-                        {breederMales.map(m=> {
-                          const geneticsTokens = combineMorphsAndHetsForDisplay(m.morphs, m.hets, m.possibleHets);
-                          const geneticsLabel = geneticsTokens.join(' ');
-                          return <option key={m.id} value={m.id}>{m.name}{geneticsLabel ? ` • ${geneticsLabel}` : ''}</option>;
-                        })}
-                      </select>
+                      <div className="mt-1 space-y-2">
+                        <input
+                          ref={maleSearchInputRef}
+                          type="text"
+                          className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
+                          value={maleSearchQuery}
+                          onChange={e => setMaleSearchQuery(e.target.value)}
+                          placeholder={breederMales.length ? "Search breeder males (name, ID, genetics…)" : "No breeder males available"}
+                          disabled={!breederMales.length}
+                        />
+                        {currentMale && (
+                          <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
+                            <div className="min-w-0 text-xs">
+                              <div className="font-medium text-sm truncate">{currentMale.name || currentMale.id}</div>
+                              <div className="text-[11px] text-neutral-500 truncate">{currentMale.id}</div>
+                            </div>
+                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))}>
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                        <div className="border rounded-xl bg-white max-h-48 overflow-auto divide-y">
+                          {!breederMales.length ? (
+                            <div className="px-3 py-2 text-xs text-neutral-500">
+                              Add breeder males to start building pairings.
+                            </div>
+                          ) : maleSearchResults.length ? (
+                            maleSearchResults.map(m => {
+                              const selected = draft.maleId === m.id;
+                              const geneticsTokens = combineMorphsAndHetsForDisplay(m.morphs, m.hets, m.possibleHets);
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  className={cx(
+                                    "w-full text-left px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
+                                    selected && "bg-sky-50/80"
+                                  )}
+                                  onClick={() => {
+                                    setDraft(d => ({ ...d, maleId: m.id }));
+                                    setMaleSearchQuery("");
+                                    setPairingSearchTarget("female");
+                                  }}
+                                >
+                                  <div className="font-medium truncate">{m.name || m.id}</div>
+                                  <div className="text-[11px] text-neutral-500 truncate">{m.id}</div>
+                                  <div className="text-[11px] text-neutral-500 truncate">
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-neutral-500">
+                              No breeder males match that search.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs font-medium">Female</label>
-                      <select className="mt-1 w-full border rounded-xl px-3 py-2 bg-white" value={draft.femaleId||""} onChange={e=>setDraft(d=>({...d,femaleId:e.target.value}))}>
-                        <option value="">Select female</option>
-                        {breederFemales.map(f=> {
-                          const geneticsTokens = combineMorphsAndHetsForDisplay(f.morphs, f.hets, f.possibleHets);
-                          const geneticsLabel = geneticsTokens.join(' ');
-                          return <option key={f.id} value={f.id}>{f.name}{geneticsLabel ? ` • ${geneticsLabel}` : ''}</option>;
-                        })}
-                      </select>
+                      <div className="mt-1 space-y-2">
+                        <input
+                          ref={femaleSearchInputRef}
+                          type="text"
+                          className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
+                          value={femaleSearchQuery}
+                          onChange={e => setFemaleSearchQuery(e.target.value)}
+                          placeholder={breederFemales.length ? "Search breeder females (name, ID, genetics…)" : "No breeder females available"}
+                          disabled={!breederFemales.length}
+                        />
+                        {currentFemale && (
+                          <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
+                            <div className="min-w-0 text-xs">
+                              <div className="font-medium text-sm truncate">{currentFemale.name || currentFemale.id}</div>
+                              <div className="text-[11px] text-neutral-500 truncate">{currentFemale.id}</div>
+                            </div>
+                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))}>
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                        <div className="border rounded-xl bg-white max-h-48 overflow-auto divide-y">
+                          {!breederFemales.length ? (
+                            <div className="px-3 py-2 text-xs text-neutral-500">
+                              Add breeder females to start building pairings.
+                            </div>
+                          ) : femaleSearchResults.length ? (
+                            femaleSearchResults.map(f => {
+                              const selected = draft.femaleId === f.id;
+                              const geneticsTokens = combineMorphsAndHetsForDisplay(f.morphs, f.hets, f.possibleHets);
+                              return (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  className={cx(
+                                    "w-full text-left px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
+                                    selected && "bg-rose-50/80"
+                                  )}
+                                  onClick={() => {
+                                    setDraft(d => ({ ...d, femaleId: f.id }));
+                                    setFemaleSearchQuery("");
+                                    setPairingSearchTarget(null);
+                                  }}
+                                >
+                                  <div className="font-medium truncate">{f.name || f.id}</div>
+                                  <div className="text-[11px] text-neutral-500 truncate">{f.id}</div>
+                                  <div className="text-[11px] text-neutral-500 truncate">
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-neutral-500">
+                              No breeder females match that search.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </>
                 );
@@ -5738,6 +5880,31 @@ export default function BreedingPlannerApp() {
                             Delete
                           </button>
                           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); alert('Export failed'); } }}>Export PDF</button>
+                          <button
+                            className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
+                            disabled={!((editSnakeDraft.id || '').trim())}
+                            onClick={async () => {
+                              const trimmedId = (editSnakeDraft.id || '').trim();
+                              if (!trimmedId) {
+                                alert('Assign an ID before creating a QR label.');
+                                return;
+                              }
+                              try {
+                                await exportQrToPdf([{
+                                  id: trimmedId,
+                                  name: editSnakeDraft.name,
+                                  morphs: editSnakeDraft.morphs,
+                                  hets: editSnakeDraft.hets,
+                                  possibleHets: editSnakeDraft.possibleHets,
+                                }], breederInfo);
+                              } catch (err) {
+                                console.error('QR export failed', err);
+                                alert('Unable to create the QR label PDF.');
+                              }
+                            }}
+                          >
+                            QR label
+                          </button>
                           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}
                             onClick={()=>{
                               const oldId = editSnake.id;
@@ -6051,8 +6218,23 @@ export default function BreedingPlannerApp() {
 
       <div className="py-10" />
       {qrFor && (() => {
-        const s = snakes.find(x=>x.id===qrFor);
-  return <QRModal id={qrFor} name={s?.name} morphs={s?.morphs} hets={s?.hets} dataUrl={qrDataUrl} onClose={() => setQrFor(null)} />;
+        const target = typeof qrFor === 'string' ? { id: qrFor } : qrFor;
+        if (!target?.id) return null;
+        const override = typeof qrFor === 'object' ? qrFor.override || null : null;
+        const fallbackSnake = snakes.find(x => x.id === target.id);
+        const modalName = override?.name ?? fallbackSnake?.name;
+        const modalMorphs = override?.morphs ?? fallbackSnake?.morphs;
+        const modalHets = override?.hets ?? fallbackSnake?.hets;
+        return (
+          <QRModal
+            id={target.id}
+            name={modalName}
+            morphs={modalMorphs}
+            hets={modalHets}
+            dataUrl={qrDataUrl}
+            onClose={() => setQrFor(null)}
+          />
+        );
       })()}
   <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} />
           {showScanner && (
@@ -7335,7 +7517,7 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, setQrFor, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults }) {
+function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults }) {
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
   const hasDelete = typeof onDelete === "function";
@@ -7563,9 +7745,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
             Pair
           </button>
         )}
-        <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => { if (typeof setQrFor === 'function') setQrFor(s.id); }}>
-          QR
-        </button>
         {hasDelete && (
           <button
             className="text-[11px] px-2 py-0.5 border rounded-lg text-rose-600"
@@ -7826,15 +8005,17 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, s
               </div>
               <div className="flex items-center justify-end gap-2">
                 <button className="px-2 py-1 border rounded" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>Cancel</button>
-                <button
-                  className="px-2 py-1 border rounded text-rose-600"
-                  onClick={(e)=>{
-                    e.stopPropagation();
-                    submitQuickAdd(quickTagOpen, { forceRefused: true });
-                  }}
-                >
-                  Refused feed
-                </button>
+                {quickTagOpen.toLowerCase().includes('feed') && (
+                  <button
+                    className="px-2 py-1 border rounded text-rose-600"
+                    onClick={(e)=>{
+                      e.stopPropagation();
+                      submitQuickAdd(quickTagOpen, { forceRefused: true });
+                    }}
+                  >
+                    Refused feed
+                  </button>
+                )}
                 <button className="px-2 py-1 bg-emerald-500 text-white rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>Add</button>
               </div>
             </div>
