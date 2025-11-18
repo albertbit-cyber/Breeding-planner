@@ -30,7 +30,7 @@
     "deploy": "cross-env PUBLIC_URL=https://albertbit-cyber.github.io/Breeding-planner/ vite build && gh-pages -d build",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder -mwl",
-    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:win": "node scripts/build-win.js",
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "dist:linux": "npm run build && electron-builder --linux",
     "test": "vitest run",
@@ -61,6 +61,8 @@
   "build": {
     "appId": "com.breedingplanner.app",
     "productName": "Breeding Planner",
+    "asar": true,
+    "artifactName": "${productName}-Setup-${version}-${env.BUILD_TAG}.${ext}",
     "files": [
       "build/**/*",
       "electron/**/*",

@@ -1989,14 +1989,53 @@ function extractSnakeIdFromPayload(decoded) {
   if (decoded == null) return null;
   const raw = String(decoded).trim();
   if (!raw) return null;
-  const match = raw.match(/#?snake=?(.*)/);
-  const candidate = match ? match[1] : raw;
-  try {
-    const decodedValue = decodeURIComponent(candidate);
-    return decodedValue || null;
-  } catch {
-    return candidate || null;
-  }
+  const decodeValue = (value) => {
+    if (value == null) return null;
+    const cleaned = String(value).replace(/\+/g, ' ');
+    try {
+      return decodeURIComponent(cleaned);
+    } catch {
+      return cleaned;
+    }
+  };
+
+  const matchGeneralSnakeParam = () => {
+    const re = /(?:#|[?&])snake=([^&#\s]+)/i;
+    const m = raw.match(re);
+    if (m && m[1]) return decodeValue(m[1]);
+    return null;
+  };
+
+  const matchPrefixedSnake = () => {
+    const re = /^#?snake[:=]([^&#\s]+)/i;
+    const m = raw.match(re);
+    if (m && m[1]) return decodeValue(m[1]);
+    return null;
+  };
+
+  const tryUrlParsing = () => {
+    try {
+      const url = raw.includes('://')
+        ? new URL(raw)
+        : new URL(raw, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+      if (url.searchParams.has('snake')) {
+        const found = url.searchParams.get('snake');
+        if (found) return decodeValue(found);
+      }
+      const hashMatch = url.hash && url.hash.match(/snake=([^&#\s]+)/i);
+      if (hashMatch && hashMatch[1]) {
+        return decodeValue(hashMatch[1]);
+      }
+    } catch {
+      // ignore malformed URLs
+    }
+    return null;
+  };
+
+  const extractor = matchGeneralSnakeParam() || matchPrefixedSnake() || tryUrlParsing();
+  if (extractor) return extractor;
+  const fallback = decodeValue(raw);
+  return fallback || null;
 }
 
 // lightweight logs helpers
@@ -3430,6 +3469,7 @@ export default function BreedingPlannerApp() {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [passiveScanNotice, setPassiveScanNotice] = useState(null);
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
   const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
@@ -3439,6 +3479,7 @@ export default function BreedingPlannerApp() {
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
+  const isAnimalScannerView = tab === 'animals' && animalView !== 'groups';
 
   useEffect(() => {
     if (!editStatusMenuOpen) return;
@@ -3457,6 +3498,18 @@ export default function BreedingPlannerApp() {
       setShowAdvisor(false);
     }
   }, [tab, showAdvisor]);
+
+  useEffect(() => {
+    if (!isAnimalScannerView) {
+      setPassiveScanNotice(null);
+    }
+  }, [isAnimalScannerView]);
+
+  useEffect(() => {
+    if (!passiveScanNotice) return;
+    const timeout = setTimeout(() => setPassiveScanNotice(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [passiveScanNotice]);
 
   const handleCreateStatusTag = useCallback((tag) => {
     const trimmed = (tag || '').trim();
@@ -4431,6 +4484,45 @@ export default function BreedingPlannerApp() {
     setPendingDeleteSnake(snake);
   }, []);
 
+  const openSnakeFromScan = useCallback((rawId, { silent = false } = {}) => {
+    const normalizedId = typeof rawId === 'string' ? rawId.trim() : String(rawId ?? '').trim();
+    if (!normalizedId) return null;
+    const match = snakes.find(s => s.id === normalizedId);
+    if (match) {
+      openSnakeCard(match);
+      return match;
+    }
+    if (!silent) {
+      alert(`No snake found with ID: ${normalizedId}`);
+    } else {
+      console.warn(`No snake found with ID: ${normalizedId}`);
+    }
+    return null;
+  }, [openSnakeCard, snakes]);
+
+  const handlePassiveScan = useCallback((payload) => {
+    if (!isAnimalScannerView) return;
+    const decoded = typeof payload === 'string' ? payload.trim() : String(payload ?? '').trim();
+    if (!decoded) return;
+    const result = openSnakeFromScan(decoded, { silent: true });
+    setPassiveScanNotice({
+      ts: Date.now(),
+      type: result ? 'success' : 'error',
+      text: result ? `Opened ${result.name || result.id}` : `No animal with ID ${decoded}`,
+    });
+  }, [isAnimalScannerView, openSnakeFromScan]);
+
+  useHardwareScannerListener({
+    enabled: isAnimalScannerView,
+    onScan: handlePassiveScan,
+    minLength: 3,
+    maxKeyInterval: 200,
+    maxScanDuration: 2500,
+  });
+
+  const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
+  const passiveScannerLabel = passiveScanNotice?.text ?? 'Scanner ready';
+
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
     setSnakes(prev => {
@@ -5105,6 +5197,30 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={animalView === "groups"} onClick={()=>handleAnimalViewTabChange("groups")}>Groups</TabButton>
               </div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
+                {isAnimalScannerView && (
+                  <div
+                    className={cx(
+                      'px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border transition-colors',
+                      passiveScannerStatus === 'success'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : passiveScannerStatus === 'error'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-sky-50 text-sky-700 border-sky-200'
+                    )}
+                  >
+                    <span
+                      className={cx(
+                        'w-2 h-2 rounded-full',
+                        passiveScannerStatus === 'success'
+                          ? 'bg-emerald-500 animate-pulse'
+                          : passiveScannerStatus === 'error'
+                            ? 'bg-amber-500'
+                            : 'bg-sky-500 animate-pulse'
+                      )}
+                    />
+                    <span>{passiveScannerLabel}</span>
+                  </div>
+                )}
                 <button onClick={()=>setShowExportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>Export QR</button>
                 <button onClick={()=>setShowScanner(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>Scan QR</button>
                 <button
@@ -6241,10 +6357,10 @@ export default function BreedingPlannerApp() {
             <QrScannerModal
               onClose={() => setShowScanner(false)}
               onFound={(id) => {
-                setShowScanner(false);
-                const s = snakes.find(x=>x.id===id);
-                if (s) { setEditSnake(s); setEditSnakeDraft(initSnakeDraft(s)); }
-                else alert(`No snake found with ID: ${id}`);
+                const match = openSnakeFromScan(id);
+                if (match) {
+                  setShowScanner(false);
+                }
               }}
             />
           )}
@@ -6605,6 +6721,164 @@ export {
         </div>
       );
     }
+
+function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInterval = 150, maxScanDuration = 2000 }) {
+  const onScanRef = useRef(onScan);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    if (typeof window === 'undefined') return undefined;
+
+    let buffer = '';
+    let startedAt = 0;
+    let lastTime = 0;
+    let capturingScan = false;
+
+    const nowTs = () => {
+      if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+        return performance.now();
+      }
+      return Date.now();
+    };
+
+    const isEditableElement = (el) => {
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = el.tagName;
+      if (!tag) return false;
+      return (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        el.getAttribute?.('data-scanner-target') === 'true'
+      );
+    };
+
+    const swallowEvent = (event) => {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+    };
+
+    const resetBuffer = () => {
+      buffer = '';
+      startedAt = 0;
+      lastTime = 0;
+      capturingScan = false;
+    };
+
+    const handleKeyDown = (event) => {
+      if (!enabled) return;
+      const targetEditable = isEditableElement(event.target);
+      if (targetEditable && !capturingScan) {
+        resetBuffer();
+        return;
+      }
+      const current = nowTs();
+      const key = event.key;
+
+      const tryCommit = () => {
+        if (!buffer.length || !startedAt) return false;
+        const duration = current - startedAt;
+        if (buffer.length >= minLength && duration <= maxScanDuration) {
+          const id = extractSnakeIdFromPayload(buffer);
+          if (id) {
+            if (typeof event.preventDefault === 'function') {
+              event.preventDefault();
+            }
+            onScanRef.current?.(id);
+            return true;
+          }
+        }
+        return false;
+      };
+
+      if (key === 'Enter' || key === 'Tab') {
+        if (capturingScan || buffer.length) {
+          swallowEvent(event);
+        }
+        tryCommit();
+        resetBuffer();
+        return;
+      }
+
+      if (key === 'Escape') {
+        if (capturingScan) {
+          swallowEvent(event);
+        }
+        resetBuffer();
+        return;
+      }
+
+      if (key === 'Backspace') {
+        if (capturingScan) {
+          swallowEvent(event);
+        }
+        buffer = buffer.slice(0, -1);
+        if (!buffer.length) {
+          resetBuffer();
+        }
+        return;
+      }
+
+      if (key === 'Shift' || key === 'CapsLock' || key === 'NumLock') {
+        return;
+      }
+
+      if (event.metaKey || event.altKey || event.ctrlKey) {
+        if (capturingScan) {
+          swallowEvent(event);
+        }
+        resetBuffer();
+        return;
+      }
+
+      if (key.length === 1) {
+        if (!capturingScan) {
+          capturingScan = true;
+        }
+        if (!targetEditable) {
+          swallowEvent(event);
+        }
+        if (!startedAt) {
+          startedAt = current;
+          buffer = '';
+        }
+        if (lastTime && current - lastTime > maxKeyInterval) {
+          buffer = '';
+          startedAt = current;
+        }
+        lastTime = current;
+        buffer += key;
+        return;
+      }
+
+      resetBuffer();
+    };
+
+    const handlePaste = (event) => {
+      if (!enabled) return;
+      if (isEditableElement(event.target)) return;
+      const text = event.clipboardData?.getData('text');
+      if (!text) return;
+      swallowEvent(event);
+      const id = extractSnakeIdFromPayload(text);
+      if (id) {
+        onScanRef.current?.(id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('paste', handlePaste, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('paste', handlePaste, true);
+    };
+  }, [enabled, maxKeyInterval, maxScanDuration, minLength]);
+}
 
 // small comps
 function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm, theme = 'blue' }) {
