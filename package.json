@@ -24,9 +24,10 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
+    "dev:desktop": "npm run electron-dev",
     "build": "vite build",
     "electron-dev": "concurrently -k \"npm:dev\" \"npm:electron-open\"",
-    "electron-open": "wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 NODE_ENV=development electron .",
+    "electron-open": "wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 NODE_ENV=development node scripts/start-electron.js",
     "deploy": "cross-env PUBLIC_URL=https://albertbit-cyber.github.io/Breeding-planner/ vite build && gh-pages -d build",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder -mwl",

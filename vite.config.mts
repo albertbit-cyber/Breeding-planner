@@ -35,6 +35,17 @@ export default defineConfig({
       "@": resolve(rootDir, "src"),
     },
   },
+  // Electron dev tooling (wait-on + ELECTRON_START_URL) expects Vite on 5173.
+  // If Vite refuses to start because 5173 is busy, stop the previous dev server
+  // or kill any stray Node/Electron processes before retrying.
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
+  preview: {
+    port: 4173,
+    strictPort: true,
+  },
   define: {
     "process.env": {
       ...process.env,
