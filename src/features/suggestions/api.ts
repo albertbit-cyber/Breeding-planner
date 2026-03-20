@@ -7,6 +7,11 @@ import { prefilterByGoal, probGoalForPair } from "../../goals/goal";
 import { justify } from "../../justify/llm";
 import { Animal, Goal, Suggestion, Demand, Outcome, MultiGenPlan, PlanStep } from "../../types/pairing";
 import { inferMorphType } from "../../genetics/geneLibrary";
+import i18n from "../../i18n";
+
+const advisorNamespace = "advisor";
+const tAdvisor = (key: string, defaultValue: string, options: Record<string, unknown> = {}) =>
+  i18n.t(key, { ns: advisorNamespace, defaultValue, ...options });
 
 type WeightOptions = {
   wDemand: number;
@@ -73,16 +78,21 @@ const formatAnimalLabel = (animal: Animal): string => {
 
 const defaultDemand = (): Demand => ({ index: 0, priceBand: null, signals: [], sources: [] });
 
-const summarizeRationale = (score: number, demandIndex: number, goalSummary: string): string => {
-  return `Projected score ${score.toFixed(2)} with demand index ${demandIndex}. ${goalSummary}`.trim();
-};
+const summarizeRationale = (score: number, demandIndex: number, goalSummary: string): string =>
+  tAdvisor("api.rationaleSummary", "Projected score {{score}} with demand index {{demand}}. {{goalSummary}}", {
+    score: score.toFixed(2),
+    demand: demandIndex,
+    goalSummary,
+  }).trim();
 
 const collectGoalProbabilities = (outcomes: Outcome[], goals: Goal[]): number[] => {
   return goals.map((goal) => probGoalForPair(outcomes, goal));
 };
 
 const bestGoalSummary = (goals: Goal[], probabilities: number[]): string => {
-  if (!goals.length || !probabilities.length) return "No specific goal targets.";
+  if (!goals.length || !probabilities.length) {
+    return tAdvisor("api.noGoalTargets", "No specific goal targets.");
+  }
   let bestIndex = 0;
   let bestProb = probabilities[0];
   probabilities.forEach((prob, idx) => {
@@ -92,7 +102,11 @@ const bestGoalSummary = (goals: Goal[], probabilities: number[]): string => {
     }
   });
   const goal = goals[bestIndex];
-  return `${(bestProb * 100).toFixed(1)}% chance to hit goal '${goal.name}'.`;
+  return tAdvisor("api.goalSummary", {
+    prob: (bestProb * 100).toFixed(1),
+    goal: goal.name,
+    defaultValue: "{{prob}}% chance to hit goal '{{goal}}'.",
+  });
 };
 
 const safeJustify = async (
@@ -108,8 +122,18 @@ const safeJustify = async (
 ): Promise<string> => {
   try {
     const result = await justify(context);
-    const watchouts = result.watchouts?.length ? ` Watchouts: ${result.watchouts.join("; ")}.` : "";
-    const sourced = result.sources?.length ? ` Sources: ${result.sources.join(", ")}.` : "";
+    const watchouts = result.watchouts?.length
+      ? tAdvisor("api.watchouts", {
+          list: result.watchouts.join("; "),
+          defaultValue: " Watchouts: {{list}}.",
+        })
+      : "";
+    const sourced = result.sources?.length
+      ? tAdvisor("api.sources", {
+          list: result.sources.join(", "),
+          defaultValue: " Sources: {{list}}.",
+        })
+      : "";
     return `${result.why_good}${watchouts}${sourced}`.trim();
   } catch (error) {
     return fallback;
@@ -269,13 +293,26 @@ const buildMultiGenerationPlan = (
 
   const directProb = baseSuggestion.goalProb ?? 0;
 
+  const targetTraitsLabel = targetTraits.join(", ");
   const steps: PlanStep[] = [
     {
       generation: 1,
-      title: `Generation 1: ${male.id} × ${female.id}`,
-      summary: directProb > 0
-        ? `Direct chance to reach the goal is ${(directProb * 100).toFixed(1)}%.`
-        : `No direct visual expected; produce holdbacks carrying ${targetTraits.join(", ")}.`,
+      title: tAdvisor("api.plan.stepTitle", {
+        generation: 1,
+        male: male.id,
+        female: female.id,
+        defaultValue: "Generation {{generation}}: {{male}} × {{female}}",
+      }),
+      summary:
+        directProb > 0
+          ? tAdvisor("api.plan.directSummary", {
+              chance: (directProb * 100).toFixed(1),
+              defaultValue: "Direct chance to reach the goal is {{chance}}%.",
+            })
+          : tAdvisor("api.plan.holdbackSummary", {
+              traits: targetTraitsLabel,
+              defaultValue: "No direct visual expected; produce holdbacks carrying {{traits}}.",
+            }),
       maleId: male.id,
       femaleId: female.id,
       focusTraits: targetTraits,
@@ -385,15 +422,31 @@ const buildMultiGenerationPlan = (
 
   steps[0] = {
     ...steps[0],
-    summary: `Direct goal chance ${(directProb * 100).toFixed(1)}%. Prioritise producing holdbacks carrying ${holdbackLabel}.`,
+    summary: tAdvisor("api.plan.adjustedSummary", {
+      chance: (directProb * 100).toFixed(1),
+      holdback: holdbackLabel,
+      defaultValue: "Direct goal chance {{chance}}%. Prioritize producing holdbacks carrying {{holdback}}.",
+    }),
   };
 
+  const holdbackSexLabel = ensuredSecondStep.holdbackSex === "F"
+    ? tAdvisor("api.plan.holdbackSex.female", "female")
+    : tAdvisor("api.plan.holdbackSex.male", "male");
   steps.push({
     generation: 2,
-    title: `Generation 2: Holdback × ${ensuredSecondStep.partnerId}`,
-    summary:
-      `Retain the ${ensuredSecondStep.holdbackSex === "F" ? "female" : "male"} holdback (${holdbackLabel}). ` +
-      `Pair with ${ensuredSecondStep.partnerId} for ${(ensuredSecondStep.prob * 100).toFixed(1)}% chance at the goal.`,
+    title: tAdvisor("api.plan.secondTitle", {
+      generation: 2,
+      partner: ensuredSecondStep.partnerId,
+      defaultValue: "Generation {{generation}}: Holdback × {{partner}}",
+    }),
+    summary: tAdvisor("api.plan.secondSummary", {
+      sex: holdbackSexLabel,
+      holdback: holdbackLabel,
+      partner: ensuredSecondStep.partnerId,
+      chance: (ensuredSecondStep.prob * 100).toFixed(1),
+      defaultValue:
+        "Retain the {{sex}} holdback ({{holdback}}). Pair with {{partner}} for {{chance}}% chance at the goal.",
+    }),
     maleId: ensuredSecondStep.holdbackSex === "F" ? ensuredSecondStep.partnerId : holdbackMaleId,
     femaleId: ensuredSecondStep.holdbackSex === "F" ? holdbackFemaleId : ensuredSecondStep.partnerId,
     focusTraits: targetTraits,

@@ -49,3 +49,19 @@ export type Suggestion = {
   goalFit?:number;
   plan?:MultiGenPlan;
 };
+
+export type PairingExportMode = "default" | "byPairing";
+
+export type PairingExportRow = {
+  maleCode: string;
+  maleName: string;
+  femaleCode: string;
+  femaleName: string;
+  pairingOrder: number | string;
+  status: string;
+  seasonName?: string;
+  startDate?: string;
+  notes?: string;
+  sortIndex?: number | null;
+  orderWarning?: string | null;
+};

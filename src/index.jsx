@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import './App.css';
+import './i18n/index.js';
 import App from './AuthShell.jsx';
 import reportWebVitals from './reportWebVitals';
 

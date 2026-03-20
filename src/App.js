@@ -6798,7 +6798,7 @@ async function exportClutchCardToPdf(details = {}) {
   const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
 
   const clutchNumberText = details.clutchNumber ? String(details.clutchNumber) : '—';
-  const heading = details.label ? details.label : (details.clutchNumber ? `Clutch #${clutchNumberText}` : 'Clutch Card');
+  const heading = details.label ? details.label : (details.clutchNumber ? `Pairing #${clutchNumberText}` : 'Pairing Card');
   const femaleName = details.femaleName || '—';
   const maleName = details.maleName || '—';
   const normalizeGeneticsLine = (value) => {
@@ -6832,7 +6832,7 @@ async function exportClutchCardToPdf(details = {}) {
   })();
 
   const rows = [
-    { label: 'Clutch #', value: clutchNumberText },
+    { label: 'Pairing #', value: clutchNumberText },
     { label: 'Date', value: clutchDate ? formatDateForDisplay(clutchDate) : '—' },
     { label: 'Female', value: femaleName, secondary: femaleGeneticsLine },
     { label: 'Male', value: maleName, secondary: maleGeneticsLine },
@@ -6862,12 +6862,12 @@ async function exportClutchCardToPdf(details = {}) {
     }
   });
 
-  const slugSource = details.label || (details.clutchNumber ? `clutch-${details.clutchNumber}` : 'clutch-card');
+  const slugSource = details.label || (details.clutchNumber ? `pairing-${details.clutchNumber}` : 'pairing-card');
   const fileSafe = slugSource
     .toString()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'clutch-card';
+    .replace(/^-+|-+$/g, '') || 'pairing-card';
   doc.save(`${fileSafe}.pdf`);
 }
 
@@ -9201,7 +9201,7 @@ function PairingInlineCard({
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">Clutch #{pairingNumber} • {cycleYear}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">Pairing #{pairingNumber} • {cycleYear}</div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1">
               <span className="font-semibold">View details</span>
               <span aria-hidden="true">›</span>
@@ -9235,7 +9235,7 @@ function PairingInlineCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-semibold leading-tight text-sm sm:text-base">
-            <div className="truncate">Clutch #{pairingNumber} • {cycleYear}</div>
+            <div className="truncate">Pairing #{pairingNumber} • {cycleYear}</div>
           </div>
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
             <div>
@@ -11803,6 +11803,95 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing }) {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }, [filteredEvents, pairingsById, snakesById, malesById, femalesById, month, year]);
 
+  const handlePrintAppointments = useCallback(() => {
+    const appointmentEvents = filteredEvents
+      .filter(ev => ev.type === 'pairing' && (typeof ev.spanOffset === 'number' ? ev.spanOffset === 0 : true));
+    if (!appointmentEvents.length) {
+      window.alert("No breeding appointments to print for the current view.");
+      return;
+    }
+    const escapeHtml = (value) => String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const sorted = [...appointmentEvents].sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      const maleCompare = (malesById[a.maleId]?.name || '').localeCompare(malesById[b.maleId]?.name || '');
+      if (maleCompare !== 0) return maleCompare;
+      return (femalesById[a.femaleId]?.name || '').localeCompare(femalesById[b.femaleId]?.name || '');
+    });
+    const rowsHtml = sorted.map(ev => {
+      const pairing = pairingsById[ev.pairingId];
+      const appt = pairing?.appointments?.find(ap => ap.id === ev.apptId);
+      const maleName = malesById[ev.maleId]?.name || ev.maleId || '—';
+      const femaleName = femalesById[ev.femaleId]?.name || ev.femaleId || '—';
+      const dateLabel = formatDateForDisplay(ev.date) || ev.date;
+      const detailParts = [];
+      if (appt?.notes) detailParts.push(appt.notes);
+      if (ev.notes && ev.notes !== appt?.notes) detailParts.push(ev.notes);
+      if (appt?.lockObserved) {
+        const lockLabel = appt.lockLoggedAt ? `Lock observed (${formatDateForDisplay(appt.lockLoggedAt) || appt.lockLoggedAt})` : 'Lock observed';
+        detailParts.push(lockLabel);
+      }
+      const notesText = detailParts.join(' • ');
+      return `
+        <tr>
+          <td>${escapeHtml(dateLabel)}</td>
+          <td>${escapeHtml(maleName)}</td>
+          <td>${escapeHtml(femaleName)}</td>
+          <td>${escapeHtml(notesText)}</td>
+        </tr>
+      `;
+    }).join('');
+    const monthLabel = new Date(year, month, 1).toLocaleString('en', { month: 'long', year: 'numeric' });
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Breeding appointments for ${escapeHtml(monthLabel)}</title>
+          <style>
+            body { font-family: "Segoe UI", Arial, sans-serif; padding: 32px; color: #111; }
+            h1 { margin-top: 0; font-size: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #ccc; padding: 8px; font-size: 13px; text-align: left; }
+            th { background: #f4f4f5; }
+            @media print {
+              body { padding: 0; }
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Breeding appointments &mdash; ${escapeHtml(monthLabel)}</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Male</th>
+                <th>Female</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <button onclick="window.print()" style="margin-top:24px;padding:10px 18px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;">Print</button>
+        </body>
+      </html>`;
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    if (!win) {
+      window.alert("Unable to open the print preview window. Please disable popup blockers and try again.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  }, [filteredEvents, malesById, femalesById, pairingsById, month, year]);
+
   const legend = useMemo(()=>{
     const maleIds = Array.from(new Set(events.filter(e=>e.type==='pairing').map(e=>e.maleId).filter(Boolean)));
     return maleIds.map(id=>({
@@ -11862,6 +11951,12 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing }) {
         <div className="ml-auto flex items-center gap-2">
           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>
             Refresh
+          </button>
+          <button
+            className="px-3 py-2 rounded-xl text-sm border"
+            onClick={handlePrintAppointments}
+          >
+            Print appointments
           </button>
           <button
             className="px-3 py-2 rounded-xl text-sm border"

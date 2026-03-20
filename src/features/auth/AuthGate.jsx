@@ -1,45 +1,214 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
 const USERS_STORAGE_KEY = "breedingPlannerUsers";
-const SPECIES_OPTIONS = [
-  "Ball python",
-  "Boa constrictor",
-  "Corn snake",
-  "Reticulated python",
-  "Monitor lizard",
-  "Gecko",
-  "Other",
-];
-const COUNTRY_OPTIONS = [
-  "United States",
-  "Canada",
-  "United Kingdom",
-  "Germany",
-  "France",
-  "Spain",
-  "Italy",
-  "Australia",
-  "New Zealand",
-  "South Africa",
-  "Brazil",
-  "Mexico",
+const COUNTRY_OPTIONS_FALLBACK = [
+  "Afghanistan",
+  "Albania",
+  "Algeria",
+  "Andorra",
+  "Angola",
+  "Antigua and Barbuda",
   "Argentina",
+  "Armenia",
+  "Australia",
+  "Austria",
+  "Azerbaijan",
+  "Bahamas",
+  "Bahrain",
+  "Bangladesh",
+  "Barbados",
+  "Belarus",
+  "Belgium",
+  "Belize",
+  "Benin",
+  "Bhutan",
+  "Bolivia",
+  "Bosnia and Herzegovina",
+  "Botswana",
+  "Brazil",
+  "Brunei",
+  "Bulgaria",
+  "Burkina Faso",
+  "Burundi",
+  "Cabo Verde",
+  "Cambodia",
+  "Cameroon",
+  "Canada",
+  "Central African Republic",
+  "Chad",
+  "Chile",
+  "China",
+  "Colombia",
+  "Comoros",
+  "Congo (Congo-Brazzaville)",
+  "Costa Rica",
+  "Cote d'Ivoire",
+  "Croatia",
+  "Cuba",
+  "Cyprus",
+  "Czechia",
+  "Democratic Republic of the Congo",
+  "Denmark",
+  "Djibouti",
+  "Dominica",
+  "Dominican Republic",
+  "Ecuador",
+  "Egypt",
+  "El Salvador",
+  "Equatorial Guinea",
+  "Eritrea",
+  "Estonia",
+  "Eswatini",
+  "Ethiopia",
+  "Fiji",
+  "Finland",
+  "France",
+  "Gabon",
+  "Gambia",
+  "Georgia",
+  "Germany",
+  "Ghana",
+  "Greece",
+  "Grenada",
+  "Guatemala",
+  "Guinea",
+  "Guinea-Bissau",
+  "Guyana",
+  "Haiti",
+  "Holy See",
+  "Honduras",
+  "Hungary",
+  "Iceland",
   "India",
-  "Japan",
-  "South Korea",
-  "Philippines",
   "Indonesia",
+  "Iran",
+  "Iraq",
+  "Ireland",
+  "Israel",
+  "Italy",
+  "Jamaica",
+  "Japan",
+  "Jordan",
+  "Kazakhstan",
+  "Kenya",
+  "Kiribati",
+  "Kuwait",
+  "Kyrgyzstan",
+  "Laos",
+  "Latvia",
+  "Lebanon",
+  "Lesotho",
+  "Liberia",
+  "Libya",
+  "Liechtenstein",
+  "Lithuania",
+  "Luxembourg",
+  "Madagascar",
+  "Malawi",
   "Malaysia",
-  "Thailand",
+  "Maldives",
+  "Mali",
+  "Malta",
+  "Marshall Islands",
+  "Mauritania",
+  "Mauritius",
+  "Mexico",
+  "Micronesia",
+  "Moldova",
+  "Monaco",
+  "Mongolia",
+  "Montenegro",
+  "Morocco",
+  "Mozambique",
+  "Myanmar",
+  "Namibia",
+  "Nauru",
+  "Nepal",
+  "Netherlands",
+  "New Zealand",
+  "Nicaragua",
+  "Niger",
+  "Nigeria",
+  "North Korea",
+  "North Macedonia",
+  "Norway",
+  "Oman",
+  "Pakistan",
+  "Palau",
+  "Panama",
+  "Papua New Guinea",
+  "Paraguay",
+  "Peru",
+  "Philippines",
+  "Poland",
+  "Portugal",
+  "Qatar",
+  "Romania",
+  "Russia",
+  "Rwanda",
+  "Saint Kitts and Nevis",
+  "Saint Lucia",
+  "Saint Vincent and the Grenadines",
+  "Samoa",
+  "San Marino",
+  "Sao Tome and Principe",
+  "Saudi Arabia",
+  "Senegal",
+  "Serbia",
+  "Seychelles",
+  "Sierra Leone",
   "Singapore",
+  "Slovakia",
+  "Slovenia",
+  "Solomon Islands",
+  "Somalia",
+  "South Africa",
+  "South Korea",
+  "South Sudan",
+  "Spain",
+  "Sri Lanka",
+  "Sudan",
+  "Suriname",
+  "Sweden",
+  "Switzerland",
+  "Syria",
+  "Tajikistan",
+  "Tanzania",
+  "Thailand",
+  "Timor-Leste",
+  "Togo",
+  "Tonga",
+  "Trinidad and Tobago",
+  "Tunisia",
+  "Turkey",
+  "Turkmenistan",
+  "Tuvalu",
+  "Uganda",
+  "Ukraine",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Uruguay",
+  "Uzbekistan",
+  "Vanuatu",
+  "Venezuela",
+  "Vietnam",
+  "Yemen",
+  "Zambia",
+  "Zimbabwe",
 ];
-const DEVICE_OPTIONS = [
+const DEVICE_OPTIONS_FALLBACK = [
   { value: "desktop", label: "Desktop only" },
   { value: "mobile", label: "Mobile only" },
   { value: "both", label: "Both desktop and mobile" },
 ];
-const EXPERIENCE_OPTIONS = [
+const DATA_BACKUP_OPTIONS_FALLBACK = [
+  { value: "automatic", label: "Automatic" },
+  { value: "manual", label: "Manual" },
+];
+const EXPERIENCE_OPTIONS_FALLBACK = [
   { value: "beginner", label: "Beginner" },
   { value: "intermediate", label: "Intermediate" },
   { value: "advanced", label: "Advanced breeder" },
@@ -58,12 +227,7 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
   devicePreference: "both",
   dataBackupPreference: "automatic",
   reptileCount: "",
-  speciesKept: [],
-  breedsReptiles: true,
-  breedingSpecies: "",
   experienceLevel: "intermediate",
-  quarantineProtocol: true,
-  quarantineNotes: "",
   enableAutomaticReptileSync: true,
   consentDataProcessing: false,
   acceptTerms: false,
@@ -72,155 +236,175 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
 const createDefaultRegistrationData = () =>
   JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
 
-const REGISTRATION_STEPS = [
-  {
-    key: "account",
-    title: "Account basics",
-    description: "Create your keeper profile and secure your login.",
-    fields: [
-      { name: "fullName", label: "Full name", type: "text", required: true },
-      {
-        name: "displayName",
-        label: "Preferred username / display name",
-        type: "text",
-        required: true,
+const buildRegistrationSteps = (t, optionSets = {}) => {
+  const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
+    ? optionSets.countries
+    : COUNTRY_OPTIONS_FALLBACK;
+  const devicePreferences = Array.isArray(optionSets.devicePreferences) && optionSets.devicePreferences.length
+    ? optionSets.devicePreferences
+    : DEVICE_OPTIONS_FALLBACK;
+  const dataBackup = Array.isArray(optionSets.dataBackup) && optionSets.dataBackup.length
+    ? optionSets.dataBackup
+    : DATA_BACKUP_OPTIONS_FALLBACK;
+  const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
+    ? optionSets.experienceLevels
+    : EXPERIENCE_OPTIONS_FALLBACK;
+
+  return [
+    {
+      key: "account",
+      title: t("auth.steps.account.title", { defaultValue: "Account basics" }),
+      description: t("auth.steps.account.description", {
+        defaultValue: "Create your keeper profile and secure your login.",
+      }),
+      fields: [
+        {
+          name: "fullName",
+          label: t("auth.fields.fullName", { defaultValue: "Full name" }),
+          type: "text",
+          required: true,
+        },
+        {
+          name: "displayName",
+          label: t("auth.fields.displayName", {
+            defaultValue: "Preferred username / display name",
+          }),
+          type: "text",
+          required: true,
+        },
+        {
+          name: "email",
+          label: t("auth.fields.email", { defaultValue: "Email address" }),
+          type: "email",
+          required: true,
+        },
+        {
+          name: "phone",
+          label: t("auth.fields.phone", { defaultValue: "Phone number (optional)" }),
+          type: "tel",
+        },
+        {
+          name: "password",
+          label: t("auth.fields.password", { defaultValue: "Password" }),
+          type: "password",
+          required: true,
+        },
+        {
+          name: "confirmPassword",
+          label: t("auth.fields.confirmPassword", { defaultValue: "Confirm password" }),
+          type: "password",
+          required: true,
+        },
+      ],
+      validate: (data) => {
+        if (data.password.trim().length < 8) {
+          return t("auth.errors.passwordLength", {
+            defaultValue: "Choose a password with at least 8 characters.",
+          });
+        }
+        if (data.password !== data.confirmPassword) {
+          return t("auth.errors.passwordMismatch", {
+            defaultValue: "Passwords do not match.",
+          });
+        }
+        return null;
       },
-      { name: "email", label: "Email address", type: "email", required: true },
-      { name: "phone", label: "Phone number (optional)", type: "tel" },
-      {
-        name: "password",
-        label: "Password",
-        type: "password",
-        required: true,
-      },
-      {
-        name: "confirmPassword",
-        label: "Confirm password",
-        type: "password",
-        required: true,
-      },
-    ],
-    validate: (data) => {
-      if (data.password.trim().length < 8) {
-        return "Choose a password with at least 8 characters.";
-      }
-      if (data.password !== data.confirmPassword) {
-        return "Passwords do not match.";
-      }
-      return null;
     },
-  },
-  {
-    key: "preferences",
-    title: "Preferences",
-    description: "Tell us how you want to use Breeding Planner.",
-    fields: [
-      {
-        name: "country",
-        label: "Country",
-        type: "select",
-        options: COUNTRY_OPTIONS,
-        required: true,
-      },
-      {
-        name: "enableCloudSync",
-        label: "Enable cloud sync",
-        type: "checkbox",
-      },
-      {
-        name: "devicePreference",
-        label: "Device preference",
-        type: "select",
-        options: DEVICE_OPTIONS,
-        required: true,
-      },
-      {
-        name: "dataBackupPreference",
-        label: "Data backup preference",
-        type: "select",
-        options: [
-          { value: "automatic", label: "Automatic" },
-          { value: "manual", label: "Manual" },
-        ],
-        required: true,
-      },
-    ],
-  },
-  {
-    key: "keeper",
-    title: "Reptile keeper profile",
-    description: "Share a bit about your collection and processes.",
-    fields: [
-      {
-        name: "reptileCount",
-        label: "How many reptiles do you currently keep?",
-        type: "number",
-        required: true,
-      },
-      {
-        name: "speciesKept",
-        label: "Which species do you keep?",
-        type: "multiselect",
-        options: SPECIES_OPTIONS,
-        required: true,
-      },
-      {
-        name: "breedsReptiles",
-        label: "Do you breed reptiles?",
-        type: "checkbox",
-      },
-      {
-        name: "breedingSpecies",
-        label: "Which species do you breed?",
-        type: "text",
-        shouldDisplay: (data) => !!data.breedsReptiles,
-        required: (data) => !!data.breedsReptiles,
-      },
-      {
-        name: "experienceLevel",
-        label: "Experience level",
-        type: "select",
-        options: EXPERIENCE_OPTIONS,
-        required: true,
-      },
-      {
-        name: "quarantineProtocol",
-        label: "Do you follow a quarantine protocol?",
-        type: "checkbox",
-      },
-      {
-        name: "quarantineNotes",
-        label: "Describe your quarantine protocol (optional)",
-        type: "textarea",
-        shouldDisplay: (data) => !!data.quarantineProtocol,
-      },
-      {
-        name: "enableAutomaticReptileSync",
-        label: "Enable automatic reptile-data syncing",
-        type: "checkbox",
-      },
-    ],
-  },
-  {
-    key: "consent",
-    title: "Consent & finish",
-    description: "Review the legal bits so we can activate your account.",
-    fields: [
-      {
-        name: "consentDataProcessing",
-        label: "I consent to data processing for sync & backup services.",
-        type: "checkbox",
-        required: true,
-      },
-      {
-        name: "acceptTerms",
-        label: "I agree to the Terms of Service and keeper guidelines.",
-        type: "checkbox",
-        required: true,
-      },
-    ],
-  },
-];
+    {
+      key: "preferences",
+      title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
+      description: t("auth.steps.preferences.description", {
+        defaultValue: "Tell us how you want to use Breeding Planner.",
+      }),
+      fields: [
+        {
+          name: "country",
+          label: t("auth.fields.country", { defaultValue: "Country" }),
+          type: "select",
+          options: countries,
+          required: true,
+        },
+        {
+          name: "enableCloudSync",
+          label: t("auth.fields.enableCloudSync", { defaultValue: "Enable cloud sync" }),
+          type: "checkbox",
+        },
+        {
+          name: "devicePreference",
+          label: t("auth.fields.devicePreference", { defaultValue: "Device preference" }),
+          type: "select",
+          options: devicePreferences,
+          required: true,
+        },
+        {
+          name: "dataBackupPreference",
+          label: t("auth.fields.dataBackupPreference", {
+            defaultValue: "Data backup preference",
+          }),
+          type: "select",
+          options: dataBackup,
+          required: true,
+        },
+      ],
+    },
+    {
+      key: "keeper",
+      title: t("auth.steps.keeper.title", { defaultValue: "Reptile keeper profile" }),
+      description: t("auth.steps.keeper.description", {
+        defaultValue: "Share a bit about your collection and processes.",
+      }),
+      fields: [
+        {
+          name: "reptileCount",
+          label: t("auth.fields.reptileCount", {
+            defaultValue: "How many reptiles do you currently keep?",
+          }),
+          type: "number",
+          required: true,
+        },
+        {
+          name: "experienceLevel",
+          label: t("auth.fields.experienceLevel", { defaultValue: "Experience level" }),
+          type: "select",
+          options: experienceLevels,
+          required: true,
+        },
+        {
+          name: "enableAutomaticReptileSync",
+          label: t("auth.fields.enableAutomaticReptileSync", {
+            defaultValue: "Enable automatic reptile-data syncing",
+          }),
+          type: "checkbox",
+        },
+      ],
+    },
+    {
+      key: "consent",
+      title: t("auth.steps.consent.title", { defaultValue: "Consent & finish" }),
+      description: t("auth.steps.consent.description", {
+        defaultValue: "Review the legal bits so we can activate your account.",
+      }),
+      fields: [
+        {
+          name: "consentDataProcessing",
+          label: t("auth.fields.consentDataProcessing", {
+            defaultValue: "I consent to data processing for sync & backup services.",
+          }),
+          type: "checkbox",
+          required: true,
+        },
+        {
+          name: "acceptTerms",
+          label: t("auth.fields.acceptTerms", {
+            defaultValue: "I agree to the Terms of Service and keeper guidelines.",
+          }),
+          type: "checkbox",
+          required: true,
+        },
+      ],
+    },
+  ];
+};
 
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
 
@@ -272,7 +456,46 @@ const hasValue = (value) => {
 
 const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
+const getRegistrationCollisionError = (
+  existingUsers,
+  displayName,
+  email,
+  translate,
+) => {
+  const tSafe = translate || ((key, opts) => opts?.defaultValue || key);
+  const normalizedDisplay = normalizeIdentifier(displayName);
+  const normalizedEmail = normalizeIdentifier(email);
+  const conflictingUser = existingUsers.find(
+    (user) =>
+      normalizeIdentifier(user.displayName) === normalizedDisplay ||
+      normalizeIdentifier(user.email) === normalizedEmail,
+  );
+
+  if (!conflictingUser) return null;
+
+  const collisions = [];
+  if (normalizeIdentifier(conflictingUser.displayName) === normalizedDisplay) {
+    collisions.push("username");
+  }
+  if (normalizeIdentifier(conflictingUser.email) === normalizedEmail) {
+    collisions.push("email");
+  }
+
+  const andWord = tSafe("common.and", { defaultValue: "and" });
+  const collisionPhrase = collisions.join(` ${andWord} `);
+  const verb = collisions.length > 1
+    ? tSafe("common.are", { defaultValue: "are" })
+    : tSafe("common.is", { defaultValue: "is" });
+
+  return tSafe("auth.errors.collision", {
+    defaultValue: "That {{fields}} {{verb}} already registered. Please choose another.",
+    fields: collisionPhrase,
+    verb,
+  });
+};
+
 export default function AuthGate({ children }) {
+  const { t, i18n } = useTranslation();
   const [authState, setAuthState] = useState(() => loadStoredAuth());
   const [users, setUsers] = useState(() => loadStoredUsers());
   const [view, setView] = useState("chooser");
@@ -284,7 +507,34 @@ export default function AuthGate({ children }) {
   const [registerStep, setRegisterStep] = useState(0);
   const [registrationError, setRegistrationError] = useState("");
 
-  const currentStep = REGISTRATION_STEPS[registerStep];
+  const registrationSteps = useMemo(() => {
+    const countries = t("auth.options.countries", {
+      returnObjects: true,
+      defaultValue: COUNTRY_OPTIONS_FALLBACK,
+    });
+    const devicePreferences = t("auth.options.devicePreferences", {
+      returnObjects: true,
+      defaultValue: DEVICE_OPTIONS_FALLBACK,
+    });
+    const dataBackup = t("auth.options.dataBackup", {
+      returnObjects: true,
+      defaultValue: DATA_BACKUP_OPTIONS_FALLBACK,
+    });
+    const experienceLevels = t("auth.options.experienceLevels", {
+      returnObjects: true,
+      defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
+    });
+
+    return buildRegistrationSteps(t, {
+      countries,
+      devicePreferences,
+      dataBackup,
+      experienceLevels,
+    });
+  }, [t, i18n.language]);
+
+  const currentStep = registrationSteps[registerStep] || registrationSteps[0];
+  const totalSteps = registrationSteps.length || 1;
 
   const persistAuth = useCallback((next) => {
     setAuthState(next);
@@ -316,11 +566,11 @@ export default function AuthGate({ children }) {
     setLoginError("");
     const { username, password } = loginValues;
     if (!username.trim() || !password.trim()) {
-      setLoginError("Enter both username and password.");
+      setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter both username and password." }));
       return;
     }
     if (!users.length) {
-      setLoginError("No accounts found. Please register first.");
+      setLoginError(t("auth.errors.noAccounts", { defaultValue: "No accounts found. Please register first." }));
       return;
     }
 
@@ -332,12 +582,12 @@ export default function AuthGate({ children }) {
     );
 
     if (!matchedUser) {
-      setLoginError("No account matches that username or email.");
+      setLoginError(t("auth.errors.noAccountMatch", { defaultValue: "No account matches that username or email." }));
       return;
     }
 
     if (matchedUser.password !== password) {
-      setLoginError("Incorrect password. Try again.");
+      setLoginError(t("auth.errors.badPassword", { defaultValue: "Incorrect password. Try again." }));
       return;
     }
 
@@ -378,7 +628,7 @@ export default function AuthGate({ children }) {
     });
 
     if (missingField) {
-      setRegistrationError(`Please complete "${missingField.label}".`);
+      setRegistrationError(t("auth.errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
       return;
     }
 
@@ -390,32 +640,36 @@ export default function AuthGate({ children }) {
       }
     }
 
-    if (registerStep === REGISTRATION_STEPS.length - 1) {
+    if (registerStep === 0) {
+      const desiredDisplayName =
+        (registrationData.displayName || registrationData.fullName).trim();
+      const desiredEmail = registrationData.email.trim();
+      const collisionError = getRegistrationCollisionError(
+        users,
+        desiredDisplayName,
+        desiredEmail,
+        t,
+      );
+      if (collisionError) {
+        setRegistrationError(collisionError);
+        return;
+      }
+    }
+
+    if (registerStep === totalSteps - 1) {
       const desiredDisplayName = (registrationData.displayName || registrationData.fullName).trim();
       const desiredEmail = registrationData.email.trim();
       const desiredFullName = registrationData.fullName.trim();
 
-      const conflictingUser = users.find(
-        (user) =>
-          normalizeIdentifier(user.displayName) ===
-            normalizeIdentifier(desiredDisplayName) ||
-          normalizeIdentifier(user.email) === normalizeIdentifier(desiredEmail),
+      const collisionError = getRegistrationCollisionError(
+        users,
+        desiredDisplayName,
+        desiredEmail,
+        t,
       );
 
-      if (conflictingUser) {
-        const collisions = [];
-        if (
-          normalizeIdentifier(conflictingUser.displayName) ===
-          normalizeIdentifier(desiredDisplayName)
-        ) {
-          collisions.push("username");
-        }
-        if (normalizeIdentifier(conflictingUser.email) === normalizeIdentifier(desiredEmail)) {
-          collisions.push("email");
-        }
-        setRegistrationError(
-          `That ${collisions.join(" and ")} is already registered. Please choose another.`,
-        );
+      if (collisionError) {
+        setRegistrationError(collisionError);
         return;
       }
 
@@ -450,25 +704,13 @@ export default function AuthGate({ children }) {
       return;
     }
 
-    setRegisterStep((prev) => Math.min(prev + 1, REGISTRATION_STEPS.length - 1));
+    setRegisterStep((prev) => Math.min(prev + 1, totalSteps - 1));
   };
 
   const resetRegistration = () => {
     setRegisterStep(0);
     setRegistrationError("");
     setRegistrationData(createDefaultRegistrationData());
-  };
-
-  const handleSpeciesToggle = (name, option) => {
-    setRegistrationData((prev) => {
-      const next = new Set(prev[name] || []);
-      if (next.has(option)) {
-        next.delete(option);
-      } else {
-        next.add(option);
-      }
-      return { ...prev, [name]: Array.from(next) };
-    });
   };
 
   const renderField = (field) => {
@@ -522,7 +764,7 @@ export default function AuthGate({ children }) {
                 handleRegistrationChange(field.name, e.target.value)
               }
             >
-              <option value="">Select an option</option>
+              <option value="">{t("common.selectOption", { defaultValue: "Select an option" })}</option>
               {field.options.map((option) => (
                 <option
                   key={option.value || option}
@@ -533,36 +775,6 @@ export default function AuthGate({ children }) {
               ))}
             </select>
           </label>
-        );
-      case "multiselect":
-        return (
-          <div key={field.name} className="auth-field">
-            {label}
-            <div className="auth-multiselect">
-              {field.options.map((option) => {
-                const optionValue = option.value || option;
-                const optionLabel = option.label || option;
-                const selected = Array.isArray(value)
-                  ? value.includes(optionValue)
-                  : false;
-                return (
-                  <label
-                    key={optionValue}
-                    className="auth-multiselect-option"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() =>
-                        handleSpeciesToggle(field.name, optionValue)
-                      }
-                    />
-                    <span>{optionLabel}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
         );
       default:
         return (
@@ -583,12 +795,14 @@ export default function AuthGate({ children }) {
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt="Breeding Planner logo" className="auth-logo" />
-        <h1 className="auth-card-title">Breeding Planner</h1>
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
       </div>
       <p className="auth-subtitle">
-        Keep your reptiles synced across desktop and mobile with one secure
-        account.
+        {t("auth.subtitle", {
+          defaultValue:
+            "Keep your reptiles synced across desktop and mobile with one secure account.",
+        })}
       </p>
       <div className="auth-primary-actions">
         <button
@@ -599,44 +813,48 @@ export default function AuthGate({ children }) {
             resetRegistration();
           }}
         >
-          Register
+          {t("auth.actions.register", { defaultValue: "Register" })}
         </button>
         <button
           type="button"
           className={`ghost ${view === "login" ? "is-active" : ""}`}
           onClick={() => setView("login")}
         >
-          Log in
+          {t("auth.actions.login", { defaultValue: "Log in" })}
         </button>
       </div>
       {view === "login" && (
-        <form className="auth-login-form" onSubmit={handleLoginSubmit}>
-          <label className="auth-field">
-            <span className="auth-field-label">Username or email</span>
-            <input
-              type="text"
-              value={loginValues.username}
-              onChange={(e) =>
-                setLoginValues((prev) => ({ ...prev, username: e.target.value }))
+          <form className="auth-login-form" onSubmit={handleLoginSubmit}>
+            <label className="auth-field">
+              <span className="auth-field-label">
+                {t("auth.fields.usernameOrEmail", { defaultValue: "Username or email" })}
+              </span>
+              <input
+                type="text"
+                value={loginValues.username}
+                onChange={(e) =>
+                  setLoginValues((prev) => ({ ...prev, username: e.target.value }))
               }
             />
-          </label>
-          <label className="auth-field">
-            <span className="auth-field-label">Password</span>
-            <input
-              type="password"
-              value={loginValues.password}
-              onChange={(e) =>
-                setLoginValues((prev) => ({ ...prev, password: e.target.value }))
+            </label>
+            <label className="auth-field">
+              <span className="auth-field-label">
+                {t("auth.fields.password", { defaultValue: "Password" })}
+              </span>
+              <input
+                type="password"
+                value={loginValues.password}
+                onChange={(e) =>
+                  setLoginValues((prev) => ({ ...prev, password: e.target.value }))
               }
             />
-          </label>
-          {loginError && <p className="auth-error">{loginError}</p>}
-          <button type="submit" className="primary wide">
-            Continue
-          </button>
-        </form>
-      )}
+            </label>
+            {loginError && <p className="auth-error">{loginError}</p>}
+            <button type="submit" className="primary wide">
+              {t("common.continue", { defaultValue: "Continue" })}
+            </button>
+          </form>
+        )}
     </div>
   );
 
@@ -644,10 +862,10 @@ export default function AuthGate({ children }) {
     <div className="auth-card registration-card">
       <div className="auth-card-header">
         <button type="button" className="text-button" onClick={() => setView("chooser")}>
-          ← Back
+          {t("common.back", { defaultValue: "Back" })}
         </button>
         <div>
-          Step {registerStep + 1} of {REGISTRATION_STEPS.length}
+          {t("auth.steps.progress", { defaultValue: "Step {{current}} of {{total}}", current: registerStep + 1, total: totalSteps, })}
         </div>
       </div>
       <h2>{currentStep.title}</h2>
@@ -664,12 +882,12 @@ export default function AuthGate({ children }) {
               setRegisterStep((prev) => Math.max(0, prev - 1))
             }
           >
-            Previous
+            {t("common.previous", { defaultValue: "Previous" })}
           </button>
           <button type="submit" className="primary">
-            {registerStep === REGISTRATION_STEPS.length - 1
-              ? "Create account"
-              : "Next"}
+            {registerStep === totalSteps - 1
+              ? t("auth.actions.createAccount", { defaultValue: "Create account" })
+              : t("common.next", { defaultValue: "Next" })}
           </button>
         </div>
       </form>
@@ -679,13 +897,13 @@ export default function AuthGate({ children }) {
   const signedInChip = authState.isAuthenticated ? (
     <div className="auth-floating-chip">
       <span>
-        Signed in as{" "}
+        {t("auth.status.signedInAs", { defaultValue: "Signed in as" })}{" "}
         {authState.profile?.displayName ||
           authState.profile?.fullName ||
-          "Keeper"}
+          t("auth.status.defaultName", { defaultValue: "Keeper" })}
       </span>
       <button type="button" onClick={handleLogout}>
-        Sign out
+        {t("auth.actions.signOut", { defaultValue: "Sign out" })}
       </button>
     </div>
   ) : null;

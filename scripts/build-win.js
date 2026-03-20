@@ -8,12 +8,7 @@ const npmCli = process.env.npm_execpath || path.join(rootDir, 'node_modules', 'n
 const electronBuilderCli = path.join(rootDir, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
 
 const pkg = require(path.join(rootDir, 'package.json'));
-const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
-const buildTag = timestamp;
-const buildIncrement = Number(BigInt(timestamp) % 60000n);
-const buildVersion = `${pkg.version}.${buildIncrement}`;
-
-const env = { ...process.env, BUILD_TAG: buildTag };
+const env = { ...process.env };
 
 function runOrThrow(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -43,7 +38,7 @@ function runElectronBuilder(args) {
   runOrThrow(nodeCmd, [electronBuilderCli, ...args]);
 }
 
-console.log(`Building Windows installer with buildVersion=${buildVersion} and tag=${buildTag}`);
+console.log(`Building Windows NSIS installer for version=${pkg.version}`);
 cleanDist();
 runNpmScript('build');
-runElectronBuilder(['--win', 'nsis']);
+runElectronBuilder(['--win', 'nsis', '--x64']);

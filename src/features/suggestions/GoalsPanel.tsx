@@ -1,6 +1,7 @@
 // @ts-nocheck
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { GOAL_PRESETS } from "../../goals/presets";
 
 const ensureTokens = (tokens) => tokens?.map((token) => token.trim()).filter(Boolean) ?? [];
@@ -55,6 +56,7 @@ const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
 };
 
 const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
+  const { t } = useTranslation();
   const requireAll = ensureTokens(goal.requireAll);
   const requireAny = ensureTokens(goal.requireAny);
   const avoid = ensureTokens(goal.avoid);
@@ -72,7 +74,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
         <input
           value={goal.name}
           onChange={(event) => onUpdate({ ...goal, name: event.target.value })}
-          placeholder="Goal name"
+          placeholder={t("advisor.goals.namePlaceholder", { defaultValue: "Goal name" })}
           className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
         />
         <button
@@ -80,34 +82,34 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
           onClick={onRemove}
           className="ml-3 text-sm text-slate-300 hover:text-red-300"
         >
-          Remove
+          {t("advisor.goals.remove", { defaultValue: "Remove" })}
         </button>
       </div>
 
       <TokenEditor
-        label="Require all"
+        label={t("advisor.goals.requireAll.label", { defaultValue: "Require all" })}
         tokens={requireAll}
         onChange={handleTokenChange("requireAll")}
-        placeholder="Add trait and press Enter"
+        placeholder={t("advisor.goals.requireAll.placeholder", { defaultValue: "Add trait and press Enter" })}
       />
 
       <TokenEditor
-        label="Require any"
+        label={t("advisor.goals.requireAny.label", { defaultValue: "Require any" })}
         tokens={requireAny}
         onChange={handleTokenChange("requireAny")}
-        placeholder="Optional traits"
+        placeholder={t("advisor.goals.requireAny.placeholder", { defaultValue: "Optional traits" })}
       />
 
       <TokenEditor
-        label="Avoid"
+        label={t("advisor.goals.avoid.label", { defaultValue: "Avoid" })}
         tokens={avoid}
         onChange={handleTokenChange("avoid")}
-        placeholder="Problem traits"
+        placeholder={t("advisor.goals.avoid.placeholder", { defaultValue: "Problem traits" })}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col text-sm text-gray-200">
-          <span className="mb-1">Recessive state</span>
+          <span className="mb-1">{t("advisor.goals.recessiveState.label", { defaultValue: "Recessive state" })}</span>
           <select
             value={goal.recessiveState ?? ""}
             onChange={(event) =>
@@ -118,15 +120,20 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
             }
             className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
           >
-            <option value="">Any</option>
-            <option value="visual">Visual</option>
-            <option value="het">Het</option>
-            <option value="possibleHet">Possible het</option>
+            <option value="">{t("advisor.goals.recessiveState.any", { defaultValue: "Any" })}</option>
+            <option value="visual">{t("advisor.goals.recessiveState.visual", { defaultValue: "Visual" })}</option>
+            <option value="het">{t("advisor.goals.recessiveState.het", { defaultValue: "Het" })}</option>
+            <option value="possibleHet">{t("advisor.goals.recessiveState.possibleHet", { defaultValue: "Possible het" })}</option>
           </select>
         </label>
 
         <div className="text-sm text-gray-200">
-          <label className="mb-1 block">Min probability ({minProbPercent}%)</label>
+          <label className="mb-1 block">
+            {t("advisor.goals.minProbability", {
+              percent: minProbPercent,
+              defaultValue: "Min probability ({{percent}}%)",
+            })}
+          </label>
           <input
             type="range"
             min={0}
@@ -139,7 +146,12 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
         </div>
 
         <div className="text-sm text-gray-200">
-          <label className="mb-1 block">Weight ({weightValue.toFixed(1)})</label>
+          <label className="mb-1 block">
+            {t("advisor.goals.weight", {
+              value: weightValue.toFixed(1),
+              defaultValue: "Weight ({{value}})",
+            })}
+          </label>
           <input
             type="range"
             min={0}
@@ -153,29 +165,31 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-xs text-slate-300">ID: {goal.id}</div>
+        <div className="text-xs text-slate-300">
+          {t("advisor.goals.idLabel", { id: goal.id, defaultValue: "ID: {{id}}" })}
+        </div>
         <button
           type="button"
           onClick={requestPreset}
           className="rounded bg-slate-700 px-3 py-1 text-sm text-white hover:bg-slate-600"
         >
-          Load Preset
+          {t("advisor.goals.loadPreset", { defaultValue: "Load Preset" })}
         </button>
       </div>
     </div>
   );
 };
 
-const defaultGoal = () => ({
-  id: `goal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-  name: "New goal",
-  requireAll: [],
-  requireAny: [],
-  avoid: [],
-  weight: 1,
-});
-
 export const GoalsPanel = ({ goals, onChange }) => {
+  const { t } = useTranslation();
+  const createDefaultGoal = useCallback(() => ({
+    id: `goal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name: t("advisor.goals.defaultName", { defaultValue: "New goal" }),
+    requireAll: [],
+    requireAny: [],
+    avoid: [],
+    weight: 1,
+  }), [t]);
   const [presetMenu, setPresetMenu] = useState({ openFor: null });
 
   const activeGoals = useMemo(() => goals ?? [], [goals]);
@@ -192,7 +206,7 @@ export const GoalsPanel = ({ goals, onChange }) => {
   };
 
   const handleAddGoal = () => {
-    onChange([...activeGoals, defaultGoal()]);
+    onChange([...activeGoals, createDefaultGoal()]);
   };
 
   const applyPreset = (goalId, presetId) => {
@@ -207,13 +221,13 @@ export const GoalsPanel = ({ goals, onChange }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Goals</h2>
+        <h2 className="text-lg font-semibold text-white">{t("advisor.goals.title", { defaultValue: "Goals" })}</h2>
         <button
           type="button"
           onClick={handleAddGoal}
           className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
         >
-          Add Goal
+          {t("advisor.goals.add", { defaultValue: "Add Goal" })}
         </button>
       </div>
 
@@ -231,13 +245,13 @@ export const GoalsPanel = ({ goals, onChange }) => {
             {presetMenu.openFor === goal.id && (
               <div className="absolute right-4 top-16 z-10 w-56 rounded border border-slate-600 bg-slate-800 shadow-lg">
                 <div className="flex items-center justify-between border-b border-slate-700 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                  Presets
+                  {t("advisor.goals.presets.title", { defaultValue: "Presets" })}
                   <button
                     type="button"
                     onClick={() => setPresetMenu({ openFor: null })}
                     className="text-slate-400 hover:text-slate-200"
                   >
-                    Close
+                    {t("advisor.goals.presets.close", { defaultValue: "Close" })}
                   </button>
                 </div>
                 <ul className="max-h-48 overflow-auto text-sm text-white">
@@ -263,7 +277,7 @@ export const GoalsPanel = ({ goals, onChange }) => {
       </div>
 
       {!activeGoals.length && (
-        <p className="text-sm text-slate-300">No goals yet. Add one to tailor suggestions.</p>
+        <p className="text-sm text-slate-300">{t("advisor.goals.empty", { defaultValue: "No goals yet. Add one to tailor suggestions." })}</p>
       )}
     </div>
   );

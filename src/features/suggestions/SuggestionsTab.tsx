@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import React, { useMemo, useState, useCallback } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { suggestForCollections } from "./api";
 import { inferMorphType, normalizeGeneCandidate, getGeneDisplayGroup } from "../../genetics/geneLibrary";
 
@@ -330,7 +331,7 @@ const matchesGoalGeneTargets = (suggestion, baseGeneKeys: Set<string>) => {
   return false;
 };
 
-const STATUS_LABELS = {
+const STATUS_FALLBACK_LABELS = {
   visual: "Visual",
   het: "Het",
   possibleHet: "Possible het",
@@ -382,12 +383,23 @@ const deriveGeneStatusForParticipant = (participantId, baseGeneKey: string, cont
   return "none";
 };
 
-const describeHetExpectation = (statusA: string, statusB: string) => {
+const getStatusLabel = (status: string, t) => {
+  const key = STATUS_FALLBACK_LABELS[status] ? status : "none";
+  return t(`advisor.plan.status.${key}`, {
+    defaultValue: STATUS_FALLBACK_LABELS[key as keyof typeof STATUS_FALLBACK_LABELS] || STATUS_FALLBACK_LABELS.none,
+  });
+};
+
+const describeHetExpectation = (statusA: string, statusB: string, t) => {
   const pair = [statusA, statusB].sort().join("-");
-  if (pair === "none-visual") return "100% het";
-  if (pair === "het-het") return "≈66% het";
-  if (pair === "het-none") return "≈50% het";
-  return null;
+  const expectations: Record<string, { key: string; fallback: string }> = {
+    "none-visual": { key: "advisor.plan.expectation.none-visual", fallback: "100% het" },
+    "het-het": { key: "advisor.plan.expectation.het-het", fallback: "≈66% het" },
+    "het-none": { key: "advisor.plan.expectation.het-none", fallback: "≈50% het" },
+  };
+  const entry = expectations[pair];
+  if (!entry) return null;
+  return t(entry.key, { defaultValue: entry.fallback });
 };
 
 const firstDisplayLabelForGene = (tokens = [], baseGeneKey: string) => {
@@ -398,7 +410,7 @@ const firstDisplayLabelForGene = (tokens = [], baseGeneKey: string) => {
   return formatMorphName(baseGeneKey);
 };
 
-const buildHetNotesForStep = (step, baseGeneKeys: Set<string>, context) => {
+const buildHetNotesForStep = (step, baseGeneKeys: Set<string>, context, t) => {
   if (!step?.focusTraits?.length || !baseGeneKeys?.size) return [];
   const targetKeys = new Set<string>();
   (step.focusTraits || []).forEach((token) => {
@@ -412,12 +424,20 @@ const buildHetNotesForStep = (step, baseGeneKeys: Set<string>, context) => {
   targetKeys.forEach((geneKey) => {
     const statusA = deriveGeneStatusForParticipant(step.maleId, geneKey, context);
     const statusB = deriveGeneStatusForParticipant(step.femaleId, geneKey, context);
-    const expectation = describeHetExpectation(statusA, statusB);
+    const expectation = describeHetExpectation(statusA, statusB, t);
     if (!expectation) return;
     const geneLabel = firstDisplayLabelForGene(step.focusTraits, geneKey);
-    const maleLabel = STATUS_LABELS[statusA] || STATUS_LABELS.none;
-    const femaleLabel = STATUS_LABELS[statusB] || STATUS_LABELS.none;
-    notes.push(`${geneLabel}: ${maleLabel} × ${femaleLabel} → ${expectation}`);
+    const maleLabel = getStatusLabel(statusA, t);
+    const femaleLabel = getStatusLabel(statusB, t);
+    notes.push(
+      t("advisor.plan.hetNote", {
+        gene: geneLabel,
+        maleStatus: maleLabel,
+        femaleStatus,
+        expectation,
+        defaultValue: `${geneLabel}: ${maleLabel} × ${femaleLabel} → ${expectation}`,
+      })
+    );
   });
 
   return notes;
@@ -478,13 +498,16 @@ export const SuggestionsTab = ({
   females = [],
   initialGoals = [],
   initialWeights = DEFAULT_WEIGHTS,
+  onExportPairingsByMale,
 }) => {
+  const { t } = useTranslation();
   const initialPrimaryGoal = initialGoals[0];
   const initialGoalName = initialPrimaryGoal?.name ?? "";
   const initialGoalTraits = (initialPrimaryGoal?.requireAll ?? []).join(", ");
   const initialGoalInputValue = [initialGoalName, initialGoalTraits]
     .filter(Boolean)
     .join(initialGoalName && initialGoalTraits ? ": " : "");
+  const defaultGoalName = t("advisor.goal.defaultName", { defaultValue: "Custom goal" });
 
   const breederMales = useMemo(() => filterBreeders(males), [males]);
   const breederFemales = useMemo(() => filterBreeders(females), [females]);
@@ -520,19 +543,23 @@ export const SuggestionsTab = ({
 
   const getDisplayNameForAnimal = useCallback(
     (id: string) => {
-      if (!id) return "Unknown";
+      if (!id) return t("advisor.labels.unknownAnimal", { defaultValue: "Unknown" });
       const record = maleMap.get(id) || femaleMap.get(id);
       if (record?.name) return record.name;
       if (record?.displayName) return record.displayName;
       if (record?.display_name) return record.display_name;
       if (isHoldbackId(id)) {
         const [, suffix] = id.split("-holdback-");
-        const sexLabel = suffix === "m" ? "Holdback Male" : suffix === "f" ? "Holdback Female" : "Holdback";
+        const sexLabel = suffix === "m"
+          ? t("advisor.labels.holdbackMale", { defaultValue: "Holdback Male" })
+          : suffix === "f"
+            ? t("advisor.labels.holdbackFemale", { defaultValue: "Holdback Female" })
+            : t("advisor.labels.holdback", { defaultValue: "Holdback" });
         return sexLabel;
       }
       return id;
     },
-    [maleMap, femaleMap]
+    [maleMap, femaleMap, t]
   );
 
   const sortedSuggestions = useMemo(
@@ -565,7 +592,7 @@ export const SuggestionsTab = ({
         if (!currentGoals.length) {
           const baseGoal = defaultGoals()[0] ?? {
             id: `goal-${Date.now().toString(36)}`,
-            name: "Custom goal",
+            name: defaultGoalName,
             requireAll: [],
             weight: 1,
           };
@@ -575,7 +602,7 @@ export const SuggestionsTab = ({
         return [updater(primary), ...rest];
       });
     },
-    []
+    [defaultGoalName]
   );
 
   const parseGoalTraits = useCallback((raw: string) => {
@@ -628,11 +655,11 @@ export const SuggestionsTab = ({
       const { name, traits } = parseGoalInputValue(value);
       updatePrimaryGoal((current) => ({
         ...current,
-        name: name || current?.name || "Custom goal",
+        name: name || current?.name || defaultGoalName,
         requireAll: traits,
       }));
     },
-    [parseGoalInputValue, updatePrimaryGoal]
+    [defaultGoalName, parseGoalInputValue, updatePrimaryGoal]
   );
 
   const handleGoalInputChange = (event) => {
@@ -655,12 +682,12 @@ export const SuggestionsTab = ({
 
   const runSuggestions = async () => {
     if (!advisorMales.length || !advisorFemales.length) {
-      setError("Add animals to the Breeders group to see advisor recommendations.");
+      setError(t("advisor.errors.noBreeders", { defaultValue: "Add animals to the Breeders group to see advisor recommendations." }));
       return;
     }
     const activeGoals = goals.filter((goal) => (goal.requireAll?.length ?? 0) > 0 || (goal.requireAny?.length ?? 0) > 0);
     if (!activeGoals.length) {
-      setError("Add goal traits before running the advisor.");
+      setError(t("advisor.errors.noGoals", { defaultValue: "Add goal traits before running the advisor." }));
       return;
     }
 
@@ -675,7 +702,7 @@ export const SuggestionsTab = ({
         .filter((entry) => (entry.goalProb ?? 0) > 0);
       setSuggestions(filtered);
     } catch (err) {
-      setError(err?.message || "Failed to generate suggestions");
+      setError(err?.message || t("advisor.errors.failure", { defaultValue: "Failed to generate suggestions." }));
     } finally {
       setLoading(false);
     }
@@ -690,23 +717,34 @@ export const SuggestionsTab = ({
   };
 
   const advisorSummary = () => {
-    if (loading) return "Crunching punnett squares…";
+    if (loading) return t("advisor.summary.loading", { defaultValue: "Crunching punnett squares…" });
     if (error) return error;
-    if (!suggestions.length) return "Run the advisor to discover promising pairings.";
+    if (!suggestions.length) return t("advisor.summary.ready", { defaultValue: "Run the advisor to discover promising pairings." });
     if (!confidentSuggestions.length && supportingSuggestions.length)
-      return `No pairs meet the high-confidence bar yet, but here are ${supportingSuggestions.length} options to review.`;
+      return t("advisor.summary.supportingOnly", {
+        count: supportingSuggestions.length,
+        defaultValue: "No pairs meet the high-confidence bar yet, but here are {{count}} options to review.",
+      });
     if (!confidentSuggestions.length)
-      return "No pairings crossed the confidence bar. Try adjusting your collections or goals.";
-    return `${confidentSuggestions.length} pairing${
-      confidentSuggestions.length === 1 ? "" : "s"
-    } meet the ≥ ${formatPercent(HIGH_CONFIDENCE_THRESHOLD)} goal confidence target.`;
+      return t("advisor.summary.noConfidence", {
+        defaultValue: "No pairings crossed the confidence bar. Try adjusting your collections or goals.",
+      });
+    return t("advisor.summary.confidentCount", {
+      count: confidentSuggestions.length,
+      threshold: formatPercent(HIGH_CONFIDENCE_THRESHOLD),
+      defaultValue: "{{count}} pairing(s) meet the ≥ {{threshold}} goal confidence target.",
+    });
   };
 
   const topOutcomeLabel = (suggestion) => {
     const outcome = suggestion.outcomes?.[0];
-    if (!outcome) return "No projection available.";
-    const genotype = outcome.genotype?.join(" ") || "Unknown morph";
-    return `${genotype} (${formatPercent(outcome.prob, 0)} appearance chance)`;
+    if (!outcome) return t("advisor.outcomes.none", { defaultValue: "No projection available." });
+    const genotype = outcome.genotype?.join(" ") || t("advisor.outcomes.unknownMorph", { defaultValue: "Unknown morph" });
+    return t("advisor.outcomes.probability", {
+      genotype,
+      chance: formatPercent(outcome.prob, 0),
+      defaultValue: "{{genotype}} ({{chance}} appearance chance)",
+    });
   };
 
   const renderSuggestionCard = (suggestion, confidenceTier: "high" | "supporting") => {
@@ -729,28 +767,28 @@ export const SuggestionsTab = ({
     const geneRows: { label: string; tokens: string[] }[] = [];
 
     if (goalTokenGroups.visuals.length) {
-      geneRows.push({ label: "Goal Visuals", tokens: goalTokenGroups.visuals });
+      geneRows.push({ label: t("advisor.genes.goalVisuals", { defaultValue: "Goal Visuals" }), tokens: goalTokenGroups.visuals });
     }
     if (goalTokenGroups.hets.length) {
-      geneRows.push({ label: "Goal Hets", tokens: goalTokenGroups.hets });
+      geneRows.push({ label: t("advisor.genes.goalHets", { defaultValue: "Goal Hets" }), tokens: goalTokenGroups.hets });
     }
     if (outcomeTokenGroups.visuals.length) {
-      geneRows.push({ label: "Projected Visuals", tokens: outcomeTokenGroups.visuals });
+      geneRows.push({ label: t("advisor.genes.projectedVisuals", { defaultValue: "Projected Visuals" }), tokens: outcomeTokenGroups.visuals });
     }
     if (outcomeTokenGroups.hets.length) {
-      geneRows.push({ label: "Projected Hets", tokens: outcomeTokenGroups.hets });
+      geneRows.push({ label: t("advisor.genes.projectedHets", { defaultValue: "Projected Hets" }), tokens: outcomeTokenGroups.hets });
     }
     if (holdbackTokenGroups.visuals.length) {
-      geneRows.push({ label: "Holdback Visuals", tokens: holdbackTokenGroups.visuals });
+      geneRows.push({ label: t("advisor.genes.holdbackVisuals", { defaultValue: "Holdback Visuals" }), tokens: holdbackTokenGroups.visuals });
     }
     if (holdbackTokenGroups.hets.length) {
-      geneRows.push({ label: "Holdback Hets", tokens: holdbackTokenGroups.hets });
+      geneRows.push({ label: t("advisor.genes.holdbackHets", { defaultValue: "Holdback Hets" }), tokens: holdbackTokenGroups.hets });
     }
     if (nextGenFocusGroups.visuals.length) {
-      geneRows.push({ label: "Next-Gen Visuals", tokens: nextGenFocusGroups.visuals });
+      geneRows.push({ label: t("advisor.genes.nextVisuals", { defaultValue: "Next-Gen Visuals" }), tokens: nextGenFocusGroups.visuals });
     }
     if (nextGenFocusGroups.hets.length) {
-      geneRows.push({ label: "Next-Gen Hets", tokens: nextGenFocusGroups.hets });
+      geneRows.push({ label: t("advisor.genes.nextHets", { defaultValue: "Next-Gen Hets" }), tokens: nextGenFocusGroups.hets });
     }
 
     const demandSignals = suggestion.demand?.signals?.slice(0, 2) ?? [];
@@ -774,36 +812,55 @@ export const SuggestionsTab = ({
             </div>
           )}
           <div className="text-sm text-neutral-600">
-            Goal success chance: {" "}
+            {t("advisor.cards.goalSuccessLabel", { defaultValue: "Goal success chance:" })}{" "}
             <span className={`font-semibold ${highConfidence ? "text-emerald-600" : "text-amber-600"}`}>
               {formatPercent(goalProb, 0)}
             </span>
-            {!highConfidence && <span className="ml-1 text-xs text-neutral-500">(below confidence target)</span>}
+            {!highConfidence && (
+              <span className="ml-1 text-xs text-neutral-500">
+                {t("advisor.cards.belowTarget", { defaultValue: "(below confidence target)" })}
+              </span>
+            )}
           </div>
           {!!demandSignals.length && (
             <div className="text-sm text-neutral-600">
-              Demand signals: {demandSignals.join(" • ")}
+              {t("advisor.cards.demandSignals", { defaultValue: "Demand signals:" })} {demandSignals.join(" • ")}
             </div>
           )}
           {priceBandLabel && (
-            <div className="text-sm text-neutral-600">{priceBandLabel}</div>
+            <div className="text-sm text-neutral-600">
+              {t("advisor.cards.priceRange", {
+                range: priceBandLabel,
+                defaultValue: "Price guidance: {{range}}",
+              })}
+            </div>
           )}
           {suggestion.rationale && (
             <div className="rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700">{suggestion.rationale}</div>
           )}
           {!!suggestion.sources?.length && (
             <div className="text-xs text-neutral-500">
-              Sources: {suggestion.sources.slice(0, 3).map((source) => source.title || source.url).join(", ")}
+              {t("advisor.cards.sources", { defaultValue: "Sources:" })}{" "}
+              {suggestion.sources.slice(0, 3).map((source) => source.title || source.url).join(", ")}
             </div>
           )}
           {plan && (
             <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm text-sky-900">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                  Multi-generation plan ({plan.strategy === "multi" ? "2-step" : "direct"})
+                  {t("advisor.plan.title", {
+                    strategy:
+                      plan.strategy === "multi"
+                        ? t("advisor.plan.strategy.multi", { defaultValue: "2-step" })
+                        : t("advisor.plan.strategy.direct", { defaultValue: "direct" }),
+                    defaultValue: "Multi-generation plan ({{strategy}})",
+                  })}
                 </div>
                 <div className="text-xs font-semibold text-emerald-700">
-                  Combined ≈ {formatPercent(plan.cumulativeProb ?? 0, 1)}
+                  {t("advisor.plan.combinedProbability", {
+                    value: formatPercent(plan.cumulativeProb ?? 0, 1),
+                    defaultValue: "Combined ≈ {{value}}",
+                  })}
                 </div>
               </div>
               <div className="mt-3 space-y-3">
@@ -811,27 +868,40 @@ export const SuggestionsTab = ({
                   const maleName = getDisplayNameForAnimal(step.maleId);
                   const femaleName = getDisplayNameForAnimal(step.femaleId);
                   const context = { advisorAnimals: advisorAnimalMap, plan };
-                  const hetNotes = buildHetNotesForStep(step, goalGeneBaseSet, context);
+                  const hetNotes = buildHetNotesForStep(step, goalGeneBaseSet, context, t);
                   const stepGroups = splitGeneTokens(step?.focusTraits || [], goalGeneBaseSet);
                   const stepRows: { label: string; tokens: string[] }[] = [];
                   if (stepGroups.visuals.length) {
-                    stepRows.push({ label: "Focus Visuals", tokens: stepGroups.visuals });
+                    stepRows.push({ label: t("advisor.genes.focusVisuals", { defaultValue: "Focus Visuals" }), tokens: stepGroups.visuals });
                   }
                   if (stepGroups.hets.length) {
-                    stepRows.push({ label: "Focus Hets", tokens: stepGroups.hets });
+                    stepRows.push({ label: t("advisor.genes.focusHets", { defaultValue: "Focus Hets" }), tokens: stepGroups.hets });
                   }
                   return (
                     <div key={`${key}-plan-${step.generation}`} className="rounded-lg border border-sky-200 bg-white p-3 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div className="text-xs font-semibold uppercase tracking-wide text-sky-600">
-                          Generation {step.generation}
+                          {t("advisor.plan.generationLabel", {
+                            generation: step.generation,
+                            defaultValue: "Generation {{generation}}",
+                          })}
                         </div>
                         <div className="flex items-center gap-3 text-[11px] font-medium text-sky-700">
                           {step.prerequisiteProb != null && (
-                            <span>Prereq ≈ {formatPercent(step.prerequisiteProb, 1)}</span>
+                            <span>
+                              {t("advisor.plan.prereqProbability", {
+                                value: formatPercent(step.prerequisiteProb, 1),
+                                defaultValue: "Prereq ≈ {{value}}",
+                              })}
+                            </span>
                           )}
                           {step.successProb != null && (
-                            <span>Goal ≈ {formatPercent(step.successProb, 1)}</span>
+                            <span>
+                              {t("advisor.plan.goalProbability", {
+                                value: formatPercent(step.successProb, 1),
+                                defaultValue: "Goal ≈ {{value}}",
+                              })}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -864,11 +934,21 @@ export const SuggestionsTab = ({
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-xs text-sky-700">
                 {plan.holdbackProb != null && (
-                  <span>Holdback ≈ {formatPercent(plan.holdbackProb, 1)}</span>
+                  <span>
+                    {t("advisor.plan.holdbackProbability", {
+                      value: formatPercent(plan.holdbackProb, 1),
+                      defaultValue: "Holdback ≈ {{value}}",
+                    })}
+                  </span>
                 )}
                 {plan.holdbackTraits?.length ? (
                   <span>
-                    Holdback genes: {[...holdbackTokenGroups.visuals, ...holdbackTokenGroups.hets].join(", ") || plan.holdbackTraits.join(", ")}
+                    {t("advisor.plan.holdbackGenes", {
+                      genes:
+                        [...holdbackTokenGroups.visuals, ...holdbackTokenGroups.hets].join(", ") ||
+                        plan.holdbackTraits.join(", "),
+                      defaultValue: "Holdback genes: {{genes}}",
+                    })}
                   </span>
                 ) : null}
               </div>
@@ -884,36 +964,39 @@ export const SuggestionsTab = ({
       <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">Breeding Advisor</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">{t("advisor.title", { defaultValue: "Breeding Advisor" })}</h2>
             <p className="text-sm text-neutral-600">
-              We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that
-              have a very high chance of producing your selected morph goal.
+              <Trans
+                i18nKey="advisor.description"
+                components={{ strong: <strong /> }}
+                defaults="We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal."
+              />
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2 flex flex-col gap-1 text-sm text-neutral-700">
-              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Goal (Name and Traits)</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("advisor.goal.label", { defaultValue: "Goal (Name and Traits)" })}</span>
               <input
                 value={goalInput}
                 onChange={handleGoalInputChange}
-                placeholder="Visual Clown: Clown, het Desert Ghost"
+                placeholder={t("advisor.goal.placeholder", { defaultValue: "Visual Clown: Clown, het Desert Ghost" })}
                 className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
               />
-              <span className="text-xs text-neutral-500">Format tip: "Goal Name: trait one, trait two". If you only list traits, we’ll build a generic goal.</span>
+              <span className="text-xs text-neutral-500">{t("advisor.goal.tip", { defaultValue: 'Format tip: "Goal Name: trait one, trait two". If you only list traits, we’ll build a generic goal.' })}</span>
             </label>
           </div>
 
           <div className="flex flex-col gap-2 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
-            <div className="font-medium">Status</div>
+            <div className="font-medium">{t("advisor.status.heading", { defaultValue: "Status" })}</div>
             <div>{advisorSummary()}</div>
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
-            <span>{`${breederMales.length} breeder male${breederMales.length === 1 ? "" : "s"}`}</span>
+            <span>{t("advisor.stats.males", { count: breederMales.length, defaultValue: "{{count}} breeder male" })}</span>
             <span>•</span>
-            <span>{`${breederFemales.length} breeder female${breederFemales.length === 1 ? "" : "s"}`}</span>
+            <span>{t("advisor.stats.females", { count: breederFemales.length, defaultValue: "{{count}} breeder female" })}</span>
             <span>•</span>
-            <span>Confidence bar ≥ {formatPercent(HIGH_CONFIDENCE_THRESHOLD)}</span>
+            <span>{t("advisor.stats.confidenceBar", { threshold: formatPercent(HIGH_CONFIDENCE_THRESHOLD), defaultValue: "Confidence bar ≥ {{threshold}}" })}</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -923,7 +1006,7 @@ export const SuggestionsTab = ({
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800"
             >
-              {loading ? "Generating..." : "Run Advisor"}
+              {loading ? t("advisor.buttons.generating", { defaultValue: "Generating..." }) : t("advisor.buttons.run", { defaultValue: "Run Advisor" })}
             </button>
             <button
               type="button"
@@ -931,8 +1014,18 @@ export const SuggestionsTab = ({
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Reset Advisor
+              {t("advisor.buttons.reset", { defaultValue: "Reset Advisor" })}
             </button>
+            {typeof onExportPairingsByMale === "function" && (
+              <button
+                type="button"
+                onClick={onExportPairingsByMale}
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-lg border border-sky-400 px-4 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t("advisor.buttons.exportPairingsByMale", { defaultValue: "Export by pairing (Male → Females)" })}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -942,14 +1035,20 @@ export const SuggestionsTab = ({
 
         {supportingSuggestions.length > 0 && (
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-neutral-700">Additional pairings worth reviewing</div>
+            <div className="text-sm font-semibold text-neutral-700">
+              {t("advisor.cards.additionalHeading", { defaultValue: "Additional pairings worth reviewing" })}
+            </div>
             {supportingSuggestions.map((suggestion) => renderSuggestionCard(suggestion, "supporting"))}
           </div>
         )}
 
         {!suggestions.length && !loading && !error && (
           <div className="rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
-            Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings.
+            <Trans
+              i18nKey="advisor.cards.readyCallout"
+              components={{ strong: <strong /> }}
+              defaults="Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
+            />
           </div>
         )}
       </div>
