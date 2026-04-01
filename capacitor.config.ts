@@ -1,4 +1,8 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+type CapacitorConfig = {
+  appId: string;
+  appName: string;
+  webDir: string;
+};
 
 const config: CapacitorConfig = {
   appId: 'com.breedingplanner.app',

@@ -2,8 +2,25 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { suggestForCollections } from "./api";
+import { buildBreedingFlowchartPlan, filterAnimalsForGoals } from "./api";
 import { inferMorphType, normalizeGeneCandidate, getGeneDisplayGroup } from "../../genetics/geneLibrary";
+import { extractTraitsFromMorphText } from "../../genetics/geneDatabase";
+import {
+  runBreedingAdvisor,
+  isAnimalAvailableForBreeding,
+  isAnimalMatureForBreeding,
+} from "../breedingAdvisor/advisorEngine";
+import {
+  openAdvisorProgress,
+  closeAdvisorProgress,
+  resetAdvisorProgress,
+  startAdvisorRun,
+  finishAdvisorRun,
+  handleAdvisorProgress,
+  useAdvisorProgress,
+} from "../breedingAdvisor/advisorProgressStore";
+import BreedingAdvisorProgressModal from "../../components/breeding/BreedingAdvisorProgressModal";
+import BreedingPlanFlowchartCard from "../../components/breeding/BreedingPlanFlowchartCard";
 
 const normalizeString = (value: unknown): string => {
   if (value == null) return "";
@@ -154,10 +171,11 @@ const partitionHetTokens = (hetsValue: unknown, possibleValue: unknown) => {
   return { certain, possible };
 };
 
-const buildAdvisorAnimal = (snake: any) => {
+const buildAdvisorAnimal = (snake: any, options: { includePossibleHets?: boolean } = {}) => {
   if (!snake || !snake.id) return null;
   const sex = normalizeSexValue(snake.sex);
   if (!sex) return null;
+  const { includePossibleHets = true } = options;
 
   const morphs = buildMorphObjects(snake.morphs);
   const { certain: hets, possible: possibleHets } = partitionHetTokens(snake.hets, snake.possibleHets);
@@ -167,12 +185,16 @@ const buildAdvisorAnimal = (snake: any) => {
     sex,
     morphs,
     hets,
-    possibleHets: possibleHets.length ? possibleHets : undefined,
+    possibleHets: includePossibleHets && possibleHets.length ? possibleHets : undefined,
   };
 };
 
 const REQUIRED_GROUP = "breeders";
 const HIGH_CONFIDENCE_THRESHOLD = 0.6;
+const DEFAULT_FLOWCHART_THRESHOLD_PERCENT = 70;
+const DEFAULT_FLOWCHART_GENERATION_LIMIT = 5;
+const FLOWCHART_THRESHOLD_RANGE = { min: 1, max: 100 };
+const FLOWCHART_GENERATION_RANGE = { min: 1, max: 8 };
 
 const DEFAULT_WEIGHTS = {
   wDemand: 1,
@@ -183,6 +205,12 @@ const DEFAULT_WEIGHTS = {
 };
 
 const formatPercent = (value, digits = 0) => `${(value * 100).toFixed(digits)}%`;
+
+const clampNumber = (value, min, max, fallback) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+};
 
 const formatPriceBand = (band) => {
   if (!band || band.length !== 2) return null;
@@ -433,7 +461,7 @@ const buildHetNotesForStep = (step, baseGeneKeys: Set<string>, context, t) => {
       t("advisor.plan.hetNote", {
         gene: geneLabel,
         maleStatus: maleLabel,
-        femaleStatus,
+        femaleStatus: femaleLabel,
         expectation,
         defaultValue: `${geneLabel}: ${maleLabel} × ${femaleLabel} → ${expectation}`,
       })
@@ -486,10 +514,23 @@ const extractGroups = (raw: unknown): string[] => {
   return [];
 };
 
-const filterBreeders = (animals = []) =>
-  animals.filter((animal) =>
-    extractGroups(animal?.groups).some((group) => group.toLowerCase() === REQUIRED_GROUP)
-  );
+const filterBreeders = (
+  animals = [],
+  {
+    requireAvailableForBreeding = true,
+    requireMatureForBreeding = true,
+  }: {
+    requireAvailableForBreeding?: boolean;
+    requireMatureForBreeding?: boolean;
+  } = {}
+) =>
+  animals.filter((animal) => {
+    const inBreedersGroup = extractGroups(animal?.groups).some((group) => group.toLowerCase() === REQUIRED_GROUP);
+    if (!inBreedersGroup) return false;
+    if (requireAvailableForBreeding && !isAnimalAvailableForBreeding(animal)) return false;
+    if (requireMatureForBreeding && !isAnimalMatureForBreeding(animal)) return false;
+    return true;
+  });
 
 const keyForSuggestion = (suggestion) => `${suggestion.maleId}::${suggestion.femaleId}`;
 
@@ -498,26 +539,38 @@ export const SuggestionsTab = ({
   females = [],
   initialGoals = [],
   initialWeights = DEFAULT_WEIGHTS,
+  includePossibleHets = true,
+  requireAvailableForBreeding = true,
+  requireMatureForBreeding = true,
+  onAcceptSuggestion,
+  onPlanSuggestion,
+  onIgnoreSuggestion,
   onExportPairingsByMale,
 }) => {
   const { t } = useTranslation();
+  const defaultGoalName = t("advisor.goal.defaultName", { defaultValue: "Custom goal" });
   const initialPrimaryGoal = initialGoals[0];
   const initialGoalName = initialPrimaryGoal?.name ?? "";
-  const initialGoalTraits = (initialPrimaryGoal?.requireAll ?? []).join(", ");
-  const initialGoalInputValue = [initialGoalName, initialGoalTraits]
-    .filter(Boolean)
-    .join(initialGoalName && initialGoalTraits ? ": " : "");
-  const defaultGoalName = t("advisor.goal.defaultName", { defaultValue: "Custom goal" });
+  const initialGoalTraits = uniqueGeneTokens(initialPrimaryGoal?.requireAll ?? []);
+  const initialGoalInputValue = normalizeString(
+    [initialGoalName && initialGoalName !== defaultGoalName ? initialGoalName : "", ...initialGoalTraits].filter(Boolean).join(" ")
+  );
 
-  const breederMales = useMemo(() => filterBreeders(males), [males]);
-  const breederFemales = useMemo(() => filterBreeders(females), [females]);
+  const breederMales = useMemo(
+    () => filterBreeders(males, { requireAvailableForBreeding, requireMatureForBreeding }),
+    [males, requireAvailableForBreeding, requireMatureForBreeding]
+  );
+  const breederFemales = useMemo(
+    () => filterBreeders(females, { requireAvailableForBreeding, requireMatureForBreeding }),
+    [females, requireAvailableForBreeding, requireMatureForBreeding]
+  );
   const advisorMales = useMemo(
-    () => breederMales.map(buildAdvisorAnimal).filter(Boolean),
-    [breederMales]
+    () => breederMales.map((animal) => buildAdvisorAnimal(animal, { includePossibleHets })).filter(Boolean),
+    [breederMales, includePossibleHets]
   );
   const advisorFemales = useMemo(
-    () => breederFemales.map(buildAdvisorAnimal).filter(Boolean),
-    [breederFemales]
+    () => breederFemales.map((animal) => buildAdvisorAnimal(animal, { includePossibleHets })).filter(Boolean),
+    [breederFemales, includePossibleHets]
   );
 
   const [goals, setGoals] = useState(initialGoals.length ? initialGoals : defaultGoals());
@@ -527,6 +580,20 @@ export const SuggestionsTab = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeRunGoals, setActiveRunGoals] = useState(initialGoals.length ? initialGoals : []);
+  const [filteredMaleCount, setFilteredMaleCount] = useState<number | null>(null);
+  const [filteredFemaleCount, setFilteredFemaleCount] = useState<number | null>(null);
+  const [ignoredSuggestions, setIgnoredSuggestions] = useState<Record<string, boolean>>({});
+  const [flowchartState, setFlowchartState] = useState({
+    isOpen: false,
+    loading: false,
+    error: "",
+    plan: null,
+    suggestion: null,
+  });
+  const [plannerSettings, setPlannerSettings] = useState({
+    thresholdPercent: DEFAULT_FLOWCHART_THRESHOLD_PERCENT,
+    generationLimit: DEFAULT_FLOWCHART_GENERATION_LIMIT,
+  });
 
   const maleMap = useMemo(() => buildAnimalMap(breederMales), [breederMales]);
   const femaleMap = useMemo(() => buildAnimalMap(breederFemales), [breederFemales]);
@@ -540,6 +607,14 @@ export const SuggestionsTab = ({
     });
     return map;
   }, [advisorMales, advisorFemales]);
+  const activeGoalAdvisorMales = useMemo(
+    () => filterAnimalsForGoals(advisorMales, activeRunGoals),
+    [advisorMales, activeRunGoals]
+  );
+  const activeGoalAdvisorFemales = useMemo(
+    () => filterAnimalsForGoals(advisorFemales, activeRunGoals),
+    [advisorFemales, activeRunGoals]
+  );
 
   const getDisplayNameForAnimal = useCallback(
     (id: string) => {
@@ -562,12 +637,113 @@ export const SuggestionsTab = ({
     [maleMap, femaleMap, t]
   );
 
+  const getSuggestionPairTitle = useCallback(
+    (suggestion) => `${getDisplayNameForAnimal(suggestion.maleId)} × ${getDisplayNameForAnimal(suggestion.femaleId)}`,
+    [getDisplayNameForAnimal]
+  );
+
+  const closeFlowchartCard = useCallback(() => {
+    setFlowchartState((current) => ({ ...current, isOpen: false, loading: false, error: "" }));
+  }, []);
+
+  const handleThresholdChange = useCallback((value) => {
+    setPlannerSettings((current) => ({
+      ...current,
+      thresholdPercent: clampNumber(
+        value,
+        FLOWCHART_THRESHOLD_RANGE.min,
+        FLOWCHART_THRESHOLD_RANGE.max,
+        current.thresholdPercent
+      ),
+    }));
+  }, []);
+
+  const handleGenerationLimitChange = useCallback((value) => {
+    setPlannerSettings((current) => ({
+      ...current,
+      generationLimit: clampNumber(
+        value,
+        FLOWCHART_GENERATION_RANGE.min,
+        FLOWCHART_GENERATION_RANGE.max,
+        current.generationLimit
+      ),
+    }));
+  }, []);
+
+  const openFlowchartCard = useCallback(
+    async (suggestion) => {
+      const planningGoals = activeRunGoals.length ? activeRunGoals : goals;
+      setFlowchartState({
+        isOpen: true,
+        loading: true,
+        error: "",
+        plan: null,
+        suggestion,
+      });
+
+      try {
+        const plan = buildBreedingFlowchartPlan(suggestion, planningGoals, {
+          allMales: activeGoalAdvisorMales.length ? activeGoalAdvisorMales : advisorMales,
+          allFemales: activeGoalAdvisorFemales.length ? activeGoalAdvisorFemales : advisorFemales,
+          threshold: plannerSettings.thresholdPercent / 100,
+          generationLimit: plannerSettings.generationLimit,
+        });
+
+        if (!plan) {
+          setFlowchartState({
+            isOpen: true,
+            loading: false,
+            error: t("advisor.plan.flowchartUnavailable", {
+              defaultValue: "No breeding flowchart could be generated for this suggestion.",
+            }),
+            plan: null,
+            suggestion,
+          });
+          return;
+        }
+
+        setFlowchartState({
+          isOpen: true,
+          loading: false,
+          error: "",
+          plan,
+          suggestion,
+        });
+      } catch (err) {
+        setFlowchartState({
+          isOpen: true,
+          loading: false,
+          error: err?.message || t("advisor.errors.failure", { defaultValue: "Failed to generate suggestions." }),
+          plan: null,
+          suggestion,
+        });
+      }
+    },
+    [
+      activeGoalAdvisorFemales,
+      activeGoalAdvisorMales,
+      activeRunGoals,
+      advisorFemales,
+      advisorMales,
+      goals,
+      plannerSettings.generationLimit,
+      plannerSettings.thresholdPercent,
+      t,
+    ]
+  );
+
+  const refreshFlowchartCard = useCallback(() => {
+    if (!flowchartState.suggestion) return;
+    openFlowchartCard(flowchartState.suggestion);
+  }, [flowchartState.suggestion, openFlowchartCard]);
+
   const sortedSuggestions = useMemo(
     () =>
       suggestions
+        .filter((entry) => !ignoredSuggestions[keyForSuggestion(entry)])
         .slice()
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    [suggestions]
+    [suggestions, ignoredSuggestions]
   );
 
   const confidentSuggestions = useMemo(
@@ -606,10 +782,7 @@ export const SuggestionsTab = ({
   );
 
   const parseGoalTraits = useCallback((raw: string) => {
-    return raw
-      .split(/[,\n]/)
-      .map((part) => part.trim())
-      .filter(Boolean);
+    return uniqueGeneTokens(extractTraitsFromMorphText(raw));
   }, []);
 
   const parseGoalInputValue = useCallback(
@@ -619,32 +792,9 @@ export const SuggestionsTab = ({
         return { name: "", traits: [] };
       }
 
-      if (trimmed.includes(":")) {
-        const [namePart, traitPart = ""] = trimmed.split(/:/, 2);
-        return {
-          name: namePart.trim(),
-          traits: parseGoalTraits(traitPart),
-        };
-      }
-
-      if (trimmed.includes(" - ")) {
-        const [namePart, traitPart = ""] = trimmed.split(" - ", 2);
-        return {
-          name: namePart.trim(),
-          traits: parseGoalTraits(traitPart),
-        };
-      }
-
-      if (trimmed.includes(",")) {
-        return {
-          name: "",
-          traits: parseGoalTraits(trimmed),
-        };
-      }
-
       return {
         name: trimmed,
-        traits: [],
+        traits: parseGoalTraits(trimmed),
       };
     },
     [parseGoalTraits]
@@ -655,7 +805,7 @@ export const SuggestionsTab = ({
       const { name, traits } = parseGoalInputValue(value);
       updatePrimaryGoal((current) => ({
         ...current,
-        name: name || current?.name || defaultGoalName,
+        name: name || defaultGoalName,
         requireAll: traits,
       }));
     },
@@ -678,7 +828,17 @@ export const SuggestionsTab = ({
     setSuggestions([]);
     setError("");
     setLoading(false);
+    setFilteredMaleCount(null);
+    setFilteredFemaleCount(null);
+    setIgnoredSuggestions({});
+    setPlannerSettings({
+      thresholdPercent: DEFAULT_FLOWCHART_THRESHOLD_PERCENT,
+      generationLimit: DEFAULT_FLOWCHART_GENERATION_LIMIT,
+    });
+    setFlowchartState({ isOpen: false, loading: false, error: "", plan: null, suggestion: null });
   };
+
+  const advisorProgress = useAdvisorProgress();
 
   const runSuggestions = async () => {
     if (!advisorMales.length || !advisorFemales.length) {
@@ -691,19 +851,54 @@ export const SuggestionsTab = ({
       return;
     }
 
+    // ── Pre-filter snakes to only those carrying a goal-relevant gene ─────────
+    const goalMales = filterAnimalsForGoals(advisorMales, activeGoals);
+    const goalFemales = filterAnimalsForGoals(advisorFemales, activeGoals);
+
+    if (!goalMales.length || !goalFemales.length) {
+      setError(
+        t("advisor.errors.noRelevantAnimals", {
+          defaultValue:
+            "No breeder animals carry genes related to this goal. Add animals with the target genetics to the Breeders group.",
+        })
+      );
+      return;
+    }
+
+    setFilteredMaleCount(goalMales.length);
+    setFilteredFemaleCount(goalFemales.length);
     setActiveRunGoals(activeGoals);
+    setIgnoredSuggestions({});
     setLoading(true);
     setError("");
+
+    // ── Open progress panel and begin the run ─────────────────────────────
+    resetAdvisorProgress();
+    startAdvisorRun();
+    openAdvisorProgress();
+
     try {
       const goalInfo = buildGoalGeneInfo(activeGoals);
-      const result = await suggestForCollections(advisorMales, advisorFemales, activeGoals, weights);
+      const result = await runBreedingAdvisor(activeGoals, {
+        males: goalMales,
+        females: goalFemales,
+        weights,
+        onProgress: handleAdvisorProgress,
+      });
       const filtered = result
         .filter((entry) => matchesGoalGeneTargets(entry, goalInfo.baseGeneKeys))
         .filter((entry) => (entry.goalProb ?? 0) > 0);
       setSuggestions(filtered);
     } catch (err) {
+      handleAdvisorProgress({
+        type: "stage-failed",
+        stepId: "advisor-run",
+        label: "Advisor run failed",
+        details: err?.message || t("advisor.errors.failure", { defaultValue: "Failed to generate suggestions." }),
+      });
       setError(err?.message || t("advisor.errors.failure", { defaultValue: "Failed to generate suggestions." }));
     } finally {
+      finishAdvisorRun();
       setLoading(false);
     }
   };
@@ -844,6 +1039,39 @@ export const SuggestionsTab = ({
               {suggestion.sources.slice(0, 3).map((source) => source.title || source.url).join(", ")}
             </div>
           )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+              onClick={() => onAcceptSuggestion?.(suggestion)}
+            >
+              {t("advisor.cards.actions.accept", { defaultValue: "Accept" })}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-50"
+              onClick={() => onPlanSuggestion?.(suggestion)}
+            >
+              {t("advisor.cards.actions.plan", { defaultValue: "Convert to Plan" })}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              onClick={() => openFlowchartCard(suggestion)}
+            >
+              {t("advisor.cards.actions.showPlan", { defaultValue: "Show Breeding Plan" })}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              onClick={() => {
+                setIgnoredSuggestions((current) => ({ ...current, [key]: true }));
+                onIgnoreSuggestion?.(suggestion);
+              }}
+            >
+              {t("advisor.cards.actions.ignore", { defaultValue: "Ignore" })}
+            </button>
+          </div>
           {plan && (
             <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm text-sky-900">
               <div className="flex items-center justify-between">
@@ -976,13 +1204,14 @@ export const SuggestionsTab = ({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2 flex flex-col gap-1 text-sm text-neutral-700">
               <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("advisor.goal.label", { defaultValue: "Goal (Name and Traits)" })}</span>
-              <input
+              <textarea
                 value={goalInput}
                 onChange={handleGoalInputChange}
-                placeholder={t("advisor.goal.placeholder", { defaultValue: "Visual Clown: Clown, het Desert Ghost" })}
+                rows={3}
+                placeholder={t("advisor.goal.freeTextPlaceholder", { defaultValue: "I want to make clown desert ghost with pastel and possible het pied" })}
                 className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
               />
-              <span className="text-xs text-neutral-500">{t("advisor.goal.tip", { defaultValue: 'Format tip: "Goal Name: trait one, trait two". If you only list traits, we’ll build a generic goal.' })}</span>
+              <span className="text-xs text-neutral-500">{t("advisor.goal.freeTextTip", { defaultValue: "Type your goal naturally. The advisor matches morph names and aliases from the morph database automatically, so commas are not required." })}</span>
             </label>
           </div>
 
@@ -992,9 +1221,25 @@ export const SuggestionsTab = ({
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
-            <span>{t("advisor.stats.males", { count: breederMales.length, defaultValue: "{{count}} breeder male" })}</span>
+            <span>
+              {filteredMaleCount !== null
+                ? t("advisor.stats.malesFiltered", {
+                    filtered: filteredMaleCount,
+                    total: breederMales.length,
+                    defaultValue: "{{filtered}}/{{total}} breeder males matched goal",
+                  })
+                : t("advisor.stats.males", { count: breederMales.length, defaultValue: "{{count}} breeder male" })}
+            </span>
             <span>•</span>
-            <span>{t("advisor.stats.females", { count: breederFemales.length, defaultValue: "{{count}} breeder female" })}</span>
+            <span>
+              {filteredFemaleCount !== null
+                ? t("advisor.stats.femalesFiltered", {
+                    filtered: filteredFemaleCount,
+                    total: breederFemales.length,
+                    defaultValue: "{{filtered}}/{{total}} breeder females matched goal",
+                  })
+                : t("advisor.stats.females", { count: breederFemales.length, defaultValue: "{{count}} breeder female" })}
+            </span>
             <span>•</span>
             <span>{t("advisor.stats.confidenceBar", { threshold: formatPercent(HIGH_CONFIDENCE_THRESHOLD), defaultValue: "Confidence bar ≥ {{threshold}}" })}</span>
           </div>
@@ -1052,6 +1297,32 @@ export const SuggestionsTab = ({
           </div>
         )}
       </div>
+
+      <BreedingAdvisorProgressModal
+        isOpen={advisorProgress.isOpen}
+        isRunning={advisorProgress.isRunning}
+        steps={advisorProgress.steps}
+        summary={advisorProgress.summary}
+        error={advisorProgress.error}
+        onClose={closeAdvisorProgress}
+        onRetry={runSuggestions}
+        onViewResults={closeAdvisorProgress}
+      />
+
+      <BreedingPlanFlowchartCard
+        isOpen={flowchartState.isOpen}
+        loading={flowchartState.loading}
+        error={flowchartState.error}
+        plan={flowchartState.plan}
+        suggestionLabel={flowchartState.suggestion ? getSuggestionPairTitle(flowchartState.suggestion) : ""}
+        getDisplayNameForAnimal={getDisplayNameForAnimal}
+        thresholdPercent={plannerSettings.thresholdPercent}
+        generationLimit={plannerSettings.generationLimit}
+        onThresholdChange={handleThresholdChange}
+        onGenerationLimitChange={handleGenerationLimitChange}
+        onRefresh={refreshFlowchartCard}
+        onClose={closeFlowchartCard}
+      />
     </div>
   );
 };

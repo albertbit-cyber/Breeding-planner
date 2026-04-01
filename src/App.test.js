@@ -55,6 +55,18 @@ describe('splitMorphHetInput', () => {
     expect(morphs).toEqual(['Butter']);
     expect(hets).toEqual(['Possible Clown']);
   });
+
+  it('expands known combo aliases into underlying genes', () => {
+    const { morphs, hets } = splitMorphHetInput('Pompeii');
+    expect(morphs).toEqual(['Black Pastel', 'Red Stripe', 'Spotnose', 'Yellow Belly', 'Clown']);
+    expect(hets).toEqual([]);
+  });
+
+  it('supports partial alias matching', () => {
+    const { morphs, hets } = splitMorphHetInput('Pomp');
+    expect(morphs).toEqual(['Black Pastel', 'Red Stripe', 'Spotnose', 'Yellow Belly', 'Clown']);
+    expect(hets).toEqual([]);
+  });
 });
 
 describe('computeGeneInitialSegment', () => {

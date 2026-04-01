@@ -51,6 +51,18 @@
   opacity: 0.6 !important;
 }
 
+.app-root .status-tag-menu-button {
+  background: transparent !important;
+  color: inherit !important;
+  border-color: transparent !important;
+}
+
+.app-root .status-tag-neutral-button {
+  background: transparent !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
 .auth-shell {
   position: relative;
   min-height: 100vh;

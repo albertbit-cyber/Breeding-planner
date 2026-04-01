@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { clearAuthToken, getAuthToken, login as loginApi, register as registerApi } from "../../../shared/api";
+import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
-const USERS_STORAGE_KEY = "breedingPlannerUsers";
 const COUNTRY_OPTIONS_FALLBACK = [
   "Afghanistan",
   "Albania",
@@ -214,6 +215,11 @@ const EXPERIENCE_OPTIONS_FALLBACK = [
   { value: "advanced", label: "Advanced breeder" },
   { value: "professional", label: "Professional" },
 ];
+const ROLE_OPTIONS_FALLBACK = [
+  { value: "breeder", label: "Breeder" },
+  { value: "lab_staff", label: "Lab Staff" },
+  { value: "admin", label: "Administrator" },
+];
 
 const DEFAULT_REGISTRATION_TEMPLATE = {
   fullName: "",
@@ -231,6 +237,7 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
   enableAutomaticReptileSync: true,
   consentDataProcessing: false,
   acceptTerms: false,
+  role: "breeder",
 };
 
 const createDefaultRegistrationData = () =>
@@ -355,6 +362,17 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
       }),
       fields: [
         {
+          name: "role",
+          label: t("auth.fields.userRole", { defaultValue: "User role" }),
+          type: "select",
+          options: [
+            { value: "breeder", label: "Breeder" },
+            { value: "lab_staff", label: "Lab Staff" },
+            { value: "admin", label: "Administrator" },
+          ],
+          required: true,
+        },
+        {
           name: "reptileCount",
           label: t("auth.fields.reptileCount", {
             defaultValue: "How many reptiles do you currently keep?",
@@ -414,32 +432,18 @@ const loadStoredAuth = () => {
     if (!raw) return { isAuthenticated: false };
     const parsed = JSON.parse(raw);
     if (parsed?.isAuthenticated) {
+      // Require a JWT to be present; sessions from before the backend was wired
+      // have no token and would cause every API call to fail with "Missing Bearer token".
+      const token = getAuthToken();
+      if (!token) {
+        try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch {}
+        return { isAuthenticated: false };
+      }
       return parsed;
     }
     return { isAuthenticated: false };
   } catch {
     return { isAuthenticated: false };
-  }
-};
-
-const loadStoredUsers = () => {
-  try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((user) => user && typeof user === "object")
-      .map((user) => ({
-        fullName: user.fullName || "",
-        displayName: user.displayName || "",
-        email: user.email || "",
-        password: user.password || "",
-        reptileCount: user.reptileCount || "",
-        registeredAt: user.registeredAt || user.authenticatedAt || user.createdAt || "",
-      }));
-  } catch {
-    return [];
   }
 };
 
@@ -456,48 +460,10 @@ const hasValue = (value) => {
 
 const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
-const getRegistrationCollisionError = (
-  existingUsers,
-  displayName,
-  email,
-  translate,
-) => {
-  const tSafe = translate || ((key, opts) => opts?.defaultValue || key);
-  const normalizedDisplay = normalizeIdentifier(displayName);
-  const normalizedEmail = normalizeIdentifier(email);
-  const conflictingUser = existingUsers.find(
-    (user) =>
-      normalizeIdentifier(user.displayName) === normalizedDisplay ||
-      normalizeIdentifier(user.email) === normalizedEmail,
-  );
-
-  if (!conflictingUser) return null;
-
-  const collisions = [];
-  if (normalizeIdentifier(conflictingUser.displayName) === normalizedDisplay) {
-    collisions.push("username");
-  }
-  if (normalizeIdentifier(conflictingUser.email) === normalizedEmail) {
-    collisions.push("email");
-  }
-
-  const andWord = tSafe("common.and", { defaultValue: "and" });
-  const collisionPhrase = collisions.join(` ${andWord} `);
-  const verb = collisions.length > 1
-    ? tSafe("common.are", { defaultValue: "are" })
-    : tSafe("common.is", { defaultValue: "is" });
-
-  return tSafe("auth.errors.collision", {
-    defaultValue: "That {{fields}} {{verb}} already registered. Please choose another.",
-    fields: collisionPhrase,
-    verb,
-  });
-};
-
 export default function AuthGate({ children }) {
   const { t, i18n } = useTranslation();
+  const { snapshot, retry } = useSharedBackend();
   const [authState, setAuthState] = useState(() => loadStoredAuth());
-  const [users, setUsers] = useState(() => loadStoredUsers());
   const [view, setView] = useState("chooser");
   const [loginValues, setLoginValues] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
@@ -506,7 +472,6 @@ export default function AuthGate({ children }) {
   );
   const [registerStep, setRegisterStep] = useState(0);
   const [registrationError, setRegistrationError] = useState("");
-
   const registrationSteps = useMemo(() => {
     const countries = t("auth.options.countries", {
       returnObjects: true,
@@ -545,23 +510,38 @@ export default function AuthGate({ children }) {
     }
   }, []);
 
-  const persistUsers = useCallback((nextUsers) => {
-    setUsers(nextUsers);
-    try {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
-    } catch {
-      // ignore write errors
-    }
-  }, []);
-
   const handleLogout = useCallback(() => {
+    clearAuthToken();
     persistAuth({ isAuthenticated: false });
     setView("chooser");
+    setLoginError("");
     setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
   }, [persistAuth]);
 
-  const handleLoginSubmit = (event) => {
+  useEffect(() => {
+    if (!authState.isAuthenticated || snapshot.state !== "unauthorized") {
+      return;
+    }
+
+    clearAuthToken();
+    persistAuth({ isAuthenticated: false });
+    setView("login");
+    setLoginValues((prev) => ({
+      username: authState.profile?.email || prev.username || "",
+      password: "",
+    }));
+    setLoginError(
+      t("auth.sharedBackend.sessionExpiredMessage", {
+        defaultValue: "Your shared backend session expired. Sign in again.",
+      })
+    );
+    setRegisterStep(0);
+    setRegistrationData(createDefaultRegistrationData());
+    setRegistrationError("");
+  }, [authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
+
+  const handleLoginSubmit = async (event) => {
     event.preventDefault();
     setLoginError("");
     const { username, password } = loginValues;
@@ -569,39 +549,36 @@ export default function AuthGate({ children }) {
       setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter both username and password." }));
       return;
     }
-    if (!users.length) {
-      setLoginError(t("auth.errors.noAccounts", { defaultValue: "No accounts found. Please register first." }));
-      return;
+    try {
+      const normalizedInput = normalizeIdentifier(username);
+      const loginEmail = String(normalizedInput.includes("@") ? normalizedInput : "").trim();
+
+      if (!loginEmail) {
+        setLoginError(t("auth.errors.emailRequired", { defaultValue: "Use your account email address to sign in." }));
+        return;
+      }
+
+      const response = await loginApi({ email: loginEmail, password: String(password || "") });
+      const backendUser = response?.user || {};
+      const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
+      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
+
+      persistAuth({
+        isAuthenticated: true,
+        mode: "login",
+        role: appRole,
+        profile: {
+          fullName: String((backendUser && backendUser.fullName) || loginEmail),
+          displayName: String((backendUser && backendUser.fullName) || loginEmail),
+          email: String((backendUser && backendUser.email) || loginEmail),
+          reptileCount: "",
+          role: appRole,
+        },
+        authenticatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : t("auth.errors.badPassword", { defaultValue: "Login failed." }));
     }
-
-    const normalizedInput = normalizeIdentifier(username);
-    const matchedUser = users.find(
-      (user) =>
-        normalizeIdentifier(user.displayName) === normalizedInput ||
-        normalizeIdentifier(user.email) === normalizedInput,
-    );
-
-    if (!matchedUser) {
-      setLoginError(t("auth.errors.noAccountMatch", { defaultValue: "No account matches that username or email." }));
-      return;
-    }
-
-    if (matchedUser.password !== password) {
-      setLoginError(t("auth.errors.badPassword", { defaultValue: "Incorrect password. Try again." }));
-      return;
-    }
-
-    persistAuth({
-      isAuthenticated: true,
-      mode: "login",
-      profile: {
-        fullName: matchedUser.fullName,
-        displayName: matchedUser.displayName || matchedUser.fullName,
-        email: matchedUser.email,
-        reptileCount: matchedUser.reptileCount,
-      },
-      authenticatedAt: new Date().toISOString(),
-    });
   };
 
   const handleRegistrationChange = (name, value) => {
@@ -611,7 +588,7 @@ export default function AuthGate({ children }) {
     }));
   };
 
-  const handleRegistrationStepSubmit = (event) => {
+  const handleRegistrationStepSubmit = async (event) => {
     event.preventDefault();
     setRegistrationError("");
     const missingField = currentStep.fields.find((field) => {
@@ -640,67 +617,49 @@ export default function AuthGate({ children }) {
       }
     }
 
-    if (registerStep === 0) {
-      const desiredDisplayName =
-        (registrationData.displayName || registrationData.fullName).trim();
-      const desiredEmail = registrationData.email.trim();
-      const collisionError = getRegistrationCollisionError(
-        users,
-        desiredDisplayName,
-        desiredEmail,
-        t,
-      );
-      if (collisionError) {
-        setRegistrationError(collisionError);
-        return;
-      }
-    }
-
     if (registerStep === totalSteps - 1) {
       const desiredDisplayName = (registrationData.displayName || registrationData.fullName).trim();
       const desiredEmail = registrationData.email.trim();
       const desiredFullName = registrationData.fullName.trim();
 
-      const collisionError = getRegistrationCollisionError(
-        users,
-        desiredDisplayName,
-        desiredEmail,
-        t,
-      );
+      try {
+        await registerApi({
+          fullName: desiredFullName || registrationData.fullName,
+          email: desiredEmail,
+          password: registrationData.password,
+        });
 
-      if (collisionError) {
-        setRegistrationError(collisionError);
-        return;
+        const loginResponse = await loginApi({
+          email: desiredEmail,
+          password: registrationData.password,
+        });
+
+        const backendUser = loginResponse?.user || {};
+        const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
+        const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
+
+        persistAuth({
+          isAuthenticated: true,
+          mode: "registered",
+          role: appRole,
+          profile: {
+            fullName: String((backendUser && backendUser.fullName) || desiredFullName),
+            displayName: desiredDisplayName,
+            email: String((backendUser && backendUser.email) || desiredEmail),
+            reptileCount: registrationData.reptileCount,
+            role: appRole,
+          },
+          registeredAt: new Date().toISOString(),
+          preferences: {
+            enableCloudSync: registrationData.enableCloudSync,
+            enableAutomaticReptileSync:
+              registrationData.enableAutomaticReptileSync,
+            devicePreference: registrationData.devicePreference,
+          },
+        });
+      } catch (error) {
+        setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
       }
-
-      const newUser = {
-        fullName: desiredFullName || registrationData.fullName,
-        displayName: desiredDisplayName,
-        email: desiredEmail,
-        password: registrationData.password,
-        reptileCount: registrationData.reptileCount,
-        registeredAt: new Date().toISOString(),
-      };
-
-      persistUsers([...users, newUser]);
-
-      persistAuth({
-        isAuthenticated: true,
-        mode: "registered",
-        profile: {
-          fullName: registrationData.fullName,
-          displayName: desiredDisplayName,
-          email: registrationData.email,
-          reptileCount: registrationData.reptileCount,
-        },
-        registeredAt: new Date().toISOString(),
-        preferences: {
-          enableCloudSync: registrationData.enableCloudSync,
-          enableAutomaticReptileSync:
-            registrationData.enableAutomaticReptileSync,
-          devicePreference: registrationData.devicePreference,
-        },
-      });
       return;
     }
 
@@ -711,6 +670,14 @@ export default function AuthGate({ children }) {
     setRegisterStep(0);
     setRegistrationError("");
     setRegistrationData(createDefaultRegistrationData());
+  };
+
+  const activeRole = String(authState?.role || authState?.profile?.role || "").trim().toLowerCase();
+  const canOpenLabApp = activeRole === "lab_staff" || activeRole === "admin";
+
+  const openLabApp = () => {
+    if (typeof window === "undefined") return;
+    window.location.hash = "/lab/dashboard";
   };
 
   const renderField = (field) => {
@@ -902,6 +869,11 @@ export default function AuthGate({ children }) {
           authState.profile?.fullName ||
           t("auth.status.defaultName", { defaultValue: "Keeper" })}
       </span>
+      {canOpenLabApp ? (
+        <button type="button" onClick={openLabApp}>
+          {t("auth.actions.openLabApp", { defaultValue: "Open Lab App" })}
+        </button>
+      ) : null}
       <button type="button" onClick={handleLogout}>
         {t("auth.actions.signOut", { defaultValue: "Sign out" })}
       </button>
@@ -909,6 +881,7 @@ export default function AuthGate({ children }) {
   ) : null;
 
   const overlayActive = !authState.isAuthenticated;
+  const showBackendBlocker = !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
 
   return (
     <div className="auth-shell">
@@ -918,9 +891,39 @@ export default function AuthGate({ children }) {
       </div>
       {overlayActive && (
         <div className="auth-overlay">
-          {view === "register" ? registrationCard : loginCard}
+          {showBackendBlocker ? (
+            <div className="auth-card">
+              <div className="auth-card-brand">
+                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+                <h1 className="auth-card-title">
+                  {snapshot.state === "config-error"
+                    ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
+                    : snapshot.state === "unauthorized"
+                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
+                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
+                </h1>
+              </div>
+              <p className="auth-subtitle">{snapshot.message}</p>
+              <div className="text-xs text-neutral-500">
+                {t("auth.sharedBackend.requirements", {
+                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
+                })}
+              </div>
+              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {snapshot.config.warnings.join(" ")}
+                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" className="primary" onClick={retry}>
+                  {t("common.retry", { defaultValue: "Retry" })}
+                </button>
+              </div>
+            </div>
+          ) : view === "register" ? registrationCard : loginCard}
         </div>
       )}
     </div>
   );
 }
+

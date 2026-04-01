@@ -96,6 +96,22 @@ async function saveData(payload) {
   }
 }
 
+async function clearData() {
+  await localeReady;
+  const filePath = resolveDataFilePath();
+  try {
+    await fs.unlink(filePath);
+    return { success: true };
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { success: true };
+    }
+    console.error('Failed to clear persisted data', error);
+    showNativeError('storageWriteFailed', error);
+    return { success: false, error: error.message };
+  }
+}
+
 async function createWindow() {
   await localeReady;
   mainWindow = new BrowserWindow({
@@ -137,6 +153,7 @@ if (gotSingleInstanceLock) {
 
 ipcMain.handle('app:load-data', () => loadData());
 ipcMain.handle('app:save-data', (_event, payload) => saveData(payload));
+ipcMain.handle('app:clear-data', () => clearData());
 ipcMain.handle('i18n:get-language', async () => {
   await localeReady;
   return electronLocale.getLanguage();

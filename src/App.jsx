@@ -7,6 +7,20 @@ import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
 import SuggestionsTab from "./features/suggestions/SuggestionsTab";
+import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
+import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
+import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
+import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
+import {
+  getActiveLabelSize,
+  getDefaultLabLabelSizeSettings,
+  getLabLabelPresetByKey,
+  LAB_LABEL_SIZE_LIMITS_MM,
+  LAB_LABEL_SIZE_PRESETS,
+  normalizeLabLabelSizeSettings,
+  validateLabLabelSize,
+} from "./features/lab/utils/labelSizing";
+import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
 import {
@@ -15,6 +29,26 @@ import {
   getGeneDisplayGroup,
   normalizeGeneCandidate,
 } from "./genetics/geneLibrary";
+import {
+  getDefaultGeneAliasRows,
+  mergeGeneAliasRows,
+  normalizeGeneAliasRows,
+  resolveCanonicalGene,
+  setActiveGeneAliasRows,
+} from "./genetics/geneDatabase";
+import {
+  collectLiveGenetics,
+  parseAnimalText,
+} from "./features/animals/quickAddParser";
+import {
+  getLabelBrands,
+  getLabelCategories,
+  getLabelPresets,
+  normalizePdfLabelSettings,
+  resolvePdfLabelLayout,
+  validatePdfLabelLayout,
+} from "./features/labels/presets";
+import defaultMorphAliasesJson from "./config/morphAliases.json";
 // use the CDN worker by version
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -122,10 +156,10 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
               />
             </label>
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
-              <span>{t('spaces.rack.tubType', { defaultValue: 'Type of tubs' })}</span>
+              <span>{t('spaces.rack.tubSize', { defaultValue: 'Tub size' })}</span>
               <select
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={isCustomPreset ? 'custom' : form.tubSizePreset}
+                value={form.tubSizePreset}
                 onChange={handlePresetChange}
               >
                 {HEAT_RACK_TUB_PRESETS.map(option => (
@@ -910,6 +944,9 @@ const STORAGE_KEYS = {
   pairings: 'breedingPlannerPairings',
   groups: 'breedingPlannerGroups',
   breeder: 'breedingPlannerBreederInfo',
+  morphAliases: 'breedingPlannerMorphAliases',
+  geneAliases: 'breedingPlannerGeneAliases',
+  leucisticType: 'breedingPlannerLeucisticType',
   lastFeedDefaults: 'breedingPlannerLastFeedDefaults',
   backupSettings: 'breedingPlannerBackupSettings',
   backupSnapshot: 'breedingPlannerBackupSnapshot',
@@ -925,6 +962,174 @@ const BACKUP_FILE_EXTENSION = 'bpbackup';
 const BACKUP_FILE_DOT_EXTENSION = `.${BACKUP_FILE_EXTENSION}`;
 const BACKUP_FILE_MIME = 'application/x-breeding-planner-backup+json';
 const buildBackupFilename = (basename, timestamp) => `${basename}-${timestamp}${BACKUP_FILE_DOT_EXTENSION}`;
+const DEFAULT_LAST_FEED_DEFAULTS = {
+  feed: 'Mouse',
+  size: 'pinky',
+  sizeDetail: '',
+  form: 'Frozen/thawed',
+  formDetail: '',
+  notes: '',
+  refused: false,
+};
+
+function normalizeMorphAliasLookupKey(value) {
+  return String(value || '')
+    .replace(/[()[\]{}]/g, ' ')
+    .replace(/[-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeMorphAliasCompactKey(value) {
+  return normalizeMorphAliasLookupKey(value).replace(/\s+/g, '');
+}
+
+function normalizeMorphAliasEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const alias = String(entry.alias || '').trim();
+  if (!alias) return null;
+  const genes = (Array.isArray(entry.genes) ? entry.genes : [])
+    .map(gene => String(gene || '').trim())
+    .filter(Boolean);
+  if (!genes.length) return null;
+  const notes = typeof entry.notes === 'string' && entry.notes.trim()
+    ? entry.notes.trim()
+    : undefined;
+  return { alias, genes, ...(notes ? { notes } : {}) };
+}
+
+function normalizeMorphAliasDatabase(value) {
+  const source = Array.isArray(value) ? value : [];
+  const out = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    const normalized = normalizeMorphAliasEntry(entry);
+    if (!normalized) return;
+    const key = normalizeMorphAliasLookupKey(normalized.alias);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(normalized);
+  });
+  return out;
+}
+
+const DEFAULT_MORPH_ALIASES = normalizeMorphAliasDatabase(defaultMorphAliasesJson);
+let ACTIVE_MORPH_ALIASES = [...DEFAULT_MORPH_ALIASES];
+const LEUCISTIC_BEL_GENE_OPTIONS = ['Mojave', 'Lesser', 'Butter', 'Russo', 'Mystic', 'Phantom', 'Special'];
+const LEUCISTIC_BLACK_EYE_GENE_OPTIONS = ['Fire', 'Lesser', 'Butter'];
+const LEUCISTIC_BEL_TOKEN_PATTERN = '\\bb(?:[\\s,.;:/|_-]*)e(?:[\\s,.;:/|_-]*)l\\b';
+const LEUCISTIC_TRIGGER_PATTERN = new RegExp(`\\bblue(?:[\\s,;/|_-]+)eyed(?:[\\s,;/|_-]+)leucistic\\b|${LEUCISTIC_BEL_TOKEN_PATTERN}|\\bleucistic\\b`, 'i');
+
+function getActiveMorphAliases() {
+  return Array.isArray(ACTIVE_MORPH_ALIASES) && ACTIVE_MORPH_ALIASES.length
+    ? ACTIVE_MORPH_ALIASES
+    : [...DEFAULT_MORPH_ALIASES];
+}
+
+function setActiveMorphAliases(value) {
+  const normalized = normalizeMorphAliasDatabase(value);
+  ACTIVE_MORPH_ALIASES = normalized.length ? normalized : [...DEFAULT_MORPH_ALIASES];
+}
+
+function collapseAliasGenes(genes = []) {
+  const counts = new Map();
+  const order = [];
+  (Array.isArray(genes) ? genes : []).forEach((rawGene) => {
+    const gene = String(rawGene || '').trim();
+    if (!gene) return;
+    const key = gene.toLowerCase();
+    if (!counts.has(key)) {
+      counts.set(key, { name: gene, count: 0 });
+      order.push(key);
+    }
+    const item = counts.get(key);
+    item.count += 1;
+  });
+
+  const out = [];
+  order.forEach((key) => {
+    const item = counts.get(key);
+    if (!item) return;
+    const isAlreadySuper = /^super\s+/i.test(item.name);
+    if (item.count > 1 && !isAlreadySuper) {
+      out.push(`Super ${item.name}`);
+    } else {
+      out.push(item.name);
+    }
+  });
+  return out;
+}
+
+function resolveMorphAliasGenes(token, aliases = getActiveMorphAliases()) {
+  const lookup = normalizeMorphAliasLookupKey(token);
+  if (!lookup) return null;
+  if (hasLeucisticTriggerText(lookup)) return null;
+  const canonicalGene = resolveCanonicalGene(token, lookupCanonicalGene);
+  const tokenIsKnownGene = Boolean(canonicalGene);
+  if (tokenIsKnownGene) return null;
+  const compactLookup = normalizeMorphAliasCompactKey(token);
+  if (!compactLookup) return null;
+  const allowPartialMatch = !tokenIsKnownGene
+    && !/\s/.test(lookup)
+    && !/[.,;:/|_\-+]/.test(String(token || ''))
+    && lookup.length >= 4;
+
+  let best = null;
+  (Array.isArray(aliases) ? aliases : []).forEach((entry) => {
+    const alias = String(entry?.alias || '').trim();
+    const genes = Array.isArray(entry?.genes) ? entry.genes : [];
+    if (!alias || !genes.length) return;
+
+    const aliasLookup = normalizeMorphAliasLookupKey(alias);
+    const aliasCompact = normalizeMorphAliasCompactKey(alias);
+    if (!aliasLookup || !aliasCompact) return;
+    if (hasLeucisticTriggerText(aliasLookup)) return;
+    if (resolveCanonicalGene(alias, lookupCanonicalGene)) return;
+
+    let score = Number.POSITIVE_INFINITY;
+    const aliasIsSingleToken = !/\s/.test(aliasLookup);
+    if (lookup === aliasLookup || compactLookup === aliasCompact) {
+      score = 0;
+    } else if (allowPartialMatch && aliasIsSingleToken && (aliasLookup.startsWith(lookup) || aliasCompact.startsWith(compactLookup))) {
+      score = 1 + ((aliasLookup.length - lookup.length) / 1000);
+    } else if (allowPartialMatch && aliasIsSingleToken && (lookup.startsWith(aliasLookup) || compactLookup.startsWith(aliasCompact))) {
+      score = 2 + ((lookup.length - aliasLookup.length) / 1000);
+    }
+
+    if (!Number.isFinite(score)) return;
+    if (!best || score < best.score) {
+      best = { score, genes: collapseAliasGenes(genes), alias };
+    }
+  });
+
+  return best?.genes?.length ? best.genes : null;
+}
+
+function hasLeucisticTriggerText(value) {
+  if (!value) return false;
+  return LEUCISTIC_TRIGGER_PATTERN.test(String(value));
+}
+
+function replaceLeucisticTriggerText(value, replacement) {
+  if (!value) return value;
+  const text = String(value);
+  if (!LEUCISTIC_TRIGGER_PATTERN.test(text)) return text;
+  return text.replace(new RegExp(`\\bblue(?:[\\s,;/|_-]+)eyed(?:[\\s,;/|_-]+)leucistic\\b|${LEUCISTIC_BEL_TOKEN_PATTERN}|\\bleucistic\\b`, 'ig'), replacement);
+}
+
+function stripLeucisticTriggerText(value) {
+  if (!value) return '';
+  const text = replaceLeucisticTriggerText(value, ' ');
+  return text
+    .replace(/[\s,;/|_-]{2,}/g, ' ')
+    .trim();
+}
+
+function isLeucisticNoiseToken(value) {
+  const token = String(value || '').trim().toLowerCase();
+  return token === 'blue' || token === 'eyed' || token === 'leucistic' || token === 'bel' || token === 'blue eyed leucistic';
+}
 
 export const ANIMAL_EXPORT_FIELD_DEFS = [
   {
@@ -2055,8 +2260,14 @@ function normalizeBreederInfo(raw) {
     businessName: '',
     email: '',
     phone: '',
+    street: '',
+    postalCode: '',
+    city: '',
+    country: '',
     logoUrl: '',
     idGenerator: getDefaultIdGeneratorConfig(),
+    pdfLabelSettings: normalizePdfLabelSettings(null),
+    labLabelSettings: getDefaultLabLabelSizeSettings(),
   };
   if (!raw || typeof raw !== 'object') {
     return base;
@@ -2079,6 +2290,8 @@ function normalizeBreederInfo(raw) {
     };
   }
   info.idGenerator = normalizeIdGeneratorConfig(normalizedConfig);
+  info.pdfLabelSettings = normalizePdfLabelSettings(raw?.pdfLabelSettings || info.pdfLabelSettings);
+  info.labLabelSettings = normalizeLabLabelSizeSettings(raw?.labLabelSettings || info.labLabelSettings);
   return info;
 }
 
@@ -2584,7 +2797,7 @@ const BORIS_PREVIEW_DEFAULTS = {
 
 const seedPairings = [];
 const DEFAULT_GROUPS = ["Breeders", "Holdbacks", "Hatchlings 2024", "Hatchlings 2025"];
-const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', 'Quarantine', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
+const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', 'Quarantine', 'For sell', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
 const STATUS_TAG_TRANSLATIONS = Object.freeze({
   'active': 'ui.animals.addAnimal.active',
   'holdback': 'ui.animals.addAnimal.holdback',
@@ -2638,6 +2851,10 @@ function createFreshPairings() {
 function formatDateForDisplay(dateLike) {
   if (!dateLike) return '';
   if (typeof dateLike === 'string') {
+    const yearOnly = dateLike.match(/^(\d{4})$/);
+    if (yearOnly) return yearOnly[1];
+    const monthYear = dateLike.match(/^(\d{4})-(\d{2})$/);
+    if (monthYear) return `${monthYear[2]}/${monthYear[1]}`;
     const m = dateLike.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return `${m[3]}/${m[2]}/${m[1]}`;
     const parsed = new Date(dateLike);
@@ -2667,6 +2884,20 @@ function formatDateForDisplay(dateLike) {
     // ignore
   }
   return String(dateLike);
+}
+
+function normalizeBirthDateValue(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(trimmed)) return trimmed;
+  if (/^(0[1-9]|1[0-2])[\/\-](\d{4})$/.test(trimmed)) {
+    const [, mm, yyyy] = trimmed.match(/^(0[1-9]|1[0-2])[\/\-](\d{4})$/) || [];
+    if (mm && yyyy) return `${yyyy}-${mm}`;
+  }
+  if (/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(trimmed)) return trimmed;
+  return normalizeDateInput(trimmed);
 }
 function withPairingLifecycleDefaults(pairing = {}) {
   const defaults = pairingLifecycleDefaults();
@@ -2779,14 +3010,16 @@ function createEmptyNewAnimalDraft() {
     autoId: true,
     idSequence: null,
     name: "",
-    sex: "F",
+    sex: "",
   status: "Active",
     morphHetInput: "",
     morphs: [],
     hets: [],
     weight: "",
+    price: "",
     year: "",
     birthDate: "",
+    notes: "",
     imageUrl: "",
     photos: [],
     groups: [],
@@ -2863,7 +3096,8 @@ function formatHetForDisplay(rawHet) {
   }
 
   if (base) {
-    base = base
+    const canonicalBase = resolveCanonicalGene(base, lookupCanonicalGene);
+    base = (canonicalBase || base)
       .split(/\s+/)
       .map(segment => {
         if (!segment) return '';
@@ -3133,7 +3367,7 @@ function splitWordsByGeneList(words) {
       for (let len = Math.min(maxWords, words.length - (i + 1)); len >= 1; len--) {
         const candidateWords = words.slice(i + 1, i + 1 + len);
         const candidateSource = candidateWords.join(' ');
-        const canonical = lookupCanonicalGene(candidateSource);
+        const canonical = resolveCanonicalGene(candidateSource, lookupCanonicalGene);
         if (canonical) {
           matched = {
             display: `Super ${canonical}`,
@@ -3164,7 +3398,7 @@ function splitWordsByGeneList(words) {
     for (let len = Math.min(maxWords, words.length - i); len >= 1; len--) {
       const candidateWords = words.slice(i, i + len);
       const candidateSource = candidateWords.join(' ');
-      const canonical = lookupCanonicalGene(candidateSource);
+      const canonical = resolveCanonicalGene(candidateSource, lookupCanonicalGene);
       if (canonical) {
         matched = {
           display: canonical,
@@ -3238,6 +3472,14 @@ function splitSegmentIntoTokens(segment) {
   let order = 0;
 
   const overlaps = (start, end) => ranges.some(range => Math.max(range.start, start) < Math.min(range.end, end));
+  const shouldAttemptCompactSplit = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    if (/\s/.test(text)) return false;
+    if (/\d+%/.test(text)) return false;
+    if (/\b(?:het|heterozygous|possible|pos|ph)\b/i.test(text)) return false;
+    return /^[a-z0-9-]+$/i.test(text);
+  };
   const pushEntry = (token, start) => {
     const trimmed = String(token || '').replace(/\s+/g, ' ').trim();
     if (!trimmed) return;
@@ -3318,7 +3560,7 @@ function splitSegmentIntoTokens(segment) {
 
     leftoverPairs.forEach(pair => {
       const isFallback = pair.display === pair.source;
-      if (isFallback) {
+      if (isFallback && shouldAttemptCompactSplit(pair.source)) {
         const compactPairs = splitCompactGeneString(pair.source) || [];
         const differsFromOriginal = compactPairs.length > 1 || (compactPairs.length === 1 && compactPairs[0].display !== pair.display);
         if (differsFromOriginal && compactPairs.length) {
@@ -3362,6 +3604,7 @@ function splitSegmentIntoTokens(segment) {
 
   if (uncoveredFragments.length) {
     uncoveredFragments.forEach(fragment => {
+      if (!shouldAttemptCompactSplit(fragment)) return;
       const compactPairs = splitCompactGeneString(fragment) || [];
       compactPairs.forEach(pair => {
         if (!pair || !pair.display) return;
@@ -3394,20 +3637,7 @@ function splitMorphHetInput(value) {
     .filter(Boolean);
 
   const tokens = segments.flatMap(splitSegmentIntoTokens);
-
-  const morphs = [];
-  const hets = [];
-
-  tokens.forEach(token => {
-    if (isHetDescriptorToken(token)) {
-      const normalizedHet = normalizeHetInputToken(token);
-      if (normalizedHet) hets.push(normalizedHet);
-    } else {
-      morphs.push(token);
-    }
-  });
-
-  return { morphs, hets };
+  return normalizeMorphHetLists(tokens);
 }
 
 function formatMorphHetForInput(morphs = [], hets = []) {
@@ -3418,6 +3648,106 @@ function formatMorphHetForInput(morphs = [], hets = []) {
     .map(formatHetForDisplay)
     .filter(Boolean);
   return [...morphTokens, ...hetTokens].join(', ');
+}
+
+function buildQuickAddGeneticsSource(snakes = [], morphAliases = [], geneAliases = []) {
+  const live = collectLiveGenetics(Array.isArray(snakes) ? snakes : []);
+  const sourceMap = new Map();
+  Object.values(GENE_GROUPS || {}).forEach(groupList => {
+    (groupList || []).forEach(name => {
+      const display = String(name || '').trim();
+      if (!display) return;
+      const key = normalizeGeneCandidate(display);
+      if (!key || sourceMap.has(key)) return;
+      sourceMap.set(key, { name: display, aliases: [] });
+    });
+  });
+
+  live.forEach(item => {
+    const display = String(item?.name || '').trim();
+    if (!display) return;
+    const key = normalizeGeneCandidate(display);
+    if (!key) return;
+    if (!sourceMap.has(key)) {
+      sourceMap.set(key, { name: display, aliases: [] });
+    }
+    const entry = sourceMap.get(key);
+    const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+    aliases.forEach(alias => {
+      const cleanedAlias = String(alias || '').trim();
+      if (!cleanedAlias) return;
+      if (!entry.aliases.some(existing => existing.toLowerCase() === cleanedAlias.toLowerCase())) {
+        entry.aliases.push(cleanedAlias);
+      }
+    });
+  });
+
+  Object.entries(GENE_ALIASES || {}).forEach(([alias, canonical]) => {
+    const canonicalKey = normalizeGeneCandidate(canonical || '');
+    if (!canonicalKey || !sourceMap.has(canonicalKey)) return;
+    const entry = sourceMap.get(canonicalKey);
+    const cleanedAlias = String(alias || '').trim();
+    if (!cleanedAlias) return;
+    if (!entry.aliases.some(existing => existing.toLowerCase() === cleanedAlias.toLowerCase())) {
+      entry.aliases.push(cleanedAlias);
+    }
+  });
+
+  (Array.isArray(morphAliases) ? morphAliases : []).forEach((entry) => {
+    const alias = String(entry?.alias || '').trim();
+    const key = normalizeGeneCandidate(alias);
+    if (!alias || !key) return;
+    if (!sourceMap.has(key)) {
+      sourceMap.set(key, { name: alias, aliases: [], shorthand: [] });
+    }
+    const target = sourceMap.get(key);
+    if (!Array.isArray(target.shorthand)) target.shorthand = [];
+    const aliasCompact = alias.replace(/[^a-z0-9]/gi, '');
+    const firstWord = alias.split(/\s+/).filter(Boolean)[0] || alias;
+    const shorthandCandidates = [];
+    if (aliasCompact.length >= 4) shorthandCandidates.push(aliasCompact.slice(0, 4));
+    if (aliasCompact.length >= 5) shorthandCandidates.push(aliasCompact.slice(0, 5));
+    if (firstWord.length >= 4) shorthandCandidates.push(firstWord.slice(0, 4));
+    shorthandCandidates.forEach(short => {
+      const cleaned = String(short || '').trim();
+      if (!cleaned) return;
+      if (!target.shorthand.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
+        target.shorthand.push(cleaned);
+      }
+    });
+  });
+
+  (Array.isArray(geneAliases) ? geneAliases : []).forEach((row) => {
+    const geneName = String(row?.geneName || '').trim();
+    const key = normalizeGeneCandidate(geneName);
+    if (!geneName || !key) return;
+    if (!sourceMap.has(key)) {
+      sourceMap.set(key, { name: geneName, aliases: [], shorthand: [] });
+    }
+    const target = sourceMap.get(key);
+    if (!Array.isArray(target.aliases)) target.aliases = [];
+    if (!Array.isArray(target.shorthand)) target.shorthand = [];
+
+    const aliasValues = Array.isArray(row?.aliases) ? row.aliases : [];
+    aliasValues.forEach((alias) => {
+      const cleaned = String(alias || '').trim();
+      if (!cleaned) return;
+      if (!target.aliases.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
+        target.aliases.push(cleaned);
+      }
+    });
+
+    const shorthandValues = Array.isArray(row?.shorthand) ? row.shorthand : [];
+    shorthandValues.forEach((value) => {
+      const cleaned = String(value || '').trim();
+      if (!cleaned) return;
+      if (!target.shorthand.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
+        target.shorthand.push(cleaned);
+      }
+    });
+  });
+
+  return [...sourceMap.values()];
 }
 
 function genMonthlyAppointments(startDate, months=3) {
@@ -4458,7 +4788,33 @@ function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber =
 
 // Normalize a list of tokens into morphs (visuals) and hets (including % and possible)
 function normalizeMorphHetLists(tokens) {
-  const arr = Array.isArray(tokens) ? tokens.slice() : (tokens ? String(tokens).split(GENE_TOKEN_SPLIT_REGEX).map(s=>s.trim()).filter(Boolean) : []);
+  const sourceArr = Array.isArray(tokens) ? tokens.slice() : (tokens ? String(tokens).split(GENE_TOKEN_SPLIT_REGEX).map(s=>s.trim()).filter(Boolean) : []);
+  const hasLeucisticContext = hasLeucisticTriggerText(sourceArr.join(' '));
+  const arr = [];
+  sourceArr.forEach((token) => {
+    const rawToken = String(token || '').trim();
+    if (!rawToken) return;
+    if (hasLeucisticContext && isLeucisticNoiseToken(rawToken)) return;
+    const canonicalToken = resolveCanonicalGene(rawToken, lookupCanonicalGene);
+    if (canonicalToken && !isHetDescriptorToken(rawToken)) {
+      arr.push(canonicalToken);
+      return;
+    }
+    if (isHetDescriptorToken(rawToken)) {
+      arr.push(rawToken);
+      return;
+    }
+    const aliasGenes = resolveMorphAliasGenes(rawToken, getActiveMorphAliases());
+    if (Array.isArray(aliasGenes) && aliasGenes.length) {
+      aliasGenes.forEach(gene => {
+        const cleanedGene = String(gene || '').trim();
+        if (cleanedGene) arr.push(cleanedGene);
+      });
+      return;
+    }
+    arr.push(rawToken);
+  });
+
   const morphs = [];
   const hets = [];
   for (let t of arr) {
@@ -4698,7 +5054,7 @@ function getHeaderValues(row = [], headerIndex = {}, key) {
 }
 
 // Add Animal modal form
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], theme='blue' }) {
   const { t } = useTranslation();
   const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
   const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
@@ -4722,9 +5078,103 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
   const canSubmit = Boolean(newAnimal.name && newAnimal.name.trim().length);
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
   const [statusTagInput, setStatusTagInput] = useState('');
+  const [quickAddText, setQuickAddText] = useState('');
   const customTagLookup = useMemo(() => new Set(customStatusTags.map(tag => tag.toLowerCase())), [customStatusTags]);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef(null);
+
+  const handleQuickAddUpdateFields = useCallback(async () => {
+    const textForParse = typeof onResolveLeucisticText === 'function'
+      ? await onResolveLeucisticText(quickAddText, 'Quick Add free text')
+      : quickAddText;
+    const parsed = parseAnimalText(textForParse, availableGenetics);
+    const hasAnyParsedValue = Boolean(
+      parsed.id
+      || parsed.sex
+      || parsed.weight
+      || parsed.hatchYear
+      || parsed.hatchDate
+      || parsed.breeder
+      || parsed.feedingInfo
+      || (Array.isArray(parsed.morphs) && parsed.morphs.length)
+      || (Array.isArray(parsed.hets) && parsed.hets.length)
+      || parsed.unmatchedNotes
+    );
+    if (!hasAnyParsedValue) return;
+
+    let parsedMorphs = Array.isArray(parsed.morphs) ? parsed.morphs : [];
+    let parsedHets = Array.isArray(parsed.hets) ? parsed.hets : [];
+    if (typeof onResolveLeucisticLists === 'function' && (parsedMorphs.length || parsedHets.length)) {
+      const resolved = await onResolveLeucisticLists(parsedMorphs, parsedHets, 'Quick Add genetics');
+      parsedMorphs = resolved?.morphs || parsedMorphs;
+      parsedHets = resolved?.hets || parsedHets;
+    }
+
+    setNewAnimal(previous => {
+      const next = { ...(previous || {}) };
+      const isBlank = (value) => value === null || typeof value === 'undefined' || String(value).trim() === '';
+
+      if (isBlank(next.id)) {
+        if (parsed.id) {
+          next.id = parsed.id;
+          next.autoId = false;
+        } else if (typeof onGenerateIdFromWizard === 'function') {
+          const generated = onGenerateIdFromWizard({
+            ...next,
+            sex: parsed.sex || next.sex,
+            morphs: parsedMorphs.length ? parsedMorphs : next.morphs,
+            hets: parsedHets.length ? parsedHets : next.hets,
+            year: parsed.hatchYear || next.year,
+            birthDate: parsed.hatchDate || next.birthDate,
+          });
+          if (generated) {
+            next.id = generated;
+            next.autoId = false;
+          }
+        }
+      }
+
+      if (isBlank(next.sex) && parsed.sex) {
+        next.sex = parsed.sex;
+      }
+
+      if (isBlank(next.morphHetInput) && (parsedMorphs.length || parsedHets.length)) {
+        const normalized = normalizeMorphHetLists([
+          ...parsedMorphs,
+          ...parsedHets,
+        ]);
+        const morphs = normalized.morphs;
+        const hets = normalized.hets;
+        next.morphs = morphs;
+        next.hets = hets;
+        next.morphHetInput = formatMorphHetForInput(morphs, hets);
+      }
+
+      if ((isBlank(next.weight) || Number(next.weight) <= 0) && Number.isFinite(Number(parsed.weight)) && Number(parsed.weight) > 0) {
+        next.weight = String(parsed.weight);
+      }
+
+      if (isBlank(next.birthDate) && parsed.hatchDate) {
+        next.birthDate = normalizeBirthDateValue(parsed.hatchDate) || parsed.hatchDate;
+      }
+
+      if (isBlank(next.year) && Number.isFinite(Number(parsed.hatchYear)) && Number(parsed.hatchYear) > 0) {
+        next.year = String(parsed.hatchYear);
+      }
+
+      const notesParts = [];
+      if (parsed.breeder) notesParts.push(`Breeder: ${parsed.breeder}`);
+      if (parsed.feedingInfo) notesParts.push(`Feeding: ${parsed.feedingInfo}`);
+      if (parsed.unmatchedNotes) notesParts.push(parsed.unmatchedNotes);
+      if (notesParts.length) {
+        const currentNotes = String(next.notes || '').trim();
+        const merged = [currentNotes, ...notesParts].filter(Boolean).join('\n').trim();
+        next.notes = merged;
+      }
+
+      return next;
+    });
+  }, [availableGenetics, onGenerateIdFromWizard, onResolveLeucisticLists, onResolveLeucisticText, quickAddText, setNewAnimal]);
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -4823,6 +5273,27 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
   return (
     <div className="p-4">
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm max-h-[68vh] overflow-auto">
+        <div className="sm:col-span-2">
+          <label className="text-xs font-medium">{t('ui.animals.addAnimal.quickAdd', { defaultValue: 'Quick Add / Free Text' })}</label>
+          <textarea
+            rows={4}
+            className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
+            value={quickAddText}
+            onChange={e => setQuickAddText(e.target.value)}
+            placeholder={t('ui.animals.addAnimal.quickAddPlaceholder', { defaultValue: 'Paste a full line like: MS-24-033 0.1 pastel clown het pied 620g born 2024 breeder John Doe eating rats weekly' })}
+          />
+          <div className="mt-2">
+            <button
+              type="button"
+              className={cx('px-3 py-2 rounded-xl text-sm border', quickAddText.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+              onClick={handleQuickAddUpdateFields}
+              disabled={!quickAddText.trim()}
+            >
+              {t('ui.animals.addAnimal.updateFields', { defaultValue: 'Update Fields' })}
+            </button>
+          </div>
+        </div>
+
         <div>
           <label className="text-xs font-medium">{t("ui.animals.addAnimal.name", { defaultValue: "Name" })}</label>
           <input
@@ -4865,7 +5336,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Tag" })}</label>
               <button
                 type="button"
-                className="mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
                 onClick={() => setStatusMenuOpen(open => !open)}
               >
                 <span>{(newAnimal.status || '').trim() ? resolveStatusLabel(newAnimal.status) : noTagText}</span>
@@ -4875,7 +5346,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                    className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
                     onClick={handleClearStatus}
                   >
                     {noTagText}
@@ -4886,14 +5357,14 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                       <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
                         <button
                           type="button"
-                          className="flex-1 text-left"
+                          className="status-tag-menu-button flex-1 text-left"
                           onClick={() => handleSelectStatus(option)}
                         >
                           {resolveStatusLabel(option)}
                         </button>
                         <button
                           type="button"
-                          className="ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                          className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                           onClick={() => handleDeleteStatus(option)}
                           title="Delete tag"
                         >
@@ -4916,7 +5387,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 />
                 <button
                   type="button"
-                  className={cx('px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', statusTagInput.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+                  className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', statusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
                   onClick={handleAddStatusTag}
                   disabled={!statusTagInput.trim()}
                 >
@@ -4959,10 +5430,13 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 rows={3}
                 className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
                 value={newAnimal.morphHetInput || ''}
-                onChange={e=>{
+                onChange={async e=>{
                   const value = e.target.value;
-                  const { morphs, hets } = splitMorphHetInput(value);
-                  setNewAnimal(a=>({ ...a, morphHetInput: value, morphs, hets }));
+                  const resolvedText = typeof onResolveLeucisticText === 'function'
+                    ? await onResolveLeucisticText(value, 'Add Animal genetics')
+                    : value;
+                  const { morphs, hets } = splitMorphHetInput(resolvedText);
+                  setNewAnimal(a=>({ ...a, morphHetInput: resolvedText, morphs, hets }));
                 }}
                 placeholder={"Clown\nPastel\nHet Hypo"}
               />
@@ -4974,6 +5448,18 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.weight", { defaultValue: "Weight (g)" })}</label>
               <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" value={newAnimal.weight} onChange={e=>setNewAnimal(a=>({...a,weight:e.target.value}))} placeholder="0" />
             </div>
+            {isSnakeTaggedForSell(newAnimal) && (
+              <div>
+                <label className="text-xs font-medium">{t("ui.animals.addAnimal.price", { defaultValue: "Price" })}</label>
+                <input
+                  type="text"
+                  className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
+                  value={newAnimal.price || ''}
+                  onChange={e=>setNewAnimal(a=>({...a,price:e.target.value}))}
+                  placeholder={t("ui.animals.addAnimal.pricePlaceholder", { defaultValue: "e.g., 450" })}
+                />
+              </div>
+            )}
             <div>
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.year", { defaultValue: "Year" })}</label>
               <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" value={newAnimal.year} onChange={e=>setNewAnimal(a=>({...a,year:e.target.value}))} placeholder="2025" />
@@ -4981,13 +5467,14 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             <div>
               <label className="text-xs font-medium">{t("snakeEdit.birthDate", { defaultValue: "Birth date" })}</label>
               <input
-                type="date"
+                type="text"
                 className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                 value={newAnimal.birthDate || ''}
+                placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
                 onChange={e => {
                   const raw = e.target.value;
                   setNewAnimal(prev => {
-                    const normalized = raw ? normalizeDateInput(raw) || raw : '';
+                    const normalized = raw ? normalizeBirthDateValue(raw) || raw : '';
                     const birthYear = extractYearFromDateString(normalized || raw);
                     const next = { ...prev, birthDate: normalized };
                     if (birthYear) {
@@ -5089,9 +5576,32 @@ export default function BreedingPlannerApp() {
     const stored = loadStoredJson(STORAGE_KEYS.breeder, null);
     return normalizeBreederInfo(stored);
   });
+  const [morphAliases, setMorphAliases] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.morphAliases, null);
+    const normalized = normalizeMorphAliasDatabase(stored);
+    return normalized.length ? normalized : [...DEFAULT_MORPH_ALIASES];
+  });
+  const [geneAliases, setGeneAliases] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.geneAliases, null);
+    return mergeGeneAliasRows(stored);
+  });
+  const [lastLeucisticType, setLastLeucisticType] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.leucisticType, 'bel');
+    return stored === 'blackEye' ? 'blackEye' : 'bel';
+  });
+  const [leucisticModalState, setLeucisticModalState] = useState(null);
+  const [leucisticTypeChoice, setLeucisticTypeChoice] = useState('bel');
+  const [leucisticBelGene1, setLeucisticBelGene1] = useState(LEUCISTIC_BEL_GENE_OPTIONS[0]);
+  const [leucisticBelGene2, setLeucisticBelGene2] = useState(LEUCISTIC_BEL_GENE_OPTIONS[1]);
+  const [leucisticBlackGene, setLeucisticBlackGene] = useState(LEUCISTIC_BLACK_EYE_GENE_OPTIONS[0]);
+  const leucisticResolverRef = useRef(null);
   const [backupSettings, setBackupSettings] = useState(() => normalizeBackupSettings(loadStoredJson(STORAGE_KEYS.backupSettings, null)));
   const [autoBackupSnapshot, setAutoBackupSnapshot] = useState(() => normalizeBackupSnapshot(loadStoredJson(STORAGE_KEYS.backupSnapshot, null)));
   const [backupVault, setBackupVault] = useState(() => normalizeBackupVault(loadStoredJson(STORAGE_KEYS.backupVault, [])));
+  const quickAddAvailableGenetics = useMemo(
+    () => buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases),
+    [snakes, morphAliases, geneAliases]
+  );
   const [animalExportFields, setAnimalExportFields] = useState(() => [...DEFAULT_ANIMAL_EXPORT_FIELDS]);
   const [pairingExportFields, setPairingExportFields] = useState(() => [...DEFAULT_PAIRING_EXPORT_FIELDS]);
   const [exportFeedback, setExportFeedback] = useState(null);
@@ -5102,10 +5612,11 @@ export default function BreedingPlannerApp() {
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [testOrderSnake, setTestOrderSnake] = useState(null);
+  const [panelRefreshToken, setPanelRefreshToken] = useState(0);
   const [returnToGroupsAfterEdit, setReturnToGroupsAfterEdit] = useState(false);
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [pairingGuard, setPairingGuard] = useState(null);
-  const [showAdvisor, setShowAdvisor] = useState(false);
   const [electronDataReady, setElectronDataReady] = useState(false);
   const handleAnimalViewTabChange = useCallback((nextView) => {
     if (!nextView || nextView === animalView) return;
@@ -5138,6 +5649,38 @@ export default function BreedingPlannerApp() {
   const femaleSearchInputRef = useRef(null);
   const [focusedPairingId, setFocusedPairingId] = useState(null);
   const [pairingsSearchQuery, setPairingsSearchQuery] = useState('');
+
+  const generateIdFromWizardRules = useCallback((draft = {}) => {
+    const sex = ensureSex(draft?.sex, 'F');
+    const parsedMorphHet = splitMorphHetInput(draft?.morphHetInput || '');
+    const morphList = Array.isArray(draft?.morphs)
+      ? draft.morphs.map(entry => String(entry).trim()).filter(Boolean)
+      : parsedMorphHet.morphs;
+    const hetList = Array.isArray(draft?.hets)
+      ? draft.hets.map(entry => String(entry).trim()).filter(Boolean)
+      : parsedMorphHet.hets;
+    const normalizedBirthDate = normalizeBirthDateValue(draft?.birthDate || null);
+    const birthYear = extractYearFromDateString(normalizedBirthDate);
+    const numericYear = Number(draft?.year);
+    const fallbackYear = Number.isFinite(numericYear) && numericYear > 0
+      ? numericYear
+      : new Date().getFullYear();
+    const derivedYear = birthYear ?? fallbackYear;
+
+    return generateSnakeId(
+      draft?.name,
+      derivedYear,
+      snakes,
+      null,
+      {
+        idConfig: breederInfo?.idGenerator,
+        sex,
+        morphs: morphList,
+        hets: hetList,
+        birthYear,
+      }
+    );
+  }, [breederInfo, snakes]);
 
   const openAppDialog = useCallback((config = {}) => new Promise(resolve => {
     const normalizedMessage = typeof config.message === 'string'
@@ -5219,6 +5762,63 @@ export default function BreedingPlannerApp() {
     placeholder: options.placeholder || '',
     tone: options.tone || 'info',
   }), [openAppDialog, t]);
+
+  const openLeucisticSelector = useCallback((sourceLabel = 'Leucistic') => {
+    return new Promise((resolve) => {
+      leucisticResolverRef.current = resolve;
+      const defaultType = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
+      setLeucisticTypeChoice(defaultType);
+      setLeucisticBelGene1(LEUCISTIC_BEL_GENE_OPTIONS[0]);
+      setLeucisticBelGene2(LEUCISTIC_BEL_GENE_OPTIONS[1]);
+      setLeucisticBlackGene(LEUCISTIC_BLACK_EYE_GENE_OPTIONS[0]);
+      setLeucisticModalState({ sourceLabel });
+    });
+  }, [lastLeucisticType]);
+
+  const cancelLeucisticSelector = useCallback(() => {
+    if (leucisticResolverRef.current) {
+      leucisticResolverRef.current({ cancelled: true, genes: [] });
+      leucisticResolverRef.current = null;
+    }
+    setLeucisticModalState(null);
+  }, []);
+
+  const confirmLeucisticSelector = useCallback(() => {
+    let genes = [];
+    if (leucisticTypeChoice === 'blackEye') {
+      const base = String(leucisticBlackGene || '').trim();
+      if (base) genes = [`Super ${base}`];
+    } else {
+      const gene1 = String(leucisticBelGene1 || '').trim();
+      const gene2 = String(leucisticBelGene2 || '').trim();
+      if (gene1 && gene2 && gene1.toLowerCase() === gene2.toLowerCase()) return;
+      if (gene1 && gene2) genes = [gene1, gene2];
+    }
+    if (!genes.length) return;
+    setLastLeucisticType(leucisticTypeChoice === 'blackEye' ? 'blackEye' : 'bel');
+    if (leucisticResolverRef.current) {
+      leucisticResolverRef.current({ cancelled: false, genes });
+      leucisticResolverRef.current = null;
+    }
+    setLeucisticModalState(null);
+  }, [leucisticTypeChoice, leucisticBlackGene, leucisticBelGene1, leucisticBelGene2]);
+
+  const resolveLeucisticInText = useCallback(async (rawText, sourceLabel = 'Leucistic') => {
+    const text = String(rawText || '');
+    if (!hasLeucisticTriggerText(text)) return text;
+    const selection = await openLeucisticSelector(sourceLabel);
+    if (!selection || selection.cancelled || !Array.isArray(selection.genes) || !selection.genes.length) {
+      return stripLeucisticTriggerText(text);
+    }
+    const replacement = selection.genes.join(', ');
+    return replaceLeucisticTriggerText(text, replacement);
+  }, [openLeucisticSelector]);
+
+  const resolveLeucisticInMorphHetLists = useCallback(async (morphs = [], hets = [], sourceLabel = 'Leucistic') => {
+    const raw = formatMorphHetForInput(morphs, hets);
+    const resolved = await resolveLeucisticInText(raw, sourceLabel);
+    return splitMorphHetInput(resolved);
+  }, [resolveLeucisticInText]);
 
   const appDialogOverlay = useMemo(() => {
     if (!appDialog) return null;
@@ -5384,6 +5984,16 @@ export default function BreedingPlannerApp() {
         if (payload.breederInfo && typeof payload.breederInfo === 'object') {
           setBreederInfo(normalizeBreederInfo(payload.breederInfo));
         }
+        if (Array.isArray(payload.morphAliases)) {
+          const normalizedAliases = normalizeMorphAliasDatabase(payload.morphAliases);
+          setMorphAliases(normalizedAliases.length ? normalizedAliases : [...DEFAULT_MORPH_ALIASES]);
+        }
+        if (Array.isArray(payload.geneAliases)) {
+          setGeneAliases(mergeGeneAliasRows(payload.geneAliases));
+        }
+        if (payload.leucisticType === 'blackEye' || payload.leucisticType === 'bel') {
+          setLastLeucisticType(payload.leucisticType);
+        }
         if (payload.backupSettings && typeof payload.backupSettings === 'object') {
           setBackupSettings(normalizeBackupSettings(payload.backupSettings));
         }
@@ -5432,6 +6042,8 @@ export default function BreedingPlannerApp() {
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
+  const [tagFilterMenuOpen, setTagFilterMenuOpen] = useState(false);
+  const tagFilterMenuRef = useRef(null);
   const isAnimalScannerView = tab === 'animals' && animalView !== 'groups';
   const editDraftStatusValue = typeof editSnakeDraft?.status === 'string' ? editSnakeDraft.status : '';
   const statusTagOptions = useMemo(() => {
@@ -5457,6 +6069,7 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => {
     setEditStatusMenuOpen(false);
+    setTagFilterMenuOpen(false);
   }, [statusTagOptions]);
 
   useEffect(() => {
@@ -5472,10 +6085,16 @@ export default function BreedingPlannerApp() {
   }, [editStatusMenuOpen]);
 
   useEffect(() => {
-    if (tab !== 'pairings' && showAdvisor) {
-      setShowAdvisor(false);
-    }
-  }, [tab, showAdvisor]);
+    if (!tagFilterMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (!tagFilterMenuRef.current) return;
+      if (!tagFilterMenuRef.current.contains(event.target)) {
+        setTagFilterMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [tagFilterMenuOpen]);
 
   useEffect(() => {
     if (!isAnimalScannerView) {
@@ -5525,6 +6144,11 @@ export default function BreedingPlannerApp() {
     setEditStatusMenuOpen(false);
   }, [setEditSnakeDraft, setEditStatusMenuOpen]);
 
+  const handleClearEditStatus = useCallback(() => {
+    setEditSnakeDraft(prev => (prev ? { ...prev, status: '' } : prev));
+    setEditStatusMenuOpen(false);
+  }, [setEditSnakeDraft, setEditStatusMenuOpen]);
+
   const handleDeleteStatusTag = useCallback((tag) => {
     const trimmed = (tag || '').trim();
     if (!trimmed) return;
@@ -5551,18 +6175,20 @@ export default function BreedingPlannerApp() {
     });
   }, [setCustomStatusTags, setRemovedStatusTags, setSelectedStatusTags, setSnakes, setNewAnimal, setEditSnakeDraft]);
 
+  const handleDeleteEditStatus = useCallback((tag) => {
+    handleDeleteStatusTag(tag);
+    setEditSnakeDraft(prev => {
+      if (!prev) return prev;
+      const current = typeof prev.status === 'string' ? prev.status.trim().toLowerCase() : '';
+      const candidate = typeof tag === 'string' ? tag.trim().toLowerCase() : '';
+      if (!current || !candidate || current !== candidate) return prev;
+      return { ...prev, status: '' };
+    });
+  }, [handleDeleteStatusTag, setEditSnakeDraft]);
+
   const toggleStatusTagFilter = useCallback((tag) => {
     const trimmed = (tag || '').trim();
-    if (!trimmed) return;
-    setSelectedStatusTags(prev => {
-      const set = new Set(prev);
-      if (set.has(trimmed)) {
-        set.delete(trimmed);
-      } else {
-        set.add(trimmed);
-      }
-      return Array.from(set);
-    });
+    setSelectedStatusTags(trimmed ? [trimmed] : []);
   }, []);
 
   const clearStatusTagFilters = useCallback(() => {
@@ -5571,17 +6197,8 @@ export default function BreedingPlannerApp() {
 
   // last feed defaults (persisted) - store feed/form/size/etc but not grams
   const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
-    const fallbackDefaults = {
-      feed: 'Mouse',
-      size: 'pinky',
-      sizeDetail: '',
-      form: 'Frozen/thawed',
-      formDetail: '',
-      notes: '',
-      refused: false,
-    };
-    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, fallbackDefaults) || fallbackDefaults;
-    return { ...fallbackDefaults, ...stored };
+    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
+    return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
   });
   useEffect(() => { saveStoredJson(STORAGE_KEYS.lastFeedDefaults, lastFeedDefaults); }, [lastFeedDefaults]);
   useEffect(() => {
@@ -5589,6 +6206,17 @@ export default function BreedingPlannerApp() {
   }, [rooms, heatRacks, terrariums]);
 
   useEffect(() => { saveStoredJson(STORAGE_KEYS.breeder, normalizeBreederInfo(breederInfo)); }, [breederInfo]);
+  useEffect(() => {
+    const normalized = normalizeMorphAliasDatabase(morphAliases);
+    const next = normalized.length ? normalized : [...DEFAULT_MORPH_ALIASES];
+    setActiveMorphAliases(next);
+    saveStoredJson(STORAGE_KEYS.morphAliases, next);
+  }, [morphAliases]);
+  useEffect(() => {
+    const next = mergeGeneAliasRows(geneAliases);
+    setActiveGeneAliasRows(next);
+    saveStoredJson(STORAGE_KEYS.geneAliases, next);
+  }, [geneAliases]);
 
   useEffect(() => {
     if (!electronDataReady) return;
@@ -5608,6 +6236,9 @@ export default function BreedingPlannerApp() {
       removedStatusTags,
       theme,
       breederInfo,
+      morphAliases,
+      geneAliases,
+      leucisticType: lastLeucisticType,
       backupSettings,
       autoBackupSnapshot,
       backupVault,
@@ -5640,6 +6271,9 @@ export default function BreedingPlannerApp() {
     rooms,
     heatRacks,
     terrariums,
+    morphAliases,
+    geneAliases,
+    lastLeucisticType,
     theme,
   ]);
 
@@ -5713,6 +6347,9 @@ export default function BreedingPlannerApp() {
     snakes,
     pairings,
     groups,
+    morphAliases: normalizeMorphAliasDatabase(morphAliases),
+    geneAliases: mergeGeneAliasRows(geneAliases),
+    leucisticType: lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel',
     breederInfo: normalizeBreederInfo(breederInfo),
     theme,
     lastFeedDefaults,
@@ -5720,7 +6357,7 @@ export default function BreedingPlannerApp() {
     heatRacks,
     terrariums,
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
-  }), [snakes, pairings, groups, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
+  }), [snakes, pairings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
   const handleRestoreBackup = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') {
@@ -5742,6 +6379,17 @@ export default function BreedingPlannerApp() {
     setPairings(incomingPairings);
     setGroups(Array.isArray(payload.groups) ? payload.groups : [...DEFAULT_GROUPS]);
 
+    if (Array.isArray(payload.morphAliases)) {
+      const normalizedAliases = normalizeMorphAliasDatabase(payload.morphAliases);
+      setMorphAliases(normalizedAliases.length ? normalizedAliases : [...DEFAULT_MORPH_ALIASES]);
+    }
+    if (Array.isArray(payload.geneAliases)) {
+      setGeneAliases(mergeGeneAliasRows(payload.geneAliases));
+    }
+    if (payload.leucisticType === 'blackEye' || payload.leucisticType === 'bel') {
+      setLastLeucisticType(payload.leucisticType);
+    }
+
     if (payload.breederInfo && typeof payload.breederInfo === 'object') {
       setBreederInfo(normalizeBreederInfo(payload.breederInfo));
     }
@@ -5762,7 +6410,7 @@ export default function BreedingPlannerApp() {
         : normalizeSpacesDataset(payload.spaces || []);
       setSpacesState(normalizedSpaces);
     }
-  }, [setSnakes, setPairings, setGroups, setBreederInfo, setLastFeedDefaults, setSpacesState]);
+  }, [setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState]);
 
   const addBackupVaultEntry = useCallback((payload, meta = {}) => {
     if (!payload || typeof payload !== 'object') return null;
@@ -5854,6 +6502,107 @@ export default function BreedingPlannerApp() {
       window.clearInterval(id);
     };
   }, [backupSettings.frequency, backupSettings.lastRun, runAutoBackup]);
+
+  const resetAppToDefaults = useCallback(async () => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+
+    if (bridge?.clearData) {
+      const result = await bridge.clearData();
+      if (result && result.success === false) {
+        throw new Error(result.error || 'Unable to clear desktop storage.');
+      }
+    } else if (bridge?.saveData) {
+      const result = await bridge.saveData({});
+      if (result && result.success === false) {
+        throw new Error(result.error || 'Unable to clear desktop storage.');
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.clear();
+      } catch (error) {
+        console.warn('Failed to clear localStorage during reset', error);
+      }
+      try {
+        window.sessionStorage.clear();
+      } catch (error) {
+        console.warn('Failed to clear sessionStorage during reset', error);
+      }
+      if (window.indexedDB && typeof window.indexedDB.databases === 'function') {
+        try {
+          const databases = await window.indexedDB.databases();
+          await Promise.all(
+            (Array.isArray(databases) ? databases : [])
+              .map((db) => db?.name)
+              .filter(Boolean)
+              .map((dbName) => new Promise((resolve) => {
+                const request = window.indexedDB.deleteDatabase(dbName);
+                request.onsuccess = () => resolve(true);
+                request.onerror = () => resolve(false);
+                request.onblocked = () => resolve(false);
+              }))
+          );
+        } catch (error) {
+          console.warn('Failed to clear IndexedDB databases during reset', error);
+        }
+      }
+      if (typeof window.caches !== 'undefined' && typeof window.caches.keys === 'function') {
+        try {
+          const cacheKeys = await window.caches.keys();
+          await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)));
+        } catch (error) {
+          console.warn('Failed to clear Cache Storage during reset', error);
+        }
+      }
+    }
+
+    if (leucisticResolverRef.current) {
+      leucisticResolverRef.current({ cancelled: true, genes: [] });
+      leucisticResolverRef.current = null;
+    }
+
+    setSnakes(createFreshSnakes());
+    setPairings(createFreshPairings());
+    setTab('animals');
+    setPairingsView('active');
+    setCompletedYearFilter('All');
+    setAnimalView('all');
+    setAnimalLayout('cards');
+    setQuery('');
+    setGroupFilter('all');
+    setShowGroups([]);
+    setHiddenGroups([]);
+    setSelectedStatusTags([]);
+    setCustomStatusTags([]);
+    setRemovedStatusTags([]);
+    setGroups([...DEFAULT_GROUPS]);
+    setSpacesState(normalizeSpacesDataset([]));
+    setBreederInfo(normalizeBreederInfo(null));
+    setMorphAliases([...DEFAULT_MORPH_ALIASES]);
+    setGeneAliases(getDefaultGeneAliasRows());
+    setLastLeucisticType('bel');
+    setLeucisticModalState(null);
+    setLeucisticTypeChoice('bel');
+    setLeucisticBelGene1(LEUCISTIC_BEL_GENE_OPTIONS[0]);
+    setLeucisticBelGene2(LEUCISTIC_BEL_GENE_OPTIONS[1]);
+    setLeucisticBlackGene(LEUCISTIC_BLACK_EYE_GENE_OPTIONS[0]);
+    setBackupSettings(normalizeBackupSettings(null));
+    setAutoBackupSnapshot(null);
+    setBackupVault([]);
+    setLastFeedDefaults({ ...DEFAULT_LAST_FEED_DEFAULTS });
+    setAnimalExportFields([...DEFAULT_ANIMAL_EXPORT_FIELDS]);
+    setPairingExportFields([...DEFAULT_PAIRING_EXPORT_FIELDS]);
+    setExportFeedback(null);
+    setListExportFeedback(null);
+    setAppDialog(null);
+    setShowAddModal(false);
+    setShowImportModal(false);
+    setTestOrderSnake(null);
+    setPairingGuard(null);
+    setPanelRefreshToken((prev) => prev + 1);
+    setElectronDataReady(true);
+  }, []);
 
   const handleAddRoom = useCallback((name) => {
     const trimmed = String(name || '').trim();
@@ -6236,6 +6985,10 @@ export default function BreedingPlannerApp() {
       const id = decodeURIComponent(h[1]);
       const s = snakes.find(x=>x.id===id);
 
+  useEffect(() => {
+    const value = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
+    saveStoredJson(STORAGE_KEYS.leucisticType, value);
+  }, [lastLeucisticType]);
       if (s) { setEditSnake(s); setEditSnakeDraft(initSnakeDraft(s)); }
     }
   }, [snakes]);
@@ -6608,6 +7361,42 @@ export default function BreedingPlannerApp() {
     setShowPairingModal(true);
   }
 
+  const handleAdvisorSuggestionToPlan = useCallback((suggestion) => {
+    if (!suggestion) return;
+    const maleId = suggestion.maleId || "";
+    const femaleId = suggestion.femaleId || "";
+    if (!maleId || !femaleId) return;
+
+    const maleSnake = snakeById(snakes, maleId);
+    const femaleSnake = snakeById(snakes, femaleId);
+    const maleName = maleSnake?.name || maleId;
+    const femaleName = femaleSnake?.name || femaleId;
+    const goalChance = Number.isFinite(suggestion?.goalProb) ? `${(suggestion.goalProb * 100).toFixed(1)}%` : null;
+    const autoNoteParts = [
+      t('advisor.convertedFromSuggestion', { defaultValue: 'Converted from Breeding Advisor suggestion.' }),
+      suggestion?.rationale ? suggestion.rationale : null,
+      goalChance
+        ? t('advisor.convertedGoalChance', {
+            defaultValue: 'Estimated goal probability: {{chance}}.',
+            chance: goalChance,
+          })
+        : null,
+    ].filter(Boolean);
+
+    setDraft({
+      maleId,
+      femaleId,
+      goals: [],
+      notes: autoNoteParts.join(' ').trim(),
+      startDate: localYMD(new Date()),
+    });
+    setMaleSearchQuery("");
+    setFemaleSearchQuery("");
+    setPairingSearchTarget(null);
+    setPairingsView('active');
+    setShowPairingModal(true);
+  }, [setDraft, setFemaleSearchQuery, setMaleSearchQuery, setPairingSearchTarget, setPairingsView, setShowPairingModal, snakes, t]);
+
   const openSnakeCard = useCallback((snake) => {
     if (!snake) return;
     setReturnToGroupsAfterEdit(tab === 'animals' && animalView === 'groups');
@@ -6647,6 +7436,43 @@ export default function BreedingPlannerApp() {
     }
     return null;
   }, [openSnakeCard, showAppAlert, snakes]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleOpenRelatedSnake = (event) => {
+      const detail = event?.detail || {};
+      const snakeId = typeof detail?.snakeId === 'string' ? detail.snakeId.trim() : String(detail?.snakeId || '').trim();
+      const snakeDisplayId = typeof detail?.snakeDisplayId === 'string' ? detail.snakeDisplayId.trim() : String(detail?.snakeDisplayId || '').trim();
+      const snakeName = typeof detail?.snakeName === 'string' ? detail.snakeName.trim() : String(detail?.snakeName || '').trim();
+
+      if (snakeId) {
+        const opened = openSnakeFromScan(snakeId, { silent: true });
+        if (opened) return;
+      }
+
+      const fallback = snakes.find((snake) => {
+        if (!snake) return false;
+        const id = String(snake.id || '').trim();
+        const displayId = String(snake.displayId || snake.display_id || snake.animalCode || '').trim();
+        const name = String(snake.name || '').trim();
+        if (snakeDisplayId && (displayId === snakeDisplayId || id === snakeDisplayId)) return true;
+        if (snakeName && name && name.toLowerCase() === snakeName.toLowerCase()) return true;
+        return false;
+      });
+
+      if (fallback) {
+        openSnakeCard(fallback);
+      } else if (snakeId || snakeDisplayId || snakeName) {
+        const fallbackLabel = snakeName || snakeDisplayId || snakeId;
+        showAppAlert(`No snake found for terminal item: ${fallbackLabel}`);
+      }
+    };
+
+    window.addEventListener('lab:open-related-snake', handleOpenRelatedSnake);
+    return () => {
+      window.removeEventListener('lab:open-related-snake', handleOpenRelatedSnake);
+    };
+  }, [openSnakeCard, openSnakeFromScan, showAppAlert, snakes]);
 
   const handlePassiveScan = useCallback((payload) => {
     if (!isAnimalScannerView) return;
@@ -6765,17 +7591,21 @@ export default function BreedingPlannerApp() {
     setFocusedPairingId(newPairingId);
   }
 
-  function addAnimalFromForm() {
+  async function addAnimalFromForm() {
     const sex = ensureSex(newAnimal.sex, 'F');
-    const parsedMorphHet = splitMorphHetInput(newAnimal.morphHetInput || '');
-    const morphList = Array.isArray(newAnimal.morphs)
+    const resolvedMorphHetInput = await resolveLeucisticInText(newAnimal.morphHetInput || '', 'Add Animal save');
+    const parsedMorphHet = splitMorphHetInput(resolvedMorphHetInput || '');
+    const rawMorphList = Array.isArray(newAnimal.morphs)
       ? newAnimal.morphs.map(entry => String(entry).trim()).filter(Boolean)
       : parsedMorphHet.morphs;
-    const hetList = Array.isArray(newAnimal.hets)
+    const rawHetList = Array.isArray(newAnimal.hets)
       ? newAnimal.hets.map(entry => String(entry).trim()).filter(Boolean)
       : parsedMorphHet.hets;
+    const normalizedGenetics = normalizeMorphHetLists([...(rawMorphList || []), ...(rawHetList || [])]);
+    const morphList = normalizedGenetics.morphs;
+    const hetList = normalizedGenetics.hets;
     const existingIds = snakes.map(snake => snake.id);
-    const normalizedBirthDate = normalizeDateInput(newAnimal.birthDate || null);
+    const normalizedBirthDate = normalizeBirthDateValue(newAnimal.birthDate || null);
     const birthYear = extractYearFromDateString(normalizedBirthDate);
     const numericYear = Number(newAnimal.year);
     const fallbackYear = Number.isFinite(numericYear) && numericYear > 0
@@ -6829,11 +7659,14 @@ export default function BreedingPlannerApp() {
       morphs: morphList,
       hets: hetList,
       weight: Number(newAnimal.weight) || 0,
+      price: String(newAnimal.price || '').trim(),
       year: derivedYear,
       birthDate: normalizedBirthDate || null,
+      notes: String(newAnimal.notes || '').trim(),
       tags: [],
       groups: groupList,
       status: normalizedStatus,
+      morphHetInput: resolvedMorphHetInput,
       imageUrl: coverImage,
       photos: draftPhotos,
       logs: cloneLogs(newAnimal.logs),
@@ -7345,6 +8178,8 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
                 <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
                 <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Planner" })}</TabButton>
+                <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
+                <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
                 <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
                 <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
               </div>
@@ -7493,7 +8328,7 @@ export default function BreedingPlannerApp() {
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("snakeEdit.tag")}</span>
                     {statusTagOptions.length > 0 && (
                       <span className="text-[11px] text-neutral-500">
-                        {selectedStatusTags.length ? `${selectedStatusTags.length} ${t("filters.show")}` : t("filters.all")}
+                        {selectedStatusTags.length ? selectedStatusTags[0] : t("filters.all")}
                       </span>
                     )}
                     {selectedStatusTags.length > 0 && (
@@ -7506,37 +8341,63 @@ export default function BreedingPlannerApp() {
                       </button>
                     )}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2 items-center">
                     {statusTagOptions.length ? (
-                      statusTagOptions.map(option => {
-                        const checked = selectedStatusTags.includes(option);
-                        return (
-                          <div key={option} className="flex items-center gap-1">
-                            <label
-                              className={cx(
-                                'inline-flex items-center gap-1 px-2 py-1 border rounded-lg text-[12px] bg-white transition-colors',
-                                checked ? 'border-sky-500 text-sky-700 bg-sky-50' : 'border-neutral-200 text-neutral-700 hover:border-sky-400'
-                              )}
-                            >
-                              <input
-                                type="checkbox"
-                                className="w-3 h-3"
-                                checked={checked}
-                                onChange={() => toggleStatusTagFilter(option)}
-                              />
-                              <span>{option}</span>
-                            </label>
+                      <div className="relative" ref={tagFilterMenuRef}>
+                        <button
+                          type="button"
+                          className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-left flex items-center justify-between"
+                          onClick={() => setTagFilterMenuOpen(prev => !prev)}
+                        >
+                          <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
+                          <span className="text-[10px] text-neutral-500">▾</span>
+                        </button>
+                        {tagFilterMenuOpen && (
+                          <div className="absolute z-30 mt-1 w-full min-w-[220px] max-h-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
                             <button
                               type="button"
-                              className="h-5 w-5 inline-flex items-center justify-center rounded-full border border-neutral-200 text-[11px] leading-none text-neutral-500 hover:border-rose-400 hover:text-rose-500"
-                              title="Delete tag"
-                              onClick={() => handleDeleteStatusTag(option)}
+                              className={cx(
+                                'status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                !selectedStatusTags.length ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
+                              )}
+                              onClick={() => {
+                                clearStatusTagFilters();
+                                setTagFilterMenuOpen(false);
+                              }}
                             >
-                            x
+                              {t("snakeEdit.noTag", { defaultValue: "No tag" })}
                             </button>
+                            {statusTagOptions.map(option => {
+                              const selected = selectedStatusTags[0] === option;
+                              return (
+                                <div key={option} className="flex items-center">
+                                  <button
+                                    type="button"
+                                    className={cx(
+                                      'status-tag-menu-button flex-1 px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                      selected ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
+                                    )}
+                                    onClick={() => {
+                                      toggleStatusTagFilter(option);
+                                      setTagFilterMenuOpen(false);
+                                    }}
+                                  >
+                                    {option}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="status-tag-menu-button px-2 py-2 text-sm font-semibold text-neutral-500 hover:text-rose-500"
+                                    title="Delete tag"
+                                    onClick={() => handleDeleteStatusTag(option)}
+                                  >
+                                    -
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })
+                        )}
+                      </div>
                     ) : (
                       <div className="text-xs text-neutral-500">{t("snakeEdit.noTagsYet")}</div>
                     )}
@@ -7557,6 +8418,7 @@ export default function BreedingPlannerApp() {
                       snakes={activeAnimalList}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
+                      onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                       onDelete={requestDeleteSnake}
                       pairings={pairings}
                       onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
@@ -7575,6 +8437,7 @@ export default function BreedingPlannerApp() {
                           setSnakes={setSnakes}
                           onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                           onQuickPair={(sn)=> startPairingWithSnake(sn)}
+                          onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                           onDelete={requestDeleteSnake}
                           pairings={pairings}
                           onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
@@ -7618,6 +8481,17 @@ export default function BreedingPlannerApp() {
           />
         )}
 
+        {tab === "advisor" && (
+          <div className="flex flex-col gap-4">
+            <SuggestionsTab
+              males={males}
+              females={females}
+              onPlanSuggestion={handleAdvisorSuggestionToPlan}
+              onExportPairingsByMale={handleAdvisorPairingExport}
+            />
+          </div>
+        )}
+
         {tab === "pairings" && (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -7651,7 +8525,6 @@ export default function BreedingPlannerApp() {
                     setPairingsView('incubator');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
-                    setShowAdvisor(false);
                   }}
                 >
                   {t("pairing.incubator")}
@@ -7677,15 +8550,6 @@ export default function BreedingPlannerApp() {
                     </button>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvisor(prev => !prev)}
-                  className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, showAdvisor ? false : true))}
-                  aria-pressed={showAdvisor}
-                  disabled={pairingsView === 'incubator'}
-                >
-                  {showAdvisor ? t("actions.hideAdvisor", { defaultValue: "Hide advisor" }) : t("actions.showAdvisor", { defaultValue: "Breeding advisor" })}
-                </button>
                 <button
                   type="button"
                   onClick={() => setShowPairingQrModal(true)}
@@ -7721,11 +8585,6 @@ export default function BreedingPlannerApp() {
                     {year}
                   </TabButton>
                 ))}
-              </div>
-            )}
-            {showAdvisor && pairingsView !== 'incubator' && (
-              <div className="flex flex-col gap-4">
-                <SuggestionsTab males={males} females={females} onExportPairingsByMale={handleAdvisorPairingExport} />
               </div>
             )}
             {pairingsView === 'incubator' ? (
@@ -7800,11 +8659,21 @@ export default function BreedingPlannerApp() {
           />
         )}
 
+        {tab === "shedTerminal" && (
+          <Card title={t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}>
+            <ShedTestTerminalPanel />
+          </Card>
+        )}
+
   {tab === "setup" && (
           <BreederSection
             breederInfo={breederInfo}
             setBreederInfo={setBreederInfo}
+            morphAliases={morphAliases}
+            setMorphAliases={setMorphAliases}
             theme={theme}
+            geneAliases={geneAliases}
+            setGeneAliases={setGeneAliases}
             onSaved={() => setTab('animals')}
             createBackupPayload={createBackupPayload}
             onRestoreBackup={handleRestoreBackup}
@@ -7827,6 +8696,7 @@ export default function BreedingPlannerApp() {
             showAppAlert={showAppAlert}
             showAppPrompt={showAppPrompt}
             showAppConfirm={showAppConfirm}
+            onResetToDefaults={resetAppToDefaults}
           />
         )}
       </div>
@@ -7944,14 +8814,128 @@ export default function BreedingPlannerApp() {
               setNewAnimal={setNewAnimal}
               groups={groups}
               setGroups={setGroups}
+              availableGenetics={quickAddAvailableGenetics}
               statusOptions={statusTagOptions}
               customStatusTags={customStatusTags}
               onCreateStatusTag={handleCreateStatusTag}
               onDeleteStatusTag={handleDeleteStatusTag}
+              onGenerateIdFromWizard={generateIdFromWizardRules}
+              onResolveLeucisticText={resolveLeucisticInText}
+              onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
               onCancel={()=>setShowAddModal(false)}
               onAdd={addAnimalFromForm}
               theme={theme}
             />
+          </div>
+        </div>
+      )}
+
+      {leucisticModalState && (
+        <div
+          className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-[120]", overlayClass(theme))}
+          onClick={cancelLeucisticSelector}
+        >
+          <div
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-lg font-semibold">Select Leucistic Type</div>
+            <div className="text-sm text-neutral-600 space-y-3">
+              <p>
+                When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations.
+              </p>
+              <div>
+                <div className="font-medium text-neutral-800">Blue Eyed Leucistic (BEL)</div>
+                <p className="mt-1">
+                  A Blue Eyed Leucistic is produced when two compatible genes from the BEL complex are combined. Common BEL complex genes include Mojave, Lesser, Butter, Russo, Mystic, Phantom, and Special.
+                </p>
+                <p className="mt-1">
+                  Example combinations: Mojave + Lesser, Mojave + Butter, Lesser + Russo, Mystic + Mojave, Phantom + Mojave.
+                </p>
+              </div>
+              <div>
+                <div className="font-medium text-neutral-800">Black Eyed Leucistic</div>
+                <p className="mt-1">
+                  Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically.
+                </p>
+                <p className="mt-1">
+                  Examples: Fire + Fire → Super Fire, Lesser + Lesser → Super Lesser, Butter + Butter → Super Butter.
+                </p>
+              </div>
+              <p>
+                Defining the exact genes keeps genetics records accurate, preserves breeding outcomes, and ensures pairing predictions are correct.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Leucistic Type</label>
+              <select
+                className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
+                value={leucisticTypeChoice}
+                onChange={e => setLeucisticTypeChoice(e.target.value === 'blackEye' ? 'blackEye' : 'bel')}
+              >
+                <option value="bel">Blue Eyed Leucistic</option>
+                <option value="blackEye">Black Eyed Leucistic</option>
+              </select>
+            </div>
+
+            {leucisticTypeChoice === 'bel' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium">BEL Gene 1</label>
+                  <select
+                    className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
+                    value={leucisticBelGene1}
+                    onChange={e => setLeucisticBelGene1(e.target.value)}
+                  >
+                    {LEUCISTIC_BEL_GENE_OPTIONS.map(option => (
+                      <option key={`bel-1-${option}`} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium">BEL Gene 2</label>
+                  <select
+                    className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
+                    value={leucisticBelGene2}
+                    onChange={e => setLeucisticBelGene2(e.target.value)}
+                  >
+                    {LEUCISTIC_BEL_GENE_OPTIONS.map(option => (
+                      <option key={`bel-2-${option}`} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                {String(leucisticBelGene1 || '').trim() && String(leucisticBelGene2 || '').trim() && String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() && (
+                  <div className="sm:col-span-2 text-xs text-red-600">
+                    Select two different genes for Blue Eyed Leucistic.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium">Black Eye Complex Gene</label>
+                <select
+                  className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
+                  value={leucisticBlackGene}
+                  onChange={e => setLeucisticBlackGene(e.target.value)}
+                >
+                  {LEUCISTIC_BLACK_EYE_GENE_OPTIONS.map(option => (
+                    <option key={`black-eye-${option}`} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>Cancel</button>
+              <button
+                type="button"
+                className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                onClick={confirmLeucisticSelector}
+                disabled={leucisticTypeChoice === 'bel' ? !(leucisticBelGene1 && leucisticBelGene2) || String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() : !leucisticBlackGene}
+              >
+                Apply
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -8180,6 +9164,7 @@ export default function BreedingPlannerApp() {
                     setImportPreview={setImportPreview}
                     runImportPreview={runImportPreview}
                     applyImport={applyImport}
+                    onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
                     theme={theme}
                     onCancel={()=>setShowImportModal(false)}
                     showAppAlert={showAppAlert}
@@ -8378,8 +9363,8 @@ export default function BreedingPlannerApp() {
 
       {/* edit snake */}
     {editSnake && editSnakeDraft && (
-  <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))}>
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+    <div className={cx("fixed inset-0 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 z-50", overlayClass(theme))}>
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border flex flex-col" onClick={e=>e.stopPropagation()}>
             <div className="p-5 border-b flex items-center justify-between">
                         <div className="font-semibold">{editSnake.name}</div>
                         <div className="flex items-center gap-2">
@@ -8414,6 +9399,12 @@ export default function BreedingPlannerApp() {
                           >
                             {t("actions.qrLabel", { defaultValue: "QR label" })}
                           </button>
+                          <button
+                            className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                            onClick={() => setTestOrderSnake(editSnakeDraft)}
+                          >
+                            {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
+                          </button>
                           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}
                             onClick={()=>{
                               const oldId = editSnake.id;
@@ -8421,7 +9412,19 @@ export default function BreedingPlannerApp() {
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
-                              setSnakes(prev => prev.map(s => s.id === oldId ? ({ ...editSnakeDraft, id: newId, sex: normalizedSex, status: normalizedStatus, groups: normalizedGroups }) : s));
+                              const normalizedGenetics = normalizeMorphHetLists([
+                                ...(Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []),
+                                ...(Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []),
+                              ]);
+                              setSnakes(prev => prev.map(s => s.id === oldId ? ({
+                                ...editSnakeDraft,
+                                id: newId,
+                                sex: normalizedSex,
+                                status: normalizedStatus,
+                                groups: normalizedGroups,
+                                morphs: normalizedGenetics.morphs,
+                                hets: normalizedGenetics.hets,
+                              }) : s));
                           setPairings(prev => prev.map(p => ({
                             ...p,
                             maleId: p.maleId === oldId ? newId : p.maleId,
@@ -8433,9 +9436,73 @@ export default function BreedingPlannerApp() {
                         </div>
             </div>
 
-            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-auto min-h-0 flex-1">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* basics */}
-              <div className="md:col-span-1 space-y-1">
+              <div className="md:col-span-1 flex flex-col gap-1">
+                <div ref={editStatusMenuRef} className="relative">
+                  <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
+                  <button
+                    type="button"
+                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                    onClick={() => setEditStatusMenuOpen(open => !open)}
+                  >
+                    <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
+                    <span className="text-[10px] text-neutral-500">v</span>
+                  </button>
+                  {editStatusMenuOpen && (
+                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
+                      <button
+                        type="button"
+                        className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                        onClick={handleClearEditStatus}
+                      >
+                        {t("snakeEdit.noTag")}
+                      </button>
+                      <div className="border-t border-neutral-100" />
+                      {statusTagOptions.length ? (
+                        statusTagOptions.map(option => (
+                          <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
+                            <button
+                              type="button"
+                              className="status-tag-menu-button flex-1 text-left"
+                              onClick={() => handleSelectEditStatus(option)}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                              onClick={() => handleDeleteEditStatus(option)}
+                              title={t("snakeEdit.deleteTag")}
+                            >
+                              -
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet")}</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <input
+                      className="w-full border rounded-lg px-2 py-1 text-sm"
+                      value={editStatusTagInput}
+                      onChange={e => setEditStatusTagInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
+                      placeholder={t("snakeEdit.tagPlaceholder")}
+                    />
+                    <button
+                      type="button"
+                      className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', editStatusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+                      onClick={handleAddEditStatusTag}
+                      disabled={!editStatusTagInput.trim()}
+                    >
+                      {t("snakeEdit.addTag")}
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.tagHelp")}</div>
+                </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.name")}</label>
                   <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
@@ -8478,75 +9545,12 @@ export default function BreedingPlannerApp() {
                     <option value="M">{t("snakeEdit.sexMale")}</option>
                   </select>
                 </div>
-                <div ref={editStatusMenuRef} className="relative">
-                  <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
-                  <button
-                    type="button"
-                    className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
-                    onClick={() => setEditStatusMenuOpen(open => !open)}
-                  >
-                    <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
-                    <span className="text-[10px] text-neutral-500">v</span>
-                  </button>
-                  {editStatusMenuOpen && (
-                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
-                        onClick={handleClearEditStatus}
-                      >
-                        {t("snakeEdit.noTag")}
-                      </button>
-                      <div className="border-t border-neutral-100" />
-                      {statusTagOptions.length ? (
-                        statusTagOptions.map(option => (
-                          <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
-                            <button
-                              type="button"
-                              className="flex-1 text-left"
-                              onClick={() => handleSelectEditStatus(option)}
-                            >
-                              {option}
-                            </button>
-                            <button
-                              type="button"
-                              className="ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
-                              onClick={() => handleDeleteEditStatus(option)}
-                              title={t("snakeEdit.deleteTag")}
-                            >
-                              -
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet")}</div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <input
-                      className="w-full border rounded-lg px-2 py-1 text-sm"
-                      value={editStatusTagInput}
-                      onChange={e => setEditStatusTagInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
-                      placeholder={t("snakeEdit.tagPlaceholder")}
-                    />
-                    <button
-                      type="button"
-                      className={cx('px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', editStatusTagInput.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
-                      onClick={handleAddEditStatusTag}
-                      disabled={!editStatusTagInput.trim()}
-                    >
-                      {t("snakeEdit.addTag")}
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.tagHelp")}</div>
-                </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
-                  <input type="date" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                  <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
                     value={editSnakeDraft.birthDate || ''}
-                    onChange={e=>setEditSnakeDraft(d=>({...d,birthDate:e.target.value}))} />
+                    placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
+                    onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
                   <div className="text-xs text-neutral-500 mt-0.5">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
                 </div>
                 <div>
@@ -8555,8 +9559,9 @@ export default function BreedingPlannerApp() {
                     rows={3}
                     className="mt-0.5 w-full border rounded-xl px-2 py-2 text-sm"
                     value={formatMorphHetForInput(editSnakeDraft.morphs, editSnakeDraft.hets)}
-                    onChange={e=>{
-                      const { morphs, hets } = splitMorphHetInput(e.target.value);
+                    onChange={async e=>{
+                      const resolvedText = await resolveLeucisticInText(e.target.value, 'Edit Animal genetics');
+                      const { morphs, hets } = splitMorphHetInput(resolvedText);
                       setEditSnakeDraft(d=>({
                         ...d,
                         morphs,
@@ -8573,6 +9578,18 @@ export default function BreedingPlannerApp() {
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
+                {isSnakeTaggedForSell(editSnakeDraft) && (
+                  <div>
+                    <label className="text-xs font-medium">{t("snakeEdit.price", { defaultValue: "Price" })}</label>
+                    <input
+                      type="text"
+                      className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
+                      value={editSnakeDraft.price || ''}
+                      onChange={e=>setEditSnakeDraft(d=>({...d,price:e.target.value}))}
+                      placeholder={t("snakeEdit.pricePlaceholder", { defaultValue: "e.g., 450" })}
+                    />
+                  </div>
+                )}
                 
                 {/* Image URL field removed per request */}
 
@@ -8608,6 +9625,8 @@ export default function BreedingPlannerApp() {
 
               {/* Genetics picker removed from edit modal per user request */}
               <div className="md:col-span-2 space-y-5">
+                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+
                 <div className="p-3 border rounded-xl bg-white">
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
@@ -8772,6 +9791,13 @@ export default function BreedingPlannerApp() {
         onCancel={cancelDeleteSnake}
         onConfirm={confirmDeleteSnake}
         theme={theme}
+      />
+      <BreederOrderGeneticTestModal
+        open={Boolean(testOrderSnake)}
+        snake={testOrderSnake}
+        onClose={() => setTestOrderSnake(null)}
+        onOrderCreated={() => setPanelRefreshToken((prev) => prev + 1)}
+        overlayClass={overlayClass(theme)}
       />
         <ScrollToTopButton theme={theme} />
     </div>
@@ -10123,22 +11149,197 @@ function loadImageElement(src) {
   });
 }
 
-async function exportQrToPdf(snakesToExport, breederInfo = {}) {
+function formatCatalogSex(rawSex) {
+  const normalized = normalizeSexValue(rawSex);
+  if (normalized === 'M') return '1.0';
+  if (normalized === 'F') return '0.1';
+  return String(rawSex || 'Unknown').trim() || 'Unknown';
+}
+
+function resolveCatalogMorph(animal) {
+  if (!animal || typeof animal !== 'object') return '';
+  if (typeof animal.genetics === 'string' && animal.genetics.trim()) {
+    return animal.genetics.trim();
+  }
+  const normalized = normalizeMorphHetLists([
+    ...(Array.isArray(animal.morphs) ? animal.morphs : []),
+    ...(Array.isArray(animal.hets) ? animal.hets : []),
+  ]);
+  const tokens = combineMorphsAndHetsForDisplay(normalized.morphs, normalized.hets, animal.possibleHets);
+  return tokens.join(', ');
+}
+
+function resolvePrimaryAnimalImage(animal) {
+  if (!animal || typeof animal !== 'object') return '';
+  if (typeof animal.primaryImage === 'string' && animal.primaryImage.trim()) return animal.primaryImage.trim();
+  if (typeof animal.imageUrl === 'string' && animal.imageUrl.trim()) return animal.imageUrl.trim();
+  const photos = Array.isArray(animal.photos) ? animal.photos : [];
+  const latest = photos.length ? photos[photos.length - 1] : null;
+  if (latest && typeof latest.url === 'string' && latest.url.trim()) return latest.url.trim();
+  return '';
+}
+
+function isSnakeTaggedForSell(animal) {
+  if (!animal || typeof animal !== 'object') return false;
+  if (animal.forSale === true || animal.isForSale === true) return true;
+  const statusToken = String(animal.status || '').trim().toLowerCase();
+  if (
+    statusToken === 'for sale'
+    || statusToken === 'forsale'
+    || statusToken === 'for sell'
+    || statusToken === 'forsell'
+    || statusToken.includes('for sale')
+    || statusToken.includes('for sell')
+  ) {
+    return true;
+  }
+  const tags = Array.isArray(animal.tags) ? animal.tags : [];
+  return tags.some((tag) => {
+    const token = String(tag || '').trim().toLowerCase();
+    return token === 'for sale' || token === 'forsale' || token === 'for sell' || token === 'forsell' || token === 'sale' || token === 'available';
+  });
+}
+
+function drawCatalogImagePlaceholder(doc, x, y, width, height) {
+  doc.setFillColor(225, 228, 232);
+  doc.rect(x, y, width, height, 'F');
+  doc.setDrawColor(190, 195, 201);
+  doc.setLineWidth(0.3);
+  doc.rect(x, y, width, height);
+  doc.setTextColor(120, 125, 130);
+  doc.setFontSize(14);
+  setPdfFont(doc, 'normal');
+  doc.text('No Image', x + (width / 2), y + (height / 2), { align: 'center', baseline: 'middle' });
+}
+
+async function generateSnakeCatalogPDF(animals = []) {
+  if (!Array.isArray(animals) || !animals.length) {
+    throw new Error('No animals available for catalog generation.');
+  }
+
   const { jsPDF } = await import('jspdf');
-  const pageW = 100;
-  const pageH = 50;
-  const margin = 6;
-  const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
   await applyPdfUnicodeFont(doc);
 
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const pagePadding = 12;
+  const contentW = pageW - (pagePadding * 2);
+  const contentH = pageH - (pagePadding * 2);
+  const textColumnW = contentW * 0.37;
+  const imageColumnW = contentW * 0.63;
+  const textX = pagePadding + 4;
+  const textLabelW = 24;
+  const lineHeight = 7;
+  const morphMaxWidth = Math.max(40, textColumnW - textLabelW - 8);
+  const imageX = pagePadding + textColumnW;
+  const imageY = pagePadding;
+  const imageW = imageColumnW;
+  const imageH = contentH;
+
+  for (let index = 0; index < animals.length; index += 1) {
+    if (index > 0) {
+      doc.addPage('a4', 'landscape');
+    }
+
+    const animal = animals[index] || {};
+    const idValue = String(animal.id || '—');
+    const sexValue = formatCatalogSex(animal.sex);
+    const morphValue = resolveCatalogMorph(animal) || '—';
+    const priceRaw = animal.price;
+    const pairingRaw = animal.pairing;
+    const taggedForSell = isSnakeTaggedForSell(animal);
+    const hasPrice = !(priceRaw === null || typeof priceRaw === 'undefined' || String(priceRaw).trim() === '');
+    const hasPairing = !(pairingRaw === null || typeof pairingRaw === 'undefined' || String(pairingRaw).trim() === '');
+
+    doc.setFillColor(244, 244, 244);
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    const primaryImage = resolvePrimaryAnimalImage(animal);
+    if (primaryImage) {
+      try {
+        const image = await loadImageElement(primaryImage);
+        const naturalW = Number(image.naturalWidth || image.width || 0);
+        const naturalH = Number(image.naturalHeight || image.height || 0);
+        if (naturalW > 0 && naturalH > 0) {
+          const scale = Math.min(imageW / naturalW, imageH / naturalH);
+          const drawW = naturalW * scale;
+          const drawH = naturalH * scale;
+          const drawX = imageX + ((imageW - drawW) / 2);
+          const drawY = imageY + ((imageH - drawH) / 2);
+          doc.addImage(primaryImage, 'JPEG', drawX, drawY, drawW, drawH);
+        } else {
+          drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+        }
+      } catch (err) {
+        drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+      }
+    } else {
+      drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+    }
+
+    let cursorY = pagePadding + 22;
+    const drawField = (label, value, { multiline = false } = {}) => {
+      setPdfFont(doc, 'bold');
+      doc.setFontSize(12.5);
+      doc.setTextColor(28, 28, 28);
+      doc.text(`${label}:`, textX, cursorY);
+      setPdfFont(doc, 'normal');
+      if (multiline) {
+        const lines = doc.splitTextToSize(String(value || ''), morphMaxWidth);
+        doc.text(lines, textX + textLabelW, cursorY);
+        cursorY += (Math.max(1, lines.length) * 5.4) + 4;
+      } else {
+        doc.text(String(value || '—'), textX + textLabelW, cursorY);
+        cursorY += lineHeight;
+      }
+    };
+
+    drawField('ID', idValue);
+    drawField('SEX', sexValue);
+    drawField('MORPH', morphValue, { multiline: true });
+    if (taggedForSell || hasPrice) drawField('PRICE', hasPrice ? String(priceRaw).trim() : '');
+    if (hasPairing) drawField('PAIRING', String(pairingRaw).trim());
+  }
+
+  doc.save(`snake-catalog-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+async function exportQrToPdf(snakesToExport, breederInfo = {}) {
+  if (!Array.isArray(snakesToExport) || !snakesToExport.length) {
+    throw new Error('Select at least one animal to export.');
+  }
+  const { jsPDF } = await import('jspdf');
+  const layout = resolvePdfLabelLayout(breederInfo?.pdfLabelSettings);
+  const pageW = layout.pageWidthMm;
+  const pageH = layout.pageHeightMm;
+  const pageOrientation = pageW >= pageH ? 'landscape' : 'portrait';
+  const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: pageOrientation });
+  await applyPdfUnicodeFont(doc);
+  const slotsPerPage = layout.mode === 'sheet'
+    ? Math.max(1, Math.floor(layout.columns) * Math.floor(layout.rows))
+    : 1;
+
   for (let i = 0; i < snakesToExport.length; i++) {
+    if (i > 0 && i % slotsPerPage === 0) {
+      doc.addPage([pageW, pageH], pageOrientation);
+    }
+    const slotIndex = i % slotsPerPage;
+    const slotColumn = layout.mode === 'sheet' ? (slotIndex % layout.columns) : 0;
+    const slotRow = layout.mode === 'sheet' ? Math.floor(slotIndex / layout.columns) : 0;
+    const labelX = layout.marginLeftMm + (slotColumn * (layout.labelWidthMm + layout.gapXmm));
+    const labelY = layout.marginTopMm + (slotRow * (layout.labelHeightMm + layout.gapYmm));
+    const labelW = layout.labelWidthMm;
+    const labelH = layout.labelHeightMm;
+
     const s = snakesToExport[i];
     const url = `${window.location.origin}${window.location.pathname}#snake=${encodeURIComponent(s.id)}`;
     try {
       const dataUrl = await createQrDataUrl(url, breederInfo?.logoUrl);
-      const qrSize = Math.min(pageH - margin * 2, 38);
-      const qrX = margin;
-      const qrY = (pageH - qrSize) / 2;
+      const margin = Math.max(1.5, Math.min(4, labelW * 0.05));
+      const qrSize = Math.min(labelH - margin * 2, Math.max(14, Math.min(38, labelW * 0.45)));
+      const qrX = labelX + margin;
+      const qrY = labelY + ((labelH - qrSize) / 2);
       doc.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
       const framePadding = 1.5;
@@ -10146,7 +11347,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       doc.setLineWidth(0.3);
       doc.rect(qrX - framePadding, qrY - framePadding, qrSize + framePadding * 2, qrSize + framePadding * 2);
 
-      const textWidth = Math.max(20, pageW - margin - (qrX + qrSize) - 8);
+      const textWidth = Math.max(12, (labelX + labelW) - (qrX + qrSize) - margin - 2);
       const nameText = s.name || 'Unnamed';
       const idText = s.id ? `ID: ${s.id}` : '';
       const normalizedSex = normalizeSexValue(s.sex);
@@ -10171,11 +11372,11 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
         return { lines, lineHeight, height: lines.length * lineHeight };
       };
 
-      let { lines: nameLines, lineHeight: nameLineHeight, height: nameHeight } = recomputeNameMetrics();
+      let { lines: nameLines, height: nameHeight } = recomputeNameMetrics();
 
   const geneticsSections = geneticsText ? [`Genetics: ${geneticsText}`] : [];
 
-      const maxContentHeight = pageH - margin * 2;
+      const maxContentHeight = labelH - margin * 2;
 
       const calculateGeneticsLayout = (fontSize) => {
         doc.setFontSize(fontSize);
@@ -10208,7 +11409,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
           ({ lines: geneticsLines, height: geneticsHeight } = calculateGeneticsLayout(geneticsFont));
         } else if (nameFont > nameFontMin) {
           nameFont = Math.max(nameFont - 1, nameFontMin);
-          ({ lines: nameLines, lineHeight: nameLineHeight, height: nameHeight } = recomputeNameMetrics());
+          ({ lines: nameLines, height: nameHeight } = recomputeNameMetrics());
         } else if (idFont > idFontMin) {
           idFont -= 1;
           recomputeIdHeights();
@@ -10221,8 +11422,8 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
         totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
       }
 
-      let textY = (pageH - totalHeight) / 2;
-      if (textY < margin) textY = margin;
+      let textY = labelY + ((labelH - totalHeight) / 2);
+      if (textY < (labelY + margin)) textY = labelY + margin;
       const textX = qrX + qrSize + 8;
 
     setPdfFont(doc, 'bold');
@@ -10253,10 +11454,8 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
     }
 
     doc.setDrawColor(120);
-    doc.setLineWidth(0.4);
-    doc.rect(1.5, 1.5, pageW - 3, pageH - 3);
-
-    if (i < snakesToExport.length - 1) doc.addPage([pageW, pageH], 'landscape');
+    doc.setLineWidth(0.25);
+    doc.rect(labelX, labelY, labelW, labelH);
   }
 
   doc.save('qr-labels.pdf');
@@ -10267,16 +11466,31 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
     throw new Error('Select at least one pairing to export.');
   }
   const { jsPDF } = await import('jspdf');
-  const pageW = 100;
-  const pageH = 50;
-  const margin = 4;
-  const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
+  const layout = resolvePdfLabelLayout(breederInfo?.pdfLabelSettings);
+  const pageW = layout.pageWidthMm;
+  const pageH = layout.pageHeightMm;
+  const pageOrientation = pageW >= pageH ? 'landscape' : 'portrait';
+  const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: pageOrientation });
   await applyPdfUnicodeFont(doc);
+  const slotsPerPage = layout.mode === 'sheet'
+    ? Math.max(1, Math.floor(layout.columns) * Math.floor(layout.rows))
+    : 1;
 
   const snakesById = new Map((snakes || []).filter(Boolean).map(s => [s.id, s]));
   const maxAppointments = 5;
 
   for (let i = 0; i < pairingsToExport.length; i++) {
+    if (i > 0 && i % slotsPerPage === 0) {
+      doc.addPage([pageW, pageH], pageOrientation);
+    }
+    const slotIndex = i % slotsPerPage;
+    const slotColumn = layout.mode === 'sheet' ? (slotIndex % layout.columns) : 0;
+    const slotRow = layout.mode === 'sheet' ? Math.floor(slotIndex / layout.columns) : 0;
+    const labelX = layout.marginLeftMm + (slotColumn * (layout.labelWidthMm + layout.gapXmm));
+    const labelY = layout.marginTopMm + (slotRow * (layout.labelHeightMm + layout.gapYmm));
+    const labelW = layout.labelWidthMm;
+    const labelH = layout.labelHeightMm;
+
     const raw = pairingsToExport[i];
     if (!raw) continue;
     const pairing = withPairingLifecycleDefaults(raw);
@@ -10299,29 +11513,30 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
       appointments.push('');
     }
 
-    const checkboxSize = 3.8;
+    const margin = Math.max(1.5, Math.min(4, labelW * 0.05));
+    const checkboxSize = Math.max(2.8, Math.min(3.8, labelW * 0.045));
     const layoutConfig = {
-      qrSize: Math.min(pageH - margin * 2, 36),
-      minQrSize: 26,
-      labelFont: 11,
-      labelMin: 8.5,
-      infoFont: 8.5,
-      infoMin: 7,
-      headingFont: 8,
-      headingMin: 7,
-      lineSpacing: 4.4,
-      minLineSpacing: checkboxSize + 0.4,
+      qrSize: Math.min(labelH - margin * 2, Math.max(16, Math.min(34, labelW * 0.42))),
+      minQrSize: 14,
+      labelFont: 10,
+      labelMin: 7.5,
+      infoFont: 7.5,
+      infoMin: 6,
+      headingFont: 7,
+      headingMin: 6,
+      lineSpacing: 3.8,
+      minLineSpacing: checkboxSize + 0.2,
     };
-    const maxContentHeight = pageH - margin * 2;
+    const maxContentHeight = labelH - margin * 2;
 
     const computeLayoutState = () => {
       const qrSize = layoutConfig.qrSize;
-      const qrX = margin;
-      const qrY = (pageH - qrSize) / 2;
-      const textX = qrX + qrSize + 7;
-      const textWidth = Math.max(20, pageW - textX - margin);
+      const qrX = labelX + margin;
+      const qrY = labelY + ((labelH - qrSize) / 2);
+      const textX = qrX + qrSize + Math.max(3, margin);
+      const textWidth = Math.max(10, (labelX + labelW) - textX - margin);
       const positions = {};
-      let cursorY = margin;
+      let cursorY = labelY + margin;
 
       setPdfFont(doc, 'bold');
       doc.setFontSize(layoutConfig.labelFont);
@@ -10353,12 +11568,12 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
       positions.appointmentsY = cursorY;
 
       let desiredSpacing = Math.max(layoutConfig.minLineSpacing, layoutConfig.lineSpacing);
-      const availableSpace = (pageH - margin) - cursorY - checkboxSize;
+      const availableSpace = (labelY + labelH - margin) - cursorY - checkboxSize;
       if (availableSpace < desiredSpacing * maxAppointments) {
         desiredSpacing = Math.max(layoutConfig.minLineSpacing, availableSpace / maxAppointments);
       }
       const appointmentsHeight = maxAppointments * desiredSpacing + checkboxSize;
-      const totalHeight = (cursorY + appointmentsHeight) - margin;
+      const totalHeight = (cursorY + appointmentsHeight) - (labelY + margin);
 
       return {
         totalHeight,
@@ -10438,12 +11653,8 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
     });
 
     doc.setDrawColor(120);
-    doc.setLineWidth(0.4);
-    doc.rect(1.5, 1.5, pageW - 3, pageH - 3);
-
-    if (i < pairingsToExport.length - 1) {
-      doc.addPage([pageW, pageH], 'landscape');
-    }
+    doc.setLineWidth(0.25);
+    doc.rect(labelX, labelY, labelW, labelH);
   }
 
   doc.save('pairing-qr-labels.pdf');
@@ -10911,7 +12122,7 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
+function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
   const { t } = useTranslation();
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
@@ -10951,6 +12162,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
     const raw = typeof s?.status === 'string' ? s.status.trim() : '';
     return raw || t("snakeEdit.status", { defaultValue: "Status" });
   }, [s?.status, t]);
+  const showCardPrice = useMemo(() => isSnakeTaggedForSell(s), [s]);
+  const cardPriceText = useMemo(() => {
+    const raw = String(s?.price ?? '').trim();
+    return raw || '—';
+  }, [s?.price]);
   const weightHistory = useMemo(() => {
     const entries = Array.isArray(s?.logs?.weights) ? s.logs.weights : [];
     const mapped = entries
@@ -11176,7 +12392,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
       </div>
 
   {/* picture moved to thumbnail in header; large inline image removed */}
-
   {/* main content: scrollable when overflow */}
   <div className="flex-1 overflow-auto">
   {/* recent activity badges: single-line items, two-per-row (half width) */}
@@ -11478,6 +12693,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
         <StatusDot status={displayStatus} />
         <div className="text-xs">{displayStatus}</div>
       </div>
+      {showCardPrice && (
+        <div className="mt-1 text-xs text-neutral-700">
+          <span className="font-semibold">{t('snakeEdit.price', { defaultValue: 'Price' })}:</span> {cardPriceText}
+        </div>
+      )}
 
       {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
         <div className="mt-2">
@@ -11730,7 +12950,7 @@ function StatusDot({ status }) {
   return <span className={cx("inline-block w-2 h-2 rounded-full", bg)} />;
 }
 
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onDelete, pairings = [], onOpenPairing }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
 
@@ -11881,6 +13101,11 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onDelete, pairings =
                     {typeof onQuickPair === 'function' && (
                       <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onQuickPair(snake)}>{t('actions.pair', { defaultValue: 'Pair' })}</button>
                     )}
+                    {typeof onOrderGeneticTest === 'function' && (
+                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOrderGeneticTest(snake)}>
+                        {t('actions.orderGeneticTest', { defaultValue: 'Order Genetic Test' })}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="text-[11px] px-2 py-1 border rounded-lg"
@@ -11969,6 +13194,10 @@ function AddGroupInline({ onAdd }) {
 function BreederSection({
   breederInfo,
   setBreederInfo,
+  morphAliases,
+  setMorphAliases,
+  geneAliases,
+  setGeneAliases,
   theme = 'blue',
   onSaved,
   createBackupPayload,
@@ -11992,6 +13221,7 @@ function BreederSection({
   showAppAlert,
   showAppPrompt,
   showAppConfirm,
+  onResetToDefaults,
 }) {
   const { t } = useTranslation();
   const info = useMemo(() => normalizeBreederInfo(breederInfo), [breederInfo]);
@@ -12011,6 +13241,23 @@ function BreederSection({
       const merged = { ...prev.idGenerator, ...(patch || {}) };
       return { ...prev, idGenerator: normalizeIdGeneratorConfig(merged) };
     });
+  }, [persistBreederInfo]);
+
+  const updatePdfLabelSettings = useCallback((patchOrUpdater) => {
+    persistBreederInfo(prev => {
+      const current = normalizePdfLabelSettings(prev?.pdfLabelSettings);
+      const next = typeof patchOrUpdater === 'function'
+        ? patchOrUpdater(current)
+        : { ...current, ...(patchOrUpdater || {}) };
+      return { ...prev, pdfLabelSettings: normalizePdfLabelSettings(next) };
+    });
+  }, [persistBreederInfo]);
+
+  const updateLabLabelSettings = useCallback((nextSettings) => {
+    persistBreederInfo(prev => ({
+      ...prev,
+      labLabelSettings: normalizeLabLabelSizeSettings(nextSettings),
+    }));
   }, [persistBreederInfo]);
 
   const handleResetIdConfig = useCallback(() => {
@@ -12063,6 +13310,17 @@ function BreederSection({
   }, []);
 
   const [setupTab, setSetupTab] = useState('info');
+  const isDevEnvironment = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
+  const [aliasDraftAlias, setAliasDraftAlias] = useState('');
+  const [aliasDraftGenes, setAliasDraftGenes] = useState('');
+  const [aliasDraftNotes, setAliasDraftNotes] = useState('');
+  const [editingAliasKey, setEditingAliasKey] = useState('');
+  const [geneAliasDraftName, setGeneAliasDraftName] = useState('');
+  const [geneAliasDraftAliases, setGeneAliasDraftAliases] = useState('');
+  const [geneAliasDraftShorthand, setGeneAliasDraftShorthand] = useState('');
+  const [editingGeneAliasKey, setEditingGeneAliasKey] = useState('');
+  const aliasImportInputRef = useRef(null);
+  const geneAliasImportInputRef = useRef(null);
   const [backupFeedback, setBackupFeedback] = useState(null);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
   const restoreInputRef = useRef(null);
@@ -12112,6 +13370,227 @@ function BreederSection({
   const pairingExportFeedback = exportFeedback && exportFeedback.context === 'pairings' ? exportFeedback : null;
   const hasAnimalData = Array.isArray(snakes) && snakes.length > 0;
   const hasPairingData = Array.isArray(pairings) && pairings.length > 0;
+  const normalizedMorphAliases = useMemo(() => {
+    const normalized = normalizeMorphAliasDatabase(morphAliases);
+    return normalized.length ? normalized : [...DEFAULT_MORPH_ALIASES];
+  }, [morphAliases]);
+  const aliasRows = useMemo(() => {
+    return [...normalizedMorphAliases].sort((a, b) => a.alias.localeCompare(b.alias));
+  }, [normalizedMorphAliases]);
+  const normalizedGeneAliases = useMemo(() => mergeGeneAliasRows(geneAliases), [geneAliases]);
+  const geneAliasRows = useMemo(() => {
+    return [...normalizedGeneAliases].sort((a, b) => a.geneName.localeCompare(b.geneName, undefined, { sensitivity: 'base' }));
+  }, [normalizedGeneAliases]);
+
+  const persistMorphAliases = useCallback((updater) => {
+    if (typeof setMorphAliases !== 'function') return;
+    setMorphAliases((prev) => {
+      const current = normalizeMorphAliasDatabase(prev);
+      const nextValue = typeof updater === 'function' ? updater(current) : updater;
+      const normalized = normalizeMorphAliasDatabase(nextValue);
+      return normalized.length ? normalized : [...DEFAULT_MORPH_ALIASES];
+    });
+  }, [setMorphAliases]);
+
+  const resetAliasDraft = useCallback(() => {
+    setAliasDraftAlias('');
+    setAliasDraftGenes('');
+    setAliasDraftNotes('');
+    setEditingAliasKey('');
+  }, []);
+  const resetGeneAliasDraft = useCallback(() => {
+    setGeneAliasDraftName('');
+    setGeneAliasDraftAliases('');
+    setGeneAliasDraftShorthand('');
+    setEditingGeneAliasKey('');
+  }, []);
+
+  const handleSaveAlias = useCallback(() => {
+    const alias = String(aliasDraftAlias || '').trim();
+    const genes = String(aliasDraftGenes || '')
+      .split(/[\n,;|/]+/)
+      .map(value => String(value || '').trim())
+      .filter(Boolean);
+    const notes = String(aliasDraftNotes || '').trim();
+    if (!alias || !genes.length) {
+      if (typeof showAppAlert === 'function') {
+        showAppAlert('Alias and at least one gene are required.');
+      }
+      return;
+    }
+    const aliasKey = normalizeMorphAliasLookupKey(alias);
+    persistMorphAliases((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      const editKey = normalizeMorphAliasLookupKey(editingAliasKey);
+      const existingIndex = next.findIndex(item => normalizeMorphAliasLookupKey(item.alias) === (editKey || aliasKey));
+      const row = { alias, genes, ...(notes ? { notes } : {}) };
+      if (existingIndex >= 0) {
+        next[existingIndex] = row;
+      } else {
+        next.push(row);
+      }
+      return next;
+    });
+    resetAliasDraft();
+  }, [aliasDraftAlias, aliasDraftGenes, aliasDraftNotes, editingAliasKey, persistMorphAliases, resetAliasDraft, showAppAlert]);
+
+  const handleEditAlias = useCallback((row) => {
+    if (!row) return;
+    setAliasDraftAlias(row.alias || '');
+    setAliasDraftGenes(Array.isArray(row.genes) ? row.genes.join(', ') : '');
+    setAliasDraftNotes(row.notes || '');
+    setEditingAliasKey(row.alias || '');
+  }, []);
+
+  const handleDeleteAlias = useCallback((alias) => {
+    const key = normalizeMorphAliasLookupKey(alias);
+    if (!key) return;
+    persistMorphAliases((prev) => prev.filter(item => normalizeMorphAliasLookupKey(item.alias) !== key));
+    if (normalizeMorphAliasLookupKey(editingAliasKey) === key) {
+      resetAliasDraft();
+    }
+  }, [editingAliasKey, persistMorphAliases, resetAliasDraft]);
+
+  const handleExportAliases = useCallback(() => {
+    const payload = JSON.stringify(normalizedMorphAliases, null, 2);
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `morph-aliases-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [normalizedMorphAliases]);
+
+  const handleImportAliases = useCallback(async (event) => {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const normalized = normalizeMorphAliasDatabase(parsed);
+      if (!normalized.length) {
+        if (typeof showAppAlert === 'function') {
+          showAppAlert('No valid alias rows were found in this JSON file.');
+        }
+        return;
+      }
+      setMorphAliases(normalized);
+      if (typeof showAppAlert === 'function') {
+        showAppAlert(`Imported ${normalized.length} morph aliases.`);
+      }
+      resetAliasDraft();
+    } catch (error) {
+      console.error('Failed to import morph aliases', error);
+      if (typeof showAppAlert === 'function') {
+        showAppAlert('Failed to import alias JSON.');
+      }
+    } finally {
+      if (event?.target) {
+        event.target.value = '';
+      }
+    }
+  }, [resetAliasDraft, setMorphAliases, showAppAlert]);
+
+  const persistGeneAliases = useCallback((updater) => {
+    if (typeof setGeneAliases !== 'function') return;
+    setGeneAliases((prev) => {
+      const current = mergeGeneAliasRows(prev);
+      const nextValue = typeof updater === 'function' ? updater(current) : updater;
+      return mergeGeneAliasRows(nextValue);
+    });
+  }, [setGeneAliases]);
+
+  const handleSaveGeneAlias = useCallback(() => {
+    const geneName = String(geneAliasDraftName || '').trim();
+    const aliases = String(geneAliasDraftAliases || '')
+      .split(/[\n,;|/]+/)
+      .map(value => String(value || '').trim())
+      .filter(Boolean);
+    const shorthand = String(geneAliasDraftShorthand || '')
+      .split(/[\n,;|/]+/)
+      .map(value => String(value || '').trim())
+      .filter(Boolean);
+    if (!geneName) {
+      if (typeof showAppAlert === 'function') showAppAlert('Gene name is required.');
+      return;
+    }
+
+    const row = {
+      geneName,
+      aliases: normalizeGeneAliasRows([{ geneName, aliases }])[0]?.aliases || [geneName],
+      shorthand: normalizeGeneAliasRows([{ geneName, shorthand }])[0]?.shorthand || [],
+    };
+
+    persistGeneAliases((prev) => {
+      const list = Array.isArray(prev) ? [...prev] : [];
+      const key = (editingGeneAliasKey || geneName).toLowerCase();
+      const index = list.findIndex(item => String(item?.geneName || '').trim().toLowerCase() === key);
+      if (index >= 0) {
+        list[index] = row;
+      } else {
+        list.push(row);
+      }
+      return list;
+    });
+    resetGeneAliasDraft();
+  }, [editingGeneAliasKey, geneAliasDraftAliases, geneAliasDraftName, geneAliasDraftShorthand, persistGeneAliases, resetGeneAliasDraft, showAppAlert]);
+
+  const handleEditGeneAlias = useCallback((row) => {
+    if (!row) return;
+    setGeneAliasDraftName(row.geneName || '');
+    setGeneAliasDraftAliases(Array.isArray(row.aliases) ? row.aliases.join(', ') : '');
+    setGeneAliasDraftShorthand(Array.isArray(row.shorthand) ? row.shorthand.join(', ') : '');
+    setEditingGeneAliasKey(row.geneName || '');
+  }, []);
+
+  const handleDeleteGeneAlias = useCallback((geneName) => {
+    const key = String(geneName || '').trim().toLowerCase();
+    if (!key) return;
+    persistGeneAliases((prev) => (Array.isArray(prev) ? prev.filter(item => String(item?.geneName || '').trim().toLowerCase() !== key) : []));
+    if (String(editingGeneAliasKey || '').trim().toLowerCase() === key) {
+      resetGeneAliasDraft();
+    }
+  }, [editingGeneAliasKey, persistGeneAliases, resetGeneAliasDraft]);
+
+  const handleExportGeneAliases = useCallback(() => {
+    const payload = JSON.stringify(geneAliasRows, null, 2);
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `gene-aliases-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [geneAliasRows]);
+
+  const handleImportGeneAliases = useCallback(async (event) => {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const normalized = mergeGeneAliasRows(parsed);
+      if (!normalized.length) {
+        if (typeof showAppAlert === 'function') showAppAlert('No valid gene alias rows were found in this JSON file.');
+        return;
+      }
+      setGeneAliases(normalized);
+      if (typeof showAppAlert === 'function') {
+        showAppAlert(`Imported ${normalized.length} gene alias rows.`);
+      }
+      resetGeneAliasDraft();
+    } catch (error) {
+      console.error('Failed to import gene aliases', error);
+      if (typeof showAppAlert === 'function') showAppAlert('Failed to import gene alias JSON.');
+    } finally {
+      if (event?.target) event.target.value = '';
+    }
+  }, [resetGeneAliasDraft, setGeneAliases, showAppAlert]);
   const [pairingExportType, setPairingExportType] = useState('default');
   const [pairingSeasonFilter, setPairingSeasonFilter] = useState('all');
   const [pairingStatusFilter, setPairingStatusFilter] = useState([]);
@@ -12147,6 +13626,202 @@ function BreederSection({
     }
     return hasPairingData;
   }, [pairingExportType, pairings, snakes, pairingMatrixOptions, hasPairingData]);
+  const normalizedPdfLabelSettings = useMemo(
+    () => normalizePdfLabelSettings(info.pdfLabelSettings),
+    [info.pdfLabelSettings]
+  );
+  const pdfLabelLayout = useMemo(
+    () => resolvePdfLabelLayout(normalizedPdfLabelSettings),
+    [normalizedPdfLabelSettings]
+  );
+  const pdfLabelLayoutValidation = useMemo(
+    () => validatePdfLabelLayout(normalizedPdfLabelSettings),
+    [normalizedPdfLabelSettings]
+  );
+  const selectedPresetFormat = normalizedPdfLabelSettings.formatType === 'sheet'
+    ? 'sheet'
+    : (normalizedPdfLabelSettings.formatType === 'custom' ? 'custom' : 'thermal');
+  const labelBrandOptions = useMemo(
+    () => getLabelBrands(),
+    []
+  );
+  const labelCategoryOptions = useMemo(
+    () => getLabelCategories(selectedPresetFormat === 'custom' ? undefined : selectedPresetFormat),
+    [selectedPresetFormat]
+  );
+  const labelPresetOptions = useMemo(() => {
+    if (selectedPresetFormat === 'custom') return [];
+    const presets = getLabelPresets(selectedPresetFormat);
+    return presets.filter(item => (
+      item.brand === normalizedPdfLabelSettings.brand
+      && item.category === normalizedPdfLabelSettings.category
+    ));
+  }, [selectedPresetFormat, normalizedPdfLabelSettings.brand, normalizedPdfLabelSettings.category]);
+  const handlePdfFormatTypeChange = useCallback((nextFormat) => {
+    if (!nextFormat) return;
+    if (nextFormat === 'custom') {
+      updatePdfLabelSettings(prev => ({ ...prev, formatType: 'custom', brand: 'Custom', presetKey: 'custom' }));
+      return;
+    }
+    const presets = getLabelPresets(nextFormat);
+    const preset = presets[0];
+    if (!preset) return;
+    updatePdfLabelSettings({
+      formatType: nextFormat,
+      brand: preset.brand,
+      category: preset.category,
+      presetKey: preset.key,
+    });
+  }, [updatePdfLabelSettings]);
+  const handlePdfBrandChange = useCallback((nextBrand) => {
+    if (!nextBrand) return;
+    if (selectedPresetFormat === 'custom') {
+      updatePdfLabelSettings({ brand: nextBrand });
+      return;
+    }
+    const presets = getLabelPresets(selectedPresetFormat).filter(item => item.brand === nextBrand);
+    const matchingCategoryPreset = presets.find(item => item.category === normalizedPdfLabelSettings.category);
+    const preset = matchingCategoryPreset || presets[0];
+    if (!preset) return;
+    updatePdfLabelSettings({
+      brand: preset.brand,
+      category: preset.category,
+      presetKey: preset.key,
+    });
+  }, [normalizedPdfLabelSettings.category, selectedPresetFormat, updatePdfLabelSettings]);
+  const handlePdfCategoryChange = useCallback((nextCategory) => {
+    if (!nextCategory) return;
+    if (selectedPresetFormat === 'custom') {
+      updatePdfLabelSettings({ category: nextCategory });
+      return;
+    }
+    const presets = getLabelPresets(selectedPresetFormat).filter(item => (
+      item.brand === normalizedPdfLabelSettings.brand && item.category === nextCategory
+    ));
+    const preset = presets[0]
+      || getLabelPresets(selectedPresetFormat).find(item => item.brand === normalizedPdfLabelSettings.brand)
+      || getLabelPresets(selectedPresetFormat)[0];
+    if (!preset) return;
+    updatePdfLabelSettings({
+      category: preset.category,
+      presetKey: preset.key,
+      brand: preset.brand,
+    });
+  }, [normalizedPdfLabelSettings.brand, selectedPresetFormat, updatePdfLabelSettings]);
+  const handlePdfPresetChange = useCallback((nextPresetKey) => {
+    if (!nextPresetKey) return;
+    const allPresets = getLabelPresets(selectedPresetFormat === 'custom' ? undefined : selectedPresetFormat);
+    const selectedPreset = allPresets.find(item => item.key === nextPresetKey);
+    updatePdfLabelSettings({
+      presetKey: nextPresetKey,
+      ...(selectedPreset ? {
+        brand: selectedPreset.brand,
+        category: selectedPreset.category,
+      } : {}),
+    });
+  }, [selectedPresetFormat, updatePdfLabelSettings]);
+  const handlePdfCustomNumberChange = useCallback((key, value) => {
+    const parsed = Number(value);
+    updatePdfLabelSettings({
+      [key]: Number.isFinite(parsed) ? parsed : 0,
+    });
+  }, [updatePdfLabelSettings]);
+  const normalizedLabLabelSettings = useMemo(
+    () => normalizeLabLabelSizeSettings(info.labLabelSettings),
+    [info.labLabelSettings]
+  );
+  const activeLabLabelSize = useMemo(
+    () => getActiveLabelSize(normalizedLabLabelSettings),
+    [normalizedLabLabelSettings]
+  );
+  const [labLabelDraft, setLabLabelDraft] = useState(() => ({
+    widthMm: String(activeLabLabelSize.widthMm),
+    heightMm: String(activeLabLabelSize.heightMm),
+    presetKey: activeLabLabelSize.presetKey,
+  }));
+  const [labLabelSettingsError, setLabLabelSettingsError] = useState('');
+  const [labLabelDebugGuides, setLabLabelDebugGuides] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(LAB_LABEL_DEBUG_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    setLabLabelDraft({
+      widthMm: String(activeLabLabelSize.widthMm),
+      heightMm: String(activeLabLabelSize.heightMm),
+      presetKey: activeLabLabelSize.presetKey,
+    });
+    setLabLabelSettingsError('');
+  }, [activeLabLabelSize.heightMm, activeLabLabelSize.presetKey, activeLabLabelSize.widthMm]);
+  const labLabelDraftValidation = useMemo(
+    () => validateLabLabelSize(labLabelDraft.widthMm, labLabelDraft.heightMm),
+    [labLabelDraft.heightMm, labLabelDraft.widthMm]
+  );
+  const previewLabLabelSize = useMemo(() => {
+    if (!labLabelDraftValidation.isValid) {
+      return activeLabLabelSize;
+    }
+    return {
+      widthMm: Number(labLabelDraft.widthMm),
+      heightMm: Number(labLabelDraft.heightMm),
+      presetKey: labLabelDraft.presetKey,
+    };
+  }, [activeLabLabelSize, labLabelDraft.heightMm, labLabelDraft.presetKey, labLabelDraft.widthMm, labLabelDraftValidation.isValid]);
+  const handleLabLabelDraftChange = useCallback((key, value) => {
+    setLabLabelDraft(prev => ({
+      ...prev,
+      [key]: value,
+      presetKey: 'custom',
+    }));
+    setLabLabelSettingsError('');
+  }, []);
+  const handleLabLabelPresetChange = useCallback((nextPresetKey) => {
+    const preset = getLabLabelPresetByKey(nextPresetKey);
+    if (!preset) return;
+    setLabLabelDraft({
+      widthMm: String(preset.widthMm),
+      heightMm: String(preset.heightMm),
+      presetKey: preset.key,
+    });
+    setLabLabelSettingsError('');
+  }, []);
+  const handleSaveLabLabelSettings = useCallback(() => {
+    const validation = validateLabLabelSize(labLabelDraft.widthMm, labLabelDraft.heightMm);
+    if (!validation.isValid) {
+      setLabLabelSettingsError(validation.errors[0] || 'Invalid label size.');
+      return;
+    }
+    const widthMm = Number(labLabelDraft.widthMm);
+    const heightMm = Number(labLabelDraft.heightMm);
+    const matchingPreset = LAB_LABEL_SIZE_PRESETS.find(item => item.widthMm === widthMm && item.heightMm === heightMm);
+    updateLabLabelSettings({
+      widthMm,
+      heightMm,
+      presetKey: matchingPreset ? matchingPreset.key : 'custom',
+    });
+    setLabLabelSettingsError('');
+  }, [labLabelDraft.heightMm, labLabelDraft.widthMm, updateLabLabelSettings]);
+  const handleResetLabLabelSettings = useCallback(() => {
+    const defaults = getDefaultLabLabelSizeSettings();
+    updateLabLabelSettings(defaults);
+    setLabLabelDraft({
+      widthMm: String(defaults.widthMm),
+      heightMm: String(defaults.heightMm),
+      presetKey: defaults.presetKey,
+    });
+    setLabLabelSettingsError('');
+  }, [updateLabLabelSettings]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(LAB_LABEL_DEBUG_STORAGE_KEY, labLabelDebugGuides ? 'true' : 'false');
+    } catch {
+      // Ignore storage failures in preview-only debug setting.
+    }
+  }, [labLabelDebugGuides]);
   const [previewName, setPreviewName] = useState(() => info.name || info.businessName || BORIS_PREVIEW_DEFAULTS.name);
   const [previewYear, setPreviewYear] = useState(() => BORIS_PREVIEW_DEFAULTS.year);
   const [previewBirthYear, setPreviewBirthYear] = useState(() => BORIS_PREVIEW_DEFAULTS.birthYear);
@@ -12156,6 +13831,46 @@ function BreederSection({
   const templateInputRef = useRef(null);
   const pendingTemplateSelectionRef = useRef(null);
   const lastTemplateSelectionRef = useRef({ start: null, end: null });
+
+  const handleReturnToDefaults = useCallback(async () => {
+    if (typeof onResetToDefaults !== 'function') {
+      if (typeof showAppAlert === 'function') {
+        await showAppAlert('Return to Defaults is unavailable in this build.');
+      }
+      return;
+    }
+
+    let confirmed = true;
+    if (typeof showAppConfirm === 'function') {
+      confirmed = await showAppConfirm(
+        'This will permanently erase all local Breeding Planner data on this device and restore factory defaults. This cannot be undone.',
+        {
+          title: 'Return to Defaults',
+          confirmLabel: 'Return to Defaults',
+          cancelLabel: 'Cancel',
+        }
+      );
+    }
+    if (!confirmed) return;
+
+    try {
+      await onResetToDefaults();
+      if (typeof showAppAlert === 'function') {
+        await showAppAlert('Factory reset complete. The app will now reload.', {
+          title: 'Return to Defaults Complete',
+          confirmLabel: 'Reload Now',
+        });
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to reset app to defaults', error);
+      if (typeof showAppAlert === 'function') {
+        await showAppAlert(error?.message || 'Failed to return app to defaults.');
+      }
+    }
+  }, [onResetToDefaults, showAppAlert, showAppConfirm]);
 
   const handleManualBackupDownload = useCallback(() => {
     if (typeof createBackupPayload !== 'function') {
@@ -12422,6 +14137,47 @@ function BreederSection({
       });
     }
   }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback]);
+
+  const handleGenerateSnakeCatalog = useCallback(async () => {
+    const timestamp = new Date().toISOString();
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    try {
+      const pairingsBySnakeId = groupPairingsBySnake(pairings, makeSnakeMap(snakes));
+      const forSaleAnimals = (Array.isArray(snakes) ? snakes : [])
+        .filter((snake) => isSnakeTaggedForSell(snake))
+        .sort((a, b) => collator.compare(String(a?.id || ''), String(b?.id || '')))
+        .map((snake) => {
+          const linkedPairings = pairingsBySnakeId.get(snake.id) || [];
+          const pairingLabel = linkedPairings.length ? String(linkedPairings[0]?.label || '').trim() : '';
+          return {
+            ...snake,
+            genetics: resolveCatalogMorph(snake),
+            pairing: snake?.pairing || pairingLabel || '',
+            primaryImage: resolvePrimaryAnimalImage(snake),
+          };
+        });
+
+      if (!forSaleAnimals.length) {
+        throw new Error('No animals marked for sale were found.');
+      }
+
+      await generateSnakeCatalogPDF(forSaleAnimals);
+      setExportFeedback({
+        type: 'success',
+        message: `Generated snake catalog (${forSaleAnimals.length} pages).`,
+        context: 'animals',
+        timestamp,
+      });
+    } catch (err) {
+      console.error('Snake catalog generation failed', err);
+      setExportFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to generate snake catalog.',
+        context: 'animals',
+        timestamp,
+      });
+    }
+  }, [pairings, setExportFeedback, snakes]);
 
   const handlePairingsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
@@ -12813,10 +14569,15 @@ function BreederSection({
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
+        <TabButton theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>Morph Alias Manager</TabButton>
+        <TabButton theme={theme} active={setupTab === 'geneAliases'} onClick={() => setSetupTab('geneAliases')}>Gene Alias Manager</TabButton>
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
+        {isDevEnvironment && (
+          <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
+        )}
       </div>
 
       {setupTab === 'info' && (
@@ -12852,6 +14613,38 @@ function BreederSection({
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.phone}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Street</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={info.street}
+                onChange={e => persistBreederInfo(prev => ({ ...prev, street: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Postal code</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={info.postalCode}
+                onChange={e => persistBreederInfo(prev => ({ ...prev, postalCode: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">City</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={info.city}
+                onChange={e => persistBreederInfo(prev => ({ ...prev, city: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Country</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={info.country}
+                onChange={e => persistBreederInfo(prev => ({ ...prev, country: e.target.value }))}
               />
             </div>
             <div className="md:col-span-2">
@@ -13062,10 +14855,10 @@ function BreederSection({
                     aria-pressed={hasToken}
                     onClick={() => handleTemplateTokenToggle(token)}
                     className={cx(
-                      'w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-left transition',
+                      'status-tag-neutral-button w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-left transition',
                       hasToken
-                        ? 'border-blue-500/60 bg-blue-50 text-blue-700 shadow-sm'
-                        : 'border-neutral-200 bg-white hover:border-blue-400 hover:bg-blue-50/40'
+                        ? 'border-blue-500/60 text-blue-700 shadow-sm'
+                        : 'border-neutral-200 bg-white hover:border-blue-400'
                     )}
                   >
                     <span className={cx(
@@ -13087,6 +14880,190 @@ function BreederSection({
         </div>
       )}
 
+      {setupTab === 'aliases' && (
+        <div className="border-t pt-4 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-semibold text-sm">Morph Alias Manager</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Map common combo names (e.g. Batman, Pompeii) to underlying genes.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={aliasImportInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={handleImportAliases}
+              />
+              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => aliasImportInputRef.current?.click()}>
+                Import JSON
+              </button>
+              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportAliases}>
+                Export JSON
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium">Alias</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={aliasDraftAlias}
+                onChange={e => setAliasDraftAlias(e.target.value)}
+                placeholder="Pompeii"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Genes (comma separated)</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={aliasDraftGenes}
+                onChange={e => setAliasDraftGenes(e.target.value)}
+                placeholder="Black Pastel, Red Stripe, Spotnose, Yellow Belly, Clown"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium">Notes (optional)</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={aliasDraftNotes}
+                onChange={e => setAliasDraftNotes(e.target.value)}
+                placeholder="BEL complex combinations"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
+              {editingAliasKey ? 'Update alias' : 'Add alias'}
+            </button>
+            {editingAliasKey && (
+              <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetAliasDraft}>
+                Cancel edit
+              </button>
+            )}
+          </div>
+
+          <div className="border rounded-xl overflow-hidden">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50 border-b">
+              Aliases ({aliasRows.length})
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y">
+              {aliasRows.length ? aliasRows.map(row => (
+                <div key={row.alias} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-neutral-800">{row.alias}</div>
+                    <div className="text-neutral-600">{(row.genes || []).join(', ')}</div>
+                    {row.notes && <div className="text-[11px] text-neutral-500 mt-0.5">{row.notes}</div>}
+                  </div>
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditAlias(row)}>Edit</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteAlias(row.alias)}>Delete</button>
+                  </div>
+                </div>
+              )) : (
+                <div className="px-3 py-4 text-sm text-neutral-500">No aliases configured.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {setupTab === 'geneAliases' && (
+        <div className="border-t pt-4 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-semibold text-sm">Gene Alias Manager</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Manage standardized gene aliases and shorthand used in parsing (e.g. OD → Orange Dream).
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={geneAliasImportInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={handleImportGeneAliases}
+              />
+              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => geneAliasImportInputRef.current?.click()}>
+                Import JSON
+              </button>
+              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportGeneAliases}>
+                Export JSON
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium">Gene name</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={geneAliasDraftName}
+                onChange={e => setGeneAliasDraftName(e.target.value)}
+                placeholder="Orange Dream"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Aliases (comma separated)</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={geneAliasDraftAliases}
+                onChange={e => setGeneAliasDraftAliases(e.target.value)}
+                placeholder="Orange Dream, OrangeDream"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Shorthand (comma separated)</label>
+              <input
+                className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={geneAliasDraftShorthand}
+                onChange={e => setGeneAliasDraftShorthand(e.target.value)}
+                placeholder="OD"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
+              {editingGeneAliasKey ? 'Update gene alias' : 'Add gene alias'}
+            </button>
+            {editingGeneAliasKey && (
+              <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetGeneAliasDraft}>
+                Cancel edit
+              </button>
+            )}
+          </div>
+
+          <div className="border rounded-xl overflow-hidden">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50 border-b">
+              Gene aliases ({geneAliasRows.length})
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y">
+              {geneAliasRows.length ? geneAliasRows.map(row => (
+                <div key={row.geneName} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-neutral-800">{row.geneName}</div>
+                    <div className="text-neutral-600">Aliases: {(row.aliases || []).join(', ') || '-'}</div>
+                    <div className="text-neutral-500 text-xs">Shorthand: {(row.shorthand || []).join(', ') || '-'}</div>
+                  </div>
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditGeneAlias(row)}>Edit</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteGeneAlias(row.geneName)}>Delete</button>
+                  </div>
+                </div>
+              )) : (
+                <div className="px-3 py-4 text-sm text-neutral-500">No gene aliases configured.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {setupTab === 'export' && (
         <div className="border-t pt-4 space-y-6">
           <div className="space-y-3">
@@ -13094,6 +15071,275 @@ function BreederSection({
               <div className="font-semibold text-sm">Data exports</div>
               <div className="text-xs text-neutral-500 mt-1">
                 Choose the columns to include and download PDF or spreadsheet summaries for animals and breeding projects.
+              </div>
+            </div>
+            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4">
+              <div>
+                <div className="font-semibold text-sm">Shed Testing Label Size</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  These dimensions are used for both shipping labels and individual sample QR labels in the shed testing workflow.
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {LAB_LABEL_SIZE_PRESETS.map((preset) => {
+                  const isActivePreset = labLabelDraft.presetKey === preset.key
+                    || (Number(labLabelDraft.widthMm) === preset.widthMm && Number(labLabelDraft.heightMm) === preset.heightMm);
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={cx(
+                        'rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                        isActivePreset
+                          ? 'border-sky-300 bg-sky-50 text-sky-700'
+                          : 'border-neutral-300 bg-white text-neutral-700 hover:border-sky-300'
+                      )}
+                      onClick={() => handleLabLabelPresetChange(preset.key)}
+                    >
+                      {preset.label} ({preset.widthMm} × {preset.heightMm} mm)
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                  <span>Label Width (mm)</span>
+                  <input
+                    type="number"
+                    min={LAB_LABEL_SIZE_LIMITS_MM.min}
+                    max={LAB_LABEL_SIZE_LIMITS_MM.max}
+                    step="1"
+                    className="w-full border rounded-lg px-2 py-2 text-sm"
+                    value={labLabelDraft.widthMm}
+                    onChange={e => handleLabLabelDraftChange('widthMm', e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                  <span>Label Height (mm)</span>
+                  <input
+                    type="number"
+                    min={LAB_LABEL_SIZE_LIMITS_MM.min}
+                    max={LAB_LABEL_SIZE_LIMITS_MM.max}
+                    step="1"
+                    className="w-full border rounded-lg px-2 py-2 text-sm"
+                    value={labLabelDraft.heightMm}
+                    onChange={e => handleLabLabelDraftChange('heightMm', e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                  onClick={handleSaveLabLabelSettings}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border text-sm"
+                  onClick={handleResetLabLabelSettings}
+                >
+                  Reset to Default
+                </button>
+                <div className="text-xs text-neutral-500">
+                  Allowed range: {LAB_LABEL_SIZE_LIMITS_MM.min} to {LAB_LABEL_SIZE_LIMITS_MM.max} mm.
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={labLabelDebugGuides}
+                  onChange={e => setLabLabelDebugGuides(e.target.checked)}
+                />
+                <span>Show debug guides in preview and generated labels</span>
+              </label>
+              {labLabelSettingsError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {labLabelSettingsError}
+                </div>
+              ) : null}
+              {!labLabelSettingsError && !labLabelDraftValidation.isValid ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  {labLabelDraftValidation.errors[0]}
+                </div>
+              ) : null}
+              <div className="rounded-lg bg-neutral-50 border px-3 py-2 text-xs text-neutral-700">
+                <div>
+                  Active label size: {activeLabLabelSize.widthMm} × {activeLabLabelSize.heightMm} mm
+                </div>
+                <div>
+                  Draft preview size: {previewLabLabelSize.widthMm} × {previewLabLabelSize.heightMm} mm
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  <div className="text-xs font-semibold text-neutral-700">Shipping label preview</div>
+                  <div className="mt-1 text-[11px] text-neutral-500">Preview uses the same layout boxes and safe area as the PDF generator.</div>
+                  <div className="mt-3 flex justify-center">
+                    <ShippingLabelPreview
+                      size={previewLabLabelSize}
+                      debug={labLabelDebugGuides}
+                      data={{
+                        orderId: 'order_preview',
+                        orderNumber: 'BP-ORDER-001',
+                        labName: 'ProHerper Genetics Laboratory',
+                        labAddress: {
+                          line1: '123 Lab Lane',
+                          city: 'Phoenix',
+                          stateOrRegion: 'AZ',
+                          postalCode: '85001',
+                          country: 'US',
+                        },
+                        breeder: {
+                          name: info.name || info.businessName || 'Breeder Name',
+                          address: {
+                            line1: info.street || '123 Breeder Street',
+                            city: info.city || 'Berlin',
+                            stateOrRegion: '',
+                            postalCode: info.postalCode || '10115',
+                            country: info.country || 'DE',
+                          },
+                        },
+                        createdAt: new Date().toISOString(),
+                        sampleCount: 1,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                  <div className="text-xs font-semibold text-neutral-700">Sample label preview</div>
+                  <div className="mt-1 text-[11px] text-neutral-500">One page per sample with fixed text and QR regions.</div>
+                  <div className="mt-3 flex justify-center">
+                    <SampleLabelPreview
+                      size={previewLabLabelSize}
+                      debug={labLabelDebugGuides}
+                      data={{
+                        sampleId: 'SMP-001',
+                        orderId: 'order_preview',
+                        orderNumber: 'BP-ORDER-001',
+                        animalId: 'ANIMAL-001',
+                        breederName: info.name || info.businessName || 'Breeder Name',
+                        requestedTests: ['Clown', 'Ultramel', 'Sex Determination', 'Puzzle'],
+                        sampleStatus: 'pending',
+                        qrPayload: 'lab-sample-preview',
+                        sampleType: 'shed',
+                        labName: 'ProHerper Genetics Laboratory',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
+              <div>
+                <div className="font-semibold text-sm">PDF label settings</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  Select a thermal or sheet preset, or define a custom label layout.
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-4">
+                <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                  <span>Format type</span>
+                  <select
+                    className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    value={normalizedPdfLabelSettings.formatType}
+                    onChange={e => handlePdfFormatTypeChange(e.target.value)}
+                  >
+                    <option value="thermal">Thermal Labels</option>
+                    <option value="sheet">Sheet Labels</option>
+                    <option value="custom">Custom Size</option>
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                  <span>Brand</span>
+                  <select
+                    className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    value={normalizedPdfLabelSettings.brand}
+                    onChange={e => handlePdfBrandChange(e.target.value)}
+                  >
+                    {labelBrandOptions.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                  <span>Label category</span>
+                  <select
+                    className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    value={normalizedPdfLabelSettings.category}
+                    onChange={e => handlePdfCategoryChange(e.target.value)}
+                  >
+                    {labelCategoryOptions.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+                {normalizedPdfLabelSettings.formatType !== 'custom' && (
+                  <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                    <span>Size preset</span>
+                    <select
+                      className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                      value={normalizedPdfLabelSettings.presetKey}
+                      onChange={e => handlePdfPresetChange(e.target.value)}
+                    >
+                      {labelPresetOptions.map(item => (
+                        <option key={item.key} value={item.key}>{item.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {normalizedPdfLabelSettings.formatType === 'custom' && (
+                  <>
+                    <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                      <span>Unit</span>
+                      <select
+                        className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                        value={normalizedPdfLabelSettings.unit}
+                        onChange={e => updatePdfLabelSettings({ unit: e.target.value })}
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                        <option value="in">in</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                      <span>Label width</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.1"
+                        className="w-full border rounded-lg px-2 py-2 text-sm"
+                        value={normalizedPdfLabelSettings.width}
+                        onChange={e => handlePdfCustomNumberChange('width', e.target.value)}
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold text-neutral-600">
+                      <span>Label height</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.1"
+                        className="w-full border rounded-lg px-2 py-2 text-sm"
+                        value={normalizedPdfLabelSettings.height}
+                        onChange={e => handlePdfCustomNumberChange('height', e.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+              <div className="rounded-lg bg-neutral-50 border px-3 py-2 text-xs text-neutral-700">
+                <div>
+                  Active layout: {pdfLabelLayout.mode === 'sheet' ? 'Sheet grid' : 'Thermal single-label'} · Label {pdfLabelLayout.labelWidthMm.toFixed(1)} × {pdfLabelLayout.labelHeightMm.toFixed(1)} mm
+                </div>
+                <div>
+                  Page {pdfLabelLayout.pageWidthMm.toFixed(1)} × {pdfLabelLayout.pageHeightMm.toFixed(1)} mm{pdfLabelLayout.mode === 'sheet' ? ` · ${pdfLabelLayout.columns} × ${pdfLabelLayout.rows} labels/page` : ''}
+                </div>
+                {!pdfLabelLayoutValidation.isValid && (
+                  <div className="mt-1 text-amber-700">
+                    {pdfLabelLayoutValidation.warnings.join(' ')}
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
@@ -13121,6 +15367,14 @@ function BreederSection({
                       disabled={!hasAnimalData}
                     >
                       Export sheet (.xlsx)
+                    </button>
+                    <button
+                      type="button"
+                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData ? '' : 'opacity-60 cursor-not-allowed')}
+                      onClick={handleGenerateSnakeCatalog}
+                      disabled={!hasAnimalData}
+                    >
+                      Generate Catalog
                     </button>
                   </div>
                 </div>
@@ -13581,6 +15835,28 @@ function BreederSection({
             <div className="text-sm font-semibold text-neutral-800">{t("setup.chooseLanguage")}</div>
             <div className="text-xs text-neutral-600">{t("setup.languageHelp")}</div>
             <LanguageSwitcher />
+          </div>
+        </div>
+      )}
+
+      {isDevEnvironment && setupTab === 'devTools' && (
+        <div className="border-t pt-4 space-y-4">
+          {/* TEMP DEV TOOL - REMOVE BEFORE PRODUCTION */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            This section contains destructive developer-only actions.
+          </div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 space-y-2">
+            <div className="font-semibold text-red-700">Return to Defaults</div>
+            <div className="text-xs text-red-700/90">
+              Permanently erases all local data and rebuilds the app to a factory-default state.
+            </div>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
+              onClick={handleReturnToDefaults}
+            >
+              Return to Defaults
+            </button>
           </div>
         </div>
       )}
@@ -14195,22 +16471,33 @@ function PairingInlineCard({
 
   const handleGenerateAppointments = useCallback(() => {
     setEdit(d => {
-      const created = genMonthlyAppointments(d.startDate || localYMD(new Date()), 5);
-      const next = { ...d, appointments: created };
+      const existing = Array.isArray(d.appointments) ? d.appointments : [];
+      const firstWithPairingDate = existing.find(appt => normalizeDateInput(appt?.pairingDate || ''));
+      const generationStart = normalizeDateInput(firstWithPairingDate?.pairingDate || '') || d.startDate || localYMD(new Date());
+      const created = genMonthlyAppointments(generationStart, 5).map((appt, index) => {
+        const pairingDate = normalizeDateInput(existing[index]?.pairingDate || '');
+        return {
+          ...appt,
+          date: pairingDate || appt.date,
+        };
+      });
+      const next = { ...d, appointments: cascadeAppointments(created, 0) };
       next.startDate = (next.appointments && next.appointments[0]) ? next.appointments[0].date : next.startDate;
       return next;
     });
-  }, [setEdit]);
+  }, [cascadeAppointments, setEdit]);
 
   const handleAddAppointment = useCallback(() => {
     setEdit(d => {
       const existing = Array.isArray(d.appointments) ? d.appointments : [];
-      const lastAppointment = existing[existing.length - 1];
       let defaultDate = null;
-      if (lastAppointment?.date) {
-        const parsedLast = parseYmd(lastAppointment.date);
-        if (parsedLast && !Number.isNaN(parsedLast.getTime())) {
-          defaultDate = localYMD(addMonthsClamped(parsedLast, 1));
+      const latestCheckedPairing = [...existing]
+        .reverse()
+        .find(appt => !!appt?.appointmentDone && normalizeDateInput(appt?.pairingDate || ''));
+      if (latestCheckedPairing?.pairingDate) {
+        const pairingBase = parseYmd(latestCheckedPairing.pairingDate);
+        if (pairingBase && !Number.isNaN(pairingBase.getTime())) {
+          defaultDate = localYMD(addMonthsClamped(pairingBase, 1));
         }
       }
       if (!defaultDate) {
@@ -14552,26 +16839,10 @@ function PairingInlineCard({
           </div>
           <div className="flex-1 flex flex-col gap-2 min-w-0">
             {(edit.appointments || []).map((ap, i) => (
-              <div key={ap.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,150px)_minmax(0,1fr)_auto] gap-2 items-center min-w-0">
-                <input
-                  type="date"
-                  className="border rounded-lg px-2 py-1 text-sm min-w-0"
-                  value={ap.date}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setEdit(d => {
-                      if (!Array.isArray(d.appointments)) return d;
-                      if (!d.appointments[i]) return d;
-                      const arr = [...d.appointments];
-                      arr[i] = { ...arr[i], date: v };
-                      const nextAppointments = v ? cascadeAppointments(arr, i) : arr;
-                      return { ...d, appointments: nextAppointments };
-                    });
-                  }}
-                />
-                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex items-center gap-2 text-xs">
+              <div key={ap.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start min-w-0">
+                <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)] gap-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
                       <input
                         type="checkbox"
                         className="w-4 h-4"
@@ -14582,46 +16853,24 @@ function PairingInlineCard({
                             const arr = [...(d.appointments || [])];
                             const prevAppt = arr[i] || {};
                             const nextPairingDate = prevAppt.pairingDate || (v ? localYMD(new Date()) : null);
+                            const normalizedPairingDate = normalizeDateInput(nextPairingDate);
+                            const baseDate = normalizedPairingDate || prevAppt.date || null;
                             arr[i] = {
                               ...prevAppt,
                               appointmentDone: v,
                               pairingObserved: v,
                               pairingDate: nextPairingDate,
                               pairingLoggedAt: nextPairingDate,
+                              date: baseDate,
                             };
-                            return { ...d, appointments: arr };
+                            const nextAppointments = baseDate ? cascadeAppointments(arr, i) : arr;
+                            return { ...d, appointments: nextAppointments, startDate: nextAppointments[0]?.date || d.startDate || null };
                           });
                         }}
                       />
                       {appointmentStatusLabel}
                     </label>
-
-                    <label className="inline-flex items-center gap-2 text-xs">
-                      <span>{pairingDateLabel}</span>
-                      <input
-                        type="date"
-                        className="border rounded-lg px-2 py-1 text-xs min-w-[138px]"
-                        value={ap.pairingDate || ''}
-                        onChange={e => {
-                          const value = e.target.value;
-                          const normalized = normalizeDateInput(value);
-                          setEdit(d => {
-                            const arr = [...(d.appointments || [])];
-                            const prevAppt = arr[i] || {};
-                            arr[i] = {
-                              ...prevAppt,
-                              pairingDate: normalized || null,
-                              pairingLoggedAt: normalized || null,
-                              appointmentDone: normalized ? true : !!prevAppt.appointmentDone,
-                              pairingObserved: normalized ? true : !!prevAppt.pairingObserved,
-                            };
-                            return { ...d, appointments: arr };
-                          });
-                        }}
-                      />
-                    </label>
-
-                    <label className="inline-flex items-center gap-2 text-xs">
+                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
                       <input
                         type="checkbox"
                         className="w-4 h-4"
@@ -14644,9 +16893,37 @@ function PairingInlineCard({
                       />
                       {lockLabel}
                     </label>
-
-                    <label className="inline-flex items-center gap-2 text-xs">
-                      <span>{lockDateLabel}</span>
+                  </div>
+                  <div className="flex flex-col gap-2 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs whitespace-nowrap">{pairingDateLabel}</span>
+                      <input
+                        type="date"
+                        className="border rounded-lg px-2 py-1 text-xs min-w-[138px]"
+                        value={ap.pairingDate || ''}
+                        onChange={e => {
+                          const value = e.target.value;
+                          const normalized = normalizeDateInput(value);
+                          setEdit(d => {
+                            const arr = [...(d.appointments || [])];
+                            const prevAppt = arr[i] || {};
+                            const baseDate = normalized || prevAppt.date || null;
+                            arr[i] = {
+                              ...prevAppt,
+                              pairingDate: normalized || null,
+                              pairingLoggedAt: normalized || null,
+                              appointmentDone: normalized ? true : !!prevAppt.appointmentDone,
+                              pairingObserved: normalized ? true : !!prevAppt.pairingObserved,
+                              date: baseDate,
+                            };
+                            const nextAppointments = baseDate ? cascadeAppointments(arr, i) : arr;
+                            return { ...d, appointments: nextAppointments, startDate: nextAppointments[0]?.date || d.startDate || null };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs whitespace-nowrap">{lockDateLabel}</span>
                       <input
                         type="date"
                         className="border rounded-lg px-2 py-1 text-xs min-w-[130px]"
@@ -14667,11 +16944,11 @@ function PairingInlineCard({
                           });
                         }}
                       />
-                    </label>
+                    </div>
                   </div>
                   <input
                     placeholder={notesLabel}
-                    className="border rounded-lg px-2 py-1 text-xs flex-1 min-w-0"
+                    className="border rounded-lg px-2 py-1 text-xs min-w-0 lg:col-span-2"
                     value={ap.notes || ''}
                     onChange={e => {
                       const v = e.target.value;
@@ -16274,10 +18551,11 @@ function parseYmd(dateStr) {
 }
 
 // import tab
-function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, theme='blue', onCancel, showAppAlert }) {
+function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const sheetInputRef = useRef();
+  const resolvingPreviewRef = useRef(false);
   const { t } = useTranslation();
   const importCount = Array.isArray(importPreview) ? importPreview.length : 0;
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
@@ -16285,6 +18563,54 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     ? t("ui.animals.import.importButtonWithCount", { count: importCount, defaultValue: "Import ({{count}})" })
     : t("ui.animals.import.importButton", { defaultValue: "Import" });
   const geneticsLabel = t("ui.animals.import.geneticsLabel", { defaultValue: "Genetics" });
+  const resolveLeucisticEntry = useCallback(async (entry, sourceLabel = 'Import genetics') => {
+    if (!entry) return entry;
+    const morphs = Array.isArray(entry.morphs) ? entry.morphs : [];
+    const hets = Array.isArray(entry.hets) ? entry.hets : [];
+    if (typeof onResolveLeucisticLists !== 'function') {
+      const normalized = normalizeMorphHetLists([...morphs, ...hets]);
+      return { ...entry, morphs: normalized.morphs, hets: normalized.hets };
+    }
+    const resolved = await onResolveLeucisticLists(morphs, hets, sourceLabel);
+    return {
+      ...entry,
+      morphs: resolved?.morphs || morphs,
+      hets: resolved?.hets || hets,
+    };
+  }, [onResolveLeucisticLists]);
+
+  useEffect(() => {
+    if (resolvingPreviewRef.current) return;
+    const list = Array.isArray(importPreview) ? importPreview : [];
+    if (!list.length) return;
+    const hasTrigger = list.some(entry => {
+      const raw = formatMorphHetForInput(entry?.morphs || [], entry?.hets || []);
+      return hasLeucisticTriggerText(raw);
+    });
+    if (!hasTrigger) return;
+
+    let cancelled = false;
+    const run = async () => {
+      resolvingPreviewRef.current = true;
+      try {
+        const next = [];
+        for (const row of list) {
+          if (cancelled) return;
+          const resolvedRow = await resolveLeucisticEntry(row, 'Import preview genetics');
+          next.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+        }
+        if (!cancelled) {
+          setImportPreview(next);
+        }
+      } finally {
+        resolvingPreviewRef.current = false;
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [importPreview, resolveLeucisticEntry, setImportPreview]);
 
   return (
     <Card title={t("ui.animals.import.title", { defaultValue: "Import snakes from text" })}>
@@ -16316,10 +18642,16 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     let items = parseFourLineBlocks(txt);
                     if (items && items.length) {
                       const converted = items.map(p => {
+                        const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
                         const sex = ensureSex(p.sex, 'F');
-                        return { name: p.name, sex, morphs: p.morphs || [], hets: p.hets || [], previewText: formatParsedPreview({ ...p, sex }) };
+                        return { name: p.name, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ ...p, sex, morphs: normalized.morphs, hets: normalized.hets }) };
                       });
-                      setImportPreview(converted);
+                      const resolvedRows = [];
+                      for (const row of converted) {
+                        const resolvedRow = await resolveLeucisticEntry(row, 'Import PDF genetics');
+                        resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                      }
+                      setImportPreview(resolvedRows);
                       return;
                     }
 
@@ -16335,16 +18667,22 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                           if (/^het\b|\bhet\b|^66%|^50%|possible/i.test(low)) hets.push(g);
                           else morphs.push(g);
                         });
+                        const normalized = normalizeMorphHetLists([...morphs, ...hets]);
                         const sex = ensureSex(p.gender && p.gender[0], 'F');
                         return {
                           name: p.name,
                           sex,
-                          morphs,
-                          hets,
-                          previewText: formatParsedPreview({ name: p.name, id: p.id || '', sex, morphs, hets })
+                          morphs: normalized.morphs,
+                          hets: normalized.hets,
+                          previewText: formatParsedPreview({ name: p.name, id: p.id || '', sex, morphs: normalized.morphs, hets: normalized.hets })
                         };
                       });
-                      setImportPreview(convertedSingle);
+                      const resolvedRows = [];
+                      for (const row of convertedSingle) {
+                        const resolvedRow = await resolveLeucisticEntry(row, 'Import line genetics');
+                        resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                      }
+                      setImportPreview(resolvedRows);
                       return;
                     }
 
@@ -16352,16 +18690,32 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     const pipeParsed = parsePipeSeparatedLines(txt);
                     if (pipeParsed && pipeParsed.length) {
                       const convertedPipe = pipeParsed.map(p => {
+                        const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
                         const sex = ensureSex(p.sex, 'F');
-                        return { name: p.name, sex, morphs: p.morphs || [], hets: p.hets || [], previewText: formatParsedPreview({ name: p.name, id: '', sex, morphs: p.morphs, hets: p.hets }) };
+                        return { name: p.name, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ name: p.name, id: '', sex, morphs: normalized.morphs, hets: normalized.hets }) };
                       });
-                      setImportPreview(convertedPipe);
+                      const resolvedRows = [];
+                      for (const row of convertedPipe) {
+                        const resolvedRow = await resolveLeucisticEntry(row, 'Import pipe genetics');
+                        resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                      }
+                      setImportPreview(resolvedRows);
                       return;
                     }
 
                     // fallback to older heuristic parser
                     const fallback = parseReptileBuddyText(txt);
-                    setImportPreview(fallback);
+                    const normalizedFallback = fallback.map(p => {
+                      const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
+                      const sex = ensureSex(p.sex, 'F');
+                      return { ...p, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ ...p, sex, morphs: normalized.morphs, hets: normalized.hets }) };
+                    });
+                    const resolvedRows = [];
+                    for (const row of normalizedFallback) {
+                      const resolvedRow = await resolveLeucisticEntry(row, 'Import fallback genetics');
+                      resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                    }
+                    setImportPreview(resolvedRows);
                   } catch (err) {
                     console.error('pdf parse failed', err);
                     if (typeof showAppAlert === 'function') {
@@ -16520,7 +18874,13 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     };
                   });
 
-                  setImportPreview(converted);
+                  const resolvedRows = [];
+                  for (const row of converted) {
+                    const resolvedRow = await resolveLeucisticEntry(row, 'Import sheet genetics');
+                    resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                  }
+
+                  setImportPreview(resolvedRows);
                   setImportText(text);
                 } catch (err) {
                   console.error('sheet import error', err);

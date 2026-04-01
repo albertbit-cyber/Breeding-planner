@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  lab
+  breeder
+}
+
+enum TestPricingType {
+  morph
+  sex
+}
+
+enum PricingTier {
+  tier_1_9
+  tier_10_49
+  tier_50_plus
+}
+
+enum ShedOrderStatus {
+  submitted
+  received
+  in_progress
+  completed
+  cancelled
+}
+
+enum ShedResultStatus {
+  running
+  completed
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  fullName     String
+  role         UserRole
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  orders       ShedTestOrder[]
+}
+
+model ShedTestCatalog {
+  id                  String          @id
+  name                String
+  category            String
+  pricingType         TestPricingType
+  active              Boolean         @default(true)
+  visibleInBreederApp Boolean         @default(true)
+  description         String?
+  sortOrder           Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  orderAnimalTests    ShedTestOrderAnimalTest[]
+}
+
+model PricingConfig {
+  id                             String   @id @default(cuid())
+  currency                       String   @default("EUR")
+  morphTier1to9FirstTest         Decimal  @db.Decimal(10, 2)
+  morphTier1to9AdditionalTest    Decimal  @db.Decimal(10, 2)
+  morphTier10to49FirstTest       Decimal  @db.Decimal(10, 2)
+  morphTier10to49AdditionalTest  Decimal  @db.Decimal(10, 2)
+  morphTier50PlusFirstTest       Decimal  @db.Decimal(10, 2)
+  morphTier50PlusAdditionalTest  Decimal  @db.Decimal(10, 2)
+  sexTier1to9                    Decimal  @db.Decimal(10, 2)
+  sexTier10to49                  Decimal  @db.Decimal(10, 2)
+  sexTier50Plus                  Decimal  @db.Decimal(10, 2)
+  isActive                       Boolean  @default(true)
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+}
+
+model ShedTestOrder {
+  id                String                @id @default(cuid())
+  breederId         String
+  breeder           User                  @relation(fields: [breederId], references: [id])
+  totalAnimals      Int
+  pricingTier       PricingTier
+  totalPrice        Decimal               @db.Decimal(12, 2)
+  currency          String
+  priceSnapshotJson Json
+  status            ShedOrderStatus       @default(submitted)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  animals           ShedTestOrderAnimal[]
+  results           ShedTestOrderResult[]
+
+  @@index([breederId])
+  @@index([status])
+}
+
+model ShedTestOrderAnimal {
+  id                 String                  @id @default(cuid())
+  orderId            String
+  order              ShedTestOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  animalId           String
+  animalName         String?
+  morphBaseCost      Decimal                 @db.Decimal(10, 2)
+  additionalMorphCost Decimal                @db.Decimal(10, 2)
+  sexCost            Decimal                 @db.Decimal(10, 2)
+  total              Decimal                 @db.Decimal(10, 2)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  tests              ShedTestOrderAnimalTest[]
+
+  @@index([orderId])
+}
+
+model ShedTestOrderAnimalTest {
+  id                  String             @id @default(cuid())
+  orderAnimalId       String
+  orderAnimal         ShedTestOrderAnimal @relation(fields: [orderAnimalId], references: [id], onDelete: Cascade)
+  testId              String
+  test                ShedTestCatalog?   @relation(fields: [testId], references: [id])
+  testNameSnapshot    String
+  pricingTypeSnapshot TestPricingType
+  priceApplied        Decimal            @db.Decimal(10, 2)
+  createdAt           DateTime           @default(now())
+
+  @@index([orderAnimalId])
+  @@index([testId])
+}
+
+model ShedTestOrderResult {
+  id            String           @id @default(cuid())
+  orderId       String
+  order         ShedTestOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  animalId      String
+  sampleId      String
+  status        ShedResultStatus @default(running)
+  testCode      String
+  method        String?
+  findingsJson  Json
+  summary       String?
+  reportedAt    DateTime?
+  analystUserId String?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([orderId, testCode])
+  @@index([orderId])
+  @@index([status])
+}

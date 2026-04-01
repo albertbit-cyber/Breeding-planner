@@ -29,12 +29,68 @@ export type PlanStep = {
   prerequisiteProb?: number;
 };
 
+export type PlanProbabilityEntry = {
+  label: string;
+  probability: number;
+  isGoal?: boolean;
+};
+
+export type PlanHoldbackSelection = {
+  id: string;
+  generation: number;
+  pairingTitle: string;
+  sourcePairingNodeId?: string;
+  sourceOutcomeNodeId?: string;
+  maleId?: string;
+  femaleId?: string;
+  traits: string[];
+  probability: number;
+  matchedGenes?: string[];
+};
+
+export type BreedingFlowchartNode = {
+  id: string;
+  generation: number;
+  kind: "collection" | "pairing" | "outcome";
+  title: string;
+  subtitle?: string;
+  animalId?: string;
+  maleId?: string;
+  femaleId?: string;
+  expectedGenetics?: string[];
+  probabilities?: PlanProbabilityEntry[];
+  goalProbability?: number;
+  isGoal?: boolean;
+  isSelected?: boolean;
+  matchedGenes?: string[];
+  holdbackTraits?: string[];
+};
+
+export type BreedingFlowchartEdge = {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+};
+
+export type BreedingFlowchartGraph = {
+  nodes: BreedingFlowchartNode[];
+  edges: BreedingFlowchartEdge[];
+};
+
 export type MultiGenPlan = {
   strategy: "direct" | "multi";
   steps: PlanStep[];
   cumulativeProb: number;
   holdbackTraits?: string[];
   holdbackProb?: number;
+  matchedGenes?: string[];
+  selectedHoldbacks?: PlanHoldbackSelection[];
+  threshold?: number;
+  generationLimit?: number;
+  goalReached?: boolean;
+  goalReachedGeneration?: number | null;
+  flowchart?: BreedingFlowchartGraph;
 };
 
 export type Suggestion = {

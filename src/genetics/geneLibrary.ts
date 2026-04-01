@@ -1,4 +1,5 @@
 import { MorphType } from "../types/pairing";
+import { getDefaultGeneAliasRows } from "./geneDatabase";
 
 export const GENE_GROUPS: Record<string, string[]> = {
   Recessive: [
@@ -32,9 +33,31 @@ export const GENE_GROUPS: Record<string, string[]> = {
 
 export const PRIMARY_GENE_GROUPS = ["Recessive", "Incomplete Dominant", "Dominant", "Other"] as const;
 
-export const GENE_ALIASES: Record<string, string> = {
+const LEGACY_FIXED_GENE_ALIASES: Record<string, string> = {
   ultramelanistic: "Ultramel",
 };
+
+function buildLegacyGeneAliases(): Record<string, string> {
+  const out: Record<string, string> = { ...LEGACY_FIXED_GENE_ALIASES };
+  const rows = getDefaultGeneAliasRows();
+  rows.forEach((row) => {
+    const canonical = String(row?.geneName || "").trim();
+    if (!canonical) return;
+    const variants = [
+      canonical,
+      ...(Array.isArray(row?.aliases) ? row.aliases : []),
+      ...(Array.isArray(row?.shorthand) ? row.shorthand : []),
+    ];
+    variants.forEach((variant) => {
+      const key = String(variant || "").trim().toLowerCase();
+      if (!key || out[key]) return;
+      out[key] = canonical;
+    });
+  });
+  return out;
+}
+
+export const GENE_ALIASES: Record<string, string> = buildLegacyGeneAliases();
 
 const RAW_GENE_GROUP_LOOKUP: Map<string, string> = (() => {
   const map = new Map<string, string>();
