@@ -1989,53 +1989,14 @@ function extractSnakeIdFromPayload(decoded) {
   if (decoded == null) return null;
   const raw = String(decoded).trim();
   if (!raw) return null;
-  const decodeValue = (value) => {
-    if (value == null) return null;
-    const cleaned = String(value).replace(/\+/g, ' ');
-    try {
-      return decodeURIComponent(cleaned);
-    } catch {
-      return cleaned;
-    }
-  };
-
-  const matchGeneralSnakeParam = () => {
-    const re = /(?:#|[?&])snake=([^&#\s]+)/i;
-    const m = raw.match(re);
-    if (m && m[1]) return decodeValue(m[1]);
-    return null;
-  };
-
-  const matchPrefixedSnake = () => {
-    const re = /^#?snake[:=]([^&#\s]+)/i;
-    const m = raw.match(re);
-    if (m && m[1]) return decodeValue(m[1]);
-    return null;
-  };
-
-  const tryUrlParsing = () => {
-    try {
-      const url = raw.includes('://')
-        ? new URL(raw)
-        : new URL(raw, typeof window !== 'undefined' ? window.location.origin : 'http://local');
-      if (url.searchParams.has('snake')) {
-        const found = url.searchParams.get('snake');
-        if (found) return decodeValue(found);
-      }
-      const hashMatch = url.hash && url.hash.match(/snake=([^&#\s]+)/i);
-      if (hashMatch && hashMatch[1]) {
-        return decodeValue(hashMatch[1]);
-      }
-    } catch {
-      // ignore malformed URLs
-    }
-    return null;
-  };
-
-  const extractor = matchGeneralSnakeParam() || matchPrefixedSnake() || tryUrlParsing();
-  if (extractor) return extractor;
-  const fallback = decodeValue(raw);
-  return fallback || null;
+  const match = raw.match(/#?snake=?(.*)/);
+  const candidate = match ? match[1] : raw;
+  try {
+    const decodedValue = decodeURIComponent(candidate);
+    return decodedValue || null;
+  } catch {
+    return candidate || null;
+  }
 }
 
 // lightweight logs helpers
@@ -3386,81 +3347,6 @@ export default function BreedingPlannerApp() {
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [pairingGuard, setPairingGuard] = useState(null);
   const [showAdvisor, setShowAdvisor] = useState(false);
-  const [electronDataReady, setElectronDataReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
-    if (!bridge?.loadData) {
-      setElectronDataReady(true);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    bridge
-      .loadData()
-      .then((payload) => {
-        if (cancelled || !payload || typeof payload !== 'object') return;
-
-        if (Array.isArray(payload.snakes)) {
-          const sanitized = payload.snakes.map(sanitizeSnakeRecord).filter(Boolean);
-          setSnakes(sanitized);
-        }
-        if (Array.isArray(payload.pairings)) {
-          const sanitizedPairings = payload.pairings.map(sanitizePairingRecord).filter(Boolean);
-          setPairings(sanitizedPairings);
-        }
-        if (Array.isArray(payload.groups)) {
-          setGroups(payload.groups);
-        }
-        if (Array.isArray(payload.showGroups)) {
-          setShowGroups(payload.showGroups);
-        }
-        if (Array.isArray(payload.hiddenGroups)) {
-          setHiddenGroups(payload.hiddenGroups);
-        }
-        if (Array.isArray(payload.customStatusTags)) {
-          setCustomStatusTags(payload.customStatusTags);
-        }
-        if (Array.isArray(payload.removedStatusTags)) {
-          setRemovedStatusTags(payload.removedStatusTags);
-        }
-        if (Object.prototype.hasOwnProperty.call(payload, 'theme')) {
-          setTheme(typeof payload.theme === 'string' ? payload.theme : 'blue');
-        }
-        if (payload.breederInfo && typeof payload.breederInfo === 'object') {
-          setBreederInfo(normalizeBreederInfo(payload.breederInfo));
-        }
-        if (payload.backupSettings && typeof payload.backupSettings === 'object') {
-          setBackupSettings(normalizeBackupSettings(payload.backupSettings));
-        }
-        if (Object.prototype.hasOwnProperty.call(payload, 'autoBackupSnapshot')) {
-          if (payload.autoBackupSnapshot && typeof payload.autoBackupSnapshot === 'object') {
-            setAutoBackupSnapshot(normalizeBackupSnapshot(payload.autoBackupSnapshot));
-          } else {
-            setAutoBackupSnapshot(null);
-          }
-        }
-        if (Object.prototype.hasOwnProperty.call(payload, 'backupVault')) {
-          const vaultValue = Array.isArray(payload.backupVault) ? payload.backupVault : [];
-          setBackupVault(normalizeBackupVault(vaultValue));
-        }
-        if (payload.lastFeedDefaults && typeof payload.lastFeedDefaults === 'object') {
-          setLastFeedDefaults((prev) => ({ ...prev, ...payload.lastFeedDefaults }));
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to load persisted Breeding Planner data', error);
-      })
-      .finally(() => {
-        if (!cancelled) setElectronDataReady(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // edit snake
   const [editSnake, setEditSnake] = useState(null);
@@ -3469,7 +3355,6 @@ export default function BreedingPlannerApp() {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [passiveScanNotice, setPassiveScanNotice] = useState(null);
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
   const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
@@ -3479,7 +3364,6 @@ export default function BreedingPlannerApp() {
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
-  const isAnimalScannerView = tab === 'animals' && animalView !== 'groups';
 
   useEffect(() => {
     if (!editStatusMenuOpen) return;
@@ -3498,18 +3382,6 @@ export default function BreedingPlannerApp() {
       setShowAdvisor(false);
     }
   }, [tab, showAdvisor]);
-
-  useEffect(() => {
-    if (!isAnimalScannerView) {
-      setPassiveScanNotice(null);
-    }
-  }, [isAnimalScannerView]);
-
-  useEffect(() => {
-    if (!passiveScanNotice) return;
-    const timeout = setTimeout(() => setPassiveScanNotice(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [passiveScanNotice]);
 
   const handleCreateStatusTag = useCallback((tag) => {
     const trimmed = (tag || '').trim();
@@ -3588,52 +3460,6 @@ export default function BreedingPlannerApp() {
   useEffect(() => { saveStoredJson(STORAGE_KEYS.lastFeedDefaults, lastFeedDefaults); }, [lastFeedDefaults]);
 
   useEffect(() => { saveStoredJson(STORAGE_KEYS.breeder, normalizeBreederInfo(breederInfo)); }, [breederInfo]);
-
-  useEffect(() => {
-    if (!electronDataReady) return;
-    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
-    if (!bridge?.saveData) return;
-    const payload = {
-      snakes,
-      pairings,
-      groups,
-      showGroups,
-      hiddenGroups,
-      customStatusTags,
-      removedStatusTags,
-      theme,
-      breederInfo,
-      backupSettings,
-      autoBackupSnapshot,
-      backupVault,
-      lastFeedDefaults,
-    };
-
-    const saveTimer = setTimeout(() => {
-      bridge.saveData(payload).catch((error) => {
-        console.error('Failed to save Breeding Planner data', error);
-      });
-    }, 300);
-
-    return () => {
-      clearTimeout(saveTimer);
-    };
-  }, [
-    autoBackupSnapshot,
-    backupSettings,
-    backupVault,
-    breederInfo,
-    customStatusTags,
-    electronDataReady,
-    groups,
-    hiddenGroups,
-    lastFeedDefaults,
-    pairings,
-    removedStatusTags,
-    showGroups,
-    snakes,
-    theme,
-  ]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -3920,6 +3746,26 @@ export default function BreedingPlannerApp() {
     maleId:"", femaleId:"", goals:[], notes:"",
     startDate: localYMD(new Date())
   });
+
+  useEffect(() => {
+    setSnakes(prev => {
+      let changed = false;
+      const next = prev.map(s => {
+        const normalized = normalizeSexValue(s?.sex);
+        if (!s || normalized === 'UNKNOWN' || s.sex === normalized) return s;
+        changed = true;
+        return { ...s, sex: normalized };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!photoGallerySnakeId) return;
+    if (!snakes.some(s => s.id === photoGallerySnakeId)) {
+      setPhotoGallerySnakeId(null);
+    }
+  }, [photoGallerySnakeId, snakes]);
   const [maleSearchQuery, setMaleSearchQuery] = useState("");
   const [femaleSearchQuery, setFemaleSearchQuery] = useState("");
   const [pairingSearchTarget, setPairingSearchTarget] = useState(null);
@@ -4483,45 +4329,6 @@ export default function BreedingPlannerApp() {
     if (!snake) return;
     setPendingDeleteSnake(snake);
   }, []);
-
-  const openSnakeFromScan = useCallback((rawId, { silent = false } = {}) => {
-    const normalizedId = typeof rawId === 'string' ? rawId.trim() : String(rawId ?? '').trim();
-    if (!normalizedId) return null;
-    const match = snakes.find(s => s.id === normalizedId);
-    if (match) {
-      openSnakeCard(match);
-      return match;
-    }
-    if (!silent) {
-      alert(`No snake found with ID: ${normalizedId}`);
-    } else {
-      console.warn(`No snake found with ID: ${normalizedId}`);
-    }
-    return null;
-  }, [openSnakeCard, snakes]);
-
-  const handlePassiveScan = useCallback((payload) => {
-    if (!isAnimalScannerView) return;
-    const decoded = typeof payload === 'string' ? payload.trim() : String(payload ?? '').trim();
-    if (!decoded) return;
-    const result = openSnakeFromScan(decoded, { silent: true });
-    setPassiveScanNotice({
-      ts: Date.now(),
-      type: result ? 'success' : 'error',
-      text: result ? `Opened ${result.name || result.id}` : `No animal with ID ${decoded}`,
-    });
-  }, [isAnimalScannerView, openSnakeFromScan]);
-
-  useHardwareScannerListener({
-    enabled: isAnimalScannerView,
-    onScan: handlePassiveScan,
-    minLength: 3,
-    maxKeyInterval: 200,
-    maxScanDuration: 2500,
-  });
-
-  const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
-  const passiveScannerLabel = passiveScanNotice?.text ?? 'Scanner ready';
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
@@ -5197,30 +5004,6 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={animalView === "groups"} onClick={()=>handleAnimalViewTabChange("groups")}>Groups</TabButton>
               </div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                {isAnimalScannerView && (
-                  <div
-                    className={cx(
-                      'px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border transition-colors',
-                      passiveScannerStatus === 'success'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : passiveScannerStatus === 'error'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-sky-50 text-sky-700 border-sky-200'
-                    )}
-                  >
-                    <span
-                      className={cx(
-                        'w-2 h-2 rounded-full',
-                        passiveScannerStatus === 'success'
-                          ? 'bg-emerald-500 animate-pulse'
-                          : passiveScannerStatus === 'error'
-                            ? 'bg-amber-500'
-                            : 'bg-sky-500 animate-pulse'
-                      )}
-                    />
-                    <span>{passiveScannerLabel}</span>
-                  </div>
-                )}
                 <button onClick={()=>setShowExportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>Export QR</button>
                 <button onClick={()=>setShowScanner(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>Scan QR</button>
                 <button
@@ -5342,6 +5125,13 @@ export default function BreedingPlannerApp() {
 
         {tab === "pairings" && (
           <div className="flex flex-col gap-4">
+            <div className="flex gap-2 mb-4">
+              <button className="px-4 py-2 rounded-xl border bg-white text-sm font-semibold" onClick={() => setTab('pairings')}>Pairings</button>
+              <button className="px-4 py-2 rounded-xl border bg-white text-sm font-semibold" onClick={() => setShowIncubator(prev => !prev)}>Incubator</button>
+            </div>
+            {showIncubator && (
+              <div className="mb-4 p-4 border rounded-xl bg-neutral-50 text-neutral-700">Incubator section (placeholder)</div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <TabButton
@@ -6357,10 +6147,10 @@ export default function BreedingPlannerApp() {
             <QrScannerModal
               onClose={() => setShowScanner(false)}
               onFound={(id) => {
-                const match = openSnakeFromScan(id);
-                if (match) {
-                  setShowScanner(false);
-                }
+                setShowScanner(false);
+                const s = snakes.find(x=>x.id===id);
+                if (s) { setEditSnake(s); setEditSnakeDraft(initSnakeDraft(s)); }
+                else alert(`No snake found with ID: ${id}`);
               }}
             />
           )}
@@ -6721,164 +6511,6 @@ export {
         </div>
       );
     }
-
-function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInterval = 150, maxScanDuration = 2000 }) {
-  const onScanRef = useRef(onScan);
-
-  useEffect(() => {
-    onScanRef.current = onScan;
-  }, [onScan]);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-    if (typeof window === 'undefined') return undefined;
-
-    let buffer = '';
-    let startedAt = 0;
-    let lastTime = 0;
-    let capturingScan = false;
-
-    const nowTs = () => {
-      if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-        return performance.now();
-      }
-      return Date.now();
-    };
-
-    const isEditableElement = (el) => {
-      if (!el) return false;
-      if (el.isContentEditable) return true;
-      const tag = el.tagName;
-      if (!tag) return false;
-      return (
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        tag === 'SELECT' ||
-        el.getAttribute?.('data-scanner-target') === 'true'
-      );
-    };
-
-    const swallowEvent = (event) => {
-      event.preventDefault?.();
-      event.stopPropagation?.();
-    };
-
-    const resetBuffer = () => {
-      buffer = '';
-      startedAt = 0;
-      lastTime = 0;
-      capturingScan = false;
-    };
-
-    const handleKeyDown = (event) => {
-      if (!enabled) return;
-      const targetEditable = isEditableElement(event.target);
-      if (targetEditable && !capturingScan) {
-        resetBuffer();
-        return;
-      }
-      const current = nowTs();
-      const key = event.key;
-
-      const tryCommit = () => {
-        if (!buffer.length || !startedAt) return false;
-        const duration = current - startedAt;
-        if (buffer.length >= minLength && duration <= maxScanDuration) {
-          const id = extractSnakeIdFromPayload(buffer);
-          if (id) {
-            if (typeof event.preventDefault === 'function') {
-              event.preventDefault();
-            }
-            onScanRef.current?.(id);
-            return true;
-          }
-        }
-        return false;
-      };
-
-      if (key === 'Enter' || key === 'Tab') {
-        if (capturingScan || buffer.length) {
-          swallowEvent(event);
-        }
-        tryCommit();
-        resetBuffer();
-        return;
-      }
-
-      if (key === 'Escape') {
-        if (capturingScan) {
-          swallowEvent(event);
-        }
-        resetBuffer();
-        return;
-      }
-
-      if (key === 'Backspace') {
-        if (capturingScan) {
-          swallowEvent(event);
-        }
-        buffer = buffer.slice(0, -1);
-        if (!buffer.length) {
-          resetBuffer();
-        }
-        return;
-      }
-
-      if (key === 'Shift' || key === 'CapsLock' || key === 'NumLock') {
-        return;
-      }
-
-      if (event.metaKey || event.altKey || event.ctrlKey) {
-        if (capturingScan) {
-          swallowEvent(event);
-        }
-        resetBuffer();
-        return;
-      }
-
-      if (key.length === 1) {
-        if (!capturingScan) {
-          capturingScan = true;
-        }
-        if (!targetEditable) {
-          swallowEvent(event);
-        }
-        if (!startedAt) {
-          startedAt = current;
-          buffer = '';
-        }
-        if (lastTime && current - lastTime > maxKeyInterval) {
-          buffer = '';
-          startedAt = current;
-        }
-        lastTime = current;
-        buffer += key;
-        return;
-      }
-
-      resetBuffer();
-    };
-
-    const handlePaste = (event) => {
-      if (!enabled) return;
-      if (isEditableElement(event.target)) return;
-      const text = event.clipboardData?.getData('text');
-      if (!text) return;
-      swallowEvent(event);
-      const id = extractSnakeIdFromPayload(text);
-      if (id) {
-        onScanRef.current?.(id);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('paste', handlePaste, true);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('paste', handlePaste, true);
-    };
-  }, [enabled, maxKeyInterval, maxScanDuration, minLength]);
-}
 
 // small comps
 function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm, theme = 'blue' }) {
@@ -8163,9 +7795,10 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
         })()}
       </div>
 
-      {/* genetics moved to header */}
-      {/* weight display removed per user request */}
-  {/* birth date moved to header */}
+        {/* genetics moved to header */}
+        {/* weight display removed per user request */}
+      {/* birth date moved to header */}
+        </div>
       </div>
       {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
       {quickTagOpen && (
@@ -8191,6 +7824,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
             </div>
             <div className="space-y-3 text-sm">
               <div>
+              <div>
                 <div className="text-xs text-neutral-500">Date</div>
                 <input className="w-full px-2 py-1 border rounded" type="date" value={quickDraft.date} onChange={(e)=>setQuickDraft(d=>({...d, date: e.target.value}))} />
               </div>
@@ -8208,6 +7842,136 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
                   <div>
                     <div className="text-xs text-neutral-500">Size</div>
                     {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
+                      <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                        <option value="pinky">pinky</option>
+                        <option value="fuzzy">fuzzy</option>
+                        <option value="medium">medium</option>
+                        <option value="adult">adult</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    ) : (
+                      <>
+                        <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                          <option value="">Select</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        {quickDraft.size === 'Other' && (
+                          <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
+                        )}
+                      </>
+                    )}
+                    {quickDraft.size === 'Other' && quickDraft.feed !== 'Mouse' && quickDraft.feed !== 'Rat' && (
+                      <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-neutral-500">Weight (g)</div>
+                    <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-neutral-500">Form</div>
+                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.form||''} onChange={(e)=>setQuickDraft(d=>({...d, form: e.target.value}))}>
+                      <option value="">Select</option>
+                      <option value="Live">Live</option>
+                      <option value="Freshly killed">Freshly killed</option>
+                      <option value="Frozen/thawed">Frozen/thawed</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {quickDraft.form === 'Other' && (
+                      <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Method details" value={quickDraft.formDetail||''} onChange={e=>setQuickDraft(d=>({...d, formDetail: e.target.value}))} />
+                    )}
+                  </div>
+                </>
+              )}
+              {quickTagOpen.toLowerCase().includes('weight') && (
+                        <>
+                          <div>
+                            <div className="text-xs text-neutral-500">Grams</div>
+                            <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                          </div>
+                          <div>
+                            <div className="text-xs text-neutral-500">Recent progress</div>
+                            <WeightTrendMiniChart data={weightHistory} />
+                          </div>
+                        </>
+                      )}
+              {quickTagOpen.toLowerCase().includes('med') && (
+                <>
+                  <div>
+                    <div className="text-xs text-neutral-500">Drug</div>
+                    <input className="w-full px-2 py-1 border rounded" value={quickDraft.drug} onChange={(e)=>setQuickDraft(d=>({...d, drug: e.target.value}))} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-neutral-500">Dose</div>
+                    <input className="w-full px-2 py-1 border rounded" value={quickDraft.dose} onChange={(e)=>setQuickDraft(d=>({...d, dose: e.target.value}))} />
+                  </div>
+                </>
+              )}
+              <div>
+                <div className="text-xs text-neutral-500">Notes</div>
+                <input className="w-full px-2 py-1 border rounded" value={quickDraft.notes} onChange={(e)=>setQuickDraft(d=>({...d, notes: e.target.value}))} />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button className="px-2 py-1 border rounded" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>Cancel</button>
+                {quickTagOpen.toLowerCase().includes('feed') && (
+                  <>
+                    <div>
+                      <button
+                        className="px-2 py-1 border rounded text-rose-600"
+                        onClick={(e)=>{
+                          e.stopPropagation();
+                          submitQuickAdd(quickTagOpen, { forceRefused: true });
+                        }}
+                      >
+                        Refused feed
+                      </button>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Size</div>
+                      {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
+                        <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                          <option value="pinky">pinky</option>
+                          <option value="fuzzy">fuzzy</option>
+                          <option value="medium">medium</option>
+                          <option value="adult">adult</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      ) : (
+                        <>
+                          <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                            <option value="">Select</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {quickDraft.size === 'Other' && (
+                            <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
+                          )}
+                        </>
+                      )}
+                      {quickDraft.size === 'Other' && quickDraft.feed !== 'Mouse' && quickDraft.feed !== 'Rat' && (
+                        <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Weight (g)</div>
+                      <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Form</div>
+                      <select className="w-full px-2 py-1 border rounded" value={quickDraft.form||''} onChange={(e)=>setQuickDraft(d=>({...d, form: e.target.value}))}>
+                        <option value="">Select</option>
+                        <option value="Live">Live</option>
+                        <option value="Freshly killed">Freshly killed</option>
+                        <option value="Frozen/thawed">Frozen/thawed</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {quickDraft.form === 'Other' && (
+                        <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Method details" value={quickDraft.formDetail||''} onChange={e=>setQuickDraft(d=>({...d, formDetail: e.target.value}))} />
+                      )}
+                    </div>
+                  </>
+                    <div>
+                      <div className="text-xs text-neutral-500">Size</div>
+                      {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
                       <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
                         <option value="pinky">pinky</option>
                         <option value="fuzzy">fuzzy</option>
@@ -8308,112 +8072,110 @@ function SnakeCard({ s, onEdit, onQuickPair, onDelete, groups = [], setSnakes, p
                 onChange={() => {
                   if (!setSnakes) return;
                   setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [g] } : x));
-                }} />
-              <span className="truncate max-w-[8rem]">{g}</span>
-            </label>
-          ))}
-          <label className="inline-flex items-center gap-1 px-2 py-0.5 border rounded-lg bg-white text-[11px]">
-            <input type="radio" name={`group-${s.id}`} className="w-3 h-3" checked={!(s.groups||[]).length}
-              onChange={() => { if (!setSnakes) return; setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [] } : x)); }} />
-            <span>None</span>
-          </label>
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-2">
-        <StatusDot status={displayStatus} />
-        <div className="text-xs">{displayStatus}</div>
-      </div>
-
-      {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
-        <div className="mt-2">
-          <div className="text-xs text-neutral-500 mb-1">Breeding cycles</div>
-          <div className="flex flex-col gap-1 max-h-40 overflow-auto pr-1">
-            {breedingCyclesByYear.map(group => (
-              <div key={group.year} className="rounded-lg border bg-neutral-50 p-2 space-y-1">
-                <div className="text-[10px] font-semibold uppercase text-neutral-500">{group.year}</div>
-                {group.cycles.map(cycle => (
-                  <div key={cycle.id} className="rounded-lg border bg-white px-2 py-1 text-[11px] space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-medium truncate">{cycle.label}</div>
-                      {onOpenPairing && cycle.id && (
-                        <button
-                          className="text-[10px] px-1.5 py-0.5 border rounded-lg"
-                          onClick={() => onOpenPairing(cycle.id)}
-                        >
-                          Open
-                        </button>
+                <div>
+                  <div className="text-xs text-neutral-500">Date</div>
+                  <input className="w-full px-2 py-1 border rounded" type="date" value={quickDraft.date} onChange={(e)=>setQuickDraft(d=>({...d, date: e.target.value}))} />
+                </div>
+                {quickTagOpen.toLowerCase().includes('feed') && (
+                  <>
+                    <div>
+                      <button
+                        className="px-2 py-1 border rounded text-rose-600"
+                        onClick={(e)=>{
+                          e.stopPropagation();
+                          submitQuickAdd(quickTagOpen, { forceRefused: true });
+                        }}
+                      >
+                        Refused feed
+                      </button>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Size</div>
+                      {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
+                        <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                          <option value="pinky">pinky</option>
+                          <option value="fuzzy">fuzzy</option>
+                          <option value="medium">medium</option>
+                          <option value="adult">adult</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      ) : (
+                        <>
+                          <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                            <option value="">Select</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {quickDraft.size === 'Other' && (
+                            <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
+                          )}
+                        </>
+                      )}
+                      {quickDraft.size === 'Other' && quickDraft.feed !== 'Mouse' && quickDraft.feed !== 'Rat' && (
+                        <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Custom size" value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
                       )}
                     </div>
-                    <div className="space-y-0.5 text-neutral-700">
-                      {cycle.locks && cycle.locks.length ? (
-                        <div>
-                          <span className="font-semibold text-neutral-600">Locks:</span>{' '}
-                          <span>{cycle.locks.map(lock => lock.display || formatDateTimeForDisplay(lock.iso)).filter(Boolean).join(', ')}</span>
-                        </div>
-                      ) : null}
-                      {cycle.ovulationDate ? (
-                        <div><span className="font-semibold text-neutral-600">Ovulation:</span> <span>{formatDateForDisplay(cycle.ovulationDate)}</span></div>
-                      ) : null}
-                      {cycle.preLayDate ? (
-                        <div><span className="font-semibold text-neutral-600">Pre-Lay Shed:</span> <span>{formatDateForDisplay(cycle.preLayDate)}</span></div>
-                      ) : null}
-                      {cycle.clutchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Eggs laid:</span> <span>{formatDateForDisplay(cycle.clutchDate)}</span></div>
-                      ) : null}
-                      {cycle.hatchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Hatched:</span> <span>{formatDateForDisplay(cycle.hatchDate)}</span></div>
-                      ) : null}
-                      {!cycle.locks?.length && !cycle.ovulationDate && !cycle.preLayDate && !cycle.clutchDate && !cycle.hatchDate ? (
-                        <div className="text-neutral-500">No cycle events recorded.</div>
-                      ) : null}
+                    <div>
+                      <div className="text-xs text-neutral-500">Weight (g)</div>
+                      <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
                     </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pairings involving this snake */}
-      <div className="mt-2">
-        <div className="text-xs text-neutral-500 mb-1">Pairings</div>
-        {(() => {
-          const myPairings = pairings.filter(p => p.maleId === s.id || p.femaleId === s.id);
-          const visible = myPairings.slice(0,3);
-          return (
-            <div className="flex flex-col gap-1 max-h-36 overflow-auto">
-              {visible.map(p => (
-                <button key={p.id} className="text-sm text-left px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
-                  <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
-                  <div className="text-xs text-neutral-500">Start: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
-                </button>
-              ))}
-              {myPairings.length === 0 && (<div className="text-xs text-neutral-500">No pairings</div>)}
-              {myPairings.length > 3 && (
-                <button className="text-xs mt-1 px-2 py-1 border rounded-lg text-neutral-700" onClick={()=>setShowPairingsModal(true)}>+{myPairings.length - 3} more</button>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-      {showPairingsModal && (
-        <PairingsModal
-          snake={s}
-          pairings={pairings.filter(p => p.maleId === s.id || p.femaleId === s.id)}
-          onClose={() => setShowPairingsModal(false)}
-          onOpenPairing={(pid) => { setShowPairingsModal(false); if (onOpenPairing) onOpenPairing(pid); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function WeightTrendMiniChart({ data = [] }) {
-  const accent = '#0ea5e9';
-  const chartWidth = 320;
-  const chartHeight = 140;
-  const padding = { top: 18, right: 28, bottom: 32, left: 42 };
+                    <div>
+                      <div className="text-xs text-neutral-500">Form</div>
+                      <select className="w-full px-2 py-1 border rounded" value={quickDraft.form||''} onChange={(e)=>setQuickDraft(d=>({...d, form: e.target.value}))}>
+                        <option value="">Select</option>
+                        <option value="Live">Live</option>
+                        <option value="Freshly killed">Freshly killed</option>
+                        <option value="Frozen/thawed">Frozen/thawed</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {quickDraft.form === 'Other' && (
+                        <input className="mt-2 w-full px-2 py-1 border rounded" placeholder="Method details" value={quickDraft.formDetail||''} onChange={e=>setQuickDraft(d=>({...d, formDetail: e.target.value}))} />
+                      )}
+                    </div>
+                  </>
+                )}
+                {quickTagOpen.toLowerCase().includes('weight') && (
+                  <>
+                    <div>
+                      <div className="text-xs text-neutral-500">Grams</div>
+                      <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Recent progress</div>
+                      <WeightTrendMiniChart data={weightHistory} />
+                    </div>
+                  </>
+                )}
+                {quickTagOpen.toLowerCase().includes('med') && (
+                  <>
+                    <div>
+                      <div className="text-xs text-neutral-500">Drug</div>
+                      <input className="w-full px-2 py-1 border rounded" value={quickDraft.drug} onChange={(e)=>setQuickDraft(d=>({...d, drug: e.target.value}))} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500">Dose</div>
+                      <input className="w-full px-2 py-1 border rounded" value={quickDraft.dose} onChange={(e)=>setQuickDraft(d=>({...d, dose: e.target.value}))} />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <div className="text-xs text-neutral-500">Notes</div>
+                  <input className="w-full px-2 py-1 border rounded" value={quickDraft.notes} onChange={(e)=>setQuickDraft(d=>({...d, notes: e.target.value}))} />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button className="px-2 py-1 border rounded" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>Cancel</button>
+                  {quickTagOpen.toLowerCase().includes('feed') && (
+                    <button
+                      className="px-2 py-1 border rounded text-rose-600"
+                      onClick={(e)=>{
+                        e.stopPropagation();
+                        submitQuickAdd(quickTagOpen, { forceRefused: true });
+                      }}
+                    >
+                      Refused feed
+                    </button>
+                  )}
+                  <button className="px-2 py-1 bg-emerald-500 text-white rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>Add</button>
+                </div>
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const gradientId = useMemo(() => `weight-gradient-${Math.random().toString(36).slice(2, 8)}`, []);
@@ -8716,7 +8478,40 @@ function BreederSection({
   }, []);
 
   const [setupTab, setSetupTab] = useState('info');
+  const repoUrl = 'https://github.com/AlbertBit-Cyber/Breeding-planner';
+  const repoZipUrl = `${repoUrl}/archive/refs/heads/main.zip`;
+  const buildGuideUrl = `${repoUrl}/blob/main/BUILD_AND_SERVE.md`;
+  const baseHref = typeof import.meta !== 'undefined' && import.meta?.env?.BASE_URL ? import.meta.env.BASE_URL : '/';
+  const normalizedBaseHref = baseHref.endsWith('/') ? baseHref : `${baseHref}/`;
+  const offlineBundleHref = `${normalizedBaseHref}offline/BreedingPlannerOffline.zip`;
+  const offlineBundleName = 'BreedingPlannerOffline.zip';
+  const runningFromGithubPages = typeof window !== 'undefined'
+    && !!window.location
+    && window.location.hostname.includes('github.io');
+  const hostedOrigin = runningFromGithubPages && typeof window !== 'undefined' ? window.location.origin : '';
   const [backupFeedback, setBackupFeedback] = useState(null);
+  const [restoreFeedback, setRestoreFeedback] = useState(null);
+  const restoreInputRef = useRef(null);
+  const legacyRestoreInputRef = useRef(null);
+  const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
+  const vaultEntries = useMemo(() => (Array.isArray(backupVault) ? backupVault : []), [backupVault]);
+  const normalizedAnimalExportFields = useMemo(
+    () => normalizeExportFieldSelection(animalExportFields, DEFAULT_ANIMAL_EXPORT_FIELDS, ANIMAL_EXPORT_FIELD_DEFS),
+    [animalExportFields]
+  );
+  const normalizedPairingExportFields = useMemo(
+    () => normalizeExportFieldSelection(pairingExportFields, DEFAULT_PAIRING_EXPORT_FIELDS, PAIRING_EXPORT_FIELD_DEFS),
+    [pairingExportFields]
+  );
+  const animalFieldSections = useMemo(() => groupFieldDefsBySection(ANIMAL_EXPORT_FIELD_DEFS), []);
+  const pairingFieldSections = useMemo(() => groupFieldDefsBySection(PAIRING_EXPORT_FIELD_DEFS), []);
+  const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
+  const pairingFieldSet = useMemo(() => new Set(normalizedPairingExportFields), [normalizedPairingExportFields]);
+  const vaultLimitValue = typeof normalizedBackupSettings.maxVaultEntries === 'number' && normalizedBackupSettings.maxVaultEntries > 0
+    ? String(normalizedBackupSettings.maxVaultEntries)
+    : 'unlimited';
+  const vaultLimitDescription = normalizedBackupSettings.maxVaultEntries
+    ? `Keeping the la  const [backupFeedback, setBackupFeedback] = useState(null);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
@@ -10001,99 +9796,7 @@ function BreederSection({
         </div>
       )}
 
-    </Card>
-  );
-}
-
-// pairings list
-function PairingsSection({
-  snakes,
-  pairings,
-  onDelete,
-  onOpenSnake,
-  onUpdatePairing,
-  theme = 'blue',
-  focusedPairingId = null,
-  onFocusPairing,
-  title,
-  emptyMessage = 'No pairings yet. Use “New pairing”.',
-  variant = 'default'
-}) {
-  const handleDelete = typeof onDelete === 'function' ? onDelete : null;
-  const openSnake = typeof onOpenSnake === 'function' ? onOpenSnake : null;
-
-  const list = Array.isArray(pairings) ? pairings : [];
-  const heading = title || `Breeding Planner (${list.length})`;
-  const isCollapsedVariant = variant === 'collapsed';
-  const listContainerClass = isCollapsedVariant
-    ? 'flex flex-col gap-3'
-    : 'space-y-4';
-
-  return (
-    <Card title={heading}>
-      <div className={listContainerClass}>
-        {list.map((p, idx) => (
-          <PairingInlineCard
-            key={p.id}
-            pairing={p}
-            pairingNumber={idx + 1}
-            snakes={snakes}
-            onDelete={handleDelete}
-            onOpenSnake={openSnake}
-            onUpdatePairing={onUpdatePairing}
-            theme={theme}
-            isFocused={focusedPairingId === p.id}
-            onFocus={onFocusPairing ? () => onFocusPairing(p.id) : undefined}
-            variant={variant}
-          />
-        ))}
-        {!list.length && (
-          <div className={cx('text-sm text-neutral-500', isCollapsedVariant && 'w-full')}>
-            {emptyMessage}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function PairingInlineCard({
-  pairing,
-  pairingNumber,
-  snakes,
-  onDelete,
-  onOpenSnake,
-  onUpdatePairing,
-  theme = 'blue',
-  isFocused = false,
-  onFocus,
-  variant = 'default'
-}) {
-  const cardRef = useRef(null);
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(variant !== 'collapsed');
-
-  useEffect(() => {
-    if (isFocused && cardRef.current) {
-      try {
-        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch (err) {
-        /* ignore scroll errors */
-      }
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (isFocused && typeof onFocus === 'function') {
-      onFocus();
-    }
-  }, [isFocused, onFocus]);
-
-  const collapsedVariant = variant === 'collapsed';
-
-  useEffect(() => {
-    if (!collapsedVariant) {
-      setIsExpanded(true);
+);
     } else {
       setIsExpanded(false);
     }
