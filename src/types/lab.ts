@@ -62,6 +62,7 @@ export interface TestOrder extends AuditedEntity {
   id: string;
   labId: LabId;
   animalId: AnimalId;
+  animalIds?: AnimalId[];
   orderNumber: string;
   status: TestOrderStatus;
   requestedTests: string[];
@@ -74,6 +75,9 @@ export interface TestOrder extends AuditedEntity {
   certificateId?: string;
   paymentId?: string;
   paymentStatus?: OrderPaymentStatus;
+  paymentRequestedAt?: IsoDateString;
+  paidAt?: IsoDateString;
+  paymentRef?: string;
   pricingSnapshot?: PricingSnapshot;
   externalReference?: string;
   notes?: string;

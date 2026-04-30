@@ -50,7 +50,7 @@ const priceScore = (demand: Demand): number => {
 const noveltyScore = (outcomes: Outcome[]): number => {
   if (!outcomes?.length) return 0;
   const uniqueGenotypes = new Set(outcomes.map((outcome) => outcome.genotype.slice().sort().join("|")));
-  const normalized = (uniqueGenotypes.size - 1) / 3;
+  const normalized = (uniqueGenotypes.size - 1) / 6;
   return clamp01(normalized);
 };
 

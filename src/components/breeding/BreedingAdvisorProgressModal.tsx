@@ -192,7 +192,7 @@ function SummaryBar({
   error: string | null;
   isRunning: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation(["advisor", "common"]);
 
   if (error) {
     return (
@@ -214,7 +214,7 @@ function SummaryBar({
           className="inline-block w-3.5 h-3.5 rounded-full border-2 border-sky-500 border-t-transparent animate-spin flex-shrink-0"
           aria-hidden="true"
         />
-        {t("advisor.progress.running", { defaultValue: "Analysis in progress…" })}
+        {t("progress.running", { ns: "advisor", defaultValue: "Analysis in progress..." })}
       </div>
     );
   }
@@ -223,7 +223,8 @@ function SummaryBar({
 
   const scannedText =
     summary.totalSnakesScanned != null
-      ? t("advisor.progress.scanned", {
+      ? t("progress.scanned", {
+          ns: "advisor",
           count: summary.totalSnakesScanned,
           defaultValue: "Processed {{count}} snakes",
         })
@@ -231,7 +232,8 @@ function SummaryBar({
 
   const relevantText =
     summary.relevantCandidates != null
-      ? t("advisor.progress.relevant", {
+      ? t("progress.relevant", {
+          ns: "advisor",
           count: summary.relevantCandidates,
           defaultValue: "{{count}} relevant candidates",
         })
@@ -239,7 +241,8 @@ function SummaryBar({
 
   const strongText =
     summary.strongPairings != null
-      ? t("advisor.progress.strongPairings", {
+      ? t("progress.strongPairings", {
+          ns: "advisor",
           count: summary.strongPairings,
           defaultValue: "{{count}} strong pairings found",
         })
@@ -270,7 +273,7 @@ export function BreedingAdvisorProgressModal({
   onRetry,
   onViewResults,
 }: BreedingAdvisorProgressModalProps) {
-  const { t } = useTranslation();
+  const { t } = useTranslation(["advisor", "common"]);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to newest step
@@ -305,7 +308,8 @@ export function BreedingAdvisorProgressModal({
               />
             )}
             <span className="font-semibold text-neutral-900">
-              {t("advisor.progress.title", {
+              {t("progress.titleRunning", {
+                ns: "advisor",
                 defaultValue: "Breeding Advisor Running",
               })}
             </span>
@@ -314,9 +318,9 @@ export function BreedingAdvisorProgressModal({
             type="button"
             className="text-sm px-2 py-1 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
             onClick={onClose}
-            aria-label={t("actions.close", { defaultValue: "Close" })}
+            aria-label={t("actions.close", { ns: "common", defaultValue: "Close" })}
           >
-            {t("actions.close", { defaultValue: "Close" })}
+            {t("actions.close", { ns: "common", defaultValue: "Close" })}
           </button>
         </div>
 
@@ -327,7 +331,7 @@ export function BreedingAdvisorProgressModal({
         >
           {steps.length === 0 ? (
             <div className="flex items-center justify-center h-24 text-sm text-neutral-400">
-              {t("advisor.progress.waiting", { defaultValue: "Waiting for analysis to start…" })}
+              {t("progress.waiting", { ns: "advisor", defaultValue: "Waiting for analysis to start..." })}
             </div>
           ) : (
             steps.map((step) => <StepRow key={step.id} step={step} />)
@@ -348,7 +352,7 @@ export function BreedingAdvisorProgressModal({
             className="px-3 py-2 rounded-xl text-sm border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors"
             onClick={onClose}
           >
-            {t("actions.close", { defaultValue: "Close" })}
+            {t("actions.close", { ns: "common", defaultValue: "Close" })}
           </button>
           <button
             type="button"
@@ -361,7 +365,7 @@ export function BreedingAdvisorProgressModal({
             onClick={canRetry ? onRetry : undefined}
             disabled={!canRetry}
           >
-            {t("advisor.progress.retry", { defaultValue: "Retry" })}
+            {t("progress.retry", { ns: "advisor", defaultValue: "Retry" })}
           </button>
           <button
             type="button"
@@ -374,7 +378,7 @@ export function BreedingAdvisorProgressModal({
             onClick={canViewResults ? onViewResults : undefined}
             disabled={!canViewResults}
           >
-            {t("advisor.progress.viewResults", { defaultValue: "View Results" })}
+            {t("progress.viewResults", { ns: "advisor", defaultValue: "View Results" })}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
+import { ensureSharedOrderNumbers } from "./orderNumberService";
 
 type PersistOrderResultUser = {
   id: string;
@@ -8,13 +9,35 @@ type PersistOrderResultUser = {
 
 type ResultSaveMode = "draft" | "submit";
 
+type AnimalResultInput = {
+  animalId: string;
+  items: unknown[];
+};
+
 type PersistOrderResultPayload = {
   orderId?: unknown;
   testCode?: unknown;
   method?: unknown;
+  // New: per-animal result groups
+  animalResults?: AnimalResultInput[];
+  // Legacy: flat items list (single-animal orders)
   items?: unknown;
   summary?: unknown;
   notes?: unknown;
+};
+
+type OrderedTemplateItem = {
+  orderedTestKey: string;
+  geneName: string;
+  sourceOrderedName: string;
+  catalogTestId?: string;
+};
+
+type OrderedAnimalTemplate = {
+  animal: unknown;
+  animalId: string;
+  animalIdx: number;
+  items: OrderedTemplateItem[];
 };
 
 const RESULT_STATUS_TO_OUTCOME = {
@@ -30,8 +53,8 @@ const sanitizeKeyPart = (value: string): string =>
     .trim()
     .replace(/[^A-Za-z0-9-]/g, "_") || "order";
 
-const getSharedSampleId = (orderId: string, index: number): string =>
-  `${sanitizeKeyPart(orderId)}-sample-${index + 1}`;
+const getSharedSampleId = (orderId: string, animalIndex: number): string =>
+  `${sanitizeKeyPart(orderId)}-sample-${animalIndex + 1}`;
 
 const assertLabUser = (user: PersistOrderResultUser): void => {
   if (user.role === "breeder") {
@@ -53,68 +76,62 @@ const optionalString = (value: unknown): string | undefined => {
 };
 
 const normalizeConfidence = (value: unknown): number | undefined => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
+  if (value === undefined || value === null || value === "") return undefined;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 const loadEditableOrder = async (orderId: string, user: PersistOrderResultUser) => {
   assertLabUser(user);
+  await ensureSharedOrderNumbers();
 
   const order = await prisma.shedTestOrder.findUnique({
     where: { id: orderId },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
-      animals: {
-        include: {
-          tests: true,
-        },
-      },
-      results: {
-        orderBy: { updatedAt: "desc" },
-      },
+      animals: { include: { tests: true } },
+      results: { orderBy: { updatedAt: "desc" } },
     },
   });
 
-  if (!order) {
-    throw new HttpError(404, "Order not found.");
-  }
-
+  if (!order) throw new HttpError(404, "Order not found.");
   return order;
 };
 
-const buildOrderedTemplate = (order: any) => {
-  const primaryAnimal = Array.isArray(order?.animals) ? order.animals[0] : null;
-  const orderedTests = Array.isArray(primaryAnimal?.tests) ? primaryAnimal.tests : [];
-
-  if (!primaryAnimal) {
-    throw new HttpError(400, "Order does not contain an animal to attach results to.");
+// Build per-animal template items. Each item key: `${orderId}:${animalId}:${testIndex}`
+const buildOrderedTemplates = (order: any): OrderedAnimalTemplate[] => {
+  const animals = Array.isArray(order?.animals) ? order.animals : [];
+  if (!animals.length) {
+    throw new HttpError(400, "Order does not contain any animals to attach results to.");
   }
 
-  if (!orderedTests.length) {
-    throw new HttpError(400, "Order has no requested tests to attach results to.");
-  }
-
-  return {
-    primaryAnimal,
-    items: orderedTests.map((test: any, index: number) => {
+  return animals.map((animal: any, animalIdx: number) => {
+    const animalId = String(animal?.animalId || "").trim();
+    const orderedTests = Array.isArray(animal?.tests) ? animal.tests : [];
+    if (!orderedTests.length) {
+      throw new HttpError(400, `Animal ${animalId || animalIdx + 1} has no requested tests.`);
+    }
+    const items = orderedTests.map((test: any, testIdx: number) => {
       const sourceOrderedName = String(test?.testNameSnapshot || test?.testId || "").trim();
-      const orderedTestKey = `${order.id}:${sanitizeKeyPart(sourceOrderedName)}:${index + 1}`;
       return {
-        orderedTestKey,
+        orderedTestKey: `${order.id}:${sanitizeKeyPart(animalId)}:${testIdx + 1}`,
         geneName: sourceOrderedName,
         sourceOrderedName,
         catalogTestId: String(test?.testId || "").trim() || undefined,
       };
-    }),
-  };
+    });
+    return { animal, animalId, animalIdx, items };
+  });
 };
 
-const normalizeFindings = (templateItems: Array<Record<string, unknown>>, incomingItems: unknown, mode: ResultSaveMode) => {
+const normalizeAnimalFindings = (
+  templateItems: OrderedTemplateItem[],
+  incomingItems: unknown,
+  animalId: string,
+  mode: ResultSaveMode
+) => {
   if (!Array.isArray(incomingItems) || !incomingItems.length) {
-    throw new HttpError(400, "At least one ordered test result is required.");
+    throw new HttpError(400, `At least one result item is required for animal ${animalId}.`);
   }
 
   const templateByKey = new Map(
@@ -123,19 +140,28 @@ const normalizeFindings = (templateItems: Array<Record<string, unknown>>, incomi
   const seen = new Set<string>();
 
   const findings = incomingItems.map((entry, index) => {
-    const orderedTestKey = requireNonEmpty((entry as any)?.orderedTestKey, `items[${index}].orderedTestKey`);
+    const orderedTestKey = requireNonEmpty(
+      (entry as any)?.orderedTestKey,
+      `animalResults[${animalId}].items[${index}].orderedTestKey`
+    );
     const template = templateByKey.get(orderedTestKey);
     if (!template) {
-      throw new HttpError(400, `Ordered test '${orderedTestKey}' does not belong to this order.`);
+      throw new HttpError(
+        400,
+        `Ordered test '${orderedTestKey}' does not belong to animal ${animalId} in this order.`
+      );
     }
     if (seen.has(orderedTestKey)) {
       throw new HttpError(400, `Ordered test '${orderedTestKey}' was provided more than once.`);
     }
     seen.add(orderedTestKey);
 
-    const resultStatus = requireNonEmpty((entry as any)?.resultStatus, `items[${index}].resultStatus`) as IncomingResultStatus;
+    const resultStatus = requireNonEmpty(
+      (entry as any)?.resultStatus,
+      `animalResults[${animalId}].items[${index}].resultStatus`
+    ) as IncomingResultStatus;
     if (!(resultStatus in RESULT_STATUS_TO_OUTCOME)) {
-      throw new HttpError(400, `Invalid result status for ordered test '${orderedTestKey}'.`);
+      throw new HttpError(400, `Invalid result status '${resultStatus}' for animal ${animalId}.`);
     }
 
     return {
@@ -150,7 +176,10 @@ const normalizeFindings = (templateItems: Array<Record<string, unknown>>, incomi
   });
 
   if (mode === "submit" && seen.size !== templateItems.length) {
-    throw new HttpError(400, "A submitted result must include a status for every ordered test.");
+    throw new HttpError(
+      400,
+      `A submitted result must include a status for every ordered test for animal ${animalId}.`
+    );
   }
 
   return findings;
@@ -180,26 +209,66 @@ export const saveOrderResult = async (
   }
 
   const testCode = requireNonEmpty(payload?.testCode, "testCode");
-  const { primaryAnimal, items } = buildOrderedTemplate(order);
-  const findings = normalizeFindings(items, payload?.items, mode);
-  const sampleId = getSharedSampleId(order.id, 0);
+  const animalTemplates = buildOrderedTemplates(order);
 
-  const nextOrderStatus = mode === "submit"
-    ? "completed"
-    : order.status === "received"
+  // Resolve which animals to process:
+  // Prefer new `animalResults` array; fall back to legacy flat `items` bound to primary animal.
+  let animalResultInputs: AnimalResultInput[];
+  if (Array.isArray(payload?.animalResults) && payload.animalResults.length) {
+    animalResultInputs = payload.animalResults;
+  } else if (Array.isArray((payload as any)?.items)) {
+    // Legacy single-animal fallback
+    const primaryTemplate = animalTemplates[0];
+    animalResultInputs = [{ animalId: primaryTemplate.animalId, items: (payload as any).items }];
+  } else {
+    throw new HttpError(400, "Either animalResults or items is required.");
+  }
+
+  // Validate all animals are present in submit mode
+  if (mode === "submit") {
+    const providedIds = new Set(animalResultInputs.map((ar) => ar.animalId));
+    const missingAnimal = animalTemplates.find((at) => !providedIds.has(at.animalId));
+    if (missingAnimal) {
+      throw new HttpError(
+        400,
+        `Results are missing for animal ${missingAnimal.animalId}. All animals must be included when submitting.`
+      );
+    }
+  }
+
+  const nextOrderStatus =
+    mode === "submit"
+      ? "completed"
+      : order.status === "received"
       ? "in_progress"
       : order.status;
 
-  const result = await prisma.$transaction(async (tx: any) => {
-    const savedResult = await tx.shedTestOrderResult.upsert({
-      where: {
-        orderId_testCode: {
-          orderId: order.id,
-          testCode,
-        },
-      },
-      update: {
-        animalId: String(primaryAnimal?.animalId || "").trim(),
+  const savedResults = await prisma.$transaction(async (tx: any) => {
+    const results: any[] = [];
+
+    for (const animalInput of animalResultInputs) {
+      const animalId = String(animalInput.animalId || "").trim();
+      const animalTemplate = animalTemplates.find((at) => at.animalId === animalId);
+      if (!animalTemplate) {
+        throw new HttpError(400, `Animal ${animalId} is not part of this order.`);
+      }
+
+      const findings = normalizeAnimalFindings(
+        animalTemplate.items,
+        animalInput.items,
+        animalId,
+        mode
+      );
+      const sampleId = getSharedSampleId(order.id, animalTemplate.animalIdx);
+
+      // Use findFirst + update/create instead of upsert to avoid relying on
+      // the named compound unique key — Prisma client may be out of sync with
+      // the schema if prisma generate hasn't been re-run yet.
+      const existing = await tx.shedTestOrderResult.findFirst({
+        where: { orderId: order.id, animalId, testCode },
+      });
+
+      const resultData = {
         sampleId,
         status: mode === "submit" ? "completed" : "running",
         method: optionalString(payload?.method) || null,
@@ -208,21 +277,31 @@ export const saveOrderResult = async (
         reportedAt: mode === "submit" ? new Date() : null,
         analystUserId: user.id,
         notes: optionalString(payload?.notes) || null,
-      },
-      create: {
-        orderId: order.id,
-        animalId: String(primaryAnimal?.animalId || "").trim(),
-        sampleId,
-        status: mode === "submit" ? "completed" : "running",
-        testCode,
-        method: optionalString(payload?.method) || null,
-        findingsJson: findings as any,
-        summary: optionalString(payload?.summary) || null,
-        reportedAt: mode === "submit" ? new Date() : null,
-        analystUserId: user.id,
-        notes: optionalString(payload?.notes) || null,
-      },
-    });
+      };
+
+      const savedResult = existing
+        ? await tx.shedTestOrderResult.update({
+            where: { id: existing.id },
+            data: resultData,
+          })
+        : await tx.shedTestOrderResult.create({
+            data: {
+              orderId: order.id,
+              animalId,
+              sampleId,
+              status: mode === "submit" ? "completed" : "running",
+              testCode,
+              method: optionalString(payload?.method) || null,
+              findingsJson: findings as any,
+              summary: optionalString(payload?.summary) || null,
+              reportedAt: mode === "submit" ? new Date() : null,
+              analystUserId: user.id,
+              notes: optionalString(payload?.notes) || null,
+            },
+          });
+
+      results.push(savedResult);
+    }
 
     if (nextOrderStatus !== order.status) {
       await tx.shedTestOrder.update({
@@ -231,30 +310,24 @@ export const saveOrderResult = async (
       });
     }
 
-    return savedResult;
+    return results;
   });
 
   const refreshedOrder = await prisma.shedTestOrder.findUnique({
     where: { id: order.id },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
-      animals: {
-        include: {
-          tests: true,
-        },
-      },
-      results: {
-        orderBy: { updatedAt: "desc" },
-      },
+      animals: { include: { tests: true } },
+      results: { orderBy: { updatedAt: "desc" } },
     },
   });
 
-  if (!refreshedOrder) {
-    throw new HttpError(404, "Order not found after saving result.");
-  }
+  if (!refreshedOrder) throw new HttpError(404, "Order not found after saving result.");
 
   return {
-    result,
+    // Return the first saved result for backward compat (single-animal callers expect `result`)
+    result: savedResults[0] || null,
+    results: savedResults,
     order: refreshedOrder,
     mode,
   };

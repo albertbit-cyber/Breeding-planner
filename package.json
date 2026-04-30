@@ -41,6 +41,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "i18n:extract": "i18next-scanner --config i18next-scanner.config.cjs",
     "i18n:verify": "node scripts/check-locales.cjs",
+    "handoff:pdf": "node scripts/generate-handoff-pdf.cjs",
+    "manual:pdf": "node scripts/generate-user-manual-pdf.cjs",
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

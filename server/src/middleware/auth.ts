@@ -18,9 +18,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
       role: payload.role,
     };
 
-    // Temporary debug log requested for auth role checks.
-    console.log("[auth] authenticated role", req.user.role, "user", req.user.email);
-
     next();
   } catch {
     res.status(401).json({ message: "Invalid or expired token" });

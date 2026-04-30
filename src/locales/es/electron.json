@@ -4,29 +4,29 @@
 	},
 	"dialogs": {
 		"storageReadFailed": {
-			"title": "Unable to open data",
-			"message": "Breeding Planner could not read your local data file. A new workspace will be created."
+			"title": "No se pueden abrir los datos",
+			"message": "Breeding Planner no pudo leer tu archivo de datos local. Se creará un nuevo espacio de trabajo."
 		},
 		"storageWriteFailed": {
-			"title": "Unable to save data",
-			"message": "Breeding Planner could not save your latest changes. Try again or export a manual backup."
+			"title": "No se pueden guardar los datos",
+			"message": "Breeding Planner no pudo guardar los últimos cambios. Inténtalo de nuevo o exporta una copia de seguridad manual."
 		}
 	},
 	"locale": {
-		"set": "Language switched to {{language}}"
+		"set": "Idioma cambiado a {{language}}"
 	},
 	"prompts": {
 		"backupName": {
-			"title": "Name this backup file"
+			"title": "Nombra este archivo de copia de seguridad"
 		},
 		"backupRename": {
-			"title": "Rename backup"
+			"title": "Renombrar copia de seguridad"
 		},
 		"backupDelete": {
-			"message": "Delete \"{{name}}\"? This cannot be undone."
+			"message": "¿Eliminar \"{{name}}\"? Esta acción no se puede deshacer."
 		},
 		"photoRemove": {
-			"message": "Remove this photo?"
+			"message": "¿Eliminar esta foto?"
 		}
 	}
 }

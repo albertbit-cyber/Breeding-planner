@@ -1,7 +1,7 @@
 import { parseQrPayload } from "../../../utils/labToken";
 
 const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
-const SAMPLE_ID_PATTERN = /^[A-Za-z0-9_-]{3,120}$/;
+const SAMPLE_ID_PATTERN = /^(?:sample[_-]?[A-Za-z0-9_-]{1,112}|smp-\d{3,}|[A-Za-z0-9_-]+-sample-\d+)$/i;
 
 export const isLabQrToken = (value: string): boolean => QR_TOKEN_PATTERN.test(String(value || "").trim());
 export const isLabSampleId = (value: string): boolean => SAMPLE_ID_PATTERN.test(String(value || "").trim());
@@ -47,5 +47,5 @@ export const toLabQrResolvePayload = (
     return { sampleId: normalized };
   }
 
-  throw new Error("Invalid lookup input. Use a 64-char token, a valid QR payload JSON string, or a sample ID.");
+  throw new Error("Invalid QR input. Use a 64-char token, a valid QR payload JSON string, or a sample ID.");
 };

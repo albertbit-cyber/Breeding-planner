@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createLabApiClient } from "../api/client";
+import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
+import { useAutoRefetch } from "../hooks/useAutoRefetch";
+import OrderProgressBar from "./OrderProgressBar";
 import SharedBackendGuard from "../../../components/SharedBackendGuard.jsx";
+import { useBatchOrder } from "../contexts/BatchOrderContext";
 import {
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
-  TEST_ORDER_STATUS_LABELS,
-  TEST_ORDER_STATUS_TONES,
 } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
 
 const toneClass = {
   neutral: "border-neutral-300 bg-neutral-50 text-neutral-700",
@@ -34,6 +36,11 @@ const geneticsSnapshotToList = (snapshot) => {
     .map((entry) => String(entry || "").trim())
     .filter(Boolean);
 };
+
+const formatFindingSummary = (findings = []) =>
+  (Array.isArray(findings) ? findings : [])
+    .map((entry) => `${entry.marker}: ${formatLabOutcomeLabel(entry.outcome)}`)
+    .join(", ");
 
 const base64ToBlob = (base64, mimeType) => {
   const binary = atob(base64);
@@ -74,65 +81,49 @@ const StatusBadge = ({ label, tone }) => (
 
 export default function BreederShedTestingPanel({ snake, refreshToken }) {
   const { t } = useTranslation();
+  const { isInCart, getCartItem } = useBatchOrder();
+  const snakeId = String(snake?.id || "").trim();
+  const stagedInCart = isInCart(snakeId);
+  const cartEntry = stagedInCart ? getCartItem(snakeId) : null;
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
   const [detailByOrderId, setDetailByOrderId] = useState({});
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [loadingDetailId, setLoadingDetailId] = useState(null);
   const [certificateActionByOrderId, setCertificateActionByOrderId] = useState({});
   const [labelActionByOrderId, setLabelActionByOrderId] = useState({});
 
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    const handleOrdersChanged = () => setRevision((prev) => prev + 1);
-    window.addEventListener("lab:test-order-created", handleOrdersChanged);
-    window.addEventListener("lab:test-order-updated", handleOrdersChanged);
-    window.addEventListener("lab:test-orders-cleared", handleOrdersChanged);
-
-    return () => {
-      window.removeEventListener("lab:test-order-created", handleOrdersChanged);
-      window.removeEventListener("lab:test-order-updated", handleOrdersChanged);
-      window.removeEventListener("lab:test-orders-cleared", handleOrdersChanged);
-    };
-  }, []);
-
-  useEffect(() => {
-    let isAlive = true;
-
-    const load = async () => {
-      const snakeId = String(snake?.id || "").trim();
-      if (!snakeId) {
-        if (isAlive) setOrders([]);
-        return;
+  const load = useCallback(async () => {
+    const snakeId = String(snake?.id || "").trim();
+    if (!snakeId) {
+      setOrders([]);
+      return;
+    }
+    setIsLoading(true);
+    setError("");
+    try {
+      const api = createLabApiClient();
+      const rows = await api.listBreederTestOrdersForSnake(snakeId);
+      setOrders(rows);
+      const completedRows = rows.filter((entry) => String(entry?.status || "").trim() === "completed");
+      if (completedRows.length) {
+        await Promise.all(
+          completedRows.map((entry) => api.getBreederOrderOutcome(entry.id).catch(() => null))
+        );
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load shed testing orders.");
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [snake?.id, refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      setIsLoading(true);
-      setError("");
-      setActiveOrderId(null);
-      setDetailByOrderId({});
-
-      try {
-        const api = createLabApiClient();
-        const rows = await api.listBreederTestOrdersForSnake(snakeId);
-        if (!isAlive) return;
-        setOrders(rows);
-      } catch (err) {
-        if (!isAlive) return;
-        setError(err instanceof Error ? err.message : "Failed to load shed testing orders.");
-        setOrders([]);
-      } finally {
-        if (isAlive) setIsLoading(false);
-      }
-    };
-
-    load();
-    return () => {
-      isAlive = false;
-    };
-  }, [snake?.id, refreshToken, revision]);
+  useAutoRefetch(load, {
+    intervalMs: 30_000,
+    events: ["lab:test-order-created", "lab:test-order-updated", "lab:test-orders-cleared"],
+  });
 
   const sortedOrders = useMemo(() => {
     return [...orders].sort((a, b) => {
@@ -247,13 +238,25 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
         <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t("lab.orders.snakePanel.title", { defaultValue: "Shed Testing Orders" })}
         </div>
-        <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-600">
-          {sortedOrders.length}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {stagedInCart ? (
+            <span className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              {t("lab.batch.stagedBadge", {
+                defaultValue: "In batch · {{count}} test(s)",
+                count: cartEntry?.selectedTestIds?.length ?? 0,
+              })}
+            </span>
+          ) : null}
+          <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-600">
+            {sortedOrders.length}
+          </span>
+        </div>
       </div>
 
       <div className="mt-2 text-[11px] text-neutral-500">
-        {t("lab.orders.snakePanel.subtitle", { defaultValue: "Order history for this snake. Filters and dashboard controls can be added later." })}
+        {t("lab.orders.snakePanel.subtitle", {
+          defaultValue: "Orders that include this snake. Batch orders show all snakes together.",
+        })}
       </div>
 
       {isLoading ? (
@@ -276,8 +279,8 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
         <div className="mt-3 space-y-2">
           {sortedOrders.map((order) => {
             const paymentStatus = String(order?.paymentStatus || "pending");
-            const statusLabel = TEST_ORDER_STATUS_LABELS[order.status] || order.status;
-            const statusTone = TEST_ORDER_STATUS_TONES[order.status] || "neutral";
+            const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status;
+            const statusTone = ORDER_STATUS_TONES[order.status] || "neutral";
             const paymentLabel = ORDER_PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus;
             const paymentTone = ORDER_PAYMENT_STATUS_TONES[paymentStatus] || "neutral";
             const detailsBundle = detailByOrderId[order.id] || null;
@@ -287,6 +290,10 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
             const resultCount = Array.isArray(order.resultIds) ? order.resultIds.length : 0;
             const certificateActionState = certificateActionByOrderId[order.id] || { loading: false, error: "" };
             const labelActionState = labelActionByOrderId[order.id] || { loading: false, error: "" };
+
+            const showPaymentBanner =
+              order.status === "received" &&
+              (paymentStatus === "pending" || paymentStatus === "payment_pending");
 
             return (
               <div key={order.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
@@ -300,11 +307,47 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                   </div>
                 </div>
 
+                {showPaymentBanner ? (
+                  <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <div className="font-semibold">
+                      {t("lab.payment.requestTitle", { defaultValue: "Payment due" })}
+                    </div>
+                    <div className="mt-0.5">
+                      {t("lab.payment.requestBody", {
+                        defaultValue:
+                          "Your sample has been received. Please arrange payment for order {{number}} to continue processing.",
+                        number: order.orderNumber || order.id,
+                      })}
+                    </div>
+                    {order.paymentRequestedAt ? (
+                      <div className="mt-1 text-[11px] text-amber-700">
+                        {t("lab.payment.requestedAt", {
+                          defaultValue: "Payment requested: {{date}}",
+                          date: formatDate(order.paymentRequestedAt),
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="mt-3">
+                  <OrderProgressBar status={order.status} />
+                </div>
+
                 <div className="mt-2 grid gap-2 text-xs text-neutral-700 sm:grid-cols-2">
                   <div>
                     <span className="font-semibold text-neutral-600">{t("lab.orders.orderDate", { defaultValue: "Order Date" })}:</span>{" "}
                     {formatDate(order.submittedAt || order.createdAt)}
                   </div>
+                  {Array.isArray(order.animalIds) && order.animalIds.length > 1 ? (
+                    <div>
+                      <span className="font-semibold text-neutral-600">{t("lab.batch.batchLabel", { defaultValue: "Batch" })}:</span>{" "}
+                      {t("lab.batch.animalCount", {
+                        defaultValue: "{{count}} snakes in this order",
+                        count: order.animalIds.length,
+                      })}
+                    </div>
+                  ) : null}
                   <div>
                     <span className="font-semibold text-neutral-600">{t("lab.orders.requestedTests", { defaultValue: "Requested Tests" })}:</span>{" "}
                     {(order.requestedTests || []).join(", ") || "-"}
@@ -344,8 +387,23 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                     >
                       {t("lab.orders.downloadLabelsPdf", { defaultValue: "Download Labels PDF" })}
                     </button>
+                    {order.status === "completed" ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
+                        disabled={certificateActionState.loading}
+                        onClick={() => openCertificate(order.id, "download")}
+                      >
+                        {certificateActionState.loading
+                          ? t("common.loading", { defaultValue: "Loading..." })
+                          : t("lab.orders.downloadCertificatePdf", { defaultValue: "Download Certificate PDF" })}
+                      </button>
+                    ) : null}
                     {labelActionState.error ? (
                       <span className="text-[11px] text-rose-700">{labelActionState.error}</span>
+                    ) : null}
+                    {certificateActionState.error ? (
+                      <span className="text-[11px] text-rose-700">{certificateActionState.error}</span>
                     ) : null}
                   </div>
                   <div className="text-[11px] text-neutral-500">
@@ -354,6 +412,8 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                           defaultValue: "Certificate: {{number}}",
                           number: outcome.certificate.certificateNumber,
                         })
+                      : order.status === "completed"
+                      ? t("lab.orders.certificateReadyGeneric", { defaultValue: "Certificate: ready to download" })
                       : t("lab.orders.certificatePlaceholder", { defaultValue: "Certificate: available after completion" })}
                   </div>
                 </div>
@@ -412,13 +472,17 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                         <div>
                           <span className="font-semibold text-neutral-600">{t("lab.orders.details.latestResult", { defaultValue: "Latest Result" })}:</span>{" "}
                           {outcome?.latestResult
-                            ? `${outcome.latestResult.testCode} (${outcome.latestResult.status})`
+                            ? `${formatLabTestNumber(
+                                outcome.latestResult.testCode,
+                                `${order.id}:${outcome.latestResult.id}`,
+                                outcome.latestResult.reportedAt || outcome.latestResult.releasedAt || outcome.latestResult.reviewedAt
+                              )} (${outcome.latestResult.status})`
                             : t("lab.orders.details.resultPending", { defaultValue: "No finalized result yet" })}
                         </div>
                         {outcome?.latestResult?.findings?.length ? (
                           <div>
                             <span className="font-semibold text-neutral-600">{t("lab.orders.details.findings", { defaultValue: "Findings" })}:</span>{" "}
-                            {outcome.latestResult.findings.map((entry) => `${entry.marker}: ${entry.outcome}`).join(", ")}
+                            {formatFindingSummary(outcome.latestResult.findings)}
                           </div>
                         ) : null}
                         {outcome?.resultHistory?.length ? (
@@ -427,9 +491,15 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                             <div className="mt-1 space-y-1">
                               {outcome.resultHistory.map((entry) => (
                                 <div key={entry.id} className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1">
-                                  <div className="font-medium text-neutral-800">{entry.testCode} ({entry.status})</div>
+                                  <div className="font-medium text-neutral-800">
+                                    {formatLabTestNumber(
+                                      entry.testCode,
+                                      `${order.id}:${entry.id}`,
+                                      entry.reportedAt || entry.releasedAt || entry.reviewedAt
+                                    )} ({entry.status})
+                                  </div>
                                   <div className="text-[11px] text-neutral-600">
-                                    {(entry.findings || []).map((finding) => `${finding.marker}: ${finding.outcome}`).join(", ") || "-"}
+                                    {formatFindingSummary(entry.findings) || "-"}
                                   </div>
                                   {entry.summary ? <div className="text-[11px] text-neutral-500">{entry.summary}</div> : null}
                                 </div>
@@ -444,7 +514,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                         {outcome?.labConfirmedMarkers?.length ? (
                           <div>
                             <span className="font-semibold text-emerald-700">{t("lab.orders.details.labConfirmedMarkers", { defaultValue: "Lab-confirmed markers" })}:</span>{" "}
-                            {outcome.labConfirmedMarkers.map((entry) => `${entry.marker} (${entry.outcome})`).join(", ")}
+                            {outcome.labConfirmedMarkers.map((entry) => `${entry.marker} (${formatLabOutcomeLabel(entry.outcome)})`).join(", ")}
                           </div>
                         ) : null}
                         {outcome?.geneticsUpdate?.applied ? (

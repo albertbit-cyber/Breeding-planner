@@ -8,6 +8,8 @@ import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
 import SuggestionsTab from "./features/suggestions/SuggestionsTab";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
+import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
+import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
 import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
@@ -768,7 +770,7 @@ function RoomModal({
               <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
               <div className="text-2xl font-semibold text-neutral-900">{room.name}</div>
               <div className="mt-1 text-xs text-neutral-500">
-                {t('spaces.roomCounts', { defaultValue: '{{racks}} racks • {{terrariums}} terrariums', racks: racks.length, terrariums: terrariums.length })}
+                {t('spaces.roomCounts', { defaultValue: '{{racks}} racks ג€¢ {{terrariums}} terrariums', racks: racks.length, terrariums: terrariums.length })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -820,7 +822,7 @@ function RoomModal({
                       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                         <div className="rounded-2xl bg-neutral-50 px-3 py-2">
                           <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t('spaces.rack.layout', { defaultValue: 'Layout' })}</div>
-                          <div className="text-base font-semibold">{rack.columns} × {rack.levels}</div>
+                          <div className="text-base font-semibold">{rack.columns} ֳ— {rack.levels}</div>
                         </div>
                         <div className="rounded-2xl bg-neutral-50 px-3 py-2">
                           <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t('spaces.rack.summaryLabel', { defaultValue: 'Usage' })}</div>
@@ -846,7 +848,7 @@ function RoomModal({
                 {terrariums.map(item => {
                   const occupantCount = Array.isArray(item.occupantIds) ? item.occupantIds.length : 0;
                   const dims = item.dimensions
-                    ? `${item.dimensions.w}×${item.dimensions.d}×${item.dimensions.h}${item.dimensions.unit}`
+                    ? `${item.dimensions.w}ֳ—${item.dimensions.d}ֳ—${item.dimensions.h}${item.dimensions.unit}`
                     : t('spaces.dimensions.unknown', { defaultValue: 'Dimensions unknown' });
                   return (
                     <div
@@ -943,6 +945,10 @@ const STORAGE_KEYS = {
   snakes: 'breedingPlannerSnakes',
   pairings: 'breedingPlannerPairings',
   groups: 'breedingPlannerGroups',
+  showGroups: 'breedingPlannerShowGroups',
+  hiddenGroups: 'breedingPlannerHiddenGroups',
+  customStatusTags: 'breedingPlannerCustomStatusTags',
+  removedStatusTags: 'breedingPlannerRemovedStatusTags',
   breeder: 'breedingPlannerBreederInfo',
   morphAliases: 'breedingPlannerMorphAliases',
   geneAliases: 'breedingPlannerGeneAliases',
@@ -1196,6 +1202,16 @@ export const ANIMAL_EXPORT_FIELD_DEFS = [
     },
   },
   {
+    key: 'lastWeightGrams',
+    label: 'Last weight (g)',
+    section: 'Vitals',
+    getter: snake => {
+      const latest = getLatestLogEntry(snake?.logs, 'weights');
+      const grams = Number(latest?.grams ?? latest?.weightGrams ?? latest?.weight ?? snake?.weight);
+      return Number.isFinite(grams) && grams > 0 ? grams : '';
+    },
+  },
+  {
     key: 'birthDate',
     label: 'Birth date',
     section: 'Vitals',
@@ -1247,8 +1263,17 @@ export const ANIMAL_EXPORT_FIELD_DEFS = [
       if (entry.size) parts.push(entry.size === 'Other' ? entry.sizeDetail || entry.size : entry.size);
       if (entry.refused) parts.push('Refused');
       if (entry.method) parts.push(entry.method === 'Other' ? entry.methodDetail || entry.method : entry.method);
-      const summary = parts.filter(Boolean).join(' — ');
+      const summary = parts.filter(Boolean).join(' ג€” ');
       return summary ? `${summary}${entry.date ? ` (${formatDateForDisplay(entry.date)})` : ''}` : (entry.date ? formatDateForDisplay(entry.date) : '');
+    },
+  },
+  {
+    key: 'lastFeedDate',
+    label: 'Last feed date',
+    section: 'Logs',
+    getter: snake => {
+      const entry = getLatestLogEntry(snake?.logs, 'feeds');
+      return entry?.date ? formatDateForDisplay(entry.date) : '';
     },
   },
 ];
@@ -1515,7 +1540,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
     if (Number.isFinite(grams) && grams > 0) feedParts.push(`${grams} g`);
     const method = entry.method === 'Other' ? entry.methodDetail : entry.method;
     if (method) feedParts.push(method);
-    const summary = feedParts.length ? feedParts.join(' — ') : (labels.feedDefault || 'Feed');
+    const summary = feedParts.length ? feedParts.join(' ג€” ') : (labels.feedDefault || 'Feed');
     return `${summary}${dateMark}`.trim();
   };
 
@@ -1538,7 +1563,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
       const projectLabels = relatedPairings.map(item => item?.label).filter(Boolean);
       return {
         animal: snake?.name || labels.unnamed || 'Unnamed',
-        id: snake?.id || '—',
+        id: snake?.id || 'ג€”',
         sex: sexLabel,
         genetics: joinTokens(geneticsTokens),
         status: statusLabel,
@@ -1878,7 +1903,7 @@ function buildPairingMatrixExportDataset(pairings = [], snakes = [], options = {
       status: row.status || '',
       seasonName: row.seasonName || '',
       startDate: row.startDate ? formatDateForDisplay(row.startDate) : '',
-      notes: noteSegments.filter(Boolean).join(' — '),
+      notes: noteSegments.filter(Boolean).join(' ג€” '),
     };
   });
 
@@ -2026,7 +2051,7 @@ function describePairingStage(pairing) {
     detailParts.push(`Last appointment ${formatDateForDisplay(latestPast.date)}`);
   }
 
-  return detailParts.length ? `${baseStatus} — ${detailParts.join(' — ')}` : baseStatus;
+  return detailParts.length ? `${baseStatus} ג€” ${detailParts.join(' ג€” ')}` : baseStatus;
 }
 
 async function exportDatasetToPdf(dataset, options = {}) {
@@ -2300,7 +2325,7 @@ const ID_TEMPLATE_TOKENS = [
   { token: '[YEAR]', description: 'Full four-digit year (e.g., 2025).' },
   { token: '[YROB]', description: 'Last two digits of the birth year.' },
   { token: '[YEAROB]', description: 'Full four-digit birth year.' },
-  { token: '[PREFIX]', description: 'Legacy prefix derived from the name (or sire — dam pattern).' },
+  { token: '[PREFIX]', description: 'Legacy prefix derived from the name (or sire ג€” dam pattern).' },
   { token: '[PREFIXU]', description: 'Prefix in uppercase.' },
   { token: '[PREFIXL]', description: 'Prefix in lowercase.' },
   { token: '[NAME]', description: 'Letters from the name in Title Case.' },
@@ -2338,6 +2363,53 @@ function saveStoredJson(key, value) {
   } catch (err) {
     console.warn(`Failed to persist ${key} to storage`, err);
   }
+}
+
+function getStoredBackupPayloadCandidates() {
+  const candidates = [];
+  const snapshot = loadStoredJson(STORAGE_KEYS.backupSnapshot, null);
+  if (snapshot?.payload && typeof snapshot.payload === 'object') {
+    candidates.push({
+      savedAt: snapshot.savedAt || snapshot.payload.generatedAt || '',
+      payload: snapshot.payload,
+    });
+  }
+
+  const vault = loadStoredJson(STORAGE_KEYS.backupVault, []);
+  (Array.isArray(vault) ? vault : []).forEach(entry => {
+    const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : null;
+    if (!payload) return;
+    candidates.push({
+      savedAt: entry.updatedAt || entry.createdAt || payload.generatedAt || '',
+      payload,
+    });
+  });
+
+  candidates.sort((a, b) => {
+    const aTime = new Date(a.savedAt || 0).getTime();
+    const bTime = new Date(b.savedAt || 0).getTime();
+    return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+  });
+  return candidates;
+}
+
+function recoverStoredPairingsFromBackups() {
+  for (const candidate of getStoredBackupPayloadCandidates()) {
+    const rawPairings = candidate?.payload?.pairings;
+    if (!Array.isArray(rawPairings) || rawPairings.length === 0) continue;
+    const recovered = rawPairings.map(sanitizePairingRecord).filter(Boolean);
+    if (recovered.length) return recovered;
+  }
+  return [];
+}
+
+function loadStoredPairingsForBrowser() {
+  const stored = loadStoredJson(STORAGE_KEYS.pairings, null);
+  if (Array.isArray(stored) && stored.length > 0) {
+    return stored.map(sanitizePairingRecord).filter(Boolean);
+  }
+  const recovered = recoverStoredPairingsFromBackups();
+  return recovered.length ? recovered : createFreshPairings();
 }
 
 function cloneLogs(logs = {}) {
@@ -2381,6 +2453,39 @@ function trimSnakePhotoList(list, limit = MAX_PHOTOS_PER_SNAKE) {
   return list.slice(list.length - limit);
 }
 
+function normalizeLabGeneticsConfirmation(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const markers = Array.isArray(raw.markers)
+    ? raw.markers
+        .filter(entry => entry && typeof entry === 'object')
+        .map(entry => {
+          const marker = typeof entry.marker === 'string' ? entry.marker.trim() : '';
+          const outcome = typeof entry.outcome === 'string' ? entry.outcome.trim() : '';
+          const confirmedAt = typeof entry.confirmedAt === 'string' && entry.confirmedAt
+            ? entry.confirmedAt
+            : new Date().toISOString();
+          if (!marker || !outcome) return null;
+          return {
+            marker,
+            outcome,
+            orderId: typeof entry.orderId === 'string' && entry.orderId.trim() ? entry.orderId.trim() : undefined,
+            resultId: typeof entry.resultId === 'string' && entry.resultId.trim() ? entry.resultId.trim() : undefined,
+            confirmedAt,
+          };
+        })
+        .filter(Boolean)
+    : [];
+  if (!markers.length) return null;
+  return {
+    source: raw.source === 'genetic-test' ? 'genetic-test' : 'genetic-test',
+    note: typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : 'Confirmed by shed test',
+    confirmedAt: typeof raw.confirmedAt === 'string' && raw.confirmedAt
+      ? raw.confirmedAt
+      : markers.reduce((latest, entry) => entry.confirmedAt > latest ? entry.confirmedAt : latest, markers[0].confirmedAt),
+    markers,
+  };
+}
+
 function sanitizeSnakeRecord(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const snake = { ...raw };
@@ -2400,6 +2505,7 @@ function sanitizeSnakeRecord(raw) {
     : normalizeSingleGroupValue(raw.groups);
   snake.logs = cloneLogs(raw.logs);
   snake.photos = normalizeSnakePhotos(raw.photos);
+  snake.labGeneticsConfirmation = normalizeLabGeneticsConfirmation(raw.labGeneticsConfirmation);
   if (snake.metadata && typeof snake.metadata === 'object') {
     snake.metadata = { ...snake.metadata };
   }
@@ -2818,6 +2924,13 @@ function getStatusTagTranslationKey(value) {
   return STATUS_TAG_TRANSLATIONS[normalized] || null;
 }
 const SCAN_MODE_STORAGE_KEY = 'breedingPlannerScanMode';
+const BREEDING_DASHBOARD_URGENCY_STYLES = {
+  overdue: 'border-rose-200 bg-rose-50 text-rose-700',
+  due: 'border-amber-200 bg-amber-50 text-amber-700',
+  soon: 'border-sky-200 bg-sky-50 text-sky-700',
+  upcoming: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  none: 'border-neutral-200 bg-neutral-50 text-neutral-600',
+};
 
 function createFreshSnakes() {
   return seedSnakes.map(s => {
@@ -3027,6 +3140,23 @@ function createEmptyNewAnimalDraft() {
   };
 }
 
+function hasMeaningfulAnimalDraftContent(draft) {
+  if (!draft || typeof draft !== 'object') return false;
+  if (String(draft.name || '').trim()) return true;
+  if (String(draft.id || '').trim()) return true;
+  if (String(draft.morphHetInput || '').trim()) return true;
+  if (Array.isArray(draft.morphs) && draft.morphs.some(entry => String(entry || '').trim())) return true;
+  if (Array.isArray(draft.hets) && draft.hets.some(entry => String(entry || '').trim())) return true;
+  if (Number.isFinite(Number(draft.weight)) && Number(draft.weight) > 0) return true;
+  if (String(draft.price || '').trim()) return true;
+  if (Number.isFinite(Number(draft.year)) && Number(draft.year) > 0) return true;
+  if (String(draft.birthDate || '').trim()) return true;
+  if (String(draft.notes || '').trim()) return true;
+  if (Array.isArray(draft.groups) && draft.groups.some(entry => String(entry || '').trim())) return true;
+  if (Array.isArray(draft.photos) && draft.photos.length > 0) return true;
+  return false;
+}
+
 function snakeById(list, id) {
   if (!Array.isArray(list)) return null; return list.find(x => x && x.id === id) || null;
 }
@@ -3124,6 +3254,10 @@ function uniqueGeneTokens(tokens = []) {
     result.push(token);
   });
   return result;
+}
+
+function getDisplayedSnakeGeneticsTokens(snake) {
+  return combineMorphsAndHetsForDisplay(snake?.morphs, snake?.hets, snake?.possibleHets);
 }
 
 function extractSuperGeneBase(token) {
@@ -3693,6 +3827,10 @@ function buildQuickAddGeneticsSource(snakes = [], morphAliases = [], geneAliases
     }
   });
 
+  // Morph aliases (e.g. "Batman", "Blackhead DG Clown") are registered by their exact
+  // alias name only. We intentionally do NOT auto-generate prefix shorthands here because
+  // short prefixes (e.g. "Black" from "BlackheadDGClown") would match unrelated genes
+  // and corrupt free-text parsing.
   (Array.isArray(morphAliases) ? morphAliases : []).forEach((entry) => {
     const alias = String(entry?.alias || '').trim();
     const key = normalizeGeneCandidate(alias);
@@ -3700,21 +3838,6 @@ function buildQuickAddGeneticsSource(snakes = [], morphAliases = [], geneAliases
     if (!sourceMap.has(key)) {
       sourceMap.set(key, { name: alias, aliases: [], shorthand: [] });
     }
-    const target = sourceMap.get(key);
-    if (!Array.isArray(target.shorthand)) target.shorthand = [];
-    const aliasCompact = alias.replace(/[^a-z0-9]/gi, '');
-    const firstWord = alias.split(/\s+/).filter(Boolean)[0] || alias;
-    const shorthandCandidates = [];
-    if (aliasCompact.length >= 4) shorthandCandidates.push(aliasCompact.slice(0, 4));
-    if (aliasCompact.length >= 5) shorthandCandidates.push(aliasCompact.slice(0, 5));
-    if (firstWord.length >= 4) shorthandCandidates.push(firstWord.slice(0, 4));
-    shorthandCandidates.forEach(short => {
-      const cleaned = String(short || '').trim();
-      if (!cleaned) return;
-      if (!target.shorthand.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
-        target.shorthand.push(cleaned);
-      }
-    });
   });
 
   (Array.isArray(geneAliases) ? geneAliases : []).forEach((row) => {
@@ -4166,13 +4289,13 @@ function parseReptileBuddyText(raw) {
     // If no explicit name found, try some common line patterns
     if (!obj.name && lines.length) {
       const first = lines[0];
-      // patterns: "Name (Female)", "Name - Female - Clown", "Name — Female"
+      // patterns: "Name (Female)", "Name - Female - Clown", "Name ג€” Female"
       const mParen = first.match(/^(.+?)\s*\((male|female|m|f)\)/i);
       if (mParen) {
         obj.name = mParen[1].trim();
         obj.sex = /male/i.test(mParen[2]) ? 'M' : 'F';
       } else {
-        const parts = first.split(/[-–—|\t]/).map(p=>p.trim()).filter(Boolean);
+        const parts = first.split(/[-ג€“ג€”|\t]/).map(p=>p.trim()).filter(Boolean);
         if (parts.length >= 2 && /^(male|female|m|f)$/i.test(parts[1])) {
           obj.name = parts[0];
           obj.sex = /male/i.test(parts[1]) ? 'M' : 'F';
@@ -4197,7 +4320,7 @@ function parseReptileBuddyText(raw) {
     if ((!obj.morphs || !obj.morphs.length) && lines.length > 1) {
       for (const l of lines.slice(1)) {
         if (/morphs?:|visuals?:/i.test(l) || /,/.test(l) || /\//.test(l)) {
-          const parts = l.split(/:|–|-|—/).map(p=>p.trim()).filter(Boolean);
+          const parts = l.split(/:|ג€“|-|ג€”/).map(p=>p.trim()).filter(Boolean);
           const payload = parts.length>1 ? parts.slice(1).join(':') : parts[0];
           const arr = splitList(payload);
           if (arr.length) { obj.morphs = arr; break; }
@@ -4208,7 +4331,7 @@ function parseReptileBuddyText(raw) {
     if ((!obj.hets || !obj.hets.length) && lines.length > 1) {
       for (const l of lines.slice(1)) {
         if (/hets?:/i.test(l) || /het\b/i.test(l)) {
-          const parts = l.split(/:|–|-|—/).map(p=>p.trim()).filter(Boolean);
+          const parts = l.split(/:|ג€“|-|ג€”/).map(p=>p.trim()).filter(Boolean);
           const payload = parts.length>1 ? parts.slice(1).join(':') : parts[0];
           const arr = splitList(payload);
           if (arr.length) { obj.hets = arr; break; }
@@ -4839,8 +4962,13 @@ function normalizeMorphHetLists(tokens) {
     }
     // 'possible' annotation
     if (/\bpos(?:s?i?a?ble)?\b/i.test(low)) {
-      const gene = raw.replace(/\bpos(?:s?i?a?ble)?\b/ig,'').replace(/[()]/g,'').trim();
-      hets.push(`${cap(gene)} (possible)`);
+      const gene = raw
+        .replace(/\bpos(?:s?i?a?ble)?\b/ig,'')
+        .replace(/\bheterozygous\b/ig,'')
+        .replace(/\bhet\b/ig,'')
+        .replace(/[()]/g,'')
+        .trim();
+      hets.push(`Possible ${cap(gene)}`);
       continue;
     }
     // explicit het words
@@ -4855,7 +4983,7 @@ function normalizeMorphHetLists(tokens) {
   const normalizedMorphs = uniqueGeneTokens(morphs.map(m => String(m).trim()).filter(Boolean));
   const normalizedHets = uniqueGeneTokens(
     hets
-      .map(h => formatHetForDisplay(h))
+      .map(h => normalizeHetInputToken(h))
       .filter(Boolean)
   );
   return {
@@ -5075,7 +5203,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
   const geneticsCalculatorLabel = t('clutch.geneticsCalculator', { defaultValue: 'Genetics calculator' });
   const showLabel = t('clutch.show', { defaultValue: 'Show' });
   const hideLabel = t('common.hide', { defaultValue: 'Hide' });
-  const canSubmit = Boolean(newAnimal.name && newAnimal.name.trim().length);
+  const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal);
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
   const [statusTagInput, setStatusTagInput] = useState('');
   const [quickAddText, setQuickAddText] = useState('');
@@ -5520,7 +5648,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
       </div>
 
       <div className="p-4 border-t flex items-center justify-between">
-        <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "Data is local only in this demo." })}</div>
+        <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "This animal is saved in your planner on this device." })}</div>
         <div className="flex gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel")}</button>
           <button className={cx('px-3 py-2 rounded-xl text-sm text-white', canSubmit ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))} disabled={!canSubmit} onClick={onAdd}>
@@ -5542,10 +5670,24 @@ export default function BreedingPlannerApp() {
   }), [resolvedAppearance]);
   // logs helpers are defined at module scope (updateLog, LogsEditor)
   // component state
-  const [snakes, setSnakes] = useState(createFreshSnakes);
-  const [pairings, setPairings] = useState(createFreshPairings);
+  const [snakes, setSnakes] = useState(() => {
+    // In Electron the bridge load-data effect (below) will overwrite this.
+    // In browser mode there is no bridge, so seed from localStorage if available.
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return createFreshSnakes();
+    const stored = loadStoredJson(STORAGE_KEYS.snakes, null);
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored.map(sanitizeSnakeRecord).filter(Boolean);
+    }
+    return createFreshSnakes();
+  });
+  const [pairings, setPairings] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return createFreshPairings();
+    return loadStoredPairingsForBrowser();
+  });
   const [tab, setTab] = useState('animals');
-  const [pairingsView, setPairingsView] = useState('active');
+  const [pairingsView, setPairingsView] = useState('dashboard');
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
   const [animalView, setAnimalView] = useState('all');
   const [animalLayout, setAnimalLayout] = useState(() => {
@@ -5561,12 +5703,40 @@ export default function BreedingPlannerApp() {
   const [query, setQuery] = useState('');
   const tag = 'all';
   const [groupFilter, setGroupFilter] = useState('all');
-  const [showGroups, setShowGroups] = useState([]);
-  const [hiddenGroups, setHiddenGroups] = useState([]);
+  const [showGroups, setShowGroups] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return [];
+    const stored = loadStoredJson(STORAGE_KEYS.showGroups, []);
+    return Array.isArray(stored) ? stored : [];
+  });
+  const [hiddenGroups, setHiddenGroups] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return [];
+    const stored = loadStoredJson(STORAGE_KEYS.hiddenGroups, []);
+    return Array.isArray(stored) ? stored : [];
+  });
   const [selectedStatusTags, setSelectedStatusTags] = useState([]);
-  const [customStatusTags, setCustomStatusTags] = useState([]);
-  const [removedStatusTags, setRemovedStatusTags] = useState([]);
-  const [groups, setGroups] = useState(() => [...DEFAULT_GROUPS]);
+  const [customStatusTags, setCustomStatusTags] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return [];
+    const stored = loadStoredJson(STORAGE_KEYS.customStatusTags, []);
+    return Array.isArray(stored) ? stored : [];
+  });
+  const [removedStatusTags, setRemovedStatusTags] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return [];
+    const stored = loadStoredJson(STORAGE_KEYS.removedStatusTags, []);
+    return Array.isArray(stored) ? stored : [];
+  });
+  const [groups, setGroups] = useState(() => {
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.loadData) return [...DEFAULT_GROUPS];
+    const stored = loadStoredJson(STORAGE_KEYS.groups, null);
+    if (Array.isArray(stored) && stored.length > 0) {
+      return Array.from(new Set(stored.map(group => String(group || '').trim()).filter(Boolean)));
+    }
+    return [...DEFAULT_GROUPS];
+  });
   const initialSpacesData = useMemo(() => normalizeSpacesDataset(loadStoredJson(STORAGE_KEYS.spaces, null)), []);
   const [spacesState, setSpacesState] = useState(initialSpacesData);
   const rooms = Array.isArray(spacesState?.rooms) ? spacesState.rooms : [];
@@ -5602,6 +5772,32 @@ export default function BreedingPlannerApp() {
     () => buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases),
     [snakes, morphAliases, geneAliases]
   );
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleLabSnakeGeneticsUpdated = (event) => {
+      const detail = event?.detail || {};
+      const rawSnake = detail.snake;
+      const snakeId = String(detail.snakeId || rawSnake?.id || '').trim();
+      if (!snakeId || !rawSnake || typeof rawSnake !== 'object') return;
+
+      const sanitized = sanitizeSnakeRecord(rawSnake);
+      if (!sanitized) return;
+
+      setSnakes(prev => {
+        let changed = false;
+        const next = prev.map(snake => {
+          if (!snake || snake.id !== snakeId) return snake;
+          changed = true;
+          return sanitized;
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    window.addEventListener('lab:snake-genetics-updated', handleLabSnakeGeneticsUpdated);
+    return () => window.removeEventListener('lab:snake-genetics-updated', handleLabSnakeGeneticsUpdated);
+  }, []);
   const [animalExportFields, setAnimalExportFields] = useState(() => [...DEFAULT_ANIMAL_EXPORT_FIELDS]);
   const [pairingExportFields, setPairingExportFields] = useState(() => [...DEFAULT_PAIRING_EXPORT_FIELDS]);
   const [exportFeedback, setExportFeedback] = useState(null);
@@ -5951,8 +6147,17 @@ export default function BreedingPlannerApp() {
           const sanitized = payload.snakes.map(sanitizeSnakeRecord).filter(Boolean);
           setSnakes(sanitized);
         }
-        if (Array.isArray(payload.pairings)) {
-          const sanitizedPairings = payload.pairings.map(sanitizePairingRecord).filter(Boolean);
+        {
+          const backupPairings = [
+            payload.autoBackupSnapshot?.payload,
+            ...(Array.isArray(payload.backupVault) ? payload.backupVault.map(entry => entry?.payload) : []),
+          ]
+            .map(candidate => Array.isArray(candidate?.pairings) ? candidate.pairings : [])
+            .find(list => list.length > 0) || [];
+          const rawPairings = Array.isArray(payload.pairings) && payload.pairings.length > 0
+            ? payload.pairings
+            : backupPairings;
+          const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
           setPairings(sanitizedPairings);
         }
         if (Array.isArray(payload.groups)) {
@@ -6044,6 +6249,29 @@ export default function BreedingPlannerApp() {
   const editStatusMenuRef = useRef(null);
   const [tagFilterMenuOpen, setTagFilterMenuOpen] = useState(false);
   const tagFilterMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleLabSnakeEditorRefresh = (event) => {
+      const detail = event?.detail || {};
+      const rawSnake = detail.snake;
+      const snakeId = String(detail.snakeId || rawSnake?.id || '').trim();
+      if (!snakeId || !rawSnake || typeof rawSnake !== 'object') return;
+
+      const sanitized = sanitizeSnakeRecord(rawSnake);
+      if (!sanitized) return;
+
+      setEditSnake(prev => (prev && prev.id === snakeId ? sanitized : prev));
+      setEditSnakeDraft(prev => {
+        if (!prev || prev.id !== snakeId) return prev;
+        return initSnakeDraft(sanitized);
+      });
+    };
+
+    window.addEventListener('lab:snake-genetics-updated', handleLabSnakeEditorRefresh);
+    return () => window.removeEventListener('lab:snake-genetics-updated', handleLabSnakeEditorRefresh);
+  }, []);
   const isAnimalScannerView = tab === 'animals' && animalView !== 'groups';
   const editDraftStatusValue = typeof editSnakeDraft?.status === 'string' ? editSnakeDraft.status : '';
   const statusTagOptions = useMemo(() => {
@@ -6066,7 +6294,6 @@ export default function BreedingPlannerApp() {
       .sort((a, b) => a.localeCompare(b));
   }, [customStatusTags, removedStatusTags, snakes, newAnimal.status, editDraftStatusValue]);
   const currentEditStatus = (editDraftStatusValue || '').trim();
-
   useEffect(() => {
     setEditStatusMenuOpen(false);
     setTagFilterMenuOpen(false);
@@ -6277,6 +6504,30 @@ export default function BreedingPlannerApp() {
     theme,
   ]);
 
+  // In browser mode (no Electron bridge) persist planner data to localStorage.
+  // Electron handles the same fields through the bridge payload above.
+  useEffect(() => {
+    if (!electronDataReady) return;
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (bridge?.saveData) return;
+    saveStoredJson(STORAGE_KEYS.snakes, snakes);
+    saveStoredJson(STORAGE_KEYS.pairings, pairings);
+    saveStoredJson(STORAGE_KEYS.groups, groups);
+    saveStoredJson(STORAGE_KEYS.showGroups, showGroups);
+    saveStoredJson(STORAGE_KEYS.hiddenGroups, hiddenGroups);
+    saveStoredJson(STORAGE_KEYS.customStatusTags, customStatusTags);
+    saveStoredJson(STORAGE_KEYS.removedStatusTags, removedStatusTags);
+  }, [
+    customStatusTags,
+    electronDataReady,
+    groups,
+    hiddenGroups,
+    pairings,
+    removedStatusTags,
+    showGroups,
+    snakes,
+  ]);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const customLogo = typeof breederInfo?.logoUrl === 'string' ? breederInfo.logoUrl.trim() : '';
@@ -6418,7 +6669,7 @@ export default function BreedingPlannerApp() {
     const savedAt = typeof meta.savedAt === 'string' && meta.savedAt ? meta.savedAt : new Date().toISOString();
     const displayName = typeof meta.name === 'string' && meta.name.trim()
       ? meta.name.trim()
-      : `${source === 'auto' ? 'Auto' : 'Manual'} backup • ${formatDateTimeForDisplay(savedAt)}`;
+      : `${source === 'auto' ? 'Auto' : 'Manual'} backup ג€¢ ${formatDateTimeForDisplay(savedAt)}`;
     const entry = normalizeBackupFileEntry({
       id: typeof meta.id === 'string' && meta.id.trim() ? meta.id.trim() : uid(source === 'auto' ? 'auto-backup' : 'manual-backup'),
       name: displayName,
@@ -6477,7 +6728,7 @@ export default function BreedingPlannerApp() {
     addBackupVaultEntry(snapshotPayload, {
       source: 'auto',
       savedAt,
-      name: `Auto backup • ${formatDateTimeForDisplay(savedAt)}`,
+      name: `Auto backup ג€¢ ${formatDateTimeForDisplay(savedAt)}`,
     });
   }, [createBackupPayload, addBackupVaultEntry, setAutoBackupSnapshot, setBackupSettings]);
 
@@ -6851,6 +7102,22 @@ export default function BreedingPlannerApp() {
   const completedPairings = pairingsPartition.completed;
   const activePairingsCount = activePairings.length;
   const completedPairingsCount = completedPairings.length;
+  const breedingDashboardItems = useMemo(() => {
+    const today = new Date();
+    return activePairings
+      .map(pairing => buildPairingDashboardItem(pairing, snakes, today))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const urgencyWeight = { overdue: 0, due: 1, soon: 2, upcoming: 3, none: 4 };
+        const aWeight = urgencyWeight[a.urgency] ?? 5;
+        const bWeight = urgencyWeight[b.urgency] ?? 5;
+        if (aWeight !== bWeight) return aWeight - bWeight;
+        const aDays = typeof a.daysUntil === 'number' ? a.daysUntil : Number.POSITIVE_INFINITY;
+        const bDays = typeof b.daysUntil === 'number' ? b.daysUntil : Number.POSITIVE_INFINITY;
+        if (aDays !== bDays) return aDays - bDays;
+        return String(a.label || '').localeCompare(String(b.label || ''));
+      });
+  }, [activePairings, snakes]);
   const completedPairingsWithYear = useMemo(() => {
     return completedPairings.map(pairing => {
       const normalized = withPairingLifecycleDefaults({ ...pairing });
@@ -6949,6 +7216,7 @@ export default function BreedingPlannerApp() {
         })();
         return {
           id: p.id || `eggbox-${clutchDate}-${pairingLabel}`,
+          pairingId: p.id,
           clutchDate,
           pairingLabel,
           eggs,
@@ -6965,6 +7233,13 @@ export default function BreedingPlannerApp() {
       dueLabel: item.dueDate ? formatDateForDisplay(item.dueDate) : '',
     }));
   }, [pairings, snakes, t]);
+  const clutchNumberByPairingId = useMemo(() => {
+    const map = new Map();
+    eggBoxes.forEach(box => {
+      if (box?.pairingId) map.set(box.pairingId, box.number);
+    });
+    return map;
+  }, [eggBoxes]);
   const filteredCompletedCount = filteredCompletedPairings.length;
 
   useEffect(() => {
@@ -7562,7 +7837,7 @@ export default function BreedingPlannerApp() {
     }
     const femaleName = femaleSnake?.name || 'Female';
     const maleName = maleSnake?.name || 'Male';
-    const autoLabel = `${femaleName} × ${maleName}`;
+    const autoLabel = `${femaleName} ֳ— ${maleName}`;
     const yearLabel = extractYearFromDateString(draft.startDate) || new Date().getFullYear();
     const basePairing = {
       femaleId: fId,
@@ -7654,7 +7929,7 @@ export default function BreedingPlannerApp() {
 
     const snake = {
       id: resolvedId,
-      name: newAnimal.name.trim() || (sex === 'F' ? 'New Female' : 'New Male'),
+      name: newAnimal.name.trim() || resolvedId || (sex === 'F' ? 'New Female' : 'New Male'),
       sex,
       morphs: morphList,
       hets: hetList,
@@ -7683,6 +7958,116 @@ export default function BreedingPlannerApp() {
     setNewAnimal(createEmptyNewAnimalDraft());
   }
 
+  async function runImportPreview() {
+    const text = String(importText || '').replace(/Ball Python\s*\(Python regius\)/ig, '');
+    let parsed = parseFourLineBlocks(text);
+
+    if (!parsed.length) {
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      parsed = lines.map(line => parseOneLineSnake(line)).filter(Boolean).map(item => {
+        const morphs = [];
+        const hets = [];
+        (item.genetics || []).forEach(gene => {
+          const lower = String(gene).toLowerCase();
+          if (/^het\b|\bhet\b|^66%|^50%|possible/i.test(lower)) hets.push(gene);
+          else morphs.push(gene);
+        });
+        return {
+          name: item.name,
+          id: item.id || '',
+          sex: ensureSex(item.gender && item.gender[0], 'F'),
+          morphs,
+          hets,
+        };
+      });
+    }
+
+    if (!parsed.length) parsed = parsePipeSeparatedLines(text);
+    if (!parsed.length) parsed = parseReptileBuddyText(text);
+
+    const normalizedRows = parsed.map(item => {
+      const normalized = normalizeMorphHetLists([
+        ...(item.morphs || []),
+        ...(item.hets || []),
+        ...(item.genetics || []),
+      ]);
+      const sex = ensureSex(item.sex || item.gender, 'F');
+      return {
+        ...item,
+        sex,
+        morphs: normalized.morphs,
+        hets: normalized.hets,
+      };
+    });
+
+    const resolvedRows = [];
+    for (const row of normalizedRows) {
+      const resolved = await resolveLeucisticInMorphHetLists(row.morphs || [], row.hets || [], 'Import preview genetics');
+      const resolvedRow = {
+        ...row,
+        morphs: resolved?.morphs || row.morphs || [],
+        hets: resolved?.hets || row.hets || [],
+      };
+      resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+    }
+
+    setImportPreview(resolvedRows);
+  }
+
+  function applyImport() {
+    const existingKeySet = new Set(
+      snakes.map(snake => `${(snake.name || '').trim().toLowerCase()}|${ensureSex(snake.sex, 'F')}`)
+    );
+    const existingIds = snakes.map(snake => snake.id).filter(Boolean);
+    const existingRecords = snakes.map(snake => ({ id: snake.id, idSequence: snake.idSequence }));
+    const canonicalGroupMap = new Map((groups || []).map(label => [String(label).trim().toLowerCase(), label]));
+
+    const normalizeImportedGroup = (label) => {
+      const trimmed = String(label || '').trim();
+      if (!trimmed) return null;
+      const key = trimmed.toLowerCase();
+      if (canonicalGroupMap.has(key)) return canonicalGroupMap.get(key);
+      canonicalGroupMap.set(key, trimmed);
+      return trimmed;
+    };
+
+    const normalizedToAdd = [];
+    for (const preview of importPreview || []) {
+      const converted = convertParsedToSnake(
+        { ...preview, __existingIds: existingIds, __existingRecords: existingRecords },
+        breederInfo?.idGenerator
+      );
+      const sex = ensureSex(converted.sex, 'F');
+      const nameKey = (converted.name || '').trim().toLowerCase();
+      const compositeKey = `${nameKey}|${sex}`;
+      if (existingKeySet.has(compositeKey)) continue;
+      existingKeySet.add(compositeKey);
+      existingIds.push(converted.id);
+      existingRecords.push({ id: converted.id, idSequence: converted.idSequence });
+      const normalizedGroups = normalizeSingleGroupValue(
+        (converted.groups || []).map(normalizeImportedGroup).filter(Boolean)
+      );
+      normalizedToAdd.push({ ...converted, sex, groups: normalizedGroups, isDemo: false });
+    }
+
+    if (normalizedToAdd.length) {
+      setSnakes(prev => {
+        const base = prev.filter(snake => !snake.isDemo);
+        return [...base, ...normalizedToAdd];
+      });
+      const newGroups = Array.from(new Set(normalizedToAdd.flatMap(snake => snake.groups || [])));
+      if (newGroups.length) {
+        setGroups(prev => Array.from(new Set([...(prev || []), ...newGroups])));
+      }
+    }
+
+    setImportText('');
+    setImportPreview([]);
+    setTab('animals');
+    setAnimalView('all');
+    setShowImportModal(false);
+  }
+
     const openHatchWizardForPayload = useCallback((payload) => {
       if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
       const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
@@ -7691,7 +8076,7 @@ export default function BreedingPlannerApp() {
       const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
       const sire = snakeById(snakes, pairing?.maleId);
       const dam = snakeById(snakes, pairing?.femaleId);
-      const pairingName = `${dam?.name || 'Dam'} × ${sire?.name || 'Sire'}`;
+      const pairingName = `${dam?.name || 'Dam'} ֳ— ${sire?.name || 'Sire'}`;
       const baseExistingRecords = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
       const idsInUse = new Set(baseExistingRecords.map(record => record.id));
       const recordsInUse = baseExistingRecords.map(record => ({ ...record }));
@@ -8184,12 +8569,25 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
               </div>
               <div className="w-full min-w-[230px] sm:w-auto">
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder={t("header.search")}
-                  className="header-search-input w-full"
-                />
+                <div className="header-search-shell">
+                  <input
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder={t("header.search")}
+                    className="header-search-input w-full pr-11"
+                  />
+                  {query ? (
+                    <button
+                      type="button"
+                      className="header-search-clear"
+                      onClick={() => setQuery("")}
+                      aria-label={t("filters.clear", { defaultValue: "Clear" })}
+                      title={t("filters.clear", { defaultValue: "Clear" })}
+                    >
+                      x
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -8300,7 +8698,7 @@ export default function BreedingPlannerApp() {
                 listExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600'
               )}>
                 {listExportFeedback.message}
-                {listExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(listExportFeedback.timestamp)}` : ''}
+                {listExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(listExportFeedback.timestamp)}` : ''}
               </div>
             )}
 
@@ -8350,7 +8748,7 @@ export default function BreedingPlannerApp() {
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
                           <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
-                          <span className="text-[10px] text-neutral-500">▾</span>
+                          <span className="text-[10px] text-neutral-500">ג–¾</span>
                         </button>
                         {tagFilterMenuOpen && (
                           <div className="absolute z-30 mt-1 w-full min-w-[220px] max-h-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
@@ -8498,6 +8896,17 @@ export default function BreedingPlannerApp() {
               <div className="flex flex-wrap items-center gap-2">
                 <TabButton
                   theme={theme}
+                  active={pairingsView === 'dashboard'}
+                  onClick={() => {
+                    setPairingsView('dashboard');
+                    setFocusedPairingId(null);
+                    setCompletedYearFilter('All');
+                  }}
+                >
+                  {t('pairing.dashboard', { defaultValue: 'Dashboard' })}
+                </TabButton>
+                <TabButton
+                  theme={theme}
                   active={pairingsView === 'active'}
                   onClick={() => {
                     setPairingsView('active');
@@ -8546,7 +8955,7 @@ export default function BreedingPlannerApp() {
                       onClick={() => setPairingsSearchQuery('')}
                       aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
                     >
-                      ×
+                      ֳ—
                     </button>
                   )}
                 </div>
@@ -8587,7 +8996,19 @@ export default function BreedingPlannerApp() {
                 ))}
               </div>
             )}
-            {pairingsView === 'incubator' ? (
+            {pairingsView === 'dashboard' ? (
+              <BreedingDashboardSection
+                items={breedingDashboardItems}
+                theme={theme}
+                onOpenPairing={(pid) => {
+                  const p = pairings.find(x => x.id === pid);
+                  if (p) {
+                    setPairingsView(isPairingCompleted(p) ? 'completed' : 'active');
+                    setFocusedPairingId(p.id);
+                  }
+                }}
+              />
+            ) : pairingsView === 'incubator' ? (
               <Card title={t("pairing.incubatorTitle", { count: eggBoxes.length })}>
                 {eggBoxes.length ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -8630,6 +9051,7 @@ export default function BreedingPlannerApp() {
               onUpdatePairing={handleUpdatePairing}
               onExportPairingQr={handleGeneratePairingQrLabels}
               showAppAlert={showAppAlert}
+              clutchNumberByPairingId={clutchNumberByPairingId}
               focusedPairingId={focusedPairingId}
               onFocusPairing={setFocusedPairingId}
               theme={theme}
@@ -8661,7 +9083,7 @@ export default function BreedingPlannerApp() {
 
         {tab === "shedTerminal" && (
           <Card title={t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}>
-            <ShedTestTerminalPanel />
+            <ShedTestTerminalPanel snakes={snakes} />
           </Card>
         )}
 
@@ -8750,7 +9172,7 @@ export default function BreedingPlannerApp() {
                           </div>
                           <div className="text-xs text-neutral-500">
                             {photo.source === 'camera' ? 'Captured on device' : 'Uploaded file'}
-                            {sizeLabel ? ` — ${sizeLabel}` : ''}
+                            {sizeLabel ? ` ג€” ${sizeLabel}` : ''}
                           </div>
                           {addedLabel && (
                             <div className="text-xs text-neutral-500">Added {addedLabel}</div>
@@ -8859,7 +9281,7 @@ export default function BreedingPlannerApp() {
                   Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically.
                 </p>
                 <p className="mt-1">
-                  Examples: Fire + Fire → Super Fire, Lesser + Lesser → Super Lesser, Butter + Butter → Super Butter.
+                  Examples: Fire + Fire ג†’ Super Fire, Lesser + Lesser ג†’ Super Lesser, Butter + Butter ג†’ Super Butter.
                 </p>
               </div>
               <p>
@@ -9063,7 +9485,7 @@ export default function BreedingPlannerApp() {
                         </button>
                       </div>
                       <div className="text-xs text-neutral-500 mt-1">
-                        {entry.autoId ? 'Generated automatically based on pairing.' : 'ID locked—edit to override or regenerate.'}
+                        {entry.autoId ? 'Generated automatically based on pairing.' : 'ID lockedג€”edit to override or regenerate.'}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -9174,7 +9596,7 @@ export default function BreedingPlannerApp() {
             </div>
           )}
 
-      {/* create pairing modal — breeders only, male-first */}
+      {/* create pairing modal ג€” breeders only, male-first */}
     {showPairingModal && (
   <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
@@ -9324,7 +9746,7 @@ export default function BreedingPlannerApp() {
 
               {draft.maleId && draft.femaleId && (
                 <div className="sm:col-span-2 text-xs text-neutral-500">
-                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} × {(currentMale?.name || draft.maleId)}.
+                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} ֳ— {(currentMale?.name || draft.maleId)}.
                 </div>
               )}
               <div className="sm:col-span-2">
@@ -9796,9 +10218,9 @@ export default function BreedingPlannerApp() {
         open={Boolean(testOrderSnake)}
         snake={testOrderSnake}
         onClose={() => setTestOrderSnake(null)}
-        onOrderCreated={() => setPanelRefreshToken((prev) => prev + 1)}
         overlayClass={overlayClass(theme)}
       />
+      <BatchOrderCart />
         <ScrollToTopButton theme={theme} />
     </div>
   );
@@ -10769,7 +11191,7 @@ function SpacesSection({
                       <span>
                         {isEmpty
                           ? t('spaces.roomEmpty', { defaultValue: 'Empty room' })
-                          : t('spaces.roomCounts', { defaultValue: '{{racks}} racks • {{terrariums}} terrariums', racks: roomRacks.length, terrariums: roomTerrariums.length })}
+                          : t('spaces.roomCounts', { defaultValue: '{{racks}} racks ג€¢ {{terrariums}} terrariums', racks: roomRacks.length, terrariums: roomTerrariums.length })}
                       </span>
                     </div>
                     <button
@@ -10888,7 +11310,7 @@ function QRModal({ id, name, morphs, hets, dataUrl, onClose }) {
         <div className="space-y-1 mb-3">
           {geneticsTokens.length ? <GeneLine label="Genetics" genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">Genetics: -</div>}
         </div>
-        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generating…</div>}
+        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generatingג€¦</div>}
         <div className="mt-3 flex gap-2">
           {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>Download</a>}
           <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>Close</button>
@@ -10984,7 +11406,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
       const female = snakeById(snakes, pairing.femaleId);
       const maleName = male?.name || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
       const femaleName = female?.name || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
-      const label = pairing.label || `${femaleName} × ${maleName}`;
+      const label = pairing.label || `${femaleName} ֳ— ${maleName}`;
       return {
         id: pairing.id,
         label,
@@ -11052,7 +11474,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
                         <span className="font-medium block">{item.label}</span>
                         <span className="text-xs text-neutral-500">
                           {t('pairingQrModal.pairingMeta', {
-                            defaultValue: 'Male: {{male}} — Female: {{female}}',
+                            defaultValue: 'Male: {{male}} ג€” Female: {{female}}',
                             male: item.maleName,
                             female: item.femaleName,
                           })}
@@ -11243,9 +11665,9 @@ async function generateSnakeCatalogPDF(animals = []) {
     }
 
     const animal = animals[index] || {};
-    const idValue = String(animal.id || '—');
+    const idValue = String(animal.id || 'ג€”');
     const sexValue = formatCatalogSex(animal.sex);
-    const morphValue = resolveCatalogMorph(animal) || '—';
+    const morphValue = resolveCatalogMorph(animal) || 'ג€”';
     const priceRaw = animal.price;
     const pairingRaw = animal.pairing;
     const taggedForSell = isSnakeTaggedForSell(animal);
@@ -11290,7 +11712,7 @@ async function generateSnakeCatalogPDF(animals = []) {
         doc.text(lines, textX + textLabelW, cursorY);
         cursorY += (Math.max(1, lines.length) * 5.4) + 4;
       } else {
-        doc.text(String(value || '—'), textX + textLabelW, cursorY);
+        doc.text(String(value || 'ג€”'), textX + textLabelW, cursorY);
         cursorY += lineHeight;
       }
     };
@@ -11500,7 +11922,7 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
     const femaleSnake = snakesById.get(pairing.femaleId);
     const maleName = maleSnake?.name || pairing.maleId || 'Male';
     const femaleName = femaleSnake?.name || pairing.femaleId || 'Female';
-    const pairingLabel = pairing.label || `${femaleName} × ${maleName}`;
+    const pairingLabel = pairing.label || `${femaleName} ֳ— ${maleName}`;
     const link = `${window.location.origin}${window.location.pathname}#pairing=${encodeURIComponent(pairing.id)}`;
 
     const appointments = (pairing.appointments || [])
@@ -11715,7 +12137,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
       const contact = [];
       if (breederInfo.email) contact.push(breederInfo.email);
       if (breederInfo.phone) contact.push(breederInfo.phone);
-      if (contact.length) doc.text(contact.join(' • '), infoX, y + 18);
+      if (contact.length) doc.text(contact.join(' ג€¢ '), infoX, y + 18);
       // separator: end of header area
       const sepY1 = y + 26;
       doc.setLineWidth(0.6);
@@ -11924,7 +12346,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
       (group.cycles || []).forEach(cycle => {
         const lines = [];
         const pairingLabel = cycle.label || `Pairing ${cycle.id || ''}`;
-        lines.push(`• ${pairingLabel}`);
+        lines.push(`ג€¢ ${pairingLabel}`);
 
         if (cycle.locks && cycle.locks.length) {
           const lockText = cycle.locks
@@ -12048,14 +12470,14 @@ async function exportClutchCardToPdf(details = {}) {
   const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
   await applyPdfUnicodeFont(doc);
 
-  const clutchNumberText = details.clutchNumber ? String(details.clutchNumber) : '—';
+  const clutchNumberText = details.clutchNumber ? String(details.clutchNumber) : 'ג€”';
   const heading = details.label ? details.label : (details.clutchNumber ? `Clutch #${clutchNumberText}` : 'Clutch Card');
-  const femaleName = details.femaleName || '—';
-  const maleName = details.maleName || '—';
+  const femaleName = details.femaleName || 'ג€”';
+  const maleName = details.maleName || 'ג€”';
   const normalizeGeneticsLine = (value) => {
     if (value === null || typeof value === 'undefined') return '';
     const text = String(value).trim();
-    if (!text || text === '—') return '';
+    if (!text || text === 'ג€”') return '';
     return text;
   };
   const femaleGeneticsLine = normalizeGeneticsLine(details.femaleGenetics);
@@ -12075,7 +12497,7 @@ async function exportClutchCardToPdf(details = {}) {
   const estimatedHatch = clutchDate ? addDaysYmd(clutchDate, 59) : '';
   const eggsValue = (() => {
     const raw = details.eggsTotal;
-    if (raw === null || typeof raw === 'undefined' || raw === '') return '—';
+    if (raw === null || typeof raw === 'undefined' || raw === '') return 'ג€”';
     if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) return String(parsed);
@@ -12084,11 +12506,11 @@ async function exportClutchCardToPdf(details = {}) {
 
   const rows = [
     { label: 'Clutch #', value: clutchNumberText },
-    { label: 'Date', value: clutchDate ? formatDateForDisplay(clutchDate) : '—' },
+    { label: 'Date', value: clutchDate ? formatDateForDisplay(clutchDate) : 'ג€”' },
     { label: 'Female', value: femaleName, secondary: femaleGeneticsLine },
     { label: 'Male', value: maleName, secondary: maleGeneticsLine },
     { label: 'Eggs', value: eggsValue },
-    { label: 'Est. hatch', value: estimatedHatch ? formatDateForDisplay(estimatedHatch) : '—' },
+    { label: 'Est. hatch', value: estimatedHatch ? formatDateForDisplay(estimatedHatch) : 'ג€”' },
   ];
 
   const startY = margin + estimateLineHeight(headingFont, 0.9) + 2;
@@ -12144,14 +12566,19 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
   });
   const cardRef = useRef(null);
   const geneticsTokens = useMemo(
-    () => combineMorphsAndHetsForDisplay(s?.morphs, s?.hets, s?.possibleHets),
-    [s?.morphs, s?.hets, s?.possibleHets]
+    () => getDisplayedSnakeGeneticsTokens(s),
+    [s?.morphs, s?.hets, s?.possibleHets, s?.labGeneticsConfirmation?.markers]
   );
   const normalizedSex = useMemo(() => normalizeSexValue(s?.sex), [s?.sex]);
   const sexSymbol = useMemo(() => {
     if (normalizedSex === 'M') return '\u2642';
     if (normalizedSex === 'F') return '\u2640';
     return '?';
+  }, [normalizedSex]);
+  const sexBadgeClass = useMemo(() => {
+    if (normalizedSex === 'M') return 'border-sky-200 bg-sky-50 text-sky-500';
+    if (normalizedSex === 'F') return 'border-rose-200 bg-rose-50 text-rose-500';
+    return 'border-neutral-200 bg-neutral-50 text-neutral-500';
   }, [normalizedSex]);
   const sexLabel = useMemo(() => {
     if (normalizedSex === 'M') return t('snake.sex.male', { defaultValue: 'Male' });
@@ -12165,7 +12592,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
   const showCardPrice = useMemo(() => isSnakeTaggedForSell(s), [s]);
   const cardPriceText = useMemo(() => {
     const raw = String(s?.price ?? '').trim();
-    return raw || '—';
+    return raw || 'ג€”';
   }, [s?.price]);
   const weightHistory = useMemo(() => {
     const entries = Array.isArray(s?.logs?.weights) ? s.logs.weights : [];
@@ -12361,11 +12788,22 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
               <div className="text-xs text-neutral-500">{s.birthDate ? formatDateForDisplay(s.birthDate) : ''}</div>
             </div>
             <div className="shrink-0">
-              <Badge title={sexLabel}>{sexSymbol}</Badge>
+              <span
+                title={sexLabel}
+                aria-label={sexLabel}
+                className={cx(
+                  'inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-1.5 text-xl font-semibold leading-none',
+                  sexBadgeClass
+                )}
+              >
+                {sexSymbol}
+              </span>
             </div>
           </div>
           <div className="mt-1 space-y-1">
-            {geneticsTokens.length ? <GeneLine label={t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })} genes={geneticsTokens} size="sm" /> : <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })}: -</div>}
+            <div className="flex flex-wrap items-center gap-1">
+              {geneticsTokens.length ? <GeneLine label={t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })} genes={geneticsTokens} size="sm" /> : <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })}: -</div>}
+            </div>
           </div>
         </div>
       </div>
@@ -12457,7 +12895,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                       if (sizeText) detailParts.push(sizeText);
                       if (gramsText) detailParts.push(gramsText);
                       if (methodText) detailParts.push(methodText);
-                      detailText = detailParts.join(' — ');
+                      detailText = detailParts.join(' ג€” ');
                     }
                     const primaryText = en.refused ? t("logs.refused", { defaultValue: "Refused feed" }) : (detailText || t("logs.feed", { defaultValue: "Feed" }));
                     return (
@@ -12489,7 +12927,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const c = a.entry;
                     return (
                       <>
-                        <div className="font-medium">{i18n.t("logs.cleaning", { defaultValue: "Cleaning" })}{c.deep ? " — " + i18n.t("logs.deepClean", { defaultValue: "Deep clean" }) : ""}</div>
+                        <div className="font-medium">{i18n.t("logs.cleaning", { defaultValue: "Cleaning" })}{c.deep ? " ג€” " + i18n.t("logs.deepClean", { defaultValue: "Deep clean" }) : ""}</div>
                         {c.notes ? <div className="text-[11px] text-neutral-700 truncate">{c.notes}</div> : null}
                       </>
                     );
@@ -12500,7 +12938,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const sh = a.entry;
                     return (
                       <>
-                        <div className="font-medium">{i18n.t("logs.shed", { defaultValue: "Shed" })}{sh.complete ? " — " + i18n.t("logs.complete", { defaultValue: "Complete" }) : ""}</div>
+                        <div className="font-medium">{i18n.t("logs.shed", { defaultValue: "Shed" })}{sh.complete ? " ג€” " + i18n.t("logs.complete", { defaultValue: "Complete" }) : ""}</div>
                         {sh.notes ? <div className="text-[11px] text-neutral-700 truncate">{sh.notes}</div> : null}
                       </>
                     );
@@ -12511,7 +12949,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const m = a.entry;
                     return (
                       <>
-                        <div className="font-medium truncate">{m.drug} {m.dose ? `— ${m.dose}` : ''}</div>
+                        <div className="font-medium truncate">{m.drug} {m.dose ? `ג€” ${m.dose}` : ''}</div>
                         {m.notes ? <div className="text-[11px] text-neutral-700 truncate">{m.notes}</div> : null}
                       </>
                     );
@@ -12760,8 +13198,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
             <div className="flex flex-col gap-1 max-h-36 overflow-auto">
               {visible.map(p => (
                 <button key={p.id} className="text-sm text-left px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
-                  <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
-                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
+                  <div className="font-medium truncate">{p.label || `${p.femaleId} ֳ— ${p.maleId}`}</div>
+                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : 'ג€”'}</div>
                 </button>
               ))}
               {myPairings.length === 0 && (<div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>)}
@@ -12923,7 +13361,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{p.label}</div>
-                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
+                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : 'ג€”'}</div>
                 </div>
                 <div className="flex gap-2">
                   <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onOpenPairing && onOpenPairing(p.id)}>{t("actions.open", { defaultValue: "Open" })}</button>
@@ -12933,7 +13371,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
                 {t("pairing.appointmentsLabel", { defaultValue: "Appointments:" })}
                 <div className="mt-1 space-y-1">
                   {(p.appointments||[]).map(ap => (
-                    <div key={ap.id} className="text-[11px] px-2 py-1 rounded border bg-neutral-50">{formatDateForDisplay(ap.date)} {ap.notes ? ` — ${ap.notes}` : ''}</div>
+                    <div key={ap.id} className="text-[11px] px-2 py-1 rounded border bg-neutral-50">{formatDateForDisplay(ap.date)} {ap.notes ? ` ג€” ${ap.notes}` : ''}</div>
                   ))}
                 </div>
               </div>
@@ -12997,7 +13435,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
         date: weightEntry?.date ? formatDateForDisplay(weightEntry.date) : '',
       };
     }
-    return { value: '—', date: '' };
+    return { value: 'ג€”', date: '' };
   };
 
   const renderFeed = (snake) => {
@@ -13024,7 +13462,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
       .filter(Boolean)
       .map(part => String(part).trim());
     return {
-      summary: feedParts.length ? feedParts.join(' — ') : t('logs.feed', { defaultValue: 'Feed' }),
+      summary: feedParts.length ? feedParts.join(' ג€” ') : t('logs.feed', { defaultValue: 'Feed' }),
       date: entry.date ? formatDateForDisplay(entry.date) : '',
     };
   };
@@ -13060,7 +13498,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
               <tr key={snake.id || `snake-row-${index}`} className="border-t border-neutral-100">
                 <td className="px-3 py-3 align-top">
                   <div className="font-medium text-base">{snake.name || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' })}</div>
-                  <div className="text-xs font-mono text-neutral-500">{snake.id || '—'}</div>
+                  <div className="text-xs font-mono text-neutral-500">{snake.id || 'ג€”'}</div>
                   <div className="mt-1 inline-flex items-center gap-2 text-xs text-neutral-600">
                     <span className="font-semibold">{sexSummary.symbol}</span>
                     <span>{sexSummary.label}</span>
@@ -13070,7 +13508,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
                   {geneticsSummary ? (
                     <div className="text-sm text-neutral-800 max-w-xs truncate" title={geneticsSummary}>{geneticsSummary}</div>
                   ) : (
-                    <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: —</div>
+                    <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: ג€”</div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
@@ -13414,7 +13852,7 @@ function BreederSection({
     const notes = String(aliasDraftNotes || '').trim();
     if (!alias || !genes.length) {
       if (typeof showAppAlert === 'function') {
-        showAppAlert('Alias and at least one gene are required.');
+        showAppAlert(t('setup.aliases.validation.aliasAndGeneRequired', { defaultValue: 'Alias and at least one gene are required.' }));
       }
       return;
     }
@@ -13432,7 +13870,7 @@ function BreederSection({
       return next;
     });
     resetAliasDraft();
-  }, [aliasDraftAlias, aliasDraftGenes, aliasDraftNotes, editingAliasKey, persistMorphAliases, resetAliasDraft, showAppAlert]);
+  }, [aliasDraftAlias, aliasDraftGenes, aliasDraftNotes, editingAliasKey, persistMorphAliases, resetAliasDraft, showAppAlert, t]);
 
   const handleEditAlias = useCallback((row) => {
     if (!row) return;
@@ -13473,26 +13911,26 @@ function BreederSection({
       const normalized = normalizeMorphAliasDatabase(parsed);
       if (!normalized.length) {
         if (typeof showAppAlert === 'function') {
-          showAppAlert('No valid alias rows were found in this JSON file.');
+          showAppAlert(t('setup.aliases.import.noValidRows', { defaultValue: 'No valid alias rows were found in this JSON file.' }));
         }
         return;
       }
       setMorphAliases(normalized);
       if (typeof showAppAlert === 'function') {
-        showAppAlert(`Imported ${normalized.length} morph aliases.`);
+        showAppAlert(t('setup.aliases.import.importedMorphAliases', { defaultValue: 'Imported {{count}} morph aliases.', count: normalized.length }));
       }
       resetAliasDraft();
     } catch (error) {
       console.error('Failed to import morph aliases', error);
       if (typeof showAppAlert === 'function') {
-        showAppAlert('Failed to import alias JSON.');
+        showAppAlert(t('setup.aliases.import.failedMorphAliases', { defaultValue: 'Failed to import alias JSON.' }));
       }
     } finally {
       if (event?.target) {
         event.target.value = '';
       }
     }
-  }, [resetAliasDraft, setMorphAliases, showAppAlert]);
+  }, [resetAliasDraft, setMorphAliases, showAppAlert, t]);
 
   const persistGeneAliases = useCallback((updater) => {
     if (typeof setGeneAliases !== 'function') return;
@@ -13514,7 +13952,7 @@ function BreederSection({
       .map(value => String(value || '').trim())
       .filter(Boolean);
     if (!geneName) {
-      if (typeof showAppAlert === 'function') showAppAlert('Gene name is required.');
+      if (typeof showAppAlert === 'function') showAppAlert(t('setup.aliases.validation.geneNameRequired', { defaultValue: 'Gene name is required.' }));
       return;
     }
 
@@ -13536,7 +13974,7 @@ function BreederSection({
       return list;
     });
     resetGeneAliasDraft();
-  }, [editingGeneAliasKey, geneAliasDraftAliases, geneAliasDraftName, geneAliasDraftShorthand, persistGeneAliases, resetGeneAliasDraft, showAppAlert]);
+  }, [editingGeneAliasKey, geneAliasDraftAliases, geneAliasDraftName, geneAliasDraftShorthand, persistGeneAliases, resetGeneAliasDraft, showAppAlert, t]);
 
   const handleEditGeneAlias = useCallback((row) => {
     if (!row) return;
@@ -13576,21 +14014,21 @@ function BreederSection({
       const parsed = JSON.parse(text);
       const normalized = mergeGeneAliasRows(parsed);
       if (!normalized.length) {
-        if (typeof showAppAlert === 'function') showAppAlert('No valid gene alias rows were found in this JSON file.');
+        if (typeof showAppAlert === 'function') showAppAlert(t('setup.aliases.import.noValidGeneRows', { defaultValue: 'No valid gene alias rows were found in this JSON file.' }));
         return;
       }
       setGeneAliases(normalized);
       if (typeof showAppAlert === 'function') {
-        showAppAlert(`Imported ${normalized.length} gene alias rows.`);
+        showAppAlert(t('setup.aliases.import.importedGeneAliases', { defaultValue: 'Imported {{count}} gene alias rows.', count: normalized.length }));
       }
       resetGeneAliasDraft();
     } catch (error) {
       console.error('Failed to import gene aliases', error);
-      if (typeof showAppAlert === 'function') showAppAlert('Failed to import gene alias JSON.');
+      if (typeof showAppAlert === 'function') showAppAlert(t('setup.aliases.import.failedGeneAliases', { defaultValue: 'Failed to import gene alias JSON.' }));
     } finally {
       if (event?.target) event.target.value = '';
     }
-  }, [resetGeneAliasDraft, setGeneAliases, showAppAlert]);
+  }, [resetGeneAliasDraft, setGeneAliases, showAppAlert, t]);
   const [pairingExportType, setPairingExportType] = useState('default');
   const [pairingSeasonFilter, setPairingSeasonFilter] = useState('all');
   const [pairingStatusFilter, setPairingStatusFilter] = useState([]);
@@ -13626,6 +14064,17 @@ function BreederSection({
     }
     return hasPairingData;
   }, [pairingExportType, pairings, snakes, pairingMatrixOptions, hasPairingData]);
+  const translateExportDataset = useCallback((dataset) => ({
+    ...dataset,
+    columns: (dataset?.columns || []).map(column => ({
+      ...column,
+      label: t(`export.fields.${column.key}`, { defaultValue: column.label }),
+    })),
+  }), [t]);
+  const translateExportSection = useCallback((section) => {
+    const key = String(section || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return t(`export.sections.${key}`, { defaultValue: section });
+  }, [t]);
   const normalizedPdfLabelSettings = useMemo(
     () => normalizePdfLabelSettings(info.pdfLabelSettings),
     [info.pdfLabelSettings]
@@ -13932,7 +14381,7 @@ function BreederSection({
       const nowIso = new Date().toISOString();
       const manualLabel = t("setup.manualBackup", { defaultValue: "Manual backup" });
       const promptTitle = t("electron.prompts.backupName.title", { defaultValue: "Name this backup file" });
-      let desiredName = `${manualLabel} · ${formatDateTimeForDisplay(nowIso)}`;
+      let desiredName = `${manualLabel} ֲ· ${formatDateTimeForDisplay(nowIso)}`;
       if (typeof showAppPrompt === 'function') {
         const prompted = await showAppPrompt(promptTitle, {
           defaultValue: desiredName,
@@ -14076,22 +14525,22 @@ function BreederSection({
   const handleAnimalsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields);
+      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields));
       if (!dataset.columns.length) {
-        throw new Error('Select at least one field before exporting.');
+        throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error('No animals available to export.');
+        throw new Error(t('export.errors.noAnimals', { defaultValue: 'No animals available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToPdf(dataset, {
-        title: 'Animals export',
-        subtitle: `${dataset.rows.length} animals × ${dataset.columns.length} fields`,
+        title: t('export.animalsTitle', { defaultValue: 'Animals export' }),
+        subtitle: t('export.animalsSubtitle', { defaultValue: '{{animals}} animals - {{fields}} fields', animals: dataset.rows.length, fields: dataset.columns.length }),
         fileName: `animals-export-${safeStamp}.pdf`,
       });
       setExportFeedback({
         type: 'success',
-        message: `Exported ${dataset.rows.length} animals to PDF.`,
+        message: t('export.feedback.animalsPdf', { defaultValue: 'Exported {{count}} animals to PDF.', count: dataset.rows.length }),
         context: 'animals',
         timestamp: new Date().toISOString(),
       });
@@ -14099,31 +14548,31 @@ function BreederSection({
       console.error('Animals PDF export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to export animals to PDF.',
+        message: err?.message || t('export.feedback.animalsPdfFailed', { defaultValue: 'Failed to export animals to PDF.' }),
         context: 'animals',
         timestamp: new Date().toISOString(),
       });
     }
-  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback]);
+  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
 
   const handleAnimalsExportSheet = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields);
+      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields));
       if (!dataset.columns.length) {
-        throw new Error('Select at least one field before exporting.');
+        throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error('No animals available to export.');
+        throw new Error(t('export.errors.noAnimals', { defaultValue: 'No animals available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToXlsx(dataset, {
         fileName: `animals-export-${safeStamp}.xlsx`,
-        sheetName: 'Animals',
+        sheetName: t('export.animalsSheetName', { defaultValue: 'Animals' }),
       });
       setExportFeedback({
         type: 'success',
-        message: `Exported ${dataset.rows.length} animals to spreadsheet.`,
+        message: t('export.feedback.animalsSheet', { defaultValue: 'Exported {{count}} animals to spreadsheet.', count: dataset.rows.length }),
         context: 'animals',
         timestamp: new Date().toISOString(),
       });
@@ -14131,12 +14580,12 @@ function BreederSection({
       console.error('Animals sheet export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to export animals to spreadsheet.',
+        message: err?.message || t('export.feedback.animalsSheetFailed', { defaultValue: 'Failed to export animals to spreadsheet.' }),
         context: 'animals',
         timestamp: new Date().toISOString(),
       });
     }
-  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback]);
+  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
 
   const handleGenerateSnakeCatalog = useCallback(async () => {
     const timestamp = new Date().toISOString();
@@ -14158,13 +14607,13 @@ function BreederSection({
         });
 
       if (!forSaleAnimals.length) {
-        throw new Error('No animals marked for sale were found.');
+        throw new Error(t('export.errors.noSaleAnimals', { defaultValue: 'No animals marked for sale were found.' }));
       }
 
       await generateSnakeCatalogPDF(forSaleAnimals);
       setExportFeedback({
         type: 'success',
-        message: `Generated snake catalog (${forSaleAnimals.length} pages).`,
+        message: t('export.feedback.catalogGenerated', { defaultValue: 'Generated snake catalog ({{count}} pages).', count: forSaleAnimals.length }),
         context: 'animals',
         timestamp,
       });
@@ -14172,34 +14621,36 @@ function BreederSection({
       console.error('Snake catalog generation failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to generate snake catalog.',
+        message: err?.message || t('export.feedback.catalogFailed', { defaultValue: 'Failed to generate snake catalog.' }),
         context: 'animals',
         timestamp,
       });
     }
-  }, [pairings, setExportFeedback, snakes]);
+  }, [pairings, setExportFeedback, snakes, t]);
 
   const handlePairingsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = buildPairingExportPayload();
+      const dataset = translateExportDataset(buildPairingExportPayload());
       if (!dataset.columns.length) {
-        throw new Error('Select at least one field before exporting.');
+        throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error('No breeding projects available to export.');
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToPdf(dataset, {
-        title: pairingExportType === 'byPairing' ? 'Pairings by male' : 'Breeding projects export',
-        subtitle: `${dataset.rows.length} rows × ${dataset.columns.length} fields`,
+        title: pairingExportType === 'byPairing'
+          ? t('export.pairingsByMaleTitle', { defaultValue: 'Pairings by male' })
+          : t('export.pairingsTitle', { defaultValue: 'Breeding projects export' }),
+        subtitle: t('export.rowsSubtitle', { defaultValue: '{{rows}} rows - {{fields}} fields', rows: dataset.rows.length, fields: dataset.columns.length }),
         fileName: `${pairingExportType === 'byPairing' ? 'pairings-by-male' : 'pairings-export'}-${safeStamp}.pdf`,
       });
       setExportFeedback({
         type: 'success',
         message: pairingExportType === 'byPairing'
-          ? `Exported ${dataset.rows.length} pairing rows to PDF.`
-          : `Exported ${dataset.rows.length} projects to PDF.`,
+          ? t('export.feedback.pairingRowsPdf', { defaultValue: 'Exported {{count}} pairing rows to PDF.', count: dataset.rows.length })
+          : t('export.feedback.projectsPdf', { defaultValue: 'Exported {{count}} projects to PDF.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -14207,33 +14658,35 @@ function BreederSection({
       console.error('Pairings PDF export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to export breeding projects to PDF.',
+        message: err?.message || t('export.feedback.projectsPdfFailed', { defaultValue: 'Failed to export breeding projects to PDF.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
     }
-  }, [buildPairingExportPayload, pairingExportType, setExportFeedback]);
+  }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
   const handlePairingsExportSheet = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = buildPairingExportPayload();
+      const dataset = translateExportDataset(buildPairingExportPayload());
       if (!dataset.columns.length) {
-        throw new Error('Select at least one field before exporting.');
+        throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error('No breeding projects available to export.');
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToXlsx(dataset, {
         fileName: `${pairingExportType === 'byPairing' ? 'pairings-by-male' : 'pairings-export'}-${safeStamp}.xlsx`,
-        sheetName: pairingExportType === 'byPairing' ? 'Male-to-female' : 'Pairings',
+        sheetName: pairingExportType === 'byPairing'
+          ? t('export.maleToFemaleSheetName', { defaultValue: 'Male-to-female' })
+          : t('export.pairingsSheetName', { defaultValue: 'Pairings' }),
       });
       setExportFeedback({
         type: 'success',
         message: pairingExportType === 'byPairing'
-          ? `Exported ${dataset.rows.length} pairing rows to spreadsheet.`
-          : `Exported ${dataset.rows.length} projects to spreadsheet.`,
+          ? t('export.feedback.pairingRowsSheet', { defaultValue: 'Exported {{count}} pairing rows to spreadsheet.', count: dataset.rows.length })
+          : t('export.feedback.projectsSheet', { defaultValue: 'Exported {{count}} projects to spreadsheet.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -14241,22 +14694,22 @@ function BreederSection({
       console.error('Pairings sheet export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to export breeding projects to spreadsheet.',
+        message: err?.message || t('export.feedback.projectsSheetFailed', { defaultValue: 'Failed to export breeding projects to spreadsheet.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
     }
-  }, [buildPairingExportPayload, pairingExportType, setExportFeedback]);
+  }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
   const handlePairingsExportCsv = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = buildPairingExportPayload();
+      const dataset = translateExportDataset(buildPairingExportPayload());
       if (!dataset.columns.length) {
-        throw new Error('Select at least one field before exporting.');
+        throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error('No breeding projects available to export.');
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToCsv(dataset, {
@@ -14265,8 +14718,8 @@ function BreederSection({
       setExportFeedback({
         type: 'success',
         message: pairingExportType === 'byPairing'
-          ? `Exported ${dataset.rows.length} pairing rows to CSV.`
-          : `Exported ${dataset.rows.length} projects to CSV.`,
+          ? t('export.feedback.pairingRowsCsv', { defaultValue: 'Exported {{count}} pairing rows to CSV.', count: dataset.rows.length })
+          : t('export.feedback.projectsCsv', { defaultValue: 'Exported {{count}} projects to CSV.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -14274,12 +14727,12 @@ function BreederSection({
       console.error('Pairings CSV export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || 'Failed to export breeding projects to CSV.',
+        message: err?.message || t('export.feedback.projectsCsvFailed', { defaultValue: 'Failed to export breeding projects to CSV.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
     }
-  }, [buildPairingExportPayload, pairingExportType, setExportFeedback]);
+  }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
@@ -14569,8 +15022,8 @@ function BreederSection({
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>Morph Alias Manager</TabButton>
-        <TabButton theme={theme} active={setupTab === 'geneAliases'} onClick={() => setSetupTab('geneAliases')}>Gene Alias Manager</TabButton>
+        <TabButton theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</TabButton>
+        <TabButton theme={theme} active={setupTab === 'geneAliases'} onClick={() => setSetupTab('geneAliases')}>{t('setup.aliases.geneTitle', { defaultValue: 'Gene Alias Manager' })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
@@ -14584,7 +15037,7 @@ function BreederSection({
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium">Name</label>
+              <label className="text-xs font-medium">{t('setup.name', { defaultValue: 'Name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.name}
@@ -14592,7 +15045,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Business name</label>
+              <label className="text-xs font-medium">{t('setup.businessName', { defaultValue: 'Business name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.businessName}
@@ -14600,7 +15053,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Email</label>
+              <label className="text-xs font-medium">{t('setup.email', { defaultValue: 'Email' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.email}
@@ -14608,7 +15061,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Phone</label>
+              <label className="text-xs font-medium">{t('setup.phone', { defaultValue: 'Phone' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.phone}
@@ -14616,7 +15069,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Street</label>
+              <label className="text-xs font-medium">{t('setup.street', { defaultValue: 'Street' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.street}
@@ -14624,7 +15077,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Postal code</label>
+              <label className="text-xs font-medium">{t('setup.postalCode', { defaultValue: 'Postal code' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.postalCode}
@@ -14632,7 +15085,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">City</label>
+              <label className="text-xs font-medium">{t('setup.city', { defaultValue: 'City' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.city}
@@ -14640,7 +15093,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Country</label>
+              <label className="text-xs font-medium">{t('setup.country', { defaultValue: 'Country' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={info.country}
@@ -14648,7 +15101,7 @@ function BreederSection({
               />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-medium">Logo</label>
+              <label className="text-xs font-medium">{t('setup.logo', { defaultValue: 'Logo' })}</label>
               <div className="mt-1 flex items-center gap-2">
                 <input
                   id="breeder-logo-upload"
@@ -14674,7 +15127,7 @@ function BreederSection({
                     if (el) el.click();
                   }}
                 >
-                  Upload logo
+                  {t('setup.uploadLogo', { defaultValue: 'Upload logo' })}
                 </button>
                 {info.logoUrl && <img src={info.logoUrl} alt="logo" className="w-20 h-20 object-cover rounded-md border" />}
               </div>
@@ -14686,14 +15139,14 @@ function BreederSection({
               className={cx('px-3 py-2 rounded-lg text-white', primaryBtnClass(theme,true))}
               onClick={() => {
                 if (typeof showAppAlert === 'function') {
-                  showAppAlert('Breeder info saved locally for this demo');
+                  showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
                 } else {
-                  console.warn('Breeder info saved locally for this demo');
+                  console.warn(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
                 }
                 if (typeof onSaved === 'function') onSaved();
               }}
             >
-              Save
+              {t('modal.save', { defaultValue: 'Save' })}
             </button>
           </div>
         </div>
@@ -14703,9 +15156,9 @@ function BreederSection({
         <div className="border-t pt-4 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-semibold text-sm">ID generator wizard</div>
+              <div className="font-semibold text-sm">{t('setup.idTitle', { defaultValue: 'ID generator wizard' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Define how automatic IDs are created when you add animals, generate hatchlings, or import data.
+                {t('setup.idHelp', { defaultValue: 'Define how automatic IDs are created when you add animals, generate hatchlings, or import data.' })}
               </div>
             </div>
             <button
@@ -14713,12 +15166,12 @@ function BreederSection({
               className="text-xs px-2 py-1 border rounded-lg"
               onClick={handleResetIdConfig}
             >
-              Reset to default
+              {t('setup.resetDefault', { defaultValue: 'Reset to default' })}
             </button>
           </div>
 
           <div>
-            <label className="text-xs font-medium">Template</label>
+            <label className="text-xs font-medium">{t('setup.template', { defaultValue: 'Template' })}</label>
             <input
               className="mt-1 w-full border rounded-xl px-3 py-2 font-mono text-sm"
               ref={templateInputRef}
@@ -14735,13 +15188,13 @@ function BreederSection({
               placeholder={DEFAULT_ID_GENERATOR_CONFIG.template}
             />
             <div className="mt-1 text-[11px] text-neutral-500">
-              Use tokens such as <code>[YROB]</code>, <code>[GEN3]</code>, <code>[SEX]</code>, and <code>[SEQ]</code>. The sequence token is required—we'll append it automatically if you omit it.
+              {t('setup.templateHint', { defaultValue: "Use tokens such as [YROB], [GEN3], [SEX], and [SEQ]. The sequence token is required; we'll append it automatically if you omit it." })}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium">Sequence padding</label>
+              <label className="text-xs font-medium">{t('setup.sequencePadding', { defaultValue: 'Sequence padding' })}</label>
               <input
                 type="number"
                 min={1}
@@ -14750,37 +15203,37 @@ function BreederSection({
                 value={idConfig.sequencePadding}
                 onChange={e => updateIdConfig({ sequencePadding: parseInt(e.target.value, 10) || 1 })}
               />
-              <div className="mt-1 text-[11px] text-neutral-500">Pads the [SEQ] number (e.g., 001).</div>
+              <div className="mt-1 text-[11px] text-neutral-500">{t('setup.sequencePaddingHelp', { defaultValue: 'Pads the [SEQ] number (e.g., 001).' })}</div>
             </div>
             <div>
-              <label className="text-xs font-medium">Letter casing</label>
+              <label className="text-xs font-medium">{t('setup.letterCasing', { defaultValue: 'Letter casing' })}</label>
               <div className="mt-1 flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={idConfig.uppercase}
                   onChange={e => updateIdConfig({ uppercase: e.target.checked })}
                 />
-                <span className="text-sm">Force uppercase output</span>
+                <span className="text-sm">{t('setup.forceUppercase', { defaultValue: 'Force uppercase output' })}</span>
               </div>
-              <div className="mt-1 text-[11px] text-neutral-500">Uncheck to keep mixed case like <em>Ath</em>.</div>
+              <div className="mt-1 text-[11px] text-neutral-500">{t('setup.forceUppercaseHelp', { defaultValue: 'Uncheck to keep mixed case like Ath.' })}</div>
             </div>
             <div>
-              <label className="text-xs font-medium">Free text token value</label>
+              <label className="text-xs font-medium">{t('setup.freeText', { defaultValue: 'Free text token value' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={idConfig.customText}
                 onChange={e => updateIdConfig({ customText: e.target.value })}
                 placeholder="BREED"
               />
-              <div className="mt-1 text-[11px] text-neutral-500">Rendered wherever <code>[TEXT]</code> appears in your template.</div>
+              <div className="mt-1 text-[11px] text-neutral-500">{t('setup.freeTextHelp', { defaultValue: 'Rendered wherever [TEXT] appears in your template.' })}</div>
             </div>
           </div>
 
           <div className="border rounded-xl bg-neutral-50 p-4 space-y-3">
-            <div className="font-medium text-sm">Live preview</div>
+            <div className="font-medium text-sm">{t('setup.livePreview', { defaultValue: 'Live preview' })}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div>
-                <label className="text-xs font-medium">Sample name</label>
+                <label className="text-xs font-medium">{t('setup.sampleName', { defaultValue: 'Sample name' })}</label>
                 <input
                   className="mt-1 w-full border rounded-xl px-3 py-2"
                   value={previewName}
@@ -14788,7 +15241,7 @@ function BreederSection({
                 />
               </div>
               <div>
-                <label className="text-xs font-medium">Year</label>
+                <label className="text-xs font-medium">{t('setup.year', { defaultValue: 'Year' })}</label>
                 <input
                   type="number"
                   className="mt-1 w-full border rounded-xl px-3 py-2"
@@ -14797,7 +15250,7 @@ function BreederSection({
                 />
               </div>
               <div>
-                <label className="text-xs font-medium">Birth year</label>
+                <label className="text-xs font-medium">{t('setup.birthYear', { defaultValue: 'Birth year' })}</label>
                 <input
                   type="number"
                   className="mt-1 w-full border rounded-xl px-3 py-2"
@@ -14806,18 +15259,18 @@ function BreederSection({
                 />
               </div>
               <div>
-                <label className="text-xs font-medium">Sex</label>
+                <label className="text-xs font-medium">{t('setup.sex', { defaultValue: 'Sex' })}</label>
                 <select
                   className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"
                   value={previewSex}
                   onChange={e => setPreviewSex(e.target.value)}
                 >
-                  <option value="F">Female</option>
-                  <option value="M">Male</option>
+                  <option value="F">{t('snakeEdit.sexFemale', { defaultValue: 'Female' })}</option>
+                  <option value="M">{t('snakeEdit.sexMale', { defaultValue: 'Male' })}</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium">Sequence</label>
+                <label className="text-xs font-medium">{t('setup.sequence', { defaultValue: 'Sequence' })}</label>
                 <input
                   type="number"
                   min={1}
@@ -14827,27 +15280,28 @@ function BreederSection({
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-xs font-medium">Sample genes</label>
+                <label className="text-xs font-medium">{t('setup.sampleGenes', { defaultValue: 'Sample genes' })}</label>
                 <input
                   className="mt-1 w-full border rounded-xl px-3 py-2"
                   value={previewGenes}
                   onChange={e => setPreviewGenes(e.target.value)}
                   placeholder="Enchi, Fire, Clown"
                 />
-                <div className="mt-1 text-[11px] text-neutral-500">Comma, slash, or newline separated list. Each gene contributes a three-letter chunk.</div>
+                <div className="mt-1 text-[11px] text-neutral-500">{t('setup.sampleGenesHelp', { defaultValue: 'Comma, slash, or newline separated list. Each gene contributes a three-letter chunk.' })}</div>
               </div>
             </div>
             <div className="text-sm">
-              Example ID: <code className="font-mono text-base font-semibold">{previewId}</code>
+              {t('setup.exampleId', { defaultValue: 'Example ID:' })} <code className="font-mono text-base font-semibold">{previewId}</code>
             </div>
           </div>
 
           <div className="space-y-1 text-[11px] text-neutral-600">
-            <div className="font-semibold text-neutral-700">Available tokens</div>
+            <div className="font-semibold text-neutral-700">{t('setup.availableTokens', { defaultValue: 'Available tokens' })}</div>
             <div className="space-y-1.5">
               {ID_TEMPLATE_TOKENS.map(({ token, description }) => {
                 const templateValue = token;
                 const hasToken = (idConfig.template || '').includes(templateValue);
+                const tokenKey = token === '[-]' ? 'dash' : token.replace(/^\[|\]$/g, '').toLowerCase();
                 return (
                   <button
                     key={token}
@@ -14868,9 +15322,13 @@ function BreederSection({
                     >
                       {token}
                     </span>
-                    <span className="flex-1 text-[11px] sm:text-xs text-neutral-600">{description}</span>
+                    <span className="flex-1 text-[11px] sm:text-xs text-neutral-600">
+                      {t(`setup.tokenDesc.${tokenKey}`, { defaultValue: description })}
+                    </span>
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                      {hasToken ? 'Remove' : 'Add'}
+                      {hasToken
+                        ? t('setup.tokenRemove', { defaultValue: 'Remove' })
+                        : t('setup.tokenAdd', { defaultValue: 'Add' })}
                     </span>
                   </button>
                 );
@@ -14884,9 +15342,9 @@ function BreederSection({
         <div className="border-t pt-4 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-semibold text-sm">Morph Alias Manager</div>
+              <div className="font-semibold text-sm">{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Map common combo names (e.g. Batman, Pompeii) to underlying genes.
+                {t('setup.aliases.morphDescription', { defaultValue: 'Map common combo names (e.g. Batman, Pompeii) to underlying genes.' })}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -14898,17 +15356,17 @@ function BreederSection({
                 onChange={handleImportAliases}
               />
               <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => aliasImportInputRef.current?.click()}>
-                Import JSON
+                {t('setup.aliases.importJson', { defaultValue: 'Import JSON' })}
               </button>
               <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportAliases}>
-                Export JSON
+                {t('setup.aliases.exportJson', { defaultValue: 'Export JSON' })}
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium">Alias</label>
+              <label className="text-xs font-medium">{t('setup.aliases.aliasLabel', { defaultValue: 'Alias' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={aliasDraftAlias}
@@ -14917,7 +15375,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Genes (comma separated)</label>
+              <label className="text-xs font-medium">{t('setup.aliases.genesLabel', { defaultValue: 'Genes (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={aliasDraftGenes}
@@ -14926,7 +15384,7 @@ function BreederSection({
               />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-medium">Notes (optional)</label>
+              <label className="text-xs font-medium">{t('setup.aliases.notesLabel', { defaultValue: 'Notes (optional)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={aliasDraftNotes}
@@ -14938,18 +15396,20 @@ function BreederSection({
 
           <div className="flex items-center gap-2">
             <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
-              {editingAliasKey ? 'Update alias' : 'Add alias'}
+              {editingAliasKey
+                ? t('setup.aliases.updateAlias', { defaultValue: 'Update alias' })
+                : t('setup.aliases.addAlias', { defaultValue: 'Add alias' })}
             </button>
             {editingAliasKey && (
               <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetAliasDraft}>
-                Cancel edit
+                {t('setup.aliases.cancelEdit', { defaultValue: 'Cancel edit' })}
               </button>
             )}
           </div>
 
           <div className="border rounded-xl overflow-hidden">
             <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50 border-b">
-              Aliases ({aliasRows.length})
+              {t('setup.aliases.aliasesCount', { defaultValue: 'Aliases ({{count}})', count: aliasRows.length })}
             </div>
             <div className="max-h-72 overflow-y-auto divide-y">
               {aliasRows.length ? aliasRows.map(row => (
@@ -14960,12 +15420,12 @@ function BreederSection({
                     {row.notes && <div className="text-[11px] text-neutral-500 mt-0.5">{row.notes}</div>}
                   </div>
                   <div className="flex items-center gap-2 whitespace-nowrap">
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditAlias(row)}>Edit</button>
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteAlias(row.alias)}>Delete</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteAlias(row.alias)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                   </div>
                 </div>
               )) : (
-                <div className="px-3 py-4 text-sm text-neutral-500">No aliases configured.</div>
+                <div className="px-3 py-4 text-sm text-neutral-500">{t('setup.aliases.emptyAliases', { defaultValue: 'No aliases configured.' })}</div>
               )}
             </div>
           </div>
@@ -14976,9 +15436,9 @@ function BreederSection({
         <div className="border-t pt-4 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-semibold text-sm">Gene Alias Manager</div>
+              <div className="font-semibold text-sm">{t('setup.aliases.geneTitle', { defaultValue: 'Gene Alias Manager' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Manage standardized gene aliases and shorthand used in parsing (e.g. OD → Orange Dream).
+                {t('setup.aliases.geneDescription', { defaultValue: 'Manage standardized gene aliases and shorthand used in parsing (e.g. OD -> Orange Dream).' })}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -14990,17 +15450,17 @@ function BreederSection({
                 onChange={handleImportGeneAliases}
               />
               <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => geneAliasImportInputRef.current?.click()}>
-                Import JSON
+                {t('setup.aliases.importJson', { defaultValue: 'Import JSON' })}
               </button>
               <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportGeneAliases}>
-                Export JSON
+                {t('setup.aliases.exportJson', { defaultValue: 'Export JSON' })}
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium">Gene name</label>
+              <label className="text-xs font-medium">{t('setup.aliases.geneNameLabel', { defaultValue: 'Gene name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={geneAliasDraftName}
@@ -15009,7 +15469,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Aliases (comma separated)</label>
+              <label className="text-xs font-medium">{t('setup.aliases.geneAliasesLabel', { defaultValue: 'Aliases (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={geneAliasDraftAliases}
@@ -15018,7 +15478,7 @@ function BreederSection({
               />
             </div>
             <div>
-              <label className="text-xs font-medium">Shorthand (comma separated)</label>
+              <label className="text-xs font-medium">{t('setup.aliases.shorthandLabel', { defaultValue: 'Shorthand (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={geneAliasDraftShorthand}
@@ -15030,34 +15490,36 @@ function BreederSection({
 
           <div className="flex items-center gap-2">
             <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
-              {editingGeneAliasKey ? 'Update gene alias' : 'Add gene alias'}
+              {editingGeneAliasKey
+                ? t('setup.aliases.updateGeneAlias', { defaultValue: 'Update gene alias' })
+                : t('setup.aliases.addGeneAlias', { defaultValue: 'Add gene alias' })}
             </button>
             {editingGeneAliasKey && (
               <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetGeneAliasDraft}>
-                Cancel edit
+                {t('setup.aliases.cancelEdit', { defaultValue: 'Cancel edit' })}
               </button>
             )}
           </div>
 
           <div className="border rounded-xl overflow-hidden">
             <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50 border-b">
-              Gene aliases ({geneAliasRows.length})
+              {t('setup.aliases.geneAliasesCount', { defaultValue: 'Gene aliases ({{count}})', count: geneAliasRows.length })}
             </div>
             <div className="max-h-72 overflow-y-auto divide-y">
               {geneAliasRows.length ? geneAliasRows.map(row => (
                 <div key={row.geneName} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-neutral-800">{row.geneName}</div>
-                    <div className="text-neutral-600">Aliases: {(row.aliases || []).join(', ') || '-'}</div>
-                    <div className="text-neutral-500 text-xs">Shorthand: {(row.shorthand || []).join(', ') || '-'}</div>
+                    <div className="text-neutral-600">{t('setup.aliases.aliasesPrefix', { defaultValue: 'Aliases:' })} {(row.aliases || []).join(', ') || '-'}</div>
+                    <div className="text-neutral-500 text-xs">{t('setup.aliases.shorthandPrefix', { defaultValue: 'Shorthand:' })} {(row.shorthand || []).join(', ') || '-'}</div>
                   </div>
                   <div className="flex items-center gap-2 whitespace-nowrap">
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditGeneAlias(row)}>Edit</button>
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteGeneAlias(row.geneName)}>Delete</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditGeneAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
+                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteGeneAlias(row.geneName)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                   </div>
                 </div>
               )) : (
-                <div className="px-3 py-4 text-sm text-neutral-500">No gene aliases configured.</div>
+                <div className="px-3 py-4 text-sm text-neutral-500">{t('setup.aliases.emptyGeneAliases', { defaultValue: 'No gene aliases configured.' })}</div>
               )}
             </div>
           </div>
@@ -15068,16 +15530,16 @@ function BreederSection({
         <div className="border-t pt-4 space-y-6">
           <div className="space-y-3">
             <div>
-              <div className="font-semibold text-sm">Data exports</div>
+              <div className="font-semibold text-sm">{t('setup.dataExports', { defaultValue: 'Data exports' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Choose the columns to include and download PDF or spreadsheet summaries for animals and breeding projects.
+                {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and breeding projects.' })}
               </div>
             </div>
             <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4">
               <div>
-                <div className="font-semibold text-sm">Shed Testing Label Size</div>
+                <div className="font-semibold text-sm">{t('export.shedTestingLabelSize', { defaultValue: 'Shed Testing Label Size' })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
-                  These dimensions are used for both shipping labels and individual sample QR labels in the shed testing workflow.
+                  {t('export.shedTestingLabelSizeHelp', { defaultValue: 'These dimensions are used for both shipping labels and individual sample QR labels in the shed testing workflow.' })}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -15096,14 +15558,14 @@ function BreederSection({
                       )}
                       onClick={() => handleLabLabelPresetChange(preset.key)}
                     >
-                      {preset.label} ({preset.widthMm} × {preset.heightMm} mm)
+                      {preset.label} ({preset.widthMm} ֳ— {preset.heightMm} mm)
                     </button>
                   );
                 })}
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                  <span>Label Width (mm)</span>
+                  <span>{t('export.labelWidthMm', { defaultValue: 'Label Width (mm)' })}</span>
                   <input
                     type="number"
                     min={LAB_LABEL_SIZE_LIMITS_MM.min}
@@ -15115,7 +15577,7 @@ function BreederSection({
                   />
                 </label>
                 <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                  <span>Label Height (mm)</span>
+                  <span>{t('export.labelHeightMm', { defaultValue: 'Label Height (mm)' })}</span>
                   <input
                     type="number"
                     min={LAB_LABEL_SIZE_LIMITS_MM.min}
@@ -15133,17 +15595,17 @@ function BreederSection({
                   className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
                   onClick={handleSaveLabLabelSettings}
                 >
-                  Save
+                  {t('modal.save', { defaultValue: 'Save' })}
                 </button>
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border text-sm"
                   onClick={handleResetLabLabelSettings}
                 >
-                  Reset to Default
+                  {t('setup.resetDefault', { defaultValue: 'Reset to Default' })}
                 </button>
                 <div className="text-xs text-neutral-500">
-                  Allowed range: {LAB_LABEL_SIZE_LIMITS_MM.min} to {LAB_LABEL_SIZE_LIMITS_MM.max} mm.
+                  {t('export.allowedRangeMm', { defaultValue: 'Allowed range: {{min}} to {{max}} mm.', min: LAB_LABEL_SIZE_LIMITS_MM.min, max: LAB_LABEL_SIZE_LIMITS_MM.max })}
                 </div>
               </div>
               <label className="flex items-center gap-2 text-xs text-neutral-700">
@@ -15152,7 +15614,7 @@ function BreederSection({
                   checked={labLabelDebugGuides}
                   onChange={e => setLabLabelDebugGuides(e.target.checked)}
                 />
-                <span>Show debug guides in preview and generated labels</span>
+                <span>{t('export.showDebugGuides', { defaultValue: 'Show debug guides in preview and generated labels' })}</span>
               </label>
               {labLabelSettingsError ? (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -15166,16 +15628,16 @@ function BreederSection({
               ) : null}
               <div className="rounded-lg bg-neutral-50 border px-3 py-2 text-xs text-neutral-700">
                 <div>
-                  Active label size: {activeLabLabelSize.widthMm} × {activeLabLabelSize.heightMm} mm
+                  {t('export.activeLabelSize', { defaultValue: 'Active label size: {{width}} × {{height}} mm', width: activeLabLabelSize.widthMm, height: activeLabLabelSize.heightMm })}
                 </div>
                 <div>
-                  Draft preview size: {previewLabLabelSize.widthMm} × {previewLabLabelSize.heightMm} mm
+                  {t('export.draftPreviewSize', { defaultValue: 'Draft preview size: {{width}} × {{height}} mm', width: previewLabLabelSize.widthMm, height: previewLabLabelSize.heightMm })}
                 </div>
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <div className="text-xs font-semibold text-neutral-700">Shipping label preview</div>
-                  <div className="mt-1 text-[11px] text-neutral-500">Preview uses the same layout boxes and safe area as the PDF generator.</div>
+                  <div className="text-xs font-semibold text-neutral-700">{t('export.shippingLabelPreview', { defaultValue: 'Shipping label preview' })}</div>
+                  <div className="mt-1 text-[11px] text-neutral-500">{t('export.shippingLabelPreviewHelp', { defaultValue: 'Preview uses the same layout boxes and safe area as the PDF generator.' })}</div>
                   <div className="mt-3 flex justify-center">
                     <ShippingLabelPreview
                       size={previewLabLabelSize}
@@ -15208,8 +15670,8 @@ function BreederSection({
                   </div>
                 </div>
                 <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                  <div className="text-xs font-semibold text-neutral-700">Sample label preview</div>
-                  <div className="mt-1 text-[11px] text-neutral-500">One page per sample with fixed text and QR regions.</div>
+                  <div className="text-xs font-semibold text-neutral-700">{t('export.sampleLabelPreview', { defaultValue: 'Sample label preview' })}</div>
+                  <div className="mt-1 text-[11px] text-neutral-500">{t('export.sampleLabelPreviewHelp', { defaultValue: 'One page per sample with fixed text and QR regions.' })}</div>
                   <div className="mt-3 flex justify-center">
                     <SampleLabelPreview
                       size={previewLabLabelSize}
@@ -15233,26 +15695,26 @@ function BreederSection({
             </div>
             <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
               <div>
-                <div className="font-semibold text-sm">PDF label settings</div>
+                <div className="font-semibold text-sm">{t('export.pdfLabelSettings', { defaultValue: 'PDF label settings' })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
-                  Select a thermal or sheet preset, or define a custom label layout.
+                  {t('export.pdfLabelSettingsHelp', { defaultValue: 'Select a thermal or sheet preset, or define a custom label layout.' })}
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-4">
                 <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                  <span>Format type</span>
+                  <span>{t('export.formatType', { defaultValue: 'Format type' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
                     value={normalizedPdfLabelSettings.formatType}
                     onChange={e => handlePdfFormatTypeChange(e.target.value)}
                   >
-                    <option value="thermal">Thermal Labels</option>
-                    <option value="sheet">Sheet Labels</option>
-                    <option value="custom">Custom Size</option>
+                    <option value="thermal">{t('export.thermalLabels', { defaultValue: 'Thermal Labels' })}</option>
+                    <option value="sheet">{t('export.sheetLabels', { defaultValue: 'Sheet Labels' })}</option>
+                    <option value="custom">{t('export.customSize', { defaultValue: 'Custom Size' })}</option>
                   </select>
                 </label>
                 <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                  <span>Brand</span>
+                  <span>{t('export.brand', { defaultValue: 'Brand' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
                     value={normalizedPdfLabelSettings.brand}
@@ -15264,7 +15726,7 @@ function BreederSection({
                   </select>
                 </label>
                 <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                  <span>Label category</span>
+                  <span>{t('export.labelCategory', { defaultValue: 'Label category' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
                     value={normalizedPdfLabelSettings.category}
@@ -15277,7 +15739,7 @@ function BreederSection({
                 </label>
                 {normalizedPdfLabelSettings.formatType !== 'custom' && (
                   <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                    <span>Size preset</span>
+                    <span>{t('export.sizePreset', { defaultValue: 'Size preset' })}</span>
                     <select
                       className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
                       value={normalizedPdfLabelSettings.presetKey}
@@ -15292,7 +15754,7 @@ function BreederSection({
                 {normalizedPdfLabelSettings.formatType === 'custom' && (
                   <>
                     <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                      <span>Unit</span>
+                      <span>{t('export.unit', { defaultValue: 'Unit' })}</span>
                       <select
                         className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
                         value={normalizedPdfLabelSettings.unit}
@@ -15304,7 +15766,7 @@ function BreederSection({
                       </select>
                     </label>
                     <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                      <span>Label width</span>
+                      <span>{t('export.labelWidth', { defaultValue: 'Label width' })}</span>
                       <input
                         type="number"
                         min="1"
@@ -15315,7 +15777,7 @@ function BreederSection({
                       />
                     </label>
                     <label className="space-y-1 text-xs font-semibold text-neutral-600">
-                      <span>Label height</span>
+                      <span>{t('export.labelHeight', { defaultValue: 'Label height' })}</span>
                       <input
                         type="number"
                         min="1"
@@ -15330,10 +15792,24 @@ function BreederSection({
               </div>
               <div className="rounded-lg bg-neutral-50 border px-3 py-2 text-xs text-neutral-700">
                 <div>
-                  Active layout: {pdfLabelLayout.mode === 'sheet' ? 'Sheet grid' : 'Thermal single-label'} · Label {pdfLabelLayout.labelWidthMm.toFixed(1)} × {pdfLabelLayout.labelHeightMm.toFixed(1)} mm
+                  {t('export.activeLayout', {
+                    defaultValue: 'Active layout: {{mode}} - Label {{width}} × {{height}} mm',
+                    mode: pdfLabelLayout.mode === 'sheet'
+                      ? t('export.sheetGrid', { defaultValue: 'Sheet grid' })
+                      : t('export.thermalSingleLabel', { defaultValue: 'Thermal single-label' }),
+                    width: pdfLabelLayout.labelWidthMm.toFixed(1),
+                    height: pdfLabelLayout.labelHeightMm.toFixed(1),
+                  })}
                 </div>
                 <div>
-                  Page {pdfLabelLayout.pageWidthMm.toFixed(1)} × {pdfLabelLayout.pageHeightMm.toFixed(1)} mm{pdfLabelLayout.mode === 'sheet' ? ` · ${pdfLabelLayout.columns} × ${pdfLabelLayout.rows} labels/page` : ''}
+                  {t('export.pageLayout', {
+                    defaultValue: 'Page {{width}} × {{height}} mm',
+                    width: pdfLabelLayout.pageWidthMm.toFixed(1),
+                    height: pdfLabelLayout.pageHeightMm.toFixed(1),
+                  })}
+                  {pdfLabelLayout.mode === 'sheet'
+                    ? ` - ${t('export.labelsPerPage', { defaultValue: '{{columns}} × {{rows}} labels/page', columns: pdfLabelLayout.columns, rows: pdfLabelLayout.rows })}`
+                    : ''}
                 </div>
                 {!pdfLabelLayoutValidation.isValid && (
                   <div className="mt-1 text-amber-700">
@@ -15346,9 +15822,9 @@ function BreederSection({
               <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-sm">Animals</div>
+                    <div className="font-semibold text-sm">{t('setup.animals', { defaultValue: 'Animals' })}</div>
                     <div className="text-xs text-neutral-500">
-                      Selected {normalizedAnimalExportFields.length} of {ANIMAL_EXPORT_FIELD_DEFS.length} fields.
+                      {t('export.selectedFields', { defaultValue: 'Selected {{selected}} of {{total}} fields.', selected: normalizedAnimalExportFields.length, total: ANIMAL_EXPORT_FIELD_DEFS.length })}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -15358,7 +15834,7 @@ function BreederSection({
                       onClick={handleAnimalsExportPdf}
                       disabled={!hasAnimalData}
                     >
-                      Export PDF
+                      {t('actions.exportPdf', { defaultValue: 'Export PDF' })}
                     </button>
                     <button
                       type="button"
@@ -15366,7 +15842,7 @@ function BreederSection({
                       onClick={handleAnimalsExportSheet}
                       disabled={!hasAnimalData}
                     >
-                      Export sheet (.xlsx)
+                      {t('export.exportSheetXlsx', { defaultValue: 'Export sheet (.xlsx)' })}
                     </button>
                     <button
                       type="button"
@@ -15374,18 +15850,18 @@ function BreederSection({
                       onClick={handleGenerateSnakeCatalog}
                       disabled={!hasAnimalData}
                     >
-                      Generate Catalog
+                      {t('export.generateCatalog', { defaultValue: 'Generate Catalog' })}
                     </button>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
-                  <button type="button" className="underline" onClick={handleSelectAllAnimalFields}>Select all</button>
-                  <button type="button" className="underline" onClick={handleResetAnimalFields}>Reset defaults</button>
+                  <button type="button" className="underline" onClick={handleSelectAllAnimalFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
+                  <button type="button" className="underline" onClick={handleResetAnimalFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {animalFieldSections.map(section => (
                     <div key={section.section} className="space-y-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{section.section}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{translateExportSection(section.section)}</div>
                       <div className="space-y-1.5">
                         {section.fields.map(field => {
                           const checked = animalFieldSet.has(field.key);
@@ -15397,7 +15873,7 @@ function BreederSection({
                                 checked={checked}
                                 onChange={() => handleToggleAnimalField(field.key)}
                               />
-                              <span>{field.label}</span>
+                              <span>{t(`export.fields.${field.key}`, { defaultValue: field.label })}</span>
                             </label>
                           );
                         })}
@@ -15411,16 +15887,16 @@ function BreederSection({
                 {animalExportFeedback && (
                   <div className={cx('text-xs', animalExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                     {animalExportFeedback.message}
-                    {animalExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(animalExportFeedback.timestamp)}` : ''}
+                    {animalExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(animalExportFeedback.timestamp)}` : ''}
                   </div>
                 )}
               </div>
               <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-sm">Breeding projects</div>
+                    <div className="font-semibold text-sm">{t('setup.breedingProjects', { defaultValue: 'Breeding projects' })}</div>
                     <div className="text-xs text-neutral-500">
-                      Selected {normalizedPairingExportFields.length} of {PAIRING_EXPORT_FIELD_DEFS.length} fields.
+                      {t('export.selectedFields', { defaultValue: 'Selected {{selected}} of {{total}} fields.', selected: normalizedPairingExportFields.length, total: PAIRING_EXPORT_FIELD_DEFS.length })}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -15430,7 +15906,7 @@ function BreederSection({
                       onClick={handlePairingsExportPdf}
                       disabled={!canExportPairings}
                     >
-                      Export PDF
+                      {t('actions.exportPdf', { defaultValue: 'Export PDF' })}
                     </button>
                     <button
                       type="button"
@@ -15438,7 +15914,7 @@ function BreederSection({
                       onClick={handlePairingsExportSheet}
                       disabled={!canExportPairings}
                     >
-                      Export sheet (.xlsx)
+                      {t('export.exportSheetXlsx', { defaultValue: 'Export sheet (.xlsx)' })}
                     </button>
                     <button
                       type="button"
@@ -15446,13 +15922,13 @@ function BreederSection({
                       onClick={handlePairingsExportCsv}
                       disabled={!canExportPairings}
                     >
-                      Export CSV
+                      {t('export.exportCsv', { defaultValue: 'Export CSV' })}
                     </button>
                   </div>
                 </div>
                 <div className="rounded-xl bg-neutral-50 px-3 py-3 space-y-3 text-[11px] text-neutral-700">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold uppercase tracking-wide text-[10px]">Export layout</span>
+                    <span className="font-semibold uppercase tracking-wide text-[10px]">{t('export.layout', { defaultValue: 'Export layout' })}</span>
                     <div className="flex flex-wrap gap-1">
                       <button
                         type="button"
@@ -15461,7 +15937,7 @@ function BreederSection({
                           : 'border-neutral-300 text-neutral-700 bg-white')}
                         onClick={() => setPairingExportType('default')}
                       >
-                        Default
+                        {t('export.defaultLayout', { defaultValue: 'Default' })}
                       </button>
                       <button
                         type="button"
@@ -15470,20 +15946,20 @@ function BreederSection({
                           : 'border-neutral-300 text-neutral-700 bg-white')}
                         onClick={() => setPairingExportType('byPairing')}
                       >
-                        By pairing (Male → Females)
+                        {t('export.byPairingLayout', { defaultValue: 'By pairing (Male -> Females)' })}
                       </button>
                     </div>
                   </div>
                   {pairingExportType === 'byPairing' && (
                     <div className="space-y-3 border-t border-neutral-200 pt-3">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-                        <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Season</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('export.season', { defaultValue: 'Season' })}</label>
                         <select
                           className="border rounded-lg px-3 py-2 bg-white text-sm"
                           value={pairingSeasonFilter}
                           onChange={e => setPairingSeasonFilter(e.target.value || 'all')}
                         >
-                          <option value="all">All seasons</option>
+                          <option value="all">{t('export.allSeasons', { defaultValue: 'All seasons' })}</option>
                           {pairingSeasonOptions.map(option => (
                             <option key={option.value} value={option.value}>{option.label}</option>
                           ))}
@@ -15491,7 +15967,7 @@ function BreederSection({
                       </div>
                       {availablePairingStatuses.length > 0 && (
                         <div className="space-y-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Statuses</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('export.statuses', { defaultValue: 'Statuses' })}</div>
                           <div className="flex flex-wrap gap-1.5">
                             {availablePairingStatuses.map(status => {
                               const active = pairingStatusFilter.includes(status);
@@ -15510,7 +15986,7 @@ function BreederSection({
                             })}
                           </div>
                           {pairingStatusFilter.length > 0 && (
-                            <button type="button" className="text-[11px] underline" onClick={handleClearPairingStatusFilter}>Clear statuses</button>
+                            <button type="button" className="text-[11px] underline" onClick={handleClearPairingStatusFilter}>{t('export.clearStatuses', { defaultValue: 'Clear statuses' })}</button>
                           )}
                         </div>
                       )}
@@ -15521,33 +15997,33 @@ function BreederSection({
                           checked={includeUnpairedMales}
                           onChange={e => setIncludeUnpairedMales(e.target.checked)}
                         />
-                        <span>Include unpaired males</span>
+                        <span>{t('export.includeUnpairedMales', { defaultValue: 'Include unpaired males' })}</span>
                       </label>
                       <div className="text-[11px] text-amber-600 flex items-center gap-1">
-                        <span className="font-semibold uppercase tracking-wide">Note</span>
-                        <span>Rows missing sort order will show “order not set”.</span>
+                        <span className="font-semibold uppercase tracking-wide">{t('export.note', { defaultValue: 'Note' })}</span>
+                        <span>{t('export.missingSortOrderNote', { defaultValue: 'Rows missing sort order will show "order not set".' })}</span>
                       </div>
                       {!canExportPairings && (
                         <div className="text-[11px] text-neutral-500">
-                          No rows match the current filters.
+                          {t('export.noRowsMatchFilters', { defaultValue: 'No rows match the current filters.' })}
                         </div>
                       )}
                     </div>
                   )}
                   {pairingExportType === 'byPairing' && (
                     <div className="text-[11px] text-neutral-500">
-                      Field toggles below only apply to the default export layout.
+                      {t('export.defaultFieldsOnly', { defaultValue: 'Field toggles below only apply to the default export layout.' })}
                     </div>
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
-                  <button type="button" className="underline" onClick={handleSelectAllPairingFields}>Select all</button>
-                  <button type="button" className="underline" onClick={handleResetPairingFields}>Reset defaults</button>
+                  <button type="button" className="underline" onClick={handleSelectAllPairingFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
+                  <button type="button" className="underline" onClick={handleResetPairingFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pairingFieldSections.map(section => (
                     <div key={section.section} className="space-y-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{section.section}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{translateExportSection(section.section)}</div>
                       <div className="space-y-1.5">
                         {section.fields.map(field => {
                           const checked = pairingFieldSet.has(field.key);
@@ -15559,7 +16035,7 @@ function BreederSection({
                                 checked={checked}
                                 onChange={() => handleTogglePairingField(field.key)}
                               />
-                              <span>{field.label}</span>
+                              <span>{t(`export.fields.${field.key}`, { defaultValue: field.label })}</span>
                             </label>
                           );
                         })}
@@ -15568,12 +16044,12 @@ function BreederSection({
                   ))}
                 </div>
                 {!hasPairingData && (
-                  <div className="text-[11px] text-neutral-500">Build at least one pairing to enable exports.</div>
+                  <div className="text-[11px] text-neutral-500">{t('export.addPairingsHint', { defaultValue: 'Build at least one pairing to enable exports.' })}</div>
                 )}
                 {pairingExportFeedback && (
                   <div className={cx('text-xs', pairingExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                     {pairingExportFeedback.message}
-                    {pairingExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(pairingExportFeedback.timestamp)}` : ''}
+                    {pairingExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(pairingExportFeedback.timestamp)}` : ''}
                   </div>
                 )}
               </div>
@@ -15614,7 +16090,7 @@ function BreederSection({
             {manualFeedback && (
               <span className={cx('text-xs', manualFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {manualFeedback.message}
-                {manualFeedback.timestamp ? ` — ${formatDateTimeForDisplay(manualFeedback.timestamp)}` : ''}
+                {manualFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(manualFeedback.timestamp)}` : ''}
               </span>
             )}
           </div>
@@ -15667,7 +16143,7 @@ function BreederSection({
             {autoFeedback && (
               <div className={cx('text-xs', autoFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {autoFeedback.message}
-                {autoFeedback.timestamp ? ` — ${formatDateTimeForDisplay(autoFeedback.timestamp)}` : ''}
+                {autoFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(autoFeedback.timestamp)}` : ''}
               </div>
             )}
           </div>
@@ -15704,7 +16180,7 @@ function BreederSection({
             {vaultFeedback && (
               <div className={cx('text-xs', vaultFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {vaultFeedback.message}
-                {vaultFeedback.timestamp ? ` — ${formatDateTimeForDisplay(vaultFeedback.timestamp)}` : ''}
+                {vaultFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(vaultFeedback.timestamp)}` : ''}
               </div>
             )}
             <div className="space-y-2">
@@ -15820,7 +16296,7 @@ function BreederSection({
             {restoreFeedback && (
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {restoreFeedback.message}
-                {restoreFeedback.timestamp ? ` — ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
+                {restoreFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
@@ -16209,6 +16685,151 @@ function AppearancePreview({ resolvedAppearance, density, mode }) {
 }
 
 // pairings list
+function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing }) {
+  const { t } = useTranslation();
+  const list = Array.isArray(items) ? items : [];
+  const counts = list.reduce((acc, item) => {
+    const key = item?.urgency || 'none';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const activeStageCounts = list.reduce((acc, item) => {
+    const key = item?.stageKey || 'active';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const openPairing = useCallback((id) => {
+    if (id && typeof onOpenPairing === 'function') onOpenPairing(id);
+  }, [onOpenPairing]);
+
+  const summaryCards = [
+    {
+      label: t('pairing.dashboard.overdue', { defaultValue: 'Overdue' }),
+      value: counts.overdue || 0,
+      className: 'border-rose-200 bg-rose-50 text-rose-700',
+    },
+    {
+      label: t('pairing.dashboard.dueSoon', { defaultValue: 'Due in 3 days' }),
+      value: counts.due || 0,
+      className: 'border-amber-200 bg-amber-50 text-amber-700',
+    },
+    {
+      label: t('pairing.dashboard.nextWeek', { defaultValue: 'Next 7 days' }),
+      value: counts.soon || 0,
+      className: 'border-sky-200 bg-sky-50 text-sky-700',
+    },
+    {
+      label: t('pairing.dashboard.tracking', { defaultValue: 'Tracking' }),
+      value: list.length,
+      className: 'border-neutral-200 bg-white text-neutral-700',
+    },
+  ];
+
+  const stageCards = [
+    { key: 'ovulation', label: t('pairing.dashboard.stageOvulation', { defaultValue: 'In ovulation' }) },
+    { key: 'preLay', label: t('pairing.dashboard.stagePreLay', { defaultValue: 'Pre-lay shed' }) },
+    { key: 'clutch', label: t('pairing.dashboard.stageClutch', { defaultValue: 'Clutch laid' }) },
+    { key: 'locks', label: t('pairing.dashboard.stageLocks', { defaultValue: 'Locks observed' }) },
+  ];
+
+  return (
+    <Card title={t('pairing.dashboardTitle', { count: list.length, defaultValue: 'Breeding Dashboard ({{count}})' })}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {summaryCards.map(card => (
+            <div key={card.label} className={cx('border rounded-xl p-3', card.className)}>
+              <div className="text-2xl font-semibold leading-none">{card.value}</div>
+              <div className="mt-1 text-xs font-medium">{card.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {stageCards.map(card => (
+            <div key={card.key} className="border rounded-xl p-3 bg-neutral-50">
+              <div className="text-lg font-semibold text-neutral-900">{activeStageCounts[card.key] || 0}</div>
+              <div className="text-xs text-neutral-500">{card.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {list.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {list.map(item => {
+              const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
+              return (
+                <div key={item.id} className="border rounded-xl bg-white p-4 shadow-sm space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-semibold text-neutral-900 truncate">{item.label}</div>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600">
+                        <span className="inline-flex items-center gap-1">
+                          <SexBadge sex="M" label={t('snake.sex.male', { defaultValue: 'Male' })} showText={false} />
+                          {item.maleName}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <SexBadge sex="F" label={t('snake.sex.female', { defaultValue: 'Female' })} showText={false} />
+                          {item.femaleName}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={cx('text-xs px-2.5 py-1 rounded-full border font-medium', urgencyClass)}>
+                      {item.countdownLabel}
+                    </span>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-2 text-sm">
+                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+                        {t('pairing.dashboard.currentStage', { defaultValue: 'Current stage' })}
+                      </div>
+                      <div className="mt-1 font-medium text-neutral-900">{item.stage}</div>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+                        {t('pairing.dashboard.nextStage', { defaultValue: 'Next stage' })}
+                      </div>
+                      <div className="mt-1 font-medium text-neutral-900">{item.nextStage}</div>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+                        {t('pairing.dashboard.targetDate', { defaultValue: 'Target date' })}
+                      </div>
+                      <div className="mt-1 font-medium text-neutral-900">{item.targetLabel || '\u2014'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs text-neutral-500">
+                      {item.latestLockLabel
+                        ? t('pairing.dashboard.latestLock', { date: item.latestLockLabel, defaultValue: 'Latest lock: {{date}}' })
+                        : t('pairing.dashboard.noLock', { defaultValue: 'No lock recorded yet' })}
+                    </div>
+                    <button
+                      type="button"
+                      className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                      onClick={() => openPairing(item.id)}
+                    >
+                      {item.actionLabel}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-sm text-neutral-500">
+            {t('pairing.dashboardEmpty', { defaultValue: 'No active pairings to track yet. Create a pairing to start the dashboard.' })}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function PairingsSection({
   snakes,
   pairings,
@@ -16218,6 +16839,7 @@ function PairingsSection({
   onOpenSnake,
   onUpdatePairing,
   onExportPairingQr,
+  clutchNumberByPairingId,
   theme = 'blue',
   focusedPairingId = null,
   onFocusPairing,
@@ -16243,7 +16865,7 @@ function PairingsSection({
           <PairingInlineCard
             key={p.id}
             pairing={p}
-            pairingNumber={idx + 1}
+            pairingNumber={clutchNumberByPairingId?.get(p.id) || idx + 1}
             snakes={snakes}
             breederMales={breederMales}
             breederFemales={breederFemales}
@@ -16360,6 +16982,7 @@ function PairingInlineCard({
   const clutchCardStartLabel = t('clutchCard.start', { defaultValue: 'Start' });
   const clutchCardEndLabel = t('clutchCard.end', { defaultValue: 'End' });
   const clutchCardViewDetailsLabel = t('clutchCard.viewDetails', { defaultValue: 'View details' });
+  const missingValueLabel = '\u2014';
   const edit = useMemo(() => withPairingLifecycleDefaults(pairing || {}), [pairing]);
   const femaleSnake = useMemo(() => snakeById(snakes, edit.femaleId), [snakes, edit.femaleId]);
   const maleSnake = useMemo(() => snakeById(snakes, edit.maleId), [snakes, edit.maleId]);
@@ -16375,8 +16998,8 @@ function PairingInlineCard({
     if (!maleSnake) return [];
     return combineMorphsAndHetsForDisplay(maleSnake.morphs, maleSnake.hets, maleSnake.possibleHets);
   }, [maleSnake]);
-  const femaleGeneticsLine = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : '—';
-  const maleGeneticsLine = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : '—';
+  const femaleGeneticsLine = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
+  const maleGeneticsLine = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
   const breederMaleOptions = useMemo(() => {
     if (Array.isArray(breederMales) && breederMales.length) return breederMales;
     return snakes.filter(isMaleSnake);
@@ -16465,9 +17088,9 @@ function PairingInlineCard({
     hatchDate: lifecycle.hatchDate,
     startDate: edit.startDate || ''
   }), [lifecycle.clutchDate, lifecycle.preLayDate, lifecycle.ovulationDate, lifecycle.hatchDate, edit.startDate]);
-  const startDisplay = edit.startDate ? formatDateForDisplay(edit.startDate) : '—';
+  const startDisplay = edit.startDate ? formatDateForDisplay(edit.startDate) : missingValueLabel;
   const endSource = lifecycle.hatchDate || (edit?.hatch?.recorded ? edit?.hatch?.date : '') || lifecycle.clutchDate || '';
-  const endDisplay = endSource ? formatDateForDisplay(endSource) : '—';
+  const endDisplay = endSource ? formatDateForDisplay(endSource) : missingValueLabel;
 
   const handleGenerateAppointments = useCallback(() => {
     setEdit(d => {
@@ -16563,8 +17186,8 @@ function PairingInlineCard({
       eggsValue = Number.isFinite(parsed) ? parsed : eggsValue;
     }
     try {
-      const maleGenetics = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : '—';
-      const femaleGenetics = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : '—';
+      const maleGenetics = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
+      const femaleGenetics = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
       await exportClutchCardToPdf({
         clutchNumber: pairingNumber,
         clutchDate,
@@ -16613,10 +17236,10 @@ function PairingInlineCard({
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">{clutchCardTitleLabel} #{pairingNumber} — {cycleYear || '—'}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">{clutchCardTitleLabel} #{pairingNumber} - {cycleYear || missingValueLabel}</div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1">
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
-              <span aria-hidden="true">›</span>
+              <span aria-hidden="true">{'\u203A'}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-800">
@@ -16667,7 +17290,7 @@ function PairingInlineCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-semibold leading-tight text-sm sm:text-base">
-            <div className="truncate">{clutchTitleLabel} #{pairingNumber} — {cycleYear || '—'}</div>
+            <div className="truncate">{clutchTitleLabel} #{pairingNumber} - {cycleYear || missingValueLabel}</div>
           </div>
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
             <div>
@@ -17147,7 +17770,7 @@ function computePairingGenetics(male, female) {
       gene: displayName,
       inheritance,
       outcomes: calculation.outcomes,
-      notes: notesParts.join(' — ')
+      notes: notesParts.join(' ג€” ')
     });
   }
 
@@ -17638,6 +18261,113 @@ function computeBreedingCycleYear({ clutchDate, preLayDate, ovulationDate, hatch
   return 'Unknown';
 }
 
+function diffCalendarDays(fromDate, toDate) {
+  if (!fromDate || !toDate) return null;
+  const from = parseYmd(localYMD(fromDate instanceof Date ? fromDate : new Date(fromDate)));
+  const to = parseYmd(String(toDate).slice(0, 10));
+  if (!from || !to) return null;
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.round((to.getTime() - from.getTime()) / dayMs);
+}
+
+function describeDaysUntil(days) {
+  if (typeof days !== 'number' || !Number.isFinite(days)) return '';
+  if (days === 0) return 'Due today';
+  if (days === 1) return 'Due tomorrow';
+  if (days > 1) return `Due in ${days} days`;
+  if (days === -1) return '1 day overdue';
+  return `${Math.abs(days)} days overdue`;
+}
+
+function getDashboardUrgency(days, hasTarget) {
+  if (!hasTarget || typeof days !== 'number' || !Number.isFinite(days)) return 'none';
+  if (days < 0) return 'overdue';
+  if (days <= 3) return 'due';
+  if (days <= 7) return 'soon';
+  return 'upcoming';
+}
+
+function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
+  if (!pairing) return null;
+  const normalized = withPairingLifecycleDefaults({ ...pairing });
+  const derived = getBreedingCycleDerived(normalized);
+  const female = snakeById(snakes, normalized.femaleId);
+  const male = snakeById(snakes, normalized.maleId);
+  const locks = (normalized.appointments || [])
+    .filter(ap => ap && ap.lockObserved && (ap.lockDate || ap.lockLoggedAt || ap.date))
+    .map(ap => getLockRecordedDate(ap) || ap.date || '')
+    .filter(Boolean)
+    .sort();
+  const latestLockDate = locks.length ? locks[locks.length - 1] : '';
+
+  let stage = 'Pairing active';
+  let stageKey = 'active';
+  let nextStage = 'Watch for lock or ovulation';
+  let targetDate = '';
+  let actionLabel = 'Open details';
+
+  if (derived.hatchedRecorded) {
+    stage = 'Hatched';
+    stageKey = 'hatched';
+    nextStage = 'Cycle complete';
+    targetDate = derived.hatchDate || '';
+  } else if (derived.clutchRecorded) {
+    stage = 'Clutch laid';
+    stageKey = 'clutch';
+    nextStage = 'Expected hatch';
+    targetDate = derived.hatchTarget || '';
+    actionLabel = 'Log hatch';
+  } else if (derived.preLayObserved) {
+    stage = 'Pre-lay shed';
+    stageKey = 'preLay';
+    nextStage = 'Expected egg laying';
+    targetDate = derived.eggLayingTarget || '';
+    actionLabel = 'Log clutch';
+  } else if (derived.ovulationObserved) {
+    stage = 'Ovulation';
+    stageKey = 'ovulation';
+    nextStage = 'Expected pre-lay shed';
+    targetDate = derived.preLayWindowTarget || '';
+    actionLabel = 'Log pre-lay shed';
+  } else if (latestLockDate) {
+    stage = 'Locks observed';
+    stageKey = 'locks';
+    nextStage = 'Watch for ovulation';
+    actionLabel = 'Log ovulation';
+  }
+
+  const daysUntil = targetDate ? diffCalendarDays(today, targetDate) : null;
+  const urgency = getDashboardUrgency(daysUntil, !!targetDate);
+  const cycleYear = computeBreedingCycleYear({
+    clutchDate: derived.clutchDate,
+    preLayDate: derived.preLayDate,
+    ovulationDate: derived.ovulationDate,
+    hatchDate: derived.hatchDate,
+    startDate: normalized.startDate || '',
+  });
+
+  return {
+    id: normalized.id,
+    pairing: normalized,
+    label: resolvePairingLabel(normalized, female, male),
+    female,
+    male,
+    femaleName: female?.name || normalized.femaleId || 'Female',
+    maleName: male?.name || normalized.maleId || 'Male',
+    stage,
+    stageKey,
+    nextStage,
+    targetDate,
+    targetLabel: targetDate ? formatDateForDisplay(targetDate) : '',
+    daysUntil,
+    countdownLabel: targetDate ? describeDaysUntil(daysUntil) : 'No target date yet',
+    urgency,
+    actionLabel,
+    latestLockLabel: latestLockDate ? formatDateForDisplay(latestLockDate) : '',
+    cycleYear,
+  };
+}
+
 function summarizePairingCycleForFemale(pairing) {
   if (!pairing) return null;
   const normalized = withPairingLifecycleDefaults({ ...pairing });
@@ -17676,7 +18406,7 @@ function summarizePairingCycleForFemale(pairing) {
   const primaryDate = clutchDate || preLayDate || ovulationDate || hatchDate || normalized.startDate || '';
   const primaryTimestamp = primaryDate && !Number.isNaN(Date.parse(primaryDate)) ? Date.parse(primaryDate) : null;
 
-  const label = normalized.label || `${normalized.femaleId || 'Female'} × ${normalized.maleId || 'Male'}`;
+  const label = normalized.label || `${normalized.femaleId || 'Female'} ֳ— ${normalized.maleId || 'Male'}`;
 
   return {
     id: normalized.id || `${normalized.femaleId || 'female'}-${normalized.maleId || 'male'}-${year}`,
@@ -17759,7 +18489,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
   const hatchedLabel = t('clutch.hatched', { defaultValue: 'HATCHED' });
   const notYetLabel = t('clutch.notYet', { defaultValue: 'Not yet' });
   const notesFieldLabel = t('clutch.notesField', { defaultValue: 'Notes' });
-  const totalEggsTemplate = t('clutch.totalEggs', { defaultValue: 'Total eggs laid:— (fertile + slugs)' });
+  const missingValueLabel = '\u2014';
 
   const derived = lifecycle || getBreedingCycleDerived(edit);
   const {
@@ -17798,12 +18528,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
   }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue]);
 
   const totalEggsText = useMemo(() => {
-    const countLabel = typeof totalEggsDisplay === 'number' ? String(totalEggsDisplay) : '—';
-    if (totalEggsTemplate.includes('—')) {
-      return totalEggsTemplate.replace('—', countLabel);
-    }
-    return `${totalEggsTemplate} ${countLabel}`;
-  }, [totalEggsDisplay, totalEggsTemplate]);
+    return t('clutch.totalEggs', {
+      defaultValue: 'Total eggs laid: {{count}} (fertile + slugs)',
+      count: typeof totalEggsDisplay === 'number' ? String(totalEggsDisplay) : missingValueLabel,
+    });
+  }, [missingValueLabel, t, totalEggsDisplay]);
 
   const hatchLimitForUi = typeof fertileEggsNumber === 'number'
     ? fertileEggsNumber
@@ -18034,7 +18763,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
               <div className="flex-1 text-center space-y-1">
                 <div className="text-[12px] font-semibold uppercase tracking-wide text-neutral-500">{ovulationLabel}</div>
                 <div className="text-neutral-700 text-[13px]">
-                  {ovulationDate ? formatDateForDisplay(ovulationDate) : '—'}
+                  {ovulationDate ? formatDateForDisplay(ovulationDate) : missingValueLabel}
                 </div>
                 {ovulationObserved && edit?.ovulation?.notes ? (
                   <div className="text-[11px] text-neutral-500 leading-snug max-h-12 overflow-hidden mx-auto">
@@ -18065,7 +18794,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
               <div className="flex-1 text-center space-y-1">
                 <div className="text-[12px] font-semibold uppercase tracking-wide text-neutral-500">{preLayLabel}</div>
                 <div className="text-neutral-700 text-[13px]">
-                  {preLayDate ? formatDateForDisplay(preLayDate) : '—'}
+                  {preLayDate ? formatDateForDisplay(preLayDate) : missingValueLabel}
                 </div>
                 {preLayObserved && Number.isFinite(edit?.preLayShed?.intervalFromOvulation) && (
                   <div className="text-[11px] text-neutral-500">
@@ -18151,7 +18880,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 <div className="flex items-center gap-2 text-[11px] text-neutral-500">
                   <span>{expectedOnLabel}</span>
                   <span className="text-neutral-700 font-medium">
-                    {hatchTarget ? formatDateForDisplay(hatchTarget) : '—'}
+                    {hatchTarget ? formatDateForDisplay(hatchTarget) : missingValueLabel}
                   </span>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -19000,7 +19729,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           currentLine = txt;
           currentY = y;
         } else {
-          // same line — append with a space separator
+          // same line ג€” append with a space separator
           currentLine = (currentLine ? currentLine + ' ' : '') + txt;
         }
       }
@@ -19329,6 +20058,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   });
   const [activeMaleId, setActiveMaleId] = useState(null);
   const [googleSyncFeedback, setGoogleSyncFeedback] = useState(null);
+  const [todayYmd, setTodayYmd] = useState(() => localYMD(new Date()));
 
   const snakesById = useMemo(() => Object.fromEntries(snakes.map(s => [s.id, s])), [snakes]);
   const malesById = useMemo(() => Object.fromEntries(snakes.filter(s=>s.sex==='M').map(m=>[m.id,m])), [snakes]);
@@ -19352,6 +20082,13 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
 
   const grid = buildMonthGrid(year, month);
 
+  useEffect(() => {
+    const updateToday = () => setTodayYmd(localYMD(new Date()));
+    updateToday();
+    const intervalId = window.setInterval(updateToday, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const handleToggleFilter = useCallback((key) => {
     setFilters(prev => ({
       ...prev,
@@ -19364,14 +20101,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   }, []);
 
   const filterDefinitions = useMemo(() => ([
-    { key: 'feeds', label: 'Feeds' },
-    { key: 'weights', label: 'Weights' },
-    { key: 'cleanings', label: 'Cleaning' },
-    { key: 'sheds', label: 'Sheds' },
-    { key: 'meds', label: 'Meds' },
-    { key: 'breeding', label: 'Breeding appointments' },
-    { key: 'clutch', label: 'Clutch actions' },
-  ]), []);
+    { key: 'feeds', label: t('calendar.filters.feeds', { defaultValue: 'Feeds' }) },
+    { key: 'weights', label: t('calendar.filters.weights', { defaultValue: 'Weights' }) },
+    { key: 'cleanings', label: t('calendar.filters.cleanings', { defaultValue: 'Cleaning' }) },
+    { key: 'sheds', label: t('calendar.filters.sheds', { defaultValue: 'Sheds' }) },
+    { key: 'meds', label: t('calendar.filters.meds', { defaultValue: 'Meds' }) },
+    { key: 'breeding', label: t('calendar.filters.breeding', { defaultValue: 'Breeding appointments' }) },
+    { key: 'clutch', label: t('calendar.filters.clutch', { defaultValue: 'Clutch actions' }) },
+  ]), [t]);
 
   const adjustMonth = useCallback((delta) => {
     let nextMonth = month + delta;
@@ -19570,7 +20307,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!start || !end) return null;
     const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    return startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
+    return startLabel === endLabel ? startLabel : `${startLabel} ג€” ${endLabel}`;
   }, [calendarEventBounds]);
 
   const pairingReminders = useMemo(() => {
@@ -19597,8 +20334,8 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       const femaleName = femalesById[event.femaleId]?.name || event.femaleId || 'Female';
       const pairingLabel = pairingsById[event.pairingId]?.label || '';
       let whenLabel = eventDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-      if (diffDays === 0) whenLabel = 'Today';
-      else if (diffDays === 1) whenLabel = 'Tomorrow';
+      if (diffDays === 0) whenLabel = t('calendar.today', { defaultValue: 'Today' });
+      else if (diffDays === 1) whenLabel = t('calendar.tomorrow', { defaultValue: 'Tomorrow' });
 
       reminders.push({
         id: `${event.pairingId || event.maleId || 'pairing'}-${event.date}`,
@@ -19614,7 +20351,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       if (a.diffDays !== b.diffDays) return a.diffDays - b.diffDays;
       return a.maleName.localeCompare(b.maleName);
     });
-  }, [events, malesById, femalesById, pairingsById, PAIRING_REMINDER_LOOKAHEAD_DAYS]);
+  }, [events, malesById, femalesById, pairingsById, PAIRING_REMINDER_LOOKAHEAD_DAYS, t]);
 
   const gatherEventsForMonths = useCallback((startYear, startMonth, monthsCount) => {
     const aggregated = [];
@@ -19691,29 +20428,29 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   }, [googleCalendars]);
 
   const googleSelectedCalendarName = useMemo(() => {
-    if (!googleCalendarId) return 'Google Calendar';
+    if (!googleCalendarId) return t('calendar.googleCalendar', { defaultValue: 'Google Calendar' });
     const match = googleCalendarOptions.find(calendar => calendar.id === googleCalendarId);
     if (match) return match.summary;
-    if (googleCalendarId === 'primary') return 'Primary calendar';
-    return 'Google Calendar';
-  }, [googleCalendarId, googleCalendarOptions]);
+    if (googleCalendarId === 'primary') return t('calendar.primary', { defaultValue: 'Primary calendar' });
+    return t('calendar.googleCalendar', { defaultValue: 'Google Calendar' });
+  }, [googleCalendarId, googleCalendarOptions, t]);
 
   const googleSyncButtonLabel = useMemo(() => {
-    if (googleIsSyncing) return 'Syncing...';
+    if (googleIsSyncing) return t('calendar.syncing', { defaultValue: 'Syncing...' });
     const count = googleSyncCandidates.length;
-    if (!count) return 'Sync to Google';
-    return `Sync ${count} event${count === 1 ? '' : 's'}`;
-  }, [googleIsSyncing, googleSyncCandidates]);
+    if (!count) return t('calendar.syncToGoogle', { defaultValue: 'Sync to Google' });
+    return t('calendar.syncEvents', { count, defaultValue: 'Sync {{count}} event(s)' });
+  }, [googleIsSyncing, googleSyncCandidates, t]);
 
   const googleSyncButtonDisabled = !googleSignedIn || googleIsSyncing || !googleSyncCandidates.length;
   const googleConnectDisabled = !googleReady || googleLoadingCalendars || googleIsSyncing;
 
   const googleRangeSyncButtonLabel = useMemo(() => {
-    if (googleIsSyncing) return 'Syncing...';
+    if (googleIsSyncing) return t('calendar.syncing', { defaultValue: 'Syncing...' });
     const count = googleRangeSyncCandidates.length;
-    if (!count) return `Sync ${MONTH_RANGE_TO_SYNC} months`;
-    return `Sync ${count} events (${MONTH_RANGE_TO_SYNC} mo)`;
-  }, [googleIsSyncing, googleRangeSyncCandidates, MONTH_RANGE_TO_SYNC]);
+    if (!count) return t('calendar.syncMonths', { count: MONTH_RANGE_TO_SYNC, defaultValue: 'Sync {{count}} months' });
+    return t('calendar.syncEventsMonths', { count, months: MONTH_RANGE_TO_SYNC, defaultValue: 'Sync {{count}} events ({{months}} mo)' });
+  }, [googleIsSyncing, googleRangeSyncCandidates, MONTH_RANGE_TO_SYNC, t]);
 
   const googleRangeSyncButtonDisabled = !googleSignedIn || googleIsSyncing || !googleRangeSyncCandidates.length;
 
@@ -19745,9 +20482,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   const handleExportGoogleCalendar = useCallback(async () => {
     if (!filteredEvents.length) {
       if (typeof showAppAlert === 'function') {
-        await showAppAlert("No calendar entries to export for the current view. Try adjusting your filters or refreshing first.");
+        await showAppAlert(t('calendar.noCurrentEntriesExport', { defaultValue: 'No calendar entries to export for the current view. Try adjusting your filters or refreshing first.' }));
       } else {
-        console.warn("No calendar entries to export for the current view. Try adjusting your filters or refreshing first.");
+        console.warn(t('calendar.noCurrentEntriesExport', { defaultValue: 'No calendar entries to export for the current view. Try adjusting your filters or refreshing first.' }));
       }
       return;
     }
@@ -19760,9 +20497,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     });
     if (!icsText) {
       if (typeof showAppAlert === 'function') {
-        await showAppAlert("Unable to build the calendar export. Please try again.");
+        await showAppAlert(t('calendar.buildExportFailed', { defaultValue: 'Unable to build the calendar export. Please try again.' }));
       } else {
-        console.warn("Unable to build the calendar export. Please try again.");
+        console.warn(t('calendar.buildExportFailed', { defaultValue: 'Unable to build the calendar export. Please try again.' }));
       }
       return;
     }
@@ -19777,7 +20514,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(url), 0);
-  }, [filteredEvents, pairingsById, snakesById, malesById, femalesById, month, year, showAppAlert]);
+  }, [filteredEvents, pairingsById, snakesById, malesById, femalesById, month, year, showAppAlert, t]);
 
   const handleExportFullCalendar = useCallback(async () => {
     const { start, end } = calendarEventBounds;
@@ -19799,9 +20536,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     const rangeEvents = gatherEventsForMonths(startYear, startMonth, monthsCount).filter(passesFilters);
     if (!rangeEvents.length) {
       if (typeof showAppAlert === 'function') {
-        await showAppAlert('No calendar entries matched your current filters for the full range. Adjust filters and try again.');
+        await showAppAlert(t('calendar.noFullRangeEntries', { defaultValue: 'No calendar entries matched your current filters for the full range. Adjust filters and try again.' }));
       } else {
-        console.warn('No calendar entries matched your current filters for the full range. Adjust filters and try again.');
+        console.warn(t('calendar.noFullRangeEntries', { defaultValue: 'No calendar entries matched your current filters for the full range. Adjust filters and try again.' }));
       }
       return;
     }
@@ -19832,9 +20569,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     });
     if (!icsText) {
       if (typeof showAppAlert === 'function') {
-        await showAppAlert('Unable to build the calendar export. Please try again.');
+        await showAppAlert(t('calendar.buildExportFailed', { defaultValue: 'Unable to build the calendar export. Please try again.' }));
       } else {
-        console.warn('Unable to build the calendar export. Please try again.');
+        console.warn(t('calendar.buildExportFailed', { defaultValue: 'Unable to build the calendar export. Please try again.' }));
       }
       return;
     }
@@ -19858,9 +20595,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     const appointmentEvents = filteredEvents.filter(ev => ev.type === 'pairing' && (typeof ev.spanOffset !== 'number' || ev.spanOffset === 0));
     if (!appointmentEvents.length) {
       if (typeof showAppAlert === 'function') {
-        await showAppAlert('No breeding appointments to export for the current view.');
+        await showAppAlert(t('calendar.noAppointmentsExport', { defaultValue: 'No breeding appointments to export for the current view.' }));
       } else {
-        console.warn('No breeding appointments to export for the current view.');
+        console.warn(t('calendar.noAppointmentsExport', { defaultValue: 'No breeding appointments to export for the current view.' }));
       }
       return;
     }
@@ -19875,8 +20612,8 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     const rows = sorted.map(ev => {
       const pairing = pairingsById[ev.pairingId];
       const appt = pairing?.appointments?.find(ap => ap.id === ev.apptId);
-      const maleName = malesById[ev.maleId]?.name || ev.maleId || '—';
-      const femaleName = femalesById[ev.femaleId]?.name || ev.femaleId || '—';
+      const maleName = malesById[ev.maleId]?.name || ev.maleId || '-';
+      const femaleName = femalesById[ev.femaleId]?.name || ev.femaleId || '-';
       const startDisplay = formatDateForDisplay(ev.date) || ev.date;
       const startDateObj = parseYmd(ev.date);
       const endDateObj = startDateObj ? cloneAndShiftDays(startDateObj, 2) : null;
@@ -19889,7 +20626,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       let lockNotes = '';
       if (ev.lockObserved) {
         const lockDateValue = ev.lockDate || ev.lockLoggedAt || appt?.lockDate || appt?.lockLoggedAt || appt?.date || null;
-        lockNotes = lockDateValue ? buildLockLogLine(lockDateValue) : 'Lock observed';
+        lockNotes = lockDateValue ? buildLockLogLine(lockDateValue) : t('calendar.lockObserved', { defaultValue: 'Lock observed' });
         detailParts.push(lockNotes);
       }
       return {
@@ -19898,20 +20635,20 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
         male: maleName,
         female: femaleName,
         pairingLabel: pairing?.label || '',
-        notes: detailParts.join(' • '),
+        notes: detailParts.join(' ג€¢ '),
         lockObserved: lockNotes,
       };
     });
 
     const dataset = {
       columns: [
-        { key: 'startDate', label: 'Start date' },
-        { key: 'endDate', label: 'End date' },
-        { key: 'male', label: 'Male' },
-        { key: 'female', label: 'Female' },
-        { key: 'pairingLabel', label: 'Pairing' },
-        { key: 'notes', label: 'Notes' },
-        { key: 'lockObserved', label: 'Lock observed' },
+        { key: 'startDate', label: t('calendar.sheet.startDate', { defaultValue: 'Start date' }) },
+        { key: 'endDate', label: t('calendar.sheet.endDate', { defaultValue: 'End date' }) },
+        { key: 'male', label: t('pairing.male', { defaultValue: 'Male' }) },
+        { key: 'female', label: t('pairing.female', { defaultValue: 'Female' }) },
+        { key: 'pairingLabel', label: t('snakeEdit.pairingLabel', { defaultValue: 'Pairing' }) },
+        { key: 'notes', label: t('pairing.notes', { defaultValue: 'Notes' }) },
+        { key: 'lockObserved', label: t('calendar.lockObserved', { defaultValue: 'Lock observed' }) },
       ],
       rows,
     };
@@ -19920,17 +20657,17 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     try {
       await exportDatasetToXlsx(dataset, {
         fileName: `breeding-appointments-${monthCode}.xlsx`,
-        sheetName: 'Appointments',
+        sheetName: t('calendar.sheet.appointments', { defaultValue: 'Appointments' }),
       });
     } catch (error) {
       console.error('Failed to export appointment sheet', error);
       if (typeof showAppAlert === 'function') {
-        await showAppAlert('Unable to export the appointments sheet. Please try again.');
+        await showAppAlert(t('calendar.appointmentSheetExportFailed', { defaultValue: 'Unable to export the appointments sheet. Please try again.' }));
       } else {
-        console.warn('Unable to export the appointments sheet. Please try again.');
+        console.warn(t('calendar.appointmentSheetExportFailed', { defaultValue: 'Unable to export the appointments sheet. Please try again.' }));
       }
     }
-  }, [filteredEvents, malesById, femalesById, pairingsById, month, year, showAppAlert]);
+  }, [filteredEvents, malesById, femalesById, pairingsById, month, year, showAppAlert, t]);
 
   const handleSyncGoogleCalendar = useCallback(async () => {
     if (!googleSupported) {
@@ -19946,14 +20683,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       }
       setGoogleSyncFeedback({
         kind: 'info',
-        text: 'Connect Google Calendar and try syncing again.',
+        text: t('calendar.connectGoogleRetry', { defaultValue: 'Connect Google Calendar and try syncing again.' }),
       });
       return;
     }
     if (!googleSyncCandidates.length) {
       setGoogleSyncFeedback({
         kind: 'info',
-        text: 'No events in the current view to sync.',
+        text: t('calendar.noEventsToSync', { defaultValue: 'No events in the current view to sync.' }),
       });
       return;
     }
@@ -19961,12 +20698,12 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     try {
       setGoogleSyncFeedback({
         kind: 'info',
-        text: 'Syncing events to Google Calendar...',
+        text: t('calendar.syncingEvents', { defaultValue: 'Syncing events to Google Calendar...' }),
       });
       const { synced = 0 } = await syncGoogleEvents(googleSyncCandidates);
       setGoogleSyncFeedback({
         kind: 'success',
-        text: `Synced ${synced} event${synced === 1 ? '' : 's'} to ${googleSelectedCalendarName}.`,
+        text: t('calendar.syncedEventsTo', { count: synced, calendar: googleSelectedCalendarName, defaultValue: 'Synced {{count}} event(s) to {{calendar}}.' }),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -19981,24 +20718,24 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: 'Google Calendar sync is not available. Add VITE_GOOGLE_CLIENT_ID and reload.',
+        text: t('calendar.syncNotConfigured', { defaultValue: 'Google Calendar sync is not available. Add VITE_GOOGLE_CLIENT_ID and reload.' }),
       });
       return;
     }
     if (!googleReady) {
       setGoogleSyncFeedback({
         kind: 'info',
-        text: 'Preparing Google services. Please try again in a moment.',
+        text: t('calendar.preparingGoogleRetry', { defaultValue: 'Preparing Google services. Please try again in a moment.' }),
       });
       return;
     }
     if (googleConnectDisabled) return;
     setGoogleSyncFeedback({
       kind: 'info',
-      text: 'Opening Google sign-in...',
+      text: t('calendar.openingGoogleSignIn', { defaultValue: 'Opening Google sign-in...' }),
     });
     googleSignIn();
-  }, [googleSupported, googleReady, googleConnectDisabled, googleSignIn]);
+  }, [googleSupported, googleReady, googleConnectDisabled, googleSignIn, t]);
 
   const handleSyncGoogleCalendarRange = useCallback(async () => {
     if (!googleSupported) {
@@ -20014,14 +20751,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       }
       setGoogleSyncFeedback({
         kind: 'info',
-        text: 'Connect Google Calendar and try syncing again.',
+        text: t('calendar.connectGoogleRetry', { defaultValue: 'Connect Google Calendar and try syncing again.' }),
       });
       return;
     }
     if (!googleRangeSyncCandidates.length) {
       setGoogleSyncFeedback({
         kind: 'info',
-        text: `No breeding appointments found between ${rangeStartLabel} and ${rangeEndLabel}.`,
+        text: t('calendar.syncRangeEmpty', { start: rangeStartLabel, end: rangeEndLabel, defaultValue: 'No breeding appointments found between {{start}} and {{end}}.' }),
       });
       return;
     }
@@ -20029,12 +20766,12 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     try {
       setGoogleSyncFeedback({
         kind: 'info',
-        text: `Syncing ${googleRangeSyncCandidates.length} breeding appointments from ${rangeStartLabel} to ${rangeEndLabel}...`,
+        text: t('calendar.syncingRange', { count: googleRangeSyncCandidates.length, start: rangeStartLabel, end: rangeEndLabel, defaultValue: 'Syncing {{count}} breeding appointments from {{start}} to {{end}}...' }),
       });
       const { synced = 0 } = await syncGoogleEvents(googleRangeSyncCandidates);
       setGoogleSyncFeedback({
         kind: 'success',
-        text: `Synced ${synced} event${synced === 1 ? '' : 's'} from ${rangeStartLabel} to ${rangeEndLabel} into ${googleSelectedCalendarName}.`,
+        text: t('calendar.syncedRangeTo', { count: synced, start: rangeStartLabel, end: rangeEndLabel, calendar: googleSelectedCalendarName, defaultValue: 'Synced {{count}} event(s) from {{start}} to {{end}} into {{calendar}}.' }),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -20058,28 +20795,28 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   return (
     <div className="bg-white border rounded-2xl shadow-sm">
       <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
-        <div className="font-semibold mr-2">Monthly calendar</div>
+        <div className="font-semibold mr-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
             onClick={() => adjustMonth(-1)}
-            aria-label="Previous month"
+            aria-label={t('calendar.previousMonth', { defaultValue: 'Previous month' })}
           >
-            ?
+            ‹
           </button>
           <select className="border rounded-lg px-2 py-1 text-sm" value={month} onChange={e=>setMonth(Number(e.target.value))}>
             {Array.from({length:12},(_,i)=>i).map(m=>(
-              <option key={m} value={m}>{new Date(2000,m,1).toLocaleString('en',{month:'long'})}</option>
+              <option key={m} value={m}>{t(`calendar.months.${m}`, { defaultValue: new Date(2000,m,1).toLocaleString('en',{month:'long'}) })}</option>
             ))}
           </select>
           <button
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
             onClick={() => adjustMonth(1)}
-            aria-label="Next month"
+            aria-label={t('calendar.nextMonth', { defaultValue: 'Next month' })}
           >
-            ?
+            ›
           </button>
         </div>
         <div className="flex items-center gap-1">
@@ -20087,18 +20824,18 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
             onClick={() => adjustYear(-1)}
-            aria-label="Previous year"
+            aria-label={t('calendar.previousYear', { defaultValue: 'Previous year' })}
           >
-            ?
+            ‹
           </button>
           <input className="border rounded-lg px-2 py-1 w-24" type="number" value={year} onChange={e=>setYear(Number(e.target.value)||year)} />
           <button
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
             onClick={() => adjustYear(1)}
-            aria-label="Next year"
+            aria-label={t('calendar.nextYear', { defaultValue: 'Next year' })}
           >
-            ?
+            ›
           </button>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -20107,7 +20844,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
               <>
                 <div className="flex items-center gap-2 border rounded-lg px-2 py-1 bg-white text-xs">
                   <div className="leading-tight">
-                    <div className="font-semibold text-[11px]">{googleUser?.name || googleUser?.email || 'Google account'}</div>
+                    <div className="font-semibold text-[11px]">{googleUser?.name || googleUser?.email || t('calendar.googleAccount', { defaultValue: 'Google account' })}</div>
                     {googleUser?.email ? <div className="text-[10px] text-neutral-600">{googleUser.email}</div> : null}
                   </div>
                   <button
@@ -20116,7 +20853,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     onClick={googleSignOut}
                     disabled={googleIsSyncing}
                   >
-                    Sign out
+                    {t('calendar.signOut', { defaultValue: 'Sign out' })}
                   </button>
                 </div>
                 <select
@@ -20124,9 +20861,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   value={googleCalendarId || 'primary'}
                   onChange={(e) => setGoogleCalendarId(e.target.value)}
                   disabled={googleLoadingCalendars || googleIsSyncing}
-                  title={`Sync target: ${googleSelectedCalendarName}`}
+                  title={t('calendar.syncTarget', { name: googleSelectedCalendarName, defaultValue: 'Sync target: {{name}}' })}
                 >
-                  <option value="primary">Primary calendar</option>
+                  <option value="primary">{t('calendar.primary', { defaultValue: 'Primary calendar' })}</option>
                   {googleCalendarOptions
                     .filter(calendar => calendar.id !== 'primary')
                     .map(calendar => (
@@ -20140,7 +20877,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true), googleSyncButtonDisabled ? 'opacity-60 cursor-not-allowed' : '')}
                   onClick={handleSyncGoogleCalendar}
                   disabled={googleSyncButtonDisabled}
-                  title={googleSyncCandidates.length ? `Ready to sync ${googleSyncCandidates.length} event${googleSyncCandidates.length === 1 ? '' : 's'}` : undefined}
+                  title={googleSyncCandidates.length ? t('calendar.syncReady', { count: googleSyncCandidates.length, defaultValue: 'Ready to sync {{count}} event(s)' }) : undefined}
                 >
                   {googleSyncButtonLabel}
                 </button>
@@ -20150,8 +20887,8 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   onClick={handleSyncGoogleCalendarRange}
                   disabled={googleRangeSyncButtonDisabled}
                   title={googleRangeSyncCandidates.length
-                    ? `Sync ${googleRangeSyncCandidates.length} breeding event${googleRangeSyncCandidates.length === 1 ? '' : 's'} spanning ${rangeStartLabel} to ${rangeEndLabel}`
-                    : `No breeding appointments found between ${rangeStartLabel} and ${rangeEndLabel}`}
+                    ? t('calendar.syncRangeReady', { count: googleRangeSyncCandidates.length, start: rangeStartLabel, end: rangeEndLabel, defaultValue: 'Sync {{count}} breeding event(s) spanning {{start}} to {{end}}' })
+                    : t('calendar.syncRangeEmpty', { start: rangeStartLabel, end: rangeEndLabel, defaultValue: 'No breeding appointments found between {{start}} and {{end}}' })}
                 >
                   {googleRangeSyncButtonLabel}
                 </button>
@@ -20163,35 +20900,35 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 onClick={handleConnectGoogleCalendar}
                 disabled={googleConnectDisabled}
               >
-                {googleReady ? 'Connect Google Calendar' : 'Preparing Google...'}
+                {googleReady ? t('calendar.connectGoogle', { defaultValue: 'Connect Google Calendar' }) : t('calendar.preparingGoogle', { defaultValue: 'Preparing Google...' })}
               </button>
             )
           ) : (
             <div className="text-[11px] text-neutral-500 max-w-xs">
-              Set <code>VITE_GOOGLE_CLIENT_ID</code> to enable Google Calendar sync.
+              {t('calendar.setClientIdPrefix', { defaultValue: 'Set' })} <code>VITE_GOOGLE_CLIENT_ID</code> {t('calendar.setClientIdSuffix', { defaultValue: 'to enable Google Calendar sync.' })}
             </div>
           )}
           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>
-            Refresh
+            {t('calendar.refresh', { defaultValue: 'Refresh' })}
           </button>
           <button
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportAppointmentSheet}
           >
-            Export appointment sheet
+            {t('calendar.exportAppointmentSheet', { defaultValue: 'Export appointment sheet' })}
           </button>
           <button
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportGoogleCalendar}
           >
-            Export Google Calendar
+            {t('calendar.exportGoogle', { defaultValue: 'Export Google Calendar' })}
           </button>
           <button
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportFullCalendar}
-            title={fullExportRangeLabel ? `Download appointments from ${fullExportRangeLabel}` : 'Download all appointments'}
+            title={fullExportRangeLabel ? t('calendar.downloadAppointmentsFrom', { range: fullExportRangeLabel, defaultValue: 'Download appointments from {{range}}' }) : t('calendar.downloadAllAppointments', { defaultValue: 'Download all appointments' })}
           >
-            Export Full Calendar
+            {t('calendar.exportFull', { defaultValue: 'Export Full Calendar' })}
           </button>
         </div>
       </div>
@@ -20213,14 +20950,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
 
       {pairingReminders.length ? (
         <div className="px-4 py-2 border-b bg-amber-50 text-amber-800 text-xs">
-          <div className="text-[11px] uppercase tracking-wide font-semibold text-amber-700">Upcoming pairings</div>
+          <div className="text-[11px] uppercase tracking-wide font-semibold text-amber-700">{t('calendar.upcomingPairings', { defaultValue: 'Upcoming pairings' })}</div>
           <ul className="mt-1 space-y-1">
             {pairingReminders.map(reminder => (
               <li key={reminder.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
-                <span className="font-medium">Pair {reminder.maleName} with {reminder.femaleName}</span>
+                <span className="font-medium">{t('calendar.pairWith', { male: reminder.maleName, female: reminder.femaleName, defaultValue: 'Pair {{male}} with {{female}}' })}</span>
                 <span className="text-[11px] text-amber-600">
                   {reminder.whenLabel}
-                  {reminder.pairingLabel ? ` — ${reminder.pairingLabel}` : ''}
+                  {reminder.pairingLabel ? ` ג€” ${reminder.pairingLabel}` : ''}
                 </span>
               </li>
             ))}
@@ -20246,14 +20983,35 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
 
       <div className="p-4">
         <div className="grid grid-cols-7 text-xs font-medium text-neutral-500">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=> <div key={d} className="p-2">{d}</div>)}
+          {['sun','mon','tue','wed','thu','fri','sat'].map(d=> <div key={d} className="p-2">{t(`calendar.weekdays.${d}`, { defaultValue: d.slice(0, 1).toUpperCase() + d.slice(1) })}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-px bg-neutral-200 rounded-lg overflow-hidden">
           {grid.map((cell, i) => {
+            const cellDate = ymd(cell.year, cell.month, cell.day);
+            const isToday = cellDate === todayYmd;
             return (
-              <div key={i} className={cx("min-h[110px] bg-white p-2", cell.current ? "" : "bg-neutral-50")}>
-                <div className="text-xs text-neutral-500">{cell.day}</div>
-                {filteredEvents.filter(e => e.date === ymd(cell.year, cell.month, cell.day)).map((e, idx) => {
+              <div
+                key={i}
+                className={cx(
+                  "min-h-[110px] bg-white p-2",
+                  cell.current ? "" : "bg-neutral-50",
+                  isToday && "relative z-10 bg-sky-50 ring-2 ring-sky-400 ring-inset"
+                )}
+                aria-current={isToday ? "date" : undefined}
+                title={isToday ? t('calendar.today', { defaultValue: 'Today' }) : undefined}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div
+                    className={cx(
+                      "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-medium",
+                      isToday ? "bg-sky-500 text-white shadow-sm" : "text-neutral-500"
+                    )}
+                  >
+                    {cell.day}
+                  </div>
+                  {isToday ? <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{t('calendar.today', { defaultValue: 'Today' })}</div> : null}
+                </div>
+                {filteredEvents.filter(e => e.date === cellDate).map((e, idx) => {
                   if (e.type === 'activity') {
                     const pal = activityPalettes[e.activityKey] || { bg: '#efefef', border: '#ddd' };
                     const s = snakes.find(x => x.id === e.snakeId);
@@ -20274,7 +21032,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         if (sizeText) detailParts.push(sizeText);
                         if (gramsText) detailParts.push(gramsText);
                         if (methodText) detailParts.push(methodText);
-                        detailText = detailParts.join(' — ');
+                        detailText = detailParts.join(' ג€” ');
                       }
                       const feedLabel = en.refused ? t("logs.refused", { defaultValue: "Refused feed" }) : (detailText || t("logs.feed", { defaultValue: "Feed" }));
                       return (
@@ -20284,7 +21042,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                           style={{ backgroundColor: pal.bg, borderColor: pal.border }}
                         >
                           <div className="truncate">
-                            <div className="font-medium truncate">{s?.name || e.snakeId} — {feedLabel}</div>
+                            <div className="font-medium truncate">{s?.name || e.snakeId} ג€” {feedLabel}</div>
                             {en.refused && detailText ? (
                               <div className="text-[11px] text-neutral-500 truncate">{detailText}</div>
                             ) : null}
@@ -20309,10 +21067,10 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     const maleName = malesById[e.maleId]?.name || e.maleId;
                     const femaleName = femalesById[e.femaleId]?.name || e.femaleId;
                     const stageLabels = {
-                      ovulation: 'Ovulation observed',
-                      preLay: 'Pre-lay shed',
-                      clutch: 'Clutch laid',
-                      hatch: 'Hatch recorded',
+                      ovulation: t('calendar.stages.ovulation', { defaultValue: 'Ovulation observed' }),
+                      preLay: t('calendar.stages.preLay', { defaultValue: 'Pre-lay shed' }),
+                      clutch: t('calendar.stages.clutch', { defaultValue: 'Clutch laid' }),
+                      hatch: t('calendar.stages.hatch', { defaultValue: 'Hatch recorded' }),
                     };
                     const stageStyles = {
                       ovulation: 'border-sky-200 bg-sky-50',
@@ -20325,17 +21083,17 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       const eggs = p?.clutch?.eggsTotal;
                       const slugs = p?.clutch?.slugs;
                       const parts = [];
-                      if (typeof eggs === 'number' && Number.isFinite(eggs)) parts.push(`Eggs: ${eggs}`);
-                      if (typeof slugs === 'number' && Number.isFinite(slugs)) parts.push(`Slugs: ${slugs}`);
-                      if (parts.length) detail = parts.join(' — ');
+                      if (typeof eggs === 'number' && Number.isFinite(eggs)) parts.push(t('calendar.eggsCount', { count: eggs, defaultValue: 'Eggs: {{count}}' }));
+                      if (typeof slugs === 'number' && Number.isFinite(slugs)) parts.push(t('calendar.slugsCount', { count: slugs, defaultValue: 'Slugs: {{count}}' }));
+                      if (parts.length) detail = parts.join(' ג€” ');
                       else if (p?.clutch?.notes) detail = p.clutch.notes;
                     } else if (e.stage === 'hatch') {
                       const hatchCount = p?.hatch?.hatchedCount;
-                      if (typeof hatchCount === 'number' && Number.isFinite(hatchCount)) detail = `Hatched: ${hatchCount}`;
+                      if (typeof hatchCount === 'number' && Number.isFinite(hatchCount)) detail = t('calendar.hatchedCount', { count: hatchCount, defaultValue: 'Hatched: {{count}}' });
                       else if (p?.hatch?.notes) detail = p.hatch.notes;
                     } else if (e.stage === 'preLay') {
                       if (p?.preLayShed?.intervalFromOvulation && Number.isFinite(p.preLayShed.intervalFromOvulation)) {
-                        detail = `${p.preLayShed.intervalFromOvulation} days after ovulation`;
+                        detail = t('calendar.daysAfterOvulation', { count: p.preLayShed.intervalFromOvulation, defaultValue: '{{count}} days after ovulation' });
                       } else if (p?.preLayShed?.notes) {
                         detail = p.preLayShed.notes;
                       }
@@ -20348,13 +21106,13 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
                         className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
                       >
-                        <div className="font-medium truncate">{stageLabels[e.stage] || 'Clutch action'}</div>
-                        <div className="text-[11px] text-neutral-500 truncate">{maleName} × {femaleName}</div>
+                        <div className="font-medium truncate">{stageLabels[e.stage] || t('calendar.filters.clutch', { defaultValue: 'Clutch action' })}</div>
+                        <div className="text-[11px] text-neutral-500 truncate">{maleName} ֳ— {femaleName}</div>
                         {detail ? <div className="text-[11px] text-neutral-500 truncate">{detail}</div> : null}
                       </button>
                     );
                   }
-                  // pairing span event — show Male × Female and make clickable
+                  // pairing span event ג€” show Male ֳ— Female and make clickable
                   const p = pairings.find(pp=>pp.id===e.pairingId);
                   const maleName = malesById[e.maleId]?.name || e.maleId;
                   const femaleName = femalesById[e.femaleId]?.name || e.femaleId;
@@ -20378,7 +21136,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         style={{ backgroundColor: maleColors.dot }}
                       ></span>
                       <div className="truncate">
-                        <div className="font-medium truncate">{maleName} × {femaleName}</div>
+                        <div className="font-medium truncate">{maleName} ֳ— {femaleName}</div>
                         {p?.label ? <div className="text-[11px] text-neutral-500 truncate">{p.label}</div> : null}
                         {lockLine ? <div className="text-[11px] text-emerald-600 truncate">{lockLine}</div> : null}
                         {additionalNote ? <div className="text-[11px] text-neutral-500 truncate">{additionalNote}</div> : null}
@@ -20417,7 +21175,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
               </button>
             );
           })}
-          {!legend.length && <div className="text-xs text-neutral-500">No appointments in this view.</div>}
+          {!legend.length && <div className="text-xs text-neutral-500">{t('calendar.noAppointmentsView', { defaultValue: 'No appointments in this view.' })}</div>}
         </div>
       </div>
     </div>
@@ -20472,7 +21230,7 @@ function prepareCalendarEventExport(event, context) {
   if (event.type === 'pairing') {
     if (typeof event.spanOffset === 'number' && event.spanOffset > 0) return null;
     durationDays = 3;
-    summary = `Breeding: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
+    summary = `Breeding: ${maleName || 'Male'} ֳ— ${femaleName || 'Female'}`;
     if (pairing?.label) descriptionParts.push(`Project: ${pairing.label}`);
     const lockRecordedAt = event.lockDate || event.lockLoggedAt || null;
     if (event.lockObserved && lockRecordedAt) descriptionParts.push(buildLockLogLine(lockRecordedAt));
@@ -20484,7 +21242,7 @@ function prepareCalendarEventExport(event, context) {
       clutch: 'Clutch laid',
       hatch: 'Hatch recorded',
     };
-    summary = `${stageLabels[event.stage] || 'Clutch event'}: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
+    summary = `${stageLabels[event.stage] || 'Clutch event'}: ${maleName || 'Male'} ֳ— ${femaleName || 'Female'}`;
     const clutchDetail = describeClutchStageDetail(event.stage, pairing);
     if (clutchDetail) descriptionParts.push(clutchDetail);
   } else if (event.type === 'activity') {
@@ -20909,7 +21667,19 @@ function ScrollToTopButton({ theme = 'blue', className }) {
       )}
       aria-label="Scroll to top"
     >
-      <span className="text-xl leading-none">?</span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 19V5" />
+        <path d="m6 11 6-6 6 6" />
+      </svg>
     </button>
   );
 }
@@ -20919,6 +21689,7 @@ function addDaysYmd(dateStr, days) {
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+
 
 
 

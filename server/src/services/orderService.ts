@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { calculateOrderBreakdown, toPublicBreakdown } from "./pricingService";
 import { getActivePricing, listCatalog } from "./labConfigService";
+import { buildNextOrderNumber, ensureSharedOrderNumbers } from "./orderNumberService";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
 
@@ -30,8 +31,18 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
   } as unknown as Record<string, unknown>;
 
   const created = await prisma.$transaction(async (tx: any) => {
+    await ensureSharedOrderNumbers(tx);
+    const existingOrders = await tx.shedTestOrder.findMany({
+      select: { orderNumber: true },
+    });
+    const orderNumber = buildNextOrderNumber(
+      existingOrders.map((entry: { orderNumber?: string | null }) => entry.orderNumber),
+      new Date()
+    );
+
     const order = await tx.shedTestOrder.create({
       data: {
+        orderNumber,
         breederId,
         totalAnimals: breakdown.animalCount,
         pricingTier: breakdown.tier,
@@ -94,6 +105,8 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
 };
 
 export const listOrdersForUser = async (user: { id: string; role: "admin" | "lab" | "breeder" }) => {
+  await ensureSharedOrderNumbers();
+
   if (user.role === "admin" || user.role === "lab") {
     return prisma.shedTestOrder.findMany({
       include: {
@@ -119,6 +132,8 @@ export const getOrderByIdForUser = async (
   orderId: string,
   user: { id: string; role: "admin" | "lab" | "breeder" }
 ) => {
+  await ensureSharedOrderNumbers();
+
   const order = await prisma.shedTestOrder.findUnique({
     where: { id: orderId },
     include: {
@@ -149,10 +164,95 @@ export const updateOrderStatus = async (
   const existing = await prisma.shedTestOrder.findUnique({ where: { id: orderId } });
   if (!existing) throw new HttpError(404, "Order not found.");
 
+  // When samples are marked as received, record that a payment request is now due.
+  const extraData: Record<string, unknown> = {};
+  if (status === "received" && existing.status !== "received") {
+    extraData.paymentRequestedAt = new Date();
+  }
+
   return prisma.shedTestOrder.update({
     where: { id: orderId },
-    data: { status },
+    data: { status, ...extraData },
   });
+};
+
+export const updateOrderPayment = async (
+  orderId: string,
+  input: { paymentStatus: "pending" | "invoiced" | "paid" | "waived"; paymentRef?: string },
+  user: { role: "admin" | "lab" | "breeder" }
+) => {
+  if (user.role === "breeder") {
+    throw new HttpError(403, "Breeder users cannot update payment status.");
+  }
+
+  const existing = await prisma.shedTestOrder.findUnique({ where: { id: orderId } });
+  if (!existing) throw new HttpError(404, "Order not found.");
+
+  const PAYMENT_STATUSES = ["pending", "invoiced", "paid", "waived"] as const;
+  if (!PAYMENT_STATUSES.includes(input.paymentStatus as any)) {
+    throw new HttpError(400, `Invalid payment status. Allowed: ${PAYMENT_STATUSES.join(", ")}`);
+  }
+
+  return prisma.shedTestOrder.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus: input.paymentStatus as any,
+      paidAt: input.paymentStatus === "paid" ? new Date() : existing.paidAt,
+      paymentRef: input.paymentRef !== undefined ? input.paymentRef : existing.paymentRef,
+    },
+    include: {
+      breeder: { select: { id: true, email: true, fullName: true, role: true } },
+      animals: { include: { tests: true } },
+      results: { orderBy: { updatedAt: "desc" } },
+    },
+  });
+};
+
+export const deleteOrderById = async (
+  orderId: string,
+  user: { role: "admin" | "lab" | "breeder" }
+) => {
+  if (user.role === "breeder") {
+    throw new HttpError(403, "Breeder users cannot delete lab orders.");
+  }
+
+  const existing = await prisma.shedTestOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      animals: {
+        include: {
+          tests: {
+            select: { id: true },
+          },
+        },
+      },
+      results: {
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!existing) {
+    throw new HttpError(404, "Order not found.");
+  }
+
+  const deletedAnimals = existing.animals.length;
+  const deletedAnimalTests = existing.animals.reduce(
+    (sum, animal) => sum + animal.tests.length,
+    0
+  );
+  const deletedResults = existing.results.length;
+
+  await prisma.shedTestOrder.delete({
+    where: { id: orderId },
+  });
+
+  return {
+    deletedOrderId: existing.id,
+    deletedAnimals,
+    deletedAnimalTests,
+    deletedResults,
+  };
 };
 
 export const deleteAllOrders = async (user: { role: "admin" | "lab" | "breeder" }) => {

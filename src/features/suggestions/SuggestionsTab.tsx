@@ -206,6 +206,14 @@ const DEFAULT_WEIGHTS = {
 
 const formatPercent = (value, digits = 0) => `${(value * 100).toFixed(digits)}%`;
 
+const useAdvisorTranslation = () => {
+  const { t: translate } = useTranslation("advisor");
+  return useCallback(
+    (key, options = {}) => translate(String(key).replace(/^advisor\./, ""), options),
+    [translate]
+  );
+};
+
 const clampNumber = (value, min, max, fallback) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -547,7 +555,7 @@ export const SuggestionsTab = ({
   onIgnoreSuggestion,
   onExportPairingsByMale,
 }) => {
-  const { t } = useTranslation();
+  const t = useAdvisorTranslation();
   const defaultGoalName = t("advisor.goal.defaultName", { defaultValue: "Custom goal" });
   const initialPrimaryGoal = initialGoals[0];
   const initialGoalName = initialPrimaryGoal?.name ?? "";
@@ -1195,7 +1203,8 @@ export const SuggestionsTab = ({
             <h2 className="text-lg font-semibold text-neutral-900">{t("advisor.title", { defaultValue: "Breeding Advisor" })}</h2>
             <p className="text-sm text-neutral-600">
               <Trans
-                i18nKey="advisor.description"
+                ns="advisor"
+                i18nKey="description"
                 components={{ strong: <strong /> }}
                 defaults="We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal."
               />
@@ -1290,7 +1299,8 @@ export const SuggestionsTab = ({
         {!suggestions.length && !loading && !error && (
           <div className="rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
             <Trans
-              i18nKey="advisor.cards.readyCallout"
+              ns="advisor"
+              i18nKey="cards.readyCallout"
               components={{ strong: <strong /> }}
               defaults="Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
             />

@@ -1,36 +1,36 @@
-﻿{
+{
 	"quickAdd": {
-		"date": "Date",
-		"feedType": "Feed type",
-		"size": "Size",
-		"selectPlaceholder": "Select",
-		"customSizePlaceholder": "Custom size",
-		"weight": "Weight (g)",
+		"date": "Datum",
+		"feedType": "Futterart",
+		"size": "Größe",
+		"selectPlaceholder": "Auswählen",
+		"customSizePlaceholder": "Benutzerdefinierte Größe",
+		"weight": "Gewicht (g)",
 		"form": "Form",
-		"methodDetailsPlaceholder": "Method details",
-		"gramsLabel": "Grams",
-		"recentProgress": "Recent progress",
-		"medicationDrug": "Drug",
-		"medicationDose": "Dose",
-		"notes": "Notes",
+		"methodDetailsPlaceholder": "Methodendetails",
+		"gramsLabel": "Gramm",
+		"recentProgress": "Aktueller Fortschritt",
+		"medicationDrug": "Medikament",
+		"medicationDose": "Dosis",
+		"notes": "Notizen",
 		"feedOptions": {
-			"mouse": "Mouse",
-			"rat": "Rat",
-			"chick": "Chick",
-			"other": "Other"
+			"mouse": "Maus",
+			"rat": "Ratte",
+			"chick": "Küken",
+			"other": "Sonstiges"
 		},
 		"sizeOptions": {
 			"pinky": "pinky",
 			"fuzzy": "fuzzy",
-			"medium": "medium",
+			"medium": "mittel",
 			"adult": "adult",
-			"other": "Other"
+			"other": "Sonstiges"
 		},
 		"formOptions": {
-			"live": "Live",
-			"fresh": "Freshly killed",
-			"frozen": "Frozen/thawed",
-			"other": "Other"
+			"live": "Lebendfutter",
+			"fresh": "Frisch getötet",
+			"frozen": "Gefroren/aufgetaut",
+			"other": "Sonstiges"
 		}
 	}
 }

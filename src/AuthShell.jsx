@@ -5,6 +5,7 @@ import LabAppShell from "./features/lab/LabAppShell.jsx";
 import { AppearanceProvider } from "./contexts/AppearanceContext.jsx";
 import { SharedBackendProvider } from "./contexts/SharedBackendContext.jsx";
 import SharedBackendBanner from "./components/SharedBackendBanner.jsx";
+import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 
 const normalizeHashPath = (hashValue) => {
   const raw = String(hashValue || "").replace(/^#/, "").trim();
@@ -37,10 +38,12 @@ export default function AppShell() {
   return (
     <AppearanceProvider>
       <SharedBackendProvider>
-        <SharedBackendBanner />
-        <AuthGate>
-          <AppSectionRouter />
-        </AuthGate>
+        <BatchOrderProvider>
+          <SharedBackendBanner />
+          <AuthGate>
+            <AppSectionRouter />
+          </AuthGate>
+        </BatchOrderProvider>
       </SharedBackendProvider>
     </AppearanceProvider>
   );

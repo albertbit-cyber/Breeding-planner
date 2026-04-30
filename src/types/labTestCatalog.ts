@@ -65,5 +65,7 @@ export type UpdateLabAvailableTestInput = {
   priceCents?: number;
   currency?: string;
   allowedPriorities?: Array<"routine" | "priority" | "urgent">;
+  isActive?: boolean;
+  isVisibleToBreeder?: boolean;
   sortOrder?: number;
 };

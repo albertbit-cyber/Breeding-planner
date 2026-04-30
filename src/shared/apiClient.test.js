@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createOrder,
+  fetchOrders,
   getHealth,
   getAuthToken,
+  getRefreshToken,
   login,
   resetSharedBackendState,
   setAuthToken,
+  setRefreshToken,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -76,6 +79,97 @@ describe("shared api client", () => {
 
     expect(getSharedBackendSnapshot().state).toBe("unauthorized");
     expect(getAuthToken()).toBe("");
+  });
+
+  it("refreshes an expired access token and retries the protected request", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("expired-access");
+    setRefreshToken("refresh-token-1");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const headers = new Headers(options.headers || {});
+
+      if (normalizedUrl.endsWith("/auth/refresh")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ token: "fresh-access", refreshToken: "refresh-token-2" }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/lab/orders")) {
+        if (headers.get("Authorization") === "Bearer fresh-access") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ orders: [{ id: "order-1" }] }),
+          };
+        }
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ message: "Missing or invalid token" }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchOrders()).resolves.toEqual({ orders: [{ id: "order-1" }] });
+    expect(getAuthToken()).toBe("fresh-access");
+    expect(getRefreshToken()).toBe("refresh-token-2");
+    expect(getSharedBackendSnapshot().authStatus).toBe("authorized");
+  });
+
+  it("reuses one refresh request when multiple protected requests fail together", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("expired-access");
+    setRefreshToken("refresh-token-1");
+
+    let refreshCalls = 0;
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const headers = new Headers(options.headers || {});
+
+      if (normalizedUrl.endsWith("/auth/refresh")) {
+        refreshCalls += 1;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ token: "fresh-access", refreshToken: "refresh-token-2" }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/lab/orders")) {
+        if (headers.get("Authorization") === "Bearer fresh-access") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ orders: [] }),
+          };
+        }
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ message: "Missing or invalid token" }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(Promise.all([fetchOrders(), fetchOrders()])).resolves.toEqual([
+      { orders: [] },
+      { orders: [] },
+    ]);
+    expect(refreshCalls).toBe(1);
+    expect(getAuthToken()).toBe("fresh-access");
+    expect(getRefreshToken()).toBe("refresh-token-2");
   });
 
   it("does not mark login failures as disconnected or unauthorized backend state", async () => {

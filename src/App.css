@@ -237,6 +237,13 @@
   text-align: left;
 }
 
+.auth-helper-copy {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
 .auth-field {
   display: flex;
   flex-direction: column;
@@ -303,6 +310,43 @@
   color: #b3261e;
   margin-top: 0.5rem;
   font-size: 0.85rem;
+}
+
+.auth-success {
+  color: #166534;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.auth-inline-link-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.15rem;
+}
+
+.auth-secondary-action {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.auth-login-form .text-button,
+.auth-secondary-action .text-button {
+  border: none;
+  background: none;
+  color: #2563eb !important;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.auth-login-form .text-button:hover,
+.auth-secondary-action .text-button:hover {
+  transform: none;
+  box-shadow: none;
+  text-decoration: underline;
 }
 
 .auth-multiselect {
@@ -440,6 +484,44 @@
   color: #39206b;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header-search-shell {
+  position: relative;
+}
+
+.header-search-clear {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 47, 124, 0.16) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: rgba(57, 32, 107, 0.72) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.header-search-clear:hover {
+  border-color: rgba(82, 47, 124, 0.28) !important;
+  background: #ffffff !important;
+  color: #39206b !important;
+}
+
+.header-search-clear:focus {
+  outline: none;
+  border-color: #c298ff !important;
+  box-shadow: 0 0 0 3px rgba(194, 152, 255, 0.25);
 }
 
 .header-search-input::placeholder {

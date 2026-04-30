@@ -9,33 +9,12 @@ import {
 } from "../../db/labStore";
 import type { Certificate, TestOrder, TestResult } from "../../types/lab";
 import type { LabCertificateTemplateData } from "../../types/labCertificate";
+import { buildLabCertificateTemplateData } from "./certificateTemplate";
+import { loadBreederInfo, loadSnakeById } from "./labelProfileService";
 import { renderLabCertificatePdf } from "../../utils/pdf/labCertificatePdf";
 import { generateQrToken } from "../../utils/labToken";
 import type { ServiceActor } from "./testOrderService";
 import { emitShedWorkflowEvent } from "./workflowEvents";
-
-type StoredSnake = {
-  id: string;
-  name?: string;
-  code?: string;
-  displayId?: string;
-  externalId?: string;
-};
-
-type BreederInfo = {
-  name?: string;
-  businessName?: string;
-  email?: string;
-  phone?: string;
-  city?: string;
-  country?: string;
-};
-
-type ElectronBridge = {
-  loadData?: () => Promise<Record<string, unknown> | null>;
-};
-
-const BREEDER_INFO_STORAGE_KEY = "breedingPlannerBreederInfo";
 const FINAL_RESULT_STATUSES = new Set<string>(["completed", "reviewed", "released"]);
 
 const canIssueCertificateForStatus = (status: string): boolean =>
@@ -45,12 +24,6 @@ const canAccessOrder = (actor: ServiceActor, order: TestOrder): boolean => {
   if (actor.role === "admin") return true;
   if (actor.role === "lab_staff") return Boolean(actor.labId && actor.labId === order.labId);
   return order.requestedByUserId === actor.userId || order.breederUserId === actor.userId;
-};
-
-const readBridge = (): ElectronBridge | null => {
-  if (typeof window === "undefined") return null;
-  const w = window as typeof window & { electronAPI?: ElectronBridge };
-  return w.electronAPI || null;
 };
 
 const makeCertificateId = (): string => {
@@ -66,57 +39,6 @@ const makeCertificateNumber = (order: TestOrder): string => {
   return `PH-GT-${stamp}-${suffix}`;
 };
 
-const loadSnakeById = async (animalId: string): Promise<StoredSnake | null> => {
-  const bridge = readBridge();
-  if (bridge?.loadData) {
-    const payload = await bridge.loadData();
-    const snakes = Array.isArray(payload?.snakes) ? payload?.snakes : [];
-    const match = snakes.find(
-      (entry) => entry && typeof entry === "object" && String((entry as Record<string, unknown>).id ?? "") === animalId
-    );
-    return (match as StoredSnake) || null;
-  }
-
-  if (typeof localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem("breedingPlannerSnakes");
-      const rows = raw ? JSON.parse(raw) : [];
-      const snakes = Array.isArray(rows) ? rows : [];
-      const match = snakes.find((entry) => String(entry?.id ?? "") === animalId);
-      return (match as StoredSnake) || null;
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-};
-
-const loadBreederInfo = async (): Promise<BreederInfo> => {
-  const bridge = readBridge();
-  if (bridge?.loadData) {
-    const payload = await bridge.loadData();
-    const info = payload?.breederInfo;
-    if (info && typeof info === "object") {
-      return info as BreederInfo;
-    }
-  }
-
-  if (typeof localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem(BREEDER_INFO_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === "object") {
-        return parsed as BreederInfo;
-      }
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
-};
-
 const toTemplateData = async (
   order: TestOrder,
   result: TestResult,
@@ -127,34 +49,28 @@ const toTemplateData = async (
 ): Promise<LabCertificateTemplateData> => {
   const [snake, breeder] = await Promise.all([loadSnakeById(order.animalId), loadBreederInfo()]);
 
-  return {
-    templateVersion: "v1",
+  return buildLabCertificateTemplateData({
+    order,
+    result,
     certificateId,
     certificateNumber,
     verificationCode,
-    issueDateIso: issueDateIso || new Date().toISOString(),
-    verificationUrl: `https://proherper.example/verify/${encodeURIComponent(verificationCode)}`,
-    orderId: order.id,
-    labId: order.labId,
-    snake: {
-      id: order.animalId,
-      name: snake?.name,
-      proHerperId: snake?.code || snake?.displayId || snake?.externalId,
-    },
+    issueDateIso,
     breeder: {
       name: breeder.name,
       businessName: breeder.businessName,
       email: breeder.email,
       phone: breeder.phone,
+      street: breeder.street,
+      addressLine1: breeder.addressLine1,
+      addressLine2: breeder.addressLine2,
       city: breeder.city,
+      stateOrRegion: breeder.stateOrRegion,
+      postalCode: breeder.postalCode,
       country: breeder.country,
     },
-    testedGenes: Array.isArray(order.requestedTests) ? order.requestedTests : [],
-    confirmedResults: (Array.isArray(result.findings) ? result.findings : []).map((row) => ({
-      marker: row.marker,
-      outcome: row.outcome,
-    })),
-  };
+    snake,
+  });
 };
 
 const ensureExistingCertificateLinks = (
@@ -201,7 +117,7 @@ export const issueCertificateForCompletedOrder = async (
   const certificateNumber = makeCertificateNumber(order);
   const templateData = await toTemplateData(order, result, certificateId, certificateNumber, verificationCode);
 
-  const artifact = await renderLabCertificatePdf(templateData, { includeQr: true });
+  const artifact = await renderLabCertificatePdf(templateData, { includeQr: false });
 
   const created = createCertificateRecord(
     {
@@ -336,7 +252,7 @@ export const getBreederCertificateArtifact = async (
     verificationCode,
     certificate.issuedAt
   );
-  const artifact = await renderLabCertificatePdf(template, { includeQr: true });
+  const artifact = await renderLabCertificatePdf(template, { includeQr: false });
 
   const safeFileStem = String(certificate.certificateNumber || certificate.id)
     .replace(/[^a-zA-Z0-9_-]+/g, "-")

@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { createLabApiClient } from "../api/client";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
+import { useAutoRefetch } from "../hooks/useAutoRefetch";
+import InlineResultEntry, { ELIGIBLE_STATUSES as RESULT_ENTRY_STATUSES } from "../components/InlineResultEntry";
+import { getCurrentAppRole, canAccessLabApp } from "../auth/roleGuard";
 import {
-  TEST_ORDER_STATUS_LABELS,
-  TEST_ORDER_STATUS_TONES,
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
 } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
 
 const toneClass = {
   neutral: "border-neutral-300 bg-neutral-50 text-neutral-700",
@@ -23,16 +25,17 @@ const formatDateTime = (value) => {
 };
 
 const parseIntakeFromHistory = (history = []) => {
-  const sampleReceivedEntry = [...history]
-    .reverse()
-    .find((entry) => entry?.toStatus === "sample_received");
+  const reversed = [...history].reverse();
+  const sampleReceivedEntry = reversed.find(
+    (entry) => entry?.toStatus === "received" || entry?.toStatus === "sample_received"
+  );
 
   if (!sampleReceivedEntry?.reason) {
     return {
       condition: null,
       notes: "",
       receivedAt: sampleReceivedEntry?.changedAt || null,
-      approvedAt: [...history].reverse().find((entry) => entry?.toStatus === "intake_approved")?.changedAt || null,
+      approvedAt: reversed.find((entry) => entry?.toStatus === "in_progress" || entry?.toStatus === "intake_approved")?.changedAt || null,
     };
   }
 
@@ -44,7 +47,7 @@ const parseIntakeFromHistory = (history = []) => {
       condition: null,
       notes: "",
       receivedAt: sampleReceivedEntry?.changedAt || null,
-      approvedAt: [...history].reverse().find((entry) => entry?.toStatus === "intake_approved")?.changedAt || null,
+      approvedAt: reversed.find((entry) => entry?.toStatus === "in_progress" || entry?.toStatus === "intake_approved")?.changedAt || null,
     };
   }
 
@@ -54,13 +57,27 @@ const parseIntakeFromHistory = (history = []) => {
     condition: conditionRaw || null,
     notes: notesRaw || "",
     receivedAt: sampleReceivedEntry?.changedAt || null,
-    approvedAt: [...history].reverse().find((entry) => entry?.toStatus === "intake_approved")?.changedAt || null,
+    approvedAt: reversed.find((entry) => entry?.toStatus === "in_progress" || entry?.toStatus === "intake_approved")?.changedAt || null,
   };
 };
 
+const formatFindingSummary = (findings = []) =>
+  (Array.isArray(findings) ? findings : [])
+    .map((entry) => `${entry.marker}: ${formatLabOutcomeLabel(entry.outcome)}`)
+    .join("; ");
+
+const base64ToBlob = (base64, mimeType) => {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mimeType || "application/pdf" });
+};
+
 const StatusBadge = ({ status }) => {
-  const label = TEST_ORDER_STATUS_LABELS[status] || status;
-  const tone = TEST_ORDER_STATUS_TONES[status] || "neutral";
+  const label = ORDER_STATUS_LABELS[status] || status;
+  const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
       {label}
@@ -90,17 +107,34 @@ export default function OrderDetailsPage({ orderId }) {
   const [actionLoading, setActionLoading] = useState("");
   const [actionError, setActionError] = useState("");
   const [allowedStatuses, setAllowedStatuses] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [certificateAction, setCertificateAction] = useState({ loading: false, error: "" });
+  const [paymentAction, setPaymentAction] = useState({ loading: false, error: "" });
 
   const normalizedOrderId = useMemo(() => String(orderId || "").trim(), [orderId]);
 
-  const loadPage = async () => {
+  // Track whether the initial load has completed so background auto-refreshes
+  // don't set loading=true, which would unmount InlineResultEntry and wipe
+  // any unsaved result entry form state.
+  const hasLoadedOnce = useRef(false);
+
+  // Reset the "loaded" flag whenever the order being viewed changes.
+  useEffect(() => {
+    hasLoadedOnce.current = false;
+  }, [normalizedOrderId]);
+
+  const loadAll = useCallback(async () => {
     if (!normalizedOrderId) {
       setError("Order ID is missing from route.");
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    // Only show the full-page loading skeleton on the very first load.
+    // Background refreshes (polling / focus / event) must NOT toggle loading,
+    // because that unmounts InlineResultEntry and erases unsaved form input.
+    if (!hasLoadedOnce.current) setLoading(true);
     setError("");
     try {
       const api = createLabApiClient();
@@ -126,6 +160,7 @@ export default function OrderDetailsPage({ orderId }) {
       setOrderOutcome(outcomeData || null);
       setResolvedSample(sampleData || null);
       setAllowedStatuses(Array.isArray(nextStatuses) ? nextStatuses : []);
+      hasLoadedOnce.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load order details.");
       setOrder(null);
@@ -136,12 +171,12 @@ export default function OrderDetailsPage({ orderId }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadPage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedOrderId]);
+
+  const { refetch: refetchPage } = useAutoRefetch(loadAll, {
+    intervalMs: 20_000,
+    events: ["lab:test-order-updated"],
+  });
 
   const paymentStatus = order?.paymentStatus || "pending";
   const intakeInfo = parseIntakeFromHistory(history);
@@ -159,7 +194,7 @@ export default function OrderDetailsPage({ orderId }) {
         status: nextStatus,
         reason: String(actionReason || "").trim() || undefined,
       });
-      await loadPage();
+      await loadAll();
       setActionReason("");
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Status update failed.");
@@ -168,9 +203,84 @@ export default function OrderDetailsPage({ orderId }) {
     }
   };
 
-  const goToResultEntry = () => {
-    if (typeof window === "undefined") return;
-    window.location.hash = "/lab/result-entry";
+  const currentRole = getCurrentAppRole();
+  const isLabOrAdmin = canAccessLabApp(currentRole);
+  const canEnterResults = isLabOrAdmin && order && RESULT_ENTRY_STATUSES.has(order.status);
+  const canDeleteOrder = isLabOrAdmin && Boolean(order?.id);
+
+  const handleDeleteOrder = async () => {
+    if (!order?.id || deleteLoading) return;
+
+    const confirmed = typeof window === "undefined"
+      ? true
+      : window.confirm(
+        "Delete this lab order permanently?\n\nThe order will be removed from the lab portal and breeder history.\n\nThis cannot be undone."
+      );
+
+    if (!confirmed) return;
+
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      const api = createLabApiClient();
+      await api.deleteLabOrder(order.id);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("lab:test-order-updated", {
+          detail: { orderId: order.id, deleted: true },
+        }));
+        window.location.hash = "/lab/incoming-orders";
+      }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete order.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleMarkAsPaid = async (newStatus) => {
+    if (!order?.id || paymentAction.loading) return;
+    setPaymentAction({ loading: true, error: "" });
+    try {
+      const api = createLabApiClient();
+      await api.updateLabOrderPaymentStatus({ orderId: order.id, paymentStatus: newStatus });
+      await loadAll();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("lab:test-order-updated", { detail: { orderId: order.id } }));
+      }
+    } catch (err) {
+      setPaymentAction({ loading: false, error: err instanceof Error ? err.message : "Payment update failed." });
+      return;
+    }
+    setPaymentAction({ loading: false, error: "" });
+  };
+
+  const handleCertificateAction = async (mode) => {
+    if (!order?.id || certificateAction.loading) return;
+
+    setCertificateAction({ loading: true, error: "" });
+    try {
+      const api = createLabApiClient();
+      const artifact = await api.getBreederCertificateArtifact(order.id);
+      const blob = base64ToBlob(artifact.base64, artifact.mimeType);
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (mode === "download") {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = artifact.fileName || `${artifact.certificateNumber || "certificate"}.pdf`;
+        link.click();
+      } else {
+        window.open(blobUrl, "_blank", "noopener,noreferrer");
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+      setCertificateAction({ loading: false, error: "" });
+    } catch (err) {
+      setCertificateAction({
+        loading: false,
+        error: err instanceof Error ? err.message : "Unable to load certificate.",
+      });
+    }
   };
 
   return (
@@ -182,14 +292,27 @@ export default function OrderDetailsPage({ orderId }) {
             <p className="mt-1 text-sm text-neutral-600">Operational order view for intake, testing progression, and timeline review.</p>
             <div className="mt-2 text-xs font-mono text-neutral-500">Order route ID: {normalizedOrderId || "(missing)"}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm"
-              onClick={goToResultEntry}
-            >
-              Open Result Entry
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {order?.status === "completed" ? (
+              <button
+                type="button"
+                className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => handleCertificateAction("download")}
+                disabled={certificateAction.loading}
+              >
+                {certificateAction.loading ? "Loading..." : "Download Certificate PDF"}
+              </button>
+            ) : null}
+            {canDeleteOrder ? (
+              <button
+                type="button"
+                className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleDeleteOrder}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Deleting..." : "Delete Order"}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -200,6 +323,10 @@ export default function OrderDetailsPage({ orderId }) {
 
       {!loading && error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
+      ) : null}
+
+      {deleteError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{deleteError}</div>
       ) : null}
 
       {!loading && !error && order ? (
@@ -257,6 +384,60 @@ export default function OrderDetailsPage({ orderId }) {
               </dl>
             </section>
           </div>
+
+          {/* Payment section — lab/admin only */}
+          {isLabOrAdmin ? (
+            <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-neutral-900">Payment</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  {paymentStatus !== "paid" && paymentStatus !== "manually_approved" ? (
+                    <button
+                      type="button"
+                      className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                      disabled={paymentAction.loading}
+                      onClick={() => handleMarkAsPaid("paid")}
+                    >
+                      {paymentAction.loading ? "Saving..." : "Mark as Paid"}
+                    </button>
+                  ) : null}
+                  {paymentStatus === "paid" ? (
+                    <button
+                      type="button"
+                      className="rounded-xl border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                      disabled={paymentAction.loading}
+                      onClick={() => handleMarkAsPaid("pending")}
+                    >
+                      {paymentAction.loading ? "Saving..." : "Revert to Pending"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <dl className="mt-3 grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Status</dt>
+                  <dd><PaymentBadge paymentStatus={paymentStatus} /></dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Requested</dt>
+                  <dd>{formatDateTime(order.paymentRequestedAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Paid At</dt>
+                  <dd>{formatDateTime(order.paidAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Reference</dt>
+                  <dd className="font-mono text-xs">{order.paymentRef || "-"}</dd>
+                </div>
+              </dl>
+              {paymentAction.error ? (
+                <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {paymentAction.error}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -324,7 +505,7 @@ export default function OrderDetailsPage({ orderId }) {
                   >
                     {actionLoading === nextStatus
                       ? "Updating..."
-                      : `Set ${TEST_ORDER_STATUS_LABELS[nextStatus] || nextStatus}`}
+                      : `Set ${ORDER_STATUS_LABELS[nextStatus] || nextStatus}`}
                   </button>
                 )) : (
                   <div className="text-sm text-neutral-500">No further workflow actions available from current status.</div>
@@ -340,11 +521,17 @@ export default function OrderDetailsPage({ orderId }) {
                 <div className="text-xs uppercase tracking-wide text-neutral-500">Latest Result</div>
                 {orderOutcome?.latestResult ? (
                   <>
-                    <div className="mt-1 text-sm font-semibold text-neutral-900">{orderOutcome.latestResult.testCode}</div>
+                    <div className="mt-1 text-sm font-semibold text-neutral-900">
+                      {formatLabTestNumber(
+                        orderOutcome.latestResult.testCode,
+                        `${order.id}:${orderOutcome.latestResult.id}`,
+                        orderOutcome.latestResult.reportedAt || orderOutcome.latestResult.releasedAt || orderOutcome.latestResult.reviewedAt
+                      )}
+                    </div>
                     <div className="text-xs text-neutral-600">Status: {orderOutcome.latestResult.status}</div>
                     <div className="mt-2 text-sm text-neutral-700">{orderOutcome.latestResult.summary || "No summary provided."}</div>
                     <div className="mt-2 text-xs text-neutral-600">
-                      Findings: {(orderOutcome.latestResult.findings || []).map((f) => `${f.marker}: ${f.outcome}`).join("; ") || "-"}
+                      Findings: {formatFindingSummary(orderOutcome.latestResult.findings) || "-"}
                     </div>
                   </>
                 ) : (
@@ -360,6 +547,29 @@ export default function OrderDetailsPage({ orderId }) {
                     <div className="text-xs text-neutral-600">Status: {orderOutcome.certificate.status}</div>
                     <div className="text-xs text-neutral-600">Issued: {formatDateTime(orderOutcome.certificate.issuedAt)}</div>
                     <div className="mt-1 text-xs text-neutral-600">Verification: {orderOutcome.certificate.verificationCode || "-"}</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => handleCertificateAction("view")}
+                        disabled={certificateAction.loading}
+                      >
+                        {certificateAction.loading ? "Loading..." : "View Certificate"}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => handleCertificateAction("download")}
+                        disabled={certificateAction.loading}
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                    {certificateAction.error ? (
+                      <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        {certificateAction.error}
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <div className="mt-1 text-sm text-neutral-600">Certificate not issued yet.</div>
@@ -373,7 +583,13 @@ export default function OrderDetailsPage({ orderId }) {
                 <ul className="mt-2 space-y-1 text-sm text-neutral-700">
                   {orderOutcome.resultHistory.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-neutral-200 bg-white px-2 py-1">
-                      <span className="font-medium">{entry.testCode}</span>
+                      <span className="font-medium">
+                        {formatLabTestNumber(
+                          entry.testCode,
+                          `${order.id}:${entry.id}`,
+                          entry.reportedAt || entry.releasedAt || entry.reviewedAt
+                        )}
+                      </span>
                       <span className="text-xs text-neutral-500"> ({entry.status})</span>
                     </li>
                   ))}
@@ -409,6 +625,16 @@ export default function OrderDetailsPage({ orderId }) {
               </ol>
             )}
           </section>
+
+          {canEnterResults ? (
+            <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+              <h2 className="text-lg font-semibold text-sky-900">Enter Results</h2>
+              <p className="mt-1 text-sm text-sky-700">Enter gene results for this order. Save a draft to work in stages, or submit to finalise and notify the breeder.</p>
+              <div className="mt-4">
+                <InlineResultEntry orderId={order.id} onSaved={loadAll} />
+              </div>
+            </section>
+          ) : null}
         </>
       ) : null}
     </section>

@@ -6,6 +6,7 @@ import {
   fitQrToBox,
   fitTextToBox,
   LABEL_LAYOUT_CONSTANTS,
+  SAMPLE_LABEL_TESTS_FIT_OPTIONS,
 } from "../../features/lab/utils/labelLayout";
 import {
   getActiveLabelSize,
@@ -140,9 +141,12 @@ export const renderSampleLabelPage = async (
     maxLines: 2,
   });
   drawFittedText(doc, layout.testsBox, content.requestedTests, {
-    maxFontPt: clamp(Math.min(size.widthMm, size.heightMm) * 0.15, 6.5, 8.5),
-    minFontPt: 6,
-    maxLines: layout.variant === "side-by-side" ? 6 : 5,
+    maxFontPt: Math.min(
+      SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].maxFontPt,
+      clamp(Math.min(size.widthMm, size.heightMm) * 0.15, 6.5, 8.5)
+    ),
+    minFontPt: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].minFontPt,
+    maxLines: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].maxLines,
   });
 
   try {

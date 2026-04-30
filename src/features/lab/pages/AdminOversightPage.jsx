@@ -3,14 +3,13 @@ import { createLabApiClient } from "../api/client";
 import {
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
-  TEST_ORDER_STATUS_LABELS,
-  TEST_ORDER_STATUS_TONES,
 } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
 
 const SHARED_ADMIN_STATUSES = [
-  "order_created",
-  "sample_received",
-  "testing_in_progress",
+  "submitted",
+  "received",
+  "in_progress",
   "completed",
   "cancelled",
 ];
@@ -31,8 +30,8 @@ const formatDateTime = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const label = TEST_ORDER_STATUS_LABELS[status] || status;
-  const tone = TEST_ORDER_STATUS_TONES[status] || "neutral";
+  const label = ORDER_STATUS_LABELS[status] || status;
+  const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
       {label}
@@ -225,7 +224,7 @@ export default function AdminOversightPage() {
                         className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-xs hover:border-neutral-500 disabled:opacity-50"
                         onClick={() => handleAdminStatusCorrection(status)}
                       >
-                        {TEST_ORDER_STATUS_LABELS[status] || status}
+                        {ORDER_STATUS_LABELS[status] || status}
                       </button>
                     ))}
                   </div>

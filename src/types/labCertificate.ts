@@ -3,17 +3,41 @@ export interface CertificatePartyInfo {
   businessName?: string;
   email?: string;
   phone?: string;
+  street?: string;
+  addressLine1?: string;
+  addressLine2?: string;
   city?: string;
+  stateOrRegion?: string;
+  postalCode?: string;
   country?: string;
 }
 
-export interface CertificateFindingRow {
-  marker: string;
-  outcome: string;
+export interface CertificateLabIssuerInfo {
+  brandName: string;
+  ownerName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  cityLine?: string;
+  phone?: string;
+  email?: string;
+  iban?: string;
+  bic?: string;
+}
+
+export interface CertificateResultRow {
+  test: string;
+  phenotype: string;
+  testNumber: string;
+  testDate: string;
+  testCode: string;
+  snakeId: string;
+  morph?: string;
+  result: string;
+  genotype: string;
 }
 
 export interface LabCertificateTemplateData {
-  templateVersion: "v1";
+  templateVersion: "v2";
   certificateId: string;
   certificateNumber: string;
   verificationCode: string;
@@ -21,14 +45,16 @@ export interface LabCertificateTemplateData {
   verificationUrl?: string;
   orderId: string;
   labId: string;
+  issuer: CertificateLabIssuerInfo;
   snake: {
     id: string;
+    displayId: string;
     name?: string;
-    proHerperId?: string;
+    morph?: string;
   };
   breeder: CertificatePartyInfo;
-  testedGenes: string[];
-  confirmedResults: CertificateFindingRow[];
+  resultRows: CertificateResultRow[];
+  disclaimers: string[];
 }
 
 export interface RenderedCertificateArtifact {

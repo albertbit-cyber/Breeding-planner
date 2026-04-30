@@ -8,6 +8,7 @@ import {
   fitTextToBox,
   getPreviewScaleStyle,
   LABEL_LAYOUT_CONSTANTS,
+  SAMPLE_LABEL_TESTS_FIT_OPTIONS,
 } from "../utils/labelLayout";
 import { getActiveLabelSize, getLabelSafeArea } from "../utils/labelSizing";
 
@@ -66,7 +67,11 @@ export function SampleLabelPreview({ size, data, debug = false }) {
   const orderFit = fitTextToBox(content.orderId, layout.orderIdBox, { maxLines: 2, maxFontPt: 10, minFontPt: 6 });
   const animalFit = fitTextToBox(content.animalId, layout.animalIdBox, { maxLines: 2, maxFontPt: 11, minFontPt: 6 });
   const breederFit = fitTextToBox(content.breederName, layout.breederNameBox, { maxLines: 2, maxFontPt: 9, minFontPt: 6 });
-  const testsFit = fitTextToBox(content.requestedTests, layout.testsBox, { maxLines: layout.variant === "side-by-side" ? 6 : 5, maxFontPt: 8.5, minFontPt: 6 });
+  const testsFit = fitTextToBox(content.requestedTests, layout.testsBox, {
+    maxLines: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].maxLines,
+    maxFontPt: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].maxFontPt,
+    minFontPt: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].minFontPt,
+  });
   const qrPlacement = fitQrToBox(layout.qrBox);
 
   return (

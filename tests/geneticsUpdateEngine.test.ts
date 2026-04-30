@@ -59,7 +59,7 @@ describe("applyConfirmedResultGeneticsUpdate", () => {
         actor: makeActor(),
         order: makeOrder(),
         result: makeResult({
-          findings: [{ marker: "Monsoon", outcome: "positive" }],
+          findings: [{ marker: "Monsoon", outcome: "carrierDetected" }],
         }),
       },
       {
@@ -86,12 +86,12 @@ describe("applyConfirmedResultGeneticsUpdate", () => {
     expect(logInput.after.hets).toEqual(["Hypo", "Monsoon"]);
   });
 
-  it("removes tested gene from het and possible lists on negative outcome", async () => {
+  it("removes tested gene from uncertain het and possible lists on negative outcome", async () => {
     const snakes = [
       {
         id: "snake_1",
         morphs: ["Clown"],
-        hets: ["Monsoon", "Hypo"],
+        hets: ["50% Monsoon", "Hypo"],
         possibleHets: ["Monsoon", "66% Pied"],
       },
     ];

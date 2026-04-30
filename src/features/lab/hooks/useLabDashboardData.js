@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createLabApiClient } from "../api/client";
+import { useAutoRefetch } from "./useAutoRefetch";
 
 const LAB_ORDER_CREATED_EVENT = "lab:test-order-created";
 const LAB_ORDER_UPDATED_EVENT = "lab:test-order-updated";
 const DASHBOARD_POLL_INTERVAL_MS = 15_000;
 
-const NEW_INCOMING_STATUSES = new Set(["draft", "order_created"]);
+const NEW_INCOMING_STATUSES = new Set(["submitted"]);
 const PAID_AWAITING_SAMPLE_STATUSES = new Set(["paid", "label_generated", "sample_sent"]);
-const RECENTLY_RECEIVED_STATUSES = new Set(["sample_received", "intake_approved"]);
-const IN_PROGRESS_STATUSES = new Set(["testing_in_progress", "result_entered", "result_reviewed"]);
-const COMPLETED_STATUSES = new Set(["completed", "certificate_issued"]);
+const RECENTLY_RECEIVED_STATUSES = new Set(["received"]);
+const IN_PROGRESS_STATUSES = new Set(["in_progress"]);
+const COMPLETED_STATUSES = new Set(["completed"]);
 
 const toTimestamp = (order) => {
   const value = order?.updatedAt || order?.submittedAt || order?.createdAt || "";
@@ -69,61 +70,32 @@ const buildSections = (orders) => {
   ];
 };
 
+const DASHBOARD_EVENTS = [LAB_ORDER_CREATED_EVENT, LAB_ORDER_UPDATED_EVENT];
+
 export function useLabDashboardData() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
 
-  const refetch = useCallback(() => setRevision((prev) => prev + 1), []);
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const api = createLabApiClient();
+      const rows = await api.listLabTestOrders();
+      setOrders(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setOrders([]);
+      setError(err instanceof Error ? err.message : "Failed to load lab dashboard data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const load = async () => {
-      setIsLoading(true);
-      setError("");
-      try {
-        const api = createLabApiClient();
-        const rows = await api.listLabTestOrders();
-        if (!isMounted) return;
-        setOrders(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        if (!isMounted) return;
-        setOrders([]);
-        setError(err instanceof Error ? err.message : "Failed to load lab dashboard data.");
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [revision]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    const handleOrderCreated = () => refetch();
-    const handleFocus = () => refetch();
-
-    window.addEventListener(LAB_ORDER_CREATED_EVENT, handleOrderCreated);
-    window.addEventListener(LAB_ORDER_UPDATED_EVENT, handleOrderCreated);
-    window.addEventListener("focus", handleFocus);
-
-    const intervalId = window.setInterval(() => {
-      refetch();
-    }, DASHBOARD_POLL_INTERVAL_MS);
-
-    return () => {
-      window.removeEventListener(LAB_ORDER_CREATED_EVENT, handleOrderCreated);
-      window.removeEventListener(LAB_ORDER_UPDATED_EVENT, handleOrderCreated);
-      window.removeEventListener("focus", handleFocus);
-      window.clearInterval(intervalId);
-    };
-  }, [refetch]);
+  const { refetch } = useAutoRefetch(load, {
+    intervalMs: DASHBOARD_POLL_INTERVAL_MS,
+    events: DASHBOARD_EVENTS,
+  });
 
   const sections = useMemo(() => buildSections(orders), [orders]);
 

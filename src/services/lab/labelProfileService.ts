@@ -14,6 +14,13 @@ type StoredSnake = {
   code?: string;
   displayId?: string;
   externalId?: string;
+  sex?: string;
+  status?: string;
+  morph?: string;
+  genetics?: string;
+  morphs?: unknown;
+  hets?: unknown;
+  possibleHets?: unknown;
 };
 
 export type BreederInfo = {
@@ -21,9 +28,11 @@ export type BreederInfo = {
   businessName?: string;
   email?: string;
   phone?: string;
+  street?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
+  state?: string;
   stateOrRegion?: string;
   postalCode?: string;
   country?: string;
@@ -99,7 +108,7 @@ export const loadBreederInfo = async (): Promise<BreederInfo> => {
 };
 
 export const toBreederAddress = (info: BreederInfo): LabAddress | undefined => {
-  const line1 = String(info.addressLine1 || "").trim();
+  const line1 = String(info.addressLine1 || info.street || "").trim();
   const postalCode = String(info.postalCode || "").trim();
   const city = String(info.city || "").trim();
   const country = String(info.country || "").trim();
@@ -108,7 +117,7 @@ export const toBreederAddress = (info: BreederInfo): LabAddress | undefined => {
     line1: line1 || "-",
     line2: String(info.addressLine2 || "").trim() || undefined,
     city: city || "-",
-    stateOrRegion: String(info.stateOrRegion || "").trim() || undefined,
+    stateOrRegion: String(info.stateOrRegion || info.state || "").trim() || undefined,
     postalCode: postalCode || "-",
     country: country || "-",
   };

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { calculatePrice, createOrder, deleteAllOrders, getOrderByIdForUser, listOrdersForUser, updateOrderStatus } from "../services/orderService";
+import { calculatePrice, createOrder, deleteAllOrders, deleteOrderById, getOrderByIdForUser, listOrdersForUser, updateOrderStatus, updateOrderPayment } from "../services/orderService";
 import { saveOrderResult } from "../services/orderResultService";
 import { ensureAnimalsPayload } from "../utils/validators";
 import { HttpError } from "../utils/errors";
@@ -9,10 +9,6 @@ type OrderStatusValue = (typeof ORDER_STATUSES)[number];
 
 export const calculateOrderPrice = async (req: Request, res: Response): Promise<void> => {
   const animals = ensureAnimalsPayload(req.body);
-
-  // Temporary debug log requested.
-  console.log("[orders] incoming calculate-price payload", req.body);
-
   const breakdown = await calculatePrice(animals);
   res.status(200).json(breakdown);
 };
@@ -51,7 +47,16 @@ export const patchOrderStatus = async (req: Request, res: Response): Promise<voi
 
 export const removeAllOrders = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
+  if (req.query["confirm"] !== "true") {
+    throw new HttpError(400, "Add ?confirm=true to confirm bulk deletion.");
+  }
   const result = await deleteAllOrders(req.user);
+  res.status(200).json(result);
+};
+
+export const removeOrder = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const result = await deleteOrderById(req.params.id, req.user);
   res.status(200).json(result);
 };
 
@@ -65,4 +70,22 @@ export const submitOrderResult = async (req: Request, res: Response): Promise<vo
   if (!req.user) throw new HttpError(401, "Unauthorized");
   const saved = await saveOrderResult(req.params.id, req.body, req.user, "submit");
   res.status(200).json(saved);
+};
+
+export const patchOrderPayment = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+
+  const paymentStatus = String(req.body?.paymentStatus || "").trim();
+  const paymentRef = req.body?.paymentRef !== undefined ? String(req.body.paymentRef).trim() : undefined;
+
+  if (!paymentStatus) {
+    throw new HttpError(400, "paymentStatus is required.");
+  }
+
+  const order = await updateOrderPayment(
+    req.params.id,
+    { paymentStatus: paymentStatus as any, paymentRef },
+    req.user
+  );
+  res.status(200).json({ order });
 };

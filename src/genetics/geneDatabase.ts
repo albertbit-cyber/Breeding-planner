@@ -75,7 +75,7 @@ const DEFAULT_GENE_ALIAS_PRESETS: Record<string, { aliases?: string[]; shorthand
   'clown': { aliases: ['Clown'], shorthand: ['Cln'] },
   'piebald': { aliases: ['Piebald'], shorthand: ['Pied', 'Pb'] },
   'lavender albino': { aliases: ['Lavender Albino'], shorthand: ['Lav', 'Lav Albino'] },
-  'ultramel': { aliases: ['Ultramel'], shorthand: ['UM'] },
+  'ultramel': { aliases: ['Ultramel', 'Ultramale', 'Ultra Male'], shorthand: ['UM'] },
   'monsoon': { aliases: ['Monsoon'], shorthand: ['Mons'] },
   'puzzle': { aliases: ['Puzzle'], shorthand: ['Puz'] },
   'sunset': { aliases: ['Sunset'], shorthand: ['Sun'] },

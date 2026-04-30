@@ -122,6 +122,12 @@ const parsePossibleProbability = (label: string): number | undefined => {
   if (percentMatch) {
     const value = Number(percentMatch[1]);
     if (!Number.isNaN(value)) {
+      if (Math.abs(value - 66) < EPSILON || Math.abs(value - 66.6) < EPSILON || Math.abs(value - 66.66) < EPSILON) {
+        return 2 / 3;
+      }
+      if (Math.abs(value - 33) < EPSILON || Math.abs(value - 33.3) < EPSILON || Math.abs(value - 33.33) < EPSILON) {
+        return 1 / 3;
+      }
       return Math.max(0, Math.min(1, value / 100));
     }
   }

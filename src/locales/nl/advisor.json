@@ -1,78 +1,78 @@
-﻿{
-	"title": "Breeding Advisor",
-	"description": "We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal.",
+{
+	"title": "Kweekadviseur",
+	"description": "We kijken alleen naar dieren in de <strong>Fokdieren</strong>-groep en tonen koppelingen met een zeer hoge kans op het gewenste morph-doel.",
 	"goal": {
-		"label": "Goal (Name and Traits)",
+		"label": "Doel (naam en eigenschappen)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
-		"tip": "Format tip: \"Goal Name: trait one, trait two\". If you only list traits, we’ll build a generic goal.",
-		"defaultName": "Custom goal"
+		"tip": "Formaattip: \"Doelnaam: eigenschap één, eigenschap twee\". Als je alleen eigenschappen opsomt, maken we een algemeen doel.",
+		"defaultName": "Aangepast doel"
 	},
 	"status": {
 		"heading": "Status"
 	},
 	"summary": {
-		"loading": "Crunching punnett squares…",
-		"ready": "Run the advisor to discover promising pairings.",
-		"supportingOnly": "No pairs meet the high-confidence bar yet, but here are {{count}} options to review.",
-		"noConfidence": "No pairings crossed the confidence bar. Try adjusting your collections or goals.",
-		"confidentCount": "{{count}} pairing(s) meet the ≥ {{threshold}} goal confidence target."
+		"loading": "Punnett-kwadraten berekenen…",
+		"ready": "Voer de adviseur uit om veelbelovende koppelingen te ontdekken.",
+		"supportingOnly": "Geen enkel koppel haalt de hoge-betrouwbaarheidsdrempel, maar hier zijn {{count}} opties ter beoordeling.",
+		"noConfidence": "Geen koppeling haalde de betrouwbaarheidsdrempel. Pas je collectie of doelen aan.",
+		"confidentCount": "{{count}} koppeling(en) halen het ≥ {{threshold}} doelbetrouwbaarheidsdoel."
 	},
 	"stats": {
-		"males": "{{count}} breeder male",
-		"males_plural": "{{count}} breeder males",
-		"females": "{{count}} breeder female",
-		"females_plural": "{{count}} breeder females",
-		"confidenceBar": "Confidence bar ≥ {{threshold}}"
+		"males": "{{count}} fokmannetje",
+		"males_plural": "{{count}} fokmannetjes",
+		"females": "{{count}} fokvrouwtje",
+		"females_plural": "{{count}} fokvrouwtjes",
+		"confidenceBar": "Betrouwbaarheidsdrempel ≥ {{threshold}}"
 	},
 	"buttons": {
-		"run": "Run Advisor",
-		"generating": "Generating...",
-		"reset": "Reset Advisor"
+		"run": "Adviseur uitvoeren",
+		"generating": "Bezig met genereren...",
+		"reset": "Adviseur resetten"
 	},
 	"errors": {
-		"noBreeders": "Add animals to the Breeders group to see advisor recommendations.",
-		"noGoals": "Add goal traits before running the advisor.",
-		"failure": "Failed to generate suggestions."
+		"noBreeders": "Voeg dieren toe aan de Fokdieren-groep om aanbevelingen te zien.",
+		"noGoals": "Voeg doeleigenschappen toe voordat je de adviseur uitvoert.",
+		"failure": "Suggesties konden niet worden gegenereerd."
 	},
 	"cards": {
-		"goalSuccessLabel": "Goal success chance:",
-		"belowTarget": "(below confidence target)",
-		"demandSignals": "Demand signals:",
-		"priceRange": "Price guidance: {{range}}",
-		"sources": "Sources:",
-		"additionalHeading": "Additional pairings worth reviewing",
-		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
+		"goalSuccessLabel": "Kans op doelbereik:",
+		"belowTarget": "(onder betrouwbaarheidsdrempel)",
+		"demandSignals": "Vraagindicatoren:",
+		"priceRange": "Prijsindicatie: {{range}}",
+		"sources": "Bronnen:",
+		"additionalHeading": "Aanvullende koppelingen ter beoordeling",
+		"readyCallout": "Klaar wanneer jij het bent — klik op <strong>Adviseur uitvoeren</strong> om je sterkste fokdier-koppelingen te ontdekken."
 	},
 	"genes": {
-		"goalVisuals": "Goal Visuals",
-		"goalHets": "Goal Hets",
-		"projectedVisuals": "Projected Visuals",
-		"projectedHets": "Projected Hets",
-		"holdbackVisuals": "Holdback Visuals",
-		"holdbackHets": "Holdback Hets",
-		"nextVisuals": "Next-Gen Visuals",
-		"nextHets": "Next-Gen Hets",
-		"focusVisuals": "Focus Visuals",
-		"focusHets": "Focus Hets"
+		"goalVisuals": "Doel-visuals",
+		"goalHets": "Doel-hets",
+		"projectedVisuals": "Verwachte visuals",
+		"projectedHets": "Verwachte hets",
+		"holdbackVisuals": "Holdback-visuals",
+		"holdbackHets": "Holdback-hets",
+		"nextVisuals": "Volgende-generatie-visuals",
+		"nextHets": "Volgende-generatie-hets",
+		"focusVisuals": "Focus-visuals",
+		"focusHets": "Focus-hets"
 	},
 	"plan": {
-		"title": "Multi-generation plan ({{strategy}})",
+		"title": "Meergeneratie-plan ({{strategy}})",
 		"strategy": {
-			"multi": "2-step",
+			"multi": "2-staps",
 			"direct": "direct"
 		},
-		"combinedProbability": "Combined ≈ {{value}}",
-		"generationLabel": "Generation {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
-		"goalProbability": "Goal ≈ {{value}}",
+		"combinedProbability": "Gecombineerd ≈ {{value}}",
+		"generationLabel": "Generatie {{generation}}",
+		"prereqProbability": "Vereiste ≈ {{value}}",
+		"goalProbability": "Doel ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
-		"holdbackGenes": "Holdback genes: {{genes}}",
+		"holdbackGenes": "Holdback-genen: {{genes}}",
 		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
 		"status": {
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Possible het",
-			"none": "Normal"
+			"possibleHet": "Mogelijke het",
+			"none": "Normaal"
 		},
 		"expectation": {
 			"none-visual": "100% het",
@@ -81,67 +81,67 @@
 		}
 	},
 	"labels": {
-		"unknownAnimal": "Unknown",
-		"holdbackMale": "Holdback Male",
-		"holdbackFemale": "Holdback Female",
+		"unknownAnimal": "Onbekend",
+		"holdbackMale": "Holdback mannetje",
+		"holdbackFemale": "Holdback vrouwtje",
 		"holdback": "Holdback"
 	},
 	"outcomes": {
-		"none": "No projection available.",
-		"unknownMorph": "Unknown morph",
-		"probability": "{{genotype}} ({{chance}} appearance chance)"
+		"none": "Geen prognose beschikbaar.",
+		"unknownMorph": "Onbekende morph",
+		"probability": "{{genotype}} ({{chance}} verschijningskans)"
 	},
 	"goals": {
-		"title": "Goals",
-		"add": "Add Goal",
-		"empty": "No goals yet. Add one to tailor suggestions.",
-		"namePlaceholder": "Goal name",
-		"remove": "Remove",
+		"title": "Doelen",
+		"add": "Doel toevoegen",
+		"empty": "Nog geen doelen. Voeg er één toe om suggesties te verfijnen.",
+		"namePlaceholder": "Doelnaam",
+		"remove": "Verwijderen",
 		"requireAll": {
-			"label": "Require all",
-			"placeholder": "Add trait and press Enter"
+			"label": "Vereist allemaal",
+			"placeholder": "Eigenschap toevoegen en Enter drukken"
 		},
 		"requireAny": {
-			"label": "Require any",
-			"placeholder": "Optional traits"
+			"label": "Vereist minimaal één",
+			"placeholder": "Optionele eigenschappen"
 		},
 		"avoid": {
-			"label": "Avoid",
-			"placeholder": "Problem traits"
+			"label": "Vermijden",
+			"placeholder": "Ongewenste eigenschappen"
 		},
 		"recessiveState": {
-			"label": "Recessive state",
-			"any": "Any",
+			"label": "Recessieve toestand",
+			"any": "Elk",
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Possible het"
+			"possibleHet": "Mogelijke het"
 		},
-		"minProbability": "Min probability ({{percent}}%)",
-		"weight": "Weight ({{value}})",
+		"minProbability": "Minimale kans ({{percent}}%)",
+		"weight": "Gewicht ({{value}})",
 		"idLabel": "ID: {{id}}",
-		"loadPreset": "Load Preset",
+		"loadPreset": "Voorinstelling laden",
 		"presets": {
-			"title": "Presets",
-			"close": "Close"
+			"title": "Voorinstellingen",
+			"close": "Sluiten"
 		},
-		"defaultName": "New goal"
+		"defaultName": "Nieuw doel"
 	},
 	"api": {
-		"rationaleSummary": "Projected score {{score}} with demand index {{demand}}. {{goalSummary}}",
-		"noGoalTargets": "No specific goal targets.",
-		"goalSummary": "{{prob}}% chance to hit goal '{{goal}}'.",
-		"watchouts": " Watchouts: {{list}}.",
-		"sources": " Sources: {{list}}.",
+		"rationaleSummary": "Verwachte score {{score}} met vraagindex {{demand}}. {{goalSummary}}",
+		"noGoalTargets": "Geen specifieke doelen ingesteld.",
+		"goalSummary": "{{prob}}% kans om doel '{{goal}}' te bereiken.",
+		"watchouts": " Aandachtspunten: {{list}}.",
+		"sources": " Bronnen: {{list}}.",
 		"plan": {
-			"stepTitle": "Generation {{generation}}: {{male}} × {{female}}",
-			"directSummary": "Direct chance to reach the goal is {{chance}}%.",
-			"holdbackSummary": "No direct visual expected; produce holdbacks carrying {{traits}}.",
-			"adjustedSummary": "Direct goal chance {{chance}}%. Prioritize producing holdbacks carrying {{holdback}}.",
-			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Retain the {{sex}} holdback ({{holdback}}). Pair with {{partner}} for {{chance}}% chance at the goal.",
+			"stepTitle": "Generatie {{generation}}: {{male}} × {{female}}",
+			"directSummary": "Directe kans om het doel te bereiken is {{chance}}%.",
+			"holdbackSummary": "Geen directe visual verwacht; produceer holdbacks die {{traits}} dragen.",
+			"adjustedSummary": "Directe doelkans {{chance}}%. Prioriteer de productie van holdbacks die {{holdback}} dragen.",
+			"secondTitle": "Generatie {{generation}}: Holdback × {{partner}}",
+			"secondSummary": "Behoud de {{sex}} holdback ({{holdback}}). Koppel met {{partner}} voor {{chance}}% kans op het doel.",
 			"holdbackSex": {
-				"female": "female",
-				"male": "male"
+				"female": "vrouwtjes",
+				"male": "mannetjes"
 			}
 		}
 	}

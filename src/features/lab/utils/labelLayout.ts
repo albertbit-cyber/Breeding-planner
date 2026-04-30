@@ -16,6 +16,19 @@ export const LABEL_LAYOUT_CONSTANTS = Object.freeze({
   sampleWideAspectThreshold: 1.3,
 });
 
+export const SAMPLE_LABEL_TESTS_FIT_OPTIONS = Object.freeze({
+  "side-by-side": {
+    maxFontPt: 8,
+    minFontPt: 5,
+    maxLines: 8,
+  },
+  stacked: {
+    maxFontPt: 8.5,
+    minFontPt: 5,
+    maxLines: 10,
+  },
+});
+
 export type LabelBox = {
   key: string;
   xMm: number;
@@ -77,6 +90,29 @@ const clamp = (value: number, min: number, max: number): number => {
 const ellipsize = (value: string, maxLength: number): string => {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+};
+
+const packRequestedTestsLines = (tests: string[], maxCharsPerLine = 28): string[] => {
+  const lines: string[] = [];
+  let current = "";
+
+  tests.forEach((test) => {
+    const normalized = normalizeText(test);
+    if (!normalized) return;
+    const candidate = current ? `${current}, ${normalized}` : normalized;
+    if (!current || candidate.length <= maxCharsPerLine) {
+      current = candidate;
+      return;
+    }
+    lines.push(current);
+    current = normalized;
+  });
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
 };
 
 const estimateLineWidthMm = (text: string, fontSizePt: number) =>
@@ -217,13 +253,13 @@ export const buildSampleLabelLayout = (
   const isWide = size.widthMm >= size.heightMm * LABEL_LAYOUT_CONSTANTS.sampleWideAspectThreshold;
 
   if (isWide) {
-    const qrWidth = Math.max(20, Math.min(safeArea.widthMm * 0.36, safeArea.heightMm));
+    const qrWidth = Math.max(20, Math.min(safeArea.widthMm * 0.3, safeArea.heightMm * 0.72));
     const textWidth = safeArea.widthMm - qrWidth - gap;
     const rowTargets = [
-      Math.max(6, safeArea.heightMm * 0.16),
-      Math.max(6, safeArea.heightMm * 0.18),
-      Math.max(6, safeArea.heightMm * 0.18),
-      Math.max(8, safeArea.heightMm * 0.24),
+      Math.max(4.5, safeArea.heightMm * 0.12),
+      Math.max(5, safeArea.heightMm * 0.14),
+      Math.max(4.5, safeArea.heightMm * 0.12),
+      Math.max(12, safeArea.heightMm * 0.46),
     ];
     const [orderHeight, animalHeight, breederHeight, testsHeight] = fitVerticalSections(rowTargets, safeArea.heightMm, gap);
     let y = safeArea.yMm;
@@ -301,9 +337,13 @@ export const buildSampleLabelContent = (sample: LabSampleLabelData) => ({
   orderId: `Order ID: ${normalizeText(sample.orderNumber || sample.orderId) || "-"}`,
   animalId: `Animal ID: ${normalizeText(sample.animalId) || "-"}`,
   breederName: `Breeder: ${normalizeText(sample.breederName) || "-"}`,
-  requestedTests: normalizeRequestedTests(sample.requestedTests).length
-    ? [`Requested Test(s): ${normalizeRequestedTests(sample.requestedTests).join(", ")}`]
-    : ["Requested Test(s): -"],
+  requestedTests: (() => {
+    const requestedTests = normalizeRequestedTests(sample.requestedTests);
+    if (!requestedTests.length) {
+      return ["Requested Tests: -"];
+    }
+    return ["Requested Tests:", ...packRequestedTestsLines(requestedTests)];
+  })(),
 });
 
 export const getPreviewScaleStyle = (widthMm: number, heightMm: number) => {

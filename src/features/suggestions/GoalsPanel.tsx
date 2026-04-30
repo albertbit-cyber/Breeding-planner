@@ -6,6 +6,14 @@ import { GOAL_PRESETS } from "../../goals/presets";
 
 const ensureTokens = (tokens) => tokens?.map((token) => token.trim()).filter(Boolean) ?? [];
 
+const useAdvisorTranslation = () => {
+  const { t: translate } = useTranslation("advisor");
+  return useCallback(
+    (key, options = {}) => translate(String(key).replace(/^advisor\./, ""), options),
+    [translate]
+  );
+};
+
 const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
   const [draft, setDraft] = useState("");
 
@@ -56,7 +64,7 @@ const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
 };
 
 const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
-  const { t } = useTranslation();
+  const t = useAdvisorTranslation();
   const requireAll = ensureTokens(goal.requireAll);
   const requireAny = ensureTokens(goal.requireAny);
   const avoid = ensureTokens(goal.avoid);
@@ -181,7 +189,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
 };
 
 export const GoalsPanel = ({ goals, onChange }) => {
-  const { t } = useTranslation();
+  const t = useAdvisorTranslation();
   const createDefaultGoal = useCallback(() => ({
     id: `goal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     name: t("advisor.goals.defaultName", { defaultValue: "New goal" }),

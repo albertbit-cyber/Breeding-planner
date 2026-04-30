@@ -1,12 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
-import { useSharedBackend } from "../../../contexts/SharedBackendContext.jsx";
-import {
-  DEFAULT_SAMPLE_TYPE,
-  SAMPLE_TYPE_OPTIONS,
-  getSampleTypeGuidance,
-} from "../utils/sampleTypeGuidance";
+import { useBatchOrder } from "../contexts/BatchOrderContext";
 
 const normalizeTokenList = (value) => {
   if (!Array.isArray(value)) return [];
@@ -19,199 +14,137 @@ export default function BreederOrderGeneticTestModal({
   open,
   snake,
   onClose,
-  onOrderCreated,
   overlayClass,
 }) {
   const { t } = useTranslation();
-  const { snapshot, retry, sharedFeaturesEnabled } = useSharedBackend();
-  const [priority, setPriority] = useState("routine");
-  const [sampleType, setSampleType] = useState(DEFAULT_SAMPLE_TYPE);
-  const [notes, setNotes] = useState("");
+  const { addToCart, isInCart, getCartItem } = useBatchOrder();
+
   const [selectedTests, setSelectedTests] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [createdOrder, setCreatedOrder] = useState(null);
-  const [sampleTypeToast, setSampleTypeToast] = useState(null);
   const [catalogTests, setCatalogTests] = useState([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [catalogError, setCatalogError] = useState("");
-  const autoCloseTimerRef = useRef(null);
+  const [added, setAdded] = useState(false);
 
-  const snakeTokens = useMemo(() => {
-    const morphs = normalizeTokenList(snake?.morphs);
-    const hets = normalizeTokenList(snake?.hets).map((entry) => `${entry} (het)`);
-    const possibleHets = normalizeTokenList(snake?.possibleHets).map((entry) => `${entry} (possible het)`);
-    return unique([...morphs, ...hets, ...possibleHets]);
-  }, [snake?.morphs, snake?.hets, snake?.possibleHets]);
+  const snakeId = String(snake?.id || "").trim();
+  const alreadyInCart = isInCart(snakeId);
 
-  const testOptions = useMemo(() => {
-    return catalogTests.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-    }));
-  }, [catalogTests]);
+  // Pre-populate test selection from cart if snake is already staged
+  useEffect(() => {
+    if (!open) return;
+    const existing = getCartItem(snakeId);
+    setSelectedTests(existing ? [...existing.selectedTestIds] : []);
+    setAdded(false);
+  }, [open, snakeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load catalog when modal opens
   useEffect(() => {
     if (!open) return;
     setIsLoadingCatalog(true);
     setCatalogError("");
     const api = createLabApiClient();
-    api.getLabTestsCatalog({ breederView: true })
-      .then((tests) => {
-        setCatalogTests(tests || []);
-        console.debug("[lab-pricing-debug] catalog response", {
-          count: Array.isArray(tests) ? tests.length : 0,
-          tests: tests || [],
-        });
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : "Unable to load lab test catalog.";
+    api
+      .getLabTestsCatalog({ breederView: true })
+      .then((tests) => setCatalogTests(tests || []))
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Unable to load lab test catalog.";
         setCatalogTests([]);
         setCatalogError(message);
       })
       .finally(() => setIsLoadingCatalog(false));
   }, [open]);
 
-  const toggleTest = (testCode) => {
-    setSelectedTests((prev) => {
-      if (prev.includes(testCode)) {
-        return prev.filter((entry) => entry !== testCode);
-      }
-      return [...prev, testCode];
-    });
+  const testOptions = useMemo(
+    () => catalogTests.map((entry) => ({ id: entry.id, name: entry.name })),
+    [catalogTests]
+  );
+
+  const snakeTokens = useMemo(() => {
+    const morphs = normalizeTokenList(snake?.morphs);
+    const hets = normalizeTokenList(snake?.hets).map((entry) => `${entry} (het)`);
+    const possHets = normalizeTokenList(snake?.possibleHets).map((entry) => `${entry} (possible het)`);
+    return unique([...morphs, ...hets, ...possHets]);
+  }, [snake?.morphs, snake?.hets, snake?.possibleHets]);
+
+  const toggleTest = (testId) => {
+    setSelectedTests((prev) =>
+      prev.includes(testId) ? prev.filter((id) => id !== testId) : [...prev, testId]
+    );
   };
 
-  const showSampleTypeGuidance = (nextSampleType) => {
-    const guidance = getSampleTypeGuidance(nextSampleType);
-    if (!guidance) {
-      setSampleTypeToast(null);
-      return;
-    }
-    const toastMessage = t(guidance.messageKey, { defaultValue: guidance.defaultMessage });
-    setSampleTypeToast({
-      id: `${nextSampleType}_${Date.now()}`,
-      message: toastMessage,
-    });
-  };
-
-  const handleSampleTypeChange = (event) => {
-    const nextSampleType = event.target.value;
-    setSampleType(nextSampleType);
-    showSampleTypeGuidance(nextSampleType);
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setSubmitError("");
-    setCreatedOrder(null);
-
+  const handleAddToBatch = () => {
     const requestedTests = unique(selectedTests);
-    if (!requestedTests.length) {
-      setSubmitError(t("lab.orders.testsRequired", { defaultValue: "Select at least one gene test." }));
-      return;
-    }
-
-    if (!catalogTests.length) {
-      setSubmitError(
-        catalogError ||
-          t("lab.orders.catalogRequired", { defaultValue: "No breeder-visible tests are available in the lab catalog." })
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const api = createLabApiClient();
-      const result = await api.createTestOrderFromBreeder({
-        snakeId: String(snake.id || "").trim(),
-        requestedTests,
-        priority,
-        notes,
-        sampleType,
-      });
-      setCreatedOrder(result.order);
-      onOrderCreated?.(result);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("lab:test-order-created", { detail: { orderId: result.order?.id } }));
-      }
-
-      autoCloseTimerRef.current = setTimeout(() => {
-        closeAndReset();
-      }, 1200);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to create order.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!requestedTests.length) return;
+    addToCart(snake, requestedTests);
+    setAdded(true);
+    // Brief confirmation, then close
+    setTimeout(() => {
+      onClose?.();
+    }, 800);
   };
 
   const closeAndReset = useCallback(() => {
-    if (autoCloseTimerRef.current) {
-      clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
-    setSubmitError("");
-    setCreatedOrder(null);
+    setAdded(false);
     setSelectedTests([]);
-    setNotes("");
-    setPriority("routine");
-    setSampleType(DEFAULT_SAMPLE_TYPE);
-    setSampleTypeToast(null);
     onClose?.();
   }, [onClose]);
 
   if (!open || !snake) return null;
 
   return (
-    <div className={`fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50 ${overlayClass || "bg-black/40"}`} onClick={closeAndReset}>
-      <div className="w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+    <div
+      className={`fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50 ${overlayClass || "bg-black/40"}`}
+      onClick={closeAndReset}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-5 py-4">
           <div>
             <div className="text-lg font-semibold">
-              {t("lab.orders.createTitle", { defaultValue: "Order Genetic Test" })}
+              {t("lab.orders.addToBatchTitle", { defaultValue: "Add to Batch Order" })}
             </div>
             <div className="text-sm text-neutral-600">
-              {t("lab.orders.createSubtitle", { defaultValue: "Create a shed testing order for this snake." })}
+              {t("lab.orders.addToBatchSubtitle", {
+                defaultValue:
+                  "Select tests for this snake. Submit all snakes together from the batch cart.",
+              })}
             </div>
           </div>
-          <button className="rounded-xl border px-3 py-1.5 text-sm" onClick={closeAndReset}>
+          <button
+            type="button"
+            className="rounded-xl border px-3 py-1.5 text-sm"
+            onClick={closeAndReset}
+          >
             {t("common.close", { defaultValue: "Close" })}
           </button>
         </div>
 
-        <form className="space-y-4 px-5 py-4" onSubmit={handleSubmit}>
+        <div className="space-y-4 px-5 py-4">
+          {/* Snake summary */}
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
-            <div className="font-medium">{snake?.name || t("snakeEdit.unnamed", { defaultValue: "Unnamed" })}</div>
-            <div className="font-mono text-xs text-neutral-600">{snake?.id}</div>
-            <div className="mt-1 text-xs text-neutral-600">
-              {t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })}: {snakeTokens.join(", ") || "-"}
+            <div className="font-medium">
+              {snake?.name || t("snakeEdit.unnamed", { defaultValue: "Unnamed" })}
             </div>
+            <div className="font-mono text-xs text-neutral-500">{snake?.id}</div>
+            {snakeTokens.length ? (
+              <div className="mt-1 text-xs text-neutral-600">
+                {t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })}:{" "}
+                {snakeTokens.join(", ")}
+              </div>
+            ) : null}
+            {alreadyInCart && !added ? (
+              <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                {t("lab.batch.alreadyStagedNote", {
+                  defaultValue:
+                    "This snake is already in the batch. Saving will update its test selection.",
+                })}
+              </div>
+            ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              <span className="mb-1 block text-xs text-neutral-600">
-                {t("lab.orders.priority", { defaultValue: "Priority" })}
-              </span>
-              <select className="w-full rounded-xl border px-3 py-2 text-sm" value={priority} onChange={(event) => setPriority(event.target.value)}>
-                <option value="routine">{t("lab.orders.priorityRoutine", { defaultValue: "Routine" })}</option>
-                <option value="urgent">{t("lab.orders.priorityUrgent", { defaultValue: "Urgent" })}</option>
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-xs text-neutral-600">
-                {t("lab.orders.sampleType", { defaultValue: "Sample Type" })}
-              </span>
-              <select className="w-full rounded-xl border px-3 py-2 text-sm" value={sampleType} onChange={handleSampleTypeChange}>
-                {SAMPLE_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {t(option.labelKey, { defaultValue: option.defaultLabel })}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
+          {/* Test selection */}
           <div>
             <div className="mb-2 text-xs text-neutral-600">
               {t("lab.orders.requestedTests", { defaultValue: "Requested Gene Tests" })}
@@ -219,100 +152,65 @@ export default function BreederOrderGeneticTestModal({
             <div className="grid max-h-52 grid-cols-1 gap-2 overflow-auto rounded-2xl border border-neutral-200 bg-white p-3 sm:grid-cols-2">
               {isLoadingCatalog ? (
                 <div className="col-span-2 py-2 text-center text-xs text-neutral-500">
-                  {t("common.loading", { defaultValue: "Loading tests..." })}
+                  {t("common.loading", { defaultValue: "Loading tests…" })}
                 </div>
               ) : catalogError ? (
-                <div className="col-span-2 py-2 text-center text-xs text-rose-600">{catalogError}</div>
+                <div className="col-span-2 py-2 text-center text-xs text-rose-600">
+                  {catalogError}
+                </div>
               ) : !testOptions.length ? (
                 <div className="col-span-2 py-2 text-center text-xs text-neutral-500">
-                  {t("lab.orders.catalogRequired", { defaultValue: "No breeder-visible tests are available in the lab catalog." })}
+                  {t("lab.orders.catalogRequired", {
+                    defaultValue: "No breeder-visible tests are available in the lab catalog.",
+                  })}
                 </div>
               ) : (
                 testOptions.map((option) => (
-                  <label key={option.id} className="inline-flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={selectedTests.includes(option.id)} onChange={() => toggleTest(option.id)} />
+                  <label key={option.id} className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedTests.includes(option.id)}
+                      onChange={() => toggleTest(option.id)}
+                    />
                     <span>{option.name}</span>
                   </label>
                 ))
               )}
             </div>
-
           </div>
 
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs text-neutral-600">{t("common.notes", { defaultValue: "Notes" })}</span>
-            <textarea
-              className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder={t("lab.orders.notesPlaceholder", { defaultValue: "Optional intake notes for the lab" })}
-            />
-          </label>
-
-          {submitError ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{submitError}</div> : null}
-
-          {!sharedFeaturesEnabled ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <div className="font-semibold">{t("lab.sharedBackend.requiredTitle", { defaultValue: "Shared backend required" })}</div>
-              <div className="mt-1">{snapshot.message || t("lab.sharedBackend.required", { defaultValue: "Order submission is blocked until the shared backend is reachable." })}</div>
-              <button type="button" className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs" onClick={retry}>
-                {t("common.retry", { defaultValue: "Retry" })}
-              </button>
+          {/* Success feedback */}
+          {added ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              {t("lab.batch.addedConfirm", {
+                defaultValue:
+                  "Added to batch. Open the batch cart (bottom-right) to review and submit.",
+              })}
             </div>
           ) : null}
 
-          {createdOrder ? (
-            <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
-              <div className="font-semibold text-emerald-800">{t("lab.orders.createdTitle", { defaultValue: "Shed Test Order Created" })}</div>
-              <div>
-                <span className="font-medium">{t("lab.orders.orderId", { defaultValue: "Order ID" })}:</span> {createdOrder.id}
-              </div>
-              <div>
-                <span className="font-medium">{t("lab.orders.status", { defaultValue: "Status" })}:</span> {t("lab.orders.statusCreated", { defaultValue: "Order created" })}
-              </div>
-              <div className="text-xs text-emerald-700">
-                {t("lab.orders.createdHelp", { defaultValue: "The order is saved immediately and will appear in the lab workflow." })}
-              </div>
-            </div>
-          ) : null}
-
+          {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-1">
-            <button type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={closeAndReset}>
+            <button
+              type="button"
+              className="rounded-xl border px-4 py-2 text-sm"
+              onClick={closeAndReset}
+            >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
             <button
-              type="submit"
+              type="button"
               className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSubmitting || isLoadingCatalog || !!catalogError || !testOptions.length || !sharedFeaturesEnabled}
+              disabled={!selectedTests.length || isLoadingCatalog || !!catalogError || added}
+              onClick={handleAddToBatch}
             >
-              {isSubmitting
-                ? t("lab.orders.submitting", { defaultValue: "Submitting..." })
-                : t("lab.orders.createAction", { defaultValue: "Create Shed Test Order" })}
+              {alreadyInCart && !added
+                ? t("lab.batch.updateInBatch", { defaultValue: "Update in Batch" })
+                : t("lab.batch.addToBatch", { defaultValue: "Add to Batch" })}
             </button>
           </div>
-        </form>
-      </div>
-      {sampleTypeToast ? (
-        <div key={sampleTypeToast.id} className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="w-full max-w-sm rounded-2xl border border-amber-200 bg-amber-50 shadow-2xl">
-            <div className="px-5 py-4">
-              <div className="mb-1 text-sm font-semibold text-amber-900">
-                {t("lab.orders.guidance.title", { defaultValue: "Sample Guidance" })}
-              </div>
-              <p className="text-sm text-amber-800">{sampleTypeToast.message}</p>
-            </div>
-            <div className="flex justify-end border-t border-amber-200 px-5 py-3">
-              <button
-                type="button"
-                className="rounded-xl bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700"
-                onClick={() => setSampleTypeToast(null)}
-              >
-                {t("common.ok", { defaultValue: "OK" })}
-              </button>
-            </div>
-          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

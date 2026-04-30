@@ -2,8 +2,32 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useSharedBackend } from "../../../contexts/SharedBackendContext.jsx";
+import { ORDER_PAYMENT_STATUS_LABELS, ORDER_PAYMENT_STATUS_TONES } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import OrderProgressBar from "./OrderProgressBar";
 
 const EMPTY_QUOTE = { items: [], subtotalCents: 0, totalCents: 0, currency: "EUR" };
+
+const toneClass = {
+  neutral: "border-neutral-300 bg-neutral-50 text-neutral-700",
+  info: "border-sky-200 bg-sky-50 text-sky-700",
+  warning: "border-amber-200 bg-amber-50 text-amber-700",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  danger: "border-rose-200 bg-rose-50 text-rose-700",
+};
+
+const StatusBadge = ({ label, tone }) => (
+  <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-medium ${toneClass[tone] || toneClass.neutral}`}>
+    {label}
+  </span>
+);
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString();
+};
 
 const isPendingQueueUnavailableError = (error) => {
   const message = error instanceof Error ? error.message : String(error || "");
@@ -41,11 +65,12 @@ const downloadArtifact = (artifact) => {
   setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
 };
 
-export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted }) {
+export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBatchSubmitted }) {
   const { t } = useTranslation();
   const { sharedFeaturesEnabled } = useSharedBackend();
   const [pendingItems, setPendingItems] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [submittedOrders, setSubmittedOrders] = useState([]);
   const [queueUnavailable, setQueueUnavailable] = useState(false);
   const [catalog, setCatalog] = useState([]);
   const [pricingConfig, setPricingConfig] = useState(null);
@@ -60,6 +85,23 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
   const [testEditorSelection, setTestEditorSelection] = useState([]);
 
   const catalogMap = useMemo(() => new Map((catalog || []).map((entry) => [entry.id, entry])), [catalog]);
+  const snakeNameById = useMemo(() => {
+    const map = new Map();
+    (snakes || []).forEach((snake) => {
+      const id = String(snake?.id || "").trim();
+      if (!id) return;
+      map.set(id, snake?.name || id);
+    });
+    return map;
+  }, [snakes]);
+
+  const sortedSubmittedOrders = useMemo(() => {
+    return [...submittedOrders].sort((a, b) => {
+      const aDate = String(a.submittedAt || a.createdAt || "");
+      const bDate = String(b.submittedAt || b.createdAt || "");
+      return bDate.localeCompare(aDate);
+    });
+  }, [submittedOrders]);
 
   const refreshData = async () => {
     setLoading(true);
@@ -67,9 +109,13 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
     setQueueUnavailable(false);
     try {
       const api = createLabApiClient();
-      const [tests, pricing] = await Promise.all([
+      const [tests, pricing, orders] = await Promise.all([
         api.getLabTestsCatalog({ breederView: true }),
         api.getLabTestsPricing(),
+        api.listBreederTestOrders().catch((err) => {
+          if (isPendingQueueUnavailableError(err)) return [];
+          throw err;
+        }),
       ]);
 
       let pending = [];
@@ -92,12 +138,14 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
       setCatalog(tests || []);
       setPricingConfig(pricing || null);
       setBatches(nextQueueUnavailable ? [] : (nextBatches || []));
+      setSubmittedOrders(orders || []);
       setQueueUnavailable(nextQueueUnavailable);
       console.debug("[lab-pricing-debug] pricing response", pricing || null);
       console.debug("[lab-pricing-debug] catalog response", tests || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load Shed Test Terminal.");
       setPricingConfig(null);
+      setSubmittedOrders([]);
       setQueueUnavailable(false);
     } finally {
       setLoading(false);
@@ -170,6 +218,23 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
 
   useEffect(() => {
     refreshData();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleRefresh = () => {
+      refreshData();
+    };
+    const intervalId = window.setInterval(handleRefresh, 30_000);
+    window.addEventListener("lab:test-order-created", handleRefresh);
+    window.addEventListener("lab:test-order-updated", handleRefresh);
+    window.addEventListener("lab:test-orders-cleared", handleRefresh);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("lab:test-order-created", handleRefresh);
+      window.removeEventListener("lab:test-order-updated", handleRefresh);
+      window.removeEventListener("lab:test-orders-cleared", handleRefresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -307,6 +372,20 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
     return map;
   }, [quote]);
 
+  const openSnakeById = (snakeId) => {
+    if (typeof window === "undefined") return;
+    const normalized = String(snakeId || "").trim();
+    if (!normalized) return;
+    window.dispatchEvent(
+      new CustomEvent("lab:open-related-snake", {
+        detail: {
+          snakeId: normalized,
+          snakeName: snakeNameById.get(normalized) || normalized,
+        },
+      })
+    );
+  };
+
   return (
     <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -360,6 +439,110 @@ export default function ShedTestTerminalPanel({ activeSnakeId, onBatchSubmitted 
               })}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {!loading ? (
+        <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                {t("lab.terminal.trackingTitle", { defaultValue: "Submitted Shed Test Tracking" })}
+              </div>
+              <div className="mt-1 text-[11px] text-neutral-500">
+                {t("lab.terminal.trackingSubtitle", { defaultValue: "Status updates for every shed test order sent from your snakes." })}
+              </div>
+            </div>
+            <span className="rounded-lg border border-neutral-200 bg-white px-2 py-0.5 text-[11px] text-neutral-600">
+              {sortedSubmittedOrders.length}
+            </span>
+          </div>
+
+          {!sortedSubmittedOrders.length ? (
+            <div className="mt-3 rounded-lg border border-dashed border-neutral-300 bg-white px-3 py-3 text-xs text-neutral-600">
+              {t("lab.terminal.trackingEmpty", { defaultValue: "No submitted shed test orders yet." })}
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {sortedSubmittedOrders.map((order) => {
+                const animalIds = Array.isArray(order.animalIds) && order.animalIds.length
+                  ? order.animalIds
+                  : [order.animalId].filter(Boolean);
+                const status = String(order?.status || "submitted");
+                const paymentStatus = String(order?.paymentStatus || "pending");
+                const statusLabel = ORDER_STATUS_LABELS[status] || status;
+                const paymentLabel = ORDER_PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus;
+                const statusTone = ORDER_STATUS_TONES[status] || "neutral";
+                const paymentTone = ORDER_PAYMENT_STATUS_TONES[paymentStatus] || "neutral";
+                const isActiveOrder = activeSnakeId && animalIds.some((id) => String(id) === String(activeSnakeId));
+
+                return (
+                  <div
+                    key={order.id}
+                    className={`rounded-lg border bg-white px-3 py-2 text-xs ${isActiveOrder ? "border-sky-300 ring-1 ring-sky-200" : "border-neutral-200"}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-neutral-800">{order.orderNumber || order.id}</div>
+                        <div className="mt-0.5 text-[11px] text-neutral-500">
+                          {t("lab.orders.orderDate", { defaultValue: "Order Date" })}: {formatDate(order.submittedAt || order.createdAt)}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge label={statusLabel} tone={statusTone} />
+                        <StatusBadge label={paymentLabel} tone={paymentTone} />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 overflow-x-auto">
+                      <OrderProgressBar status={status} />
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div>
+                        <div className="mb-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                          {t("lab.terminal.snakes", { defaultValue: "Snakes" })}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {animalIds.map((snakeId) => (
+                            <button
+                              key={`${order.id}-${snakeId}`}
+                              type="button"
+                              className="rounded-md border border-neutral-300 bg-neutral-50 px-1.5 py-0.5 text-[11px] hover:bg-white"
+                              onClick={() => openSnakeById(snakeId)}
+                            >
+                              {snakeNameById.get(String(snakeId)) || snakeId}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                          {t("lab.terminal.tests", { defaultValue: "Tests" })}
+                        </div>
+                        <div className="text-neutral-700">
+                          {(order.requestedTests || []).join(", ") || "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                          {t("lab.orders.linkedResults", { defaultValue: "Linked Results" })}
+                        </div>
+                        <div className="text-neutral-700">
+                          {Array.isArray(order.resultIds) ? order.resultIds.length : 0}
+                          {order.certificateId ? (
+                            <span className="ml-2 text-emerald-700">
+                              {t("lab.orders.certificateReadyGeneric", { defaultValue: "Certificate ready" })}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
 

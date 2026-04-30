@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createLabApiClient } from "../api/client";
-import { TEST_ORDER_STATUS_LABELS } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS } from "../constants/orderStatuses";
 
-const COMPLETED = new Set(["completed", "certificate_issued"]);
+const COMPLETED = new Set(["completed"]);
 
 const formatDate = (value) => {
   if (!value) return "-";
@@ -129,7 +129,7 @@ export default function CompletedTestsPage() {
                     <div className="font-medium text-neutral-800">{order.orderNumber || order.id}</div>
                   </td>
                   <td className="px-3 py-2 text-neutral-700">{order.animalId || "-"}</td>
-                  <td className="px-3 py-2 text-neutral-700">{TEST_ORDER_STATUS_LABELS[order.status] || order.status}</td>
+                  <td className="px-3 py-2 text-neutral-700">{ORDER_STATUS_LABELS[order.status] || order.status}</td>
                   <td className="px-3 py-2 text-neutral-700">{formatDate(order.submittedAt || order.createdAt)}</td>
                   <td className="px-3 py-2 text-neutral-700 max-w-[280px] truncate" title={outcome?.latestResult?.summary || ""}>
                     {outcome?.latestResult?.summary || "No summary"}

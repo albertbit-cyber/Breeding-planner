@@ -49,6 +49,9 @@ import {
   toBreederAddress,
   isLabLabelDebugEnabled,
 } from "../../../services/lab/labelProfileService";
+import { buildLabCertificateTemplateData } from "../../../services/lab/certificateTemplate";
+import { applyConfirmedResultGeneticsUpdate } from "../../../services/lab/geneticsUpdateEngine";
+import { resolveLabTestNumber } from "../../../services/lab/testNumber";
 import {
   type AllOrderLabelsArtifactResponse,
   type OrderLabelsArtifactResponse,
@@ -75,8 +78,9 @@ import type { LabResultEntryTemplate } from "../../../types/labResultEntry";
 import type { PendingShedTestItem, ShedSubmissionBatch, ShedTerminalQuote } from "../../../types/labShedTerminal";
 import type { AnimalTestSelection, OrderPriceBreakdown, PricingConfig, ShedTestCatalogItem } from "../../../types/labPricing";
 import type { CreateTestOrderResult } from "../../../services/lab/testOrderService";
-import type { SampleType, StatusHistory, TestOrder } from "../../../types/lab";
+import type { ResultFinding, SampleType, StatusHistory, TestOrder, TestResult } from "../../../types/lab";
 import { buildQrPayload, parseQrPayload } from "../../../utils/labToken";
+import { renderLabCertificatePdf } from "../../../utils/pdf/labCertificatePdf";
 import { generateOrderLabelsPdf } from "../../../utils/pdf/labOrderLabelsPdf";
 import { getActiveLabelSize } from "../utils/labelSizing";
 import { toLabQrResolvePayload } from "../utils/qrLookupInput";
@@ -95,21 +99,14 @@ type AuthSession = {
   };
 };
 
-const mapBackendStatusToLegacy = (status: string): string => {
-  if (status === "submitted") return "order_created";
-  if (status === "received") return "sample_received";
-  if (status === "in_progress") return "testing_in_progress";
-  if (status === "completed") return "completed";
-  return status || "order_created";
-};
-
 const mapLegacyStatusToBackend = (status: string): string => {
+  // Legacy names still accepted for backwards compat with older stored data
   if (status === "order_created") return "submitted";
-  if (status === "sample_received") return "received";
-  if (status === "intake_approved" || status === "testing_in_progress" || status === "result_entered" || status === "result_reviewed") return "in_progress";
-  if (status === "completed" || status === "result_released" || status === "certificate_issued") return "completed";
-  if (status === "cancelled") return "cancelled";
-  return "submitted";
+  if (status === "sample_received" || status === "intake_approved") return "received";
+  if (status === "testing_in_progress" || status === "result_entered" || status === "result_reviewed") return "in_progress";
+  if (status === "result_released" || status === "certificate_issued") return "completed";
+  // Backend canonical names pass through unchanged
+  return status || "submitted";
 };
 
 const normalizeRole = (value: unknown): LegacyRole => {
@@ -172,27 +169,37 @@ const toLegacyOrder = (order: any): TestOrder => {
     .filter(Boolean);
 
   const backendStatus = String(order?.status || "submitted");
-  const orderNumber = String(order?.id || "");
+  const orderId = String(order?.id || "");
+  const orderNumber = String(order?.orderNumber || orderId).trim() || orderId;
 
   return {
-    id: String(order?.id || ""),
+    id: orderId,
     labId: DEFAULT_LAB_ID,
     animalId: String(firstAnimal?.animalId || ""),
+    animalIds: animals.map((a: any) => String(a?.animalId || "")).filter(Boolean),
     orderNumber,
-    status: mapBackendStatusToLegacy(backendStatus) as any,
+    status: backendStatus as any,
     requestedTests: Array.from(new Set(requestedTests)),
     priority: "routine",
     breederUserId: String(order?.breederId || ""),
     requestedByUserId: String(order?.breederId || ""),
     submittedAt: String(order?.createdAt || ""),
-    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderNumber)}-sample-${index + 1}`),
+    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderId)}-sample-${index + 1}`),
     resultIds: Array.isArray(order?.results)
       ? order.results
           .map((result: any) => String(result?.id || "").trim())
           .filter(Boolean)
       : [],
-    paymentStatus: (backendStatus === "submitted" || backendStatus === "cancelled" ? "pending" : "manually_approved") as any,
+    paymentStatus: (["pending", "invoiced", "paid", "waived"].includes(String(order?.paymentStatus || ""))
+      ? String(order.paymentStatus) === "paid" ? "paid"
+        : String(order.paymentStatus) === "waived" ? "manually_approved"
+        : String(order.paymentStatus) === "invoiced" ? "payment_pending"
+        : "pending"
+      : "pending") as any,
     notes: "",
+    paidAt: String(order?.paidAt || "").trim() || undefined,
+    paymentRequestedAt: String(order?.paymentRequestedAt || "").trim() || undefined,
+    paymentRef: String(order?.paymentRef || "").trim() || undefined,
     createdAt: String(order?.createdAt || ""),
     updatedAt: String(order?.updatedAt || ""),
   };
@@ -224,12 +231,59 @@ const toLegacyPricingConfig = (pricing: any): PricingConfig => ({
 const toLegacyCatalogItem = (test: any): ShedTestCatalogItem => ({
   id: String(test?.id || ""),
   name: String(test?.name || ""),
-  category: String(test?.category || "morph").toLowerCase() === "sex" ? "sex-determination" : "morph",
+  category: (() => {
+    const normalized = String(test?.category || "morph").trim().toLowerCase();
+    if (normalized === "sex" || normalized === "sex-determination") return "sex-determination";
+    if (normalized === "other") return "other";
+    return "morph";
+  })(),
   pricingType: String(test?.pricingType || "morph") === "sex" ? "sex" : "morph",
   active: Boolean(test?.active),
   visibleInBreederApp: Boolean(test?.visibleInBreederApp),
   description: test?.description ? String(test.description) : undefined,
   sortOrder: Number(test?.sortOrder || 0),
+});
+
+const normalizeAllowedPriorities = (
+  value: unknown
+): Array<"routine" | "priority" | "urgent"> => {
+  const priorities = Array.isArray(value)
+    ? Array.from(
+        new Set(
+          value
+            .map((entry) => String(entry || "").trim().toLowerCase())
+            .filter((entry): entry is "routine" | "priority" | "urgent" =>
+              entry === "routine" || entry === "priority" || entry === "urgent"
+            )
+        )
+      )
+    : [];
+  return priorities.length ? priorities : ["routine", "priority", "urgent"];
+};
+
+const toLabAvailableTestRecord = (test: any, index = 0): LabAvailableTest => ({
+  id: String(test?.id || ""),
+  labId: DEFAULT_LAB_ID,
+  internalCode: String(test?.internalCode || test?.id || ""),
+  name: String(test?.name || ""),
+  shortLabel: String(test?.shortLabel || test?.name || "").trim() || undefined,
+  description: test?.description ? String(test.description) : undefined,
+  geneTarget: String(test?.geneTarget || "").trim() || undefined,
+  category: (() => {
+    const normalized = String(test?.category || "morph").trim().toLowerCase();
+    if (normalized === "sex" || normalized === "sex-determination") return "sex-determination";
+    if (normalized === "other") return "other";
+    return "morph";
+  })(),
+  pricingType: String(test?.pricingType || "morph") === "sex" ? "sex" : "morph",
+  priceCents: Number.isFinite(Number(test?.priceCents)) ? Number(test.priceCents) : undefined,
+  currency: String(test?.currency || "EUR").trim() || "EUR",
+  allowedPriorities: normalizeAllowedPriorities(test?.allowedPriorities),
+  isActive: test?.active !== false,
+  isVisibleToBreeder: test?.visibleInBreederApp !== false,
+  sortOrder: Number(test?.sortOrder || index || 0),
+  createdAt: String(test?.createdAt || new Date().toISOString()),
+  updatedAt: String(test?.updatedAt || new Date().toISOString()),
 });
 
 const unsupported = (feature: string): never => {
@@ -274,10 +328,10 @@ const getSharedOrderAnimals = (order: any): any[] =>
   Array.isArray(order?.animals) ? order.animals : [];
 
 const getSharedOrderNumber = (order: any): string =>
-  String(order?.id || "").trim();
+  String(order?.orderNumber || order?.id || "").trim();
 
 const getSharedSampleId = (order: any, index: number): string =>
-  `${sanitizeFilePart(getSharedOrderNumber(order))}-sample-${index + 1}`;
+  `${sanitizeFilePart(String(order?.id || "").trim())}-sample-${index + 1}`;
 
 const getSharedRequestedTestsForAnimal = (animal: any): string[] =>
   Array.isArray(animal?.tests)
@@ -294,9 +348,9 @@ const mapBackendStatusToSampleStatus = (status: string): string => {
 };
 
 const supportsSharedWorkflowTransition = (status: string): boolean =>
-  status === "order_created"
-  || status === "sample_received"
-  || status === "testing_in_progress"
+  status === "submitted"
+  || status === "received"
+  || status === "in_progress"
   || status === "completed"
   || status === "cancelled";
 
@@ -336,33 +390,33 @@ const buildSharedStatusHistory = (order: any): StatusHistory[] => {
   const updatedAt = String(order?.updatedAt || createdAt);
   const backendStatus = String(order?.status || "submitted");
   const entries: StatusHistory[] = [
-    createSyntheticHistoryEntry(orderId, 0, undefined, "order_created", createdAt),
+    createSyntheticHistoryEntry(orderId, 0, undefined, "submitted", createdAt),
   ];
 
   if (backendStatus === "received") {
-    entries.push(createSyntheticHistoryEntry(orderId, 1, "order_created", "sample_received", updatedAt));
+    entries.push(createSyntheticHistoryEntry(orderId, 1, "submitted", "received", updatedAt));
     return entries;
   }
 
   if (backendStatus === "in_progress") {
     entries.push(
-      createSyntheticHistoryEntry(orderId, 1, "order_created", "sample_received", interpolateIso(createdAt, updatedAt, 0.45)),
-      createSyntheticHistoryEntry(orderId, 2, "sample_received", "testing_in_progress", updatedAt)
+      createSyntheticHistoryEntry(orderId, 1, "submitted", "received", interpolateIso(createdAt, updatedAt, 0.45)),
+      createSyntheticHistoryEntry(orderId, 2, "received", "in_progress", updatedAt)
     );
     return entries;
   }
 
   if (backendStatus === "completed") {
     entries.push(
-      createSyntheticHistoryEntry(orderId, 1, "order_created", "sample_received", interpolateIso(createdAt, updatedAt, 0.3)),
-      createSyntheticHistoryEntry(orderId, 2, "sample_received", "testing_in_progress", interpolateIso(createdAt, updatedAt, 0.65)),
-      createSyntheticHistoryEntry(orderId, 3, "testing_in_progress", "completed", updatedAt)
+      createSyntheticHistoryEntry(orderId, 1, "submitted", "received", interpolateIso(createdAt, updatedAt, 0.3)),
+      createSyntheticHistoryEntry(orderId, 2, "received", "in_progress", interpolateIso(createdAt, updatedAt, 0.65)),
+      createSyntheticHistoryEntry(orderId, 3, "in_progress", "completed", updatedAt)
     );
     return entries;
   }
 
   if (backendStatus === "cancelled") {
-    entries.push(createSyntheticHistoryEntry(orderId, 1, "order_created", "cancelled", updatedAt));
+    entries.push(createSyntheticHistoryEntry(orderId, 1, "submitted", "cancelled", updatedAt));
   }
 
   return entries;
@@ -374,24 +428,57 @@ const OUTCOME_TO_RESULT_STATUS = {
   positive: "visual",
 } as const;
 
+const RESULT_OUTCOME_LABELS: Record<string, string> = {
+  positive: "Visual",
+  negative: "Negative",
+  inconclusive: "Inconclusive",
+  carrierDetected: "Heterozygous",
+  notDetected: "Negative",
+};
+
+export const formatLabOutcomeLabel = (value: unknown): string => {
+  const normalized = String(value || "").trim();
+  return RESULT_OUTCOME_LABELS[normalized] || normalized || "-";
+};
+
+export const formatLabTestNumber = (value: unknown, seed: unknown, dateLike?: string): string =>
+  resolveLabTestNumber(value, seed, dateLike);
+
+const normalizeSnakeStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [];
+
 const getSharedPrimaryAnimal = (order: any) => {
   const animals = getSharedOrderAnimals(order);
   return animals[0] || null;
 };
 
-const getSharedOrderedResultItems = (order: any) => {
-  const primaryAnimal = getSharedPrimaryAnimal(order);
-  const tests = Array.isArray(primaryAnimal?.tests) ? primaryAnimal.tests : [];
-
-  return tests.map((test: any, index: number) => {
-    const sourceOrderedName = String(test?.testNameSnapshot || test?.testId || "").trim();
-    return {
-      orderedTestKey: `${String(order?.id || "").trim()}:${sanitizeFilePart(sourceOrderedName)}:${index + 1}`,
-      geneName: sourceOrderedName,
-      sourceOrderedName,
-      catalogTestId: String(test?.testId || "").trim() || undefined,
-    };
+// Build per-animal result item groups. Key format: `${orderId}:${animalId}:${testIndex}`
+const getSharedOrderedAnimalGroups = (order: any) => {
+  const orderId = String(order?.id || "").trim();
+  const animals = getSharedOrderAnimals(order);
+  return animals.map((animal: any) => {
+    const animalId = String(animal?.animalId || "").trim();
+    const animalName = String(animal?.animalName || "").trim();
+    const tests = Array.isArray(animal?.tests) ? animal.tests : [];
+    const items = tests.map((test: any, index: number) => {
+      const sourceOrderedName = String(test?.testNameSnapshot || test?.testId || "").trim();
+      return {
+        orderedTestKey: `${orderId}:${sanitizeFilePart(animalId)}:${index + 1}`,
+        geneName: sourceOrderedName,
+        sourceOrderedName,
+        catalogTestId: String(test?.testId || "").trim() || undefined,
+      };
+    });
+    return { animalId, animalName, items };
   });
+};
+
+// Flat list for backward compat (primary animal only for single-animal code paths)
+const getSharedOrderedResultItems = (order: any) => {
+  const groups = getSharedOrderedAnimalGroups(order);
+  return groups.flatMap((g) => g.items);
 };
 
 const parseSharedResultFindings = (result: any) => {
@@ -411,6 +498,118 @@ const parseSharedResultFindings = (result: any) => {
       notes: String(entry?.notes || "").trim() || undefined,
     }))
     .filter((entry) => entry.marker && entry.outcome);
+};
+
+const toStoredSnakeGeneticsSnapshot = (snake: any) => {
+  if (!snake || typeof snake !== "object") return null;
+  return {
+    morphs: normalizeSnakeStringList(snake.morphs),
+    hets: normalizeSnakeStringList(snake.hets),
+    possibleHets: normalizeSnakeStringList(snake.possibleHets),
+  };
+};
+
+const attachSharedCurrentGenetics = async (order: any, outcome: any) => {
+  const animalId = String(getSharedPrimaryAnimal(order)?.animalId || "").trim();
+  if (!animalId) return outcome;
+  const storedSnake = await loadSnakeById(animalId);
+  const currentGenetics = toStoredSnakeGeneticsSnapshot(storedSnake);
+  if (!currentGenetics) return outcome;
+
+  // Derive geneticsUpdate.applied: true if every lab-confirmed marker now
+  // appears in the snake's current morphs or hets.
+  const confirmedMarkers: Array<{ marker: string; outcome: string }> =
+    Array.isArray(outcome?.labConfirmedMarkers) ? outcome.labConfirmedMarkers : [];
+  let geneticsUpdateApplied = false;
+  if (confirmedMarkers.length > 0) {
+    const allTokens = [
+      ...(currentGenetics.morphs || []),
+      ...(currentGenetics.hets || []),
+    ].map((token) => String(token || "").trim().toLowerCase());
+    geneticsUpdateApplied = confirmedMarkers.every((entry) => {
+      const markerKey = String(entry?.marker || "").trim().toLowerCase();
+      return markerKey && allTokens.some((token) => token.includes(markerKey) || markerKey.includes(token));
+    });
+  }
+
+  return {
+    ...outcome,
+    currentGenetics,
+    geneticsUpdate: geneticsUpdateApplied
+      ? { applied: true, changeLogId: outcome?.geneticsUpdate?.changeLogId || undefined }
+      : outcome?.geneticsUpdate || null,
+  };
+};
+
+const toSharedLocalResultRecord = (order: any, result: any): TestResult | null => {
+  if (!result) return null;
+
+  const legacyOrder = toLegacyOrder(order);
+  if (!legacyOrder.id || !legacyOrder.animalId) return null;
+
+  const findings = parseSharedResultFindings(result) as ResultFinding[];
+  return {
+    id: String(result?.id || "").trim(),
+    labId: DEFAULT_LAB_ID,
+    orderId: legacyOrder.id,
+    sampleId: String(result?.sampleId || getSharedSampleId(order, 0)).trim(),
+    animalId: legacyOrder.animalId,
+    status: String(result?.status || "completed").trim() as TestResult["status"],
+    testCode: resolveLabTestNumber(
+      String(result?.testCode || "").trim(),
+      `${legacyOrder.id}:${String(result?.id || "").trim()}`,
+      String(result?.reportedAt || result?.updatedAt || order?.updatedAt || order?.createdAt || "").trim() || undefined
+    ),
+    method: String(result?.method || "").trim() || undefined,
+    findings,
+    summary: String(result?.summary || "").trim() || undefined,
+    reportedAt: String(result?.reportedAt || "").trim() || undefined,
+    reviewedAt: String(result?.reviewedAt || "").trim() || undefined,
+    releasedAt: String(result?.releasedAt || "").trim() || undefined,
+    analystUserId: String(result?.analystUserId || "").trim() || undefined,
+    reviewerUserId: String(result?.reviewerUserId || "").trim() || undefined,
+    certificateId: String(result?.certificateId || "").trim() || undefined,
+    notes: String(result?.notes || "").trim() || undefined,
+    createdAt: String(result?.createdAt || new Date().toISOString()).trim(),
+    updatedAt: String(result?.updatedAt || result?.createdAt || new Date().toISOString()).trim(),
+  };
+};
+
+const syncSharedResultSnakeGenetics = async (role: LegacyRole, order: any, result: any): Promise<void> => {
+  if (!order || !result) return;
+
+  const legacyOrder = toLegacyOrder(order);
+  const localResult = toSharedLocalResultRecord(order, result);
+  if (!legacyOrder.id || !legacyOrder.animalId || !localResult) return;
+
+  try {
+    await applyConfirmedResultGeneticsUpdate({
+      actor: buildActorFromSessionRole(role),
+      order: legacyOrder,
+      result: localResult,
+    }, {
+      allowNonLabActor: role === "breeder",
+    });
+
+    const updatedSnake = await loadSnakeById(legacyOrder.animalId);
+    if (updatedSnake && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("lab:snake-genetics-updated", {
+        detail: {
+          snakeId: legacyOrder.animalId,
+          snake: updatedSnake,
+        },
+      }));
+    }
+  } catch (error) {
+    console.warn("Failed to synchronize shared lab genetics into local snake data.", error);
+  }
+};
+
+const syncSharedLatestCompletedResultSnakeGenetics = async (role: LegacyRole, order: any): Promise<void> => {
+  const completedResult = (Array.isArray(order?.results) ? order.results : [])
+    .find((entry: any) => String(entry?.status || "").trim() === "completed");
+  if (!completedResult) return;
+  await syncSharedResultSnakeGenetics(role, order, completedResult);
 };
 
 const buildSharedTemplateExistingResult = (result: any) => {
@@ -444,23 +643,113 @@ const buildSharedTemplateExistingResult = (result: any) => {
 };
 
 const buildSharedResultEntryTemplate = (order: any): LabResultEntryTemplate => {
-  const items = getSharedOrderedResultItems(order);
-  const requestedTests = items.map((item) => item.sourceOrderedName);
-  const latestSavedResult = Array.isArray(order?.results) ? order.results[0] || null : null;
+  const animalGroups = getSharedOrderedAnimalGroups(order);
+  const allItems = animalGroups.flatMap((g) => g.items);
+  const requestedTests = allItems.map((item) => item.sourceOrderedName);
+  const savedResults: any[] = Array.isArray(order?.results) ? order.results : [];
+
+  // Build per-animal groups with their existing result (matched by animalId)
+  const animals = animalGroups.map((group) => {
+    const existingResult =
+      savedResults.find((r: any) => String(r?.animalId || "").trim() === group.animalId) ||
+      (animalGroups.length === 1 ? savedResults[0] || null : null);
+    return {
+      ...group,
+      existingResult: buildSharedTemplateExistingResult(existingResult),
+    };
+  });
 
   return {
     orderId: String(order?.id || "").trim(),
     requestedTests,
-    items,
-    existingResult: buildSharedTemplateExistingResult(latestSavedResult),
+    animals,
+    items: allItems,
+    existingResult: buildSharedTemplateExistingResult(savedResults[0] || null),
   };
 };
 
-const buildSharedOrderOutcome = (order: any) => {
+const buildSharedCertificateNumber = (order: any, issuedAt: string): string => {
+  const parsed = new Date(issuedAt || "");
+  const stamp = Number.isNaN(parsed.getTime())
+    ? String(issuedAt || "").replace(/[^0-9]/g, "").slice(0, 8)
+    : [
+        parsed.getFullYear(),
+        String(parsed.getMonth() + 1).padStart(2, "0"),
+        String(parsed.getDate()).padStart(2, "0"),
+      ].join("");
+  const suffix = String(order?.id || "").replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase() || "GEN";
+  return `PH-GC-${stamp || "00000000"}-${suffix}`;
+};
+
+const buildSharedCertificateSummary = async (order: any, result: any) => {
+  const orderId = String(order?.id || "").trim();
+  const resultId = String(result?.id || result?.testCode || "").trim() || "result";
+  const issuedAt = String(result?.reportedAt || result?.updatedAt || order?.updatedAt || order?.createdAt || new Date().toISOString()).trim();
+  const certificateHash = await buildStableQrToken(`${orderId}:${resultId}:certificate`);
+  const verificationHash = await buildStableQrToken(`${orderId}:${resultId}:verification`);
+  const certificateId = `shared-cert-${sanitizeFilePart(orderId || "order")}-${certificateHash.slice(0, 12).toLowerCase()}`;
+
+  return {
+    id: certificateId,
+    status: "issued",
+    certificateNumber: buildSharedCertificateNumber(order, issuedAt),
+    issuedAt,
+    fileUrl: `lab-certificate://${certificateId}`,
+    verificationCode: verificationHash.slice(0, 24).toUpperCase(),
+  };
+};
+
+const buildSharedCertificateTemplate = async (order: any, result: any, certificate: any, preUpdateSnake?: any) => {
   const legacyOrder = toLegacyOrder(order);
-  const finalizedResults = (Array.isArray(order?.results) ? order.results : [])
-    .filter((result: any) => String(result?.status || "").trim() === "completed")
-    .map((result: any) => {
+  const localResult = toSharedLocalResultRecord(order, result);
+  if (!localResult) {
+    throw new Error("Finalized result could not be converted into a certificate.");
+  }
+
+  // Use the pre-update snake snapshot when provided so the certificate morph column
+  // reflects the snake's known genetics at the time of testing (before the lab result
+  // was incorporated). Fall back to current stored data if no snapshot was captured.
+  const [breederInfo, snake] = await Promise.all([
+    loadBreederInfo(),
+    preUpdateSnake !== undefined
+      ? Promise.resolve(preUpdateSnake)
+      : legacyOrder.animalId ? loadSnakeById(legacyOrder.animalId) : Promise.resolve(null),
+  ]);
+
+  return buildLabCertificateTemplateData({
+    order: legacyOrder,
+    result: localResult,
+    certificateId: String(certificate?.id || "").trim(),
+    certificateNumber: String(certificate?.certificateNumber || "").trim(),
+    verificationCode: String(certificate?.verificationCode || "").trim(),
+    issueDateIso: String(certificate?.issuedAt || "").trim() || undefined,
+    breeder: {
+      name: String(breederInfo?.name || order?.breeder?.fullName || order?.breeder?.email || "").trim() || undefined,
+      businessName: String(breederInfo?.businessName || "").trim() || undefined,
+      email: String(breederInfo?.email || order?.breeder?.email || "").trim() || undefined,
+      phone: String(breederInfo?.phone || "").trim() || undefined,
+      street: String(breederInfo?.street || breederInfo?.addressLine1 || "").trim() || undefined,
+      addressLine1: String(breederInfo?.addressLine1 || breederInfo?.street || "").trim() || undefined,
+      addressLine2: String(breederInfo?.addressLine2 || "").trim() || undefined,
+      city: String(breederInfo?.city || "").trim() || undefined,
+      stateOrRegion: String(breederInfo?.stateOrRegion || breederInfo?.state || "").trim() || undefined,
+      postalCode: String(breederInfo?.postalCode || "").trim() || undefined,
+      country: String(breederInfo?.country || "").trim() || undefined,
+    },
+    snake,
+  });
+};
+
+const buildSharedOrderOutcome = async (order: any) => {
+  const legacyOrder = toLegacyOrder(order);
+  const completedResults = (Array.isArray(order?.results) ? order.results : [])
+    .filter((result: any) => String(result?.status || "").trim() === "completed");
+  const certificate = completedResults[0]
+    ? await buildSharedCertificateSummary(order, completedResults[0])
+    : null;
+  const latestCompletedResultId = String(completedResults[0]?.id || "").trim();
+
+  const finalizedResults = completedResults.map((result: any) => {
       const findings = parseSharedResultFindings(result);
       return {
         id: String(result?.id || "").trim(),
@@ -471,7 +760,9 @@ const buildSharedOrderOutcome = (order: any) => {
         reportedAt: String(result?.reportedAt || "").trim() || undefined,
         reviewedAt: undefined,
         releasedAt: undefined,
-        certificateId: undefined,
+        certificateId: certificate && String(result?.id || "").trim() === latestCompletedResultId
+          ? certificate.id
+          : undefined,
       };
     });
 
@@ -487,7 +778,7 @@ const buildSharedOrderOutcome = (order: any) => {
     order: legacyOrder,
     latestResult: finalizedResults[0] || null,
     geneticsUpdate: null,
-    certificate: null,
+    certificate,
     resultHistory: finalizedResults,
     labConfirmedMarkers,
     currentGenetics: null,
@@ -631,7 +922,7 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
   const labelSize = getActiveLabelSize(breederInfo);
   const debug = await isLabLabelDebugEnabled();
   const normalizedOrderId = String(order?.id || "").trim();
-  const orderNumber = String(order?.id || "").trim() || normalizedOrderId;
+  const orderNumber = getSharedOrderNumber(order) || normalizedOrderId;
   const animals = Array.isArray(order?.animals) ? order.animals : [];
   const breederName = String(
     breederInfo?.name ||
@@ -646,7 +937,7 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
     animals.map(async (animal: any, index: number) => {
       const animalId = String(animal?.animalId || "").trim();
       const storedSnake = animalId ? await loadSnakeById(animalId) : null;
-      const sampleId = `${sanitizeFilePart(orderNumber)}-sample-${index + 1}`;
+      const sampleId = getSharedSampleId(order, index);
       const qrToken = await buildStableQrToken(`${normalizedOrderId}:${animalId}:${sampleId}`);
       const requestedTests = Array.isArray(animal?.tests)
         ? animal.tests
@@ -738,6 +1029,28 @@ export const createLabApiClient = () => {
     return { order: toLegacyOrder((created as any)?.order || null) } as any;
   };
 
+  const createBatchOrder = async (
+    items: { snakeId: string; snakeName?: string; selectedTestIds: string[] }[]
+  ): Promise<{ order: TestOrder }> => {
+    requireSessionRole("breeder");
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("No animals in batch.");
+    }
+    const animals = items.map((item) => ({
+      animalId: String(item.snakeId || "").trim(),
+      animalName: String(item.snakeName || "").trim() || undefined,
+      selectedTestIds: Array.from(
+        new Set((item.selectedTestIds || []).map((id) => String(id || "").trim()).filter(Boolean))
+      ),
+    }));
+    const invalid = animals.find((a) => !a.animalId || a.selectedTestIds.length === 0);
+    if (invalid) {
+      throw new Error("Each animal must have an ID and at least one selected test.");
+    }
+    const created = await createOrder({ animals } as any);
+    return { order: toLegacyOrder((created as any)?.order || null) };
+  };
+
   const listBreederTestOrders = async (): Promise<TestOrder[]> => {
     requireSessionRole("breeder");
     const data = await fetchMyOrders();
@@ -748,7 +1061,12 @@ export const createLabApiClient = () => {
   const listBreederTestOrdersForSnake = async (snakeId: string): Promise<TestOrder[]> => {
     const normalized = String(snakeId || "").trim();
     const orders = await listBreederTestOrders();
-    return orders.filter((order) => String(order.animalId || "").trim() === normalized);
+    return orders.filter((order) => {
+      const ids: string[] = Array.isArray(order.animalIds) && order.animalIds.length
+        ? order.animalIds
+        : [String(order.animalId || "").trim()].filter(Boolean);
+      return ids.some((id) => id === normalized);
+    });
   };
 
   const getBreederTestOrderDetails = async (orderId: string): Promise<TestOrder> => {
@@ -758,14 +1076,46 @@ export const createLabApiClient = () => {
   };
 
   const getBreederOrderOutcome = async (orderId: string) => {
-    requireSessionRole("breeder");
+    const role = requireSessionRole("breeder");
     const order = await fetchSharedOrderRaw(orderId);
-    return buildSharedOrderOutcome(order);
+    await syncSharedLatestCompletedResultSnakeGenetics(role, order);
+    return attachSharedCurrentGenetics(order, await buildSharedOrderOutcome(order));
   };
 
   const getBreederCertificateArtifact = async (orderId: string) => {
-    requireSessionRole("breeder");
-    return unsupported("Certificate artifact retrieval");
+    const role = requireSessionRole("breeder", "admin", "lab_staff");
+    const order = await fetchSharedOrderRaw(orderId);
+    if (!order) {
+      throw new Error("Order not found.");
+    }
+
+    const completedResult = (Array.isArray(order?.results) ? order.results : [])
+      .find((entry: any) => String(entry?.status || "").trim() === "completed");
+    if (!completedResult) {
+      throw new Error("Certificate is not available for this order yet.");
+    }
+
+    // Capture the snake's genetics BEFORE syncing the lab result so the certificate
+    // morph column shows the snake's known morphs at the time of testing.
+    const legacyOrderForSnap = toLegacyOrder(order);
+    const preUpdateSnake = legacyOrderForSnap.animalId
+      ? await loadSnakeById(legacyOrderForSnap.animalId)
+      : null;
+
+    await syncSharedResultSnakeGenetics(role, order, completedResult);
+    const certificate = await buildSharedCertificateSummary(order, completedResult);
+    const template = await buildSharedCertificateTemplate(order, completedResult, certificate, preUpdateSnake);
+    const rendered = await renderLabCertificatePdf(template, { includeQr: false });
+
+    return {
+      certificateId: certificate.id,
+      certificateNumber: certificate.certificateNumber,
+      issuedAt: certificate.issuedAt,
+      fileName: `${sanitizeFilePart(certificate.certificateNumber || certificate.id)}.pdf`,
+      mimeType: "application/pdf" as const,
+      base64: bytesToBase64(rendered.arrayBuffer),
+      byteLength: rendered.byteLength,
+    };
   };
 
   const listLabTestOrders = async (): Promise<TestOrder[]> => {
@@ -775,9 +1125,10 @@ export const createLabApiClient = () => {
   };
 
   const getLabOrderOutcome = async (orderId: string) => {
-    requireSessionRole("admin", "lab_staff", "breeder");
+    const role = requireSessionRole("admin", "lab_staff", "breeder");
     const order = await fetchSharedOrderRaw(orderId);
-    return buildSharedOrderOutcome(order);
+    await syncSharedLatestCompletedResultSnakeGenetics(role, order);
+    return attachSharedCurrentGenetics(order, await buildSharedOrderOutcome(order));
   };
 
   const resolveLabSampleByQrToken = async (rawInput: string) => {
@@ -817,7 +1168,7 @@ export const createLabApiClient = () => {
     requireSessionRole("admin", "lab_staff");
     const resolved = await resolveLabSampleBySampleId(sampleId);
     const currentStatus = String(resolved?.testOrder?.status || "").trim();
-    if (currentStatus === "sample_received" || currentStatus === "testing_in_progress" || currentStatus === "completed" || currentStatus === "cancelled") {
+    if (currentStatus === "received" || currentStatus === "in_progress" || currentStatus === "completed" || currentStatus === "cancelled") {
       return {
         ...resolved,
         alreadyReceived: true,
@@ -868,9 +1219,26 @@ export const createLabApiClient = () => {
     return toLegacyOrder(response?.order || null);
   };
 
-  const updateLabOrderPaymentStatus = async (input: { orderId: string; paymentStatus: string; reason?: string; }): Promise<TestOrder> => {
+  const updateLabOrderPaymentStatus = async (input: { orderId: string; paymentStatus: string; paymentRef?: string; }): Promise<TestOrder> => {
     requireSessionRole("admin", "lab_staff");
-    return unsupported("Payment status changes");
+    // Map legacy status names to the canonical backend enum values
+    const statusMap: Record<string, string> = {
+      pending: "pending",
+      payment_pending: "invoiced",
+      paid: "paid",
+      manually_approved: "waived",
+      refunded: "waived",
+      failed: "pending",
+    };
+    const backendPaymentStatus = statusMap[String(input.paymentStatus || "").trim()] || "pending";
+    const response = await apiRequest<{ order: any }>(
+      `/lab/orders/${encodeURIComponent(String(input.orderId || "").trim())}/payment`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus: backendPaymentStatus, paymentRef: input.paymentRef }),
+      }
+    );
+    return toLegacyOrder(response?.order || null);
   };
 
   const getBreederShipmentLabelArtifact = async (orderId: string) => {
@@ -992,24 +1360,9 @@ export const createLabApiClient = () => {
 
   const listLabAvailableTests = async (): Promise<LabAvailableTest[]> => {
     requireSessionRole("admin", "lab_staff");
-    const tests = await getLabTestsCatalog({ breederView: false });
-    return tests.map((test, index) => ({
-      id: test.id,
-      labId: DEFAULT_LAB_ID,
-      internalCode: test.id,
-      name: test.name,
-      shortLabel: test.name,
-      description: test.description,
-      category: test.category,
-      pricingType: test.pricingType,
-      currency: "EUR",
-      allowedPriorities: ["routine", "priority", "urgent"],
-      isActive: test.active,
-      isVisibleToBreeder: test.visibleInBreederApp,
-      sortOrder: Number(test.sortOrder || index),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+    const response = await apiRequest<{ tests: any[] }>("/lab/tests/catalog?breederView=false");
+    const tests = Array.isArray(response?.tests) ? response.tests : [];
+    return tests.map((test, index) => toLabAvailableTestRecord(test, index));
   };
 
   const createLabAvailableTest = async (input: CreateLabAvailableTestInput): Promise<LabAvailableTest> => {
@@ -1019,28 +1372,30 @@ export const createLabApiClient = () => {
 
   const updateLabAvailableTest = async (input: UpdateLabAvailableTestInput): Promise<LabAvailableTest> => {
     requireSessionRole("admin", "lab_staff");
+    const payload: Record<string, unknown> = {};
+
+    if (input.name !== undefined) payload.name = String(input.name || "").trim();
+    if (input.shortLabel !== undefined) payload.shortLabel = String(input.shortLabel || "").trim() || null;
+    if (input.description !== undefined) payload.description = String(input.description || "").trim() || null;
+    if (input.geneTarget !== undefined) payload.geneTarget = String(input.geneTarget || "").trim() || null;
+    if (input.category !== undefined) payload.category = input.category;
+    if (input.pricingType !== undefined) payload.pricingType = input.pricingType;
+    if (input.priceCents !== undefined) {
+      payload.priceCents = Number.isFinite(Number(input.priceCents))
+        ? Math.max(0, Math.round(Number(input.priceCents)))
+        : null;
+    }
+    if (input.currency !== undefined) payload.currency = String(input.currency || "EUR").trim().toUpperCase() || "EUR";
+    if (input.allowedPriorities !== undefined) payload.allowedPriorities = normalizeAllowedPriorities(input.allowedPriorities);
+    if (input.sortOrder !== undefined) payload.sortOrder = Math.max(0, Math.round(Number(input.sortOrder) || 0));
+    if (input.isActive !== undefined) payload.active = Boolean(input.isActive);
+    if (input.isVisibleToBreeder !== undefined) payload.visibleInBreederApp = Boolean(input.isVisibleToBreeder);
+
     const response = await apiRequest<{ test: any }>(`/lab/tests/catalog/${encodeURIComponent(String(input.id || "").trim())}`, {
       method: "PATCH",
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
-    const item = toLegacyCatalogItem(response?.test || null);
-    return {
-      id: item.id,
-      labId: DEFAULT_LAB_ID,
-      internalCode: item.id,
-      name: item.name,
-      shortLabel: item.name,
-      description: item.description,
-      category: item.category,
-      pricingType: item.pricingType,
-      currency: "EUR",
-      allowedPriorities: ["routine", "priority", "urgent"],
-      isActive: item.active,
-      isVisibleToBreeder: item.visibleInBreederApp,
-      sortOrder: Number(item.sortOrder || 0),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    return toLabAvailableTestRecord(response?.test || null);
   };
 
   const setLabAvailableTestActive = async (id: string, isActive: boolean): Promise<LabAvailableTest> => {
@@ -1065,6 +1420,22 @@ export const createLabApiClient = () => {
   }> => {
     requireSessionRole("admin", "lab_staff");
     return apiRequest("/lab/orders", {
+      method: "DELETE",
+    });
+  };
+
+  const deleteLabOrder = async (orderId: string): Promise<{
+    deletedOrderId: string;
+    deletedAnimals: number;
+    deletedAnimalTests: number;
+    deletedResults: number;
+  }> => {
+    requireSessionRole("admin", "lab_staff");
+    const normalized = String(orderId || "").trim();
+    if (!normalized) {
+      throw new Error("orderId is required.");
+    }
+    return apiRequest(`/lab/orders/${encodeURIComponent(normalized)}`, {
       method: "DELETE",
     });
   };
@@ -1099,13 +1470,13 @@ export const createLabApiClient = () => {
       return [];
     }
 
-    if (currentStatus === "order_created") {
-      return ["sample_received", "cancelled"];
+    if (currentStatus === "submitted") {
+      return ["received", "cancelled"];
     }
-    if (currentStatus === "sample_received") {
-      return ["testing_in_progress", "cancelled"];
+    if (currentStatus === "received") {
+      return ["in_progress", "cancelled"];
     }
-    if (currentStatus === "testing_in_progress") {
+    if (currentStatus === "in_progress") {
       return ["completed", "cancelled"];
     }
     return [];
@@ -1140,7 +1511,7 @@ export const createLabApiClient = () => {
   };
 
   const submitLabResult = async (payload: any): Promise<any> => {
-    requireSessionRole("admin", "lab_staff");
+    const role = requireSessionRole("admin", "lab_staff");
     const orderId = String(payload?.orderId || "").trim();
     if (!orderId) {
       throw new Error("orderId is required.");
@@ -1149,6 +1520,7 @@ export const createLabApiClient = () => {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    await syncSharedResultSnakeGenetics(role, response?.order || null, response?.result || null);
     return {
       ...response,
       order: toLegacyOrder(response?.order || null),
@@ -1163,6 +1535,7 @@ export const createLabApiClient = () => {
 
   return {
     createTestOrderFromBreeder,
+    createBatchOrder,
     listBreederTestOrders,
     listBreederTestOrdersForSnake,
     getBreederTestOrderDetails,
@@ -1199,6 +1572,7 @@ export const createLabApiClient = () => {
     setLabAvailableTestActive,
     setLabAvailableTestVisibility,
     listAdminAllOrders,
+    deleteLabOrder,
     deleteAllLabOrders,
     getAdminOrderOversight,
     adminCorrectOrderStatus,

@@ -1,148 +1,171 @@
-﻿{
-	"title": "Breeding Advisor",
-	"description": "We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal.",
-	"goal": {
-		"label": "Goal (Name and Traits)",
-		"placeholder": "Visual Clown: Clown, het Desert Ghost",
-		"tip": "Format tip: \"Goal Name: trait one, trait two\". If you only list traits, we’ll build a generic goal.",
-		"defaultName": "Custom goal"
-	},
-	"status": {
-		"heading": "Status"
-	},
-	"summary": {
-		"loading": "Crunching punnett squares…",
-		"ready": "Run the advisor to discover promising pairings.",
-		"supportingOnly": "No pairs meet the high-confidence bar yet, but here are {{count}} options to review.",
-		"noConfidence": "No pairings crossed the confidence bar. Try adjusting your collections or goals.",
-		"confidentCount": "{{count}} pairing(s) meet the ≥ {{threshold}} goal confidence target."
-	},
-	"stats": {
-		"males": "{{count}} breeder male",
-		"males_plural": "{{count}} breeder males",
-		"females": "{{count}} breeder female",
-		"females_plural": "{{count}} breeder females",
-		"confidenceBar": "Confidence bar ≥ {{threshold}}"
-	},
-	"buttons": {
-		"run": "Run Advisor",
-		"generating": "Generating...",
-		"reset": "Reset Advisor"
-	},
-	"errors": {
-		"noBreeders": "Add animals to the Breeders group to see advisor recommendations.",
-		"noGoals": "Add goal traits before running the advisor.",
-		"failure": "Failed to generate suggestions."
-	},
-	"cards": {
-		"goalSuccessLabel": "Goal success chance:",
-		"belowTarget": "(below confidence target)",
-		"demandSignals": "Demand signals:",
-		"priceRange": "Price guidance: {{range}}",
-		"sources": "Sources:",
-		"additionalHeading": "Additional pairings worth reviewing",
-		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
-	},
-	"genes": {
-		"goalVisuals": "Goal Visuals",
-		"goalHets": "Goal Hets",
-		"projectedVisuals": "Projected Visuals",
-		"projectedHets": "Projected Hets",
-		"holdbackVisuals": "Holdback Visuals",
-		"holdbackHets": "Holdback Hets",
-		"nextVisuals": "Next-Gen Visuals",
-		"nextHets": "Next-Gen Hets",
-		"focusVisuals": "Focus Visuals",
-		"focusHets": "Focus Hets"
-	},
-	"plan": {
-		"title": "Multi-generation plan ({{strategy}})",
-		"strategy": {
-			"multi": "2-step",
-			"direct": "direct"
-		},
-		"combinedProbability": "Combined ≈ {{value}}",
-		"generationLabel": "Generation {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
-		"goalProbability": "Goal ≈ {{value}}",
-		"holdbackProbability": "Holdback ≈ {{value}}",
-		"holdbackGenes": "Holdback genes: {{genes}}",
-		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
-		"status": {
-			"visual": "Visual",
-			"het": "Het",
-			"possibleHet": "Possible het",
-			"none": "Normal"
-		},
-		"expectation": {
-			"none-visual": "100% het",
-			"het-het": "≈66% het",
-			"het-none": "≈50% het"
-		}
-	},
-	"labels": {
-		"unknownAnimal": "Unknown",
-		"holdbackMale": "Holdback Male",
-		"holdbackFemale": "Holdback Female",
-		"holdback": "Holdback"
-	},
-	"outcomes": {
-		"none": "No projection available.",
-		"unknownMorph": "Unknown morph",
-		"probability": "{{genotype}} ({{chance}} appearance chance)"
-	},
-	"goals": {
-		"title": "Goals",
-		"add": "Add Goal",
-		"empty": "No goals yet. Add one to tailor suggestions.",
-		"namePlaceholder": "Goal name",
-		"remove": "Remove",
-		"requireAll": {
-			"label": "Require all",
-			"placeholder": "Add trait and press Enter"
-		},
-		"requireAny": {
-			"label": "Require any",
-			"placeholder": "Optional traits"
-		},
-		"avoid": {
-			"label": "Avoid",
-			"placeholder": "Problem traits"
-		},
-		"recessiveState": {
-			"label": "Recessive state",
-			"any": "Any",
-			"visual": "Visual",
-			"het": "Het",
-			"possibleHet": "Possible het"
-		},
-		"minProbability": "Min probability ({{percent}}%)",
-		"weight": "Weight ({{value}})",
-		"idLabel": "ID: {{id}}",
-		"loadPreset": "Load Preset",
-		"presets": {
-			"title": "Presets",
-			"close": "Close"
-		},
-		"defaultName": "New goal"
-	},
-	"api": {
-		"rationaleSummary": "Projected score {{score}} with demand index {{demand}}. {{goalSummary}}",
-		"noGoalTargets": "No specific goal targets.",
-		"goalSummary": "{{prob}}% chance to hit goal '{{goal}}'.",
-		"watchouts": " Watchouts: {{list}}.",
-		"sources": " Sources: {{list}}.",
-		"plan": {
-			"stepTitle": "Generation {{generation}}: {{male}} × {{female}}",
-			"directSummary": "Direct chance to reach the goal is {{chance}}%.",
-			"holdbackSummary": "No direct visual expected; produce holdbacks carrying {{traits}}.",
-			"adjustedSummary": "Direct goal chance {{chance}}%. Prioritize producing holdbacks carrying {{holdback}}.",
-			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Retain the {{sex}} holdback ({{holdback}}). Pair with {{partner}} for {{chance}}% chance at the goal.",
-			"holdbackSex": {
-				"female": "female",
-				"male": "male"
-			}
-		}
-	}
+{
+  "title": "יועץ רבייה",
+  "description": "אנחנו בודקים רק חיות בקבוצת <strong>Breeders</strong> ומציגים זיווגים עם סיכוי גבוה מאוד להפיק את יעד המורף שבחרת.",
+  "goal": {
+    "label": "יעד (שם ותכונות)",
+    "placeholder": "Clown ויזואלי: Clown, het Desert Ghost",
+    "tip": "טיפ לפורמט: \"שם יעד: תכונה אחת, תכונה שתיים\". אם תכתוב רק תכונות, ניצור יעד כללי.",
+    "defaultName": "יעד מותאם אישית",
+    "freeTextPlaceholder": "אני רוצה ליצור clown desert ghost עם pastel ו-possible het pied",
+    "freeTextTip": "כתוב את היעד בצורה טבעית. היועץ מתאים שמות מורפים וכינויים ממסד הנתונים אוטומטית, כך שאין חובה להשתמש בפסיקים."
+  },
+  "status": {
+    "heading": "סטטוס"
+  },
+  "summary": {
+    "loading": "מחשב ריבועי פנט...",
+    "ready": "הפעל את היועץ כדי למצוא זיווגים מבטיחים.",
+    "supportingOnly": "אין עדיין זוגות שעוברים את רף הביטחון הגבוה, אבל יש {{count}} אפשרויות לבדיקה.",
+    "noConfidence": "אף זיווג לא עבר את רף הביטחון. נסה להתאים את האוסף או את היעדים.",
+    "confidentCount": "{{count}} זיווגים עומדים ביעד ביטחון של ≥ {{threshold}}."
+  },
+  "stats": {
+    "males": "{{count}} זכר רבייה",
+    "males_plural": "{{count}} זכרי רבייה",
+    "females": "{{count}} נקבת רבייה",
+    "females_plural": "{{count}} נקבות רבייה",
+    "malesFiltered": "{{filtered}}/{{total}} זכרי רבייה התאימו ליעד",
+    "femalesFiltered": "{{filtered}}/{{total}} נקבות רבייה התאימו ליעד",
+    "confidenceBar": "רף ביטחון ≥ {{threshold}}"
+  },
+  "buttons": {
+    "run": "הפעל יועץ",
+    "generating": "מחשב...",
+    "reset": "אפס יועץ",
+    "exportPairingsByMale": "ייצא לפי זיווג (זכר → נקבות)"
+  },
+  "errors": {
+    "noBreeders": "הוסף חיות לקבוצת Breeders כדי לראות המלצות מהיועץ.",
+    "noGoals": "הוסף תכונות יעד לפני הפעלת היועץ.",
+    "noRelevantAnimals": "אין חיות רבייה שנושאות גנים הקשורים ליעד הזה. הוסף חיות עם הגנטיקה המבוקשת לקבוצת Breeders.",
+    "failure": "יצירת ההצעות נכשלה."
+  },
+  "cards": {
+    "goalSuccessLabel": "סיכוי הצלחה ליעד:",
+    "belowTarget": "(מתחת לרף הביטחון)",
+    "demandSignals": "סימני ביקוש:",
+    "priceRange": "הערכת מחיר: {{range}}",
+    "sources": "מקורות:",
+    "additionalHeading": "זיווגים נוספים שכדאי לבדוק",
+    "readyCallout": "מוכן כשאתה מוכן - לחץ על <strong>הפעל יועץ</strong> כדי למצוא את זיווגי הרבייה החזקים ביותר.",
+    "actions": {
+      "accept": "קבל",
+      "plan": "המר לתוכנית",
+      "showPlan": "הצג תוכנית רבייה",
+      "ignore": "התעלם"
+    }
+  },
+  "genes": {
+    "goalVisuals": "ויזואלים ביעד",
+    "goalHets": "הטים ביעד",
+    "projectedVisuals": "ויזואלים צפויים",
+    "projectedHets": "הטים צפויים",
+    "holdbackVisuals": "ויזואלים לשמירה",
+    "holdbackHets": "הטים לשמירה",
+    "nextVisuals": "ויזואלים בדור הבא",
+    "nextHets": "הטים בדור הבא",
+    "focusVisuals": "ויזואלים במיקוד",
+    "focusHets": "הטים במיקוד"
+  },
+  "plan": {
+    "title": "תוכנית רב-דורית ({{strategy}})",
+    "strategy": {
+      "multi": "2 שלבים",
+      "direct": "ישיר"
+    },
+    "combinedProbability": "משולב ≈ {{value}}",
+    "generationLabel": "דור {{generation}}",
+    "prereqProbability": "תנאי מקדים ≈ {{value}}",
+    "goalProbability": "יעד ≈ {{value}}",
+    "holdbackProbability": "שמירה ≈ {{value}}",
+    "holdbackGenes": "גנים לשמירה: {{genes}}",
+    "hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
+    "flowchartUnavailable": "לא ניתן היה ליצור תרשים רבייה עבור ההצעה הזו.",
+    "status": {
+      "visual": "ויזואלי",
+      "het": "הט",
+      "possibleHet": "הט אפשרי",
+      "none": "רגיל"
+    },
+    "expectation": {
+      "none-visual": "100% הט",
+      "het-het": "≈66% הט",
+      "het-none": "≈50% הט"
+    }
+  },
+  "labels": {
+    "unknownAnimal": "לא ידוע",
+    "holdbackMale": "זכר לשמירה",
+    "holdbackFemale": "נקבה לשמירה",
+    "holdback": "לשמירה"
+  },
+  "outcomes": {
+    "none": "אין תחזית זמינה.",
+    "unknownMorph": "מורף לא ידוע",
+    "probability": "{{genotype}} (סיכוי הופעה {{chance}})"
+  },
+  "goals": {
+    "title": "יעדים",
+    "add": "הוסף יעד",
+    "empty": "אין עדיין יעדים. הוסף יעד כדי להתאים את ההצעות.",
+    "namePlaceholder": "שם יעד",
+    "remove": "הסר",
+    "requireAll": {
+      "label": "חייב לכלול הכל",
+      "placeholder": "הוסף תכונה ולחץ Enter"
+    },
+    "requireAny": {
+      "label": "חייב לכלול אחד",
+      "placeholder": "תכונות אופציונליות"
+    },
+    "avoid": {
+      "label": "להימנע",
+      "placeholder": "תכונות בעייתיות"
+    },
+    "recessiveState": {
+      "label": "מצב רצסיבי",
+      "any": "כל מצב",
+      "visual": "ויזואלי",
+      "het": "הט",
+      "possibleHet": "הט אפשרי"
+    },
+    "minProbability": "הסתברות מינימלית ({{percent}}%)",
+    "weight": "משקל ({{value}})",
+    "idLabel": "מזהה: {{id}}",
+    "loadPreset": "טען תבנית",
+    "presets": {
+      "title": "תבניות",
+      "close": "סגור"
+    },
+    "defaultName": "יעד חדש"
+  },
+  "progress": {
+    "titleRunning": "יועץ הרבייה פועל",
+    "running": "הניתוח מתבצע...",
+    "waiting": "ממתין לתחילת הניתוח...",
+    "scanned": "עובדו {{count}} נחשים",
+    "relevant": "{{count}} מועמדים רלוונטיים",
+    "strongPairings": "נמצאו {{count}} זיווגים חזקים",
+    "retry": "נסה שוב",
+    "viewResults": "הצג תוצאות"
+  },
+  "api": {
+    "rationaleSummary": "ציון צפוי {{score}} עם מדד ביקוש {{demand}}. {{goalSummary}}",
+    "noGoalTargets": "אין יעדי מטרה ספציפיים.",
+    "goalSummary": "סיכוי של {{prob}}% להגיע ליעד \"{{goal}}\".",
+    "watchouts": " נקודות לשים לב: {{list}}.",
+    "sources": " מקורות: {{list}}.",
+    "plan": {
+      "stepTitle": "דור {{generation}}: {{male}} × {{female}}",
+      "directSummary": "הסיכוי הישיר להגיע ליעד הוא {{chance}}%.",
+      "holdbackSummary": "לא צפוי ויזואל ישיר; יש לייצר צאצאים לשמירה שנושאים {{traits}}.",
+      "adjustedSummary": "סיכוי יעד ישיר {{chance}}%. תעדף יצירת צאצאים לשמירה שנושאים {{holdback}}.",
+      "secondTitle": "דור {{generation}}: צאצא שמור × {{partner}}",
+      "secondSummary": "שמור את ה{{sex}} ({{holdback}}). זווג עם {{partner}} לקבלת סיכוי של {{chance}}% ליעד.",
+      "holdbackSex": {
+        "female": "נקבה",
+        "male": "זכר"
+      }
+    }
+  }
 }

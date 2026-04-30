@@ -4,6 +4,19 @@ type RecessiveState = Goal["recessiveState"];
 
 const normalize = (value: string): string => value.trim().toLowerCase();
 
+const normalizeTraitName = (value: string): string =>
+  normalize(value)
+    .replace(/\(([^)]*)\)/g, " $1 ")
+    .replace(/\b(?:possible|pos|probable|het|ph|carrier)\b/g, "")
+    .replace(/\d+(?:\.\d+)?\s*%/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isHetLabel = (value: string): boolean => /\bhet\b/i.test(value);
+
+const isPossibleHetLabel = (value: string): boolean =>
+  /\b(?:possible|pos|probable|ph)\b/i.test(value) || /\d+(?:\.\d+)?\s*%/.test(value);
+
 const traitMatches = (label: string, target: string): boolean => {
   const normalizedLabel = normalize(label);
   const normalizedTarget = normalize(target);
@@ -36,8 +49,30 @@ const expandAliases = (label: string, goal: Goal): string[] => {
 };
 
 const phenotypeMatches = (phenotype: string[], label: string, goal: Goal): boolean => {
+  const targetGene = normalizeTraitName(label);
+  if (!targetGene) return false;
+
+  if (goal.recessiveState === "visual") {
+    return phenotype.some((entry) => !isHetLabel(entry) && normalizeTraitName(entry) === targetGene);
+  }
+
+  if (goal.recessiveState === "het") {
+    return phenotype.some((entry) => isHetLabel(entry) && !isPossibleHetLabel(entry) && normalizeTraitName(entry) === targetGene);
+  }
+
+  if (goal.recessiveState === "possibleHet") {
+    return phenotype.some((entry) => isHetLabel(entry) && normalizeTraitName(entry) === targetGene);
+  }
+
+  if (isHetLabel(label) || isPossibleHetLabel(label)) {
+    return phenotype.some((entry) => isHetLabel(entry) && normalizeTraitName(entry) === targetGene);
+  }
+
   const aliases = expandAliases(label, goal);
-  return aliases.some((alias) => phenotype.some((entry) => traitMatches(entry, alias)));
+  return aliases.some((alias) => phenotype.some((entry) => {
+    if (isHetLabel(entry)) return normalize(entry) === normalize(alias);
+    return traitMatches(entry, alias);
+  }));
 };
 
 const carriesRecessivePotential = (animal: Animal, gene: string): boolean => {

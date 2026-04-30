@@ -10,13 +10,16 @@ export {
   fetchPricingConfig,
   fetchTestCatalog,
   getAuthToken,
+  getRefreshToken,
   getCurrentUser,
   getHealth,
+  hasStoredAuthSession,
   login,
+  recoverPassword,
   register,
   setAuthToken,
+  setRefreshToken,
   updateOrderStatus,
 } from "../src/shared/apiClient";
 
 export { getSharedApiConfig, validateSharedApiUrl } from "../src/shared/config/api";
-

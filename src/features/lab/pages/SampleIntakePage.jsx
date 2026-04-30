@@ -6,9 +6,8 @@ import {
   SAMPLE_STATUS_TONES,
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
-  TEST_ORDER_STATUS_LABELS,
-  TEST_ORDER_STATUS_TONES,
 } from "../../../types/labStatus";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
 import { canResolveLabQrInput, toLabQrResolvePayload } from "../utils/qrLookupInput";
 
 const toneClass = {
@@ -27,8 +26,8 @@ const formatDate = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const label = TEST_ORDER_STATUS_LABELS[status] || status;
-  const tone = TEST_ORDER_STATUS_TONES[status] || "neutral";
+  const label = ORDER_STATUS_LABELS[status] || status;
+  const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
       {label}
@@ -165,9 +164,9 @@ export default function SampleIntakePage() {
         } : prev);
       }
 
-      if (updatedOrder.status === "testing_in_progress") {
+      if (updatedOrder.status === "in_progress") {
         setSubmitSuccess("Sample received and moved into testing.");
-      } else if (updatedOrder.status === "sample_received") {
+      } else if (updatedOrder.status === "received") {
         setSubmitSuccess("Sample received. Intake remains pending because the sample was marked insufficient.");
       } else {
         setSubmitSuccess(`Sample intake updated. Order status is now ${updatedOrder.status}.`);

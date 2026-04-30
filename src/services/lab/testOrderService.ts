@@ -12,6 +12,7 @@ import {
   updateTestOrderStatusRecord,
 } from "../../db/labStore";
 import { buildQrPayload, generateQrToken } from "../../utils/labToken";
+import { buildNextOrderNumber } from "./orderNumber";
 import {
   actorCanRunLabWorkflow,
   getAllowedNextStatuses,
@@ -84,66 +85,14 @@ const assertStringArray = (value: unknown, fieldName: string): string[] => {
   return normalized;
 };
 
-const sanitizeDisplayToken = (value: unknown, fallback: string, maxLength = 24): string => {
-  const normalized = String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-  if (!normalized) return fallback;
-  return normalized.slice(0, Math.max(1, maxLength));
-};
-
-const resolveBreederCode = (request: CreateTestOrderRequest, actorUserId: string): string => {
-  const source = request.breederUserId || request.requestedByUserId || actorUserId;
-  const emailLocal = String(source || "").split("@")[0];
-  return sanitizeDisplayToken(emailLocal || source, "BREEDER", 12);
-};
-
-const resolveOrderYear = (submittedAt?: string): number => {
-  if (typeof submittedAt === "string" && submittedAt.trim()) {
-    const parsed = new Date(submittedAt);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.getFullYear();
-    }
-  }
-  return new Date().getFullYear();
-};
-
-const resolveSnakeSegment = (animalId: string): string => {
-  return sanitizeDisplayToken(animalId, "SNAKE", 24);
-};
-
-const extractSequenceForPrefix = (orderNumber: string, prefix: string): number | null => {
-  const normalized = String(orderNumber || "").trim().toUpperCase();
-  if (!normalized.startsWith(prefix)) return null;
-  const suffix = normalized.slice(prefix.length);
-  const match = suffix.match(/^(\d+)$/);
-  if (!match) return null;
-  const value = Number(match[1]);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.floor(value);
-};
-
 const buildOrderNumber = (
   request: CreateTestOrderRequest,
-  actorUserId: string,
   existingOrders: TestOrder[]
 ): string => {
-  const breederCode = resolveBreederCode(request, actorUserId);
-  const year = resolveOrderYear(request.submittedAt);
-  const snakeSegment = resolveSnakeSegment(request.animalId);
-  const prefix = `${breederCode}-${year}-${snakeSegment}-`;
-
-  let maxSeq = 0;
-  for (const entry of existingOrders) {
-    const seq = extractSequenceForPrefix(entry?.orderNumber || "", prefix);
-    if (Number.isFinite(seq) && (seq as number) > maxSeq) {
-      maxSeq = seq as number;
-    }
-  }
-
-  const nextSeq = maxSeq + 1;
-  return `${prefix}${String(nextSeq).padStart(2, "0")}`;
+  return buildNextOrderNumber(
+    existingOrders.map((entry) => entry?.orderNumber),
+    request.submittedAt
+  );
 };
 
 const PAYMENT_REQUIRED_LAB_STATUSES = new Set<TestOrderStatus>([
@@ -227,7 +176,7 @@ export const createTestOrder = (actor: ServiceActor, request: CreateTestOrderReq
 
   if (!normalized.orderNumber) {
     const existingOrders = listTestOrderRecordsByLabId(normalized.labId);
-    normalized.orderNumber = buildOrderNumber(normalized, normalizedActorUserId, existingOrders);
+    normalized.orderNumber = buildOrderNumber(normalized, existingOrders);
   }
 
   // Generate the QR token and sample ID before creating the order so we can

@@ -29,10 +29,10 @@ describe("calculateLabOrderPrice", () => {
     const order = LAB_PRICING_EXAMPLE_ORDERS[1];
     const breakdown = calculateLabOrderPrice(order, activeCatalog);
 
-    expect(breakdown.total).toBe(10500);
+    expect(breakdown.total).toBe(8500);
     expect(breakdown.perAnimal[0]?.morphBaseCost).toBe(3500);
     expect(breakdown.perAnimal[0]?.additionalMorphCost).toBe(4000);
-    expect(breakdown.perAnimal[0]?.sexCost).toBe(3000);
+    expect(breakdown.perAnimal[0]?.sexCost).toBe(1000);
   });
 
   it("uses tier 2 prices when order has ten animals", () => {
@@ -44,8 +44,8 @@ describe("calculateLabOrderPrice", () => {
     const breakdown = calculateLabOrderPrice(order, activeCatalog);
 
     expect(breakdown.tier).toBe("10-49");
-    expect(breakdown.total).toBe(55000);
+    expect(breakdown.total).toBe(40000);
     expect(breakdown.perAnimal[0]?.morphBaseCost).toBe(3000);
-    expect(breakdown.perAnimal[0]?.sexCost).toBe(2500);
+    expect(breakdown.perAnimal[0]?.sexCost).toBe(1000);
   });
 });

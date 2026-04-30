@@ -58,6 +58,9 @@ function addBuiltInSynonyms(variants: Set<string>) {
   if (lowerSet.has('piebald')) {
     variants.add('Pied');
   }
+  if (lowerSet.has('pied') || lowerSet.has('piebald')) {
+    variants.add('pide');
+  }
 }
 
 function buildLookup(availableGenetics: GeneticsType[] = []): GeneticsLookupEntry[] {
@@ -291,7 +294,7 @@ export function parseAnimalText(text: string, availableGenetics: GeneticsType[] 
       .map(toPattern);
 
     variantPatterns.forEach(pattern => {
-      const hetRegex = new RegExp(`(^|[^a-z0-9])(?:(\\d{1,3})\\s*%\\s*)?(?:(poss(?:ible)?|ph)\\s+)?het\\s+(${pattern})(?=$|[^a-z0-9])`, 'gi');
+      const hetRegex = new RegExp(`(^|[^a-z0-9])(?:(\\d{1,3})\\s*%\\s*)?(?:(poss(?:ible)?|ph)\\s+)?(?:het|hat)\\s+(${pattern})(?=$|[^a-z0-9])`, 'gi');
       const hetMatches: string[] = [];
       geneticsWorking = geneticsWorking.replace(hetRegex, (...args) => {
         const percent = args[2] ? `${args[2]}% ` : '';

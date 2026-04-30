@@ -11,6 +11,7 @@ import {
   buildShippingLabelLayout,
   fitQrToBox,
   fitTextToBox,
+  SAMPLE_LABEL_TESTS_FIT_OPTIONS,
 } from "./labelLayout";
 import { getLabelSafeArea } from "./labelSizing";
 import { generateOrderLabelsPdf } from "../../../utils/pdf/labOrderLabelsPdf";
@@ -43,24 +44,24 @@ describe("lab label layout engine", () => {
     const size = { widthMm: 100, heightMm: 50, presetKey: "medium" };
     const safeArea = getLabelSafeArea(size, 5);
     const layout = buildSampleLabelLayout(size, safeArea);
+    const requestedTests = ["Clown", "Ultramel", "Hypo", "Puzzle", "Desert Ghost", "Sunset", "Monsoon"];
     const content = buildSampleLabelContent({
       sampleId: "s1",
       orderId: "o1",
       orderNumber: "ORDER-1",
       animalId: "A1",
       breederName: "Breeder",
-      requestedTests: ["Clown", "Ultramel", "Hypo", "Puzzle", "Desert Ghost", "Sunset", "Monsoon"],
+      requestedTests,
       sampleStatus: "pending",
       qrPayload: "qr",
       sampleType: "shed",
       labName: "Lab",
     });
-    const fitted = fitTextToBox(content.requestedTests, layout.testsBox, {
-      maxFontPt: 8.5,
-      minFontPt: 6,
-      maxLines: layout.variant === "side-by-side" ? 6 : 5,
+    const fitted = fitTextToBox(content.requestedTests, layout.testsBox, SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant]);
+    expect(fitted.truncated).toBe(false);
+    requestedTests.forEach((test) => {
+      expect(fitted.lines.join(" ")).toContain(test);
     });
-    expect(fitted.lines.length).toBeLessThanOrEqual(layout.variant === "side-by-side" ? 6 : 5);
   });
 
   it("keeps QR codes inside the QR box", () => {

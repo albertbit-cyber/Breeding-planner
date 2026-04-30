@@ -7,6 +7,7 @@ import {
 } from "./backendStatus";
 
 export const AUTH_TOKEN_STORAGE_KEY = "breedingPlannerAuthToken";
+export const REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
 
 export type SharedApiErrorKind =
   | "config"
@@ -31,28 +32,53 @@ export class SharedApiError extends Error {
   }
 }
 
-const getStoredToken = (): string => {
+const getStoredValue = (key: string): string => {
   try {
-    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
+    return localStorage.getItem(key) || "";
   } catch {
     return "";
   }
 };
 
-const setStoredToken = (token: string): void => {
+const setStoredValue = (key: string, value: string): void => {
   try {
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(key, value);
   } catch {
     // Ignore storage failures in private mode.
   }
 };
 
-const clearStoredToken = (): void => {
+const clearStoredValue = (key: string): void => {
   try {
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(key);
   } catch {
     // Ignore storage failures in private mode.
   }
+};
+
+const getStoredToken = (): string => getStoredValue(AUTH_TOKEN_STORAGE_KEY);
+
+const setStoredToken = (token: string): void => {
+  setStoredValue(AUTH_TOKEN_STORAGE_KEY, token);
+};
+
+const clearStoredToken = (): void => {
+  clearStoredValue(AUTH_TOKEN_STORAGE_KEY);
+};
+
+const getStoredRefreshToken = (): string => getStoredValue(REFRESH_TOKEN_STORAGE_KEY);
+
+const setStoredRefreshToken = (token: string): void => {
+  setStoredValue(REFRESH_TOKEN_STORAGE_KEY, token);
+};
+
+const clearStoredRefreshToken = (): void => {
+  clearStoredValue(REFRESH_TOKEN_STORAGE_KEY);
+};
+
+const clearStoredAuth = (): void => {
+  clearStoredToken();
+  clearStoredRefreshToken();
 };
 
 const categorizeHttpError = (status: number): SharedApiErrorKind => {
@@ -135,6 +161,88 @@ type RequestOptions = RequestInit & {
   timeoutMs?: number;
   requiresAuth?: boolean;
   statusOnHttpError?: SharedBackendState;
+  skipRefreshRetry?: boolean;
+};
+
+const markAuthorized = (reason = "Authenticated against shared backend."): void => {
+  setSharedBackendSnapshot((previous) => ({
+    ...previous,
+    authStatus: "authorized",
+    state: "connected",
+    message: "Connected to shared backend.",
+    reason,
+    checkedAt: new Date().toISOString(),
+    reachable: true,
+    configured: true,
+    backendModeEnabled: true,
+    healthOk: true,
+  }));
+};
+
+let refreshRequestPromise: Promise<{ token: string; refreshToken: string }> | null = null;
+
+const refreshAuthSession = async (): Promise<{ token: string; refreshToken: string }> => {
+  if (refreshRequestPromise) {
+    return refreshRequestPromise;
+  }
+
+  refreshRequestPromise = (async () => {
+    const config = getSharedApiConfig();
+    if (!config.ok) {
+      const error = new SharedApiError(config.message, "config", null, config);
+      updateStatusForFailure(error);
+      throw error;
+    }
+
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) {
+      const error = new SharedApiError("Your shared backend session expired. Sign in again.", "unauthorized", 401, null);
+      clearStoredAuth();
+      updateStatusForFailure(error);
+      throw error;
+    }
+
+    const response = await fetch(`${config.baseUrl}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const mapped = mapResponseError(response, data);
+      clearStoredAuth();
+      updateStatusForFailure(mapped);
+      throw mapped;
+    }
+
+    const nextToken = String(data?.token || "").trim();
+    const nextRefreshToken = String(data?.refreshToken || "").trim();
+    if (!nextToken || !nextRefreshToken) {
+      const error = new SharedApiError(
+        "Shared backend refresh did not return valid auth tokens.",
+        "unauthorized",
+        401,
+        data
+      );
+      clearStoredAuth();
+      updateStatusForFailure(error);
+      throw error;
+    }
+
+    setStoredToken(nextToken);
+    setStoredRefreshToken(nextRefreshToken);
+    markAuthorized("Refreshed shared backend session.");
+
+    return {
+      token: nextToken,
+      refreshToken: nextRefreshToken,
+    };
+  })().finally(() => {
+    refreshRequestPromise = null;
+  });
+
+  return refreshRequestPromise;
 };
 
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
@@ -171,8 +279,21 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const mapped = mapResponseError(response, data);
+        if (
+          mapped.kind === "unauthorized"
+          && requiresAuth
+          && !options.skipRefreshRetry
+          && path !== "/auth/refresh"
+          && getStoredRefreshToken()
+        ) {
+          await refreshAuthSession();
+          return request<T>(path, {
+            ...options,
+            skipRefreshRetry: true,
+          });
+        }
         if (mapped.kind === "unauthorized") {
-          clearStoredToken();
+          clearStoredAuth();
         }
         if (mapped.kind === "unauthorized" && !requiresAuth) {
           updateStatusForSuccess();
@@ -204,7 +325,13 @@ export const getAuthToken = (): string => getStoredToken();
 
 export const setAuthToken = (token: string): void => setStoredToken(String(token || "").trim());
 
-export const clearAuthToken = (): void => clearStoredToken();
+export const getRefreshToken = (): string => getStoredRefreshToken();
+
+export const setRefreshToken = (token: string): void => setStoredRefreshToken(String(token || "").trim());
+
+export const hasStoredAuthSession = (): boolean => Boolean(getStoredToken() || getStoredRefreshToken());
+
+export const clearAuthToken = (): void => clearStoredAuth();
 
 export const resetSharedBackendState = (): void => {
   resetSharedBackendSnapshot();
@@ -242,24 +369,15 @@ export const getHealth = async () =>
   };
 
 export const login = async (payload: { email: string; password: string }) => {
-  const data = await request<{ token: string; user: unknown }>("/auth/login", {
+  const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
   });
-  if (data?.token) {
+  if (data?.token && data?.refreshToken) {
     setStoredToken(data.token);
-    setSharedBackendSnapshot((previous) => ({
-      ...previous,
-      authStatus: "authorized",
-      state: "connected",
-      message: "Connected to shared backend.",
-      reason: "Authenticated against shared backend.",
-      reachable: true,
-      configured: true,
-      backendModeEnabled: true,
-      healthOk: true,
-    }));
+    setStoredRefreshToken(data.refreshToken);
+    markAuthorized();
   }
   return data;
 };
@@ -271,19 +389,16 @@ export const register = async (payload: { email: string; password: string; fullN
     requiresAuth: false,
   });
 
+export const recoverPassword = async (payload: { email: string; fullName: string; newPassword: string }) =>
+  request<{ message: string }>("/auth/recover-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
 export const getCurrentUser = async () => {
   const data = await request<{ user: unknown }>("/auth/me");
-  setSharedBackendSnapshot((previous) => ({
-    ...previous,
-    authStatus: "authorized",
-    state: "connected",
-    message: "Connected to shared backend.",
-    reason: "Authenticated against shared backend.",
-    reachable: true,
-    configured: true,
-    backendModeEnabled: true,
-    healthOk: true,
-  }));
+  markAuthorized();
   return data;
 };
 

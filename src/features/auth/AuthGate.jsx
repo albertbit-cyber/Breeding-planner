@@ -1,6 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, getAuthToken, login as loginApi, register as registerApi } from "../../../shared/api";
+import { clearAuthToken, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../../shared/api";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
@@ -217,8 +217,6 @@ const EXPERIENCE_OPTIONS_FALLBACK = [
 ];
 const ROLE_OPTIONS_FALLBACK = [
   { value: "breeder", label: "Breeder" },
-  { value: "lab_staff", label: "Lab Staff" },
-  { value: "admin", label: "Administrator" },
 ];
 
 const DEFAULT_REGISTRATION_TEMPLATE = {
@@ -243,6 +241,13 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
 const createDefaultRegistrationData = () =>
   JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
 
+const createDefaultPasswordRecoveryData = (email = "") => ({
+  email,
+  fullName: "",
+  newPassword: "",
+  confirmNewPassword: "",
+});
+
 const buildRegistrationSteps = (t, optionSets = {}) => {
   const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
     ? optionSets.countries
@@ -256,6 +261,10 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
   const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
     ? optionSets.experienceLevels
     : EXPERIENCE_OPTIONS_FALLBACK;
+  const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
+    ? optionSets.roleOptions
+    : ROLE_OPTIONS_FALLBACK
+  ).filter((option) => String(option?.value || option || "").trim().toLowerCase() === "breeder");
 
   return [
     {
@@ -365,11 +374,7 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
           name: "role",
           label: t("auth.fields.userRole", { defaultValue: "User role" }),
           type: "select",
-          options: [
-            { value: "breeder", label: "Breeder" },
-            { value: "lab_staff", label: "Lab Staff" },
-            { value: "admin", label: "Administrator" },
-          ],
+          options: roleOptions,
           required: true,
         },
         {
@@ -432,10 +437,9 @@ const loadStoredAuth = () => {
     if (!raw) return { isAuthenticated: false };
     const parsed = JSON.parse(raw);
     if (parsed?.isAuthenticated) {
-      // Require a JWT to be present; sessions from before the backend was wired
-      // have no token and would cause every API call to fail with "Missing Bearer token".
-      const token = getAuthToken();
-      if (!token) {
+      // Keep the session only if either the access token or refresh token is still
+      // available. This lets the app silently restore auth after a reload.
+      if (!hasStoredAuthSession()) {
         try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch {}
         return { isAuthenticated: false };
       }
@@ -467,6 +471,12 @@ export default function AuthGate({ children }) {
   const [view, setView] = useState("chooser");
   const [loginValues, setLoginValues] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [loginMessage, setLoginMessage] = useState("");
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  const [passwordRecoveryData, setPasswordRecoveryData] = useState(() =>
+    createDefaultPasswordRecoveryData()
+  );
+  const [passwordRecoveryError, setPasswordRecoveryError] = useState("");
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -489,12 +499,17 @@ export default function AuthGate({ children }) {
       returnObjects: true,
       defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
     });
+    const roleOptions = t("auth.options.roles", {
+      returnObjects: true,
+      defaultValue: ROLE_OPTIONS_FALLBACK,
+    });
 
     return buildRegistrationSteps(t, {
       countries,
       devicePreferences,
       dataBackup,
       experienceLevels,
+      roleOptions,
     });
   }, [t, i18n.language]);
 
@@ -515,6 +530,10 @@ export default function AuthGate({ children }) {
     persistAuth({ isAuthenticated: false });
     setView("chooser");
     setLoginError("");
+    setLoginMessage("");
+    setIsRecoveringPassword(false);
+    setPasswordRecoveryError("");
+    setPasswordRecoveryData(createDefaultPasswordRecoveryData());
     setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
   }, [persistAuth]);
@@ -527,6 +546,7 @@ export default function AuthGate({ children }) {
     clearAuthToken();
     persistAuth({ isAuthenticated: false });
     setView("login");
+    setIsRecoveringPassword(false);
     setLoginValues((prev) => ({
       username: authState.profile?.email || prev.username || "",
       password: "",
@@ -536,6 +556,9 @@ export default function AuthGate({ children }) {
         defaultValue: "Your shared backend session expired. Sign in again.",
       })
     );
+    setLoginMessage("");
+    setPasswordRecoveryError("");
+    setPasswordRecoveryData(createDefaultPasswordRecoveryData(authState.profile?.email || ""));
     setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
     setRegistrationError("");
@@ -544,6 +567,7 @@ export default function AuthGate({ children }) {
   const handleLoginSubmit = async (event) => {
     event.preventDefault();
     setLoginError("");
+    setLoginMessage("");
     const { username, password } = loginValues;
     if (!username.trim() || !password.trim()) {
       setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter both username and password." }));
@@ -578,6 +602,95 @@ export default function AuthGate({ children }) {
       });
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : t("auth.errors.badPassword", { defaultValue: "Login failed." }));
+    }
+  };
+
+  const openPasswordRecovery = () => {
+    const normalizedInput = normalizeIdentifier(loginValues.username);
+    const recoveryEmail = normalizedInput.includes("@") ? normalizedInput : "";
+    setIsRecoveringPassword(true);
+    setLoginError("");
+    setLoginMessage("");
+    setPasswordRecoveryError("");
+    setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
+  };
+
+  const closePasswordRecovery = () => {
+    setIsRecoveringPassword(false);
+    setPasswordRecoveryError("");
+    setPasswordRecoveryData((prev) => createDefaultPasswordRecoveryData(prev.email));
+  };
+
+  const handlePasswordRecoveryChange = (name, value) => {
+    setPasswordRecoveryData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handlePasswordRecoverySubmit = async (event) => {
+    event.preventDefault();
+    setPasswordRecoveryError("");
+    setLoginMessage("");
+
+    const recoveryEmail = normalizeIdentifier(passwordRecoveryData.email);
+    const recoveryFullName = String(passwordRecoveryData.fullName || "").trim();
+    const recoveryPassword = String(passwordRecoveryData.newPassword || "");
+    const recoveryConfirmPassword = String(passwordRecoveryData.confirmNewPassword || "");
+
+    if (!recoveryEmail || !recoveryEmail.includes("@")) {
+      setPasswordRecoveryError(t("auth.errors.emailRequired", {
+        defaultValue: "Use the account email address for password recovery.",
+      }));
+      return;
+    }
+
+    if (!recoveryFullName) {
+      setPasswordRecoveryError(t("auth.errors.requiredField", {
+        defaultValue: 'Please complete "{{field}}".',
+        field: t("auth.fields.fullName", { defaultValue: "Full name" }),
+      }));
+      return;
+    }
+
+    if (recoveryPassword.trim().length < 8) {
+      setPasswordRecoveryError(t("auth.errors.passwordLength", {
+        defaultValue: "Choose a password with at least 8 characters.",
+      }));
+      return;
+    }
+
+    if (recoveryPassword !== recoveryConfirmPassword) {
+      setPasswordRecoveryError(t("auth.errors.passwordMismatch", {
+        defaultValue: "Passwords do not match.",
+      }));
+      return;
+    }
+
+    try {
+      const result = await recoverPasswordApi({
+        email: recoveryEmail,
+        fullName: recoveryFullName,
+        newPassword: recoveryPassword,
+      });
+
+      setIsRecoveringPassword(false);
+      setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
+      setLoginValues({
+        username: recoveryEmail,
+        password: "",
+      });
+      setLoginMessage(String(result?.message || t("auth.recovery.success", {
+        defaultValue: "Password updated. Sign in with your new password.",
+      })));
+    } catch (error) {
+      setPasswordRecoveryError(
+        error instanceof Error
+          ? error.message
+          : t("auth.recovery.error", {
+              defaultValue: "Password recovery failed.",
+            })
+      );
     }
   };
 
@@ -777,6 +890,7 @@ export default function AuthGate({ children }) {
           className={`primary ${view === "register" ? "is-active" : ""}`}
           onClick={() => {
             setView("register");
+            setIsRecoveringPassword(false);
             resetRegistration();
           }}
         >
@@ -785,42 +899,128 @@ export default function AuthGate({ children }) {
         <button
           type="button"
           className={`ghost ${view === "login" ? "is-active" : ""}`}
-          onClick={() => setView("login")}
+          onClick={() => {
+            setView("login");
+            setIsRecoveringPassword(false);
+            setPasswordRecoveryError("");
+          }}
         >
           {t("auth.actions.login", { defaultValue: "Log in" })}
         </button>
       </div>
       {view === "login" && (
-          <form className="auth-login-form" onSubmit={handleLoginSubmit}>
-            <label className="auth-field">
-              <span className="auth-field-label">
-                {t("auth.fields.usernameOrEmail", { defaultValue: "Username or email" })}
-              </span>
-              <input
-                type="text"
-                value={loginValues.username}
-                onChange={(e) =>
-                  setLoginValues((prev) => ({ ...prev, username: e.target.value }))
-              }
-            />
-            </label>
-            <label className="auth-field">
-              <span className="auth-field-label">
-                {t("auth.fields.password", { defaultValue: "Password" })}
-              </span>
-              <input
-                type="password"
-                value={loginValues.password}
-                onChange={(e) =>
-                  setLoginValues((prev) => ({ ...prev, password: e.target.value }))
-              }
-            />
-            </label>
-            {loginError && <p className="auth-error">{loginError}</p>}
-            <button type="submit" className="primary wide">
-              {t("common.continue", { defaultValue: "Continue" })}
-            </button>
-          </form>
+          isRecoveringPassword ? (
+            <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
+              <p className="auth-helper-copy">
+                {t("auth.recovery.instructions", {
+                  defaultValue: "Enter the email and full name on the account, then choose a new password.",
+                })}
+              </p>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.fields.email", { defaultValue: "Email address" })}
+                </span>
+                <input
+                  type="email"
+                  value={passwordRecoveryData.email}
+                  onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
+                />
+              </label>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.fields.fullName", { defaultValue: "Full name" })}
+                </span>
+                <input
+                  type="text"
+                  value={passwordRecoveryData.fullName}
+                  onChange={(e) => handlePasswordRecoveryChange("fullName", e.target.value)}
+                />
+              </label>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.recovery.newPassword", { defaultValue: "New password" })}
+                </span>
+                <input
+                  type="password"
+                  value={passwordRecoveryData.newPassword}
+                  onChange={(e) => handlePasswordRecoveryChange("newPassword", e.target.value)}
+                />
+              </label>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.recovery.confirmNewPassword", { defaultValue: "Confirm new password" })}
+                </span>
+                <input
+                  type="password"
+                  value={passwordRecoveryData.confirmNewPassword}
+                  onChange={(e) => handlePasswordRecoveryChange("confirmNewPassword", e.target.value)}
+                />
+              </label>
+              {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
+              <button type="submit" className="primary wide">
+                {t("auth.actions.resetPassword", { defaultValue: "Reset password" })}
+              </button>
+              <div className="auth-secondary-action">
+                <button type="button" className="text-button" onClick={closePasswordRecovery}>
+                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="auth-login-form" onSubmit={handleLoginSubmit}>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.fields.email", { defaultValue: "Email address" })}
+                </span>
+                <input
+                  type="email"
+                  value={loginValues.username}
+                  onChange={(e) =>
+                    setLoginValues((prev) => ({ ...prev, username: e.target.value }))
+                }
+              />
+              </label>
+              <label className="auth-field">
+                <span className="auth-field-label">
+                  {t("auth.fields.password", { defaultValue: "Password" })}
+                </span>
+                <input
+                  type="password"
+                  value={loginValues.password}
+                  onChange={(e) =>
+                    setLoginValues((prev) => ({ ...prev, password: e.target.value }))
+                }
+              />
+              </label>
+              <div className="auth-inline-link-row">
+                <button type="button" className="text-button" onClick={openPasswordRecovery}>
+                  {t("auth.actions.forgotPassword", { defaultValue: "Forgot password?" })}
+                </button>
+              </div>
+              {loginMessage && <p className="auth-success">{loginMessage}</p>}
+              {loginError && <p className="auth-error">{loginError}</p>}
+              <button type="submit" className="primary wide">
+                {t("common.continue", { defaultValue: "Continue" })}
+              </button>
+              {import.meta.env.DEV ? (
+                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                  Dev login:
+                  {" "}
+                  <code>lab@proherper.dev</code>
+                  {" / "}
+                  <code>demo1234</code>
+                  {" "}
+                  or
+                  {" "}
+                  <code>admin@proherper.dev</code>
+                  {" / "}
+                  <code>admin1234</code>.
+                  {" "}
+                  Public registration creates breeder accounts only.
+                </div>
+              ) : null}
+            </form>
+          )
         )}
     </div>
   );

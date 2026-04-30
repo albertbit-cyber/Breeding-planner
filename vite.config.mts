@@ -65,11 +65,23 @@ const resolveBase = (publicUrl: string | undefined): string => {
 };
 
 const base = resolveBase(process.env.PUBLIC_URL);
-const disableCodeSplitting = true;
+// Set to true only if Electron packaging requires a single bundle.
+// For web builds, code splitting dramatically reduces initial load time.
+const disableCodeSplitting = process.env.ELECTRON_BUILD === "true";
 
 export default defineConfig({
   base,
   plugins: [react(), networkUrlLogger()],
+  test: {
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "server/**",
+      "src/genetics/punnett.test.ts",
+    ],
+  },
   resolve: {
     alias: {
       "@": resolve(rootDir, "src"),

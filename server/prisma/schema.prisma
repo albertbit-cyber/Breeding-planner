@@ -32,28 +32,41 @@ enum ShedOrderStatus {
   cancelled
 }
 
+enum ShedPaymentStatus {
+  pending
+  invoiced
+  paid
+  waived
+}
+
 enum ShedResultStatus {
   running
   completed
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String
-  fullName     String
-  role         UserRole
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  orders       ShedTestOrder[]
+  id               String         @id @default(cuid())
+  email            String         @unique
+  passwordHash     String
+  fullName         String
+  role             UserRole
+  isActive         Boolean        @default(true)
+  refreshToken     String?        @db.Text
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  orders           ShedTestOrder[]
 }
 
 model ShedTestCatalog {
   id                  String          @id
   name                String
+  shortLabel          String?
+  geneTarget          String?
   category            String
   pricingType         TestPricingType
+  priceCents          Int?
+  currency            String          @default("EUR")
+  allowedPriorities   String[]        @default(["routine", "priority", "urgent"])
   active              Boolean         @default(true)
   visibleInBreederApp Boolean         @default(true)
   description         String?
@@ -82,6 +95,7 @@ model PricingConfig {
 
 model ShedTestOrder {
   id                String                @id @default(cuid())
+  orderNumber       String?               @unique
   breederId         String
   breeder           User                  @relation(fields: [breederId], references: [id])
   totalAnimals      Int
@@ -89,11 +103,15 @@ model ShedTestOrder {
   totalPrice        Decimal               @db.Decimal(12, 2)
   currency          String
   priceSnapshotJson Json
-  status            ShedOrderStatus       @default(submitted)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  animals           ShedTestOrderAnimal[]
-  results           ShedTestOrderResult[]
+  status                ShedOrderStatus       @default(submitted)
+  paymentStatus         ShedPaymentStatus     @default(pending)
+  paymentRequestedAt    DateTime?
+  paidAt                DateTime?
+  paymentRef            String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  animals               ShedTestOrderAnimal[]
+  results               ShedTestOrderResult[]
 
   @@index([breederId])
   @@index([status])
@@ -148,7 +166,8 @@ model ShedTestOrderResult {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
-  @@unique([orderId, testCode])
+  @@unique([orderId, animalId, testCode])
   @@index([orderId])
+  @@index([animalId])
   @@index([status])
 }

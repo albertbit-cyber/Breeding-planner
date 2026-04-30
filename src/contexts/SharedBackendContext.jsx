@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { getHealth, getCurrentUser, getAuthToken, normalizeSharedApiError, resetSharedBackendState } from "../shared/apiClient";
+import { getHealth, getCurrentUser, hasStoredAuthSession, normalizeSharedApiError, resetSharedBackendState } from "../shared/apiClient";
 import { getSharedApiConfig } from "../shared/config/api";
 import { getSharedBackendSnapshot, subscribeSharedBackendStatus } from "../shared/backendStatus";
 
@@ -28,7 +28,7 @@ export function SharedBackendProvider({ children }) {
     try {
       const health = await getHealth();
       console.info("[shared-backend] backend health check success:", health);
-      if (getAuthToken()) {
+      if (hasStoredAuthSession()) {
         try {
           await getCurrentUser();
           console.info("[shared-backend] auth status: authorized");
@@ -38,7 +38,7 @@ export function SharedBackendProvider({ children }) {
           console.warn("[shared-backend] auth status: unauthorized");
         }
       } else {
-        console.info("[shared-backend] auth status: no token present");
+        console.info("[shared-backend] auth status: no stored auth session present");
       }
     } catch (error) {
       const normalized = normalizeSharedApiError(error);

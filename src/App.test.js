@@ -19,6 +19,7 @@ import {
   buildAnimalExportDataset,
   buildPairingExportDataset,
 } from './App.jsx';
+import { describe, expect, it } from 'vitest';
 
 describe('splitMorphHetInput', () => {
   it('parses morphs separated by spaces', () => {

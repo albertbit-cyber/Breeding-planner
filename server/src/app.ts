@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
 import { env } from "./config/env";
 import { authRoutes } from "./routes/authRoutes";
 import { labRoutes } from "./routes/labRoutes";
@@ -7,6 +9,9 @@ import { orderRoutes } from "./routes/orderRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
+
+app.use(helmet());
+app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
 const origins = env.corsOrigin
   .split(",")
