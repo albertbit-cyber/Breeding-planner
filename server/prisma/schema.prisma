@@ -55,6 +55,64 @@ model User {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   orders           ShedTestOrder[]
+  animals          Animal[]
+  pairings         Pairing[]
+  clutches         Clutch[]
+}
+
+model Animal {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appAnimalId String
+  name        String?
+  sex         String?
+  status      String?
+  payload     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ownerId, appAnimalId])
+  @@index([ownerId])
+}
+
+model Pairing {
+  id                String   @id @default(cuid())
+  ownerId           String
+  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appPairingId      String
+  label             String?
+  maleAnimalAppId   String?
+  femaleAnimalAppId String?
+  status            String?
+  startDate         String?
+  payload           Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  clutches          Clutch[]
+
+  @@unique([ownerId, appPairingId])
+  @@index([ownerId])
+  @@index([ownerId, status])
+}
+
+model Clutch {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pairingId     String?
+  pairing       Pairing? @relation(fields: [pairingId], references: [id], onDelete: SetNull)
+  appClutchId   String
+  clutchNumber  Int?
+  seasonYear    Int?
+  laidDate      String?
+  payload       Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([ownerId, appClutchId])
+  @@index([ownerId])
+  @@index([pairingId])
 }
 
 model ShedTestCatalog {
