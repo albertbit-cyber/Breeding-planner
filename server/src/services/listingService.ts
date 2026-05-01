@@ -184,10 +184,69 @@ export const listModerationListings = async (actor: { role: string }) => {
   })).filter(Boolean);
 };
 
+export const listModerationAudit = async (actor: { role: string }) => {
+  assertAdmin(actor);
+  const rows = await db.listingModerationAudit.findMany({
+    include: {
+      listing: {
+        select: {
+          id: true,
+          appListingId: true,
+          title: true,
+          owner: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      },
+      actor: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: 100,
+  });
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    listingId: row.listing?.appListingId || row.listingId,
+    listingRowId: row.listingId,
+    listingTitle: row.listing?.title,
+    previousStatus: row.previousStatus,
+    newStatus: row.newStatus,
+    note: row.note,
+    createdAt: row.createdAt,
+    breeder: row.listing?.owner
+      ? {
+          userId: row.listing.owner.id,
+          fullName: row.listing.owner.fullName,
+          email: row.listing.owner.email,
+        }
+      : undefined,
+    actor: row.actor
+      ? {
+          id: row.actor.id,
+          fullName: row.actor.fullName,
+          email: row.actor.email,
+          role: row.actor.role,
+        }
+      : undefined,
+  }));
+};
+
 export const updateListingModerationStatus = async (
   actor: { id?: string; role: string },
   listingId: string,
-  statusInput: unknown
+  statusInput: unknown,
+  noteInput?: unknown
 ) => {
   assertAdmin(actor);
   const id = textValue(listingId, 160);
@@ -202,6 +261,7 @@ export const updateListingModerationStatus = async (
     where: { OR: [{ id }, { appListingId: id }] },
   });
   if (!existing) throw new HttpError(404, "Listing not found.");
+  const note = textValue(noteInput, 1000);
 
   const payload = existing.payload && typeof existing.payload === "object"
     ? { ...existing.payload, status }
@@ -220,6 +280,16 @@ export const updateListingModerationStatus = async (
           profile: true,
         },
       },
+    },
+  });
+
+  await db.listingModerationAudit.create({
+    data: {
+      listingId: row.id,
+      actorId: actor.id || null,
+      previousStatus: existing.status,
+      newStatus: status,
+      note,
     },
   });
 

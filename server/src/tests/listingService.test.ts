@@ -16,6 +16,10 @@ vi.mock("../lib/prisma", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    listingModerationAudit: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+    },
     notification: { create: vi.fn() },
   },
 }));
@@ -65,6 +69,10 @@ beforeEach(() => {
       profile: { breederName: "Demo Breeder", isPublic: true },
     },
   });
+  vi.mocked((prisma as any).listingModerationAudit.create).mockResolvedValue({
+    id: "audit-1",
+  });
+  vi.mocked((prisma as any).listingModerationAudit.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).notification.create).mockResolvedValue({
     id: "notification-1",
     type: "listing_status_changed",
@@ -184,9 +192,10 @@ describe("listingService", () => {
 
   it("lets admins change listing moderation status", async () => {
     await expect(updateListingModerationStatus(
-      { role: "admin" },
+      { id: "admin-1", role: "admin" },
       "listing-1",
-      "hidden"
+      "hidden",
+      "Policy review."
     )).resolves.toMatchObject({
       id: "listing-1",
       status: "hidden",
@@ -197,6 +206,15 @@ describe("listingService", () => {
       data: expect.objectContaining({
         status: "hidden",
         payload: expect.objectContaining({ status: "hidden" }),
+      }),
+    }));
+    expect((prisma as any).listingModerationAudit.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        listingId: "listing-row-1",
+        actorId: "admin-1",
+        previousStatus: "available",
+        newStatus: "hidden",
+        note: "Policy review.",
       }),
     }));
     expect((prisma as any).notification.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -212,5 +230,37 @@ describe("listingService", () => {
       .rejects.toThrow("Only admin users can moderate marketplace listings.");
     await expect(updateListingModerationStatus({ role: "breeder" }, "listing-1", "hidden"))
       .rejects.toThrow("Only admin users can moderate marketplace listings.");
+  });
+
+  it("lists moderation audit entries for admins", async () => {
+    vi.mocked((prisma as any).listingModerationAudit.findMany).mockResolvedValue([
+      {
+        id: "audit-1",
+        listingId: "listing-row-1",
+        previousStatus: "draft",
+        newStatus: "available",
+        note: "Approved.",
+        createdAt: new Date("2026-05-01T12:00:00.000Z"),
+        listing: {
+          id: "listing-row-1",
+          appListingId: "listing-1",
+          title: "Banana Clown",
+          owner: { id: "breeder-1", fullName: "Demo User", email: "breeder@example.com" },
+        },
+        actor: { id: "admin-1", fullName: "Admin User", email: "admin@example.com", role: "admin" },
+      },
+    ]);
+
+    const { listModerationAudit } = await import("../services/listingService");
+
+    await expect(listModerationAudit({ role: "admin" })).resolves.toEqual([
+      expect.objectContaining({
+        id: "audit-1",
+        listingId: "listing-1",
+        previousStatus: "draft",
+        newStatus: "available",
+        actor: expect.objectContaining({ id: "admin-1" }),
+      }),
+    ]);
   });
 });

@@ -4,6 +4,7 @@ import {
   createSavedSearch,
   deleteSavedSearch,
   fetchMarketplaceProfiles,
+  fetchModerationAudit,
   fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
@@ -204,6 +205,8 @@ export default function MarketplacePage() {
   const [inquiryEdits, setInquiryEdits] = useState({});
   const [moderationListings, setModerationListings] = useState([]);
   const [moderationEdits, setModerationEdits] = useState({});
+  const [moderationNotes, setModerationNotes] = useState({});
+  const [moderationAudit, setModerationAudit] = useState([]);
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchName, setSavedSearchName] = useState("");
   const [notifications, setNotifications] = useState([]);
@@ -248,6 +251,7 @@ export default function MarketplacePage() {
       const listings = canEditProfile ? await fetchMyListings() : { listings: [] };
       const inquiries = await fetchMyInquiries();
       const moderation = canModerate ? await fetchModerationListings() : { listings: [] };
+      const audit = canModerate ? await fetchModerationAudit() : { audits: [] };
       const searches = await fetchSavedSearches();
       const notices = await fetchNotifications();
       const moderationList = normalizeModerationRows(moderation?.listings);
@@ -268,6 +272,8 @@ export default function MarketplacePage() {
         listing.rowId || listing.id,
         listing.status || "draft",
       ])));
+      setModerationNotes({});
+      setModerationAudit(Array.isArray(audit?.audits) ? audit.audits : []);
       setSavedSearches(Array.isArray(searches?.searches) ? searches.searches : []);
       setNotifications(Array.isArray(notices?.notifications) ? notices.notifications : []);
       setStatus("ready");
@@ -367,6 +373,10 @@ export default function MarketplacePage() {
     setModerationEdits((prev) => ({ ...prev, [id]: status }));
   };
 
+  const updateModerationNote = (id, note) => {
+    setModerationNotes((prev) => ({ ...prev, [id]: note }));
+  };
+
   const clearFilters = () => {
     setFilters({ search: "", sex: "", location: "", maxPrice: "" });
   };
@@ -436,6 +446,8 @@ export default function MarketplacePage() {
         listing.rowId || listing.id,
         listing.status || "draft",
       ])));
+      const audit = await fetchModerationAudit();
+      setModerationAudit(Array.isArray(audit?.audits) ? audit.audits : []);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Listing moderation refresh failed.");
     }
@@ -444,9 +456,10 @@ export default function MarketplacePage() {
   const saveModerationStatus = async (listing) => {
     const id = listing.rowId || listing.id;
     const nextStatus = moderationEdits[id] || listing.status || "draft";
+    const note = moderationNotes[id] || "";
     setMessage("");
     try {
-      await updateListingStatus(id, nextStatus);
+      await updateListingStatus(id, nextStatus, note);
       await loadProfiles();
       setMessage("Listing status updated.");
     } catch (error) {
@@ -636,10 +649,30 @@ export default function MarketplacePage() {
                       <option value="hidden">Hidden</option>
                     </select>
                   </label>
+                  <label>
+                    <span>Audit note</span>
+                    <input
+                      value={moderationNotes[id] || ""}
+                      placeholder="Reason"
+                      onChange={(event) => updateModerationNote(id, event.target.value)}
+                    />
+                  </label>
                   <button type="button" onClick={() => saveModerationStatus(listing)}>Save</button>
                 </article>
               );
             })}
+          </div>
+          <div className="marketplace-audit-list">
+            <h3>Recent moderation history</h3>
+            {!moderationAudit.length ? <p>No moderation history yet.</p> : null}
+            {moderationAudit.slice(0, 8).map((audit) => (
+              <article key={audit.id}>
+                <strong>{audit.listingTitle || audit.listingId}</strong>
+                <span>{audit.previousStatus} to {audit.newStatus}</span>
+                <span>{audit.actor?.fullName || audit.actor?.email || "Admin"}{audit.breeder?.email ? ` - ${audit.breeder.email}` : ""}</span>
+                {audit.note ? <p>{audit.note}</p> : null}
+              </article>
+            ))}
           </div>
         </section>
       ) : null}

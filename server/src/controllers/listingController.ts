@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { HttpError } from "../utils/errors";
 import {
   listModerationListings,
+  listModerationAudit,
   listMyListings,
   listPublicMarketplaceListings,
   replaceMyListings,
@@ -31,8 +32,14 @@ export const getModerationListings = async (req: Request, res: Response): Promis
   res.status(200).json({ listings });
 };
 
+export const getModerationAudit = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const audits = await listModerationAudit(req.user);
+  res.status(200).json({ audits });
+};
+
 export const patchListingStatus = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const listing = await updateListingModerationStatus(req.user, req.params.id, req.body?.status);
+  const listing = await updateListingModerationStatus(req.user, req.params.id, req.body?.status, req.body?.note);
   res.status(200).json({ listing });
 };

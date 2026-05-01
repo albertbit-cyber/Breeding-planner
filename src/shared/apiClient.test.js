@@ -8,6 +8,7 @@ import {
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
   fetchMarketplaceListings,
+  fetchModerationAudit,
   fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
@@ -422,6 +423,14 @@ describe("shared api client", () => {
         };
       }
 
+      if (normalizedUrl.endsWith("/listings/moderation/audit") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ audits: [{ id: "audit-1", newStatus: "hidden" }] }),
+        };
+      }
+
       if (normalizedUrl.endsWith("/listings/listing-1/status") && method === "PATCH") {
         return {
           ok: true,
@@ -438,8 +447,11 @@ describe("shared api client", () => {
     await expect(fetchModerationListings()).resolves.toEqual({
       listings: [{ id: "listing-1", status: "draft" }],
     });
-    await expect(updateListingStatus("listing-1", "hidden")).resolves.toEqual({
-      listing: { id: "listing-1", status: "hidden" },
+    await expect(fetchModerationAudit()).resolves.toEqual({
+      audits: [{ id: "audit-1", newStatus: "hidden" }],
+    });
+    await expect(updateListingStatus("listing-1", "hidden", "Policy review.")).resolves.toEqual({
+      listing: { id: "listing-1", status: "hidden", note: "Policy review." },
     });
   });
 

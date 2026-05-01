@@ -9,6 +9,7 @@ export {
   deleteSavedSearch,
   fetchMarketplaceProfiles,
   fetchMarketplaceListings,
+  fetchModerationAudit,
   fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,

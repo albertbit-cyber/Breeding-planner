@@ -493,10 +493,13 @@ export const fetchMarketplaceListings = async () =>
 export const fetchModerationListings = async () =>
   request<{ listings: unknown[] }>("/listings/moderation");
 
-export const updateListingStatus = async (id: string, status: string) =>
+export const fetchModerationAudit = async () =>
+  request<{ audits: unknown[] }>("/listings/moderation/audit");
+
+export const updateListingStatus = async (id: string, status: string, note = "") =>
   request<{ listing: unknown }>(`/listings/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, note }),
   });
 
 export const fetchSavedSearches = async () =>

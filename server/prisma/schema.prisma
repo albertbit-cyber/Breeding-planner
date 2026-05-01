@@ -66,6 +66,7 @@ model User {
   savedSearches    SavedSearch[]
   notifications     Notification[] @relation("NotificationRecipient")
   notificationsSent Notification[] @relation("NotificationActor")
+  listingModerationAudits ListingModerationAudit[]
 }
 
 model Profile {
@@ -159,6 +160,7 @@ model Listing {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   inquiries    ListingInquiry[]
+  moderationAudits ListingModerationAudit[]
 
   @@unique([ownerId, appListingId])
   @@index([ownerId])
@@ -218,6 +220,22 @@ model Notification {
   @@index([recipientId])
   @@index([recipientId, readAt])
   @@index([recipientId, createdAt])
+}
+
+model ListingModerationAudit {
+  id             String   @id @default(cuid())
+  listingId      String
+  listing        Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  previousStatus String
+  newStatus      String
+  note           String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([listingId])
+  @@index([actorId])
+  @@index([createdAt])
 }
 
 model ShedTestCatalog {

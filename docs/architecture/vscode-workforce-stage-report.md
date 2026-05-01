@@ -383,7 +383,7 @@ Recommended next work:
 
 ## Marketplace Email/Notification Workflow Stage Status
 
-Completed as a verified slice after approval.
+Committed as `5de644d feat: add marketplace notifications`.
 
 - Added Prisma `Notification` model linked to users as recipients and optional actors.
 - Added migration:
@@ -427,3 +427,44 @@ Known remaining issue outside this stage:
 Recommended next work:
 
 1. Start the final planned marketplace stage: richer admin moderation/audit history.
+
+## Marketplace Moderation Audit History Stage Status
+
+Completed as a verified slice after approval.
+
+- Added Prisma `ListingModerationAudit` model linked to listings and optional admin actor.
+- Added migration:
+  - `server/prisma/migrations/20260501200000_add_listing_moderation_audit/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added admin-only moderation audit backend API:
+  - `GET /api/listings/moderation/audit`
+- Extended listing moderation status updates:
+  - record previous status
+  - record new status
+  - record admin actor
+  - record optional audit note
+- Added frontend API client function:
+  - `fetchModerationAudit`
+- Updated marketplace moderation UI:
+  - admins can enter an audit note when changing listing status
+  - admins can review recent moderation history
+- Added tests for moderation audit creation and listing.
+
+Verification completed:
+
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `npm.cmd test -- listingService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Final review and app smoke test.
