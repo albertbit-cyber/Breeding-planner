@@ -13,6 +13,7 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .min(1, "fullName is required."),
+  role: z.enum(["breeder", "buyer"]).optional(),
 });
 
 export const loginSchema = z.object({

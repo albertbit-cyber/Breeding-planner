@@ -49,6 +49,25 @@ describe("POST /api/auth/register", () => {
     expect(res.body.user.passwordHash).toBeUndefined();
   });
 
+  it("allows public buyer registration", async () => {
+    const newUser = { ...mockUser, email: "buyer@example.com", role: "buyer" as const };
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue(newUser);
+
+    const res = await request(app).post("/api/auth/register").send({
+      email: "buyer@example.com",
+      password: "password123",
+      fullName: "Buyer User",
+      role: "buyer",
+    });
+
+    expect(res.status).toBe(201);
+    expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: "buyer" }),
+    }));
+    expect(res.body.user).toMatchObject({ email: "buyer@example.com", role: "buyer" });
+  });
+
   it("returns 400 on missing email", async () => {
     const res = await request(app).post("/api/auth/register").send({
       password: "password123",

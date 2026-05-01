@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/authRoutes";
 import { labRoutes } from "./routes/labRoutes";
 import { orderRoutes } from "./routes/orderRoutes";
 import { breederDataRoutes } from "./routes/breederDataRoutes";
+import { profileRoutes } from "./routes/profileRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -58,6 +59,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/breeder", breederDataRoutes);
+app.use("/api/profiles", profileRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 

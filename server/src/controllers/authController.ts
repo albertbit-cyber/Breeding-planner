@@ -8,10 +8,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
     return;
   }
-  const { email, password, fullName } = parsed.data;
+  const { email, password, fullName, role } = parsed.data;
 
-  // Public registration creates breeder users by default.
-  const user = await registerUser({ email, password, fullName, role: "breeder" });
+  // Public registration is limited to non-staff roles.
+  const user = await registerUser({ email, password, fullName, role: role || "breeder" });
   res.status(201).json({ user });
 };
 

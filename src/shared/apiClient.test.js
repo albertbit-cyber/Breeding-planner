@@ -3,6 +3,8 @@ import {
   createOrder,
   fetchOrders,
   fetchBreederSnapshot,
+  fetchMarketplaceProfiles,
+  fetchMyBreederProfile,
   getHealth,
   getAuthToken,
   getRefreshToken,
@@ -11,6 +13,7 @@ import {
   setAuthToken,
   setRefreshToken,
   saveBreederSnapshot,
+  saveMyBreederProfile,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -214,6 +217,57 @@ describe("shared api client", () => {
     await expect(saveBreederSnapshot({ animals: [], pairings: [{ id: "pairing-1" }] })).resolves.toEqual({
       animals: [],
       pairings: [{ id: "pairing-1" }],
+    });
+  });
+
+  it("loads marketplace profiles and saves my breeder profile", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/profiles/marketplace") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ profiles: [{ id: "profile-1", breederName: "Demo Breeder" }] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/profiles/me") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ profile: { id: "profile-1", breederName: "Demo Breeder" } }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/profiles/me") && method === "PUT") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ profile: JSON.parse(String(options.body)) }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchMarketplaceProfiles()).resolves.toEqual({
+      profiles: [{ id: "profile-1", breederName: "Demo Breeder" }],
+    });
+    await expect(fetchMyBreederProfile()).resolves.toEqual({
+      profile: { id: "profile-1", breederName: "Demo Breeder" },
+    });
+    await expect(saveMyBreederProfile({ breederName: "Updated", isPublic: true })).resolves.toEqual({
+      profile: { breederName: "Updated", isPublic: true },
     });
   });
 

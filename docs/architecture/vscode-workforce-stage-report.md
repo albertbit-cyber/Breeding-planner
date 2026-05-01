@@ -103,9 +103,48 @@ Known remaining issue outside this Stage 3 slice:
 
 ## Immediate Next Work
 
-Stage 3 is ready for review as a verified slice. Recommended next work:
+Stage 3 was committed as `63e17c3 feat: complete breeder snapshot stage 3`.
 
-1. Review the Stage 3 diff.
-2. Apply the new Prisma migration to the target database.
-3. Commit the verified Stage 3 slice.
-4. Start the next stage: profile API and buyer-facing marketplace/profile UI.
+## Next Stage Status
+
+Completed as an uncommitted verified slice after Stage 3 approval.
+
+- Added profile backend API:
+  - `GET /api/profiles/me`
+  - `PUT /api/profiles/me`
+  - `GET /api/profiles/marketplace`
+- Added profile service/controller/routes:
+  - `server/src/services/profileService.ts`
+  - `server/src/controllers/profileController.ts`
+  - `server/src/routes/profileRoutes.ts`
+- Registered profile routes in `server/src/app.ts`.
+- Allowed public registration for `buyer` while keeping public registration limited to `breeder` and `buyer`.
+- Added buyer role support in the auth registration UI.
+- Added frontend API client functions:
+  - `fetchMyBreederProfile`
+  - `saveMyBreederProfile`
+  - `fetchMarketplaceProfiles`
+- Added `#/marketplace` route and a first marketplace page:
+  - buyers can browse public breeder profiles
+  - breeders/admins can edit and publish their own public breeder profile
+- Added tests for profile service behavior, buyer registration, and frontend profile API calls.
+
+Verification completed:
+
+- `npm.cmd test -- profileService.test.ts auth.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Review the profile/marketplace diff.
+2. Commit the verified profile/marketplace slice if approved.
+3. Start the next stage: add animal listing/sales inventory data behind marketplace breeder profiles.

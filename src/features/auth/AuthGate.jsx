@@ -217,6 +217,7 @@ const EXPERIENCE_OPTIONS_FALLBACK = [
 ];
 const ROLE_OPTIONS_FALLBACK = [
   { value: "breeder", label: "Breeder" },
+  { value: "buyer", label: "Buyer" },
 ];
 
 const DEFAULT_REGISTRATION_TEMPLATE = {
@@ -264,7 +265,14 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
   const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
     ? optionSets.roleOptions
     : ROLE_OPTIONS_FALLBACK
-  ).filter((option) => String(option?.value || option || "").trim().toLowerCase() === "breeder");
+  ).filter((option) => ["breeder", "buyer"].includes(String(option?.value || option || "").trim().toLowerCase()));
+  const roleOptionValues = new Set(roleOptions.map((option) => String(option?.value || option || "").trim().toLowerCase()));
+  if (!roleOptionValues.has("buyer")) {
+    roleOptions.push({ value: "buyer", label: "Buyer" });
+  }
+  if (!roleOptionValues.has("breeder")) {
+    roleOptions.unshift({ value: "breeder", label: "Breeder" });
+  }
 
   return [
     {
@@ -740,6 +748,7 @@ export default function AuthGate({ children }) {
           fullName: desiredFullName || registrationData.fullName,
           email: desiredEmail,
           password: registrationData.password,
+          role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
         });
 
         const loginResponse = await loginApi({
@@ -787,10 +796,16 @@ export default function AuthGate({ children }) {
 
   const activeRole = String(authState?.role || authState?.profile?.role || "").trim().toLowerCase();
   const canOpenLabApp = activeRole === "lab_staff" || activeRole === "admin";
+  const canOpenMarketplace = Boolean(activeRole);
 
   const openLabApp = () => {
     if (typeof window === "undefined") return;
     window.location.hash = "/lab/dashboard";
+  };
+
+  const openMarketplace = () => {
+    if (typeof window === "undefined") return;
+    window.location.hash = "/marketplace";
   };
 
   const renderField = (field) => {
@@ -1072,6 +1087,11 @@ export default function AuthGate({ children }) {
       {canOpenLabApp ? (
         <button type="button" onClick={openLabApp}>
           {t("auth.actions.openLabApp", { defaultValue: "Open Lab App" })}
+        </button>
+      ) : null}
+      {canOpenMarketplace ? (
+        <button type="button" onClick={openMarketplace}>
+          {t("auth.actions.openMarketplace", { defaultValue: "Marketplace" })}
         </button>
       ) : null}
       <button type="button" onClick={handleLogout}>

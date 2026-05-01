@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import BreedingPlannerApp from "./App.jsx";
 import AuthGate from "./features/auth/AuthGate.jsx";
 import LabAppShell from "./features/lab/LabAppShell.jsx";
+import MarketplacePage from "./features/marketplace/MarketplacePage.jsx";
 import { AppearanceProvider } from "./contexts/AppearanceContext.jsx";
 import { SharedBackendProvider } from "./contexts/SharedBackendContext.jsx";
 import SharedBackendBanner from "./components/SharedBackendBanner.jsx";
@@ -15,6 +16,7 @@ const normalizeHashPath = (hashValue) => {
 };
 
 const isLabSectionPath = (path) => normalizeHashPath(path).startsWith("/lab");
+const isMarketplacePath = (path) => normalizeHashPath(path).startsWith("/marketplace");
 
 function AppSectionRouter() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
@@ -29,6 +31,10 @@ function AppSectionRouter() {
 
   if (isLabSectionPath(hashPath)) {
     return <LabAppShell />;
+  }
+
+  if (isMarketplacePath(hashPath)) {
+    return <MarketplacePage />;
   }
 
   return <BreedingPlannerApp />;

@@ -428,6 +428,21 @@ export type BreederSnapshotPayload = {
   clutches?: unknown[];
 };
 
+export type BreederProfilePayload = {
+  breederName?: string;
+  logoUrl?: string;
+  location?: string;
+  bio?: string;
+  websiteUrl?: string;
+  instagramHandle?: string;
+  facebookHandle?: string;
+  telegramHandle?: string;
+  publicContactEmail?: string;
+  publicContactPhone?: string;
+  contactPreference?: string;
+  isPublic?: boolean;
+};
+
 export const fetchBreederSnapshot = async () =>
   request<BreederSnapshotPayload>("/breeder/snapshot");
 
@@ -436,6 +451,18 @@ export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
     method: "PUT",
     body: JSON.stringify(payload),
   });
+
+export const fetchMyBreederProfile = async () =>
+  request<{ profile: unknown | null }>("/profiles/me");
+
+export const saveMyBreederProfile = async (payload: BreederProfilePayload) =>
+  request<{ profile: unknown }>("/profiles/me", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMarketplaceProfiles = async () =>
+  request<{ profiles: unknown[] }>("/profiles/marketplace");
 
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);
