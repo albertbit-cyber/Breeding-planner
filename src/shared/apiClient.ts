@@ -513,6 +513,14 @@ export const deleteSavedSearch = async (id: string) =>
     method: "DELETE",
   });
 
+export const fetchNotifications = async () =>
+  request<{ notifications: unknown[] }>("/notifications");
+
+export const markNotificationRead = async (id: string) =>
+  request<{ notification: unknown }>(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: "PATCH",
+  });
+
 export const createListingInquiry = async (payload: {
   listingId: string;
   buyerName: string;

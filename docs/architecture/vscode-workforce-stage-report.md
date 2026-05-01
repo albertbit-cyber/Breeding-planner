@@ -380,3 +380,50 @@ Known remaining issue outside this stage:
 Recommended next work:
 
 1. Start the next stage: email/notification workflow or richer admin moderation/audit history.
+
+## Marketplace Email/Notification Workflow Stage Status
+
+Completed as a verified slice after approval.
+
+- Added Prisma `Notification` model linked to users as recipients and optional actors.
+- Added migration:
+  - `server/prisma/migrations/20260501193000_add_marketplace_notifications/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added notification backend API:
+  - `GET /api/notifications`
+  - `PATCH /api/notifications/:id/read`
+- Added notification service/controller/routes:
+  - `server/src/services/notificationService.ts`
+  - `server/src/controllers/notificationController.ts`
+  - `server/src/routes/notificationRoutes.ts`
+- Registered notification routes in `server/src/app.ts`.
+- Added notification creation for marketplace events:
+  - new listing inquiry notifies the receiving breeder
+  - inquiry follow-up notifies the buyer
+  - listing moderation status changes notify the listing owner
+- Added frontend API client functions:
+  - `fetchNotifications`
+  - `markNotificationRead`
+- Updated marketplace UI:
+  - users can see recent marketplace notifications
+  - users can mark unread notifications as read
+- Added tests for notification creation/listing/read behavior and notification side effects in inquiry/listing services.
+
+Verification completed:
+
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `npm.cmd test -- notificationService.test.ts inquiryService.test.ts listingService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Start the final planned marketplace stage: richer admin moderation/audit history.

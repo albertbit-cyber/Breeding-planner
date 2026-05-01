@@ -16,6 +16,7 @@ vi.mock("../lib/prisma", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    notification: { create: vi.fn() },
   },
 }));
 
@@ -63,6 +64,16 @@ beforeEach(() => {
       role: "breeder",
       profile: { breederName: "Demo Breeder", isPublic: true },
     },
+  });
+  vi.mocked((prisma as any).notification.create).mockResolvedValue({
+    id: "notification-1",
+    type: "listing_status_changed",
+    title: "Listing status changed",
+    message: "Banana Clown is now hidden.",
+    metadata: {},
+    readAt: null,
+    createdAt: new Date("2026-05-01T11:00:00.000Z"),
+    actor: null,
   });
 });
 
@@ -186,6 +197,12 @@ describe("listingService", () => {
       data: expect.objectContaining({
         status: "hidden",
         payload: expect.objectContaining({ status: "hidden" }),
+      }),
+    }));
+    expect((prisma as any).notification.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        recipientId: "breeder-1",
+        type: "listing_status_changed",
       }),
     }));
   });

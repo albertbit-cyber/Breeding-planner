@@ -64,6 +64,8 @@ model User {
   inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
   inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
   savedSearches    SavedSearch[]
+  notifications     Notification[] @relation("NotificationRecipient")
+  notificationsSent Notification[] @relation("NotificationActor")
 }
 
 model Profile {
@@ -198,6 +200,24 @@ model SavedSearch {
 
   @@index([ownerId])
   @@index([ownerId, updatedAt])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  recipientId String
+  recipient   User      @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type        String
+  title       String
+  message     String    @db.Text
+  metadata    Json?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId])
+  @@index([recipientId, readAt])
+  @@index([recipientId, createdAt])
 }
 
 model ShedTestCatalog {

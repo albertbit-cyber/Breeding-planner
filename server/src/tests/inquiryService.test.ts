@@ -9,6 +9,7 @@ vi.mock("../lib/prisma", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    notification: { create: vi.fn() },
   },
 }));
 
@@ -64,6 +65,16 @@ beforeEach(() => {
     createdAt: new Date("2026-05-01T10:00:00.000Z"),
     listing: { appListingId: "listing-1", title: "Banana Clown" },
   });
+  vi.mocked((prisma as any).notification.create).mockResolvedValue({
+    id: "notification-1",
+    type: "listing_inquiry",
+    title: "New listing inquiry",
+    message: "Buyer asked about Banana Clown.",
+    metadata: {},
+    readAt: null,
+    createdAt: new Date("2026-05-01T10:00:00.000Z"),
+    actor: null,
+  });
 });
 
 describe("inquiryService", () => {
@@ -88,6 +99,13 @@ describe("inquiryService", () => {
         breederId: "breeder-1",
         buyerId: "buyer-1",
         buyerEmail: "buyer@example.com",
+      }),
+    }));
+    expect((prisma as any).notification.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        recipientId: "breeder-1",
+        actorId: "buyer-1",
+        type: "listing_inquiry",
       }),
     }));
   });
@@ -148,6 +166,13 @@ describe("inquiryService", () => {
       data: expect.objectContaining({
         status: "contacted",
         breederResponseNote: "Email sent.",
+      }),
+    }));
+    expect((prisma as any).notification.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        recipientId: "buyer-1",
+        actorId: "breeder-1",
+        type: "inquiry_follow_up",
       }),
     }));
   });

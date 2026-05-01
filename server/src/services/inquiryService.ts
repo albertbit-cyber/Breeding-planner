@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AppRole } from "../types/auth";
+import { createNotification } from "./notificationService";
 
 type InquiryInput = {
   listingId?: unknown;
@@ -81,6 +82,19 @@ export const createListingInquiry = async (
     include: { listing: true },
   });
 
+  await createNotification({
+    recipientId: listing.ownerId,
+    actorId: actor.id,
+    type: "listing_inquiry",
+    title: "New listing inquiry",
+    message: `${buyerName} asked about ${listing.title || "your listing"}.`,
+    metadata: {
+      inquiryId: inquiry.id,
+      listingId: listing.id,
+      appListingId: listing.appListingId,
+    },
+  });
+
   return toPublicInquiry(inquiry);
 };
 
@@ -133,6 +147,21 @@ export const updateInquiryFollowUp = async (
     },
     include: { listing: true },
   });
+
+  if (updated.buyerId) {
+    await createNotification({
+      recipientId: updated.buyerId,
+      actorId: actor.id,
+      type: "inquiry_follow_up",
+      title: "Inquiry updated",
+      message: `Your inquiry about ${updated.listing?.title || "a listing"} was updated.`,
+      metadata: {
+        inquiryId: updated.id,
+        listingId: updated.listingId,
+        status: updated.status,
+      },
+    });
+  }
 
   return toPublicInquiry(updated);
 };

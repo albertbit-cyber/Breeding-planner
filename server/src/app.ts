@@ -11,6 +11,7 @@ import { profileRoutes } from "./routes/profileRoutes";
 import { listingRoutes } from "./routes/listingRoutes";
 import { inquiryRoutes } from "./routes/inquiryRoutes";
 import { savedSearchRoutes } from "./routes/savedSearchRoutes";
+import { notificationRoutes } from "./routes/notificationRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -66,6 +67,7 @@ app.use("/api/profiles", profileRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/searches", savedSearchRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 

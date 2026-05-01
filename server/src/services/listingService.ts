@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
+import { createNotification } from "./notificationService";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -184,7 +185,7 @@ export const listModerationListings = async (actor: { role: string }) => {
 };
 
 export const updateListingModerationStatus = async (
-  actor: { role: string },
+  actor: { id?: string; role: string },
   listingId: string,
   statusInput: unknown
 ) => {
@@ -219,6 +220,19 @@ export const updateListingModerationStatus = async (
           profile: true,
         },
       },
+    },
+  });
+
+  await createNotification({
+    recipientId: row.ownerId,
+    actorId: actor.id || null,
+    type: "listing_status_changed",
+    title: "Listing status changed",
+    message: `${row.title || "Your listing"} is now ${status}.`,
+    metadata: {
+      listingId: row.id,
+      appListingId: row.appListingId,
+      status,
     },
   });
 

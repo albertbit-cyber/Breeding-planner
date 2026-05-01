@@ -12,6 +12,7 @@ import {
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
+  fetchNotifications,
   fetchSavedSearches,
   getHealth,
   getAuthToken,
@@ -20,6 +21,7 @@ import {
   resetSharedBackendState,
   setAuthToken,
   setRefreshToken,
+  markNotificationRead,
   saveBreederSnapshot,
   saveMyBreederProfile,
   saveMyListings,
@@ -495,6 +497,46 @@ describe("shared api client", () => {
       },
     });
     await expect(deleteSavedSearch("search-1")).resolves.toEqual({ deleted: "search-1" });
+  });
+
+  it("loads notifications and marks them read", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/notifications") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ notifications: [{ id: "notification-1", title: "New inquiry" }] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/notifications/notification-1/read") && method === "PATCH") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ notification: { id: "notification-1", readAt: "2026-05-01T10:00:00.000Z" } }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchNotifications()).resolves.toEqual({
+      notifications: [{ id: "notification-1", title: "New inquiry" }],
+    });
+    await expect(markNotificationRead("notification-1")).resolves.toEqual({
+      notification: { id: "notification-1", readAt: "2026-05-01T10:00:00.000Z" },
+    });
   });
 
   it("does not mark login failures as disconnected or unauthorized backend state", async () => {

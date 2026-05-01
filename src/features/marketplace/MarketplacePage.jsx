@@ -8,7 +8,9 @@ import {
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
+  fetchNotifications,
   fetchSavedSearches,
+  markNotificationRead,
   saveMyBreederProfile,
   saveMyListings,
   updateInquiry,
@@ -204,6 +206,7 @@ export default function MarketplacePage() {
   const [moderationEdits, setModerationEdits] = useState({});
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchName, setSavedSearchName] = useState("");
+  const [notifications, setNotifications] = useState([]);
   const [inquiryDraft, setInquiryDraft] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
   const [filters, setFilters] = useState({
@@ -246,6 +249,7 @@ export default function MarketplacePage() {
       const inquiries = await fetchMyInquiries();
       const moderation = canModerate ? await fetchModerationListings() : { listings: [] };
       const searches = await fetchSavedSearches();
+      const notices = await fetchNotifications();
       const moderationList = normalizeModerationRows(moderation?.listings);
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
@@ -265,6 +269,7 @@ export default function MarketplacePage() {
         listing.status || "draft",
       ])));
       setSavedSearches(Array.isArray(searches?.searches) ? searches.searches : []);
+      setNotifications(Array.isArray(notices?.notifications) ? notices.notifications : []);
       setStatus("ready");
     } catch (error) {
       setStatus("error");
@@ -403,6 +408,21 @@ export default function MarketplacePage() {
       setMessage("Saved search deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Saved search delete failed.");
+    }
+  };
+
+  const refreshNotifications = async () => {
+    const notices = await fetchNotifications();
+    setNotifications(Array.isArray(notices?.notifications) ? notices.notifications : []);
+  };
+
+  const markNoticeRead = async (id) => {
+    setMessage("");
+    try {
+      await markNotificationRead(id);
+      await refreshNotifications();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Notification update failed.");
     }
   };
 
@@ -625,6 +645,26 @@ export default function MarketplacePage() {
       ) : null}
 
       {message ? <p className="marketplace-message">{message}</p> : null}
+      <section className="marketplace-notifications">
+        <div>
+          <h2>Notifications</h2>
+          <p>{notifications.filter((notice) => !notice.readAt).length} unread</p>
+        </div>
+        <div className="marketplace-notifications__list">
+          {!notifications.length ? <p>No marketplace notifications.</p> : null}
+          {notifications.slice(0, 5).map((notice) => (
+            <article key={notice.id} className={notice.readAt ? "is-read" : ""}>
+              <div>
+                <strong>{notice.title || "Marketplace notification"}</strong>
+                <span>{notice.message || ""}</span>
+              </div>
+              {!notice.readAt ? (
+                <button type="button" onClick={() => markNoticeRead(notice.id)}>Mark read</button>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
       <section className="marketplace-filters">
         <div>
           <h2>Search listings</h2>
