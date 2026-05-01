@@ -6,6 +6,7 @@ import {
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
   fetchMarketplaceListings,
+  fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
@@ -20,6 +21,7 @@ import {
   saveMyBreederProfile,
   saveMyListings,
   updateInquiry,
+  updateListingStatus,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -393,6 +395,46 @@ describe("shared api client", () => {
         status: "contacted",
         breederResponseNote: "Email sent.",
       },
+    });
+  });
+
+  it("loads moderation listings and updates listing status", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/listings/moderation") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ listings: [{ id: "listing-1", status: "draft" }] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/listings/listing-1/status") && method === "PATCH") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ listing: { id: "listing-1", ...JSON.parse(String(options.body)) } }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchModerationListings()).resolves.toEqual({
+      listings: [{ id: "listing-1", status: "draft" }],
+    });
+    await expect(updateListingStatus("listing-1", "hidden")).resolves.toEqual({
+      listing: { id: "listing-1", status: "hidden" },
     });
   });
 

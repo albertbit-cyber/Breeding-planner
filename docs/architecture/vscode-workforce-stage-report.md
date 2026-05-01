@@ -184,8 +184,6 @@ Known remaining issue outside this stage:
   - `src/features/lab/api/client.ts`
   - `src/utils/pdf/labCertificatePdf.ts`
 
-Recommended next work:
-
 ## Buyer Inquiry/Contact Workflow Stage Status
 
 Committed as `efb319d feat: add marketplace listing inquiries`.
@@ -225,8 +223,6 @@ Known remaining issue outside this stage:
 - Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
   - `src/features/lab/api/client.ts`
   - `src/utils/pdf/labCertificatePdf.ts`
-
-Recommended next work:
 
 ## Inquiry Status/Response Notes Stage Status
 
@@ -269,11 +265,9 @@ Known remaining issue outside this stage:
   - `src/features/lab/api/client.ts`
   - `src/utils/pdf/labCertificatePdf.ts`
 
-Recommended next work:
-
 ## Marketplace Filters/Search and Listing Detail Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `cbee880 feat: add marketplace search and listing detail`.
 
 - Added client-side marketplace filters:
   - keyword search across listing, genetics, breeder, and location fields
@@ -298,8 +292,47 @@ Known remaining issue outside this stage:
   - `src/features/lab/api/client.ts`
   - `src/utils/pdf/labCertificatePdf.ts`
 
+## Marketplace Listing Moderation Tools Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added admin-only listing moderation backend API:
+  - `GET /api/listings/moderation`
+  - `PATCH /api/listings/:id/status`
+- Added service authorization so only admin users can moderate marketplace listings.
+- Added moderation status support for:
+  - `draft`
+  - `available`
+  - `reserved`
+  - `sold`
+  - `hidden`
+- Updated listing serialization so database-owned moderation status overrides stale payload status.
+- Added frontend API client functions:
+  - `fetchModerationListings`
+  - `updateListingStatus`
+- Updated marketplace UI:
+  - admins can see all marketplace listings in a moderation panel
+  - admins can review breeder identity/email for each listing
+  - admins can change listing status, including hiding a listing
+  - status changes refresh the marketplace and moderation list
+- Added tests for moderation listing, status updates, non-admin rejection, and frontend moderation API calls.
+
+Verification completed:
+
+- `npm.cmd test -- listingService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
 Recommended next work:
 
-1. Review the marketplace filters/detail diff.
-2. Commit the verified filters/detail slice if approved.
-3. Start the next stage: marketplace saved searches or breeder/listing moderation tools.
+1. Review the marketplace moderation diff.
+2. Commit the verified moderation slice if approved.
+3. Start the next stage: marketplace saved searches, email/notification workflow, or richer admin moderation/audit history.

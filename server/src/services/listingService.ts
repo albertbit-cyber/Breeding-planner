@@ -48,6 +48,7 @@ const assertCanManageListings = async (ownerId: string) => {
 const toPublicListing = (row: any) => {
   if (!row) return null;
   return {
+    ...(row.payload && typeof row.payload === "object" ? row.payload : {}),
     id: row.appListingId,
     rowId: row.id,
     ownerId: row.ownerId,
@@ -57,8 +58,13 @@ const toPublicListing = (row: any) => {
     priceCents: row.priceCents,
     currency: row.currency,
     updatedAt: row.updatedAt,
-    ...(row.payload && typeof row.payload === "object" ? row.payload : {}),
   };
+};
+
+const assertAdmin = (actor: { role: string }) => {
+  if (actor.role !== "admin") {
+    throw new HttpError(403, "Only admin users can moderate marketplace listings.");
+  }
 };
 
 export const listMyListings = async (ownerId: string) => {
@@ -143,4 +149,90 @@ export const listPublicMarketplaceListings = async () => {
         }
       : undefined,
   })).filter(Boolean);
+};
+
+export const listModerationListings = async (actor: { role: string }) => {
+  assertAdmin(actor);
+  const rows = await db.listing.findMany({
+    include: {
+      owner: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+          profile: true,
+        },
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }],
+  });
+
+  return rows.map((row: any) => ({
+    ...toPublicListing(row),
+    breeder: row.owner
+      ? {
+          userId: row.owner.id,
+          fullName: row.owner.fullName,
+          email: row.owner.email,
+          role: row.owner.role,
+          breederName: row.owner.profile?.breederName || row.owner.fullName,
+          isPublic: row.owner.profile?.isPublic === true,
+        }
+      : undefined,
+  })).filter(Boolean);
+};
+
+export const updateListingModerationStatus = async (
+  actor: { role: string },
+  listingId: string,
+  statusInput: unknown
+) => {
+  assertAdmin(actor);
+  const id = textValue(listingId, 160);
+  const status = textValue(statusInput, 40);
+  const allowed = new Set(["draft", "available", "reserved", "sold", "hidden"]);
+  if (!id) throw new HttpError(400, "listingId is required.");
+  if (!status || !allowed.has(status)) {
+    throw new HttpError(400, "Invalid listing status.");
+  }
+
+  const existing = await db.listing.findFirst({
+    where: { OR: [{ id }, { appListingId: id }] },
+  });
+  if (!existing) throw new HttpError(404, "Listing not found.");
+
+  const payload = existing.payload && typeof existing.payload === "object"
+    ? { ...existing.payload, status }
+    : { status };
+
+  const row = await db.listing.update({
+    where: { id: existing.id },
+    data: { status, payload },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+          profile: true,
+        },
+      },
+    },
+  });
+
+  return {
+    ...toPublicListing(row),
+    breeder: row.owner
+      ? {
+          userId: row.owner.id,
+          fullName: row.owner.fullName,
+          email: row.owner.email,
+          role: row.owner.role,
+          breederName: row.owner.profile?.breederName || row.owner.fullName,
+          isPublic: row.owner.profile?.isPublic === true,
+        }
+      : undefined,
+  };
 };

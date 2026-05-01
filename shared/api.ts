@@ -7,6 +7,7 @@ export {
   createOrder,
   fetchMarketplaceProfiles,
   fetchMarketplaceListings,
+  fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
@@ -28,6 +29,7 @@ export {
   setAuthToken,
   setRefreshToken,
   updateInquiry,
+  updateListingStatus,
   updateOrderStatus,
 } from "../src/shared/apiClient";
 

@@ -490,6 +490,15 @@ export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
 export const fetchMarketplaceListings = async () =>
   request<{ listings: unknown[] }>("/listings/marketplace");
 
+export const fetchModerationListings = async () =>
+  request<{ listings: unknown[] }>("/listings/moderation");
+
+export const updateListingStatus = async (id: string, status: string) =>
+  request<{ listing: unknown }>(`/listings/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+
 export const createListingInquiry = async (payload: {
   listingId: string;
   buyerName: string;

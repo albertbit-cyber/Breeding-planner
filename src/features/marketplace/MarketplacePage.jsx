@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   createListingInquiry,
   fetchMarketplaceProfiles,
+  fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
   saveMyBreederProfile,
   saveMyListings,
   updateInquiry,
+  updateListingStatus,
 } from "../../shared/apiClient";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
@@ -65,6 +67,8 @@ const normalizeProfile = (profile) => ({
   ...emptyProfile,
   ...(profile && typeof profile === "object" ? profile : {}),
 });
+
+const normalizeModerationRows = (listings) => Array.isArray(listings) ? listings : [];
 
 const firstText = (...values) => values.map((value) => String(value || "").trim()).find(Boolean) || "";
 
@@ -193,6 +197,8 @@ export default function MarketplacePage() {
   const [myListings, setMyListings] = useState([]);
   const [myInquiries, setMyInquiries] = useState([]);
   const [inquiryEdits, setInquiryEdits] = useState({});
+  const [moderationListings, setModerationListings] = useState([]);
+  const [moderationEdits, setModerationEdits] = useState({});
   const [inquiryDraft, setInquiryDraft] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
   const [filters, setFilters] = useState({
@@ -207,6 +213,7 @@ export default function MarketplacePage() {
   const authProfile = useMemo(readProfile, []);
   const canEditProfile = role === "breeder" || role === "admin";
   const canSendInquiry = role === "buyer" || role === "breeder" || role === "admin";
+  const canModerate = role === "admin";
   const filteredProfiles = useMemo(() => profiles.map((profile) => {
     const listings = Array.isArray(profile?.listings) ? profile.listings : [];
     return {
@@ -232,6 +239,8 @@ export default function MarketplacePage() {
       ]);
       const listings = canEditProfile ? await fetchMyListings() : { listings: [] };
       const inquiries = await fetchMyInquiries();
+      const moderation = canModerate ? await fetchModerationListings() : { listings: [] };
+      const moderationList = normalizeModerationRows(moderation?.listings);
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
       setMyListings(Array.isArray(listings?.listings) ? listings.listings : []);
@@ -243,6 +252,11 @@ export default function MarketplacePage() {
           status: inquiry.status || "new",
           breederResponseNote: inquiry.breederResponseNote || "",
         },
+      ])));
+      setModerationListings(moderationList);
+      setModerationEdits(Object.fromEntries(moderationList.map((listing) => [
+        listing.rowId || listing.id,
+        listing.status || "draft",
       ])));
       setStatus("ready");
     } catch (error) {
@@ -337,8 +351,40 @@ export default function MarketplacePage() {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
+  const updateModerationEdit = (id, status) => {
+    setModerationEdits((prev) => ({ ...prev, [id]: status }));
+  };
+
   const clearFilters = () => {
     setFilters({ search: "", sex: "", location: "", maxPrice: "" });
+  };
+
+  const refreshModerationListings = async () => {
+    setMessage("");
+    try {
+      const moderation = await fetchModerationListings();
+      const moderationList = normalizeModerationRows(moderation?.listings);
+      setModerationListings(moderationList);
+      setModerationEdits(Object.fromEntries(moderationList.map((listing) => [
+        listing.rowId || listing.id,
+        listing.status || "draft",
+      ])));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Listing moderation refresh failed.");
+    }
+  };
+
+  const saveModerationStatus = async (listing) => {
+    const id = listing.rowId || listing.id;
+    const nextStatus = moderationEdits[id] || listing.status || "draft";
+    setMessage("");
+    try {
+      await updateListingStatus(id, nextStatus);
+      await loadProfiles();
+      setMessage("Listing status updated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Listing moderation update failed.");
+    }
   };
 
   const saveInquiryFollowUp = async (id) => {
@@ -486,6 +532,49 @@ export default function MarketplacePage() {
           </div>
         </section>
         </>
+      ) : null}
+
+      {canModerate ? (
+        <section className="marketplace-editor">
+          <div className="marketplace-editor__header">
+            <h2>Marketplace moderation</h2>
+            <button type="button" onClick={refreshModerationListings}>Refresh</button>
+          </div>
+          <div className="marketplace-moderation-list">
+            {!moderationListings.length ? <p>No listings to review.</p> : null}
+            {moderationListings.map((listing) => {
+              const id = listing.rowId || listing.id;
+              const breederName = firstText(
+                listing?.breeder?.breederName,
+                listing?.breeder?.fullName,
+                "Breeder"
+              );
+              return (
+                <article className="marketplace-moderation-item" key={id}>
+                  <div>
+                    <strong>{firstText(listing?.title, listing?.name, id)}</strong>
+                    <span>{breederName}{listing?.breeder?.email ? ` - ${listing.breeder.email}` : ""}</span>
+                    <span>Current status: {listing.status || "draft"}</span>
+                  </div>
+                  <label>
+                    <span>Moderation status</span>
+                    <select
+                      value={moderationEdits[id] || listing.status || "draft"}
+                      onChange={(event) => updateModerationEdit(id, event.target.value)}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="available">Available</option>
+                      <option value="reserved">Reserved</option>
+                      <option value="sold">Sold</option>
+                      <option value="hidden">Hidden</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => saveModerationStatus(listing)}>Save</button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       {message ? <p className="marketplace-message">{message}</p> : null}
