@@ -230,7 +230,7 @@ Recommended next work:
 
 ## Inquiry Status/Response Notes Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `c94d13c feat: add inquiry follow-up management`.
 
 - Added persistent inquiry follow-up fields:
   - `breederResponseNote`
@@ -271,6 +271,35 @@ Known remaining issue outside this stage:
 
 Recommended next work:
 
-1. Review the inquiry status/response notes diff.
-2. Commit the verified follow-up slice if approved.
-3. Start the next stage: marketplace filters/search and listing detail view.
+## Marketplace Filters/Search and Listing Detail Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added client-side marketplace filters:
+  - keyword search across listing, genetics, breeder, and location fields
+  - sex filter
+  - location filter
+  - max price filter
+- Added visible listing count and clear-filter action.
+- Updated grouped breeder profile rendering so filters hide nonmatching listings and hide profiles with no matching listings.
+- Added listing detail panel opened from listing cards.
+- Detail panel shows price, sex, hatch date, genetics, animal ID, description, and image when available.
+- Detail panel can start the existing inquiry flow.
+- Added responsive CSS for filter controls and the listing detail panel.
+
+Verification completed:
+
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Review the marketplace filters/detail diff.
+2. Commit the verified filters/detail slice if approved.
+3. Start the next stage: marketplace saved searches or breeder/listing moderation tools.

@@ -68,7 +68,39 @@ const normalizeProfile = (profile) => ({
 
 const firstText = (...values) => values.map((value) => String(value || "").trim()).find(Boolean) || "";
 
-function ProfileCard({ profile, onInquire }) {
+const normalizeSearch = (value) => String(value || "").trim().toLowerCase();
+
+const listingMatchesFilters = (listing, profile, filters) => {
+  const search = normalizeSearch(filters.search);
+  const sexFilter = normalizeSearch(filters.sex);
+  const locationFilter = normalizeSearch(filters.location);
+  const maxPrice = Number(filters.maxPrice);
+  const searchable = [
+    listing?.title,
+    listing?.name,
+    listing?.description,
+    listing?.genetics,
+    listing?.sex,
+    listing?.hatchDate,
+    profile?.breederName,
+    profile?.user?.fullName,
+    profile?.location,
+  ].map(normalizeSearch).join(" ");
+
+  if (search && !searchable.includes(search)) return false;
+  if (sexFilter && normalizeSearch(listing?.sex) !== sexFilter) return false;
+  if (locationFilter && !normalizeSearch(profile?.location).includes(locationFilter)) return false;
+  if (Number.isFinite(maxPrice) && maxPrice > 0) {
+    const priceValue = typeof listing?.priceCents === "number"
+      ? listing.priceCents / 100
+      : Number(listing?.price);
+    if (Number.isFinite(priceValue) && priceValue > maxPrice) return false;
+  }
+
+  return true;
+};
+
+function ProfileCard({ profile, onInquire, onSelectListing }) {
   const displayName = firstText(profile?.breederName, profile?.user?.fullName, "Breeder");
   const contact = firstText(profile?.publicContactEmail, profile?.publicContactPhone);
 
@@ -101,7 +133,13 @@ function ProfileCard({ profile, onInquire }) {
       {Array.isArray(profile?.listings) && profile.listings.length ? (
         <div className="marketplace-listings">
           {profile.listings.map((listing) => (
-            <ListingCard key={listing.id || listing.rowId} listing={listing} compact onInquire={onInquire} />
+            <ListingCard
+              key={listing.id || listing.rowId}
+              listing={listing}
+              compact
+              onInquire={onInquire}
+              onSelect={onSelectListing}
+            />
           ))}
         </div>
       ) : null}
@@ -117,7 +155,7 @@ function formatPrice(listing) {
   return raw ? `${raw} ${listing?.currency || "EUR"}` : "";
 }
 
-function ListingCard({ listing, compact = false, onInquire }) {
+function ListingCard({ listing, compact = false, onInquire, onSelect }) {
   const title = firstText(listing?.title, listing?.name, "Available animal");
   const details = [
     firstText(listing?.sex),
@@ -134,6 +172,11 @@ function ListingCard({ listing, compact = false, onInquire }) {
         {details ? <p>{details}</p> : null}
         {listing?.description ? <p className="marketplace-listing-card__description">{listing.description}</p> : null}
         {price ? <strong>{price}</strong> : null}
+        {onSelect ? (
+          <button type="button" className="marketplace-detail-button" onClick={() => onSelect(listing)}>
+            View details
+          </button>
+        ) : null}
         {onInquire ? (
           <button type="button" className="marketplace-inquire" onClick={() => onInquire(listing)}>
             Ask about this animal
@@ -151,12 +194,33 @@ export default function MarketplacePage() {
   const [myInquiries, setMyInquiries] = useState([]);
   const [inquiryEdits, setInquiryEdits] = useState({});
   const [inquiryDraft, setInquiryDraft] = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
+  const [filters, setFilters] = useState({
+    search: "",
+    sex: "",
+    location: "",
+    maxPrice: "",
+  });
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
   const role = useMemo(readRole, []);
   const authProfile = useMemo(readProfile, []);
   const canEditProfile = role === "breeder" || role === "admin";
   const canSendInquiry = role === "buyer" || role === "breeder" || role === "admin";
+  const filteredProfiles = useMemo(() => profiles.map((profile) => {
+    const listings = Array.isArray(profile?.listings) ? profile.listings : [];
+    return {
+      ...profile,
+      listings: listings.filter((listing) => listingMatchesFilters(listing, profile, filters)),
+    };
+  }).filter((profile) => {
+    const hasFilters = Object.values(filters).some((value) => String(value || "").trim());
+    if (!hasFilters) return true;
+    return Array.isArray(profile.listings) && profile.listings.length > 0;
+  }), [filters, profiles]);
+  const visibleListingCount = filteredProfiles.reduce((sum, profile) => (
+    sum + (Array.isArray(profile?.listings) ? profile.listings.length : 0)
+  ), 0);
 
   const loadProfiles = async () => {
     setStatus("loading");
@@ -267,6 +331,14 @@ export default function MarketplacePage() {
         [field]: value,
       },
     }));
+  };
+
+  const updateFilter = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ search: "", sex: "", location: "", maxPrice: "" });
   };
 
   const saveInquiryFollowUp = async (id) => {
@@ -417,6 +489,38 @@ export default function MarketplacePage() {
       ) : null}
 
       {message ? <p className="marketplace-message">{message}</p> : null}
+      <section className="marketplace-filters">
+        <div>
+          <h2>Search listings</h2>
+          <p>{visibleListingCount} available listing{visibleListingCount === 1 ? "" : "s"} shown</p>
+        </div>
+        <label>
+          <span>Search</span>
+          <input
+            value={filters.search}
+            placeholder="Morph, genetics, breeder"
+            onChange={(event) => updateFilter("search", event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Sex</span>
+          <select value={filters.sex} onChange={(event) => updateFilter("sex", event.target.value)}>
+            <option value="">Any</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+        <label>
+          <span>Location</span>
+          <input value={filters.location} onChange={(event) => updateFilter("location", event.target.value)} />
+        </label>
+        <label>
+          <span>Max price</span>
+          <input type="number" min="0" value={filters.maxPrice} onChange={(event) => updateFilter("maxPrice", event.target.value)} />
+        </label>
+        <button type="button" onClick={clearFilters}>Clear</button>
+      </section>
       {inquiryDraft ? (
         <section className="marketplace-editor marketplace-inquiry-form">
           <h2>Ask about {inquiryDraft.listingTitle}</h2>
@@ -486,15 +590,44 @@ export default function MarketplacePage() {
       {status === "error" ? (
         <button type="button" className="marketplace-retry" onClick={loadProfiles}>Retry</button>
       ) : null}
+      {selectedListing ? (
+        <section className="marketplace-detail">
+          <div className="marketplace-detail__panel">
+            <button type="button" className="marketplace-detail__close" onClick={() => setSelectedListing(null)}>Close</button>
+            {selectedListing.imageUrl ? <img src={selectedListing.imageUrl} alt="" /> : null}
+            <div>
+              <h2>{firstText(selectedListing.title, selectedListing.name, "Available animal")}</h2>
+              {formatPrice(selectedListing) ? <strong>{formatPrice(selectedListing)}</strong> : null}
+              <dl>
+                {selectedListing.sex ? <><dt>Sex</dt><dd>{selectedListing.sex}</dd></> : null}
+                {selectedListing.hatchDate ? <><dt>Hatch date</dt><dd>{selectedListing.hatchDate}</dd></> : null}
+                {selectedListing.genetics ? <><dt>Genetics</dt><dd>{selectedListing.genetics}</dd></> : null}
+                {selectedListing.animalAppId ? <><dt>Animal ID</dt><dd>{selectedListing.animalAppId}</dd></> : null}
+              </dl>
+              {selectedListing.description ? <p>{selectedListing.description}</p> : null}
+              {canSendInquiry ? (
+                <button type="button" className="marketplace-inquire" onClick={() => {
+                  openInquiry(selectedListing);
+                  setSelectedListing(null);
+                }}>
+                  Ask about this animal
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="marketplace-list">
         {status === "loading" ? <p>Loading breeder profiles...</p> : null}
         {status === "ready" && !profiles.length ? <p>No public breeder profiles yet.</p> : null}
-        {profiles.map((profile) => (
+        {status === "ready" && profiles.length > 0 && !filteredProfiles.length ? <p>No listings match the current filters.</p> : null}
+        {filteredProfiles.map((profile) => (
           <ProfileCard
             key={profile.id || profile.userId}
             profile={profile}
             onInquire={canSendInquiry ? openInquiry : null}
+            onSelectListing={setSelectedListing}
           />
         ))}
       </section>
