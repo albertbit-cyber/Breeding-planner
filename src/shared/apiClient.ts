@@ -422,6 +422,21 @@ export const fetchOrders = async () => request<{ orders: unknown[] }>("/lab/orde
 
 export const fetchMyOrders = fetchOrders;
 
+export type BreederSnapshotPayload = {
+  animals: unknown[];
+  pairings: unknown[];
+  clutches?: unknown[];
+};
+
+export const fetchBreederSnapshot = async () =>
+  request<BreederSnapshotPayload>("/breeder/snapshot");
+
+export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
+  request<BreederSnapshotPayload>("/breeder/snapshot", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);
 

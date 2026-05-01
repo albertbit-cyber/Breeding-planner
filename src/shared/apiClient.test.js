@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createOrder,
   fetchOrders,
+  fetchBreederSnapshot,
   getHealth,
   getAuthToken,
   getRefreshToken,
@@ -9,6 +10,7 @@ import {
   resetSharedBackendState,
   setAuthToken,
   setRefreshToken,
+  saveBreederSnapshot,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -170,6 +172,49 @@ describe("shared api client", () => {
     expect(refreshCalls).toBe(1);
     expect(getAuthToken()).toBe("fresh-access");
     expect(getRefreshToken()).toBe("refresh-token-2");
+  });
+
+  it("round-trips breeder planner snapshots through the shared backend", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/breeder/snapshot") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ animals: [{ id: "snake-1" }], pairings: [], clutches: [] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/breeder/snapshot") && method === "PUT") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => JSON.parse(String(options.body)),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchBreederSnapshot()).resolves.toEqual({
+      animals: [{ id: "snake-1" }],
+      pairings: [],
+      clutches: [],
+    });
+    await expect(saveBreederSnapshot({ animals: [], pairings: [{ id: "pairing-1" }] })).resolves.toEqual({
+      animals: [],
+      pairings: [{ id: "pairing-1" }],
+    });
   });
 
   it("does not mark login failures as disconnected or unauthorized backend state", async () => {

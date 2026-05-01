@@ -11,6 +11,7 @@ enum UserRole {
   admin
   lab
   breeder
+  buyer
 }
 
 enum TestPricingType {
@@ -54,10 +55,33 @@ model User {
   refreshToken     String?        @db.Text
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  profile          Profile?
   orders           ShedTestOrder[]
   animals          Animal[]
   pairings         Pairing[]
   clutches         Clutch[]
+}
+
+model Profile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  breederName          String?
+  logoUrl              String?
+  location             String?
+  bio                  String?  @db.Text
+  websiteUrl           String?
+  instagramHandle      String?
+  facebookHandle       String?
+  telegramHandle       String?
+  publicContactEmail   String?
+  publicContactPhone   String?
+  contactPreference    String?  @default("email")
+  isPublic             Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Animal {

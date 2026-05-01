@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "lab" | "breeder";
+export type AppRole = "admin" | "lab" | "breeder" | "buyer";
 
 export interface AuthTokenPayload {
   sub: string;

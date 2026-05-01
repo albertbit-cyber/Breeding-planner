@@ -4,8 +4,22 @@ import { HttpError } from "../utils/errors";
 import { calculateOrderBreakdown, toPublicBreakdown } from "./pricingService";
 import { getActivePricing, listCatalog } from "./labConfigService";
 import { buildNextOrderNumber, ensureSharedOrderNumbers } from "./orderNumberService";
+import type { AppRole } from "../types/auth";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
+type OrderActor = { id?: string; role: AppRole };
+
+const assertOrderWorkflowUser: (user: OrderActor) => asserts user is { id: string; role: "admin" | "lab" | "breeder" } = (user) => {
+  if (user.role === "buyer") {
+    throw new HttpError(403, "Buyer users cannot access lab order workflows.");
+  }
+};
+
+const assertLabWorkflowUser = (user: OrderActor): void => {
+  if (user.role !== "admin" && user.role !== "lab") {
+    throw new HttpError(403, "Only admin or lab users can manage lab order workflows.");
+  }
+};
 
 export const calculatePrice = async (animals: AnimalOrderInput[]) => {
   const [catalog, pricing] = await Promise.all([
@@ -104,7 +118,8 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
   return getOrderByIdForUser(created.id, { id: breederId, role: "breeder" });
 };
 
-export const listOrdersForUser = async (user: { id: string; role: "admin" | "lab" | "breeder" }) => {
+export const listOrdersForUser = async (user: { id: string; role: AppRole }) => {
+  assertOrderWorkflowUser(user);
   await ensureSharedOrderNumbers();
 
   if (user.role === "admin" || user.role === "lab") {
@@ -130,8 +145,9 @@ export const listOrdersForUser = async (user: { id: string; role: "admin" | "lab
 
 export const getOrderByIdForUser = async (
   orderId: string,
-  user: { id: string; role: "admin" | "lab" | "breeder" }
+  user: { id: string; role: AppRole }
 ) => {
+  assertOrderWorkflowUser(user);
   await ensureSharedOrderNumbers();
 
   const order = await prisma.shedTestOrder.findUnique({
@@ -155,11 +171,9 @@ export const getOrderByIdForUser = async (
 export const updateOrderStatus = async (
   orderId: string,
   status: "submitted" | "received" | "in_progress" | "completed" | "cancelled",
-  user: { role: "admin" | "lab" | "breeder" }
+  user: { role: AppRole }
 ) => {
-  if (user.role === "breeder") {
-    throw new HttpError(403, "Breeder users cannot update order status.");
-  }
+  assertLabWorkflowUser(user);
 
   const existing = await prisma.shedTestOrder.findUnique({ where: { id: orderId } });
   if (!existing) throw new HttpError(404, "Order not found.");
@@ -179,11 +193,9 @@ export const updateOrderStatus = async (
 export const updateOrderPayment = async (
   orderId: string,
   input: { paymentStatus: "pending" | "invoiced" | "paid" | "waived"; paymentRef?: string },
-  user: { role: "admin" | "lab" | "breeder" }
+  user: { role: AppRole }
 ) => {
-  if (user.role === "breeder") {
-    throw new HttpError(403, "Breeder users cannot update payment status.");
-  }
+  assertLabWorkflowUser(user);
 
   const existing = await prisma.shedTestOrder.findUnique({ where: { id: orderId } });
   if (!existing) throw new HttpError(404, "Order not found.");
@@ -210,11 +222,9 @@ export const updateOrderPayment = async (
 
 export const deleteOrderById = async (
   orderId: string,
-  user: { role: "admin" | "lab" | "breeder" }
+  user: { role: AppRole }
 ) => {
-  if (user.role === "breeder") {
-    throw new HttpError(403, "Breeder users cannot delete lab orders.");
-  }
+  assertLabWorkflowUser(user);
 
   const existing = await prisma.shedTestOrder.findUnique({
     where: { id: orderId },
@@ -255,10 +265,8 @@ export const deleteOrderById = async (
   };
 };
 
-export const deleteAllOrders = async (user: { role: "admin" | "lab" | "breeder" }) => {
-  if (user.role === "breeder") {
-    throw new HttpError(403, "Breeder users cannot delete lab orders.");
-  }
+export const deleteAllOrders = async (user: { role: AppRole }) => {
+  assertLabWorkflowUser(user);
 
   const result = await prisma.$transaction(async (tx: any) => {
     const deletedAnimalTests = await tx.shedTestOrderAnimalTest.deleteMany({});

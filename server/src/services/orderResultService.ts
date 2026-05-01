@@ -1,10 +1,11 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { ensureSharedOrderNumbers } from "./orderNumberService";
+import type { AppRole } from "../types/auth";
 
 type PersistOrderResultUser = {
   id: string;
-  role: "admin" | "lab" | "breeder";
+  role: AppRole;
 };
 
 type ResultSaveMode = "draft" | "submit";
@@ -57,8 +58,8 @@ const getSharedSampleId = (orderId: string, animalIndex: number): string =>
   `${sanitizeKeyPart(orderId)}-sample-${animalIndex + 1}`;
 
 const assertLabUser = (user: PersistOrderResultUser): void => {
-  if (user.role === "breeder") {
-    throw new HttpError(403, "Breeder users cannot persist lab results.");
+  if (user.role !== "admin" && user.role !== "lab") {
+    throw new HttpError(403, "Only admin or lab users can persist lab results.");
   }
 };
 

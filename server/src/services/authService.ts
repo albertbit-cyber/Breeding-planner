@@ -2,13 +2,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
+import type { AppRole } from "../types/auth";
 
 type UserEntity = {
   id: string;
   email: string;
   passwordHash: string;
   fullName: string;
-  role: "admin" | "lab" | "breeder";
+  role: AppRole;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +32,7 @@ export const registerUser = async (input: {
   email: string;
   password: string;
   fullName: string;
-  role?: "admin" | "lab" | "breeder";
+  role?: AppRole;
 }) => {
   const exists = await prisma.user.findUnique({ where: { email: input.email } });
   if (exists) {

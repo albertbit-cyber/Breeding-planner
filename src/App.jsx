@@ -25,6 +25,8 @@ import {
 import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
+import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
+import { fetchBreederSnapshot, saveBreederSnapshot } from "./shared/apiClient";
 import {
   GENE_GROUPS,
   GENE_ALIASES,
@@ -5663,6 +5665,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 export default function BreedingPlannerApp() {
   const { t } = useTranslation();
   const { resolvedAppearance, effectiveThemeMode } = useAppearance();
+  const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
   const appRootStyle = useMemo(() => ({
     backgroundColor: resolvedAppearance?.colors?.background || '#f4f4f5',
@@ -5814,6 +5817,14 @@ export default function BreedingPlannerApp() {
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [pairingGuard, setPairingGuard] = useState(null);
   const [electronDataReady, setElectronDataReady] = useState(false);
+  const backendPlannerSyncRef = useRef({
+    status: 'idle',
+    seeded: false,
+    lastSavedSignature: '',
+  });
+  const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const sharedBreederDataReady = sharedBackendSnapshot?.state === 'connected'
+    && sharedBackendSnapshot?.authStatus === 'authorized';
   const handleAnimalViewTabChange = useCallback((nextView) => {
     if (!nextView || nextView === animalView) return;
     setAnimalView(nextView);
@@ -6127,6 +6138,82 @@ export default function BreedingPlannerApp() {
       };
     });
   }, []);
+
+  useEffect(() => {
+    latestPlannerSnapshotRef.current = { snakes, pairings };
+  }, [snakes, pairings]);
+
+  useEffect(() => {
+    if (!electronDataReady || !sharedBreederDataReady) return;
+    if (backendPlannerSyncRef.current.status !== 'idle') return;
+
+    let cancelled = false;
+    backendPlannerSyncRef.current.status = 'loading';
+
+    fetchBreederSnapshot()
+      .then((snapshot) => {
+        if (cancelled) return;
+        const backendSnakes = Array.isArray(snapshot?.animals)
+          ? snapshot.animals.map(sanitizeSnakeRecord).filter(Boolean)
+          : [];
+        const backendPairings = Array.isArray(snapshot?.pairings)
+          ? snapshot.pairings.map(sanitizePairingRecord).filter(Boolean)
+          : [];
+
+        if (backendSnakes.length || backendPairings.length) {
+          setSnakes(backendSnakes);
+          setPairings(backendPairings);
+          backendPlannerSyncRef.current.seeded = true;
+          backendPlannerSyncRef.current.status = 'ready';
+          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({
+            snakes: backendSnakes,
+            pairings: backendPairings,
+          });
+          return;
+        }
+
+        const localSnapshot = latestPlannerSnapshotRef.current;
+        const hasLocalData = Array.isArray(localSnapshot.snakes) && localSnapshot.snakes.length > 0
+          || Array.isArray(localSnapshot.pairings) && localSnapshot.pairings.length > 0;
+        if (!hasLocalData) {
+          backendPlannerSyncRef.current.seeded = true;
+          backendPlannerSyncRef.current.status = 'ready';
+          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({ snakes: [], pairings: [] });
+          return;
+        }
+
+        saveBreederSnapshot({
+          animals: localSnapshot.snakes,
+          pairings: localSnapshot.pairings,
+          clutches: [],
+        })
+          .then(() => {
+            if (cancelled) return;
+            backendPlannerSyncRef.current.seeded = true;
+            backendPlannerSyncRef.current.status = 'ready';
+            backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify(localSnapshot);
+          })
+          .catch((error) => {
+            if (!cancelled) {
+              backendPlannerSyncRef.current.status = 'idle';
+              console.warn('Failed to seed shared breeder snapshot', error);
+            }
+          });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          backendPlannerSyncRef.current.status = 'idle';
+          console.warn('Failed to load shared breeder snapshot', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (!backendPlannerSyncRef.current.seeded && backendPlannerSyncRef.current.status === 'loading') {
+        backendPlannerSyncRef.current.status = 'idle';
+      }
+    };
+  }, [electronDataReady, sharedBreederDataReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6527,6 +6614,31 @@ export default function BreedingPlannerApp() {
     showGroups,
     snakes,
   ]);
+
+  useEffect(() => {
+    if (!electronDataReady || !sharedBreederDataReady) return;
+    if (backendPlannerSyncRef.current.status !== 'ready' || !backendPlannerSyncRef.current.seeded) return;
+
+    const payload = {
+      animals: snakes,
+      pairings,
+      clutches: [],
+    };
+    const signature = JSON.stringify({ snakes, pairings });
+    if (signature === backendPlannerSyncRef.current.lastSavedSignature) return;
+
+    const saveTimer = setTimeout(() => {
+      saveBreederSnapshot(payload)
+        .then(() => {
+          backendPlannerSyncRef.current.lastSavedSignature = signature;
+        })
+        .catch((error) => {
+          console.warn('Failed to save shared breeder snapshot', error);
+        });
+    }, 600);
+
+    return () => clearTimeout(saveTimer);
+  }, [electronDataReady, pairings, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

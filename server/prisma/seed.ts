@@ -5,7 +5,7 @@ import { LAB_TEST_CATALOG_SEEDS } from "../../src/data/testCatalog";
 
 const prisma = new PrismaClient();
 
-type UserRoleValue = "admin" | "lab" | "breeder";
+type UserRoleValue = "admin" | "lab" | "breeder" | "buyer";
 type TestPricingTypeValue = "morph" | "sex";
 
 const toBackendCatalogId = (name: string): string => {
