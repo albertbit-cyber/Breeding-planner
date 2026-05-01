@@ -919,3 +919,53 @@
   margin: 0.55rem 0 0;
   color: #334155;
 }
+
+.marketplace-inquiry-item__note {
+  border-left: 3px solid #1f7a5b;
+  padding-left: 0.65rem;
+  font-weight: 600;
+}
+
+.marketplace-inquiry-followup {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(240px, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.marketplace-inquiry-followup label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.marketplace-inquiry-followup select,
+.marketplace-inquiry-followup textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  font-weight: 500;
+}
+
+.marketplace-inquiry-followup button {
+  border: 0;
+  border-radius: 8px;
+  background: #235789;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .marketplace-inquiry-followup {
+    grid-template-columns: 1fr;
+  }
+}

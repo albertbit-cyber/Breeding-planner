@@ -5,13 +5,15 @@ vi.mock("../lib/prisma", () => ({
     listing: { findFirst: vi.fn() },
     listingInquiry: {
       create: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
 
 import { prisma } from "../lib/prisma";
-import { createListingInquiry, listMyInquiries } from "../services/inquiryService";
+import { createListingInquiry, listMyInquiries, updateInquiryFollowUp } from "../services/inquiryService";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -34,6 +36,34 @@ beforeEach(() => {
     listing: { appListingId: "listing-1", title: "Banana Clown" },
   });
   vi.mocked((prisma as any).listingInquiry.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).listingInquiry.findUnique).mockResolvedValue({
+    id: "inquiry-1",
+    listingId: "listing-row-1",
+    breederId: "breeder-1",
+    buyerId: "buyer-1",
+    buyerName: "Buyer User",
+    buyerEmail: "buyer@example.com",
+    message: "Is this animal still available?",
+    status: "new",
+    breederResponseNote: null,
+    respondedAt: null,
+    createdAt: new Date("2026-05-01T10:00:00.000Z"),
+    listing: { appListingId: "listing-1", title: "Banana Clown" },
+  });
+  vi.mocked((prisma as any).listingInquiry.update).mockResolvedValue({
+    id: "inquiry-1",
+    listingId: "listing-row-1",
+    breederId: "breeder-1",
+    buyerId: "buyer-1",
+    buyerName: "Buyer User",
+    buyerEmail: "buyer@example.com",
+    message: "Is this animal still available?",
+    status: "contacted",
+    breederResponseNote: "Email sent.",
+    respondedAt: new Date("2026-05-01T11:00:00.000Z"),
+    createdAt: new Date("2026-05-01T10:00:00.000Z"),
+    listing: { appListingId: "listing-1", title: "Banana Clown" },
+  });
 });
 
 describe("inquiryService", () => {
@@ -100,5 +130,33 @@ describe("inquiryService", () => {
     expect((prisma as any).listingInquiry.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { breederId: "breeder-1" },
     }));
+  });
+
+  it("lets the receiving breeder update inquiry status and response note", async () => {
+    await expect(updateInquiryFollowUp(
+      { id: "breeder-1", role: "breeder" },
+      "inquiry-1",
+      { status: "contacted", breederResponseNote: "Email sent." }
+    )).resolves.toMatchObject({
+      id: "inquiry-1",
+      status: "contacted",
+      breederResponseNote: "Email sent.",
+    });
+
+    expect((prisma as any).listingInquiry.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "inquiry-1" },
+      data: expect.objectContaining({
+        status: "contacted",
+        breederResponseNote: "Email sent.",
+      }),
+    }));
+  });
+
+  it("blocks buyers from updating breeder follow-up fields", async () => {
+    await expect(updateInquiryFollowUp(
+      { id: "buyer-1", role: "buyer" },
+      "inquiry-1",
+      { status: "closed" }
+    )).rejects.toThrow("Only the receiving breeder or admin can update this inquiry.");
   });
 });

@@ -27,6 +27,7 @@ export {
   saveMyListings,
   setAuthToken,
   setRefreshToken,
+  updateInquiry,
   updateOrderStatus,
 } from "../src/shared/apiClient";
 

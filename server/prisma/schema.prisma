@@ -175,6 +175,8 @@ model ListingInquiry {
   buyerEmail    String
   message       String   @db.Text
   status        String   @default("new")
+  breederResponseNote String?  @db.Text
+  respondedAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

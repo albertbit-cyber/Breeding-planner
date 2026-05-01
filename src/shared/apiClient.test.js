@@ -19,6 +19,7 @@ import {
   saveBreederSnapshot,
   saveMyBreederProfile,
   saveMyListings,
+  updateInquiry,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -354,6 +355,14 @@ describe("shared api client", () => {
         };
       }
 
+      if (normalizedUrl.endsWith("/inquiries/inquiry-1") && method === "PATCH") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ inquiry: { id: "inquiry-1", ...JSON.parse(String(options.body)) } }),
+        };
+      }
+
       throw new Error(`Unexpected URL ${normalizedUrl}`);
     });
 
@@ -374,6 +383,16 @@ describe("shared api client", () => {
     });
     await expect(fetchMyInquiries()).resolves.toEqual({
       inquiries: [{ id: "inquiry-1", listingTitle: "Banana Clown" }],
+    });
+    await expect(updateInquiry("inquiry-1", {
+      status: "contacted",
+      breederResponseNote: "Email sent.",
+    })).resolves.toEqual({
+      inquiry: {
+        id: "inquiry-1",
+        status: "contacted",
+        breederResponseNote: "Email sent.",
+      },
     });
   });
 

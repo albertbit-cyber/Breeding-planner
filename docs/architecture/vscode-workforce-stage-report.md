@@ -188,7 +188,7 @@ Recommended next work:
 
 ## Buyer Inquiry/Contact Workflow Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `efb319d feat: add marketplace listing inquiries`.
 
 - Added Prisma `ListingInquiry` model linked to listings, breeders, and optional buyers.
 - Added migration:
@@ -228,6 +228,49 @@ Known remaining issue outside this stage:
 
 Recommended next work:
 
-1. Review the buyer inquiry/contact workflow diff.
-2. Commit the verified inquiry slice if approved.
-3. Start the next stage: inquiry status management and breeder response notes.
+## Inquiry Status/Response Notes Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added persistent inquiry follow-up fields:
+  - `breederResponseNote`
+  - `respondedAt`
+- Added migration:
+  - `server/prisma/migrations/20260501163000_add_inquiry_response_fields/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added inquiry update backend API:
+  - `PATCH /api/inquiries/:id`
+- Added service authorization so only the receiving breeder or an admin can update inquiry status/response notes.
+- Supported inquiry statuses:
+  - `new`
+  - `contacted`
+  - `in_discussion`
+  - `closed`
+- Added frontend API client function:
+  - `updateInquiry`
+- Updated marketplace UI:
+  - breeders/admins can update inquiry status
+  - breeders/admins can save response notes
+  - buyers can see response notes and current status in their inquiry panel
+- Added tests for inquiry follow-up updates and frontend update calls.
+
+Verification completed:
+
+- `npm.cmd test -- inquiryService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Review the inquiry status/response notes diff.
+2. Commit the verified follow-up slice if approved.
+3. Start the next stage: marketplace filters/search and listing detail view.

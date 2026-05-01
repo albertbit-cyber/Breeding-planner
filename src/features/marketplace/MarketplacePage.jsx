@@ -7,6 +7,7 @@ import {
   fetchMyListings,
   saveMyBreederProfile,
   saveMyListings,
+  updateInquiry,
 } from "../../shared/apiClient";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
@@ -148,6 +149,7 @@ export default function MarketplacePage() {
   const [myProfile, setMyProfile] = useState(emptyProfile);
   const [myListings, setMyListings] = useState([]);
   const [myInquiries, setMyInquiries] = useState([]);
+  const [inquiryEdits, setInquiryEdits] = useState({});
   const [inquiryDraft, setInquiryDraft] = useState(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
@@ -169,7 +171,15 @@ export default function MarketplacePage() {
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
       setMyListings(Array.isArray(listings?.listings) ? listings.listings : []);
-      setMyInquiries(Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : []);
+      const inquiryList = Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : [];
+      setMyInquiries(inquiryList);
+      setInquiryEdits(Object.fromEntries(inquiryList.map((inquiry) => [
+        inquiry.id,
+        {
+          status: inquiry.status || "new",
+          breederResponseNote: inquiry.breederResponseNote || "",
+        },
+      ])));
       setStatus("ready");
     } catch (error) {
       setStatus("error");
@@ -246,6 +256,36 @@ export default function MarketplacePage() {
       setMyInquiries(Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : []);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Inquiry failed.");
+    }
+  };
+
+  const updateInquiryEdit = (id, field, value) => {
+    setInquiryEdits((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveInquiryFollowUp = async (id) => {
+    setMessage("");
+    try {
+      await updateInquiry(id, inquiryEdits[id] || {});
+      setMessage("Inquiry updated.");
+      const inquiries = await fetchMyInquiries();
+      const inquiryList = Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : [];
+      setMyInquiries(inquiryList);
+      setInquiryEdits(Object.fromEntries(inquiryList.map((inquiry) => [
+        inquiry.id,
+        {
+          status: inquiry.status || "new",
+          breederResponseNote: inquiry.breederResponseNote || "",
+        },
+      ])));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Inquiry update failed.");
     }
   };
 
@@ -407,8 +447,37 @@ export default function MarketplacePage() {
             {myInquiries.map((inquiry) => (
               <article key={inquiry.id} className="marketplace-inquiry-item">
                 <strong>{inquiry.listingTitle || inquiry.listingId}</strong>
-                <span>{inquiry.buyerName} · {inquiry.buyerEmail}</span>
+                <span>{inquiry.buyerName} - {inquiry.buyerEmail}</span>
                 <p>{inquiry.message}</p>
+                {inquiry.breederResponseNote ? (
+                  <p className="marketplace-inquiry-item__note">Response note: {inquiry.breederResponseNote}</p>
+                ) : null}
+                <span>Status: {inquiry.status || "new"}</span>
+                {canEditProfile ? (
+                  <div className="marketplace-inquiry-followup">
+                    <label>
+                      <span>Status</span>
+                      <select
+                        value={inquiryEdits[inquiry.id]?.status || inquiry.status || "new"}
+                        onChange={(event) => updateInquiryEdit(inquiry.id, "status", event.target.value)}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="in_discussion">In discussion</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Response note</span>
+                      <textarea
+                        rows={3}
+                        value={inquiryEdits[inquiry.id]?.breederResponseNote || ""}
+                        onChange={(event) => updateInquiryEdit(inquiry.id, "breederResponseNote", event.target.value)}
+                      />
+                    </label>
+                    <button type="button" onClick={() => saveInquiryFollowUp(inquiry.id)}>Save follow-up</button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

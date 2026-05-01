@@ -504,6 +504,15 @@ export const createListingInquiry = async (payload: {
 export const fetchMyInquiries = async () =>
   request<{ inquiries: unknown[] }>("/inquiries/me");
 
+export const updateInquiry = async (id: string, payload: {
+  status?: string;
+  breederResponseNote?: string;
+}) =>
+  request<{ inquiry: unknown }>(`/inquiries/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);
 

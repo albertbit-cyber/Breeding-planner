@@ -9,6 +9,13 @@ type InquiryInput = {
   message?: unknown;
 };
 
+type InquiryUpdateInput = {
+  status?: unknown;
+  breederResponseNote?: unknown;
+};
+
+const INQUIRY_STATUSES = new Set(["new", "contacted", "in_discussion", "closed"]);
+
 const db = prisma as any;
 
 const textValue = (value: unknown, maxLength = 1000): string => {
@@ -27,6 +34,8 @@ const toPublicInquiry = (row: any) => ({
   buyerEmail: row.buyerEmail,
   message: row.message,
   status: row.status,
+  breederResponseNote: row.breederResponseNote,
+  respondedAt: row.respondedAt,
   createdAt: row.createdAt,
 });
 
@@ -89,4 +98,41 @@ export const listMyInquiries = async (actor: { id: string; role: AppRole }) => {
   });
 
   return rows.map(toPublicInquiry);
+};
+
+export const updateInquiryFollowUp = async (
+  actor: { id: string; role: AppRole },
+  inquiryId: string,
+  input: InquiryUpdateInput
+) => {
+  const id = textValue(inquiryId, 160);
+  if (!id) throw new HttpError(400, "inquiryId is required.");
+
+  const inquiry = await db.listingInquiry.findUnique({
+    where: { id },
+    include: { listing: true },
+  });
+  if (!inquiry) throw new HttpError(404, "Inquiry not found.");
+  if (actor.role !== "admin" && inquiry.breederId !== actor.id) {
+    throw new HttpError(403, "Only the receiving breeder or admin can update this inquiry.");
+  }
+
+  const status = textValue(input?.status, 40) || inquiry.status;
+  if (!INQUIRY_STATUSES.has(status)) {
+    throw new HttpError(400, "Invalid inquiry status.");
+  }
+  const breederResponseNote = textValue(input?.breederResponseNote, 2000);
+  const hasResponse = Boolean(breederResponseNote);
+
+  const updated = await db.listingInquiry.update({
+    where: { id },
+    data: {
+      status,
+      breederResponseNote: hasResponse ? breederResponseNote : null,
+      respondedAt: hasResponse ? new Date() : null,
+    },
+    include: { listing: true },
+  });
+
+  return toPublicInquiry(updated);
 };
