@@ -337,7 +337,7 @@ Recommended next work:
 
 ## Marketplace Saved Searches Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `e5b8382 feat: add marketplace saved searches`.
 
 - Added Prisma `SavedSearch` model linked to `User`.
 - Added migration:
@@ -379,6 +379,4 @@ Known remaining issue outside this stage:
 
 Recommended next work:
 
-1. Review the marketplace saved-searches diff.
-2. Commit the verified saved-searches slice if approved.
-3. Start the next stage: email/notification workflow or richer admin moderation/audit history.
+1. Start the next stage: email/notification workflow or richer admin moderation/audit history.
