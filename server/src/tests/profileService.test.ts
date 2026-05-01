@@ -8,6 +8,9 @@ vi.mock("../lib/prisma", () => ({
       findMany: vi.fn(),
       upsert: vi.fn(),
     },
+    listing: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -16,6 +19,7 @@ import { listPublicBreederProfiles, upsertMyProfile } from "../services/profileS
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked((prisma as any).listing.findMany).mockResolvedValue([]);
 });
 
 describe("profileService", () => {
@@ -71,12 +75,32 @@ describe("profileService", () => {
         user: { id: "breeder-1", fullName: "Demo User", email: "breeder@example.com" },
       },
     ]);
+    vi.mocked((prisma as any).listing.findMany).mockResolvedValue([
+      {
+        id: "listing-row-1",
+        ownerId: "breeder-1",
+        appListingId: "listing-1",
+        animalAppId: "snake-1",
+        title: "Banana Clown",
+        status: "available",
+        priceCents: 25000,
+        currency: "EUR",
+        payload: { id: "listing-1", title: "Banana Clown" },
+        updatedAt: new Date("2026-05-01T10:00:00.000Z"),
+      },
+    ]);
 
     await expect(listPublicBreederProfiles()).resolves.toEqual([
       expect.objectContaining({
         id: "profile-1",
         breederName: "Demo Breeder",
         location: "Berlin",
+        listings: [
+          expect.objectContaining({
+            id: "listing-1",
+            title: "Banana Clown",
+          }),
+        ],
       }),
     ]);
 

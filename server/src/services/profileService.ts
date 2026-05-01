@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
+import { listPublicListingsByOwner } from "./listingService";
 
 type ProfilePayload = {
   breederName?: unknown;
@@ -111,5 +112,8 @@ export const listPublicBreederProfiles = async () => {
     include: { user: { select: { id: true, fullName: true, email: true } } },
     orderBy: [{ updatedAt: "desc" }],
   });
-  return profiles.map(toPublicProfile).filter(Boolean);
+  return Promise.all(profiles.map(async (profile: any) => ({
+    ...toPublicProfile(profile),
+    listings: await listPublicListingsByOwner(profile.userId),
+  })));
 };

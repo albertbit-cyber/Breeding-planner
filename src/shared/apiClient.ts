@@ -443,6 +443,20 @@ export type BreederProfilePayload = {
   isPublic?: boolean;
 };
 
+export type MarketplaceListingPayload = {
+  id?: string;
+  animalAppId?: string;
+  title?: string;
+  status?: string;
+  price?: string | number;
+  currency?: string;
+  description?: string;
+  imageUrl?: string;
+  sex?: string;
+  hatchDate?: string;
+  genetics?: string;
+};
+
 export const fetchBreederSnapshot = async () =>
   request<BreederSnapshotPayload>("/breeder/snapshot");
 
@@ -463,6 +477,18 @@ export const saveMyBreederProfile = async (payload: BreederProfilePayload) =>
 
 export const fetchMarketplaceProfiles = async () =>
   request<{ profiles: unknown[] }>("/profiles/marketplace");
+
+export const fetchMyListings = async () =>
+  request<{ listings: unknown[] }>("/listings/me");
+
+export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
+  request<{ listings: unknown[] }>("/listings/me", {
+    method: "PUT",
+    body: JSON.stringify({ listings }),
+  });
+
+export const fetchMarketplaceListings = async () =>
+  request<{ listings: unknown[] }>("/listings/marketplace");
 
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);

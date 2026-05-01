@@ -107,7 +107,7 @@ Stage 3 was committed as `63e17c3 feat: complete breeder snapshot stage 3`.
 
 ## Next Stage Status
 
-Completed as an uncommitted verified slice after Stage 3 approval.
+Committed as `6e3b9b7 feat: add breeder marketplace profiles`.
 
 - Added profile backend API:
   - `GET /api/profiles/me`
@@ -143,8 +143,49 @@ Known remaining issue outside this stage:
   - `src/features/lab/api/client.ts`
   - `src/utils/pdf/labCertificatePdf.ts`
 
+## Sales Inventory/Listings Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added Prisma `Listing` model for breeder-owned marketplace inventory.
+- Added migration:
+  - `server/prisma/migrations/20260501143000_add_marketplace_listings/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added listings backend API:
+  - `GET /api/listings/me`
+  - `PUT /api/listings/me`
+  - `GET /api/listings/marketplace`
+- Added listing service/controller/routes:
+  - `server/src/services/listingService.ts`
+  - `server/src/controllers/listingController.ts`
+  - `server/src/routes/listingRoutes.ts`
+- Updated public breeder profiles to include each breeder's available listings.
+- Added frontend API client functions:
+  - `fetchMyListings`
+  - `saveMyListings`
+  - `fetchMarketplaceListings`
+- Updated marketplace UI:
+  - breeders/admins can add, edit, remove, and save listings
+  - buyers can see available listings grouped under public breeder profiles
+- Added tests for listing service behavior, profile listings inclusion, and frontend listing API calls.
+
+Verification completed:
+
+- `npm.cmd test -- listingService.test.ts profileService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
 Recommended next work:
 
-1. Review the profile/marketplace diff.
-2. Commit the verified profile/marketplace slice if approved.
-3. Start the next stage: add animal listing/sales inventory data behind marketplace breeder profiles.
+1. Review the sales inventory/listings diff.
+2. Commit the verified listings slice if approved.
+3. Start the next stage: add inquiry/contact workflow for buyers interested in listings.

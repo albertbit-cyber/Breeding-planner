@@ -60,6 +60,7 @@ model User {
   animals          Animal[]
   pairings         Pairing[]
   clutches         Clutch[]
+  listings         Listing[]
 }
 
 model Profile {
@@ -137,6 +138,26 @@ model Clutch {
   @@unique([ownerId, appClutchId])
   @@index([ownerId])
   @@index([pairingId])
+}
+
+model Listing {
+  id           String   @id @default(cuid())
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appListingId String
+  animalAppId  String?
+  title        String?
+  status       String   @default("draft")
+  priceCents   Int?
+  currency     String   @default("EUR")
+  payload      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([ownerId, appListingId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([ownerId, status])
 }
 
 model ShedTestCatalog {

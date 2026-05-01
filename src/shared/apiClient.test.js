@@ -4,7 +4,9 @@ import {
   fetchOrders,
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
+  fetchMarketplaceListings,
   fetchMyBreederProfile,
+  fetchMyListings,
   getHealth,
   getAuthToken,
   getRefreshToken,
@@ -14,6 +16,7 @@ import {
   setRefreshToken,
   saveBreederSnapshot,
   saveMyBreederProfile,
+  saveMyListings,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -268,6 +271,57 @@ describe("shared api client", () => {
     });
     await expect(saveMyBreederProfile({ breederName: "Updated", isPublic: true })).resolves.toEqual({
       profile: { breederName: "Updated", isPublic: true },
+    });
+  });
+
+  it("loads and saves marketplace listings", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/listings/me") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ listings: [{ id: "listing-1", title: "Banana Clown" }] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/listings/me") && method === "PUT") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ listings: JSON.parse(String(options.body)).listings }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/listings/marketplace") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ listings: [{ id: "listing-1", title: "Banana Clown" }] }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchMyListings()).resolves.toEqual({
+      listings: [{ id: "listing-1", title: "Banana Clown" }],
+    });
+    await expect(saveMyListings([{ id: "listing-2", title: "Pied" }])).resolves.toEqual({
+      listings: [{ id: "listing-2", title: "Pied" }],
+    });
+    await expect(fetchMarketplaceListings()).resolves.toEqual({
+      listings: [{ id: "listing-1", title: "Banana Clown" }],
     });
   });
 

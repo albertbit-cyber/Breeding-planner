@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchMarketplaceProfiles,
   fetchMyBreederProfile,
+  fetchMyListings,
   saveMyBreederProfile,
+  saveMyListings,
 } from "../../shared/apiClient";
 
 const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
@@ -31,6 +33,20 @@ const emptyProfile = {
   contactPreference: "email",
   isPublic: false,
 };
+
+const createEmptyListing = () => ({
+  id: `listing-${Date.now()}`,
+  animalAppId: "",
+  title: "",
+  status: "draft",
+  price: "",
+  currency: "EUR",
+  description: "",
+  imageUrl: "",
+  sex: "",
+  hatchDate: "",
+  genetics: "",
+});
 
 const normalizeProfile = (profile) => ({
   ...emptyProfile,
@@ -69,6 +85,43 @@ function ProfileCard({ profile }) {
           <strong>{contact}</strong>
         </div>
       ) : null}
+      {Array.isArray(profile?.listings) && profile.listings.length ? (
+        <div className="marketplace-listings">
+          {profile.listings.map((listing) => (
+            <ListingCard key={listing.id || listing.rowId} listing={listing} compact />
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function formatPrice(listing) {
+  if (typeof listing?.priceCents === "number") {
+    return `${(listing.priceCents / 100).toFixed(2)} ${listing.currency || "EUR"}`;
+  }
+  const raw = String(listing?.price || "").trim();
+  return raw ? `${raw} ${listing?.currency || "EUR"}` : "";
+}
+
+function ListingCard({ listing, compact = false }) {
+  const title = firstText(listing?.title, listing?.name, "Available animal");
+  const details = [
+    firstText(listing?.sex),
+    firstText(listing?.hatchDate),
+    firstText(listing?.genetics),
+  ].filter(Boolean).join(" | ");
+  const price = formatPrice(listing);
+
+  return (
+    <article className={`marketplace-listing-card ${compact ? "is-compact" : ""}`}>
+      {listing?.imageUrl ? <img src={listing.imageUrl} alt="" /> : null}
+      <div>
+        <h3>{title}</h3>
+        {details ? <p>{details}</p> : null}
+        {listing?.description ? <p className="marketplace-listing-card__description">{listing.description}</p> : null}
+        {price ? <strong>{price}</strong> : null}
+      </div>
     </article>
   );
 }
@@ -76,6 +129,7 @@ function ProfileCard({ profile }) {
 export default function MarketplacePage() {
   const [profiles, setProfiles] = useState([]);
   const [myProfile, setMyProfile] = useState(emptyProfile);
+  const [myListings, setMyListings] = useState([]);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
   const role = useMemo(readRole, []);
@@ -89,8 +143,10 @@ export default function MarketplacePage() {
         fetchMarketplaceProfiles(),
         canEditProfile ? fetchMyBreederProfile() : Promise.resolve({ profile: null }),
       ]);
+      const listings = canEditProfile ? await fetchMyListings() : { listings: [] };
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
+      setMyListings(Array.isArray(listings?.listings) ? listings.listings : []);
       setStatus("ready");
     } catch (error) {
       setStatus("error");
@@ -119,6 +175,32 @@ export default function MarketplacePage() {
     }
   };
 
+  const addListing = () => {
+    setMyListings((prev) => [createEmptyListing(), ...prev]);
+  };
+
+  const updateListing = (index, field, value) => {
+    setMyListings((prev) => prev.map((listing, currentIndex) => (
+      currentIndex === index ? { ...listing, [field]: value } : listing
+    )));
+  };
+
+  const removeListing = (index) => {
+    setMyListings((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const saveListings = async () => {
+    setMessage("");
+    try {
+      const result = await saveMyListings(myListings);
+      setMyListings(Array.isArray(result?.listings) ? result.listings : []);
+      setMessage("Listings saved.");
+      await loadProfiles();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Listing save failed.");
+    }
+  };
+
   return (
     <main className="marketplace-shell">
       <header className="marketplace-header">
@@ -132,6 +214,7 @@ export default function MarketplacePage() {
       </header>
 
       {canEditProfile ? (
+        <>
         <section className="marketplace-editor">
           <h2>My public breeder profile</h2>
           <form onSubmit={saveProfile}>
@@ -184,6 +267,65 @@ export default function MarketplacePage() {
             </div>
           </form>
         </section>
+        <section className="marketplace-editor">
+          <div className="marketplace-editor__header">
+            <h2>Sales listings</h2>
+            <button type="button" onClick={addListing}>Add listing</button>
+          </div>
+          <div className="marketplace-listing-editor">
+            {!myListings.length ? <p>No listings yet.</p> : null}
+            {myListings.map((listing, index) => (
+              <div className="marketplace-listing-editor__row" key={listing.id || index}>
+                <label>
+                  <span>Title</span>
+                  <input value={listing.title || ""} onChange={(event) => updateListing(index, "title", event.target.value)} />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select value={listing.status || "draft"} onChange={(event) => updateListing(index, "status", event.target.value)}>
+                    <option value="draft">Draft</option>
+                    <option value="available">Available</option>
+                    <option value="reserved">Reserved</option>
+                    <option value="sold">Sold</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Price</span>
+                  <input value={listing.price || ""} onChange={(event) => updateListing(index, "price", event.target.value)} />
+                </label>
+                <label>
+                  <span>Currency</span>
+                  <input value={listing.currency || "EUR"} onChange={(event) => updateListing(index, "currency", event.target.value)} />
+                </label>
+                <label>
+                  <span>Image URL</span>
+                  <input value={listing.imageUrl || ""} onChange={(event) => updateListing(index, "imageUrl", event.target.value)} />
+                </label>
+                <label>
+                  <span>Sex</span>
+                  <input value={listing.sex || ""} onChange={(event) => updateListing(index, "sex", event.target.value)} />
+                </label>
+                <label>
+                  <span>Hatch date</span>
+                  <input value={listing.hatchDate || ""} onChange={(event) => updateListing(index, "hatchDate", event.target.value)} />
+                </label>
+                <label>
+                  <span>Genetics</span>
+                  <input value={listing.genetics || ""} onChange={(event) => updateListing(index, "genetics", event.target.value)} />
+                </label>
+                <label className="marketplace-editor__wide">
+                  <span>Description</span>
+                  <textarea rows={3} value={listing.description || ""} onChange={(event) => updateListing(index, "description", event.target.value)} />
+                </label>
+                <button type="button" className="marketplace-remove" onClick={() => removeListing(index)}>Remove</button>
+              </div>
+            ))}
+          </div>
+          <div className="marketplace-editor__actions">
+            <button type="button" onClick={saveListings}>Save listings</button>
+          </div>
+        </section>
+        </>
       ) : null}
 
       {message ? <p className="marketplace-message">{message}</p> : null}
