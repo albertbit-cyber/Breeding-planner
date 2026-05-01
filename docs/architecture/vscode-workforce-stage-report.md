@@ -294,7 +294,7 @@ Known remaining issue outside this stage:
 
 ## Marketplace Listing Moderation Tools Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `27e6528 feat: add marketplace listing moderation`.
 
 - Added admin-only listing moderation backend API:
   - `GET /api/listings/moderation`
@@ -333,6 +333,4 @@ Known remaining issue outside this stage:
 
 Recommended next work:
 
-1. Review the marketplace moderation diff.
-2. Commit the verified moderation slice if approved.
-3. Start the next stage: marketplace saved searches, email/notification workflow, or richer admin moderation/audit history.
+1. Start the next stage: marketplace saved searches, email/notification workflow, or richer admin moderation/audit history.
