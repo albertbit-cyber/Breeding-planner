@@ -490,6 +490,20 @@ export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
 export const fetchMarketplaceListings = async () =>
   request<{ listings: unknown[] }>("/listings/marketplace");
 
+export const createListingInquiry = async (payload: {
+  listingId: string;
+  buyerName: string;
+  buyerEmail: string;
+  message: string;
+}) =>
+  request<{ inquiry: unknown }>("/inquiries", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMyInquiries = async () =>
+  request<{ inquiries: unknown[] }>("/inquiries/me");
+
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);
 

@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createOrder,
+  createListingInquiry,
   fetchOrders,
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
   fetchMarketplaceListings,
   fetchMyBreederProfile,
+  fetchMyInquiries,
   fetchMyListings,
   getHealth,
   getAuthToken,
@@ -322,6 +324,56 @@ describe("shared api client", () => {
     });
     await expect(fetchMarketplaceListings()).resolves.toEqual({
       listings: [{ id: "listing-1", title: "Banana Clown" }],
+    });
+  });
+
+  it("creates and loads marketplace inquiries", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/inquiries") && method === "POST") {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ inquiry: JSON.parse(String(options.body)) }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/inquiries/me") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ inquiries: [{ id: "inquiry-1", listingTitle: "Banana Clown" }] }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createListingInquiry({
+      listingId: "listing-1",
+      buyerName: "Buyer User",
+      buyerEmail: "buyer@example.com",
+      message: "Is this still available?",
+    })).resolves.toEqual({
+      inquiry: {
+        listingId: "listing-1",
+        buyerName: "Buyer User",
+        buyerEmail: "buyer@example.com",
+        message: "Is this still available?",
+      },
+    });
+    await expect(fetchMyInquiries()).resolves.toEqual({
+      inquiries: [{ id: "inquiry-1", listingTitle: "Banana Clown" }],
     });
   });
 

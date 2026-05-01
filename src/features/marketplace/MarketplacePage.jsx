@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  createListingInquiry,
   fetchMarketplaceProfiles,
   fetchMyBreederProfile,
+  fetchMyInquiries,
   fetchMyListings,
   saveMyBreederProfile,
   saveMyListings,
@@ -16,6 +18,16 @@ const readRole = () => {
     return String(parsed?.role || parsed?.profile?.role || "").trim().toLowerCase();
   } catch {
     return "";
+  }
+};
+
+const readProfile = () => {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.profile && typeof parsed.profile === "object" ? parsed.profile : {};
+  } catch {
+    return {};
   }
 };
 
@@ -55,7 +67,7 @@ const normalizeProfile = (profile) => ({
 
 const firstText = (...values) => values.map((value) => String(value || "").trim()).find(Boolean) || "";
 
-function ProfileCard({ profile }) {
+function ProfileCard({ profile, onInquire }) {
   const displayName = firstText(profile?.breederName, profile?.user?.fullName, "Breeder");
   const contact = firstText(profile?.publicContactEmail, profile?.publicContactPhone);
 
@@ -88,7 +100,7 @@ function ProfileCard({ profile }) {
       {Array.isArray(profile?.listings) && profile.listings.length ? (
         <div className="marketplace-listings">
           {profile.listings.map((listing) => (
-            <ListingCard key={listing.id || listing.rowId} listing={listing} compact />
+            <ListingCard key={listing.id || listing.rowId} listing={listing} compact onInquire={onInquire} />
           ))}
         </div>
       ) : null}
@@ -104,7 +116,7 @@ function formatPrice(listing) {
   return raw ? `${raw} ${listing?.currency || "EUR"}` : "";
 }
 
-function ListingCard({ listing, compact = false }) {
+function ListingCard({ listing, compact = false, onInquire }) {
   const title = firstText(listing?.title, listing?.name, "Available animal");
   const details = [
     firstText(listing?.sex),
@@ -121,6 +133,11 @@ function ListingCard({ listing, compact = false }) {
         {details ? <p>{details}</p> : null}
         {listing?.description ? <p className="marketplace-listing-card__description">{listing.description}</p> : null}
         {price ? <strong>{price}</strong> : null}
+        {onInquire ? (
+          <button type="button" className="marketplace-inquire" onClick={() => onInquire(listing)}>
+            Ask about this animal
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -130,10 +147,14 @@ export default function MarketplacePage() {
   const [profiles, setProfiles] = useState([]);
   const [myProfile, setMyProfile] = useState(emptyProfile);
   const [myListings, setMyListings] = useState([]);
+  const [myInquiries, setMyInquiries] = useState([]);
+  const [inquiryDraft, setInquiryDraft] = useState(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
   const role = useMemo(readRole, []);
+  const authProfile = useMemo(readProfile, []);
   const canEditProfile = role === "breeder" || role === "admin";
+  const canSendInquiry = role === "buyer" || role === "breeder" || role === "admin";
 
   const loadProfiles = async () => {
     setStatus("loading");
@@ -144,9 +165,11 @@ export default function MarketplacePage() {
         canEditProfile ? fetchMyBreederProfile() : Promise.resolve({ profile: null }),
       ]);
       const listings = canEditProfile ? await fetchMyListings() : { listings: [] };
+      const inquiries = await fetchMyInquiries();
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
       setMyListings(Array.isArray(listings?.listings) ? listings.listings : []);
+      setMyInquiries(Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : []);
       setStatus("ready");
     } catch (error) {
       setStatus("error");
@@ -198,6 +221,31 @@ export default function MarketplacePage() {
       await loadProfiles();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Listing save failed.");
+    }
+  };
+
+  const openInquiry = (listing) => {
+    setInquiryDraft({
+      listingId: listing.rowId || listing.id,
+      listingTitle: listing.title || listing.name || "Available animal",
+      buyerName: authProfile.displayName || authProfile.fullName || "",
+      buyerEmail: authProfile.email || "",
+      message: "",
+    });
+  };
+
+  const submitInquiry = async (event) => {
+    event.preventDefault();
+    if (!inquiryDraft) return;
+    setMessage("");
+    try {
+      await createListingInquiry(inquiryDraft);
+      setInquiryDraft(null);
+      setMessage("Inquiry sent.");
+      const inquiries = await fetchMyInquiries();
+      setMyInquiries(Array.isArray(inquiries?.inquiries) ? inquiries.inquiries : []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Inquiry failed.");
     }
   };
 
@@ -329,6 +377,43 @@ export default function MarketplacePage() {
       ) : null}
 
       {message ? <p className="marketplace-message">{message}</p> : null}
+      {inquiryDraft ? (
+        <section className="marketplace-editor marketplace-inquiry-form">
+          <h2>Ask about {inquiryDraft.listingTitle}</h2>
+          <form onSubmit={submitInquiry}>
+            <label>
+              <span>Your name</span>
+              <input value={inquiryDraft.buyerName} onChange={(event) => setInquiryDraft((prev) => ({ ...prev, buyerName: event.target.value }))} />
+            </label>
+            <label>
+              <span>Your email</span>
+              <input type="email" value={inquiryDraft.buyerEmail} onChange={(event) => setInquiryDraft((prev) => ({ ...prev, buyerEmail: event.target.value }))} />
+            </label>
+            <label className="marketplace-editor__wide">
+              <span>Message</span>
+              <textarea rows={4} value={inquiryDraft.message} onChange={(event) => setInquiryDraft((prev) => ({ ...prev, message: event.target.value }))} />
+            </label>
+            <div className="marketplace-editor__actions">
+              <button type="submit">Send inquiry</button>
+              <button type="button" className="marketplace-secondary" onClick={() => setInquiryDraft(null)}>Cancel</button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+      {myInquiries.length ? (
+        <section className="marketplace-editor">
+          <h2>{canEditProfile ? "Listing inquiries" : "My inquiries"}</h2>
+          <div className="marketplace-inquiry-list">
+            {myInquiries.map((inquiry) => (
+              <article key={inquiry.id} className="marketplace-inquiry-item">
+                <strong>{inquiry.listingTitle || inquiry.listingId}</strong>
+                <span>{inquiry.buyerName} · {inquiry.buyerEmail}</span>
+                <p>{inquiry.message}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {status === "error" ? (
         <button type="button" className="marketplace-retry" onClick={loadProfiles}>Retry</button>
       ) : null}
@@ -337,7 +422,11 @@ export default function MarketplacePage() {
         {status === "loading" ? <p>Loading breeder profiles...</p> : null}
         {status === "ready" && !profiles.length ? <p>No public breeder profiles yet.</p> : null}
         {profiles.map((profile) => (
-          <ProfileCard key={profile.id || profile.userId} profile={profile} />
+          <ProfileCard
+            key={profile.id || profile.userId}
+            profile={profile}
+            onInquire={canSendInquiry ? openInquiry : null}
+          />
         ))}
       </section>
     </main>

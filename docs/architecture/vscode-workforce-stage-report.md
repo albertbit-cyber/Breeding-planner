@@ -145,7 +145,7 @@ Known remaining issue outside this stage:
 
 ## Sales Inventory/Listings Stage Status
 
-Completed as an uncommitted verified slice after approval.
+Committed as `4f59dd4 feat: add marketplace sales listings`.
 
 - Added Prisma `Listing` model for breeder-owned marketplace inventory.
 - Added migration:
@@ -186,6 +186,48 @@ Known remaining issue outside this stage:
 
 Recommended next work:
 
-1. Review the sales inventory/listings diff.
-2. Commit the verified listings slice if approved.
-3. Start the next stage: add inquiry/contact workflow for buyers interested in listings.
+## Buyer Inquiry/Contact Workflow Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added Prisma `ListingInquiry` model linked to listings, breeders, and optional buyers.
+- Added migration:
+  - `server/prisma/migrations/20260501153000_add_marketplace_inquiries/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added inquiry backend API:
+  - `POST /api/inquiries`
+  - `GET /api/inquiries/me`
+- Added inquiry service/controller/routes:
+  - `server/src/services/inquiryService.ts`
+  - `server/src/controllers/inquiryController.ts`
+  - `server/src/routes/inquiryRoutes.ts`
+- Added frontend API client functions:
+  - `createListingInquiry`
+  - `fetchMyInquiries`
+- Updated marketplace UI:
+  - buyers can ask about an available listing from the listing card
+  - inquiry form pre-fills account name/email where available
+  - buyers can see sent inquiries
+  - breeders/admins can see received inquiries
+- Added tests for inquiry creation/listing and frontend inquiry API calls.
+
+Verification completed:
+
+- `npm.cmd test -- inquiryService.test.ts listingService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Review the buyer inquiry/contact workflow diff.
+2. Commit the verified inquiry slice if approved.
+3. Start the next stage: inquiry status management and breeder response notes.

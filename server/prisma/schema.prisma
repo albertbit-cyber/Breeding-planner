@@ -61,6 +61,8 @@ model User {
   pairings         Pairing[]
   clutches         Clutch[]
   listings         Listing[]
+  inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
+  inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
 }
 
 model Profile {
@@ -153,11 +155,33 @@ model Listing {
   payload      Json
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  inquiries    ListingInquiry[]
 
   @@unique([ownerId, appListingId])
   @@index([ownerId])
   @@index([status])
   @@index([ownerId, status])
+}
+
+model ListingInquiry {
+  id            String   @id @default(cuid())
+  listingId     String
+  listing       Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  breederId     String
+  breeder       User     @relation("ListingInquiryBreeder", fields: [breederId], references: [id], onDelete: Cascade)
+  buyerId       String?
+  buyer         User?    @relation("ListingInquiryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  buyerName     String
+  buyerEmail    String
+  message       String   @db.Text
+  status        String   @default("new")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([breederId])
+  @@index([buyerId])
+  @@index([status])
 }
 
 model ShedTestCatalog {

@@ -9,6 +9,7 @@ import { orderRoutes } from "./routes/orderRoutes";
 import { breederDataRoutes } from "./routes/breederDataRoutes";
 import { profileRoutes } from "./routes/profileRoutes";
 import { listingRoutes } from "./routes/listingRoutes";
+import { inquiryRoutes } from "./routes/inquiryRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -62,6 +63,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/breeder", breederDataRoutes);
 app.use("/api/profiles", profileRoutes);
 app.use("/api/listings", listingRoutes);
+app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 

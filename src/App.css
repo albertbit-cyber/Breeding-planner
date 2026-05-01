@@ -870,3 +870,52 @@
   color: #334155 !important;
   line-height: 1.45;
 }
+
+.marketplace-inquire {
+  display: inline-flex;
+  margin-top: 0.65rem;
+  border: 0;
+  border-radius: 8px;
+  background: #1f7a5b;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+.marketplace-secondary {
+  margin-left: 0.5rem;
+  background: #64748b !important;
+}
+
+.marketplace-inquiry-form {
+  border-color: #a7f3d0;
+}
+
+.marketplace-inquiry-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.marketplace-inquiry-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 0.85rem;
+}
+
+.marketplace-inquiry-item strong,
+.marketplace-inquiry-item span {
+  display: block;
+}
+
+.marketplace-inquiry-item span {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.marketplace-inquiry-item p {
+  margin: 0.55rem 0 0;
+  color: #334155;
+}
