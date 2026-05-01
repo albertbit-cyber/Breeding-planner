@@ -499,6 +499,20 @@ export const updateListingStatus = async (id: string, status: string) =>
     body: JSON.stringify({ status }),
   });
 
+export const fetchSavedSearches = async () =>
+  request<{ searches: unknown[] }>("/searches");
+
+export const createSavedSearch = async (payload: { name: string; filters: unknown }) =>
+  request<{ search: unknown }>("/searches", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteSavedSearch = async (id: string) =>
+  request<{ deleted: string }>(`/searches/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+
 export const createListingInquiry = async (payload: {
   listingId: string;
   buyerName: string;

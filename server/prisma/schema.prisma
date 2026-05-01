@@ -63,6 +63,7 @@ model User {
   listings         Listing[]
   inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
   inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
+  savedSearches    SavedSearch[]
 }
 
 model Profile {
@@ -184,6 +185,19 @@ model ListingInquiry {
   @@index([breederId])
   @@index([buyerId])
   @@index([status])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  filters   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([ownerId, updatedAt])
 }
 
 model ShedTestCatalog {

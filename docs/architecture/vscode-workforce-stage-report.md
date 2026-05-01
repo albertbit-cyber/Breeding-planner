@@ -334,3 +334,51 @@ Known remaining issue outside this stage:
 Recommended next work:
 
 1. Start the next stage: marketplace saved searches, email/notification workflow, or richer admin moderation/audit history.
+
+## Marketplace Saved Searches Stage Status
+
+Completed as an uncommitted verified slice after approval.
+
+- Added Prisma `SavedSearch` model linked to `User`.
+- Added migration:
+  - `server/prisma/migrations/20260501190000_add_marketplace_saved_searches/migration.sql`
+- Applied the migration to the configured local PostgreSQL database.
+- Added saved-search backend API:
+  - `GET /api/searches`
+  - `POST /api/searches`
+  - `DELETE /api/searches/:id`
+- Added saved-search service/controller/routes:
+  - `server/src/services/savedSearchService.ts`
+  - `server/src/controllers/savedSearchController.ts`
+  - `server/src/routes/savedSearchRoutes.ts`
+- Registered saved-search routes in `server/src/app.ts`.
+- Added frontend API client functions:
+  - `fetchSavedSearches`
+  - `createSavedSearch`
+  - `deleteSavedSearch`
+- Updated marketplace UI:
+  - users can save the current marketplace filters as a named search
+  - users can apply saved searches back into the filter panel
+  - users can delete saved searches
+- Added tests for saved-search listing, creation, validation, deletion, and frontend API calls.
+
+Verification completed:
+
+- `node_modules\.bin\prisma.cmd migrate deploy` from `server/`
+- `npm.cmd test -- savedSearchService.test.ts` from `server/`
+- `node_modules\.bin\vitest.cmd run src\shared\apiClient.test.js`
+- `npm.cmd run build` from `server/`
+- `npm.cmd run build` from repo root
+- `git diff --check`
+
+Known remaining issue outside this stage:
+
+- Root `npm.cmd run typecheck` still reports existing TypeScript issues in:
+  - `src/features/lab/api/client.ts`
+  - `src/utils/pdf/labCertificatePdf.ts`
+
+Recommended next work:
+
+1. Review the marketplace saved-searches diff.
+2. Commit the verified saved-searches slice if approved.
+3. Start the next stage: email/notification workflow or richer admin moderation/audit history.

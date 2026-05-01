@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   createListingInquiry,
+  createSavedSearch,
+  deleteSavedSearch,
   fetchMarketplaceProfiles,
   fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
+  fetchSavedSearches,
   saveMyBreederProfile,
   saveMyListings,
   updateInquiry,
@@ -199,6 +202,8 @@ export default function MarketplacePage() {
   const [inquiryEdits, setInquiryEdits] = useState({});
   const [moderationListings, setModerationListings] = useState([]);
   const [moderationEdits, setModerationEdits] = useState({});
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [savedSearchName, setSavedSearchName] = useState("");
   const [inquiryDraft, setInquiryDraft] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
   const [filters, setFilters] = useState({
@@ -240,6 +245,7 @@ export default function MarketplacePage() {
       const listings = canEditProfile ? await fetchMyListings() : { listings: [] };
       const inquiries = await fetchMyInquiries();
       const moderation = canModerate ? await fetchModerationListings() : { listings: [] };
+      const searches = await fetchSavedSearches();
       const moderationList = normalizeModerationRows(moderation?.listings);
       setProfiles(Array.isArray(marketplace?.profiles) ? marketplace.profiles : []);
       setMyProfile(normalizeProfile(own?.profile));
@@ -258,6 +264,7 @@ export default function MarketplacePage() {
         listing.rowId || listing.id,
         listing.status || "draft",
       ])));
+      setSavedSearches(Array.isArray(searches?.searches) ? searches.searches : []);
       setStatus("ready");
     } catch (error) {
       setStatus("error");
@@ -357,6 +364,46 @@ export default function MarketplacePage() {
 
   const clearFilters = () => {
     setFilters({ search: "", sex: "", location: "", maxPrice: "" });
+  };
+
+  const refreshSavedSearches = async () => {
+    const searches = await fetchSavedSearches();
+    setSavedSearches(Array.isArray(searches?.searches) ? searches.searches : []);
+  };
+
+  const saveCurrentSearch = async () => {
+    setMessage("");
+    try {
+      const name = savedSearchName || firstText(filters.search, filters.location, "Marketplace search");
+      await createSavedSearch({ name, filters });
+      setSavedSearchName("");
+      await refreshSavedSearches();
+      setMessage("Saved search created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Saved search failed.");
+    }
+  };
+
+  const applySavedSearch = (search) => {
+    const nextFilters = search?.filters && typeof search.filters === "object" ? search.filters : {};
+    setFilters({
+      search: String(nextFilters.search || ""),
+      sex: String(nextFilters.sex || ""),
+      location: String(nextFilters.location || ""),
+      maxPrice: String(nextFilters.maxPrice || ""),
+    });
+    setMessage(`Applied saved search: ${search.name || "Saved search"}.`);
+  };
+
+  const removeSavedSearch = async (id) => {
+    setMessage("");
+    try {
+      await deleteSavedSearch(id);
+      await refreshSavedSearches();
+      setMessage("Saved search deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Saved search delete failed.");
+    }
   };
 
   const refreshModerationListings = async () => {
@@ -609,6 +656,34 @@ export default function MarketplacePage() {
           <input type="number" min="0" value={filters.maxPrice} onChange={(event) => updateFilter("maxPrice", event.target.value)} />
         </label>
         <button type="button" onClick={clearFilters}>Clear</button>
+      </section>
+      <section className="marketplace-saved-searches">
+        <div>
+          <h2>Saved searches</h2>
+          <p>{savedSearches.length} saved search{savedSearches.length === 1 ? "" : "es"}</p>
+        </div>
+        <label>
+          <span>Name</span>
+          <input
+            value={savedSearchName}
+            placeholder="Clown females"
+            onChange={(event) => setSavedSearchName(event.target.value)}
+          />
+        </label>
+        <button type="button" onClick={saveCurrentSearch}>Save current filters</button>
+        <div className="marketplace-saved-searches__list">
+          {!savedSearches.length ? <p>No saved searches yet.</p> : null}
+          {savedSearches.map((search) => (
+            <article key={search.id}>
+              <button type="button" onClick={() => applySavedSearch(search)}>
+                {search.name || "Saved search"}
+              </button>
+              <button type="button" className="marketplace-secondary" onClick={() => removeSavedSearch(search.id)}>
+                Delete
+              </button>
+            </article>
+          ))}
+        </div>
       </section>
       {inquiryDraft ? (
         <section className="marketplace-editor marketplace-inquiry-form">

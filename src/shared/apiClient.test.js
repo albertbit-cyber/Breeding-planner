@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createOrder,
   createListingInquiry,
+  createSavedSearch,
+  deleteSavedSearch,
   fetchOrders,
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
@@ -10,6 +12,7 @@ import {
   fetchMyBreederProfile,
   fetchMyInquiries,
   fetchMyListings,
+  fetchSavedSearches,
   getHealth,
   getAuthToken,
   getRefreshToken,
@@ -436,6 +439,62 @@ describe("shared api client", () => {
     await expect(updateListingStatus("listing-1", "hidden")).resolves.toEqual({
       listing: { id: "listing-1", status: "hidden" },
     });
+  });
+
+  it("loads, creates, and deletes saved marketplace searches", async () => {
+    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+    setAuthToken("access-token");
+
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = new Headers(options.headers || {});
+
+      expect(headers.get("Authorization")).toBe("Bearer access-token");
+
+      if (normalizedUrl.endsWith("/searches") && method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ searches: [{ id: "search-1", name: "Clown females" }] }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/searches") && method === "POST") {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ search: { id: "search-2", ...JSON.parse(String(options.body)) } }),
+        };
+      }
+
+      if (normalizedUrl.endsWith("/searches/search-1") && method === "DELETE") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ deleted: "search-1" }),
+        };
+      }
+
+      throw new Error(`Unexpected URL ${normalizedUrl}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchSavedSearches()).resolves.toEqual({
+      searches: [{ id: "search-1", name: "Clown females" }],
+    });
+    await expect(createSavedSearch({
+      name: "Pied males",
+      filters: { search: "pied", sex: "male" },
+    })).resolves.toEqual({
+      search: {
+        id: "search-2",
+        name: "Pied males",
+        filters: { search: "pied", sex: "male" },
+      },
+    });
+    await expect(deleteSavedSearch("search-1")).resolves.toEqual({ deleted: "search-1" });
   });
 
   it("does not mark login failures as disconnected or unauthorized backend state", async () => {
