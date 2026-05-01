@@ -430,7 +430,7 @@ Recommended next work:
 
 ## Marketplace Moderation Audit History Stage Status
 
-Completed as a verified slice after approval.
+Committed as `b7bbcb9 feat: add marketplace moderation audit history`.
 
 - Added Prisma `ListingModerationAudit` model linked to listings and optional admin actor.
 - Added migration:
