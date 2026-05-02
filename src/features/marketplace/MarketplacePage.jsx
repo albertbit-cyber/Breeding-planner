@@ -18,7 +18,7 @@ import {
   updateListingStatus,
 } from "../../shared/apiClient";
 
-const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+const AUTH_STORAGE_KEY = "breedingPlannerBreederAuthSession";
 
 const readRole = () => {
   try {
@@ -197,7 +197,7 @@ function ListingCard({ listing, compact = false, onInquire, onSelect }) {
   );
 }
 
-export default function MarketplacePage() {
+export default function MarketplacePage({ portalMode = "marketplace" }) {
   const [profiles, setProfiles] = useState([]);
   const [myProfile, setMyProfile] = useState(emptyProfile);
   const [myListings, setMyListings] = useState([]);
@@ -225,6 +225,7 @@ export default function MarketplacePage() {
   const canEditProfile = role === "breeder" || role === "admin";
   const canSendInquiry = role === "buyer" || role === "breeder" || role === "admin";
   const canModerate = role === "admin";
+  const isAdminPortal = portalMode === "admin";
   const filteredProfiles = useMemo(() => profiles.map((profile) => {
     const listings = Array.isArray(profile?.listings) ? profile.listings : [];
     return {
@@ -491,11 +492,15 @@ export default function MarketplacePage() {
     <main className="marketplace-shell">
       <header className="marketplace-header">
         <button type="button" className="marketplace-back" onClick={() => { window.location.hash = "/"; }}>
-          Back to planner
+          Back to start
         </button>
         <div>
-          <h1>Breeder Marketplace</h1>
-          <p>Browse public breeder profiles and contact keepers directly.</p>
+          <h1>{isAdminPortal ? "Admin Portal" : "Breeder Marketplace"}</h1>
+          <p>
+            {isAdminPortal
+              ? "Review marketplace notifications, listings, moderation status, and audit history."
+              : "Browse public breeder profiles and contact keepers directly."}
+          </p>
         </div>
       </header>
 

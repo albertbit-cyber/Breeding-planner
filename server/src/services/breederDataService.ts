@@ -28,6 +28,15 @@ const numberValue = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const centsValue = (value: unknown): number | null => {
+  if (value === undefined || value === null || value === "") return null;
+  const text = String(value).trim();
+  if (!text || /inquire|ask|contact/i.test(text)) return null;
+  const parsed = Number(text.replace(/[^\d.,-]/g, "").replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100);
+};
+
 const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: number): string => {
   return textValue(record.id) || textValue(record.appId) || `${fallbackPrefix}-${index + 1}`;
 };
@@ -51,6 +60,82 @@ const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new HttpError(400, `${label} must be an array.`);
   return value.map(asRecord).filter((item): item is JsonRecord => !!item);
+};
+
+const listValue = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  const text = textValue(value);
+  return text ? [text] : [];
+};
+
+const buildGeneticsText = (animal: JsonRecord): string => {
+  const tokens = [
+    ...listValue(animal.morphs),
+    ...listValue(animal.hets).map((entry) => /^het\b/i.test(entry) ? entry : `het ${entry}`),
+    ...listValue(animal.possibleHets).map((entry) => /^possible/i.test(entry) ? entry : `possible het ${entry}`),
+  ];
+  return tokens.length ? tokens.join(", ") : "Genetics available on inquiry";
+};
+
+const isSaleAnimal = (animal: JsonRecord): boolean => {
+  const tokens = [
+    ...listValue(animal.tags),
+    ...listValue(animal.status),
+    ...listValue(animal.availability),
+  ].map((entry) => entry.toLowerCase());
+  return tokens.some((entry) => (
+    entry === "for sale"
+    || entry === "sale"
+    || entry === "available for sale"
+    || entry === "available"
+    || entry === "inquire"
+  ));
+};
+
+const isPublishedToMarketplace = (animal: JsonRecord): boolean => (
+  animal.marketplacePublished === true
+  || !!textValue(animal.marketplacePublishedAt)
+  || animal.publishedToMarketplace === true
+);
+
+const primaryImageUrl = (animal: JsonRecord): string | null => {
+  const direct = textValue(animal.imageUrl) || textValue(animal.photoUrl) || textValue(animal.pictureUrl);
+  if (direct) return direct;
+  const photos = Array.isArray(animal.photos) ? animal.photos : [];
+  for (const photo of [...photos].reverse()) {
+    const record = asRecord(photo);
+    const url = record ? textValue(record.url) || textValue(record.src) : null;
+    if (url) return url;
+  }
+  return null;
+};
+
+const buildAutoListing = (ownerId: string, animal: JsonRecord, index: number) => {
+  const appAnimalId = requireRecordId(animal, "animal", index);
+  const genetics = buildGeneticsText(animal);
+  const price = textValue(animal.price) || textValue(animal.salePrice) || textValue(animal.askingPrice) || "Inquire";
+  return {
+    ownerId,
+    appListingId: `auto-animal-${appAnimalId}`,
+    animalAppId: appAnimalId,
+    title: genetics,
+    status: "available",
+    priceCents: centsValue(price),
+    currency: textValue(animal.currency) || "EUR",
+    payload: {
+      id: `auto-animal-${appAnimalId}`,
+      animalAppId: appAnimalId,
+      title: genetics,
+      status: "available",
+      price,
+      currency: textValue(animal.currency) || "EUR",
+      genetics,
+      imageUrl: primaryImageUrl(animal),
+      marketplacePublished: true,
+      marketplacePublishedAt: textValue(animal.marketplacePublishedAt),
+      source: "breeder-animal-tag",
+    },
+  };
 };
 
 export const listBreederSnapshot = async (ownerId: string) => {
@@ -92,6 +177,37 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
           sex: textValue(animal.sex),
           status: textValue(animal.status),
           payload: animal,
+        },
+      });
+    }
+
+    const saleListings = animals
+      .map((animal, index) => (isSaleAnimal(animal) && isPublishedToMarketplace(animal))
+        ? buildAutoListing(ownerId, animal, index)
+        : null)
+      .filter((item): item is ReturnType<typeof buildAutoListing> => !!item);
+    const saleListingIds = saleListings.map((listing) => listing.appListingId);
+
+    await tx.listing.updateMany({
+      where: {
+        ownerId,
+        appListingId: { startsWith: "auto-animal-" },
+        ...(saleListingIds.length ? { NOT: { appListingId: { in: saleListingIds } } } : {}),
+      },
+      data: { status: "hidden" },
+    });
+
+    for (const listing of saleListings) {
+      await tx.listing.upsert({
+        where: { ownerId_appListingId: { ownerId, appListingId: listing.appListingId } },
+        create: listing,
+        update: {
+          animalAppId: listing.animalAppId,
+          title: listing.title,
+          status: listing.status,
+          priceCents: listing.priceCents,
+          currency: listing.currency,
+          payload: listing.payload,
         },
       });
     }

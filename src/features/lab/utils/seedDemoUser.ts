@@ -29,7 +29,7 @@ export const DEMO_LAB_STAFF_USER: StoredUser = {
 export const DEMO_ADMIN_USER: StoredUser = {
   fullName: "Demo Admin",
   displayName: "admin_demo",
-  email: "admin@proherper.dev",
+  email: "admin@breedingplanner.dev",
   password: "admin1234",
   reptileCount: "100",
   role: "admin",
@@ -75,7 +75,7 @@ export const seedDemoUsersIfNeeded = (): void => {
 
     if (!hasDemoLabStaff || !hasDemoAdmin) {
       console.info(
-        "[Demo] Lab staff and admin demo users created. Use lab@proherper.dev or admin@proherper.dev with password demo1234 / admin1234"
+        "[Demo] Lab staff and admin demo users created. Use lab@proherper.dev or admin@BreedingPlanner.dev with password demo1234 / admin1234"
       );
     }
   } catch (error) {

@@ -1,9 +1,21 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../../shared/api";
+import { clearAuthToken, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
-const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+const AUTH_SESSION_STORAGE_KEYS = {
+  breeder: "breedingPlannerBreederAuthSession",
+  lab: "breedingPlannerLabAuthSession",
+  admin: "breedingPlannerAdminAuthSession",
+};
+const LEGACY_AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+
+const getAuthSurfaceForHash = (hashValue) => {
+  const raw = String(hashValue || "").replace(/^#/, "").trim();
+  const path = raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "/";
+  if (path === "/") return "public";
+  return getAuthScopeForHash(hashValue);
+};
 const COUNTRY_OPTIONS_FALLBACK = [
   "Afghanistan",
   "Albania",
@@ -439,16 +451,21 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
 
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
 
-const loadStoredAuth = () => {
+const loadStoredAuth = (scope = "breeder") => {
+  if (scope === "public") return { isAuthenticated: false };
+  const storageKey = AUTH_SESSION_STORAGE_KEYS[scope] || AUTH_SESSION_STORAGE_KEYS.breeder;
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey) || (scope === "breeder" ? localStorage.getItem(LEGACY_AUTH_STORAGE_KEY) : "");
     if (!raw) return { isAuthenticated: false };
     const parsed = JSON.parse(raw);
     if (parsed?.isAuthenticated) {
       // Keep the session only if either the access token or refresh token is still
       // available. This lets the app silently restore auth after a reload.
-      if (!hasStoredAuthSession()) {
-        try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch {}
+      if (!hasStoredAuthSession(scope)) {
+        try {
+          localStorage.removeItem(storageKey);
+          if (scope === "breeder") localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+        } catch {}
         return { isAuthenticated: false };
       }
       return parsed;
@@ -475,7 +492,8 @@ const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 export default function AuthGate({ children }) {
   const { t, i18n } = useTranslation();
   const { snapshot, retry } = useSharedBackend();
-  const [authState, setAuthState] = useState(() => loadStoredAuth());
+  const [authScope, setAuthScope] = useState(() => getAuthSurfaceForHash(window?.location?.hash));
+  const [authState, setAuthState] = useState(() => loadStoredAuth(authScope));
   const [view, setView] = useState("chooser");
   const [loginValues, setLoginValues] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
@@ -524,17 +542,35 @@ export default function AuthGate({ children }) {
   const currentStep = registrationSteps[registerStep] || registrationSteps[0];
   const totalSteps = registrationSteps.length || 1;
 
+  useEffect(() => {
+    const onHashChange = () => {
+      setAuthScope(getAuthSurfaceForHash(window.location.hash));
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    setAuthState(loadStoredAuth(authScope));
+    setView("chooser");
+    setLoginError("");
+    setLoginMessage("");
+    setIsRecoveringPassword(false);
+  }, [authScope]);
+
   const persistAuth = useCallback((next) => {
     setAuthState(next);
+    if (authScope === "public") return;
+    const storageKey = AUTH_SESSION_STORAGE_KEYS[authScope] || AUTH_SESSION_STORAGE_KEYS.breeder;
     try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
       // ignore write errors
     }
-  }, []);
+  }, [authScope]);
 
   const handleLogout = useCallback(() => {
-    clearAuthToken();
+    if (authScope !== "public") clearAuthToken(authScope);
     persistAuth({ isAuthenticated: false });
     setView("chooser");
     setLoginError("");
@@ -544,14 +580,14 @@ export default function AuthGate({ children }) {
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
     setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
-  }, [persistAuth]);
+  }, [authScope, persistAuth]);
 
   useEffect(() => {
     if (!authState.isAuthenticated || snapshot.state !== "unauthorized") {
       return;
     }
 
-    clearAuthToken();
+    if (authScope !== "public") clearAuthToken(authScope);
     persistAuth({ isAuthenticated: false });
     setView("login");
     setIsRecoveringPassword(false);
@@ -570,7 +606,7 @@ export default function AuthGate({ children }) {
     setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
     setRegistrationError("");
-  }, [authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
+  }, [authScope, authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
 
   const handleLoginSubmit = async (event) => {
     event.preventDefault();
@@ -590,7 +626,7 @@ export default function AuthGate({ children }) {
         return;
       }
 
-      const response = await loginApi({ email: loginEmail, password: String(password || "") });
+      const response = await loginApi({ email: loginEmail, password: String(password || "") }, authScope === "public" ? "breeder" : authScope);
       const backendUser = response?.user || {};
       const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
       const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
@@ -754,7 +790,7 @@ export default function AuthGate({ children }) {
         const loginResponse = await loginApi({
           email: desiredEmail,
           password: registrationData.password,
-        });
+        }, authScope === "public" ? "breeder" : authScope);
 
         const backendUser = loginResponse?.user || {};
         const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
@@ -1027,7 +1063,7 @@ export default function AuthGate({ children }) {
                   {" "}
                   or
                   {" "}
-                  <code>admin@proherper.dev</code>
+                  <code>admin@BreedingPlanner.dev</code>
                   {" / "}
                   <code>admin1234</code>.
                   {" "}
@@ -1100,8 +1136,8 @@ export default function AuthGate({ children }) {
     </div>
   ) : null;
 
-  const overlayActive = !authState.isAuthenticated;
-  const showBackendBlocker = !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
+  const overlayActive = authScope !== "public" && !authState.isAuthenticated;
+  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
 
   return (
     <div className="auth-shell">

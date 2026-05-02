@@ -12,6 +12,7 @@ import { listingRoutes } from "./routes/listingRoutes";
 import { inquiryRoutes } from "./routes/inquiryRoutes";
 import { savedSearchRoutes } from "./routes/savedSearchRoutes";
 import { notificationRoutes } from "./routes/notificationRoutes";
+import { adminRoutes } from "./routes/adminRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -68,6 +69,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/searches", savedSearchRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 

@@ -44,9 +44,32 @@ async function upsertUser(email: string, fullName: string, role: UserRoleValue, 
 }
 
 async function main() {
-  await upsertUser("admin@proherper.dev", "Seed Admin", "admin", "admin1234");
-  await upsertUser("lab@proherper.dev", "Seed Lab User", "lab", "demo1234");
-  await upsertUser("breeder@proherper.dev", "Seed Breeder", "breeder", "breeder1234");
+  const adminUser = await upsertUser("admin@breedingplanner.dev", "BreedingPlanner Admin", "admin", "admin1234");
+  const labUser = await upsertUser("lab@proherper.dev", "Seed Lab User", "lab", "demo1234");
+  const breederUser = await upsertUser("breeder@proherper.dev", "Seed Breeder", "breeder", "breeder1234");
+  const buyerUser = await upsertUser("buyer@breedingplanner.dev", "Seed Buyer", "buyer", "buyer1234");
+
+  await prisma.user.update({
+    where: { id: breederUser.id },
+    data: { verificationStatus: "pending" },
+  });
+
+  await prisma.profile.upsert({
+    where: { userId: breederUser.id },
+    update: {
+      breederName: "Seed Morphs",
+      location: "Germany",
+      websiteUrl: "https://breedingplanner.dev/seed-morphs",
+      isPublic: true,
+    },
+    create: {
+      userId: breederUser.id,
+      breederName: "Seed Morphs",
+      location: "Germany",
+      websiteUrl: "https://breedingplanner.dev/seed-morphs",
+      isPublic: true,
+    },
+  });
 
   const tests = LAB_TEST_CATALOG_SEEDS.map((seed, index) => {
     const pricingType = seed.pricingType === "sex" ? "sex" : "morph";
@@ -124,7 +147,134 @@ async function main() {
     },
   });
 
-  console.log("Seed complete: admin/lab/breeder users + catalog + pricing created.");
+  await prisma.report.upsert({
+    where: { id: "seed-report-marketplace-1" },
+    update: {
+      reporterUserId: buyerUser.id,
+      reportedUserId: breederUser.id,
+      assignedAdminId: adminUser.id,
+      type: "incorrect_genetics",
+      status: "open",
+      description: "Buyer reported that a marketplace listing may have incorrect genetics.",
+    },
+    create: {
+      id: "seed-report-marketplace-1",
+      reporterUserId: buyerUser.id,
+      reportedUserId: breederUser.id,
+      assignedAdminId: adminUser.id,
+      type: "incorrect_genetics",
+      status: "open",
+      description: "Buyer reported that a marketplace listing may have incorrect genetics.",
+    },
+  });
+
+  await prisma.marketplacePermission.upsert({
+    where: { userId: breederUser.id },
+    update: {
+      canAccess: true,
+      activeListingLimit: 50,
+      requireApproval: false,
+      featuredBreeder: true,
+      disabledReason: null,
+    },
+    create: {
+      userId: breederUser.id,
+      canAccess: true,
+      activeListingLimit: 50,
+      requireApproval: false,
+      featuredBreeder: true,
+    },
+  });
+
+  await prisma.labAccount.upsert({
+    where: { userId: labUser.id },
+    update: {
+      labName: "Seed Genetics Lab",
+      contactPerson: "Seed Lab User",
+      location: "Germany",
+      status: "approved",
+      permissionsJson: { can_manage_test_orders: true, can_upload_results: true },
+      availableTestsJson: ["clown", "pied", "sex"],
+      pricingJson: { currency: "EUR", baseMorphTest: 35, sexTest: 30 },
+    },
+    create: {
+      userId: labUser.id,
+      labName: "Seed Genetics Lab",
+      contactPerson: "Seed Lab User",
+      location: "Germany",
+      status: "approved",
+      permissionsJson: { can_manage_test_orders: true, can_upload_results: true },
+      availableTestsJson: ["clown", "pied", "sex"],
+      pricingJson: { currency: "EUR", baseMorphTest: 35, sexTest: 30 },
+    },
+  });
+
+  await prisma.gdprRequest.upsert({
+    where: { id: "seed-gdpr-export-1" },
+    update: {
+      userId: buyerUser.id,
+      type: "data_export_requested",
+      status: "data_export_requested",
+      adminNote: "Seed request for GDPR tools.",
+      reviewedBy: adminUser.id,
+      reviewedAt: new Date(),
+    },
+    create: {
+      id: "seed-gdpr-export-1",
+      userId: buyerUser.id,
+      type: "data_export_requested",
+      status: "data_export_requested",
+      adminNote: "Seed request for GDPR tools.",
+      reviewedBy: adminUser.id,
+      reviewedAt: new Date(),
+    },
+  });
+
+  await prisma.verificationRequest.upsert({
+    where: { id: "seed-verification-breeder-1" },
+    update: {
+      userId: breederUser.id,
+      type: "breeder",
+      status: "pending_review",
+      submittedDataJson: {
+        breederName: "Seed Morphs",
+        realName: "Seed Breeder",
+        country: "Germany",
+        website: "https://breedingplanner.dev/seed-morphs",
+        socialMedia: "@seedmorphs",
+        yearsBreeding: "6",
+        mainSpecies: "Ball python",
+        businessRegistration: "Optional registration pending",
+        facilityPhotos: "Provided",
+        references: "Two breeder references",
+        labTestingHistory: "Uses shed tests for recessive confirmation",
+      },
+      adminNote: null,
+      reviewedBy: null,
+      reviewedAt: null,
+    },
+    create: {
+      id: "seed-verification-breeder-1",
+      userId: breederUser.id,
+      type: "breeder",
+      status: "pending_review",
+      submittedDataJson: {
+        breederName: "Seed Morphs",
+        realName: "Seed Breeder",
+        country: "Germany",
+        website: "https://breedingplanner.dev/seed-morphs",
+        socialMedia: "@seedmorphs",
+        yearsBreeding: "6",
+        mainSpecies: "Ball python",
+        businessRegistration: "Optional registration pending",
+        facilityPhotos: "Provided",
+        references: "Two breeder references",
+        labTestingHistory: "Uses shed tests for recessive confirmation",
+      },
+    },
+  });
+
+  console.log("Seed complete: admin/lab/breeder/buyer users + catalog + pricing + admin advanced tool samples created.");
 }
 
 main()

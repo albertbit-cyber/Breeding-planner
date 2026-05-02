@@ -6,8 +6,36 @@ import {
   setSharedBackendSnapshot,
 } from "./backendStatus";
 
-export const AUTH_TOKEN_STORAGE_KEY = "breedingPlannerAuthToken";
-export const REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
+export type AuthScope = "breeder" | "lab" | "admin";
+
+export const AUTH_TOKEN_STORAGE_KEYS: Record<AuthScope, string> = {
+  breeder: "breedingPlannerBreederAuthToken",
+  lab: "breedingPlannerLabAuthToken",
+  admin: "breedingPlannerAdminAuthToken",
+};
+
+export const REFRESH_TOKEN_STORAGE_KEYS: Record<AuthScope, string> = {
+  breeder: "breedingPlannerBreederRefreshToken",
+  lab: "breedingPlannerLabRefreshToken",
+  admin: "breedingPlannerAdminRefreshToken",
+};
+
+export const AUTH_TOKEN_STORAGE_KEY = AUTH_TOKEN_STORAGE_KEYS.breeder;
+export const REFRESH_TOKEN_STORAGE_KEY = REFRESH_TOKEN_STORAGE_KEYS.breeder;
+
+const LEGACY_AUTH_TOKEN_STORAGE_KEY = "breedingPlannerAuthToken";
+const LEGACY_REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
+
+export const getAuthScopeForHash = (hashValue?: string): AuthScope => {
+  const fallbackHash = typeof window !== "undefined" ? window.location.hash : "";
+  const raw = String((hashValue ?? fallbackHash) || "")
+    .replace(/^#/, "")
+    .trim();
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  if (path.startsWith("/admin")) return "admin";
+  if (path.startsWith("/lab")) return "lab";
+  return "breeder";
+};
 
 export type SharedApiErrorKind =
   | "config"
@@ -56,29 +84,45 @@ const clearStoredValue = (key: string): void => {
   }
 };
 
-const getStoredToken = (): string => getStoredValue(AUTH_TOKEN_STORAGE_KEY);
+const normalizeAuthScope = (scope?: AuthScope): AuthScope => scope || getAuthScopeForHash();
 
-const setStoredToken = (token: string): void => {
-  setStoredValue(AUTH_TOKEN_STORAGE_KEY, token);
+const getStoredToken = (scope?: AuthScope): string => {
+  const resolvedScope = normalizeAuthScope(scope);
+  const scoped = getStoredValue(AUTH_TOKEN_STORAGE_KEYS[resolvedScope]);
+  if (scoped) return scoped;
+  return resolvedScope === "breeder" ? getStoredValue(LEGACY_AUTH_TOKEN_STORAGE_KEY) : "";
 };
 
-const clearStoredToken = (): void => {
-  clearStoredValue(AUTH_TOKEN_STORAGE_KEY);
+const setStoredToken = (token: string, scope?: AuthScope): void => {
+  setStoredValue(AUTH_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)], token);
 };
 
-const getStoredRefreshToken = (): string => getStoredValue(REFRESH_TOKEN_STORAGE_KEY);
-
-const setStoredRefreshToken = (token: string): void => {
-  setStoredValue(REFRESH_TOKEN_STORAGE_KEY, token);
+const clearStoredToken = (scope?: AuthScope): void => {
+  const resolvedScope = normalizeAuthScope(scope);
+  clearStoredValue(AUTH_TOKEN_STORAGE_KEYS[resolvedScope]);
+  if (resolvedScope === "breeder") clearStoredValue(LEGACY_AUTH_TOKEN_STORAGE_KEY);
 };
 
-const clearStoredRefreshToken = (): void => {
-  clearStoredValue(REFRESH_TOKEN_STORAGE_KEY);
+const getStoredRefreshToken = (scope?: AuthScope): string => {
+  const resolvedScope = normalizeAuthScope(scope);
+  const scoped = getStoredValue(REFRESH_TOKEN_STORAGE_KEYS[resolvedScope]);
+  if (scoped) return scoped;
+  return resolvedScope === "breeder" ? getStoredValue(LEGACY_REFRESH_TOKEN_STORAGE_KEY) : "";
 };
 
-const clearStoredAuth = (): void => {
-  clearStoredToken();
-  clearStoredRefreshToken();
+const setStoredRefreshToken = (token: string, scope?: AuthScope): void => {
+  setStoredValue(REFRESH_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)], token);
+};
+
+const clearStoredRefreshToken = (scope?: AuthScope): void => {
+  const resolvedScope = normalizeAuthScope(scope);
+  clearStoredValue(REFRESH_TOKEN_STORAGE_KEYS[resolvedScope]);
+  if (resolvedScope === "breeder") clearStoredValue(LEGACY_REFRESH_TOKEN_STORAGE_KEY);
+};
+
+const clearStoredAuth = (scope?: AuthScope): void => {
+  clearStoredToken(scope);
+  clearStoredRefreshToken(scope);
 };
 
 const categorizeHttpError = (status: number): SharedApiErrorKind => {
@@ -162,6 +206,7 @@ type RequestOptions = RequestInit & {
   requiresAuth?: boolean;
   statusOnHttpError?: SharedBackendState;
   skipRefreshRetry?: boolean;
+  authScope?: AuthScope;
 };
 
 const markAuthorized = (reason = "Authenticated against shared backend."): void => {
@@ -179,14 +224,14 @@ const markAuthorized = (reason = "Authenticated against shared backend."): void 
   }));
 };
 
-let refreshRequestPromise: Promise<{ token: string; refreshToken: string }> | null = null;
+const refreshRequestPromises: Partial<Record<AuthScope, Promise<{ token: string; refreshToken: string }>>> = {};
 
-const refreshAuthSession = async (): Promise<{ token: string; refreshToken: string }> => {
-  if (refreshRequestPromise) {
-    return refreshRequestPromise;
+const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; refreshToken: string }> => {
+  if (refreshRequestPromises[scope]) {
+    return refreshRequestPromises[scope]!;
   }
 
-  refreshRequestPromise = (async () => {
+  refreshRequestPromises[scope] = (async () => {
     const config = getSharedApiConfig();
     if (!config.ok) {
       const error = new SharedApiError(config.message, "config", null, config);
@@ -194,10 +239,10 @@ const refreshAuthSession = async (): Promise<{ token: string; refreshToken: stri
       throw error;
     }
 
-    const refreshToken = getStoredRefreshToken();
+    const refreshToken = getStoredRefreshToken(scope);
     if (!refreshToken) {
       const error = new SharedApiError("Your shared backend session expired. Sign in again.", "unauthorized", 401, null);
-      clearStoredAuth();
+      clearStoredAuth(scope);
       updateStatusForFailure(error);
       throw error;
     }
@@ -211,7 +256,7 @@ const refreshAuthSession = async (): Promise<{ token: string; refreshToken: stri
 
     if (!response.ok) {
       const mapped = mapResponseError(response, data);
-      clearStoredAuth();
+      clearStoredAuth(scope);
       updateStatusForFailure(mapped);
       throw mapped;
     }
@@ -225,13 +270,13 @@ const refreshAuthSession = async (): Promise<{ token: string; refreshToken: stri
         401,
         data
       );
-      clearStoredAuth();
+      clearStoredAuth(scope);
       updateStatusForFailure(error);
       throw error;
     }
 
-    setStoredToken(nextToken);
-    setStoredRefreshToken(nextRefreshToken);
+    setStoredToken(nextToken, scope);
+    setStoredRefreshToken(nextRefreshToken, scope);
     markAuthorized("Refreshed shared backend session.");
 
     return {
@@ -239,13 +284,14 @@ const refreshAuthSession = async (): Promise<{ token: string; refreshToken: stri
       refreshToken: nextRefreshToken,
     };
   })().finally(() => {
-    refreshRequestPromise = null;
+    refreshRequestPromises[scope] = undefined;
   });
 
-  return refreshRequestPromise;
+  return refreshRequestPromises[scope]!;
 };
 
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
+  const authScope = normalizeAuthScope(options.authScope);
   const config = getSharedApiConfig();
   if (!config.ok) {
     const error = new SharedApiError(config.message, "config", null, config);
@@ -259,7 +305,7 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
     headers.set("Content-Type", "application/json");
   }
 
-  const token = getStoredToken();
+  const token = getStoredToken(authScope);
   if (requiresAuth && token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -284,16 +330,16 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
           && requiresAuth
           && !options.skipRefreshRetry
           && path !== "/auth/refresh"
-          && getStoredRefreshToken()
+          && getStoredRefreshToken(authScope)
         ) {
-          await refreshAuthSession();
+          await refreshAuthSession(authScope);
           return request<T>(path, {
             ...options,
             skipRefreshRetry: true,
           });
         }
         if (mapped.kind === "unauthorized") {
-          clearStoredAuth();
+          clearStoredAuth(authScope);
         }
         if (mapped.kind === "unauthorized" && !requiresAuth) {
           updateStatusForSuccess();
@@ -321,17 +367,17 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const apiRequest = request;
 
-export const getAuthToken = (): string => getStoredToken();
+export const getAuthToken = (scope?: AuthScope): string => getStoredToken(scope);
 
-export const setAuthToken = (token: string): void => setStoredToken(String(token || "").trim());
+export const setAuthToken = (token: string, scope?: AuthScope): void => setStoredToken(String(token || "").trim(), scope);
 
-export const getRefreshToken = (): string => getStoredRefreshToken();
+export const getRefreshToken = (scope?: AuthScope): string => getStoredRefreshToken(scope);
 
-export const setRefreshToken = (token: string): void => setStoredRefreshToken(String(token || "").trim());
+export const setRefreshToken = (token: string, scope?: AuthScope): void => setStoredRefreshToken(String(token || "").trim(), scope);
 
-export const hasStoredAuthSession = (): boolean => Boolean(getStoredToken() || getStoredRefreshToken());
+export const hasStoredAuthSession = (scope?: AuthScope): boolean => Boolean(getStoredToken(scope) || getStoredRefreshToken(scope));
 
-export const clearAuthToken = (): void => clearStoredAuth();
+export const clearAuthToken = (scope?: AuthScope): void => clearStoredAuth(scope);
 
 export const resetSharedBackendState = (): void => {
   resetSharedBackendSnapshot();
@@ -368,15 +414,17 @@ export const getHealth = async () =>
     return data;
   };
 
-export const login = async (payload: { email: string; password: string }) => {
+export const login = async (payload: { email: string; password: string }, authScope?: AuthScope) => {
+  const scope = normalizeAuthScope(authScope);
   const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
+    authScope: scope,
   });
   if (data?.token && data?.refreshToken) {
-    setStoredToken(data.token);
-    setStoredRefreshToken(data.refreshToken);
+    setStoredToken(data.token, scope);
+    setStoredRefreshToken(data.refreshToken, scope);
     markAuthorized();
   }
   return data;
@@ -543,6 +591,140 @@ export const updateInquiry = async (id: string, payload: {
   breederResponseNote?: string;
 }) =>
   request<{ inquiry: unknown }>(`/inquiries/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminDashboard = async () =>
+  request<{ cards: Record<string, number> }>("/admin/dashboard");
+
+export const fetchAdminUsers = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ users: unknown[]; total: number; page: number; pageSize: number }>(`/admin/users${suffix}`);
+};
+
+export const fetchAdminUserDetail = async (id: string) =>
+  request<{ user: unknown; auditLogs: unknown[]; reports: unknown[]; activity: unknown[] }>(`/admin/users/${encodeURIComponent(id)}`);
+
+export const updateAdminUserRole = async (id: string, payload: { role: string; reason: string; internalNote?: string }) =>
+  request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const updateAdminUserStatus = async (id: string, payload: { status: string; reason: string; internalNote?: string }) =>
+  request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const updateAdminUserVerification = async (id: string, payload: { verificationStatus: string; reason: string; internalNote?: string }) =>
+  request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/verification`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminReports = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ reports: unknown[]; total: number; page: number; pageSize: number; reportTypes: string[]; reportStatuses: string[] }>(`/admin/reports${suffix}`);
+};
+
+export const updateAdminReportStatus = async (id: string, payload: { status: string; resolutionNote?: string; reason: string; internalNote?: string }) =>
+  request<{ report: unknown }>(`/admin/reports/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const applyAdminReportAction = async (id: string, payload: { action: string; reason: string; internalNote?: string }) =>
+  request<{ report: unknown }>(`/admin/reports/${encodeURIComponent(id)}/action`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminVerificationRequests = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ requests: unknown[]; total: number; page: number; pageSize: number; statuses: string[] }>(`/admin/verification-requests${suffix}`);
+};
+
+export const updateAdminVerificationRequest = async (id: string, payload: { status: string; reason: string; adminNote?: string; internalNote?: string }) =>
+  request<{ request: unknown }>(`/admin/verification-requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminMarketplacePermission = async (userId: string) =>
+  request<{ user: unknown; permission: unknown }>(`/admin/users/${encodeURIComponent(userId)}/marketplace-permission`);
+
+export const updateAdminMarketplacePermission = async (userId: string, payload: {
+  canAccess: boolean;
+  activeListingLimit: number;
+  requireApproval: boolean;
+  featuredBreeder: boolean;
+  disabledReason?: string;
+  reason: string;
+}) =>
+  request<{ permission: unknown }>(`/admin/users/${encodeURIComponent(userId)}/marketplace-permission`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminLabAccounts = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ labs: unknown[]; statuses: string[] }>(`/admin/lab-accounts${suffix}`);
+};
+
+export const updateAdminLabAccount = async (id: string, payload: { status: string; reason: string; adminNote?: string }) =>
+  request<{ lab: unknown }>(`/admin/lab-accounts/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const sendAdminNotification = async (payload: {
+  recipientId?: string;
+  audience: string;
+  title: string;
+  message: string;
+  type?: string;
+  reason: string;
+}) =>
+  request<{ sent: number }>("/admin/notifications/send", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminGdprRequests = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ requests: unknown[]; types: string[]; statuses: string[] }>(`/admin/gdpr-requests${suffix}`);
+};
+
+export const createAdminGdprRequest = async (userId: string, payload: { type: string; reason: string; adminNote?: string }) =>
+  request<{ request: unknown }>(`/admin/users/${encodeURIComponent(userId)}/gdpr-requests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateAdminGdprRequest = async (id: string, payload: { status: string; reason: string; adminNote?: string }) =>
+  request<{ request: unknown }>(`/admin/gdpr-requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

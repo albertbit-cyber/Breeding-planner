@@ -17,7 +17,9 @@ const DEFAULT_ROUTE = "/lab/dashboard";
 // All localStorage keys owned by the Lab app — cleared during a dev reset.
 const LAB_STORAGE_KEYS = [
   "breedingPlannerLabMemoryStore",
-  "breedingPlannerAuthSession",
+  "breedingPlannerLabAuthSession",
+  "breedingPlannerLabAuthToken",
+  "breedingPlannerLabRefreshToken",
   "breedingPlannerUsers",
   "breedingPlannerDemoUserSeeded",
 ];

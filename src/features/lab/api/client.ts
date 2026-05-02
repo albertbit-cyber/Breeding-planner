@@ -6,7 +6,7 @@ import {
   fetchOrderById,
   fetchPricingConfig,
   fetchTestCatalog,
-} from "../../../../shared/api";
+} from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
   adminCorrectOrderStatusHandler,
@@ -85,7 +85,7 @@ import { generateOrderLabelsPdf } from "../../../utils/pdf/labOrderLabelsPdf";
 import { getActiveLabelSize } from "../utils/labelSizing";
 import { toLabQrResolvePayload } from "../utils/qrLookupInput";
 
-const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+const AUTH_STORAGE_KEY = "breedingPlannerLabAuthSession";
 const DEFAULT_LAB_ID = "proherper-main-lab";
 type LegacyRole = "admin" | "lab_staff" | "breeder";
 

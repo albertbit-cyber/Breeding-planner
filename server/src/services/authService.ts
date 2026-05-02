@@ -68,9 +68,9 @@ export const loginUser = async (email: string, password: string) => {
   const token = signAuthToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
 
-  await prisma.user.update({
+  await (prisma as any).user.update({
     where: { id: user.id },
-    data: { refreshToken },
+    data: { refreshToken, lastLoginAt: new Date(), status: "active" },
   });
 
   return {

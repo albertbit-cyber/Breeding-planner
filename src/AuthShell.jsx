@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import BreedingPlannerApp from "./App.jsx";
 import AuthGate from "./features/auth/AuthGate.jsx";
+import AdminApp from "./admin/AdminApp.jsx";
 import LabAppShell from "./features/lab/LabAppShell.jsx";
+import LaunchPage from "./features/launch/LaunchPage.jsx";
 import MarketplacePage from "./features/marketplace/MarketplacePage.jsx";
 import { AppearanceProvider } from "./contexts/AppearanceContext.jsx";
 import { SharedBackendProvider } from "./contexts/SharedBackendContext.jsx";
@@ -17,6 +19,11 @@ const normalizeHashPath = (hashValue) => {
 
 const isLabSectionPath = (path) => normalizeHashPath(path).startsWith("/lab");
 const isMarketplacePath = (path) => normalizeHashPath(path).startsWith("/marketplace");
+const isAdminPath = (path) => normalizeHashPath(path).startsWith("/admin");
+const isBreederPath = (path) => {
+  const normalized = normalizeHashPath(path);
+  return normalized === "/breeder" || normalized.startsWith("/breeder/");
+};
 
 function AppSectionRouter() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
@@ -33,8 +40,20 @@ function AppSectionRouter() {
     return <LabAppShell />;
   }
 
+  if (isAdminPath(hashPath)) {
+    return <AdminApp />;
+  }
+
   if (isMarketplacePath(hashPath)) {
     return <MarketplacePage />;
+  }
+
+  if (hashPath === "/") {
+    return <LaunchPage />;
+  }
+
+  if (isBreederPath(hashPath)) {
+    return <BreedingPlannerApp />;
   }
 
   return <BreedingPlannerApp />;

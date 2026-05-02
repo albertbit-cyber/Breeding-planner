@@ -12702,6 +12702,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
     return raw || t("snakeEdit.status", { defaultValue: "Status" });
   }, [s?.status, t]);
   const showCardPrice = useMemo(() => isSnakeTaggedForSell(s), [s]);
+  const isMarketplacePublished = s?.marketplacePublished === true || Boolean(s?.marketplacePublishedAt);
+  const canPublishToMarketplace = showCardPrice && typeof setSnakes === "function";
   const cardPriceText = useMemo(() => {
     const raw = String(s?.price ?? '').trim();
     return raw || 'ג€”';
@@ -12814,6 +12816,21 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
   }
 
   function closeQuickAdd() { setQuickTagOpen(null); }
+
+  async function publishToMarketplace(e) {
+    e && e.stopPropagation();
+    if (!canPublishToMarketplace) return;
+    const publishedAt = new Date().toISOString();
+    setSnakes(prev => prev.map(x => x.id === s.id ? ({
+      ...x,
+      forSale: true,
+      marketplacePublished: true,
+      marketplacePublishedAt: x.marketplacePublishedAt || publishedAt,
+    }) : x));
+    if (typeof showAppAlert === 'function') {
+      await showAppAlert('This snake will publish in the Marketplace after the breeder data sync finishes.');
+    }
+  }
 
   async function submitQuickAdd(tag, options = {}) {
     if (!setSnakes) {
@@ -12937,6 +12954,21 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
             title="Delete snake"
           >
             {t("actions.delete")}
+          </button>
+        )}
+        {canPublishToMarketplace && (
+          <button
+            className={cx(
+              "text-[11px] px-2 py-0.5 border rounded-lg",
+              isMarketplacePublished
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            )}
+            onClick={publishToMarketplace}
+            disabled={isMarketplacePublished}
+            title={isMarketplacePublished ? "Already published in the Marketplace" : "Publish this sale snake in the Marketplace"}
+          >
+            Publish in Market Place
           </button>
         )}
       </div>

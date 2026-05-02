@@ -1,6 +1,6 @@
 export type AppRole = "breeder" | "lab_staff" | "admin" | "unknown";
 
-const AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+const AUTH_STORAGE_KEY = "breedingPlannerLabAuthSession";
 
 type StoredSession = {
   isAuthenticated?: boolean;

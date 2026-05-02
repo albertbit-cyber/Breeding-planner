@@ -52,6 +52,11 @@ model User {
   fullName         String
   role             UserRole
   isActive         Boolean        @default(true)
+  status           String         @default("active")
+  verificationStatus String       @default("not_applied")
+  subscriptionPlan String         @default("free")
+  subscriptionStatus String       @default("inactive")
+  lastLoginAt      DateTime?
   refreshToken     String?        @db.Text
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -67,6 +72,17 @@ model User {
   notifications     Notification[] @relation("NotificationRecipient")
   notificationsSent Notification[] @relation("NotificationActor")
   listingModerationAudits ListingModerationAudit[]
+  adminAuditActions AdminAuditLog[] @relation("AdminAuditActor")
+  targetAuditActions AdminAuditLog[] @relation("AdminAuditTarget")
+  reportsFiled     Report[] @relation("ReportReporter")
+  reportsReceived  Report[] @relation("ReportReportedUser")
+  reportsAssigned  Report[] @relation("ReportAssignedAdmin")
+  verificationRequests VerificationRequest[] @relation("VerificationRequestUser")
+  verificationReviews  VerificationRequest[] @relation("VerificationRequestReviewer")
+  marketplacePermission MarketplacePermission?
+  labAccount       LabAccount?
+  gdprRequests     GdprRequest[] @relation("GdprRequestUser")
+  gdprReviews      GdprRequest[] @relation("GdprRequestReviewer")
 }
 
 model Profile {
@@ -161,6 +177,7 @@ model Listing {
   updatedAt    DateTime @updatedAt
   inquiries    ListingInquiry[]
   moderationAudits ListingModerationAudit[]
+  reports      Report[]
 
   @@unique([ownerId, appListingId])
   @@index([ownerId])
@@ -235,6 +252,126 @@ model ListingModerationAudit {
 
   @@index([listingId])
   @@index([actorId])
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id            String   @id @default(cuid())
+  adminUserId   String?
+  adminUser     User?    @relation("AdminAuditActor", fields: [adminUserId], references: [id], onDelete: SetNull)
+  targetUserId  String?
+  targetUser    User?    @relation("AdminAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  action        String
+  beforeJson    Json?
+  afterJson     Json?
+  reason        String
+  internalNote  String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Report {
+  id               String   @id @default(cuid())
+  reporterUserId   String?
+  reporterUser     User?    @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reportedUserId   String?
+  reportedUser     User?    @relation("ReportReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  relatedListingId String?
+  relatedListing   Listing? @relation(fields: [relatedListingId], references: [id], onDelete: SetNull)
+  relatedMessageId String?
+  type             String
+  status           String   @default("open")
+  description      String   @db.Text
+  assignedAdminId  String?
+  assignedAdmin    User?    @relation("ReportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  resolutionNote   String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([reporterUserId])
+  @@index([reportedUserId])
+  @@index([relatedListingId])
+  @@index([assignedAdminId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model VerificationRequest {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation("VerificationRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  type              String   @default("breeder")
+  status            String   @default("pending_review")
+  submittedDataJson Json
+  adminNote         String?  @db.Text
+  reviewedBy        String?
+  reviewer          User?    @relation("VerificationRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([reviewedBy])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MarketplacePermission {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canAccess         Boolean  @default(true)
+  activeListingLimit Int     @default(25)
+  requireApproval   Boolean @default(false)
+  featuredBreeder   Boolean @default(false)
+  disabledReason    String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([canAccess])
+  @@index([featuredBreeder])
+}
+
+model LabAccount {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labName           String
+  contactPerson     String?
+  location          String?
+  status            String   @default("pending")
+  permissionsJson   Json
+  availableTestsJson Json
+  pricingJson       Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+}
+
+model GdprRequest {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation("GdprRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  status            String   @default("data_export_requested")
+  adminNote         String?  @db.Text
+  reviewedBy        String?
+  reviewer          User?    @relation("GdprRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([reviewedBy])
+  @@index([type])
+  @@index([status])
   @@index([createdAt])
 }
 
