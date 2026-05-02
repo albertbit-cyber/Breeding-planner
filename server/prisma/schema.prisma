@@ -12,6 +12,8 @@ enum UserRole {
   lab
   breeder
   buyer
+  moderator
+  support
 }
 
 enum TestPricingType {
@@ -52,6 +54,7 @@ model User {
   fullName         String
   role             UserRole
   isActive         Boolean        @default(true)
+  emailVerified    Boolean        @default(false)
   status           String         @default("active")
   verificationStatus String       @default("not_applied")
   subscriptionPlan String         @default("free")
@@ -95,12 +98,17 @@ model Profile {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   breederName          String?
   logoUrl              String?
+  profileImageUrl      String?
   location             String?
+  country              String?
+  city                 String?
+  language             String?
   bio                  String?  @db.Text
   websiteUrl           String?
   instagramHandle      String?
   facebookHandle       String?
   telegramHandle       String?
+  socialLinks          Json?
   publicContactEmail   String?
   publicContactPhone   String?
   contactPreference    String?  @default("email")

@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 import {
   getAdminDashboard,
+  getAdminReportDetail,
+  getAdminVerificationRequestDetail,
+  listAdminAuditLogs,
   listAdminReports,
   listAdminVerificationRequests,
   getAdminUserDetail,
@@ -34,8 +37,20 @@ export const reports = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listAdminReports(req.query));
 };
 
+export const reportDetail = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getAdminReportDetail(req.params.id));
+};
+
+export const auditLogs = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listAdminAuditLogs({ ...req.query, targetUserId: req.params.id || req.query.targetUserId }));
+};
+
 export const verificationRequests = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listAdminVerificationRequests(req.query));
+};
+
+export const verificationRequestDetail = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getAdminVerificationRequestDetail(req.params.id));
 };
 
 export const userDetail = async (req: Request, res: Response): Promise<void> => {
@@ -68,6 +83,22 @@ export const reportAction = async (req: Request, res: Response): Promise<void> =
 
 export const changeVerificationRequest = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await updateAdminVerificationRequest(req.user!, req.params.id, req.body || {}));
+};
+
+export const approveVerificationRequest = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await updateAdminVerificationRequest(req.user!, req.params.id, { ...(req.body || {}), status: "approved" }));
+};
+
+export const rejectVerificationRequest = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await updateAdminVerificationRequest(req.user!, req.params.id, { ...(req.body || {}), status: "rejected" }));
+};
+
+export const requestMoreVerificationInfo = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await updateAdminVerificationRequest(req.user!, req.params.id, { ...(req.body || {}), status: "more_info_requested" }));
+};
+
+export const revokeVerificationRequest = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await updateAdminVerificationRequest(req.user!, req.params.id, { ...(req.body || {}), status: "revoked" }));
 };
 
 export const marketplacePermission = async (req: Request, res: Response): Promise<void> => {

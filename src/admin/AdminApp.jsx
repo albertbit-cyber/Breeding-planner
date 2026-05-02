@@ -50,43 +50,110 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
 };
 
-const ROLE_OPTIONS = ["buyer", "breeder", "lab", "admin"];
+const ROLE_OPTIONS = ["buyer", "breeder", "lab", "moderator", "admin", "support"];
 const STATUS_OPTIONS = ["active", "pending", "restricted", "suspended", "banned", "deleted"];
 const VERIFICATION_OPTIONS = ["not_applied", "pending", "approved", "rejected", "revoked", "more_info_requested"];
 const SUBSCRIPTION_OPTIONS = ["free", "hobby", "breeder", "professional", "lab", "enterprise"];
+const ACTIVITY_OPTIONS = ["active_today", "active_this_week", "inactive_30_days"];
 const SUBSCRIPTION_STATUS_OPTIONS = ["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"];
 const PAYMENT_STATUS_OPTIONS = ["none", "paid", "pending", "failed", "waived", "refunded"];
 const REPORT_TYPE_OPTIONS = ["fake_listing", "incorrect_genetics", "scam_suspicion", "abusive_message", "non_payment", "animal_welfare_concern", "spam", "other"];
 const REPORT_STATUS_OPTIONS = ["open", "under_review", "waiting_for_response", "resolved", "dismissed", "escalated"];
 const REPORT_ACTION_OPTIONS = ["warn_user", "restrict_messaging", "remove_listing", "suspend_account", "ban_account", "escalate_report"];
 const VERIFICATION_REQUEST_STATUS_OPTIONS = ["pending_review", "approved", "rejected", "more_info_requested", "revoked"];
+const PERMISSION_LABELS = [
+  "can_create_listings",
+  "can_publish_marketplace_animals",
+  "can_use_lab_system",
+  "can_manage_test_orders",
+  "can_access_admin_panel",
+  "can_moderate_listings",
+  "can_message_users",
+  "can_create_collaborations",
+];
+
+const rolePermissions = (role) => {
+  const normalized = String(role || "").toLowerCase();
+  return {
+    can_create_listings: ["breeder", "admin"].includes(normalized),
+    can_publish_marketplace_animals: ["breeder", "admin"].includes(normalized),
+    can_use_lab_system: ["lab", "admin"].includes(normalized),
+    can_manage_test_orders: ["lab", "admin"].includes(normalized),
+    can_access_admin_panel: ["admin", "moderator", "support"].includes(normalized),
+    can_moderate_listings: ["admin", "moderator"].includes(normalized),
+    can_message_users: normalized !== "banned",
+    can_create_collaborations: ["breeder", "admin"].includes(normalized),
+  };
+};
 
 function AdminLayout({ path, children }) {
   const nav = [
-    ["/admin", "Dashboard"],
-    ["/admin/users", "Users"],
-    ["/admin/verification", "Breeders"],
-    ["/admin/reports", "Reports"],
-    ["/admin/marketplace", "Marketplace"],
-    ["/admin/labs", "Labs"],
-    ["/admin/notifications", "Messages"],
-    ["/admin/gdpr", "GDPR"],
-    ["/admin/settings", "Settings"],
+    { label: "Dashboard", items: [["/admin", "Dashboard"]] },
+    { label: "Users", items: [
+      ["/admin/users", "All Users"],
+      ["/admin/users?verification=pending", "Pending Verification"],
+      ["/admin/users?status=suspended", "Suspended Users"],
+      ["/admin/reports?status=open", "Reported Users"],
+    ] },
+    { label: "Breeders", items: [
+      ["/admin/verification?status=pending_review", "Applications"],
+      ["/admin/users?role=breeder&verification=approved", "Verified Breeders"],
+      ["/admin/users?role=breeder", "Seller Metrics"],
+    ] },
+    { label: "Subscriptions", items: [
+      ["/admin/users?subscription=breeder", "Plans"],
+      ["/admin/users?subscription=professional", "Payments"],
+      ["/admin/users?activity=active_this_week", "Trials"],
+    ] },
+    { label: "Reports", items: [
+      ["/admin/reports?status=open", "Open Reports"],
+      ["/admin/reports?type=scam_suspicion", "Marketplace Disputes"],
+      ["/admin/reports?type=abusive_message", "Message Reports"],
+    ] },
+    { label: "Marketplace", items: [
+      ["/admin/marketplace", "Listings"],
+      ["/admin/marketplace", "Orders"],
+      ["/admin/users?role=breeder&verification=approved", "Featured Listings"],
+    ] },
+    { label: "Labs", items: [
+      ["/admin/labs", "Lab Accounts"],
+      ["/admin/labs", "Test Orders"],
+      ["/admin/labs", "Test Catalog"],
+    ] },
+    { label: "Messages", items: [
+      ["/admin/notifications", "System Messages"],
+      ["/admin/reports?type=abusive_message", "Reported Chats"],
+      ["/admin/notifications", "Announcements"],
+    ] },
+    { label: "Settings", items: [
+      ["/admin/settings", "Roles & Permissions"],
+      ["/admin/settings", "Platform Rules"],
+      ["/admin/gdpr", "GDPR Tools"],
+    ] },
   ];
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-brand">Admin Panel</div>
         <nav>
-          {nav.map(([href, label]) => (
-            <button
-              key={href}
-              type="button"
-              className={path === href || (href !== "/admin" && path.startsWith(href)) ? "active" : ""}
-              onClick={() => go(href)}
-            >
-              {label}
-            </button>
+          {nav.map((group) => (
+            <div key={group.label} className="admin-nav-group">
+              <span>{group.label}</span>
+              {group.items.map(([href, label]) => {
+                const hrefOnly = href.split("?")[0];
+                const active = path === hrefOnly || (hrefOnly !== "/admin" && path.startsWith(hrefOnly));
+                return (
+                  <button
+                    key={`${group.label}:${label}:${href}`}
+                    type="button"
+                    className={active ? "active" : ""}
+                    onClick={() => go(href)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
       </aside>
@@ -156,6 +223,17 @@ function useAdminQuery(path) {
   }, [path]);
 }
 
+function PaginationControls({ page, pageSize, total, onPage }) {
+  const pageCount = Math.max(1, Math.ceil(Number(total || 0) / Number(pageSize || 25)));
+  return (
+    <div className="admin-pagination">
+      <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+      <span>Page {page} of {pageCount}</span>
+      <button type="button" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>Next</button>
+    </div>
+  );
+}
+
 function UsersPage({ path }) {
   const initial = useAdminQuery(path);
   const [filters, setFilters] = useState({
@@ -164,30 +242,50 @@ function UsersPage({ path }) {
     status: initial.status || "",
     verification: initial.verification || "",
     subscription: initial.subscription || "",
+    activity: initial.activity || "",
+    page: Number(initial.page || 1),
+    pageSize: 25,
   });
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = () => {
+  const load = (nextFilters = filters) => {
     setLoading(true);
     setError("");
-    fetchAdminUsers(filters)
+    fetchAdminUsers(nextFilters)
       .then((data) => {
         setUsers(Array.isArray(data.users) ? data.users : []);
         setTotal(Number(data.total || 0));
+        setFilters((prev) => ({ ...prev, page: Number(data.page || nextFilters.page || 1), pageSize: Number(data.pageSize || nextFilters.pageSize || 25) }));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load users."))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    load();
+    const nextFilters = {
+      search: initial.search || "",
+      role: initial.role || "",
+      status: initial.status || "",
+      verification: initial.verification || "",
+      subscription: initial.subscription || "",
+      activity: initial.activity || "",
+      page: Number(initial.page || 1),
+      pageSize: 25,
+    };
+    setFilters(nextFilters);
+    load(nextFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
-  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  const changePage = (page) => {
+    const nextFilters = { ...filters, page };
+    setFilters(nextFilters);
+    load(nextFilters);
+  };
 
   return (
     <section className="admin-section">
@@ -213,7 +311,11 @@ function UsersPage({ path }) {
           <option value="">All subscriptions</option>
           {SUBSCRIPTION_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <button type="button" onClick={load}>Apply</button>
+        <select value={filters.activity} onChange={(e) => updateFilter("activity", e.target.value)}>
+          <option value="">All activity</option>
+          {ACTIVITY_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <button type="button" onClick={() => load(filters)}>Apply</button>
       </div>
       {error && <div className="admin-error">{error}</div>}
       <div className="admin-table-wrap">
@@ -246,7 +348,15 @@ function UsersPage({ path }) {
                 <td>{user.country || "-"}</td>
                 <td>{formatDate(user.joinedDate)}</td>
                 <td>{formatDate(user.lastLoginAt)}</td>
-                <td><button type="button" onClick={() => go(`/admin/users/${user.id}`)}>View Profile</button></td>
+                <td>
+                  <div className="admin-row-actions">
+                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>View Profile</button>
+                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Edit User</button>
+                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Change Role</button>
+                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Change Subscription</button>
+                    <button type="button" onClick={() => go(`/admin/reports?search=${encodeURIComponent(user.email)}`)}>View Reports</button>
+                  </div>
+                </td>
               </tr>
             ))}
             {!users.length && (
@@ -255,7 +365,10 @@ function UsersPage({ path }) {
           </tbody>
         </table>
       </div>
-      <div className="admin-muted">{total.toLocaleString()} user records</div>
+      <div className="admin-table-footer">
+        <div className="admin-muted">{total.toLocaleString()} user records</div>
+        <PaginationControls page={filters.page} pageSize={filters.pageSize} total={total} onPage={changePage} />
+      </div>
     </section>
   );
 }
@@ -468,6 +581,8 @@ function UserDetailPage({ id }) {
   if (error) return <div className="admin-error">{error}</div>;
   if (!detail) return <div className="admin-section">Loading user...</div>;
   const user = detail.user || {};
+  const permissions = rolePermissions(user.role);
+  const socialLinks = user.socialLinks || {};
 
   return (
     <section className="admin-section">
@@ -475,8 +590,10 @@ function UserDetailPage({ id }) {
       <div className="admin-detail-grid">
         <div className="admin-panel">
           <h2>{user.name || user.email}</h2>
+          {user.profileImageUrl ? <img className="admin-profile-photo" src={user.profileImageUrl} alt="" /> : null}
           <dl className="admin-definition-list">
             <dt>User ID</dt><dd>{user.id}</dd>
+            <dt>Name</dt><dd>{user.name || "-"}</dd>
             <dt>Email</dt><dd>{user.email}</dd>
             <dt>Phone number</dt><dd>{user.phone || "-"}</dd>
             <dt>Country</dt><dd>{user.country || "-"}</dd>
@@ -484,10 +601,23 @@ function UserDetailPage({ id }) {
             <dt>Language</dt><dd>{user.language || "-"}</dd>
             <dt>Breeder/business name</dt><dd>{user.breederName || "-"}</dd>
             <dt>Website</dt><dd>{user.websiteUrl || "-"}</dd>
+            <dt>Social links</dt><dd>{[socialLinks.instagram, socialLinks.facebook, socialLinks.telegram].filter(Boolean).join(", ") || "-"}</dd>
             <dt>Joined date</dt><dd>{formatDate(user.joinedDate)}</dd>
             <dt>Last login</dt><dd>{formatDate(user.lastLoginAt)}</dd>
             <dt>Account status</dt><dd>{user.status}</dd>
-            <dt>Email verified</dt><dd>Not tracked yet</dd>
+            <dt>Email verified</dt><dd>{user.emailVerified ? "yes" : "no"}</dd>
+          </dl>
+        </div>
+        <div className="admin-panel">
+          <h3>Role & Permissions</h3>
+          <dl className="admin-definition-list">
+            <dt>Current role</dt><dd>{user.role}</dd>
+            {PERMISSION_LABELS.map((permission) => (
+              <React.Fragment key={permission}>
+                <dt>{permission}</dt>
+                <dd>{permissions[permission] ? "allowed" : "blocked"}</dd>
+              </React.Fragment>
+            ))}
           </dl>
         </div>
         <ActionControls user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
@@ -495,9 +625,21 @@ function UserDetailPage({ id }) {
         <SubscriptionPanel user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
         <div className="admin-panel">
           <h3>Reports Connected to User</h3>
-          {(detail.reports || []).length ? detail.reports.map((report) => (
-            <div key={report.id} className="admin-log-row">{report.action} - {formatDate(report.createdAt)}</div>
-          )) : <p className="admin-muted">No reports connected to this user.</p>}
+          {(detail.reports || []).length ? (
+            <div className="admin-mini-table">
+              {(detail.reports || []).map((report) => (
+                <div key={report.id} className="admin-mini-row">
+                  <span className="mono">{report.id}</span>
+                  <span>{report.type}</span>
+                  <span>{report.status}</span>
+                  <span>{report.reporter?.email || "-"}</span>
+                  <span>{formatDate(report.createdAt)}</span>
+                  <span>{report.assignedAdmin?.email || "Unassigned"}</span>
+                  <span>{report.resolutionNote || "-"}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="admin-muted">No reports connected to this user.</p>}
         </div>
         <div className="admin-panel wide">
           <h3>Activity Timeline</h3>
@@ -526,6 +668,8 @@ function ReportsPage({ path }) {
     search: initial.search || "",
     status: initial.status || "",
     type: initial.type || "",
+    page: Number(initial.page || 1),
+    pageSize: 25,
   });
   const [reports, setReports] = useState([]);
   const [total, setTotal] = useState(0);
@@ -535,22 +679,37 @@ function ReportsPage({ path }) {
   const [noteById, setNoteById] = useState({});
   const [busy, setBusy] = useState("");
 
-  const load = () => {
+  const load = (nextFilters = filters) => {
     setLoading(true);
     setError("");
-    fetchAdminReports(filters)
+    fetchAdminReports(nextFilters)
       .then((data) => {
         setReports(Array.isArray(data.reports) ? data.reports : []);
         setTotal(Number(data.total || 0));
+        setFilters((prev) => ({ ...prev, page: Number(data.page || nextFilters.page || 1), pageSize: Number(data.pageSize || nextFilters.pageSize || 25) }));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load reports."))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    load();
+    const nextFilters = {
+      search: initial.search || "",
+      status: initial.status || "",
+      type: initial.type || "",
+      page: Number(initial.page || 1),
+      pageSize: 25,
+    };
+    setFilters(nextFilters);
+    load(nextFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
+  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  const changePage = (page) => {
+    const nextFilters = { ...filters, page };
+    setFilters(nextFilters);
+    load(nextFilters);
+  };
 
   const updateReportInList = (nextReport) => {
     if (!nextReport?.id) return;
@@ -608,16 +767,16 @@ function ReportsPage({ path }) {
         <p>Review user reports, marketplace disputes, message reports, and apply controlled moderation actions.</p>
       </div>
       <div className="admin-filters">
-        <input value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} placeholder="Search reporter, user, listing, description" />
-        <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
+        <input value={filters.search} onChange={(e) => updateFilter("search", e.target.value)} placeholder="Search reporter, user, listing, description" />
+        <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
           <option value="">All statuses</option>
           {REPORT_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select value={filters.type} onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}>
+        <select value={filters.type} onChange={(e) => updateFilter("type", e.target.value)}>
           <option value="">All report types</option>
           {REPORT_TYPE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <button type="button" onClick={load}>Apply</button>
+        <button type="button" onClick={() => load(filters)}>Apply</button>
       </div>
       {error && <div className="admin-error">{error}</div>}
       <div className="admin-table-wrap">
@@ -691,7 +850,10 @@ function ReportsPage({ path }) {
           </tbody>
         </table>
       </div>
-      <div className="admin-muted">{total.toLocaleString()} report records</div>
+      <div className="admin-table-footer">
+        <div className="admin-muted">{total.toLocaleString()} report records</div>
+        <PaginationControls page={filters.page} pageSize={filters.pageSize} total={total} onPage={changePage} />
+      </div>
     </section>
   );
 }
@@ -701,6 +863,8 @@ function BreederVerificationQueue({ path }) {
   const [filters, setFilters] = useState({
     search: initial.search || "",
     status: initial.status || "pending_review",
+    page: Number(initial.page || 1),
+    pageSize: 25,
   });
   const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
@@ -710,22 +874,36 @@ function BreederVerificationQueue({ path }) {
   const [noteById, setNoteById] = useState({});
   const [busy, setBusy] = useState("");
 
-  const load = () => {
+  const load = (nextFilters = filters) => {
     setLoading(true);
     setError("");
-    fetchAdminVerificationRequests(filters)
+    fetchAdminVerificationRequests(nextFilters)
       .then((data) => {
         setRequests(Array.isArray(data.requests) ? data.requests : []);
         setTotal(Number(data.total || 0));
+        setFilters((prev) => ({ ...prev, page: Number(data.page || nextFilters.page || 1), pageSize: Number(data.pageSize || nextFilters.pageSize || 25) }));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load breeder applications."))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    load();
+    const nextFilters = {
+      search: initial.search || "",
+      status: initial.status || "pending_review",
+      page: Number(initial.page || 1),
+      pageSize: 25,
+    };
+    setFilters(nextFilters);
+    load(nextFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
+  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  const changePage = (page) => {
+    const nextFilters = { ...filters, page };
+    setFilters(nextFilters);
+    load(nextFilters);
+  };
 
   const updateRequestInList = (nextRequest) => {
     if (!nextRequest?.id) return;
@@ -762,12 +940,12 @@ function BreederVerificationQueue({ path }) {
         <p>Review breeder applications, approve verified sellers, reject incomplete applications, request more information, or revoke verification.</p>
       </div>
       <div className="admin-filters">
-        <input value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} placeholder="Search breeder, name, email" />
-        <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
+        <input value={filters.search} onChange={(e) => updateFilter("search", e.target.value)} placeholder="Search breeder, name, email" />
+        <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
           <option value="">All statuses</option>
           {VERIFICATION_REQUEST_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <button type="button" onClick={load}>Apply</button>
+        <button type="button" onClick={() => load(filters)}>Apply</button>
       </div>
       {error && <div className="admin-error">{error}</div>}
       <div className="admin-table-wrap">
@@ -837,7 +1015,10 @@ function BreederVerificationQueue({ path }) {
           </tbody>
         </table>
       </div>
-      <div className="admin-muted">{total.toLocaleString()} breeder application records</div>
+      <div className="admin-table-footer">
+        <div className="admin-muted">{total.toLocaleString()} breeder application records</div>
+        <PaginationControls page={filters.page} pageSize={filters.pageSize} total={total} onPage={changePage} />
+      </div>
     </section>
   );
 }

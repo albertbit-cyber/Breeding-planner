@@ -28,6 +28,20 @@
   gap: 6px;
 }
 
+.admin-nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-nav-group > span {
+  color: #98a2b3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 10px 10px 2px;
+  text-transform: uppercase;
+}
+
 .admin-sidebar button,
 .admin-topbar-actions button,
 .admin-filters button,
@@ -48,6 +62,11 @@
   border-color: transparent;
   background: transparent;
   color: #d7deea;
+}
+
+.admin-nav-group button {
+  font-size: 13px;
+  padding-left: 14px;
 }
 
 .admin-sidebar button.active,
@@ -136,7 +155,7 @@
 
 .admin-filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(150px, 180px)) auto;
+  grid-template-columns: minmax(220px, 1fr) repeat(5, minmax(150px, 180px)) auto;
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -187,6 +206,31 @@
   text-overflow: ellipsis;
 }
 
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 360px;
+}
+
+.admin-row-actions button {
+  white-space: nowrap;
+}
+
+.admin-table-footer,
+.admin-pagination {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.admin-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .admin-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -214,6 +258,15 @@
   overflow-wrap: anywhere;
 }
 
+.admin-profile-photo {
+  aspect-ratio: 1;
+  border: 1px solid #cdd5df;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  object-fit: cover;
+  width: 112px;
+}
+
 .admin-action-reason,
 .admin-action-grid {
   display: grid;
@@ -236,6 +289,21 @@
   border-top: 1px solid #e1e7ef;
   padding: 10px 0;
   font-size: 14px;
+}
+
+.admin-mini-table {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-mini-row {
+  background: #f8fafc;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(120px, 1fr) repeat(6, minmax(90px, 1fr));
+  padding: 10px;
 }
 
 .admin-report-controls {
@@ -330,13 +398,16 @@
 
   .admin-sidebar nav,
   .admin-filters,
-  .admin-detail-grid {
+  .admin-detail-grid,
+  .admin-mini-row {
     grid-template-columns: 1fr;
   }
 
   .admin-topbar,
   .admin-section-header,
-  .admin-log-row {
+  .admin-log-row,
+  .admin-table-footer,
+  .admin-pagination {
     align-items: stretch;
     flex-direction: column;
   }

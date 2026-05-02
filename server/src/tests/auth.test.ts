@@ -23,6 +23,7 @@ const mockUser = {
   fullName: "Test User",
   role: "breeder" as const,
   isActive: true,
+  emailVerified: false,
   status: "active",
   verificationStatus: "not_applied",
   subscriptionPlan: "free",

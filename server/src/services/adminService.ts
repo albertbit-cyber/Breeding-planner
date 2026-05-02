@@ -10,6 +10,7 @@ const USER_SELECT = {
   fullName: true,
   role: true,
   isActive: true,
+  emailVerified: true,
   status: true,
   verificationStatus: true,
   subscriptionPlan: true,
@@ -24,7 +25,7 @@ const USER_SELECT = {
   profile: true,
 };
 
-const ADMIN_ROLES = new Set(["admin", "lab", "breeder", "buyer"]);
+const ADMIN_ROLES = new Set(["admin", "lab", "breeder", "buyer", "moderator", "support"]);
 const USER_STATUSES = new Set(["active", "pending", "restricted", "suspended", "banned", "deleted"]);
 const SUBSCRIPTION_PLANS = new Set(["free", "hobby", "breeder", "professional", "lab", "enterprise"]);
 const SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"]);
@@ -58,6 +59,7 @@ const normalizeUser = (row: any) => ({
   email: row.email,
   role: row.role,
   status: row.status || (row.isActive ? "active" : "suspended"),
+  emailVerified: Boolean(row.emailVerified),
   subscription: {
     plan: row.subscriptionPlan || "free",
     status: row.subscriptionStatus || "inactive",
@@ -74,6 +76,11 @@ const normalizeUser = (row: any) => ({
   profileImageUrl: row.profile?.profileImageUrl || row.profile?.logoUrl || "",
   phone: row.profile?.publicContactPhone || "",
   language: row.profile?.language || "",
+  socialLinks: row.profile?.socialLinks || {
+    instagram: row.profile?.instagramHandle || "",
+    facebook: row.profile?.facebookHandle || "",
+    telegram: row.profile?.telegramHandle || "",
+  },
   joinedDate: row.createdAt,
   lastLoginAt: row.lastLoginAt,
   updatedAt: row.updatedAt,
@@ -237,6 +244,7 @@ export const listAdminUsers = async (query: Record<string, unknown>) => {
   const status = String(query.status || "").trim();
   const verification = String(query.verification || "").trim();
   const subscription = String(query.subscription || "").trim();
+  const activity = String(query.activity || "").trim();
   const page = Math.max(1, Number(query.page || 1));
   const pageSize = Math.min(100, Math.max(10, Number(query.pageSize || 25)));
 
@@ -252,6 +260,22 @@ export const listAdminUsers = async (query: Record<string, unknown>) => {
   if (status) where.status = status;
   if (verification) where.verificationStatus = verification;
   if (subscription) where.subscriptionPlan = subscription;
+  if (activity) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const inactiveCutoff = new Date();
+    inactiveCutoff.setDate(inactiveCutoff.getDate() - 30);
+    if (activity === "active_today") where.lastLoginAt = { gte: today };
+    if (activity === "active_this_week") where.lastLoginAt = { gte: weekAgo };
+    if (activity === "inactive_30_days") {
+      where.AND = [
+        ...(where.AND || []),
+        { OR: [{ lastLoginAt: null }, { lastLoginAt: { lt: inactiveCutoff } }] },
+      ];
+    }
+  }
 
   const [total, rows] = await Promise.all([
     db.user.count({ where }),
@@ -692,6 +716,42 @@ export const listAdminReports = async (query: Record<string, unknown>) => {
     reportTypes: Array.from(REPORT_TYPES),
     reportStatuses: Array.from(REPORT_STATUSES),
   };
+};
+
+export const getAdminReportDetail = async (reportId: string) => {
+  const report = await db.report.findUnique({ where: { id: reportId }, include: REPORT_INCLUDE });
+  if (!report) throw new HttpError(404, "Report not found.");
+  return { report: normalizeReport(report) };
+};
+
+export const listAdminAuditLogs = async (query: Record<string, unknown>) => {
+  const targetUserId = String(query.targetUserId || "").trim();
+  const action = String(query.action || "").trim();
+  const page = Math.max(1, Number(query.page || 1));
+  const pageSize = Math.min(100, Math.max(10, Number(query.pageSize || 25)));
+  const where: any = {};
+  if (targetUserId) where.targetUserId = targetUserId;
+  if (action) where.action = action;
+  const [total, logs] = await Promise.all([
+    db.adminAuditLog.count({ where }),
+    db.adminAuditLog.findMany({
+      where,
+      include: { adminUser: { select: { id: true, fullName: true, email: true, role: true } }, targetUser: { select: { id: true, fullName: true, email: true, role: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return { auditLogs: logs, total, page, pageSize };
+};
+
+export const getAdminVerificationRequestDetail = async (requestId: string) => {
+  const request = await db.verificationRequest.findUnique({
+    where: { id: requestId },
+    include: VERIFICATION_REQUEST_INCLUDE,
+  });
+  if (!request) throw new HttpError(404, "Verification request not found.");
+  return { request: normalizeVerificationRequest(request) };
 };
 
 export const updateAdminReportStatus = async (
