@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   changeUserRole,
   changeUserStatus,
+  changeUserSubscription,
   changeUserVerification,
   changeGdprRequest,
   changeLabAccount,
@@ -46,4 +47,5 @@ adminRoutes.get("/users", asyncHandler(users));
 adminRoutes.get("/users/:id", asyncHandler(userDetail));
 adminRoutes.patch("/users/:id/role", asyncHandler(changeUserRole));
 adminRoutes.patch("/users/:id/status", asyncHandler(changeUserStatus));
+adminRoutes.patch("/users/:id/subscription", asyncHandler(changeUserSubscription));
 adminRoutes.patch("/users/:id/verification", asyncHandler(changeUserVerification));

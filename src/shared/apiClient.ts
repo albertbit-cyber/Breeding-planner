@@ -622,6 +622,21 @@ export const updateAdminUserStatus = async (id: string, payload: { status: strin
     body: JSON.stringify(payload),
   });
 
+export const updateAdminUserSubscription = async (id: string, payload: {
+  plan: string;
+  status: string;
+  paymentStatus: string;
+  startDate?: string;
+  renewalDate?: string;
+  trialEndsAt?: string;
+  reason: string;
+  internalNote?: string;
+}) =>
+  request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/subscription`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
 export const updateAdminUserVerification = async (id: string, payload: { verificationStatus: string; reason: string; internalNote?: string }) =>
   request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/verification`, {
     method: "PATCH",

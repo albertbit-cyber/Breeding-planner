@@ -19,6 +19,7 @@ import {
   updateAdminVerificationRequest,
   updateAdminUserRole,
   updateAdminUserStatus,
+  updateAdminUserSubscription,
   updateAdminUserVerification,
 } from "../shared/apiClient";
 
@@ -53,6 +54,8 @@ const ROLE_OPTIONS = ["buyer", "breeder", "lab", "admin"];
 const STATUS_OPTIONS = ["active", "pending", "restricted", "suspended", "banned", "deleted"];
 const VERIFICATION_OPTIONS = ["not_applied", "pending", "approved", "rejected", "revoked", "more_info_requested"];
 const SUBSCRIPTION_OPTIONS = ["free", "hobby", "breeder", "professional", "lab", "enterprise"];
+const SUBSCRIPTION_STATUS_OPTIONS = ["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"];
+const PAYMENT_STATUS_OPTIONS = ["none", "paid", "pending", "failed", "waived", "refunded"];
 const REPORT_TYPE_OPTIONS = ["fake_listing", "incorrect_genetics", "scam_suspicion", "abusive_message", "non_payment", "animal_welfare_concern", "spam", "other"];
 const REPORT_STATUS_OPTIONS = ["open", "under_review", "waiting_for_response", "resolved", "dismissed", "escalated"];
 const REPORT_ACTION_OPTIONS = ["warn_user", "restrict_messaging", "remove_listing", "suspend_account", "ban_account", "escalate_report"];
@@ -372,6 +375,84 @@ function MarketplacePermissionPanel({ userId }) {
   );
 }
 
+const dateInputValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
+function SubscriptionPanel({ user, onUpdated }) {
+  const subscription = user?.subscription || {};
+  const [draft, setDraft] = useState(() => ({
+    plan: subscription.plan || "free",
+    status: subscription.status || "inactive",
+    paymentStatus: subscription.paymentStatus || "none",
+    startDate: dateInputValue(subscription.startDate),
+    renewalDate: dateInputValue(subscription.renewalDate),
+    trialEndsAt: dateInputValue(subscription.trialEndsAt),
+    reason: "",
+    internalNote: "",
+  }));
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDraft((prev) => ({
+      ...prev,
+      plan: subscription.plan || "free",
+      status: subscription.status || "inactive",
+      paymentStatus: subscription.paymentStatus || "none",
+      startDate: dateInputValue(subscription.startDate),
+      renewalDate: dateInputValue(subscription.renewalDate),
+      trialEndsAt: dateInputValue(subscription.trialEndsAt),
+    }));
+  }, [subscription.plan, subscription.status, subscription.paymentStatus, subscription.startDate, subscription.renewalDate, subscription.trialEndsAt]);
+
+  const update = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+
+  const save = async () => {
+    if (!draft.reason.trim()) {
+      setError("Reason is required for subscription changes.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await updateAdminUserSubscription(user.id, draft);
+      onUpdated(result.user);
+      setDraft((prev) => ({ ...prev, reason: "", internalNote: "" }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Subscription update failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      <h3>Subscription</h3>
+      {error && <div className="admin-error">{error}</div>}
+      <div className="admin-action-grid">
+        <label>Plan<select value={draft.plan} onChange={(e) => update("plan", e.target.value)}>
+          {SUBSCRIPTION_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select></label>
+        <label>Status<select value={draft.status} onChange={(e) => update("status", e.target.value)}>
+          {SUBSCRIPTION_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select></label>
+        <label>Payment<select value={draft.paymentStatus} onChange={(e) => update("paymentStatus", e.target.value)}>
+          {PAYMENT_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select></label>
+        <label>Start date<input type="date" value={draft.startDate} onChange={(e) => update("startDate", e.target.value)} /></label>
+        <label>Renewal date<input type="date" value={draft.renewalDate} onChange={(e) => update("renewalDate", e.target.value)} /></label>
+        <label>Trial ends<input type="date" value={draft.trialEndsAt} onChange={(e) => update("trialEndsAt", e.target.value)} /></label>
+        <label>Reason<input value={draft.reason} onChange={(e) => update("reason", e.target.value)} /></label>
+        <label>Internal note<input value={draft.internalNote} onChange={(e) => update("internalNote", e.target.value)} /></label>
+        <button type="button" disabled={busy} onClick={save}>Save subscription</button>
+      </div>
+    </div>
+  );
+}
+
 function UserDetailPage({ id }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
@@ -411,11 +492,7 @@ function UserDetailPage({ id }) {
         </div>
         <ActionControls user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
         <MarketplacePermissionPanel userId={user.id} />
-        <div className="admin-panel">
-          <h3>Subscription</h3>
-          <p>Current plan: <strong>{user.subscription?.plan || "free"}</strong></p>
-          <p>Status: <strong>{user.subscription?.status || "inactive"}</strong></p>
-        </div>
+        <SubscriptionPanel user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
         <div className="admin-panel">
           <h3>Reports Connected to User</h3>
           {(detail.reports || []).length ? detail.reports.map((report) => (

@@ -56,6 +56,10 @@ model User {
   verificationStatus String       @default("not_applied")
   subscriptionPlan String         @default("free")
   subscriptionStatus String       @default("inactive")
+  subscriptionStartedAt DateTime?
+  subscriptionRenewalAt DateTime?
+  subscriptionTrialEndsAt DateTime?
+  subscriptionPaymentStatus String @default("none")
   lastLoginAt      DateTime?
   refreshToken     String?        @db.Text
   createdAt        DateTime       @default(now())

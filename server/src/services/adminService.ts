@@ -14,6 +14,10 @@ const USER_SELECT = {
   verificationStatus: true,
   subscriptionPlan: true,
   subscriptionStatus: true,
+  subscriptionStartedAt: true,
+  subscriptionRenewalAt: true,
+  subscriptionTrialEndsAt: true,
+  subscriptionPaymentStatus: true,
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
@@ -22,6 +26,9 @@ const USER_SELECT = {
 
 const ADMIN_ROLES = new Set(["admin", "lab", "breeder", "buyer"]);
 const USER_STATUSES = new Set(["active", "pending", "restricted", "suspended", "banned", "deleted"]);
+const SUBSCRIPTION_PLANS = new Set(["free", "hobby", "breeder", "professional", "lab", "enterprise"]);
+const SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"]);
+const PAYMENT_STATUSES = new Set(["none", "paid", "pending", "failed", "waived", "refunded"]);
 const VERIFICATION_STATUSES = new Set(["not_applied", "pending", "approved", "rejected", "revoked", "more_info_requested"]);
 const VERIFICATION_REQUEST_STATUSES = new Set(["not_applied", "pending_review", "approved", "rejected", "revoked", "more_info_requested"]);
 const REPORT_TYPES = new Set([
@@ -54,6 +61,10 @@ const normalizeUser = (row: any) => ({
   subscription: {
     plan: row.subscriptionPlan || "free",
     status: row.subscriptionStatus || "inactive",
+    startDate: row.subscriptionStartedAt,
+    renewalDate: row.subscriptionRenewalAt,
+    trialEndsAt: row.subscriptionTrialEndsAt,
+    paymentStatus: row.subscriptionPaymentStatus || "none",
   },
   verificationStatus: row.verificationStatus || "not_applied",
   country: row.profile?.country || row.profile?.location || "",
@@ -823,6 +834,77 @@ export const updateAdminUserStatus = async (
     action: status === "suspended" ? "user_suspended" : status === "banned" ? "user_banned" : "status_change",
     beforeJson: { status: before.status, isActive: before.isActive },
     afterJson: { status: updated.status, isActive: updated.isActive },
+    reason,
+    internalNote: String(payload.internalNote || "").trim(),
+  });
+  return { user: normalizeUser(updated) };
+};
+
+const dateValue = (value: unknown): Date | null | undefined => {
+  if (value === undefined) return undefined;
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) throw new HttpError(400, "Invalid subscription date.");
+  return parsed;
+};
+
+export const updateAdminUserSubscription = async (
+  actor: AuthenticatedUser,
+  userId: string,
+  payload: {
+    plan?: unknown;
+    status?: unknown;
+    paymentStatus?: unknown;
+    startDate?: unknown;
+    renewalDate?: unknown;
+    trialEndsAt?: unknown;
+    reason?: unknown;
+    internalNote?: unknown;
+  }
+) => {
+  const plan = String(payload.plan || "").trim().toLowerCase();
+  const status = String(payload.status || "").trim().toLowerCase();
+  const paymentStatus = String(payload.paymentStatus || "").trim().toLowerCase();
+  if (!SUBSCRIPTION_PLANS.has(plan)) throw new HttpError(400, "Unsupported subscription plan.");
+  if (!SUBSCRIPTION_STATUSES.has(status)) throw new HttpError(400, "Unsupported subscription status.");
+  if (!PAYMENT_STATUSES.has(paymentStatus)) throw new HttpError(400, "Unsupported payment status.");
+  const reason = assertReason(payload.reason);
+  const before = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
+  if (!before) throw new HttpError(404, "User not found.");
+
+  const updated = await db.user.update({
+    where: { id: userId },
+    data: {
+      subscriptionPlan: plan,
+      subscriptionStatus: status,
+      subscriptionPaymentStatus: paymentStatus,
+      subscriptionStartedAt: dateValue(payload.startDate),
+      subscriptionRenewalAt: dateValue(payload.renewalDate),
+      subscriptionTrialEndsAt: dateValue(payload.trialEndsAt),
+    },
+    select: USER_SELECT,
+  });
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: userId,
+    action: "subscription_change",
+    beforeJson: {
+      plan: before.subscriptionPlan,
+      status: before.subscriptionStatus,
+      paymentStatus: before.subscriptionPaymentStatus,
+      startDate: before.subscriptionStartedAt,
+      renewalDate: before.subscriptionRenewalAt,
+      trialEndsAt: before.subscriptionTrialEndsAt,
+    },
+    afterJson: {
+      plan: updated.subscriptionPlan,
+      status: updated.subscriptionStatus,
+      paymentStatus: updated.subscriptionPaymentStatus,
+      startDate: updated.subscriptionStartedAt,
+      renewalDate: updated.subscriptionRenewalAt,
+      trialEndsAt: updated.subscriptionTrialEndsAt,
+    },
     reason,
     internalNote: String(payload.internalNote || "").trim(),
   });

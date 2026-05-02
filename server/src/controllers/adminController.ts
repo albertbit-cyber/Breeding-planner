@@ -18,6 +18,7 @@ import {
   updateAdminReportStatus,
   updateAdminUserRole,
   updateAdminUserStatus,
+  updateAdminUserSubscription,
   updateAdminUserVerification,
 } from "../services/adminService";
 
@@ -47,6 +48,10 @@ export const changeUserRole = async (req: Request, res: Response): Promise<void>
 
 export const changeUserStatus = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await updateAdminUserStatus(req.user!, req.params.id, req.body || {}));
+};
+
+export const changeUserSubscription = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await updateAdminUserSubscription(req.user!, req.params.id, req.body || {}));
 };
 
 export const changeUserVerification = async (req: Request, res: Response): Promise<void> => {

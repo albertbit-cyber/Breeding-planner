@@ -51,7 +51,14 @@ async function main() {
 
   await prisma.user.update({
     where: { id: breederUser.id },
-    data: { verificationStatus: "pending" },
+    data: {
+      verificationStatus: "pending",
+      subscriptionPlan: "breeder",
+      subscriptionStatus: "active",
+      subscriptionPaymentStatus: "paid",
+      subscriptionStartedAt: new Date("2026-05-01T00:00:00.000Z"),
+      subscriptionRenewalAt: new Date("2027-05-01T00:00:00.000Z"),
+    },
   });
 
   await prisma.profile.upsert({
