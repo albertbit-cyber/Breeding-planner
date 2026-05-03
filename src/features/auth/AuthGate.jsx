@@ -14,6 +14,7 @@ const getAuthSurfaceForHash = (hashValue) => {
   const raw = String(hashValue || "").replace(/^#/, "").trim();
   const path = raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "/";
   if (path === "/") return "public";
+  if (path.startsWith("/pricing")) return "public";
   return getAuthScopeForHash(hashValue);
 };
 const COUNTRY_OPTIONS_FALLBACK = [

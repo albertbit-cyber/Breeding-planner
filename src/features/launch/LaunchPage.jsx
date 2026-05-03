@@ -12,7 +12,7 @@ export default function LaunchPage() {
           <p className="launch-kicker">Breeding Planner</p>
           <h1>Select workspace</h1>
           <p>
-            Open the breeder tools, browse marketplace listings, or review marketplace operations.
+            Open the breeder tools, mobile rack terminal, marketplace, pricing, or admin portal.
           </p>
         </div>
       </section>
@@ -25,6 +25,14 @@ export default function LaunchPage() {
         <button type="button" onClick={() => goTo("/marketplace")}>
           <span>Marketplace</span>
           <strong>Browse public breeder profiles, listings, inquiries, and saved searches.</strong>
+        </button>
+        <button type="button" onClick={() => goTo("/mobile")}>
+          <span>Mobile App</span>
+          <strong>Scan QR codes, open animal profiles, and update rack records fast.</strong>
+        </button>
+        <button type="button" onClick={() => goTo("/pricing")}>
+          <span>Pricing</span>
+          <strong>Compare public subscription tiers and upgrade options.</strong>
         </button>
         <button type="button" onClick={() => goTo("/admin")}>
           <span>Admin Portal</span>

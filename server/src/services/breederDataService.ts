@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
+import { canAccessFeature } from "./subscriptionService";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -158,6 +159,13 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const explicitClutches = normalizeArray(input.clutches, "clutches");
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
+  const animalAccess = await canAccessFeature({ id: ownerId }, "animals.create");
+  if (!animalAccess.allowed && animalAccess.reason === "Usage limit reached") {
+    throw new HttpError(403, `${animalAccess.reason}: ${animalAccess.currentUsage || 0} / ${animalAccess.limit || 0} animals.`);
+  }
+  if (animalAccess.limit !== undefined && animalAccess.limit !== null && animals.length > Number(animalAccess.limit)) {
+    throw new HttpError(403, `Animal limit reached: ${animals.length} / ${animalAccess.limit} animals.`);
+  }
 
   await db.$transaction(async (tx: any) => {
     for (const [index, animal] of animals.entries()) {

@@ -6,12 +6,24 @@ import {
   fetchAdminVerificationRequests,
   fetchAdminUserDetail,
   fetchAdminUsers,
+  addUserFeatureOverride,
   applyAdminReportAction,
+  archiveSubscriptionTier,
+  assignUserSubscriptionTier,
   createAdminGdprRequest,
+  createSubscriptionTier,
+  duplicateSubscriptionTier,
+  fetchFeatureCatalog,
   fetchAdminGdprRequests,
   fetchAdminLabAccounts,
   fetchAdminMarketplacePermission,
+  fetchSubscriptionTier,
+  fetchSubscriptionTiers,
+  fetchUserSubscriptionPanel,
+  removeUserFeatureOverride,
+  resetUserUsage,
   sendAdminNotification,
+  updateSubscriptionTier,
   updateAdminGdprRequest,
   updateAdminLabAccount,
   updateAdminMarketplacePermission,
@@ -86,24 +98,22 @@ const rolePermissions = (role) => {
   };
 };
 
-function AdminLayout({ path, children }) {
+function AdminLayout({ path, title, children }) {
   const nav = [
     { label: "Dashboard", items: [["/admin", "Dashboard"]] },
     { label: "Users", items: [
       ["/admin/users", "All Users"],
       ["/admin/users?verification=pending", "Pending Verification"],
       ["/admin/users?status=suspended", "Suspended Users"],
-      ["/admin/reports?status=open", "Reported Users"],
     ] },
     { label: "Breeders", items: [
       ["/admin/verification?status=pending_review", "Applications"],
       ["/admin/users?role=breeder&verification=approved", "Verified Breeders"],
-      ["/admin/users?role=breeder", "Seller Metrics"],
     ] },
     { label: "Subscriptions", items: [
-      ["/admin/users?subscription=breeder", "Plans"],
-      ["/admin/users?subscription=professional", "Payments"],
-      ["/admin/users?activity=active_this_week", "Trials"],
+      ["/admin/tiers", "Tier Overview"],
+      ["/admin/tiers/new", "Create Tier"],
+      ["/admin/users", "User Subscriptions"],
     ] },
     { label: "Reports", items: [
       ["/admin/reports?status=open", "Open Reports"],
@@ -112,22 +122,14 @@ function AdminLayout({ path, children }) {
     ] },
     { label: "Marketplace", items: [
       ["/admin/marketplace", "Listings"],
-      ["/admin/marketplace", "Orders"],
-      ["/admin/users?role=breeder&verification=approved", "Featured Listings"],
     ] },
     { label: "Labs", items: [
       ["/admin/labs", "Lab Accounts"],
-      ["/admin/labs", "Test Orders"],
-      ["/admin/labs", "Test Catalog"],
     ] },
     { label: "Messages", items: [
-      ["/admin/notifications", "System Messages"],
-      ["/admin/reports?type=abusive_message", "Reported Chats"],
       ["/admin/notifications", "Announcements"],
     ] },
     { label: "Settings", items: [
-      ["/admin/settings", "Roles & Permissions"],
-      ["/admin/settings", "Platform Rules"],
       ["/admin/gdpr", "GDPR Tools"],
     ] },
   ];
@@ -161,7 +163,7 @@ function AdminLayout({ path, children }) {
         <div className="admin-topbar">
           <div>
             <div className="admin-eyebrow">Protected admin workspace</div>
-            <h1>User Administration</h1>
+            <h1>{title || "Admin Panel"}</h1>
           </div>
           <div className="admin-topbar-actions">
             <button type="button" onClick={() => go("/")}>Start</button>
@@ -350,11 +352,8 @@ function UsersPage({ path }) {
                 <td>{formatDate(user.lastLoginAt)}</td>
                 <td>
                   <div className="admin-row-actions">
-                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>View Profile</button>
-                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Edit User</button>
-                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Change Role</button>
-                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Change Subscription</button>
-                    <button type="button" onClick={() => go(`/admin/reports?search=${encodeURIComponent(user.email)}`)}>View Reports</button>
+                    <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Open</button>
+                    <button type="button" onClick={() => go(`/admin/reports?search=${encodeURIComponent(user.email)}`)}>Reports</button>
                   </div>
                 </td>
               </tr>
@@ -374,10 +373,19 @@ function UsersPage({ path }) {
 }
 
 function ActionControls({ user, onUpdated }) {
+  const [draftRole, setDraftRole] = useState(user.role || "buyer");
+  const [draftStatus, setDraftStatus] = useState(user.status || "active");
+  const [draftVerification, setDraftVerification] = useState(user.verificationStatus || "not_applied");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setDraftRole(user.role || "buyer");
+    setDraftStatus(user.status || "active");
+    setDraftVerification(user.verificationStatus || "not_applied");
+  }, [user.role, user.status, user.verificationStatus]);
 
   const run = async (kind, value) => {
     if (!reason.trim()) {
@@ -406,7 +414,7 @@ function ActionControls({ user, onUpdated }) {
       <h3>Admin Actions</h3>
       <div className="admin-action-reason">
         <select value={reason} onChange={(e) => setReason(e.target.value)}>
-          <option value="">Select reason</option>
+          <option value="">Select reason (required)</option>
           <option value="spam">spam</option>
           <option value="fake_profile">fake_profile</option>
           <option value="payment_issue">payment_issue</option>
@@ -415,19 +423,37 @@ function ActionControls({ user, onUpdated }) {
           <option value="user_request">user_request</option>
           <option value="other">other</option>
         </select>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note optional" />
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note (optional)" />
       </div>
       {error && <div className="admin-error">{error}</div>}
       <div className="admin-action-grid">
-        <label>Role<select defaultValue={user.role} onChange={(e) => run("role", e.target.value)} disabled={Boolean(busy)}>
-          {ROLE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select></label>
-        <label>Status<select defaultValue={user.status} onChange={(e) => run("status", e.target.value)} disabled={Boolean(busy)}>
-          {STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select></label>
-        <label>Breeder Verification<select defaultValue={user.verificationStatus} onChange={(e) => run("verification", e.target.value)} disabled={Boolean(busy)}>
-          {VERIFICATION_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select></label>
+        <label>
+          Role
+          <select value={draftRole} onChange={(e) => setDraftRole(e.target.value)}>
+            {ROLE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button type="button" disabled={Boolean(busy) || draftRole === user.role} onClick={() => run("role", draftRole)}>
+            {busy === "role" ? "Saving..." : "Change Role"}
+          </button>
+        </label>
+        <label>
+          Status
+          <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)}>
+            {STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button type="button" disabled={Boolean(busy) || draftStatus === user.status} onClick={() => run("status", draftStatus)}>
+            {busy === "status" ? "Saving..." : "Change Status"}
+          </button>
+        </label>
+        <label>
+          Breeder Verification
+          <select value={draftVerification} onChange={(e) => setDraftVerification(e.target.value)}>
+            {VERIFICATION_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button type="button" disabled={Boolean(busy) || draftVerification === user.verificationStatus} onClick={() => run("verification", draftVerification)}>
+            {busy === "verification" ? "Saving..." : "Change Verification"}
+          </button>
+        </label>
       </div>
     </div>
   );
@@ -566,6 +592,407 @@ function SubscriptionPanel({ user, onUpdated }) {
   );
 }
 
+const emptyTierDraft = () => ({
+  name: "New Tier",
+  key: "new_tier",
+  shortDescription: "",
+  longDescription: "",
+  badgeText: "",
+  monthlyPrice: 0,
+  yearlyPrice: 0,
+  currency: "EUR",
+  trialDays: 0,
+  setupFee: "",
+  discountLabel: "",
+  customPrice: false,
+  isActive: true,
+  isPublic: true,
+  isRecommended: false,
+  sortOrder: 0,
+  reason: "tier_updated",
+  features: [],
+});
+
+const mergeTierFeatures = (catalog, tier) => {
+  const byKey = new Map((tier?.features || []).map((entry) => [entry.featureKey, entry]));
+  return (catalog || []).map((feature) => {
+    const existing = byKey.get(feature.featureKey) || {};
+    return {
+      featureKey: feature.featureKey,
+      featureName: feature.featureName,
+      featureGroup: feature.featureGroup,
+      defaultLimitType: feature.defaultLimitType,
+      enabled: Boolean(existing.enabled),
+      limitValue: existing.limitValue ?? "",
+    };
+  });
+};
+
+function FeatureCheckboxMatrix({ features, onChange }) {
+  const grouped = useMemo(() => {
+    const groups = new Map();
+    (features || []).forEach((feature) => {
+      const group = feature.featureGroup || "Other";
+      groups.set(group, [...(groups.get(group) || []), feature]);
+    });
+    return Array.from(groups.entries());
+  }, [features]);
+
+  const updateFeature = (featureKey, patch) => {
+    onChange((features || []).map((feature) => feature.featureKey === featureKey ? { ...feature, ...patch } : feature));
+  };
+
+  const toggleGroup = (group, enabled) => {
+    onChange((features || []).map((feature) => feature.featureGroup === group ? { ...feature, enabled } : feature));
+  };
+
+  return (
+    <div className="tier-feature-matrix">
+      {grouped.map(([group, items]) => (
+        <div key={group} className="admin-panel">
+          <div className="tier-group-header">
+            <h3>{group}</h3>
+            <div className="admin-report-actions">
+              <button type="button" onClick={() => toggleGroup(group, true)}>Enable group</button>
+              <button type="button" onClick={() => toggleGroup(group, false)}>Disable group</button>
+            </div>
+          </div>
+          <div className="tier-feature-grid">
+            {items.map((feature) => (
+              <label key={feature.featureKey} className="tier-feature-row">
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(feature.enabled)}
+                    onChange={(event) => updateFeature(feature.featureKey, { enabled: event.target.checked })}
+                  />
+                  {feature.featureName}
+                </span>
+                {feature.defaultLimitType ? (
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Limit"
+                    value={feature.limitValue ?? ""}
+                    onChange={(event) => updateFeature(feature.featureKey, { limitValue: event.target.value })}
+                  />
+                ) : null}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TierOverviewPage() {
+  const [tiers, setTiers] = useState([]);
+  const [error, setError] = useState("");
+  const load = () => fetchSubscriptionTiers().then((data) => setTiers(Array.isArray(data.tiers) ? data.tiers : []));
+  useEffect(() => { load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load tiers.")); }, []);
+
+  const createTier = async () => {
+    setError("");
+    try {
+      const result = await createSubscriptionTier({ ...emptyTierDraft(), key: `tier_${Date.now()}`, name: "New Tier" });
+      go(`/admin/tiers/${result.tier.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create tier.");
+    }
+  };
+
+  const duplicate = async (tier) => {
+    setError("");
+    try {
+      const result = await duplicateSubscriptionTier(tier.id);
+      setTiers((prev) => [...prev, result.tier]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to duplicate tier.");
+    }
+  };
+
+  const archive = async (tier) => {
+    const reason = window.prompt("Reason for archiving this tier?", "tier_archived");
+    if (!reason) return;
+    setError("");
+    try {
+      await archiveSubscriptionTier(tier.id, { reason });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to archive tier.");
+    }
+  };
+
+  return (
+    <section className="admin-section">
+      <div className="admin-section-header">
+        <div>
+          <h2>Tier Overview</h2>
+          <p>Create, edit, price, activate, hide, duplicate, or archive subscription tiers.</p>
+        </div>
+        <button type="button" onClick={createTier}>Create new tier</button>
+      </div>
+      {error && <div className="admin-error">{error}</div>}
+      <div className="admin-card-grid">
+        {tiers.map((tier) => {
+          const limits = (tier.features || []).filter((feature) => feature.limitValue !== null && feature.limitValue !== undefined).slice(0, 4);
+          return (
+            <div key={tier.id} className="admin-panel tier-card">
+              <div className="tier-card-title">
+                <h3>{tier.name}</h3>
+                {tier.isRecommended ? <span>Recommended</span> : null}
+              </div>
+              <p>{tier.shortDescription || "-"}</p>
+              <dl className="admin-definition-list">
+                <dt>Monthly</dt><dd>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.monthlyPrice}`}</dd>
+                <dt>Yearly</dt><dd>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.yearlyPrice}`}</dd>
+                <dt>Active users</dt><dd>{tier.activeUsers || 0}</dd>
+                <dt>Status</dt><dd>{tier.isActive ? "active" : "inactive"}</dd>
+                <dt>Visibility</dt><dd>{tier.isPublic ? "public" : "hidden"}</dd>
+                <dt>Main limits</dt><dd>{limits.map((item) => `${item.featureKey}: ${item.limitValue}`).join(", ") || "Unlimited / unset"}</dd>
+              </dl>
+              <div className="admin-report-actions">
+                <button type="button" onClick={() => go(`/admin/tiers/${tier.id}`)}>Edit</button>
+                <button type="button" onClick={() => duplicate(tier)}>Duplicate</button>
+                <button type="button" onClick={() => archive(tier)}>Archive</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function TierEditorPage({ id }) {
+  const isNew = id === "new";
+  const [catalog, setCatalog] = useState([]);
+  const [draft, setDraft] = useState(emptyTierDraft);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const update = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      fetchFeatureCatalog(),
+      isNew ? Promise.resolve({ tier: emptyTierDraft() }) : fetchSubscriptionTier(id),
+    ])
+      .then(([featureData, tierData]) => {
+        if (!mounted) return;
+        const features = Array.isArray(featureData.features) ? featureData.features : [];
+        setCatalog(features);
+        const tier = tierData.tier || emptyTierDraft();
+        setDraft({
+          ...emptyTierDraft(),
+          ...tier,
+          setupFee: tier.setupFee ?? "",
+          reason: "tier_updated",
+          features: mergeTierFeatures(features, tier),
+        });
+      })
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : "Unable to load tier editor."));
+    return () => { mounted = false; };
+  }, [id, isNew]);
+
+  const save = async () => {
+    setError("");
+    setSaved("");
+    try {
+      const payload = {
+        ...draft,
+        monthlyPrice: Number(draft.monthlyPrice || 0),
+        yearlyPrice: Number(draft.yearlyPrice || 0),
+        trialDays: Number(draft.trialDays || 0),
+        sortOrder: Number(draft.sortOrder || 0),
+        features: draft.features.map((feature) => ({
+          featureKey: feature.featureKey,
+          enabled: Boolean(feature.enabled),
+          limitValue: feature.limitValue === "" ? null : Number(feature.limitValue),
+        })),
+      };
+      const result = isNew ? await createSubscriptionTier(payload) : await updateSubscriptionTier(id, payload);
+      setSaved("Tier saved.");
+      if (isNew) go(`/admin/tiers/${result.tier.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save tier.");
+    }
+  };
+
+  return (
+    <section className="admin-section">
+      <button type="button" className="admin-back" onClick={() => go("/admin/tiers")}>Back to tiers</button>
+      <div className="admin-section-header">
+        <div>
+          <h2>Tier Editor</h2>
+          <p>Edit basic info, pricing, limits, and feature access. The internal key stays stable after creation.</p>
+        </div>
+        <button type="button" onClick={save}>Save tier</button>
+      </div>
+      {error && <div className="admin-error">{error}</div>}
+      {saved && <div className="admin-success">{saved}</div>}
+      <div className="admin-detail-grid">
+        <div className="admin-panel">
+          <h3>Basic Info</h3>
+          <div className="admin-form-grid">
+            <label>Tier name<input value={draft.name} onChange={(e) => update("name", e.target.value)} /></label>
+            <label>Internal tier key<input value={draft.key} disabled={!isNew} onChange={(e) => update("key", e.target.value)} /></label>
+            <label>Short public description<input value={draft.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} /></label>
+            <label>Tier badge text<input value={draft.badgeText} onChange={(e) => update("badgeText", e.target.value)} /></label>
+            <label>Long public description<textarea rows={4} value={draft.longDescription} onChange={(e) => update("longDescription", e.target.value)} /></label>
+            <label><input type="checkbox" checked={draft.isRecommended} onChange={(e) => update("isRecommended", e.target.checked)} /> Recommended</label>
+            <label><input type="checkbox" checked={draft.isActive} onChange={(e) => update("isActive", e.target.checked)} /> Active</label>
+            <label><input type="checkbox" checked={draft.isPublic} onChange={(e) => update("isPublic", e.target.checked)} /> Publicly visible</label>
+          </div>
+        </div>
+        <div className="admin-panel">
+          <h3>Pricing</h3>
+          <div className="admin-form-grid">
+            <label>Monthly price<input type="number" value={draft.monthlyPrice} onChange={(e) => update("monthlyPrice", e.target.value)} /></label>
+            <label>Yearly price<input type="number" value={draft.yearlyPrice} onChange={(e) => update("yearlyPrice", e.target.value)} /></label>
+            <label>Currency<input value={draft.currency} onChange={(e) => update("currency", e.target.value)} /></label>
+            <label>Trial days<input type="number" value={draft.trialDays} onChange={(e) => update("trialDays", e.target.value)} /></label>
+            <label>Setup fee<input type="number" value={draft.setupFee} onChange={(e) => update("setupFee", e.target.value)} /></label>
+            <label>Discount label<input value={draft.discountLabel} onChange={(e) => update("discountLabel", e.target.value)} /></label>
+            <label><input type="checkbox" checked={draft.customPrice} onChange={(e) => update("customPrice", e.target.checked)} /> Custom price</label>
+          </div>
+        </div>
+      </div>
+      <div className="admin-panel">
+        <h3>Limits & Feature Access</h3>
+        <p className="admin-muted">Use group buttons for fast enable/disable, then set individual limits where applicable. Blank limit means unlimited.</p>
+      </div>
+      <FeatureCheckboxMatrix features={draft.features.length ? draft.features : mergeTierFeatures(catalog, {})} onChange={(features) => update("features", features)} />
+    </section>
+  );
+}
+
+function UserTierSubscriptionPanel({ userId }) {
+  const [tiers, setTiers] = useState([]);
+  const [features, setFeatures] = useState([]);
+  const [panel, setPanel] = useState(null);
+  const [form, setForm] = useState({ tierId: "", status: "active", paymentStatus: "none", trialEndsAt: "", renewsAt: "", reason: "manual_assignment", internalNote: "" });
+  const [override, setOverride] = useState({ featureKey: "", enabled: true, limitOverride: "", reason: "", expiresAt: "" });
+  const [error, setError] = useState("");
+  const load = () => Promise.all([fetchSubscriptionTiers(), fetchFeatureCatalog(), fetchUserSubscriptionPanel(userId)])
+    .then(([tierData, featureData, panelData]) => {
+      setTiers(Array.isArray(tierData.tiers) ? tierData.tiers : []);
+      setFeatures(Array.isArray(featureData.features) ? featureData.features : []);
+      setPanel(panelData);
+      const currentTierId = panelData.subscription?.tier?.id || "";
+      setForm((prev) => ({ ...prev, tierId: currentTierId, status: panelData.subscription?.status || "active", paymentStatus: panelData.subscription?.paymentStatus || "none" }));
+    });
+  useEffect(() => { load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load user subscription.")); }, [userId]);
+  const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const updateOverride = (key, value) => setOverride((prev) => ({ ...prev, [key]: value }));
+  const assign = async () => {
+    setError("");
+    try {
+      await assignUserSubscriptionTier(userId, form);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to assign tier.");
+    }
+  };
+  const addOverride = async () => {
+    setError("");
+    try {
+      await addUserFeatureOverride(userId, {
+        ...override,
+        limitOverride: override.limitOverride === "" ? null : Number(override.limitOverride),
+      });
+      setOverride({ featureKey: "", enabled: true, limitOverride: "", reason: "", expiresAt: "" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add override.");
+    }
+  };
+  const removeOverride = async (entry) => {
+    const reason = window.prompt("Reason for removing override?", "override_removed");
+    if (!reason) return;
+    await removeUserFeatureOverride(userId, entry.id, { reason });
+    await load();
+  };
+  const resetUsage = async () => {
+    setError("");
+    try {
+      await resetUserUsage(userId, { featureKey: "", reason: "manual_usage_reset" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to reset usage.");
+    }
+  };
+  return (
+    <div className="admin-panel wide">
+      <h3>User Subscription Page</h3>
+      {error && <div className="admin-error">{error}</div>}
+      <div className="admin-detail-grid">
+        <div>
+          <dl className="admin-definition-list">
+            <dt>Current tier</dt><dd>{panel?.subscription?.tier?.name || "No active tier"}</dd>
+            <dt>Status</dt><dd>{panel?.subscription?.status || "-"}</dd>
+            <dt>Payment</dt><dd>{panel?.subscription?.paymentStatus || "-"}</dd>
+            <dt>Trial ends</dt><dd>{formatDate(panel?.subscription?.trialEndsAt)}</dd>
+            <dt>Renewal date</dt><dd>{formatDate(panel?.subscription?.renewsAt)}</dd>
+          </dl>
+          <div className="admin-action-grid">
+            <label>Change tier<select value={form.tierId} onChange={(e) => updateForm("tierId", e.target.value)}>
+              <option value="">Select tier</option>
+              {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
+            </select></label>
+            <label>Status<select value={form.status} onChange={(e) => updateForm("status", e.target.value)}>
+              {["active", "trialing", "paused", "cancelled", "past_due", "lifetime"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select></label>
+            <label>Payment<select value={form.paymentStatus} onChange={(e) => updateForm("paymentStatus", e.target.value)}>
+              {PAYMENT_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select></label>
+            <label>Trial ends<input type="date" value={form.trialEndsAt} onChange={(e) => updateForm("trialEndsAt", e.target.value)} /></label>
+            <label>Renews at<input type="date" value={form.renewsAt} onChange={(e) => updateForm("renewsAt", e.target.value)} /></label>
+            <label>Reason<input value={form.reason} onChange={(e) => updateForm("reason", e.target.value)} /></label>
+            <label>Internal admin note<input value={form.internalNote} onChange={(e) => updateForm("internalNote", e.target.value)} /></label>
+            <button type="button" onClick={assign}>Assign / update subscription</button>
+            <button type="button" onClick={resetUsage}>Reset monthly usage</button>
+          </div>
+        </div>
+        <div>
+          <h3>Manual Overrides</h3>
+          <div className="admin-action-grid">
+            <label>Feature<select value={override.featureKey} onChange={(e) => updateOverride("featureKey", e.target.value)}>
+              <option value="">Select feature</option>
+              {features.map((feature) => <option key={feature.featureKey} value={feature.featureKey}>{feature.featureGroup} - {feature.featureName}</option>)}
+            </select></label>
+            <label><input type="checkbox" checked={override.enabled} onChange={(e) => updateOverride("enabled", e.target.checked)} /> Enabled</label>
+            <label>Limit override<input type="number" value={override.limitOverride} onChange={(e) => updateOverride("limitOverride", e.target.value)} /></label>
+            <label>Expires at<input type="date" value={override.expiresAt} onChange={(e) => updateOverride("expiresAt", e.target.value)} /></label>
+            <label>Reason<input value={override.reason} onChange={(e) => updateOverride("reason", e.target.value)} /></label>
+            <button type="button" onClick={addOverride}>Add feature override</button>
+          </div>
+          {(panel?.overrides || []).map((entry) => (
+            <div key={entry.id} className="admin-log-row">
+              <strong>{entry.featureKey}</strong>
+              <span>{entry.enabled ? "enabled" : "disabled"} {entry.limitOverride !== null ? `limit ${entry.limitOverride}` : ""}</span>
+              <button type="button" onClick={() => removeOverride(entry)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="admin-detail-grid">
+        <div className="admin-panel">
+          <h3>Enabled Features</h3>
+          <p className="admin-muted">{(panel?.enabledFeatures || []).join(", ") || "None"}</p>
+        </div>
+        <div className="admin-panel">
+          <h3>Current Usage</h3>
+          {(panel?.usage || []).length ? panel.usage.map((entry) => (
+            <div key={entry.id} className="admin-log-row"><strong>{entry.featureKey}</strong><span>{entry.usedAmount} / {entry.limitAmount ?? "unlimited"}</span></div>
+          )) : <p className="admin-muted">No usage tracked yet.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UserDetailPage({ id }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
@@ -623,6 +1050,7 @@ function UserDetailPage({ id }) {
         <ActionControls user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
         <MarketplacePermissionPanel userId={user.id} />
         <SubscriptionPanel user={user} onUpdated={(nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }))} />
+        <UserTierSubscriptionPanel userId={user.id} />
         <div className="admin-panel">
           <h3>Reports Connected to User</h3>
           {(detail.reports || []).length ? (
@@ -1223,16 +1651,33 @@ export default function AdminApp() {
 
   const pathOnly = path.split("?")[0];
   const userMatch = pathOnly.match(/^\/admin\/users\/([^/]+)$/);
+  const tierMatch = pathOnly.match(/^\/admin\/tiers\/([^/]+)$/);
 
   if (pathOnly === "/admin/marketplace") {
     return <MarketplacePage portalMode="admin" />;
   }
 
+  const pageTitle = (() => {
+    if (pathOnly === "/admin") return "Dashboard";
+    if (userMatch) return "User Detail";
+    if (tierMatch) return "Tier Editor";
+    if (pathOnly === "/admin/users") return "All Users";
+    if (pathOnly === "/admin/tiers") return "Tier Overview";
+    if (pathOnly === "/admin/verification") return "Breeder Verification Queue";
+    if (pathOnly === "/admin/reports") return "Reports & Safety";
+    if (pathOnly === "/admin/labs") return "Lab Accounts";
+    if (pathOnly === "/admin/notifications") return "Messages & Announcements";
+    if (pathOnly === "/admin/gdpr") return "GDPR Tools";
+    return "Admin Panel";
+  })();
+
   return (
-    <AdminLayout path={pathOnly}>
+    <AdminLayout path={pathOnly} title={pageTitle}>
       {pathOnly === "/admin" && <AdminDashboard />}
       {pathOnly === "/admin/users" && <UsersPage path={path} />}
       {userMatch && <UserDetailPage id={decodeURIComponent(userMatch[1])} />}
+      {pathOnly === "/admin/tiers" && <TierOverviewPage />}
+      {tierMatch && <TierEditorPage id={decodeURIComponent(tierMatch[1])} />}
       {pathOnly === "/admin/verification" && <BreederVerificationQueue path={path} />}
       {pathOnly === "/admin/reports" && <ReportsPage path={path} />}
       {pathOnly === "/admin/labs" && <LabAccountsPage />}

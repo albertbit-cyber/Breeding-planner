@@ -26,7 +26,7 @@ import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
-import { fetchBreederSnapshot, saveBreederSnapshot } from "./shared/apiClient";
+import { fetchBreederSnapshot, saveBreederSnapshot, fetchMyListings, saveMyListings } from "./shared/apiClient";
 import {
   GENE_GROUPS,
   GENE_ALIASES,
@@ -6319,6 +6319,8 @@ export default function BreedingPlannerApp() {
   // edit snake
   const [editSnake, setEditSnake] = useState(null);
   const [editSnakeDraft, setEditSnakeDraft] = useState(null);
+  const [editForSalePublishing, setEditForSalePublishing] = useState(false);
+  const [editForSalePublishError, setEditForSalePublishError] = useState('');
   const [qrFor, setQrFor] = useState(null);
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -7796,12 +7798,69 @@ export default function BreedingPlannerApp() {
   const closeSnakeEditor = useCallback(() => {
     setEditSnake(null);
     setEditSnakeDraft(null);
+    setEditForSalePublishError('');
     if (returnToGroupsAfterEdit) {
       setTab('animals');
       setAnimalView('groups');
       setReturnToGroupsAfterEdit(false);
     }
   }, [returnToGroupsAfterEdit]);
+
+  const publishEditSnakeToMarketplace = useCallback(async () => {
+    if (!editSnakeDraft || editForSalePublishing) return;
+    setEditForSalePublishing(true);
+    setEditForSalePublishError('');
+    try {
+      let existing = [];
+      try {
+        const data = await fetchMyListings();
+        existing = Array.isArray(data?.listings) ? data.listings : [];
+      } catch (_) {}
+      if (!existing.some((l) => l.animalAppId === editSnakeDraft.id)) {
+        const coverUrl = editSnakeDraft.imageUrl
+          || (Array.isArray(editSnakeDraft.photos) && editSnakeDraft.photos.length
+            ? editSnakeDraft.photos[editSnakeDraft.photos.length - 1]?.url || ''
+            : '');
+        const tokens = getDisplayedSnakeGeneticsTokens(editSnakeDraft);
+        const geneticsStr = tokens.map((tok) =>
+          typeof tok === 'string' ? tok : tok?.label || tok?.gene || tok?.name || ''
+        ).filter(Boolean).join(', ');
+        const newListing = {
+          id: `listing-${Date.now()}`,
+          animalAppId: editSnakeDraft.id,
+          title: editSnakeDraft.name || 'Snake for sale',
+          status: 'available',
+          price: String(editSnakeDraft.price ?? ''),
+          currency: editSnakeDraft.currency || 'EUR',
+          description: editSnakeDraft.saleDescription || '',
+          imageUrl: coverUrl,
+          sex: editSnakeDraft.sex || '',
+          hatchDate: editSnakeDraft.birthDate || '',
+          genetics: geneticsStr,
+        };
+        await saveMyListings([...existing, newListing]);
+      }
+      const publishedAt = new Date().toISOString();
+      setEditSnakeDraft(d => ({
+        ...d,
+        forSale: true,
+        marketplacePublished: true,
+        marketplacePublishedAt: d.marketplacePublishedAt || publishedAt,
+      }));
+      setSnakes(prev => prev.map(x => x.id === editSnakeDraft.id ? {
+        ...x,
+        forSale: true,
+        marketplacePublished: true,
+        marketplacePublishedAt: x.marketplacePublishedAt || publishedAt,
+        price: editSnakeDraft.price || x.price,
+        currency: editSnakeDraft.currency || x.currency,
+      } : x));
+    } catch (err) {
+      setEditForSalePublishError(err instanceof Error ? err.message : 'Could not publish to Marketplace.');
+    } finally {
+      setEditForSalePublishing(false);
+    }
+  }, [editSnakeDraft, editForSalePublishing]);
 
   const requestDeleteSnake = useCallback((snake) => {
     if (!snake) return;
@@ -10112,19 +10171,88 @@ export default function BreedingPlannerApp() {
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
-                {isSnakeTaggedForSell(editSnakeDraft) && (
-                  <div>
-                    <label className="text-xs font-medium">{t("snakeEdit.price", { defaultValue: "Price" })}</label>
-                    <input
-                      type="text"
-                      className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
-                      value={editSnakeDraft.price || ''}
-                      onChange={e=>setEditSnakeDraft(d=>({...d,price:e.target.value}))}
-                      placeholder={t("snakeEdit.pricePlaceholder", { defaultValue: "e.g., 450" })}
-                    />
+                {/* For Sale */}
+                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-neutral-700">For Sale</label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!editSnakeDraft.forSale}
+                      onClick={() => setEditSnakeDraft(d => ({ ...d, forSale: !d.forSale }))}
+                      className={cx(
+                        'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none',
+                        editSnakeDraft.forSale ? 'bg-emerald-500' : 'bg-neutral-300'
+                      )}
+                    >
+                      <span className={cx(
+                        'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
+                        editSnakeDraft.forSale ? 'translate-x-[18px]' : 'translate-x-1'
+                      )} />
+                    </button>
                   </div>
-                )}
-                
+                  {editSnakeDraft.forSale && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <div className="flex flex-col gap-0.5 flex-1">
+                          <label className="text-xs font-medium text-neutral-600">{t("snakeEdit.price", { defaultValue: "Price" })}</label>
+                          <input
+                            type="text"
+                            className="border rounded-lg px-2 py-1 text-sm w-full"
+                            value={editSnakeDraft.price || ''}
+                            onChange={e => setEditSnakeDraft(d => ({ ...d, price: e.target.value }))}
+                            placeholder={t("snakeEdit.pricePlaceholder", { defaultValue: "e.g., 450" })}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-0.5 w-20">
+                          <label className="text-xs font-medium text-neutral-600">Currency</label>
+                          <select
+                            className="border rounded-lg px-2 py-1 text-sm bg-white"
+                            value={editSnakeDraft.currency || 'EUR'}
+                            onChange={e => setEditSnakeDraft(d => ({ ...d, currency: e.target.value }))}
+                          >
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                            <option value="GBP">GBP</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <label className="text-xs font-medium text-neutral-600">Description for buyers</label>
+                        <textarea
+                          rows={2}
+                          className="border rounded-lg px-2 py-1 text-sm resize-none w-full"
+                          value={editSnakeDraft.saleDescription || ''}
+                          onChange={e => setEditSnakeDraft(d => ({ ...d, saleDescription: e.target.value }))}
+                          placeholder="Optional details..."
+                        />
+                      </div>
+                      {editForSalePublishError && (
+                        <div className="text-xs text-rose-600 bg-rose-50 rounded-lg px-2 py-1">{editForSalePublishError}</div>
+                      )}
+                      {editSnakeDraft.marketplacePublished ? (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5">
+                          <span>✓</span><span>Published to Marketplace</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={editForSalePublishing}
+                          onClick={publishEditSnakeToMarketplace}
+                          className={cx(
+                            'w-full rounded-lg py-2 text-xs font-semibold transition-colors',
+                            editForSalePublishing
+                              ? 'bg-amber-100 text-amber-500 cursor-wait'
+                              : 'bg-amber-500 hover:bg-amber-600 text-white'
+                          )}
+                        >
+                          {editForSalePublishing ? 'Publishing...' : 'Publish to Marketplace'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Image URL field removed per request */}
 
                 {/* group */}
@@ -12701,12 +12829,10 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
     const raw = typeof s?.status === 'string' ? s.status.trim() : '';
     return raw || t("snakeEdit.status", { defaultValue: "Status" });
   }, [s?.status, t]);
-  const showCardPrice = useMemo(() => isSnakeTaggedForSell(s), [s]);
-  const isMarketplacePublished = s?.marketplacePublished === true || Boolean(s?.marketplacePublishedAt);
-  const canPublishToMarketplace = showCardPrice && typeof setSnakes === "function";
+  const isForSale = s?.forSale === true || isSnakeTaggedForSell(s);
   const cardPriceText = useMemo(() => {
     const raw = String(s?.price ?? '').trim();
-    return raw || 'ג€”';
+    return raw || '—';
   }, [s?.price]);
   const weightHistory = useMemo(() => {
     const entries = Array.isArray(s?.logs?.weights) ? s.logs.weights : [];
@@ -12817,20 +12943,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
 
   function closeQuickAdd() { setQuickTagOpen(null); }
 
-  async function publishToMarketplace(e) {
-    e && e.stopPropagation();
-    if (!canPublishToMarketplace) return;
-    const publishedAt = new Date().toISOString();
-    setSnakes(prev => prev.map(x => x.id === s.id ? ({
-      ...x,
-      forSale: true,
-      marketplacePublished: true,
-      marketplacePublishedAt: x.marketplacePublishedAt || publishedAt,
-    }) : x));
-    if (typeof showAppAlert === 'function') {
-      await showAppAlert('This snake will publish in the Marketplace after the breeder data sync finishes.');
-    }
-  }
 
   async function submitQuickAdd(tag, options = {}) {
     if (!setSnakes) {
@@ -12956,20 +13068,10 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
             {t("actions.delete")}
           </button>
         )}
-        {canPublishToMarketplace && (
-          <button
-            className={cx(
-              "text-[11px] px-2 py-0.5 border rounded-lg",
-              isMarketplacePublished
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-            )}
-            onClick={publishToMarketplace}
-            disabled={isMarketplacePublished}
-            title={isMarketplacePublished ? "Already published in the Marketplace" : "Publish this sale snake in the Marketplace"}
-          >
-            Publish in Market Place
-          </button>
+        {isForSale && (
+          <span className="ml-auto text-[11px] font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-0.5">
+            For Sale
+          </span>
         )}
       </div>
 
@@ -13275,7 +13377,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
         <StatusDot status={displayStatus} />
         <div className="text-xs">{displayStatus}</div>
       </div>
-      {showCardPrice && (
+      {isForSale && (
         <div className="mt-1 text-xs text-neutral-700">
           <span className="font-semibold">{t('snakeEdit.price', { defaultValue: 'Price' })}:</span> {cardPriceText}
         </div>

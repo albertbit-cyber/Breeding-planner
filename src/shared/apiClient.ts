@@ -538,6 +538,83 @@ export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
 export const fetchMarketplaceListings = async () =>
   request<{ listings: unknown[] }>("/listings/marketplace");
 
+export const fetchMarketplaceCatalog = async (params: Record<string, string | number | boolean | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ listings: unknown[] }>(`/marketplace/listings${suffix}`);
+};
+
+export const fetchMarketplaceListingDetail = async (id: string) =>
+  request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}`);
+
+export const createMarketplaceListing = async (payload: Record<string, unknown>) =>
+  request<{ listing: unknown }>("/marketplace/listings", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateMarketplaceListing = async (id: string, payload: Record<string, unknown>) =>
+  request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const updateMarketplaceListingWorkflow = async (id: string, payload: Record<string, unknown>) =>
+  request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const favoriteMarketplaceListing = async (id: string) =>
+  request<{ favorited: boolean }>(`/marketplace/listings/${encodeURIComponent(id)}/favorite`, {
+    method: "POST",
+  });
+
+export const fetchSellerDashboard = async () =>
+  request<{ store: unknown; listings: unknown[]; conversations: unknown[]; sales: unknown[]; analytics: unknown }>("/marketplace/seller/dashboard");
+
+export const saveMarketplaceStore = async (payload: Record<string, unknown>) =>
+  request<{ store: unknown }>("/marketplace/seller/store", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMarketplaceStore = async (userId: string) =>
+  request<{ store: unknown }>(`/marketplace/stores/${encodeURIComponent(userId)}`);
+
+export const createMarketplaceConversation = async (payload: Record<string, unknown>) =>
+  request<{ conversation: unknown }>("/marketplace/conversations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMarketplaceConversations = async () =>
+  request<{ conversations: unknown[] }>("/marketplace/conversations");
+
+export const addMarketplaceMessage = async (id: string, payload: Record<string, unknown>) =>
+  request<{ message: unknown }>(`/marketplace/conversations/${encodeURIComponent(id)}/messages`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const createMarketplaceSale = async (payload: Record<string, unknown>) =>
+  request<{ sale: unknown }>("/marketplace/sales", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const createMarketplaceReview = async (payload: Record<string, unknown>) =>
+  request<{ review: unknown }>("/marketplace/reviews", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminMarketplace = async () =>
+  request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");
+
 export const fetchModerationListings = async () =>
   request<{ listings: unknown[] }>("/listings/moderation");
 
@@ -597,6 +674,145 @@ export const updateInquiry = async (id: string, payload: {
 
 export const fetchAdminDashboard = async () =>
   request<{ cards: Record<string, number> }>("/admin/dashboard");
+
+export const fetchFeatureCatalog = async () =>
+  request<{ features: unknown[] }>("/subscriptions/admin/features");
+
+export const fetchPublicSubscriptionTiers = async () =>
+  request<{ tiers: unknown[] }>("/subscriptions/public/tiers");
+
+export const fetchSubscriptionTiers = async (params: Record<string, string | number | boolean | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ tiers: unknown[] }>(`/subscriptions/admin/tiers${suffix}`);
+};
+
+export const fetchSubscriptionTier = async (id: string) =>
+  request<{ tier: unknown }>(`/subscriptions/admin/tiers/${encodeURIComponent(id)}`);
+
+export const createSubscriptionTier = async (payload: Record<string, unknown>) =>
+  request<{ tier: unknown }>("/subscriptions/admin/tiers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateSubscriptionTier = async (id: string, payload: Record<string, unknown>) =>
+  request<{ tier: unknown }>(`/subscriptions/admin/tiers/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const duplicateSubscriptionTier = async (id: string) =>
+  request<{ tier: unknown }>(`/subscriptions/admin/tiers/${encodeURIComponent(id)}/duplicate`, {
+    method: "POST",
+  });
+
+export const archiveSubscriptionTier = async (id: string, payload: { reason: string }) =>
+  request<{ tier: unknown }>(`/subscriptions/admin/tiers/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchUserSubscriptionPanel = async (id: string) =>
+  request<{ user: unknown; subscription: unknown; overrides: unknown[]; enabledFeatures: string[]; disabledFeatures: string[]; usage: unknown[] }>(
+    `/subscriptions/admin/users/${encodeURIComponent(id)}/subscription`
+  );
+
+export const assignUserSubscriptionTier = async (id: string, payload: Record<string, unknown>) =>
+  request(`/subscriptions/admin/users/${encodeURIComponent(id)}/subscription`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const addUserFeatureOverride = async (id: string, payload: Record<string, unknown>) =>
+  request(`/subscriptions/admin/users/${encodeURIComponent(id)}/overrides`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const removeUserFeatureOverride = async (id: string, overrideId: string, payload: { reason: string }) =>
+  request(`/subscriptions/admin/users/${encodeURIComponent(id)}/overrides/${encodeURIComponent(overrideId)}`, {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+  });
+
+export const resetUserUsage = async (id: string, payload: Record<string, unknown>) =>
+  request(`/subscriptions/admin/users/${encodeURIComponent(id)}/usage/reset`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const checkFeatureAccess = async (featureKey: string) =>
+  request(`/subscriptions/access?featureKey=${encodeURIComponent(featureKey)}`);
+
+export const fetchMobilePermissions = async (payload: Record<string, unknown> = {}) =>
+  request<{ plan: string; permissions: Record<string, unknown> }>("/mobile/permissions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const scanMobileQr = async (payload: { qrCode: string; metadata?: Record<string, unknown> }) =>
+  request<{ targetType: string; animal?: unknown }>("/mobile/scan", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMobileAnimal = async (qrCode: string) =>
+  request<{ animal: unknown }>(`/mobile/animal/${encodeURIComponent(qrCode)}`);
+
+export const logMobileFeed = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/feed", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logMobileWeight = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/weight", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logMobileShed = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/shed", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logMobileNote = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/note", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logMobileClean = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/clean", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logMobileWater = async (payload: Record<string, unknown>) =>
+  request<{ animal: unknown; log: unknown }>("/mobile/log/water", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMobileTasks = async () =>
+  request<{ tasks: unknown[] }>("/mobile/tasks/today");
+
+export const fetchMobileRackMode = async () =>
+  request<{ rooms: unknown[] }>("/mobile/rack-mode");
+
+export const fetchMobileCommunication = async () =>
+  request<{ telegram: unknown; pendingConfirmations: unknown[]; activity: unknown[] }>("/mobile/communication");
+
+export const syncMobileQueue = async (payload: Record<string, unknown>) =>
+  request<{ processed: number; results: unknown[] }>("/mobile/sync", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
 export const fetchAdminUsers = async (params: Record<string, string | number | undefined> = {}) => {
   const query = new URLSearchParams();

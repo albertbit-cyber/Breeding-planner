@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { createNotification } from "./notificationService";
+import { canAccessFeature } from "./subscriptionService";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -44,6 +45,8 @@ const assertCanManageListings = async (ownerId: string) => {
   if (user.role !== "breeder" && user.role !== "admin") {
     throw new HttpError(403, "Only breeder or admin users can manage listings.");
   }
+  const access = await canAccessFeature({ id: user.id, role: user.role }, "marketplace.create_listing");
+  if (!access.allowed) throw new HttpError(403, access.reason || "Your subscription tier does not include marketplace selling.");
 };
 
 const toPublicListing = (row: any) => {

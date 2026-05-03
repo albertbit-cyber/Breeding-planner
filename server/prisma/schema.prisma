@@ -90,6 +90,23 @@ model User {
   labAccount       LabAccount?
   gdprRequests     GdprRequest[] @relation("GdprRequestUser")
   gdprReviews      GdprRequest[] @relation("GdprRequestReviewer")
+  subscriptions     UserSubscription[] @relation("UserSubscriptionUser")
+  featureOverrides  UserFeatureOverride[] @relation("UserFeatureOverrideUser")
+  featureOverridesCreated UserFeatureOverride[] @relation("UserFeatureOverrideAdmin")
+  usageTracking     UsageTracking[]
+  marketplaceListings MarketplaceListing[] @relation("MarketplaceListingSeller")
+  marketplaceStores MarketplaceStore[]
+  marketplaceMessages MarketplaceMessage[] @relation("MarketplaceMessageSender")
+  marketplaceBuyerConversations MarketplaceConversation[] @relation("MarketplaceConversationBuyer")
+  marketplaceSellerConversations MarketplaceConversation[] @relation("MarketplaceConversationSeller")
+  marketplaceFavorites MarketplaceFavorite[]
+  marketplaceBuyerSales MarketplaceSale[] @relation("MarketplaceSaleBuyer")
+  marketplaceSellerSales MarketplaceSale[] @relation("MarketplaceSaleSeller")
+  marketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewReviewer")
+  marketplaceSellerReviews MarketplaceReview[] @relation("MarketplaceReviewSeller")
+  mobileScanLogs   MobileScanLog[]
+  mobileSyncQueue  MobileSyncQueue[]
+  deviceSessions   UserDeviceSession[]
 }
 
 model Profile {
@@ -385,6 +402,374 @@ model GdprRequest {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+}
+
+model SubscriptionTier {
+  id               String   @id @default(cuid())
+  name             String
+  key              String   @unique
+  shortDescription String?  @map("short_description") @db.Text
+  longDescription  String?  @map("long_description") @db.Text
+  badgeText        String?  @map("badge_text")
+  monthlyPrice     Decimal  @default(0) @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice      Decimal  @default(0) @map("yearly_price") @db.Decimal(10, 2)
+  currency         String   @default("EUR")
+  trialDays        Int      @default(0) @map("trial_days")
+  setupFee         Decimal? @map("setup_fee") @db.Decimal(10, 2)
+  discountLabel    String?  @map("discount_label")
+  customPrice      Boolean  @default(false) @map("custom_price")
+  isActive         Boolean  @default(true) @map("is_active")
+  isPublic         Boolean  @default(true) @map("is_public")
+  isRecommended    Boolean  @default(false) @map("is_recommended")
+  sortOrder        Int      @default(0) @map("sort_order")
+  archivedAt       DateTime? @map("archived_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  features         TierFeature[]
+  subscriptions    UserSubscription[]
+
+  @@index([isActive])
+  @@index([isPublic])
+  @@index([sortOrder])
+  @@map("subscription_tiers")
+}
+
+model FeatureCatalog {
+  id               String   @id @default(cuid())
+  featureKey       String   @unique @map("feature_key")
+  featureName      String   @map("feature_name")
+  featureGroup     String   @map("feature_group")
+  description      String?  @db.Text
+  defaultLimitType String?  @map("default_limit_type")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  tierFeatures     TierFeature[]
+
+  @@index([featureGroup])
+  @@map("feature_catalog")
+}
+
+model TierFeature {
+  id         String   @id @default(cuid())
+  tierId     String   @map("tier_id")
+  tier       SubscriptionTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  featureKey String   @map("feature_key")
+  feature    FeatureCatalog @relation(fields: [featureKey], references: [featureKey], onDelete: Cascade)
+  enabled    Boolean  @default(false)
+  limitValue Int?     @map("limit_value")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([tierId, featureKey])
+  @@index([featureKey])
+  @@map("tier_features")
+}
+
+model UserSubscription {
+  id                    String   @id @default(cuid())
+  userId                String   @map("user_id")
+  user                  User     @relation("UserSubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  tierId                String?  @map("tier_id")
+  tier                  SubscriptionTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  status                String   @default("active")
+  paymentStatus         String   @default("none") @map("payment_status")
+  startedAt             DateTime @default(now()) @map("started_at")
+  trialEndsAt           DateTime? @map("trial_ends_at")
+  renewsAt              DateTime? @map("renews_at")
+  cancelledAt           DateTime? @map("cancelled_at")
+  paymentProvider       String?  @map("payment_provider")
+  paymentCustomerId     String?  @map("payment_customer_id")
+  paymentSubscriptionId String?  @map("payment_subscription_id")
+  internalNote          String?  @map("internal_note") @db.Text
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([tierId])
+  @@index([status])
+  @@map("user_subscriptions")
+}
+
+model UserFeatureOverride {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  user             User     @relation("UserFeatureOverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  featureKey       String   @map("feature_key")
+  enabled          Boolean
+  limitOverride    Int?     @map("limit_override")
+  reason           String   @db.Text
+  expiresAt        DateTime? @map("expires_at")
+  createdByAdminId String?  @map("created_by_admin_id")
+  createdByAdmin   User?    @relation("UserFeatureOverrideAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([featureKey])
+  @@index([createdByAdminId])
+  @@map("user_feature_overrides")
+}
+
+model UsageTracking {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  featureKey  String   @map("feature_key")
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  usedAmount  Int      @default(0) @map("used_amount")
+  limitAmount Int?     @map("limit_amount")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, featureKey, periodStart])
+  @@index([userId])
+  @@index([featureKey])
+  @@map("usage_tracking")
+}
+
+model MobileScanLog {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animalId       String?  @map("animal_id")
+  qrCode         String   @map("qr_code") @db.Text
+  targetType     String   @default("animal") @map("target_type")
+  resultStatus   String   @default("opened") @map("result_status")
+  metadataJson   Json?    @map("metadata_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([targetType])
+  @@index([createdAt])
+  @@map("mobile_scan_logs")
+}
+
+model MobileSyncQueue {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId      String?  @map("device_id")
+  actionType    String   @map("action_type")
+  payloadJson   Json     @map("payload_json")
+  status        String   @default("queued")
+  errorMessage  String?  @map("error_message") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  processedAt   DateTime? @map("processed_at")
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([status])
+  @@index([actionType])
+  @@map("mobile_sync_queue")
+}
+
+model UserDeviceSession {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId    String   @map("device_id")
+  deviceName  String?  @map("device_name")
+  platform    String?
+  pushToken   String?  @map("push_token") @db.Text
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([lastSeenAt])
+  @@map("user_device_sessions")
+}
+
+model MarketplaceListing {
+  id                     String   @id @default(cuid())
+  sellerUserId           String   @map("seller_user_id")
+  seller                 User     @relation("MarketplaceListingSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  animalId               String?  @map("animal_id")
+  title                  String
+  species                String?
+  category               String?
+  genetics               String?  @db.Text
+  sex                    String?
+  birthDate              DateTime? @map("birth_date")
+  year                   Int?
+  weight                 Decimal? @db.Decimal(10, 2)
+  price                  Decimal? @db.Decimal(12, 2)
+  currency               String   @default("EUR")
+  status                 String   @default("draft")
+  availability           String   @default("available")
+  country                String?
+  city                   String?
+  shippingAvailable      Boolean  @default(false) @map("shipping_available")
+  pickupAvailable        Boolean  @default(false) @map("pickup_available")
+  description            String?  @db.Text
+  feedingNotes           String?  @map("feeding_notes") @db.Text
+  temperamentNotes       String?  @map("temperament_notes") @db.Text
+  publicDataSettingsJson Json?    @map("public_data_settings_json")
+  viewsCount             Int      @default(0) @map("views_count")
+  favoritesCount         Int      @default(0) @map("favorites_count")
+  isFeatured             Boolean  @default(false) @map("is_featured")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  publishedAt            DateTime? @map("published_at")
+  archivedAt             DateTime? @map("archived_at")
+  images                 MarketplaceListingImage[]
+  conversations          MarketplaceConversation[]
+  favorites              MarketplaceFavorite[]
+  sales                  MarketplaceSale[]
+
+  @@index([sellerUserId])
+  @@index([status])
+  @@index([availability])
+  @@index([species])
+  @@index([country])
+  @@index([isFeatured])
+  @@map("marketplace_listings")
+}
+
+model MarketplaceListingImage {
+  id         String   @id @default(cuid())
+  listingId  String   @map("listing_id")
+  listing    MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  imageUrl   String   @map("image_url") @db.Text
+  sortOrder  Int      @default(0) @map("sort_order")
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([listingId])
+  @@map("marketplace_listing_images")
+}
+
+model MarketplaceStore {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeName       String   @map("store_name")
+  logoUrl         String?  @map("logo_url") @db.Text
+  bannerUrl       String?  @map("banner_url") @db.Text
+  about           String?  @db.Text
+  country         String?
+  city            String?
+  websiteUrl      String?  @map("website_url") @db.Text
+  socialLinksJson Json?    @map("social_links_json")
+  terms           String?  @db.Text
+  shippingPolicy  String?  @map("shipping_policy") @db.Text
+  paymentPolicy   String?  @map("payment_policy") @db.Text
+  isVerified      Boolean  @default(false) @map("is_verified")
+  ratingAverage   Decimal  @default(0) @map("rating_average") @db.Decimal(3, 2)
+  reviewCount     Int      @default(0) @map("review_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([isVerified])
+  @@map("marketplace_stores")
+}
+
+model MarketplaceConversation {
+  id            String   @id @default(cuid())
+  listingId     String   @map("listing_id")
+  listing       MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerUserId   String?  @map("buyer_user_id")
+  buyer         User?    @relation("MarketplaceConversationBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  sellerUserId  String   @map("seller_user_id")
+  seller        User     @relation("MarketplaceConversationSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  status        String   @default("open")
+  lastMessageAt DateTime? @map("last_message_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  messages      MarketplaceMessage[]
+
+  @@index([listingId])
+  @@index([buyerUserId])
+  @@index([sellerUserId])
+  @@index([status])
+  @@map("marketplace_conversations")
+}
+
+model MarketplaceMessage {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  conversation   MarketplaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUserId   String?  @map("sender_user_id")
+  sender         User?    @relation("MarketplaceMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  messageText    String   @map("message_text") @db.Text
+  offerAmount    Decimal? @map("offer_amount") @db.Decimal(12, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  readAt         DateTime? @map("read_at")
+
+  @@index([conversationId])
+  @@index([senderUserId])
+  @@map("marketplace_messages")
+}
+
+model MarketplaceFavorite {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String   @map("listing_id")
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, listingId])
+  @@index([listingId])
+  @@map("marketplace_favorites")
+}
+
+model MarketplaceSale {
+  id              String   @id @default(cuid())
+  listingId       String   @map("listing_id")
+  listing         MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sellerUserId    String   @map("seller_user_id")
+  seller          User     @relation("MarketplaceSaleSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  buyerUserId     String?  @map("buyer_user_id")
+  buyer           User?    @relation("MarketplaceSaleBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  buyerName       String?  @map("buyer_name")
+  buyerEmail      String?  @map("buyer_email")
+  buyerPhone      String?  @map("buyer_phone")
+  buyerCountry    String?  @map("buyer_country")
+  salePrice       Decimal? @map("sale_price") @db.Decimal(12, 2)
+  currency        String   @default("EUR")
+  depositAmount   Decimal? @map("deposit_amount") @db.Decimal(12, 2)
+  paymentStatus   String   @default("pending") @map("payment_status")
+  saleStatus      String   @default("inquiry") @map("sale_status")
+  handoverMethod  String?  @map("handover_method")
+  handoverDate    DateTime? @map("handover_date")
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  reviews         MarketplaceReview[]
+
+  @@index([listingId])
+  @@index([sellerUserId])
+  @@index([buyerUserId])
+  @@index([saleStatus])
+  @@map("marketplace_sales")
+}
+
+model MarketplaceReview {
+  id                  String   @id @default(cuid())
+  saleId              String   @map("sale_id")
+  sale                MarketplaceSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  reviewerUserId      String?  @map("reviewer_user_id")
+  reviewer            User?    @relation("MarketplaceReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+  sellerUserId        String   @map("seller_user_id")
+  seller              User     @relation("MarketplaceReviewSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  rating              Int
+  communicationRating Int?     @map("communication_rating")
+  accuracyRating      Int?     @map("accuracy_rating")
+  shippingRating      Int?     @map("shipping_rating")
+  healthRating        Int?     @map("health_rating")
+  reviewText          String?  @map("review_text") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([saleId])
+  @@index([sellerUserId])
+  @@index([reviewerUserId])
+  @@map("marketplace_reviews")
 }
 
 model ShedTestCatalog {
