@@ -1,4 +1,4 @@
-package com.breedingplanner.app;
+package com.breedingplanner.mobile;
 
 import com.getcapacitor.BridgeActivity;
 

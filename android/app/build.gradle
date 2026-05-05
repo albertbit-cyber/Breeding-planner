@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.breedingplanner.app"
+    namespace "com.breedingplanner.mobile"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.breedingplanner.app"
+        applicationId "com.breedingplanner.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -16,11 +16,43 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
+    signingConfigs {
         release {
-            minifyEnabled false
+            def keyProperties = new Properties()
+            def keyPropertiesFile = rootProject.file("key.properties")
+            if (keyPropertiesFile.exists()) {
+                keyProperties.load(new FileInputStream(keyPropertiesFile))
+            }
+
+            def keystorePath = project.findProperty("BREEDING_PLANNER_KEYSTORE_FILE") ?: System.getenv("BREEDING_PLANNER_KEYSTORE_FILE") ?: keyProperties["storeFile"]
+            def keystorePassword = project.findProperty("BREEDING_PLANNER_KEYSTORE_PASSWORD") ?: System.getenv("BREEDING_PLANNER_KEYSTORE_PASSWORD") ?: keyProperties["storePassword"]
+            def releaseKeyAlias = project.findProperty("BREEDING_PLANNER_KEY_ALIAS") ?: System.getenv("BREEDING_PLANNER_KEY_ALIAS") ?: keyProperties["keyAlias"]
+            def releaseKeyPassword = project.findProperty("BREEDING_PLANNER_KEY_PASSWORD") ?: System.getenv("BREEDING_PLANNER_KEY_PASSWORD") ?: keyProperties["keyPassword"]
+            if (keystorePath && keystorePassword && releaseKeyAlias && releaseKeyPassword) {
+                def keystoreFile = new File(keystorePath.toString())
+                storeFile keystoreFile.isAbsolute() ? keystoreFile : rootProject.file(keystorePath)
+                storePassword keystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            manifestPlaceholders = [usesCleartextTraffic: "true"]
+        }
+        release {
+            manifestPlaceholders = [usesCleartextTraffic: "false"]
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled project.hasProperty("enableReleaseOptimization")
+            shrinkResources project.hasProperty("enableReleaseOptimization")
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+    lint {
+        checkReleaseBuilds false
     }
 }
 

@@ -28,6 +28,13 @@ const isBreederPath = (path) => {
   const normalized = normalizeHashPath(path);
   return normalized === "/breeder" || normalized.startsWith("/breeder/");
 };
+const isNativeMobileShell = () => {
+  try {
+    return Boolean(window?.Capacitor?.isNativePlatform?.() || window?.Capacitor?.getPlatform?.() === "android");
+  } catch {
+    return false;
+  }
+};
 
 function AppSectionRouter() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
@@ -58,6 +65,10 @@ function AppSectionRouter() {
 
   if (isPricingPath(hashPath)) {
     return <PricingPage />;
+  }
+
+  if (hashPath === "/" && isNativeMobileShell()) {
+    return <MobileApp />;
   }
 
   if (hashPath === "/") {

@@ -27,6 +27,14 @@
 /server/dist
 .codex-*.log
 /server/*.log
+/.tools
+
+# Android signing secrets
+*.keystore
+*.jks
+android/key.properties
+android/app/*.keystore
+android/app/*.jks
 
 npm-debug.log*
 yarn-debug.log*

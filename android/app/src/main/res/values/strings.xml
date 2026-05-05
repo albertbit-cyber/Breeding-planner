@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Breeding Planner</string>
-    <string name="title_activity_main">Breeding Planner</string>
-    <string name="package_name">com.breedingplanner.app</string>
-    <string name="custom_url_scheme">com.breedingplanner.app</string>
+    <string name="app_name">Breeding Planner Mobile</string>
+    <string name="title_activity_main">Breeding Planner Mobile</string>
+    <string name="package_name">com.breedingplanner.mobile</string>
+    <string name="custom_url_scheme">com.breedingplanner.mobile</string>
 </resources>
