@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "./i18n";
 import QRCode from 'qrcode';
@@ -772,7 +773,7 @@ function RoomModal({
               <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
               <div className="text-2xl font-semibold text-neutral-900">{room.name}</div>
               <div className="mt-1 text-xs text-neutral-500">
-                {t('spaces.roomCounts', { defaultValue: '{{racks}} racks ג€¢ {{terrariums}} terrariums', racks: racks.length, terrariums: terrariums.length })}
+                {t('spaces.roomCounts', { defaultValue: '{{racks}} racks • {{terrariums}} terrariums', racks: racks.length, terrariums: terrariums.length })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -824,7 +825,7 @@ function RoomModal({
                       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                         <div className="rounded-2xl bg-neutral-50 px-3 py-2">
                           <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t('spaces.rack.layout', { defaultValue: 'Layout' })}</div>
-                          <div className="text-base font-semibold">{rack.columns} ֳ— {rack.levels}</div>
+                          <div className="text-base font-semibold">{rack.columns} × {rack.levels}</div>
                         </div>
                         <div className="rounded-2xl bg-neutral-50 px-3 py-2">
                           <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t('spaces.rack.summaryLabel', { defaultValue: 'Usage' })}</div>
@@ -850,7 +851,7 @@ function RoomModal({
                 {terrariums.map(item => {
                   const occupantCount = Array.isArray(item.occupantIds) ? item.occupantIds.length : 0;
                   const dims = item.dimensions
-                    ? `${item.dimensions.w}ֳ—${item.dimensions.d}ֳ—${item.dimensions.h}${item.dimensions.unit}`
+                    ? `${item.dimensions.w}×${item.dimensions.d}×${item.dimensions.h}${item.dimensions.unit}`
                     : t('spaces.dimensions.unknown', { defaultValue: 'Dimensions unknown' });
                   return (
                     <div
@@ -894,6 +895,15 @@ function pairingLifecycleDefaults() {
   clutch: { recorded: false, date: '', eggsTotal: '', fertileEggs: '', slugs: '', notes: '' },
     hatch: { scheduledDate: '', recorded: false, date: '', hatchedCount: 0, notes: '' }
   };
+}
+function resolveEggCountForClutch(eggsTotal, fertileEggs) {
+  const candidates = [eggsTotal, fertileEggs];
+  for (const value of candidates) {
+    if (value === null || typeof value === 'undefined' || value === '') continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.max(0, Math.floor(parsed));
+  }
+  return null;
 }
 const cx = (...parts) => parts.flat().filter(Boolean).join(' ');
 const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
@@ -1265,7 +1275,7 @@ export const ANIMAL_EXPORT_FIELD_DEFS = [
       if (entry.size) parts.push(entry.size === 'Other' ? entry.sizeDetail || entry.size : entry.size);
       if (entry.refused) parts.push('Refused');
       if (entry.method) parts.push(entry.method === 'Other' ? entry.methodDetail || entry.method : entry.method);
-      const summary = parts.filter(Boolean).join(' ג€” ');
+      const summary = parts.filter(Boolean).join(' — ');
       return summary ? `${summary}${entry.date ? ` (${formatDateForDisplay(entry.date)})` : ''}` : (entry.date ? formatDateForDisplay(entry.date) : '');
     },
   },
@@ -1542,7 +1552,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
     if (Number.isFinite(grams) && grams > 0) feedParts.push(`${grams} g`);
     const method = entry.method === 'Other' ? entry.methodDetail : entry.method;
     if (method) feedParts.push(method);
-    const summary = feedParts.length ? feedParts.join(' ג€” ') : (labels.feedDefault || 'Feed');
+    const summary = feedParts.length ? feedParts.join(' — ') : (labels.feedDefault || 'Feed');
     return `${summary}${dateMark}`.trim();
   };
 
@@ -1565,7 +1575,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
       const projectLabels = relatedPairings.map(item => item?.label).filter(Boolean);
       return {
         animal: snake?.name || labels.unnamed || 'Unnamed',
-        id: snake?.id || 'ג€”',
+        id: snake?.id || '—',
         sex: sexLabel,
         genetics: joinTokens(geneticsTokens),
         status: statusLabel,
@@ -1905,7 +1915,7 @@ function buildPairingMatrixExportDataset(pairings = [], snakes = [], options = {
       status: row.status || '',
       seasonName: row.seasonName || '',
       startDate: row.startDate ? formatDateForDisplay(row.startDate) : '',
-      notes: noteSegments.filter(Boolean).join(' ג€” '),
+      notes: noteSegments.filter(Boolean).join(' — '),
     };
   });
 
@@ -2053,7 +2063,7 @@ function describePairingStage(pairing) {
     detailParts.push(`Last appointment ${formatDateForDisplay(latestPast.date)}`);
   }
 
-  return detailParts.length ? `${baseStatus} ג€” ${detailParts.join(' ג€” ')}` : baseStatus;
+  return detailParts.length ? `${baseStatus} — ${detailParts.join(' — ')}` : baseStatus;
 }
 
 async function exportDatasetToPdf(dataset, options = {}) {
@@ -2327,7 +2337,7 @@ const ID_TEMPLATE_TOKENS = [
   { token: '[YEAR]', description: 'Full four-digit year (e.g., 2025).' },
   { token: '[YROB]', description: 'Last two digits of the birth year.' },
   { token: '[YEAROB]', description: 'Full four-digit birth year.' },
-  { token: '[PREFIX]', description: 'Legacy prefix derived from the name (or sire ג€” dam pattern).' },
+  { token: '[PREFIX]', description: 'Legacy prefix derived from the name (or sire — dam pattern).' },
   { token: '[PREFIXU]', description: 'Prefix in uppercase.' },
   { token: '[PREFIXL]', description: 'Prefix in lowercase.' },
   { token: '[NAME]', description: 'Letters from the name in Title Case.' },
@@ -4291,13 +4301,13 @@ function parseReptileBuddyText(raw) {
     // If no explicit name found, try some common line patterns
     if (!obj.name && lines.length) {
       const first = lines[0];
-      // patterns: "Name (Female)", "Name - Female - Clown", "Name ג€” Female"
+      // patterns: "Name (Female)", "Name - Female - Clown", "Name — Female"
       const mParen = first.match(/^(.+?)\s*\((male|female|m|f)\)/i);
       if (mParen) {
         obj.name = mParen[1].trim();
         obj.sex = /male/i.test(mParen[2]) ? 'M' : 'F';
       } else {
-        const parts = first.split(/[-ג€“ג€”|\t]/).map(p=>p.trim()).filter(Boolean);
+        const parts = first.split(/[-–—|\t]/).map(p=>p.trim()).filter(Boolean);
         if (parts.length >= 2 && /^(male|female|m|f)$/i.test(parts[1])) {
           obj.name = parts[0];
           obj.sex = /male/i.test(parts[1]) ? 'M' : 'F';
@@ -4322,7 +4332,7 @@ function parseReptileBuddyText(raw) {
     if ((!obj.morphs || !obj.morphs.length) && lines.length > 1) {
       for (const l of lines.slice(1)) {
         if (/morphs?:|visuals?:/i.test(l) || /,/.test(l) || /\//.test(l)) {
-          const parts = l.split(/:|ג€“|-|ג€”/).map(p=>p.trim()).filter(Boolean);
+          const parts = l.split(/:|–|-|—/).map(p=>p.trim()).filter(Boolean);
           const payload = parts.length>1 ? parts.slice(1).join(':') : parts[0];
           const arr = splitList(payload);
           if (arr.length) { obj.morphs = arr; break; }
@@ -4333,7 +4343,7 @@ function parseReptileBuddyText(raw) {
     if ((!obj.hets || !obj.hets.length) && lines.length > 1) {
       for (const l of lines.slice(1)) {
         if (/hets?:/i.test(l) || /het\b/i.test(l)) {
-          const parts = l.split(/:|ג€“|-|ג€”/).map(p=>p.trim()).filter(Boolean);
+          const parts = l.split(/:|–|-|—/).map(p=>p.trim()).filter(Boolean);
           const payload = parts.length>1 ? parts.slice(1).join(':') : parts[0];
           const arr = splitList(payload);
           if (arr.length) { obj.hets = arr; break; }
@@ -5184,6 +5194,77 @@ function getHeaderValues(row = [], headerIndex = {}, key) {
 }
 
 // Add Animal modal form
+function deriveQuickAddName(text, parsed = {}) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return '';
+
+  const firstLine = lines[0];
+  const parentheticalId = firstLine.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (parentheticalId?.[1]) {
+    return parentheticalId[1].trim();
+  }
+
+  const normalized = firstLine.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (/^(?:female|male|0\s*[.,/:]\s*1|1\s*[.,/:]\s*0|0\s*1|1\s*0|f|m)(?=\W|$)/i.test(normalized)) {
+    return '';
+  }
+
+  const cutIndexes = [];
+  const id = String(parsed?.id || '').trim();
+  if (id) {
+    const idIndex = normalized.toLowerCase().indexOf(id.toLowerCase());
+    if (idIndex > 0) cutIndexes.push(idIndex);
+  }
+
+  const boundaryPatterns = [
+    /\b(female|male|0\s*[.,/:]\s*1|1\s*[.,/:]\s*0)\b/i,
+    /\b\d{2,5}\s*g\b/i,
+    /\bborn\b/i,
+    /\b(?:eating|feeding?|fed)\b/i,
+    /\bbreeder\b/i,
+    /\b(?:19\d{2}|20\d{2})\b/,
+  ];
+  boundaryPatterns.forEach(pattern => {
+    const match = normalized.match(pattern);
+    if (match && typeof match.index === 'number' && match.index > 0) {
+      cutIndexes.push(match.index);
+    }
+  });
+
+  const geneticsTokens = [
+    ...(Array.isArray(parsed?.morphs) ? parsed.morphs : []),
+    ...(Array.isArray(parsed?.hets) ? parsed.hets : []),
+  ]
+    .map(token => String(token || '')
+      .replace(/^\d{1,3}%\s*/i, '')
+      .replace(/^(possible|probable|maybe)\s+/i, '')
+      .replace(/^het\s+/i, '')
+      .trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  geneticsTokens.forEach(token => {
+    const tokenIndex = normalized.toLowerCase().indexOf(token.toLowerCase());
+    if (tokenIndex > 0) cutIndexes.push(tokenIndex);
+  });
+
+  const cutAt = cutIndexes.length ? Math.min(...cutIndexes) : normalized.length;
+  const candidate = normalized
+    .slice(0, cutAt)
+    .replace(/[-–—,:;|/]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!candidate) return '';
+  if (/^(?:female|male|0\s*[.,/:]\s*1|1\s*[.,/:]\s*0|0\s*1|1\s*0|f|m)$/i.test(candidate)) return '';
+  const words = candidate.split(/\s+/).filter(Boolean);
+  if (words.length > 5) return '';
+  return candidate;
+}
+
 function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], theme='blue' }) {
   const { t } = useTranslation();
   const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
@@ -5218,8 +5299,10 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
       ? await onResolveLeucisticText(quickAddText, 'Quick Add free text')
       : quickAddText;
     const parsed = parseAnimalText(textForParse, availableGenetics);
+    const parsedName = deriveQuickAddName(textForParse, parsed);
     const hasAnyParsedValue = Boolean(
-      parsed.id
+      parsedName
+      || parsed.id
       || parsed.sex
       || parsed.weight
       || parsed.hatchYear
@@ -5251,6 +5334,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
         } else if (typeof onGenerateIdFromWizard === 'function') {
           const generated = onGenerateIdFromWizard({
             ...next,
+            name: parsedName || next.name,
             sex: parsed.sex || next.sex,
             morphs: parsedMorphs.length ? parsedMorphs : next.morphs,
             hets: parsedHets.length ? parsedHets : next.hets,
@@ -5264,17 +5348,21 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
         }
       }
 
+      if (isBlank(next.name) && parsedName) {
+        next.name = parsedName;
+      }
+
       if (isBlank(next.sex) && parsed.sex) {
         next.sex = parsed.sex;
       }
 
       if (isBlank(next.morphHetInput) && (parsedMorphs.length || parsedHets.length)) {
-        const normalized = normalizeMorphHetLists([
-          ...parsedMorphs,
-          ...parsedHets,
-        ]);
-        const morphs = normalized.morphs;
-        const hets = normalized.hets;
+        const morphs = normalizeMorphHetLists(parsedMorphs).morphs;
+        const hets = uniqueGeneTokens(
+          parsedHets
+            .map(h => normalizeHetInputToken(h))
+            .filter(Boolean)
+        );
         next.morphs = morphs;
         next.hets = hets;
         next.morphHetInput = formatMorphHetForInput(morphs, hets);
@@ -5668,7 +5756,7 @@ export default function BreedingPlannerApp() {
   const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
   const appRootStyle = useMemo(() => ({
-    backgroundColor: resolvedAppearance?.colors?.background || '#f4f4f5',
+    backgroundColor: resolvedAppearance?.colors?.background || '#f6f7f9',
     color: resolvedAppearance?.colors?.text || '#0f172a',
   }), [resolvedAppearance]);
   // logs helpers are defined at module scope (updateLog, LogsEditor)
@@ -5749,6 +5837,12 @@ export default function BreedingPlannerApp() {
     const stored = loadStoredJson(STORAGE_KEYS.breeder, null);
     return normalizeBreederInfo(stored);
   });
+  const breederLogoBackground = useMemo(() => {
+    const logo = typeof breederInfo?.logoUrl === 'string' && breederInfo.logoUrl.trim()
+      ? breederInfo.logoUrl.trim()
+      : '/app-icons/icon_512x512.png';
+    return `url("${logo.replace(/["\\\n\r]/g, '')}")`;
+  }, [breederInfo?.logoUrl]);
   const [morphAliases, setMorphAliases] = useState(() => {
     const stored = loadStoredJson(STORAGE_KEYS.morphAliases, null);
     const normalized = normalizeMorphAliasDatabase(stored);
@@ -5842,6 +5936,7 @@ export default function BreedingPlannerApp() {
   }, [animalLayout]);
 
   const [showPairingModal, setShowPairingModal] = useState(false);
+  const [eggBoxModal, setEggBoxModal] = useState(null);
   const [draft, setDraft] = useState({
     maleId: "",
     femaleId: "",
@@ -6042,13 +6137,14 @@ export default function BreedingPlannerApp() {
       .slice(0, 2)
       .join('') || 'BP';
     const confirmLabel = appDialog.confirmLabel || t('common.ok', { defaultValue: 'OK' });
-    return (
+    if (typeof document === 'undefined') return null;
+    return createPortal((
       <div
-        className={cx('fixed inset-0 flex items-center justify-center p-4 z-[130]', overlayClass(theme))}
+        className={cx('fixed inset-0 flex items-center justify-center p-4 z-[10030]', overlayClass(theme))}
         onClick={handleAppDialogBackdrop}
       >
         <div
-          className="bg-white w-full max-w-sm rounded-2xl shadow-xl border p-5 space-y-4"
+          className="relative z-[10031] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5 space-y-4"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center gap-3">
@@ -6102,7 +6198,7 @@ export default function BreedingPlannerApp() {
           </div>
         </div>
       </div>
-    );
+    ), document.body);
   }, [appDialog, breederInfo, handleAppDialogBackdrop, handleAppDialogCancel, handleAppDialogConfirm, handleAppDialogInputChange, theme, t]);
 
   useEffect(() => {
@@ -6783,7 +6879,7 @@ export default function BreedingPlannerApp() {
     const savedAt = typeof meta.savedAt === 'string' && meta.savedAt ? meta.savedAt : new Date().toISOString();
     const displayName = typeof meta.name === 'string' && meta.name.trim()
       ? meta.name.trim()
-      : `${source === 'auto' ? 'Auto' : 'Manual'} backup ג€¢ ${formatDateTimeForDisplay(savedAt)}`;
+      : `${source === 'auto' ? 'Auto' : 'Manual'} backup • ${formatDateTimeForDisplay(savedAt)}`;
     const entry = normalizeBackupFileEntry({
       id: typeof meta.id === 'string' && meta.id.trim() ? meta.id.trim() : uid(source === 'auto' ? 'auto-backup' : 'manual-backup'),
       name: displayName,
@@ -6842,7 +6938,7 @@ export default function BreedingPlannerApp() {
     addBackupVaultEntry(snapshotPayload, {
       source: 'auto',
       savedAt,
-      name: `Auto backup ג€¢ ${formatDateTimeForDisplay(savedAt)}`,
+      name: `Auto backup • ${formatDateTimeForDisplay(savedAt)}`,
     });
   }, [createBackupPayload, addBackupVaultEntry, setAutoBackupSnapshot, setBackupSettings]);
 
@@ -7222,6 +7318,10 @@ export default function BreedingPlannerApp() {
       .map(pairing => buildPairingDashboardItem(pairing, snakes, today))
       .filter(Boolean)
       .sort((a, b) => {
+        const stageWeight = { clutch: 0, preLay: 1, ovulation: 2, locks: 3, active: 4, hatched: 5 };
+        const aStageWeight = stageWeight[a.stageKey] ?? 6;
+        const bStageWeight = stageWeight[b.stageKey] ?? 6;
+        if (aStageWeight !== bStageWeight) return aStageWeight - bStageWeight;
         const urgencyWeight = { overdue: 0, due: 1, soon: 2, upcoming: 3, none: 4 };
         const aWeight = urgencyWeight[a.urgency] ?? 5;
         const bWeight = urgencyWeight[b.urgency] ?? 5;
@@ -7305,9 +7405,60 @@ export default function BreedingPlannerApp() {
       return tokens.every(token => fields.some(field => field.includes(token)));
     });
   }, [displayedPairings, pairingsSearchQuery, snakes]);
+  const clutchMetadataByPairingId = useMemo(() => {
+    const list = Array.isArray(pairings) ? pairings : [];
+    const sortByClutchDate = (a, b) => {
+      const dateDiff = new Date(a.clutchDate) - new Date(b.clutchDate);
+      if (dateDiff) return dateDiff;
+      return String(a.pairingId || '').localeCompare(String(b.pairingId || ''));
+    };
+    const clutchesWithDates = list
+      .filter(p => p?.clutch?.date)
+      .map(p => ({
+        pairingId: p.id,
+        clutchDate: p.clutch.date,
+        eggs: resolveEggCountForClutch(p?.clutch?.eggsTotal, p?.clutch?.fertileEggs) || 0,
+        completed: isPairingCompleted(p),
+        label: resolvePairingLabel(p, snakeById(snakes, p.femaleId), snakeById(snakes, p.maleId)),
+      }))
+      .sort(sortByClutchDate);
+    const completedClutches = clutchesWithDates.filter(item => item.completed).sort(sortByClutchDate);
+    const activeClutches = clutchesWithDates.filter(item => !item.completed).sort(sortByClutchDate);
+    const starterCompletedIndex = completedClutches.findIndex(item => /salon\s+in\s+guglia/i.test(String(item.label || '')));
+    const starterCompleted = starterCompletedIndex >= 0
+      ? completedClutches[starterCompletedIndex]
+      : completedClutches[0] || null;
+    const remainingCompleted = completedClutches.filter(item => item.pairingId !== starterCompleted?.pairingId);
+    const numberedClutches = [
+      ...(starterCompleted ? [starterCompleted] : []),
+      ...activeClutches,
+      ...remainingCompleted,
+    ];
+    const map = new Map();
+    let nextEggBoxNumber = 1;
+    numberedClutches.forEach((item, idx) => {
+      if (!item?.pairingId || map.has(item.pairingId)) return;
+      const eggBoxCount = splitEggBoxCounts(item.eggs).length;
+      map.set(item.pairingId, {
+        clutchNumber: idx + 1,
+        eggBoxNumber: nextEggBoxNumber,
+        eggBoxCount,
+      });
+      nextEggBoxNumber += 1;
+    });
+    return map;
+  }, [pairings, snakes]);
+  const clutchNumberByPairingId = useMemo(() => {
+    const map = new Map();
+    clutchMetadataByPairingId.forEach((meta, pairingId) => {
+      map.set(pairingId, meta.clutchNumber);
+    });
+    return map;
+  }, [clutchMetadataByPairingId]);
+
   const eggBoxes = useMemo(() => {
     const list = Array.isArray(pairings) ? pairings : [];
-    const withClutchDate = list
+    const activeClutchesWithDates = list
       .filter(p => p?.clutch?.date && !isPairingCompleted(p))
       .map(p => {
         const clutchDate = p.clutch.date;
@@ -7316,9 +7467,7 @@ export default function BreedingPlannerApp() {
         const pairingLabel = resolvePairingLabel(p, female, male);
         const eggsRaw = p?.clutch?.eggsTotal;
         const fertileRaw = p?.clutch?.fertileEggs;
-        const eggs = Number.isFinite(Number(eggsRaw))
-          ? Number(eggsRaw)
-          : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : 0);
+        const eggs = resolveEggCountForClutch(eggsRaw, fertileRaw) || 0;
         const dueDate = addDaysYmd(clutchDate, 60);
         const dueDateObj = new Date(dueDate);
         const remaining = Number.isFinite(dueDateObj.getTime())
@@ -7331,29 +7480,96 @@ export default function BreedingPlannerApp() {
         return {
           id: p.id || `eggbox-${clutchDate}-${pairingLabel}`,
           pairingId: p.id,
+          pairing: p,
+          clutchNotes: p?.clutch?.notes || '',
+          eggBoxNotes: p?.clutch?.eggBoxNotes || {},
+          eggBoxBadEggs: p?.clutch?.eggBoxBadEggs || {},
           clutchDate,
           pairingLabel,
+          femaleName: female?.name || p.femaleId || 'Female',
+          maleName: male?.name || p.maleId || 'Male',
+          femaleGenetics: female ? (getDisplayedSnakeGeneticsTokens(female).length ? getDisplayedSnakeGeneticsTokens(female).join(', ') : 'Normal') : '\u2014',
+          maleGenetics: male ? (getDisplayedSnakeGeneticsTokens(male).length ? getDisplayedSnakeGeneticsTokens(male).join(', ') : 'Normal') : '\u2014',
           eggs,
+          fertileEggs: fertileRaw,
           dueDate,
           remaining,
           year: clutchYear,
         };
       })
       .sort((a, b) => new Date(a.clutchDate) - new Date(b.clutchDate));
-    return withClutchDate.map((item, idx) => ({
-      ...item,
-      number: idx + 1,
-      laidLabel: formatDateForDisplay(item.clutchDate) || '',
-      dueLabel: item.dueDate ? formatDateForDisplay(item.dueDate) : '',
-    }));
-  }, [pairings, snakes, t]);
-  const clutchNumberByPairingId = useMemo(() => {
-    const map = new Map();
-    eggBoxes.forEach(box => {
-      if (box?.pairingId) map.set(box.pairingId, box.number);
+    return activeClutchesWithDates.flatMap((item) => {
+      const metadata = clutchMetadataByPairingId.get(item.pairingId) || {};
+      const clutchNumber = metadata.clutchNumber || 0;
+      const eggBoxNumber = metadata.eggBoxNumber || clutchNumber || 0;
+      const boxEggCounts = splitEggBoxCounts(item.eggs);
+      return boxEggCounts.map((eggs, boxIdx) => {
+        const boxKey = String(boxIdx + 1);
+        const badEggsRaw = item.eggBoxBadEggs?.[boxKey] ?? item.eggBoxBadEggs?.[boxIdx + 1] ?? 0;
+        const badEggs = Math.max(0, Math.min(eggs, Math.floor(Number(badEggsRaw) || 0)));
+        return {
+          ...item,
+          id: `${item.id}-box-${boxIdx + 1}`,
+          clutchNumber,
+          number: clutchNumber,
+          eggBoxNumber,
+          eggBoxIndexInClutch: boxIdx + 1,
+          eggBoxCount: boxEggCounts.length,
+          originalEggs: eggs,
+          badEggs,
+          eggs: Math.max(0, eggs - badEggs),
+          notes: item.eggBoxNotes?.[boxKey] || item.eggBoxNotes?.[boxIdx + 1] || (boxEggCounts.length === 1 ? item.clutchNotes : ''),
+          laidLabel: formatDateForDisplay(item.clutchDate) || '',
+          dueLabel: item.dueDate ? formatDateForDisplay(item.dueDate) : '',
+        };
+      });
     });
-    return map;
+  }, [pairings, snakes, t, clutchMetadataByPairingId]);
+  const incubatorSummary = useMemo(() => {
+    const clutchIds = new Set();
+    let totalEggs = 0;
+    eggBoxes.forEach(box => {
+      if (box?.pairingId) clutchIds.add(box.pairingId);
+      const count = Number(box?.eggs);
+      if (Number.isFinite(count)) totalEggs += count;
+    });
+    return {
+      clutches: clutchIds.size,
+      boxes: eggBoxes.length,
+      eggs: totalEggs,
+    };
   }, [eggBoxes]);
+  const handleSaveEggBoxDetails = useCallback((box, { notes, badEggs } = {}) => {
+    if (!box?.pairingId) return;
+    const noteValue = String(notes || '').trim();
+    const maxEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
+    const badEggsValue = Math.max(0, Math.min(maxEggs, Math.floor(Number(badEggs) || 0)));
+    const indexKey = String(box.eggBoxIndexInClutch || 1);
+    setPairings(prev => prev.map(pairing => {
+      if (!pairing || pairing.id !== box.pairingId) return pairing;
+      const current = withPairingLifecycleDefaults({ ...pairing });
+      const currentClutch = { ...(current.clutch || {}) };
+      const nextEggBoxNotes = { ...(currentClutch.eggBoxNotes || {}) };
+      const nextEggBoxBadEggs = { ...(currentClutch.eggBoxBadEggs || {}) };
+      if (noteValue) nextEggBoxNotes[indexKey] = noteValue;
+      else delete nextEggBoxNotes[indexKey];
+      if (badEggsValue > 0) nextEggBoxBadEggs[indexKey] = badEggsValue;
+      else delete nextEggBoxBadEggs[indexKey];
+      const nextClutch = {
+        ...currentClutch,
+        eggBoxNotes: nextEggBoxNotes,
+        eggBoxBadEggs: nextEggBoxBadEggs,
+      };
+      if ((box.eggBoxCount || 1) === 1) {
+        nextClutch.notes = noteValue;
+      }
+      return withPairingLifecycleDefaults({
+        ...current,
+        clutch: nextClutch,
+      });
+    }));
+    setEggBoxModal(null);
+  }, [setPairings]);
   const filteredCompletedCount = filteredCompletedPairings.length;
 
   useEffect(() => {
@@ -7395,7 +7611,9 @@ export default function BreedingPlannerApp() {
   // generate QR data url when requested
   useEffect(()=>{
     if (!qrFor) { setQrDataUrl(null); return; }
-    const url = `${window.location.origin}${window.location.pathname}#snake=${encodeURIComponent(qrFor)}`;
+    const targetId = typeof qrFor === 'string' ? qrFor : qrFor?.id;
+    if (!targetId) { setQrDataUrl(null); return; }
+    const url = `${window.location.origin}${window.location.pathname}#snake=${encodeURIComponent(targetId)}`;
     QRCode.toDataURL(url, { width: 300 }).then(dataUrl => setQrDataUrl(dataUrl)).catch(()=>setQrDataUrl(null));
   }, [qrFor]);
 
@@ -7617,6 +7835,7 @@ export default function BreedingPlannerApp() {
 
   const handleRemoveSnakePhoto = useCallback((snakeId, photoId) => {
     if (!snakeId || !photoId) return;
+    let updatedSnake = null;
     setSnakes(prev => prev.map(s => {
       if (!s || s.id !== snakeId) return s;
       const remaining = normalizeSnakePhotos(s.photos).filter(photo => photo.id !== photoId);
@@ -7624,20 +7843,33 @@ export default function BreedingPlannerApp() {
       if (!remaining.some(photo => photo.url === nextImageUrl)) {
         nextImageUrl = remaining.length ? remaining[remaining.length - 1].url : undefined;
       }
-      return { ...s, photos: remaining, imageUrl: nextImageUrl };
+      updatedSnake = { ...s, photos: remaining, imageUrl: nextImageUrl };
+      return updatedSnake;
     }));
-  }, [setSnakes]);
+    if (editSnakeDraft?.id === snakeId) {
+      setEditSnakeDraft(prev => prev ? ({
+        ...prev,
+        photos: updatedSnake ? normalizeSnakePhotos(updatedSnake.photos) : normalizeSnakePhotos(prev.photos).filter(photo => photo.id !== photoId),
+        imageUrl: updatedSnake?.imageUrl,
+      }) : prev);
+    }
+  }, [setSnakes, editSnakeDraft?.id, setEditSnakeDraft]);
 
   const handleSetSnakeCoverPhoto = useCallback((snakeId, photoId) => {
     if (!snakeId || !photoId) return;
+    let selectedUrl = null;
     setSnakes(prev => prev.map(s => {
       if (!s || s.id !== snakeId) return s;
       const photos = normalizeSnakePhotos(s.photos);
       const selected = photos.find(photo => photo.id === photoId);
       if (!selected) return s;
+      selectedUrl = selected.url;
       return { ...s, photos, imageUrl: selected.url };
     }));
-  }, [setSnakes]);
+    if (selectedUrl && editSnakeDraft?.id === snakeId) {
+      setEditSnakeDraft(prev => prev ? ({ ...prev, photos: normalizeSnakePhotos(prev.photos), imageUrl: selectedUrl }) : prev);
+    }
+  }, [setSnakes, editSnakeDraft?.id]);
 
   const handleOpenPhotoGallery = useCallback((snakeId) => {
     if (!snakeId) return;
@@ -7686,10 +7918,11 @@ export default function BreedingPlannerApp() {
         if (!prev) return prev;
         const existing = normalizeSnakePhotos(prev.photos);
         const nextPhotos = combinedFromHandler || trimSnakePhotoList([...existing, ...newEntries]);
+        const latestUrl = nextPhotos.length ? nextPhotos[nextPhotos.length - 1]?.url : null;
         return {
           ...prev,
           photos: nextPhotos,
-          imageUrl: imageUrlFromHandler || prev.imageUrl,
+          imageUrl: imageUrlFromHandler || latestUrl || prev.imageUrl,
         };
       });
     } catch (error) {
@@ -8008,7 +8241,7 @@ export default function BreedingPlannerApp() {
     }
     const femaleName = femaleSnake?.name || 'Female';
     const maleName = maleSnake?.name || 'Male';
-    const autoLabel = `${femaleName} ֳ— ${maleName}`;
+    const autoLabel = `${femaleName} × ${maleName}`;
     const yearLabel = extractYearFromDateString(draft.startDate) || new Date().getFullYear();
     const basePairing = {
       femaleId: fId,
@@ -8247,7 +8480,7 @@ export default function BreedingPlannerApp() {
       const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
       const sire = snakeById(snakes, pairing?.maleId);
       const dam = snakeById(snakes, pairing?.femaleId);
-      const pairingName = `${dam?.name || 'Dam'} ֳ— ${sire?.name || 'Sire'}`;
+      const pairingName = `${dam?.name || 'Dam'} × ${sire?.name || 'Sire'}`;
       const baseExistingRecords = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
       const idsInUse = new Set(baseExistingRecords.map(record => record.id));
       const recordsInUse = baseExistingRecords.map(record => ({ ...record }));
@@ -8432,16 +8665,6 @@ export default function BreedingPlannerApp() {
       setHatchWizard(prev => regenerateWizardIdInState(prev, index, prev?.entries?.[index]?.sex));
     }, [regenerateWizardIdInState]);
 
-    const handleWizardNext = useCallback(() => {
-      setHatchWizard(prev => {
-        if (!prev) return prev;
-        const total = Array.isArray(prev.entries) ? prev.entries.length : 0;
-        const nextIndex = Math.min(total - 1, (prev.currentIndex || 0) + 1);
-        if (nextIndex === prev.currentIndex) return prev;
-        return { ...prev, currentIndex: nextIndex };
-      });
-    }, []);
-
     const handleWizardPrev = useCallback(() => {
       setHatchWizard(prev => {
         if (!prev) return prev;
@@ -8455,91 +8678,108 @@ export default function BreedingPlannerApp() {
       setHatchWizard(null);
     }, []);
 
-    const handleWizardSave = useCallback(() => {
+    const handleWizardSaveCurrent = useCallback(() => {
       setHatchWizard(prev => {
         if (!prev) return prev;
         const entries = Array.isArray(prev.entries) ? prev.entries : [];
         if (!entries.length) return null;
+        const currentIndex = Math.min(entries.length - 1, Math.max(0, prev.currentIndex || 0));
+        const entry = entries[currentIndex];
+        if (!entry) return prev;
+        if (entry.saved) {
+          const nextIndex = Math.min(entries.length - 1, currentIndex + 1);
+          return nextIndex === currentIndex ? null : { ...prev, currentIndex: nextIndex };
+        }
         const context = prev.context || {};
         const pairing = prev.pairing || null;
         const hatchedOn = prev.hatchedDate || localYMD(new Date());
         const baseGroup = context.groupName || null;
-  const existingIds = new Set(snakes.map(s => s.id));
-  const existingRecords = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
-        const created = [];
-
-        entries.forEach((entry, idx) => {
-          const fallbackName = entry.name || context.pairingName || `Hatchling ${idx + 1}`;
-          const sex = ensureSex(entry.sex, 'F');
-          let resolvedId = String(entry.id || '').trim();
-          const rawBirthValue = entry.birthDate || hatchedOn;
-          const normalizedBirthDate = rawBirthValue ? normalizeDateInput(rawBirthValue) || rawBirthValue : '';
-          const entryBirthYear = extractYearFromDateString(normalizedBirthDate || rawBirthValue);
-          const yearBase = entryBirthYear ?? context.year ?? new Date().getFullYear();
-          if (!resolvedId) {
-            resolvedId = generateSnakeId(
-              fallbackName,
-              yearBase,
-              existingRecords,
-              null,
-              { idConfig: context.idConfig, sex, morphs: [], hets: [], birthYear: entryBirthYear ?? yearBase }
-            );
+        const savedIds = entries
+          .map(item => item?.savedId || (item?.saved ? item?.id : ''))
+          .filter(Boolean)
+          .map(id => String(id));
+        const existingIds = new Set([...snakes.map(s => s.id), ...savedIds]);
+        const existingRecords = [
+          ...snakes.map(s => ({ id: s.id, idSequence: s.idSequence })),
+          ...savedIds.map(id => ({ id, idSequence: extractSequenceFromId(id, breederInfo?.idGenerator) })),
+        ];
+        const fallbackName = entry.name || context.pairingName || `Hatchling ${currentIndex + 1}`;
+        const sex = ensureSex(entry.sex, 'F');
+        let resolvedId = String(entry.id || '').trim();
+        const rawBirthValue = entry.birthDate || hatchedOn;
+        const normalizedBirthDate = rawBirthValue ? normalizeDateInput(rawBirthValue) || rawBirthValue : '';
+        const entryBirthYear = extractYearFromDateString(normalizedBirthDate || rawBirthValue);
+        const yearBase = entryBirthYear ?? context.year ?? new Date().getFullYear();
+        if (!resolvedId) {
+          resolvedId = generateSnakeId(
+            fallbackName,
+            yearBase,
+            existingRecords,
+            null,
+            { idConfig: context.idConfig, sex, morphs: [], hets: [], birthYear: entryBirthYear ?? yearBase }
+          );
+        }
+        if (!resolvedId) return prev;
+        if (existingIds.has(resolvedId)) {
+          let suffix = 2;
+          let candidate = `${resolvedId}-${suffix}`;
+          while (existingIds.has(candidate)) {
+            suffix += 1;
+            candidate = `${resolvedId}-${suffix}`;
           }
-          if (!resolvedId) return;
-          if (existingIds.has(resolvedId)) {
-            let suffix = 2;
-            let candidate = `${resolvedId}-${suffix}`;
-            while (existingIds.has(candidate)) {
-              suffix += 1;
-              candidate = `${resolvedId}-${suffix}`;
-            }
-            resolvedId = candidate;
-          }
-          existingIds.add(resolvedId);
-          const idSequence = extractSequenceFromId(resolvedId, breederInfo?.idGenerator);
-          existingRecords.push({ id: resolvedId, idSequence });
-          const birthDateRaw = normalizedBirthDate || rawBirthValue;
-          const parsedBirth = parseYmd(birthDateRaw);
-          const derivedYear = parsedBirth && Number.isFinite(parsedBirth.getFullYear())
-            ? parsedBirth.getFullYear()
-            : yearBase;
-          const { morphs, hets } = splitMorphHetInput(entry.morph || '');
-          const grams = Number(entry.weight);
-          const weight = Number.isFinite(grams) && grams >= 0 ? grams : 0;
-          created.push({
-            id: resolvedId,
-            name: fallbackName,
-            sex,
-            morphs,
-            hets,
-            weight,
-            year: derivedYear,
-            birthDate: birthDateRaw,
-            pairingId: pairing?.id || prev.pairingId || null,
-            sireId: pairing?.maleId || null,
-            damId: pairing?.femaleId || null,
-            tags: ['hatchling'],
-            groups: baseGroup ? normalizeSingleGroupValue(baseGroup) : [],
-            status: 'Active',
-            imageUrl: undefined,
-            logs: cloneLogs(),
-            idSequence,
-            isDemo: false,
-          });
-        });
+          resolvedId = candidate;
+        }
+        const idSequence = extractSequenceFromId(resolvedId, breederInfo?.idGenerator);
+        const birthDateRaw = normalizedBirthDate || rawBirthValue;
+        const parsedBirth = parseYmd(birthDateRaw);
+        const derivedYear = parsedBirth && Number.isFinite(parsedBirth.getFullYear())
+          ? parsedBirth.getFullYear()
+          : yearBase;
+        const { morphs, hets } = splitMorphHetInput(entry.morph || '');
+        const grams = Number(entry.weight);
+        const weight = Number.isFinite(grams) && grams >= 0 ? grams : 0;
+        const created = {
+          id: resolvedId,
+          name: fallbackName,
+          sex,
+          morphs,
+          hets,
+          weight,
+          year: derivedYear,
+          birthDate: birthDateRaw,
+          pairingId: pairing?.id || prev.pairingId || null,
+          sireId: pairing?.maleId || null,
+          damId: pairing?.femaleId || null,
+          tags: ['hatchling'],
+          groups: baseGroup ? normalizeSingleGroupValue(baseGroup) : [],
+          status: 'Active',
+          imageUrl: undefined,
+          logs: cloneLogs(),
+          idSequence,
+          isDemo: false,
+        };
 
-        if (created.length) {
+        if (created.id) {
           setSnakes(prevSnakes => {
             const base = prevSnakes.filter(s => !s.isDemo);
-            return [...base, ...created];
+            if (base.some(s => s.id === created.id)) return base;
+            return [...base, created];
           });
           if (baseGroup) {
             setGroups(prevGroups => (prevGroups.includes(baseGroup) ? prevGroups : [...prevGroups, baseGroup]));
           }
-          showAppAlert(`${created.length} hatchlings added${baseGroup ? ` to ${baseGroup}` : ''}.`);
         }
 
-        return null;
+        const nextEntries = entries.map((item, idx) => idx === currentIndex
+          ? { ...item, id: resolvedId, idSequence, saved: true, savedId: resolvedId }
+          : item
+        );
+        const savedCount = nextEntries.filter(item => item?.saved).length;
+        if (currentIndex >= entries.length - 1) {
+          showAppAlert(`${savedCount} hatchlings added${baseGroup ? ` to ${baseGroup}` : ''}.`);
+          return null;
+        }
+        return { ...prev, entries: nextEntries, currentIndex: currentIndex + 1 };
       });
   }, [snakes, setSnakes, setGroups, breederInfo, showAppAlert]);
 
@@ -8712,7 +8952,11 @@ export default function BreedingPlannerApp() {
   }, [pairings, snakes, showAppAlert]);
 
   return (
-    <div className="app-root w-full min-h-screen" style={appRootStyle}>
+    <div
+      className="app-root w-full min-h-screen"
+      data-background-mode={resolvedAppearance?.backgroundMode === 'logo' ? 'logo' : 'solid'}
+      style={{ ...appRootStyle, '--breeder-logo-bg': breederLogoBackground }}
+    >
       {appDialogOverlay}
       {/* header */}
       <div className="px-5 py-4 border-b bg-white sticky top-0 z-10">
@@ -8869,7 +9113,7 @@ export default function BreedingPlannerApp() {
                 listExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600'
               )}>
                 {listExportFeedback.message}
-                {listExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(listExportFeedback.timestamp)}` : ''}
+                {listExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(listExportFeedback.timestamp)}` : ''}
               </div>
             )}
 
@@ -8919,7 +9163,7 @@ export default function BreedingPlannerApp() {
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
                           <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
-                          <span className="text-[10px] text-neutral-500">ג–¾</span>
+                          <span className="text-[10px] text-neutral-500">v</span>
                         </button>
                         {tagFilterMenuOpen && (
                           <div className="absolute z-30 mt-1 w-full min-w-[220px] max-h-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
@@ -9126,7 +9370,7 @@ export default function BreedingPlannerApp() {
                       onClick={() => setPairingsSearchQuery('')}
                       aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
                     >
-                      ֳ—
+                      ×
                     </button>
                   )}
                 </div>
@@ -9171,6 +9415,8 @@ export default function BreedingPlannerApp() {
               <BreedingDashboardSection
                 items={breedingDashboardItems}
                 theme={theme}
+                clutchNumberByPairingId={clutchNumberByPairingId}
+                clutchMetadataByPairingId={clutchMetadataByPairingId}
                 onOpenPairing={(pid) => {
                   const p = pairings.find(x => x.id === pid);
                   if (p) {
@@ -9182,27 +9428,95 @@ export default function BreedingPlannerApp() {
             ) : pairingsView === 'incubator' ? (
               <Card title={t("pairing.incubatorTitle", { count: eggBoxes.length })}>
                 {eggBoxes.length ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {eggBoxes.map(box => (
-                      <div key={box.id} className="border rounded-xl p-4 bg-white shadow-sm flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold">{t("pairing.eggBox.title", { number: box.number })}</div>
-                          <div className="text-xs text-neutral-500">{box.year || t("pairing.eggBox.yearFallback")}</div>
-                        </div>
-                        <div className="text-sm text-neutral-700">
-                          {t("pairing.eggBox.clutchLabel", { number: box.number, pairing: box.pairingLabel })}
-                        </div>
-                        <div className="text-xs text-neutral-500">
-                          {t("pairing.eggBox.laidDue", { laid: box.laidLabel, due: box.dueLabel })}
-                        </div>
-                        <div className="text-sm font-medium">{t("pairing.eggBox.eggs", { count: box.eggs })}</div>
-                        {typeof box.remaining === 'number' && (
-                          <div className="text-xs text-neutral-600">
-                            {t("pairing.eggBox.remaining", { remaining: box.remaining })}
-                          </div>
-                        )}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Clutches</div>
+                        <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.clutches}</div>
                       </div>
-                    ))}
+                      <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Egg boxes</div>
+                        <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.boxes}</div>
+                      </div>
+                      <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Total eggs</div>
+                        <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.eggs}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      {eggBoxes.map(box => (
+                        <div key={box.id} className="border rounded-xl p-3 bg-white shadow-sm flex flex-col gap-1.5 text-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="font-semibold text-sm leading-snug">
+                              {box.eggBoxCount > 1
+                                ? t("pairing.eggBox.splitTitle", {
+                                  number: box.eggBoxNumber,
+                                  box: box.eggBoxIndexInClutch,
+                                  total: box.eggBoxCount,
+                                  defaultValue: "Egg box #{{number}} ({{box}} of {{total}})",
+                                })
+                                : t("pairing.eggBox.title", { number: box.eggBoxNumber })}
+                            </div>
+                            <div className="text-xs text-neutral-500">{box.year || t("pairing.eggBox.yearFallback")}</div>
+                          </div>
+                          <div className="text-xs leading-snug text-neutral-700">
+                            {t("pairing.eggBox.clutchLabel", { number: box.clutchNumber || box.number, pairing: box.pairingLabel })}
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            {t("pairing.eggBox.laidDue", { laid: box.laidLabel, due: box.dueLabel })}
+                          </div>
+                          <div className="text-xs font-medium">{t("pairing.eggBox.eggs", { count: box.eggs })}</div>
+                          {box.badEggs > 0 ? (
+                            <div className="text-xs text-rose-600">
+                              Bad eggs: {box.badEggs} of {box.originalEggs}
+                            </div>
+                          ) : null}
+                          {typeof box.remaining === 'number' && (
+                            <div className="text-xs text-neutral-600">
+                              {t("pairing.eggBox.remaining", { remaining: box.remaining })}
+                            </div>
+                          )}
+                          {box.notes ? (
+                            <div className="text-xs text-neutral-500 line-clamp-2">
+                              Notes: {box.notes}
+                            </div>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
+                            onClick={() => setEggBoxModal(box)}
+                          >
+                            View / edit egg box
+                          </button>
+                          <button
+                            type="button"
+                            className={cx('mt-1 w-fit px-2.5 py-1.5 rounded-xl text-xs', primaryBtnClass(theme, true))}
+                            onClick={async () => {
+                              try {
+                                await exportClutchCardToPdf({
+                                  clutchNumber: box.clutchNumber || box.number,
+                                  clutchDate: box.clutchDate,
+                                  femaleName: box.femaleName,
+                                  femaleGenetics: box.femaleGenetics,
+                                  maleName: box.maleName,
+                                  maleGenetics: box.maleGenetics,
+                                  eggsTotal: box.eggs,
+                                  fertileEggs: box.fertileEggs,
+                                  eggBoxNumber: box.eggBoxNumber,
+                                  eggBoxCount: box.eggBoxCount,
+                                  label: box.pairingLabel,
+                                });
+                              } catch (err) {
+                                console.error('Failed to generate clutch card from incubator', err);
+                                await showAppAlert('Unable to generate clutch card PDF.');
+                              }
+                            }}
+                          >
+                            Print clutch card
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-neutral-500">{t("pairing.incubatorEmpty")}</div>
@@ -9223,6 +9537,7 @@ export default function BreedingPlannerApp() {
               onExportPairingQr={handleGeneratePairingQrLabels}
               showAppAlert={showAppAlert}
               clutchNumberByPairingId={clutchNumberByPairingId}
+              clutchMetadataByPairingId={clutchMetadataByPairingId}
               focusedPairingId={focusedPairingId}
               onFocusPairing={setFocusedPairingId}
               theme={theme}
@@ -9294,13 +9609,13 @@ export default function BreedingPlannerApp() {
         )}
       </div>
 
-      {photoGallerySnake && (
+      {photoGallerySnake && typeof document !== 'undefined' && createPortal((
         <div
-          className={cx("fixed inset-0 flex items-center justify-center p-4 z-[80]", overlayClass(theme))}
+          className={cx("fixed inset-0 flex items-center justify-center p-4 z-[10040]", overlayClass(theme))}
           onClick={handleClosePhotoGallery}
         >
           <div
-            className="relative w-full max-w-4xl bg-white text-neutral-900 rounded-2xl shadow-xl border border-neutral-200 max-h-[90vh] overflow-hidden"
+            className="relative z-[10041] w-full max-w-4xl bg-white text-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 px-5 pt-5">
@@ -9343,7 +9658,7 @@ export default function BreedingPlannerApp() {
                           </div>
                           <div className="text-xs text-neutral-500">
                             {photo.source === 'camera' ? 'Captured on device' : 'Uploaded file'}
-                            {sizeLabel ? ` ג€” ${sizeLabel}` : ''}
+                            {sizeLabel ? ` — ${sizeLabel}` : ''}
                           </div>
                           {addedLabel && (
                             <div className="text-xs text-neutral-500">Added {addedLabel}</div>
@@ -9390,12 +9705,12 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* add animal modal (two-step wizard) */}
-  {showAddModal && (
-  <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowAddModal(false)}>
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+  {showAddModal && typeof document !== 'undefined' && createPortal((
+  <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowAddModal(false)}>
+      <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">{i18n.t("ui.animals.addAnimal.title")}</div>
               <button className="text-sm px-2 py-1" onClick={()=>setShowAddModal(false)}>{i18n.t("common.close")}</button>
@@ -9421,15 +9736,15 @@ export default function BreedingPlannerApp() {
             />
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {leucisticModalState && (
+      {leucisticModalState && typeof document !== 'undefined' && createPortal((
         <div
-          className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-[120]", overlayClass(theme))}
+          className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10050]", overlayClass(theme))}
           onClick={cancelLeucisticSelector}
         >
           <div
-            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
+            className="relative z-[10051] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="text-lg font-semibold">Select Leucistic Type</div>
@@ -9452,7 +9767,7 @@ export default function BreedingPlannerApp() {
                   Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically.
                 </p>
                 <p className="mt-1">
-                  Examples: Fire + Fire ג†’ Super Fire, Lesser + Lesser ג†’ Super Lesser, Butter + Butter ג†’ Super Butter.
+                  Examples: Fire + Fire creates Super Fire, Lesser + Lesser creates Super Lesser, Butter + Butter creates Super Butter.
                 </p>
               </div>
               <p>
@@ -9531,7 +9846,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {pairingGuard && (() => {
         const pairingGuardSnakeName =
@@ -9607,26 +9922,39 @@ export default function BreedingPlannerApp() {
         const groupName = hatchWizard.context?.groupName || '';
         const isLast = safeIndex === total - 1;
         const canAdvance = entry && String(entry.id || '').trim().length > 0;
+        const savedCount = Array.isArray(hatchWizard.entries)
+          ? hatchWizard.entries.filter(item => item?.saved).length
+          : 0;
         return (
           <div
             className={cx(
-              'fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50',
+              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-50',
               overlayClass(theme)
             )}
             onClick={handleWizardCancel}
           >
             <div
-              className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh] flex flex-col"
+              className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-4 border-b flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">Log hatchlings</div>
-                  <div className="text-xs text-neutral-500 mt-0.5">
-                    {total > 0 ? `Hatchling ${safeIndex + 1} of ${total}` : 'No hatchlings to record'}
+              <div className="p-4 border-b bg-neutral-50">
+                <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Hatching clutch</div>
+                    <div className="mt-1 font-semibold text-neutral-900 truncate">{pairingName}</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">
+                      {total > 0 ? `Hatchling ${safeIndex + 1} of ${total}` : 'No hatchlings to record'}
+                      {groupName ? ` - ${groupName}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-2xl font-semibold leading-none">{savedCount}/{total}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">Saved</div>
+                    </div>
+                    <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>Close</button>
                   </div>
                 </div>
-                <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>Close</button>
               </div>
               <div className="p-4 overflow-auto flex-1">
                 {entry ? (
@@ -9656,7 +9984,9 @@ export default function BreedingPlannerApp() {
                         </button>
                       </div>
                       <div className="text-xs text-neutral-500 mt-1">
-                        {entry.autoId ? 'Generated automatically based on pairing.' : 'ID lockedג€”edit to override or regenerate.'}
+                        {entry.saved
+                          ? `Saved as ${entry.savedId || entry.id}.`
+                          : (entry.autoId ? 'Generated automatically based on pairing.' : 'ID locked—edit to override or regenerate.')}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -9715,26 +10045,14 @@ export default function BreedingPlannerApp() {
                       Previous
                     </button>
                   )}
-                  {!isLast && (
-                    <button
-                      type="button"
-                      className={cx('px-3 py-2 rounded-xl text-sm text-white', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
-                      onClick={handleWizardNext}
-                      disabled={!canAdvance}
-                    >
-                      Next
-                    </button>
-                  )}
-                  {isLast && (
-                    <button
-                      type="button"
-                      className={cx('px-3 py-2 rounded-xl text-sm text-white', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
-                      onClick={handleWizardSave}
-                      disabled={!canAdvance}
-                    >
-                      Save hatchlings
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className={cx('px-3 py-2 rounded-xl text-sm text-white', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
+                    onClick={handleWizardSaveCurrent}
+                    disabled={!canAdvance}
+                  >
+                    {isLast ? 'Save hatchling' : 'Save & next'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -9742,9 +10060,9 @@ export default function BreedingPlannerApp() {
         );
       })()}
 
-          {showImportModal && (
-            <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
-              <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+          {showImportModal && typeof document !== 'undefined' && createPortal((
+            <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
+              <div className="relative z-[10011] bg-white w-full max-w-5xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b flex items-center justify-between">
                   <div className="font-semibold">{t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })}</div>
                   <button className="text-sm px-2 py-1" onClick={()=>setShowImportModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
@@ -9765,9 +10083,9 @@ export default function BreedingPlannerApp() {
                 </div>
               </div>
             </div>
-          )}
+          ), document.body)}
 
-      {/* create pairing modal ג€” breeders only, male-first */}
+      {/* create pairing modal — breeders only, male-first */}
     {showPairingModal && (
   <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
@@ -9917,7 +10235,7 @@ export default function BreedingPlannerApp() {
 
               {draft.maleId && draft.femaleId && (
                 <div className="sm:col-span-2 text-xs text-neutral-500">
-                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} ֳ— {(currentMale?.name || draft.maleId)}.
+                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} × {(currentMale?.name || draft.maleId)}.
                 </div>
               )}
               <div className="sm:col-span-2">
@@ -9955,9 +10273,9 @@ export default function BreedingPlannerApp() {
       )}
 
       {/* edit snake */}
-    {editSnake && editSnakeDraft && (
-    <div className={cx("fixed inset-0 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 z-50", overlayClass(theme))}>
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border flex flex-col" onClick={e=>e.stopPropagation()}>
+    {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
+    <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
+      <div className="relative z-[10001] bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
             <div className="p-5 border-b flex items-center justify-between">
                         <div className="font-semibold">{editSnake.name}</div>
                         <div className="flex items-center gap-2">
@@ -10339,11 +10657,15 @@ export default function BreedingPlannerApp() {
                 {/* Image panel moved under logs; upload button sits inside the picture area */}
                 <div className="mt-4 flex flex-col items-end gap-3">
                   <div style={{width:318, height:318}} className="rounded-lg overflow-hidden border-2 border-neutral-200 relative">
-                    {editSnakeDraft.imageUrl ? (
-                      <img src={editSnakeDraft.imageUrl} alt={editSnakeDraft.name} className="w-full h-full object-cover object-center" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-neutral-500 bg-neutral-50">{t("snakeEdit.image.none")}</div>
-                    )}
+                    {(() => {
+                      const draftPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
+                      const frameUrl = editSnakeDraft.imageUrl || (draftPhotos.length ? draftPhotos[draftPhotos.length - 1]?.url : '');
+                      return frameUrl ? (
+                        <img src={frameUrl} alt={editSnakeDraft.name} className="w-full h-full object-contain object-center bg-neutral-50" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-sm text-neutral-500 bg-neutral-50">{t("snakeEdit.image.none")}</div>
+                      );
+                    })()}
                     {editUploadingPhoto && (
                       <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center text-sm text-neutral-600">
                         {t("snakeEdit.image.saving")}
@@ -10404,7 +10726,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       <div className="py-10" />
       {qrFor && (() => {
@@ -10415,18 +10737,20 @@ export default function BreedingPlannerApp() {
         const modalName = override?.name ?? fallbackSnake?.name;
         const modalMorphs = override?.morphs ?? fallbackSnake?.morphs;
         const modalHets = override?.hets ?? fallbackSnake?.hets;
+        const modalPossibleHets = override?.possibleHets ?? fallbackSnake?.possibleHets;
         return (
           <QRModal
             id={target.id}
             name={modalName}
             morphs={modalMorphs}
             hets={modalHets}
+            possibleHets={modalPossibleHets}
             dataUrl={qrDataUrl}
             onClose={() => setQrFor(null)}
           />
         );
       })()}
-  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} />
+  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
       <ExportPairingQrModal
         open={showPairingQrModal}
         onClose={() => setShowPairingQrModal(false)}
@@ -10452,6 +10776,12 @@ export default function BreedingPlannerApp() {
         snake={pendingDeleteSnake}
         onCancel={cancelDeleteSnake}
         onConfirm={confirmDeleteSnake}
+        theme={theme}
+      />
+      <EggBoxModal
+        box={eggBoxModal}
+        onClose={() => setEggBoxModal(null)}
+        onSave={handleSaveEggBoxDetails}
         theme={theme}
       />
       <BreederOrderGeneticTestModal
@@ -10719,9 +11049,9 @@ export {
 
       const hasManualValue = manualValue.trim().length > 0;
 
-      return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={onClose}>
-          <div className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e=>e.stopPropagation()}>
+      const scannerContent = (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
+          <div className="relative z-[10011] bg-white p-4 rounded-lg shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium text-lg">{t('scanQrCode')}</div>
@@ -10819,6 +11149,8 @@ export {
           </div>
         </div>
       );
+      if (inline || typeof document === 'undefined') return scannerContent;
+      return createPortal(scannerContent, document.body);
     }
 
 function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInterval = 150, maxScanDuration = 2000 }) {
@@ -10983,9 +11315,10 @@ function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInte
 function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
   const { t } = useTranslation();
   if (!snake) return null;
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[70]" onClick={onCancel}>
-      <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
+  if (typeof document === 'undefined') return null;
+  return createPortal((
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
+      <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="font-semibold text-lg">Delete {snake.name || 'this snake'}?</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           This removes the animal and detaches any pairings linked to it. Demo animals will return automatically whenever your collection is empty, so you always have something to explore.
@@ -11001,7 +11334,7 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function primaryBtnClass(theme, filled = true) {
@@ -11431,7 +11764,7 @@ function SpacesSection({
                       <span>
                         {isEmpty
                           ? t('spaces.roomEmpty', { defaultValue: 'Empty room' })
-                          : t('spaces.roomCounts', { defaultValue: '{{racks}} racks ג€¢ {{terrariums}} terrariums', racks: roomRacks.length, terrariums: roomTerrariums.length })}
+                          : t('spaces.roomCounts', { defaultValue: '{{racks}} racks • {{terrariums}} terrariums', racks: roomRacks.length, terrariums: roomTerrariums.length })}
                       </span>
                     </div>
                     <button
@@ -11539,34 +11872,131 @@ function SpacesSection({
   );
 }
 
-function QRModal({ id, name, morphs, hets, dataUrl, onClose }) {
+function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
   if (!id) return null;
   const geneticsTokens = combineMorphsAndHetsForDisplay(morphs, hets, possibleHets);
-  return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
+  if (typeof document === 'undefined') return null;
+  return createPortal((
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
+      <div className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
         <div className="font-medium mb-2">QR for {name || id}</div>
         <div className="text-sm text-neutral-500 mb-2">ID: <span className="font-mono">{id}</span></div>
         <div className="space-y-1 mb-3">
           {geneticsTokens.length ? <GeneLine label="Genetics" genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">Genetics: -</div>}
         </div>
-        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generatingג€¦</div>}
+        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generating…</div>}
         <div className="mt-3 flex gap-2">
           {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>Download</a>}
           <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
-function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue' }) {
+function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
+  const [notes, setNotes] = useState('');
+  const [badEggs, setBadEggs] = useState('0');
+
+  useEffect(() => {
+    setNotes(box?.notes || '');
+    setBadEggs(String(box?.badEggs || 0));
+  }, [box]);
+
+  if (!box || typeof document === 'undefined') return null;
+
+  const title = box.eggBoxCount > 1
+    ? `Egg box #${box.eggBoxNumber} (${box.eggBoxIndexInClutch} of ${box.eggBoxCount})`
+    : `Egg box #${box.eggBoxNumber}`;
+  const originalEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
+  const badEggsCount = Math.max(0, Math.min(originalEggs, Math.floor(Number(badEggs) || 0)));
+  const goodEggsCount = Math.max(0, originalEggs - badEggsCount);
+
+  return createPortal((
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-[10020]" onClick={onClose}>
+      <div className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b flex items-start justify-between gap-3">
+          <div>
+            <div className="font-semibold text-lg">{title}</div>
+            <div className="text-sm text-neutral-500">Clutch #{box.clutchNumber || box.number}</div>
+          </div>
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Close</button>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Pairing</div>
+              <div className="mt-1 font-medium text-neutral-900">{box.pairingLabel}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Good eggs in this box</div>
+              <div className="mt-1 font-medium text-neutral-900">{goodEggsCount}</div>
+              <div className="mt-1 text-xs text-neutral-500">Started with {originalEggs}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Laid</div>
+              <div className="mt-1 font-medium text-neutral-900">{box.laidLabel || '-'}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Due</div>
+              <div className="mt-1 font-medium text-neutral-900">{box.dueLabel || '-'}</div>
+            </div>
+            {typeof box.remaining === 'number' ? (
+              <div className="rounded-xl border bg-neutral-50 p-3 sm:col-span-2">
+                <div className="text-[11px] uppercase tracking-wide text-neutral-500">Remaining</div>
+                <div className="mt-1 font-medium text-neutral-900">{box.remaining} days</div>
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium">Bad eggs</label>
+            <input
+              type="number"
+              min="0"
+              max={originalEggs}
+              className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+              value={badEggs}
+              onChange={e => setBadEggs(e.target.value)}
+            />
+            <div className="mt-1 text-xs text-neutral-500">
+              Enter eggs that went bad. The egg box count will reduce to {goodEggsCount}.
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium">Egg box notes</label>
+            <textarea
+              className="mt-1 w-full min-h-32 border rounded-xl px-3 py-2 text-sm"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Add incubation notes, egg condition, movement, or reminders."
+            />
+          </div>
+        </div>
+        <div className="p-4 border-t flex justify-end gap-2">
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+            onClick={() => onSave?.(box, { notes, badEggs: badEggsCount })}
+          >
+            Save egg box
+          </button>
+        </div>
+      </div>
+    </div>
+  ), document.body);
+}
+
+function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue', showAppAlert }) {
   const [mode, setMode] = useState('all'); // all | groups | selected
   const [selectedGroupsLocal, setSelectedGroupsLocal] = useState([]);
   const [selectedSnakesLocal, setSelectedSnakesLocal] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { t } = useTranslation();
 
-  useEffect(()=>{ if (!open) { setMode('all'); setSelectedGroupsLocal([]); setSelectedSnakesLocal([]); } }, [open]);
+  useEffect(()=>{ if (!open) { setMode('all'); setSelectedGroupsLocal([]); setSelectedSnakesLocal([]); setIsGenerating(false); } }, [open]);
 
   const handleGenerate = async () => {
     let toExport = [];
@@ -11576,13 +12006,28 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
     } else {
       toExport = snakes.filter(s => selectedSnakesLocal.includes(s.id));
     }
-    onGenerate(toExport);
-    onClose();
+    if (!toExport.length) {
+      const message = t("qrModal.emptySelection", { defaultValue: "Select at least one animal to export." });
+      if (typeof showAppAlert === 'function') showAppAlert(message);
+      else console.warn(message);
+      return;
+    }
+    try {
+      setIsGenerating(true);
+      await onGenerate(toExport);
+      onClose();
+    } catch (err) {
+      const message = err?.message || t("qrModal.exportFailed", { defaultValue: "QR export failed." });
+      if (typeof showAppAlert === 'function') showAppAlert(message);
+      else console.error('QR export failed', err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  return open ? (
-    <div className={cx("fixed inset-0 flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={onClose}>
-      <div className="bg-white p-4 rounded-lg shadow w-full max-w-2xl" onClick={e=>e.stopPropagation()}>
+  return open && typeof document !== 'undefined' ? createPortal((
+    <div className={cx("fixed inset-0 flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
+      <div className="relative z-[10011] bg-white p-4 rounded-lg shadow w-full max-w-2xl" onClick={e=>e.stopPropagation()}>
         <div className="font-medium mb-2">{t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })}</div>
         <div className="space-y-3">
           <div>
@@ -11620,12 +12065,14 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-lg border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-lg text-white', primaryBtnClass(theme,true))} onClick={handleGenerate}>{t("qrModal.generate", { defaultValue: "Generate PDF" })}</button>
+          <button className="px-3 py-2 rounded-lg border" onClick={onClose} disabled={isGenerating}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          <button className={cx('px-3 py-2 rounded-lg text-white', primaryBtnClass(theme,true))} onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? t("qrModal.generating", { defaultValue: "Generating..." }) : t("qrModal.generate", { defaultValue: "Generate PDF" })}
+          </button>
         </div>
       </div>
     </div>
-  ) : null;
+  ), document.body) : null;
 }
 
 function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGenerate, theme = 'blue', showAppAlert }) {
@@ -11646,7 +12093,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
       const female = snakeById(snakes, pairing.femaleId);
       const maleName = male?.name || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
       const femaleName = female?.name || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
-      const label = pairing.label || `${femaleName} ֳ— ${maleName}`;
+      const label = pairing.label || `${femaleName} × ${maleName}`;
       return {
         id: pairing.id,
         label,
@@ -11714,7 +12161,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
                         <span className="font-medium block">{item.label}</span>
                         <span className="text-xs text-neutral-500">
                           {t('pairingQrModal.pairingMeta', {
-                            defaultValue: 'Male: {{male}} ג€” Female: {{female}}',
+                            defaultValue: 'Male: {{male}} — Female: {{female}}',
                             male: item.maleName,
                             female: item.femaleName,
                           })}
@@ -11905,9 +12352,9 @@ async function generateSnakeCatalogPDF(animals = []) {
     }
 
     const animal = animals[index] || {};
-    const idValue = String(animal.id || 'ג€”');
+    const idValue = String(animal.id || '—');
     const sexValue = formatCatalogSex(animal.sex);
-    const morphValue = resolveCatalogMorph(animal) || 'ג€”';
+    const morphValue = resolveCatalogMorph(animal) || '—';
     const priceRaw = animal.price;
     const pairingRaw = animal.pairing;
     const taggedForSell = isSnakeTaggedForSell(animal);
@@ -11952,7 +12399,7 @@ async function generateSnakeCatalogPDF(animals = []) {
         doc.text(lines, textX + textLabelW, cursorY);
         cursorY += (Math.max(1, lines.length) * 5.4) + 4;
       } else {
-        doc.text(String(value || 'ג€”'), textX + textLabelW, cursorY);
+        doc.text(String(value || '—'), textX + textLabelW, cursorY);
         cursorY += lineHeight;
       }
     };
@@ -11971,6 +12418,13 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
   if (!Array.isArray(snakesToExport) || !snakesToExport.length) {
     throw new Error('Select at least one animal to export.');
   }
+  const exportRows = snakesToExport
+    .filter(Boolean)
+    .map(snake => ({ ...snake, id: String(snake.id || '').trim() }))
+    .filter(snake => snake.id);
+  if (!exportRows.length) {
+    throw new Error('Selected animals do not have IDs to export.');
+  }
   const { jsPDF } = await import('jspdf');
   const layout = resolvePdfLabelLayout(breederInfo?.pdfLabelSettings);
   const pageW = layout.pageWidthMm;
@@ -11982,7 +12436,12 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
     ? Math.max(1, Math.floor(layout.columns) * Math.floor(layout.rows))
     : 1;
 
-  for (let i = 0; i < snakesToExport.length; i++) {
+  const baseUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}`
+    : '';
+  let renderedCount = 0;
+
+  for (let i = 0; i < exportRows.length; i++) {
     if (i > 0 && i % slotsPerPage === 0) {
       doc.addPage([pageW, pageH], pageOrientation);
     }
@@ -11994,10 +12453,16 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
     const labelW = layout.labelWidthMm;
     const labelH = layout.labelHeightMm;
 
-    const s = snakesToExport[i];
-    const url = `${window.location.origin}${window.location.pathname}#snake=${encodeURIComponent(s.id)}`;
+    const s = exportRows[i];
+    const url = `${baseUrl}#snake=${encodeURIComponent(s.id)}`;
     try {
-      const dataUrl = await createQrDataUrl(url, breederInfo?.logoUrl);
+      let dataUrl;
+      try {
+        dataUrl = await createQrDataUrl(url, breederInfo?.logoUrl);
+      } catch (qrErr) {
+        console.warn('Logo QR generation failed; retrying without logo', qrErr);
+        dataUrl = await createQrDataUrl(url, null);
+      }
       const margin = Math.max(1.5, Math.min(4, labelW * 0.05));
       const qrSize = Math.min(labelH - margin * 2, Math.max(14, Math.min(38, labelW * 0.45)));
       const qrX = labelX + margin;
@@ -12110,6 +12575,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
         doc.setFontSize(geneticsFont);
         doc.text(geneticsLines, textX, textY, { baseline: 'top' });
       }
+      renderedCount += 1;
 
     } catch (err) {
       console.error('QR gen failed', err);
@@ -12118,6 +12584,10 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
     doc.setDrawColor(120);
     doc.setLineWidth(0.25);
     doc.rect(labelX, labelY, labelW, labelH);
+  }
+
+  if (!renderedCount) {
+    throw new Error('QR export failed before any labels could be generated.');
   }
 
   doc.save('qr-labels.pdf');
@@ -12162,7 +12632,7 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
     const femaleSnake = snakesById.get(pairing.femaleId);
     const maleName = maleSnake?.name || pairing.maleId || 'Male';
     const femaleName = femaleSnake?.name || pairing.femaleId || 'Female';
-    const pairingLabel = pairing.label || `${femaleName} ֳ— ${maleName}`;
+    const pairingLabel = pairing.label || `${femaleName} × ${maleName}`;
     const link = `${window.location.origin}${window.location.pathname}#pairing=${encodeURIComponent(pairing.id)}`;
 
     const appointments = (pairing.appointments || [])
@@ -12377,7 +12847,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
       const contact = [];
       if (breederInfo.email) contact.push(breederInfo.email);
       if (breederInfo.phone) contact.push(breederInfo.phone);
-      if (contact.length) doc.text(contact.join(' ג€¢ '), infoX, y + 18);
+      if (contact.length) doc.text(contact.join(' • '), infoX, y + 18);
       // separator: end of header area
       const sepY1 = y + 26;
       doc.setLineWidth(0.6);
@@ -12586,7 +13056,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
       (group.cycles || []).forEach(cycle => {
         const lines = [];
         const pairingLabel = cycle.label || `Pairing ${cycle.id || ''}`;
-        lines.push(`ג€¢ ${pairingLabel}`);
+        lines.push(`• ${pairingLabel}`);
 
         if (cycle.locks && cycle.locks.length) {
           const lockText = cycle.locks
@@ -12702,6 +13172,34 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
   doc.save(fn);
 }
 
+function splitEggBoxCounts(totalEggs) {
+  const eggs = Number(totalEggs);
+  if (!Number.isFinite(eggs) || eggs <= 0) return [0];
+  const normalized = Math.floor(eggs);
+  if (normalized <= 10) return [normalized];
+  return [Math.floor(normalized / 2), Math.ceil(normalized / 2)];
+}
+
+function fitTextBlockToWidth(doc, text, maxWidth, maxLines = 2, maxFontSize = 18, minFontSize = 7) {
+  const source = String(text || '').trim();
+  if (!source) return { fontSize: minFontSize, lines: [''] };
+  for (let size = maxFontSize; size >= minFontSize; size -= 1) {
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(source, maxWidth);
+    if (lines.length <= maxLines) return { fontSize: size, lines };
+  }
+  doc.setFontSize(minFontSize);
+  const lines = doc.splitTextToSize(source, maxWidth);
+  if (lines.length <= maxLines) return { fontSize: minFontSize, lines };
+  const trimmedLines = lines.slice(0, maxLines);
+  let lastLine = String(trimmedLines[maxLines - 1] || '').trim();
+  while (lastLine.length > 0 && doc.getTextWidth(`${lastLine}...`) > maxWidth) {
+    lastLine = lastLine.slice(0, -1).trimEnd();
+  }
+  trimmedLines[maxLines - 1] = lastLine ? `${lastLine}...` : '...';
+  return { fontSize: minFontSize, lines: trimmedLines };
+}
+
 async function exportClutchCardToPdf(details = {}) {
   const { jsPDF } = await import('jspdf');
   const pageW = 100;
@@ -12710,69 +13208,75 @@ async function exportClutchCardToPdf(details = {}) {
   const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
   await applyPdfUnicodeFont(doc);
 
-  const clutchNumberText = details.clutchNumber ? String(details.clutchNumber) : 'ג€”';
-  const heading = details.label ? details.label : (details.clutchNumber ? `Clutch #${clutchNumberText}` : 'Clutch Card');
-  const femaleName = details.femaleName || 'ג€”';
-  const maleName = details.maleName || 'ג€”';
+  const clutchNumberText = details.clutchNumber ? String(details.clutchNumber) : '—';
+  const baseHeading = details.label ? details.label : (details.clutchNumber ? `Clutch #${clutchNumberText}` : 'Clutch Card');
+  const femaleName = details.femaleName || '—';
+  const maleName = details.maleName || '—';
   const normalizeGeneticsLine = (value) => {
     if (value === null || typeof value === 'undefined') return '';
     const text = String(value).trim();
-    if (!text || text === 'ג€”') return '';
+    if (!text || text === '—') return '';
     return text;
   };
   const femaleGeneticsLine = normalizeGeneticsLine(details.femaleGenetics);
   const maleGeneticsLine = normalizeGeneticsLine(details.maleGenetics);
-
-  doc.setDrawColor(80);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(3, 3, pageW - 6, pageH - 6, 2, 2);
-
-  const headingFont = fitTextToWidth(doc, heading, pageW - margin * 2, 18, 12);
-  setPdfFont(doc, 'bold');
-  doc.setFontSize(headingFont);
-  doc.text(heading, pageW / 2, margin, { align: 'center', baseline: 'top' });
-  setPdfFont(doc, 'normal');
-
   const clutchDate = details.clutchDate || '';
   const estimatedHatch = clutchDate ? addDaysYmd(clutchDate, 59) : '';
-  const eggsValue = (() => {
-    const raw = details.eggsTotal;
-    if (raw === null || typeof raw === 'undefined' || raw === '') return 'ג€”';
-    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) return String(parsed);
-    return String(raw);
-  })();
+  const missingValue = '\u2014';
+  const resolvedEggs = resolveEggCountForClutch(details.eggsTotal, details.fertileEggs);
+  const eggBoxCounts = splitEggBoxCounts(resolvedEggs);
+  const firstEggBoxNumber = Number(details.eggBoxNumber);
+  const hasGlobalEggBoxNumber = Number.isFinite(firstEggBoxNumber) && firstEggBoxNumber > 0;
 
-  const rows = [
-    { label: 'Clutch #', value: clutchNumberText },
-    { label: 'Date', value: clutchDate ? formatDateForDisplay(clutchDate) : 'ג€”' },
-    { label: 'Female', value: femaleName, secondary: femaleGeneticsLine },
-    { label: 'Male', value: maleName, secondary: maleGeneticsLine },
-    { label: 'Eggs', value: eggsValue },
-    { label: 'Est. hatch', value: estimatedHatch ? formatDateForDisplay(estimatedHatch) : 'ג€”' },
-  ];
+  eggBoxCounts.forEach((boxEggs, index) => {
+    if (index > 0) doc.addPage([pageW, pageH], 'landscape');
+    const boxIndexInClutch = index + 1;
+    const boxNumber = hasGlobalEggBoxNumber ? firstEggBoxNumber : boxIndexInClutch;
+    const heading = `${baseHeading} - Egg box #${boxNumber}`;
 
-  const startY = margin + estimateLineHeight(headingFont, 0.9) + 2;
-  let y = startY;
-  const availableWidth = pageW - margin * 2;
-  const bodyFont = 10;
-  doc.setFontSize(bodyFont);
-  const lineHeight = estimateLineHeight(bodyFont, 1.05);
-  const secondaryFont = Math.max(8, bodyFont - 1);
+    doc.setDrawColor(80);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(3, 3, pageW - 6, pageH - 6, 2, 2);
 
-  rows.forEach(row => {
-    const line = `${row.label}: ${row.value}`;
-    const lines = doc.splitTextToSize(line, availableWidth);
-    doc.text(lines, margin, y, { baseline: 'top' });
-    y += lines.length * lineHeight;
-    if (row.secondary) {
-      doc.setFontSize(secondaryFont);
-      const secondaryLines = doc.splitTextToSize(`   ${row.secondary}`, availableWidth);
-      doc.text(secondaryLines, margin, y, { baseline: 'top' });
-      y += secondaryLines.length * estimateLineHeight(secondaryFont, 1.05);
-      doc.setFontSize(bodyFont);
-    }
+    const headingLayout = fitTextBlockToWidth(doc, heading, pageW - margin * 2, 2, 16, 7);
+    setPdfFont(doc, 'bold');
+    doc.setFontSize(headingLayout.fontSize);
+    doc.text(headingLayout.lines, pageW / 2, margin, { align: 'center', baseline: 'top' });
+    setPdfFont(doc, 'normal');
+
+    const rows = [
+      { label: 'Clutch #', value: clutchNumberText },
+      { label: 'Egg box #', value: String(boxNumber) },
+      ...(eggBoxCounts.length > 1 ? [{ label: 'Box in clutch', value: `${boxIndexInClutch} of ${eggBoxCounts.length}` }] : []),
+      { label: 'Eggs in box', value: String(boxEggs) },
+      { label: 'Date', value: clutchDate ? formatDateForDisplay(clutchDate) : missingValue },
+      { label: 'Female', value: femaleName, secondary: femaleGeneticsLine },
+      { label: 'Male', value: maleName, secondary: maleGeneticsLine },
+      { label: 'Est. hatch', value: estimatedHatch ? formatDateForDisplay(estimatedHatch) : missingValue },
+    ];
+
+    const headingHeight = headingLayout.lines.length * estimateLineHeight(headingLayout.fontSize, 0.95);
+    const startY = margin + headingHeight + 2;
+    let y = startY;
+    const availableWidth = pageW - margin * 2;
+    const bodyFont = 9;
+    doc.setFontSize(bodyFont);
+    const lineHeight = estimateLineHeight(bodyFont, 1.02);
+    const secondaryFont = Math.max(7, bodyFont - 1);
+
+    rows.forEach(row => {
+      const line = `${row.label}: ${row.value}`;
+      const lines = doc.splitTextToSize(line, availableWidth);
+      doc.text(lines, margin, y, { baseline: 'top' });
+      y += lines.length * lineHeight;
+      if (row.secondary) {
+        doc.setFontSize(secondaryFont);
+        const secondaryLines = doc.splitTextToSize(`   ${row.secondary}`, availableWidth);
+        doc.text(secondaryLines, margin, y, { baseline: 'top' });
+        y += secondaryLines.length * estimateLineHeight(secondaryFont, 1.02);
+        doc.setFontSize(bodyFont);
+      }
+    });
   });
 
   const slugSource = details.label || (details.clutchNumber ? `clutch-${details.clutchNumber}` : 'clutch-card');
@@ -13141,7 +13645,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                       if (sizeText) detailParts.push(sizeText);
                       if (gramsText) detailParts.push(gramsText);
                       if (methodText) detailParts.push(methodText);
-                      detailText = detailParts.join(' ג€” ');
+                      detailText = detailParts.join(' — ');
                     }
                     const primaryText = en.refused ? t("logs.refused", { defaultValue: "Refused feed" }) : (detailText || t("logs.feed", { defaultValue: "Feed" }));
                     return (
@@ -13173,7 +13677,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const c = a.entry;
                     return (
                       <>
-                        <div className="font-medium">{i18n.t("logs.cleaning", { defaultValue: "Cleaning" })}{c.deep ? " ג€” " + i18n.t("logs.deepClean", { defaultValue: "Deep clean" }) : ""}</div>
+                        <div className="font-medium">{i18n.t("logs.cleaning", { defaultValue: "Cleaning" })}{c.deep ? " — " + i18n.t("logs.deepClean", { defaultValue: "Deep clean" }) : ""}</div>
                         {c.notes ? <div className="text-[11px] text-neutral-700 truncate">{c.notes}</div> : null}
                       </>
                     );
@@ -13184,7 +13688,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const sh = a.entry;
                     return (
                       <>
-                        <div className="font-medium">{i18n.t("logs.shed", { defaultValue: "Shed" })}{sh.complete ? " ג€” " + i18n.t("logs.complete", { defaultValue: "Complete" }) : ""}</div>
+                        <div className="font-medium">{i18n.t("logs.shed", { defaultValue: "Shed" })}{sh.complete ? " — " + i18n.t("logs.complete", { defaultValue: "Complete" }) : ""}</div>
                         {sh.notes ? <div className="text-[11px] text-neutral-700 truncate">{sh.notes}</div> : null}
                       </>
                     );
@@ -13195,7 +13699,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
                     const m = a.entry;
                     return (
                       <>
-                        <div className="font-medium truncate">{m.drug} {m.dose ? `ג€” ${m.dose}` : ''}</div>
+                        <div className="font-medium truncate">{m.drug} {m.dose ? `— ${m.dose}` : ''}</div>
                         {m.notes ? <div className="text-[11px] text-neutral-700 truncate">{m.notes}</div> : null}
                       </>
                     );
@@ -13224,7 +13728,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
       {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
       {quickTagOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           onClick={(e) => {
             e.stopPropagation();
             closeQuickAdd();
@@ -13444,8 +13948,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
             <div className="flex flex-col gap-1 max-h-36 overflow-auto">
               {visible.map(p => (
                 <button key={p.id} className="text-sm text-left px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
-                  <div className="font-medium truncate">{p.label || `${p.femaleId} ֳ— ${p.maleId}`}</div>
-                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : 'ג€”'}</div>
+                  <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
+                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </button>
               ))}
               {myPairings.length === 0 && (<div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>)}
@@ -13592,7 +14096,7 @@ function WeightTrendMiniChart({ data = [] }) {
 function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   const { t } = useTranslation();
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[200]" onClick={onClose}>
       <div className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
@@ -13607,7 +14111,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{p.label}</div>
-                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : 'ג€”'}</div>
+                  <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </div>
                 <div className="flex gap-2">
                   <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onOpenPairing && onOpenPairing(p.id)}>{t("actions.open", { defaultValue: "Open" })}</button>
@@ -13617,7 +14121,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
                 {t("pairing.appointmentsLabel", { defaultValue: "Appointments:" })}
                 <div className="mt-1 space-y-1">
                   {(p.appointments||[]).map(ap => (
-                    <div key={ap.id} className="text-[11px] px-2 py-1 rounded border bg-neutral-50">{formatDateForDisplay(ap.date)} {ap.notes ? ` ג€” ${ap.notes}` : ''}</div>
+                    <div key={ap.id} className="text-[11px] px-2 py-1 rounded border bg-neutral-50">{formatDateForDisplay(ap.date)} {ap.notes ? ` — ${ap.notes}` : ''}</div>
                   ))}
                 </div>
               </div>
@@ -13681,7 +14185,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
         date: weightEntry?.date ? formatDateForDisplay(weightEntry.date) : '',
       };
     }
-    return { value: 'ג€”', date: '' };
+    return { value: '—', date: '' };
   };
 
   const renderFeed = (snake) => {
@@ -13708,7 +14212,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
       .filter(Boolean)
       .map(part => String(part).trim());
     return {
-      summary: feedParts.length ? feedParts.join(' ג€” ') : t('logs.feed', { defaultValue: 'Feed' }),
+      summary: feedParts.length ? feedParts.join(' — ') : t('logs.feed', { defaultValue: 'Feed' }),
       date: entry.date ? formatDateForDisplay(entry.date) : '',
     };
   };
@@ -13744,7 +14248,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
               <tr key={snake.id || `snake-row-${index}`} className="border-t border-neutral-100">
                 <td className="px-3 py-3 align-top">
                   <div className="font-medium text-base">{snake.name || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' })}</div>
-                  <div className="text-xs font-mono text-neutral-500">{snake.id || 'ג€”'}</div>
+                  <div className="text-xs font-mono text-neutral-500">{snake.id || '—'}</div>
                   <div className="mt-1 inline-flex items-center gap-2 text-xs text-neutral-600">
                     <span className="font-semibold">{sexSummary.symbol}</span>
                     <span>{sexSummary.label}</span>
@@ -13754,7 +14258,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
                   {geneticsSummary ? (
                     <div className="text-sm text-neutral-800 max-w-xs truncate" title={geneticsSummary}>{geneticsSummary}</div>
                   ) : (
-                    <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: ג€”</div>
+                    <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: —</div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
@@ -14627,7 +15131,7 @@ function BreederSection({
       const nowIso = new Date().toISOString();
       const manualLabel = t("setup.manualBackup", { defaultValue: "Manual backup" });
       const promptTitle = t("electron.prompts.backupName.title", { defaultValue: "Name this backup file" });
-      let desiredName = `${manualLabel} ֲ· ${formatDateTimeForDisplay(nowIso)}`;
+      let desiredName = `${manualLabel} - ${formatDateTimeForDisplay(nowIso)}`;
       if (typeof showAppPrompt === 'function') {
         const prompted = await showAppPrompt(promptTitle, {
           defaultValue: desiredName,
@@ -15804,7 +16308,7 @@ function BreederSection({
                       )}
                       onClick={() => handleLabLabelPresetChange(preset.key)}
                     >
-                      {preset.label} ({preset.widthMm} ֳ— {preset.heightMm} mm)
+                      {preset.label} ({preset.widthMm} × {preset.heightMm} mm)
                     </button>
                   );
                 })}
@@ -16133,7 +16637,7 @@ function BreederSection({
                 {animalExportFeedback && (
                   <div className={cx('text-xs', animalExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                     {animalExportFeedback.message}
-                    {animalExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(animalExportFeedback.timestamp)}` : ''}
+                    {animalExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(animalExportFeedback.timestamp)}` : ''}
                   </div>
                 )}
               </div>
@@ -16295,7 +16799,7 @@ function BreederSection({
                 {pairingExportFeedback && (
                   <div className={cx('text-xs', pairingExportFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                     {pairingExportFeedback.message}
-                    {pairingExportFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(pairingExportFeedback.timestamp)}` : ''}
+                    {pairingExportFeedback.timestamp ? ` — ${formatDateTimeForDisplay(pairingExportFeedback.timestamp)}` : ''}
                   </div>
                 )}
               </div>
@@ -16336,7 +16840,7 @@ function BreederSection({
             {manualFeedback && (
               <span className={cx('text-xs', manualFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {manualFeedback.message}
-                {manualFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(manualFeedback.timestamp)}` : ''}
+                {manualFeedback.timestamp ? ` — ${formatDateTimeForDisplay(manualFeedback.timestamp)}` : ''}
               </span>
             )}
           </div>
@@ -16389,7 +16893,7 @@ function BreederSection({
             {autoFeedback && (
               <div className={cx('text-xs', autoFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {autoFeedback.message}
-                {autoFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(autoFeedback.timestamp)}` : ''}
+                {autoFeedback.timestamp ? ` • ${formatDateTimeForDisplay(autoFeedback.timestamp)}` : ''}
               </div>
             )}
           </div>
@@ -16426,7 +16930,7 @@ function BreederSection({
             {vaultFeedback && (
               <div className={cx('text-xs', vaultFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {vaultFeedback.message}
-                {vaultFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(vaultFeedback.timestamp)}` : ''}
+                {vaultFeedback.timestamp ? ` — ${formatDateTimeForDisplay(vaultFeedback.timestamp)}` : ''}
               </div>
             )}
             <div className="space-y-2">
@@ -16542,7 +17046,7 @@ function BreederSection({
             {restoreFeedback && (
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {restoreFeedback.message}
-                {restoreFeedback.timestamp ? ` ג€” ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
+                {restoreFeedback.timestamp ? ` — ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
@@ -16632,6 +17136,7 @@ function AppearanceSettingsPanel() {
     { value: 'small', label: t('appearance.type.small', { defaultValue: 'Small' }) },
     { value: 'medium', label: t('appearance.type.medium', { defaultValue: 'Medium' }) },
     { value: 'large', label: t('appearance.type.large', { defaultValue: 'Large' }) },
+    { value: 'xlarge', label: t('appearance.type.xlarge', { defaultValue: 'Extra large' }) },
   ];
 
   const lineSpacingOptions = [
@@ -16654,6 +17159,7 @@ function AppearanceSettingsPanel() {
 
   const currentPresetKey = appearanceState?.preset || 'custom';
   const motion = appearanceState?.motion || { animations: true, reducedMotion: false };
+  const visualImpairedEnabled = currentPresetKey === 'visualImpaired';
 
   const handleColorInput = useCallback((key, value) => {
     if (!key) return;
@@ -16689,6 +17195,19 @@ function AppearanceSettingsPanel() {
   const handleReducedMotionToggle = useCallback((event) => {
     updateAppearance({ motion: { reducedMotion: event.target.checked, animations: event.target.checked ? false : motion.animations } });
   }, [updateAppearance, motion.animations]);
+
+  const handleVisualImpairedToggle = useCallback((event) => {
+    if (event.target.checked) {
+      applyPreset('visualImpaired');
+    } else {
+      resetAppearance('default');
+    }
+  }, [applyPreset, resetAppearance]);
+
+  const handleBackgroundModeChange = useCallback((event) => {
+    const value = event?.target?.value === 'logo' ? 'logo' : 'solid';
+    updateAppearance({ backgroundMode: value });
+  }, [updateAppearance]);
 
   const handleSavePreset = useCallback(() => {
     const trimmed = customPresetName.trim();
@@ -16788,12 +17307,27 @@ function AppearanceSettingsPanel() {
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.mode', { defaultValue: 'Mode & palette' })}</div>
             <div className="mt-2 space-y-2">
+              <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
+                <input type="checkbox" checked={visualImpairedEnabled} onChange={handleVisualImpairedToggle} className="mt-0.5" />
+                <span>
+                  <span className="block font-semibold text-neutral-900">{t('appearance.accessibility.visualImpaired', { defaultValue: 'Visually impaired preset' })}</span>
+                  <span className="block text-xs text-neutral-500">{t('appearance.accessibility.visualImpairedHelp', { defaultValue: 'Bigger fonts, stronger contrast, spacious controls, and reduced motion.' })}</span>
+                </span>
+              </label>
               <label className="text-xs font-medium">{t('appearance.modes.label', { defaultValue: 'Theme mode' })}</label>
               <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.themeMode} onChange={handleThemeModeChange}>
                 {themeModeOptions.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              <label className="text-xs font-medium">{t('appearance.background.label', { defaultValue: 'Background style' })}</label>
+              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.backgroundMode || 'solid'} onChange={handleBackgroundModeChange}>
+                <option value="solid">{t('appearance.background.solid', { defaultValue: 'Solid color' })}</option>
+                <option value="logo">{t('appearance.background.logo', { defaultValue: 'Breeder logo pattern' })}</option>
+              </select>
+              <div className="text-[11px] text-neutral-500">
+                {t('appearance.background.logoHelp', { defaultValue: 'The logo pattern uses the breeder logo uploaded in Breeder Info.' })}
+              </div>
             </div>
           </div>
           <div className="space-y-3">
@@ -16931,7 +17465,7 @@ function AppearancePreview({ resolvedAppearance, density, mode }) {
 }
 
 // pairings list
-function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing }) {
+function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, clutchNumberByPairingId, clutchMetadataByPairingId }) {
   const { t } = useTranslation();
   const list = Array.isArray(items) ? items : [];
   const counts = list.reduce((acc, item) => {
@@ -16972,9 +17506,9 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing })
   ];
 
   const stageCards = [
-    { key: 'ovulation', label: t('pairing.dashboard.stageOvulation', { defaultValue: 'In ovulation' }) },
-    { key: 'preLay', label: t('pairing.dashboard.stagePreLay', { defaultValue: 'Pre-lay shed' }) },
     { key: 'clutch', label: t('pairing.dashboard.stageClutch', { defaultValue: 'Clutch laid' }) },
+    { key: 'preLay', label: t('pairing.dashboard.stagePreLay', { defaultValue: 'Pre-lay shed' }) },
+    { key: 'ovulation', label: t('pairing.dashboard.stageOvulation', { defaultValue: 'In ovulation' }) },
     { key: 'locks', label: t('pairing.dashboard.stageLocks', { defaultValue: 'Locks observed' }) },
   ];
 
@@ -17000,18 +17534,49 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing })
         </div>
 
         {list.length ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             {list.map(item => {
               const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
+              const clutch = item?.pairing?.clutch || {};
+              const clutchRecorded = item.stageKey === 'clutch' && !!clutch.recorded;
+              const clutchNumber = clutchNumberByPairingId?.get?.(item.id);
+              const clutchMetadata = clutchMetadataByPairingId?.get?.(item.id) || {};
+              const boxNumber = clutchMetadata.eggBoxNumber;
+              const eggsRaw = clutch.eggsTotal;
+              const fertileRaw = clutch.fertileEggs;
+              const slugsRaw = clutch.slugs;
+              const eggsCount = Number.isFinite(Number(eggsRaw))
+                ? Number(eggsRaw)
+                : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+              const slugsCount = Number.isFinite(Number(slugsRaw)) ? Number(slugsRaw) : null;
+              const splitBoxCounts = typeof eggsCount === 'number' ? splitEggBoxCounts(eggsCount) : [];
+              const eggBoxLabel = splitBoxCounts.length > 1
+                ? t('pairing.dashboard.eggBoxesForClutch', {
+                  clutch: clutchNumber,
+                  number: boxNumber,
+                  defaultValue: 'Clutch #{{clutch}} egg boxes from #{{number}}',
+                })
+                : (boxNumber
+                  ? t('pairing.dashboard.eggBoxNumber', { number: boxNumber, defaultValue: 'Egg box #{{number}}' })
+                  : t('pairing.dashboard.eggBox', { defaultValue: 'Egg box' }));
+              const eggCountLabel = splitBoxCounts.length > 1
+                ? t('pairing.dashboard.splitEggBoxes', {
+                  first: splitBoxCounts[0],
+                  second: splitBoxCounts[1],
+                  defaultValue: '{{first}} eggs + {{second}} eggs',
+                })
+                : (typeof eggsCount === 'number'
+                  ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
+                  : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
               return (
-                <div key={item.id} className="border rounded-xl bg-white p-4 shadow-sm space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
+                  <div className="flex flex-col gap-2">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-semibold text-neutral-900 truncate">{item.label}</div>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-600">
                         <span className="inline-flex items-center gap-1">
                           <SexBadge sex="M" label={t('snake.sex.male', { defaultValue: 'Male' })} showText={false} />
                           {item.maleName}
@@ -17022,25 +17587,36 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing })
                         </span>
                       </div>
                     </div>
-                    <span className={cx('text-xs px-2.5 py-1 rounded-full border font-medium', urgencyClass)}>
+                    <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
                       {item.countdownLabel}
                     </span>
                   </div>
 
-                  <div className="grid sm:grid-cols-3 gap-2 text-sm">
-                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
                       <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
                         {t('pairing.dashboard.currentStage', { defaultValue: 'Current stage' })}
                       </div>
-                      <div className="mt-1 font-medium text-neutral-900">{item.stage}</div>
+                      <div className="mt-1 font-medium text-neutral-900 leading-snug">{item.stage}</div>
+                      {clutchRecorded && (
+                        <div className="mt-1 text-[11px] leading-snug text-neutral-600">
+                          {[
+                            eggBoxLabel,
+                            eggCountLabel,
+                            typeof slugsCount === 'number' && slugsCount > 0
+                              ? t('pairing.dashboard.slugsInBox', { count: slugsCount, defaultValue: '{{count}} slugs' })
+                              : '',
+                          ].filter(Boolean).join(' • ')}
+                        </div>
+                      )}
                     </div>
-                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
                       <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
                         {t('pairing.dashboard.nextStage', { defaultValue: 'Next stage' })}
                       </div>
-                      <div className="mt-1 font-medium text-neutral-900">{item.nextStage}</div>
+                      <div className="mt-1 font-medium text-neutral-900 leading-snug">{item.nextStage}</div>
                     </div>
-                    <div className="rounded-lg bg-neutral-50 border px-3 py-2">
+                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
                       <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
                         {t('pairing.dashboard.targetDate', { defaultValue: 'Target date' })}
                       </div>
@@ -17048,15 +17624,15 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing })
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-xs text-neutral-500">
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[11px] text-neutral-500 leading-snug">
                       {item.latestLockLabel
                         ? t('pairing.dashboard.latestLock', { date: item.latestLockLabel, defaultValue: 'Latest lock: {{date}}' })
                         : t('pairing.dashboard.noLock', { defaultValue: 'No lock recorded yet' })}
                     </div>
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                      className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
                       onClick={() => openPairing(item.id)}
                     >
                       {item.actionLabel}
@@ -17086,6 +17662,7 @@ function PairingsSection({
   onUpdatePairing,
   onExportPairingQr,
   clutchNumberByPairingId,
+  clutchMetadataByPairingId,
   theme = 'blue',
   focusedPairingId = null,
   onFocusPairing,
@@ -17112,6 +17689,7 @@ function PairingsSection({
             key={p.id}
             pairing={p}
             pairingNumber={clutchNumberByPairingId?.get(p.id) || idx + 1}
+            clutchMetadata={clutchMetadataByPairingId?.get?.(p.id) || null}
             snakes={snakes}
             breederMales={breederMales}
             breederFemales={breederFemales}
@@ -17139,6 +17717,7 @@ function PairingsSection({
 function PairingInlineCard({
   pairing,
   pairingNumber,
+  clutchMetadata,
   snakes,
   breederMales = [],
   breederFemales = [],
@@ -17337,6 +17916,11 @@ function PairingInlineCard({
   const startDisplay = edit.startDate ? formatDateForDisplay(edit.startDate) : missingValueLabel;
   const endSource = lifecycle.hatchDate || (edit?.hatch?.recorded ? edit?.hatch?.date : '') || lifecycle.clutchDate || '';
   const endDisplay = endSource ? formatDateForDisplay(endSource) : missingValueLabel;
+  const eggBoxLabel = clutchMetadata?.eggBoxNumber
+    ? (clutchMetadata.eggBoxCount > 1
+      ? `Egg box #${clutchMetadata.eggBoxNumber} (${clutchMetadata.eggBoxCount} boxes)`
+      : `Egg box #${clutchMetadata.eggBoxNumber}`)
+    : '';
 
   const handleGenerateAppointments = useCallback(() => {
     setEdit(d => {
@@ -17424,13 +18008,7 @@ function PairingInlineCard({
       }
       return;
     }
-    let eggsValue = edit?.clutch?.eggsTotal;
-    if (eggsValue === '' || typeof eggsValue === 'undefined') {
-      eggsValue = null;
-    } else if (typeof eggsValue === 'string') {
-      const parsed = Number(eggsValue);
-      eggsValue = Number.isFinite(parsed) ? parsed : eggsValue;
-    }
+    const eggsValue = resolveEggCountForClutch(edit?.clutch?.eggsTotal, edit?.clutch?.fertileEggs);
     try {
       const maleGenetics = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
       const femaleGenetics = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
@@ -17442,6 +18020,9 @@ function PairingInlineCard({
         maleName,
         maleGenetics,
         eggsTotal: eggsValue,
+        fertileEggs: edit?.clutch?.fertileEggs,
+        eggBoxNumber: clutchMetadata?.eggBoxNumber,
+        eggBoxCount: clutchMetadata?.eggBoxCount,
         label: labelValue,
       });
     } catch (err) {
@@ -17452,7 +18033,7 @@ function PairingInlineCard({
         console.warn('Unable to generate clutch card PDF.');
       }
     }
-  }, [edit, pairingNumber, femaleName, maleName, femaleGeneticsTokens, maleGeneticsTokens, labelValue, femaleSnake, maleSnake, showAppAlert]);
+  }, [edit, pairingNumber, clutchMetadata, femaleName, maleName, femaleGeneticsTokens, maleGeneticsTokens, labelValue, femaleSnake, maleSnake, showAppAlert]);
 
   const cardClasses = cx(
     'border rounded-xl shadow-sm bg-white focus:outline-none w-full p-3',
@@ -17482,7 +18063,9 @@ function PairingInlineCard({
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">{clutchCardTitleLabel} #{pairingNumber} - {cycleYear || missingValueLabel}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
+              {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
+            </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1">
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
               <span aria-hidden="true">{'\u203A'}</span>
@@ -17536,7 +18119,7 @@ function PairingInlineCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-semibold leading-tight text-sm sm:text-base">
-            <div className="truncate">{clutchTitleLabel} #{pairingNumber} - {cycleYear || missingValueLabel}</div>
+            <div className="truncate">{clutchTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}</div>
           </div>
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
             <div>
@@ -18016,7 +18599,7 @@ function computePairingGenetics(male, female) {
       gene: displayName,
       inheritance,
       outcomes: calculation.outcomes,
-      notes: notesParts.join(' ג€” ')
+      notes: notesParts.join(' — ')
     });
   }
 
@@ -18558,7 +19141,14 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
     nextStage = 'Cycle complete';
     targetDate = derived.hatchDate || '';
   } else if (derived.clutchRecorded) {
-    stage = 'Clutch laid';
+    const eggsRaw = normalized?.clutch?.eggsTotal;
+    const fertileRaw = normalized?.clutch?.fertileEggs;
+    const eggsCount = Number.isFinite(Number(eggsRaw))
+      ? Number(eggsRaw)
+      : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+    stage = typeof eggsCount === 'number'
+      ? `Clutch laid - ${eggsCount} ${eggsCount === 1 ? 'egg' : 'eggs'}`
+      : 'Clutch laid';
     stageKey = 'clutch';
     nextStage = 'Expected hatch';
     targetDate = derived.hatchTarget || '';
@@ -18652,7 +19242,7 @@ function summarizePairingCycleForFemale(pairing) {
   const primaryDate = clutchDate || preLayDate || ovulationDate || hatchDate || normalized.startDate || '';
   const primaryTimestamp = primaryDate && !Number.isNaN(Date.parse(primaryDate)) ? Date.parse(primaryDate) : null;
 
-  const label = normalized.label || `${normalized.femaleId || 'Female'} ֳ— ${normalized.maleId || 'Male'}`;
+  const label = normalized.label || `${normalized.femaleId || 'Female'} × ${normalized.maleId || 'Male'}`;
 
   return {
     id: normalized.id || `${normalized.femaleId || 'female'}-${normalized.maleId || 'male'}-${year}`,
@@ -19975,7 +20565,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           currentLine = txt;
           currentY = y;
         } else {
-          // same line ג€” append with a space separator
+          // same line — append with a space separator
           currentLine = (currentLine ? currentLine + ' ' : '') + txt;
         }
       }
@@ -20553,7 +21143,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!start || !end) return null;
     const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    return startLabel === endLabel ? startLabel : `${startLabel} ג€” ${endLabel}`;
+    return startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
   }, [calendarEventBounds]);
 
   const pairingReminders = useMemo(() => {
@@ -20881,7 +21471,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
         male: maleName,
         female: femaleName,
         pairingLabel: pairing?.label || '',
-        notes: detailParts.join(' ג€¢ '),
+        notes: detailParts.join(' • '),
         lockObserved: lockNotes,
       };
     });
@@ -21203,7 +21793,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 <span className="font-medium">{t('calendar.pairWith', { male: reminder.maleName, female: reminder.femaleName, defaultValue: 'Pair {{male}} with {{female}}' })}</span>
                 <span className="text-[11px] text-amber-600">
                   {reminder.whenLabel}
-                  {reminder.pairingLabel ? ` ג€” ${reminder.pairingLabel}` : ''}
+                  {reminder.pairingLabel ? ` — ${reminder.pairingLabel}` : ''}
                 </span>
               </li>
             ))}
@@ -21278,7 +21868,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         if (sizeText) detailParts.push(sizeText);
                         if (gramsText) detailParts.push(gramsText);
                         if (methodText) detailParts.push(methodText);
-                        detailText = detailParts.join(' ג€” ');
+                        detailText = detailParts.join(' — ');
                       }
                       const feedLabel = en.refused ? t("logs.refused", { defaultValue: "Refused feed" }) : (detailText || t("logs.feed", { defaultValue: "Feed" }));
                       return (
@@ -21288,7 +21878,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                           style={{ backgroundColor: pal.bg, borderColor: pal.border }}
                         >
                           <div className="truncate">
-                            <div className="font-medium truncate">{s?.name || e.snakeId} ג€” {feedLabel}</div>
+                            <div className="font-medium truncate">{s?.name || e.snakeId} — {feedLabel}</div>
                             {en.refused && detailText ? (
                               <div className="text-[11px] text-neutral-500 truncate">{detailText}</div>
                             ) : null}
@@ -21331,7 +21921,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       const parts = [];
                       if (typeof eggs === 'number' && Number.isFinite(eggs)) parts.push(t('calendar.eggsCount', { count: eggs, defaultValue: 'Eggs: {{count}}' }));
                       if (typeof slugs === 'number' && Number.isFinite(slugs)) parts.push(t('calendar.slugsCount', { count: slugs, defaultValue: 'Slugs: {{count}}' }));
-                      if (parts.length) detail = parts.join(' ג€” ');
+                      if (parts.length) detail = parts.join(' — ');
                       else if (p?.clutch?.notes) detail = p.clutch.notes;
                     } else if (e.stage === 'hatch') {
                       const hatchCount = p?.hatch?.hatchedCount;
@@ -21353,12 +21943,12 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
                       >
                         <div className="font-medium truncate">{stageLabels[e.stage] || t('calendar.filters.clutch', { defaultValue: 'Clutch action' })}</div>
-                        <div className="text-[11px] text-neutral-500 truncate">{maleName} ֳ— {femaleName}</div>
+                        <div className="text-[11px] text-neutral-500 truncate">{maleName} × {femaleName}</div>
                         {detail ? <div className="text-[11px] text-neutral-500 truncate">{detail}</div> : null}
                       </button>
                     );
                   }
-                  // pairing span event ג€” show Male ֳ— Female and make clickable
+                  // pairing span event — show Male × Female and make clickable
                   const p = pairings.find(pp=>pp.id===e.pairingId);
                   const maleName = malesById[e.maleId]?.name || e.maleId;
                   const femaleName = femalesById[e.femaleId]?.name || e.femaleId;
@@ -21382,7 +21972,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                         style={{ backgroundColor: maleColors.dot }}
                       ></span>
                       <div className="truncate">
-                        <div className="font-medium truncate">{maleName} ֳ— {femaleName}</div>
+                        <div className="font-medium truncate">{maleName} × {femaleName}</div>
                         {p?.label ? <div className="text-[11px] text-neutral-500 truncate">{p.label}</div> : null}
                         {lockLine ? <div className="text-[11px] text-emerald-600 truncate">{lockLine}</div> : null}
                         {additionalNote ? <div className="text-[11px] text-neutral-500 truncate">{additionalNote}</div> : null}
@@ -21476,7 +22066,7 @@ function prepareCalendarEventExport(event, context) {
   if (event.type === 'pairing') {
     if (typeof event.spanOffset === 'number' && event.spanOffset > 0) return null;
     durationDays = 3;
-    summary = `Breeding: ${maleName || 'Male'} ֳ— ${femaleName || 'Female'}`;
+    summary = `Breeding: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
     if (pairing?.label) descriptionParts.push(`Project: ${pairing.label}`);
     const lockRecordedAt = event.lockDate || event.lockLoggedAt || null;
     if (event.lockObserved && lockRecordedAt) descriptionParts.push(buildLockLogLine(lockRecordedAt));
@@ -21488,7 +22078,7 @@ function prepareCalendarEventExport(event, context) {
       clutch: 'Clutch laid',
       hatch: 'Hatch recorded',
     };
-    summary = `${stageLabels[event.stage] || 'Clutch event'}: ${maleName || 'Male'} ֳ— ${femaleName || 'Female'}`;
+    summary = `${stageLabels[event.stage] || 'Clutch event'}: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
     const clutchDetail = describeClutchStageDetail(event.stage, pairing);
     if (clutchDetail) descriptionParts.push(clutchDetail);
   } else if (event.type === 'activity') {
@@ -21901,12 +22491,14 @@ function ScrollToTopButton({ theme = 'blue', className }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal((
     <button
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       className={cx(
-        'fixed bottom-6 right-6 z-50 rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 text-white',
+        'fixed bottom-6 right-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 text-white',
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         primaryBtnClass(theme, true),
         className
@@ -21927,7 +22519,7 @@ function ScrollToTopButton({ theme = 'blue', className }) {
         <path d="m6 11 6-6 6 6" />
       </svg>
     </button>
-  );
+  ), document.body);
 }
 
 function addDaysYmd(dateStr, days) {

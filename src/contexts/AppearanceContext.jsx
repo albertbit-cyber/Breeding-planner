@@ -10,7 +10,7 @@ const DEFAULT_APPEARANCE = {
     primary: "#0ea5e9",
     secondary: "#2563eb",
     accent: "#f59e0b",
-    background: "#f4f4f5",
+    background: "#f6f7f9",
     card: "#ffffff",
     text: "#0f172a",
   },
@@ -21,6 +21,7 @@ const DEFAULT_APPEARANCE = {
   },
   layoutDensity: "comfortable",
   borderStyle: "soft",
+  backgroundMode: "solid",
   motion: {
     animations: true,
     reducedMotion: false,
@@ -40,6 +41,7 @@ const FONT_SIZE_SCALE = {
   small: "14px",
   medium: "16px",
   large: "18px",
+  xlarge: "20px",
 };
 
 const LINE_HEIGHT_SCALE = {
@@ -133,6 +135,36 @@ const APPEARANCE_PRESETS = {
       },
       layoutDensity: "comfortable",
       borderStyle: "soft",
+      motion: {
+        animations: false,
+        reducedMotion: true,
+      },
+    },
+  },
+  visualImpaired: {
+    key: "visualImpaired",
+    label: "Visually impaired",
+    description: "Large text, strong contrast, spacious controls, and reduced motion.",
+    state: {
+      ...DEFAULT_APPEARANCE,
+      preset: "visualImpaired",
+      themeMode: "light",
+      colors: {
+        primary: "#005fcc",
+        secondary: "#111827",
+        accent: "#b45309",
+        background: "#ffffff",
+        card: "#ffffff",
+        text: "#000000",
+      },
+      typography: {
+        fontFamily: "opensans",
+        fontSize: "xlarge",
+        lineSpacing: "relaxed",
+      },
+      layoutDensity: "spacious",
+      borderStyle: "soft",
+      backgroundMode: "solid",
       motion: {
         animations: false,
         reducedMotion: true,
@@ -233,6 +265,7 @@ function sanitizeAppearance(raw = {}) {
     typography,
     layoutDensity: ["compact", "comfortable", "spacious"].includes(incoming.layoutDensity) ? incoming.layoutDensity : base.layoutDensity,
     borderStyle: ["sharp", "soft", "rounded"].includes(incoming.borderStyle) ? incoming.borderStyle : base.borderStyle,
+    backgroundMode: ["solid", "logo"].includes(incoming.backgroundMode) ? incoming.backgroundMode : base.backgroundMode,
     motion: {
       animations: motion.animations !== false,
       reducedMotion: motion.reducedMotion === true,
@@ -249,7 +282,7 @@ function mergeAppearance(base, updates = {}) {
     typography: { ...sanitizedBase.typography, ...(updates.typography || {}) },
     motion: { ...sanitizedBase.motion, ...(updates.motion || {}) },
   };
-  if (!updates.preset && (updates.colors || updates.typography || updates.layoutDensity || updates.borderStyle)) {
+  if (!updates.preset && (updates.colors || updates.typography || updates.layoutDensity || updates.borderStyle || updates.backgroundMode)) {
     next.preset = "custom";
   }
   return sanitizeAppearance(next);
@@ -395,13 +428,14 @@ export function AppearanceProvider({ children }) {
     root.dataset.themeMode = effectiveThemeMode;
     root.dataset.appearanceDensity = appearanceState.layoutDensity;
     root.dataset.appearanceRadius = appearanceState.borderStyle;
+    root.dataset.backgroundMode = appearanceState.backgroundMode;
     root.dataset.motionPreference = resolvedMotion.reduced ? "reduced" : "full";
     return () => {
       Object.keys(cssVariables).forEach((token) => {
         root.style.removeProperty(token);
       });
     };
-  }, [cssVariables, effectiveThemeMode, appearanceState.layoutDensity, appearanceState.borderStyle, resolvedMotion.reduced]);
+  }, [cssVariables, effectiveThemeMode, appearanceState.layoutDensity, appearanceState.borderStyle, appearanceState.backgroundMode, resolvedMotion.reduced]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -481,8 +515,9 @@ export function AppearanceProvider({ children }) {
     typography: resolvedTypography,
     density: resolvedDensity,
     borderRadius: resolvedRadius,
+    backgroundMode: appearanceState.backgroundMode,
     motion: resolvedMotion,
-  }), [effectiveThemeMode, resolvedColors, resolvedTypography, resolvedDensity, resolvedRadius, resolvedMotion]);
+  }), [effectiveThemeMode, resolvedColors, resolvedTypography, resolvedDensity, resolvedRadius, appearanceState.backgroundMode, resolvedMotion]);
 
   return (
     <AppearanceContext.Provider

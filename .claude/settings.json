@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat:*)",
+      "Bash(cat \"d:/Git Clone/Breeding-planner/server/src/validators/\"*.ts)",
+      "Bash(node -e ':*)",
+      "Bash(curl -s -X POST http://localhost:4000/api/lab/orders/cmog6i12v0001jryw4thgna1f/results/submit -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW15NHRzbHcwMDAwanJxczFtbmp1a2RzIiwiZW1haWwiOiJhZG1pbkBwcm9oZXJwZXIuZGV2Iiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzc3MjQ4ODY4LCJleHAiOjE3NzcyNTI0Njh9.IgNDUclIcDkmp04JkOreIhDc--Tu0hyAUoNE18vtO-Q' -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{ try { const r=JSON.parse\\(d\\); console.log\\('Status:', r.mode, '| Order status:', r.order?.status, '| Results:', r.results?.length\\); } catch\\(e\\) { console.log\\(d.slice\\(0,300\\)\\); } }\\)\")",
+      "Bash(node scripts/check-locales.cjs)",
+      "Bash(python3 -c ':*)",
+      "Read(//c/Users/alber/Downloads/**)",
+      "Bash(cd /d \"d:\\\\Git Clone\\\\Breeding-planner\")",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(xargs grep *)",
+      "Bash(npm run *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr \":3000\\\\|:5173\\\\|:4000\\\\|:8080\\\\|:5000\\\\|:3001\\\\|:5174\")",
+      "PowerShell(Stop-Process -Id 42260, 41764, 45844 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Set-Location \"d:\\\\Git Clone\\\\Breeding-planner\\\\server\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'd:\\\\Git Clone\\\\Breeding-planner\\\\server'; npm run dev\" -WindowStyle Normal)"
+    ]
+  }
+}

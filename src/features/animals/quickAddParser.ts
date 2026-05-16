@@ -128,8 +128,8 @@ function consumeRegex(source: string, regex: RegExp): { working: string; matches
 }
 
 function parseSex(text: string): 'F' | 'M' | undefined {
-  const female = /(^|\W)(female|0\s*[./:]\s*1|0\s*1|f)(?=\W|$)/i;
-  const male = /(^|\W)(male|1\s*[./:]\s*0|1\s*0|m)(?=\W|$)/i;
+  const female = /(^|\W)(female|0\s*[.,/:]\s*1|0\s*1|f)(?=\W|$)/i;
+  const male = /(^|\W)(male|1\s*[.,/:]\s*0|1\s*0|m)(?=\W|$)/i;
   if (female.test(text)) return 'F';
   if (male.test(text)) return 'M';
   return undefined;
@@ -211,7 +211,7 @@ export function parseAnimalText(text: string, availableGenetics: GeneticsType[] 
   const sex = parseSex(working);
   if (sex) {
     parsed.sex = sex;
-    working = working.replace(/(^|\W)(female|male|0\s*[./:]\s*1|1\s*[./:]\s*0|0\s*1|1\s*0|f|m)(?=\W|$)/gi, ' ');
+    working = working.replace(/(^|\W)(female|male|0\s*[.,/:]\s*1|1\s*[.,/:]\s*0|0\s*1|1\s*0|f|m)(?=\W|$)/gi, ' ');
   }
 
   const weightMatch = working.match(/\b(\d{2,5})\s*g\b/i);
@@ -299,7 +299,7 @@ export function parseAnimalText(text: string, availableGenetics: GeneticsType[] 
       geneticsWorking = geneticsWorking.replace(hetRegex, (...args) => {
         const percent = args[2] ? `${args[2]}% ` : '';
         const possRaw = args[3] ? 'Possible ' : '';
-        const token = `${percent}${possRaw}${entry.display}`.trim();
+        const token = `${percent}${possRaw}Het ${entry.display}`.trim();
         parsed.hets.push(token);
         hetMatches.push(args[0]);
         return ' ';
