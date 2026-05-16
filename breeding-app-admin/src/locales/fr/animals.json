@@ -1,0 +1,36 @@
+{
+	"quickAdd": {
+		"date": "Date",
+		"feedType": "Type d'aliment",
+		"size": "Taille",
+		"selectPlaceholder": "Sélectionner",
+		"customSizePlaceholder": "Taille personnalisée",
+		"weight": "Poids (g)",
+		"form": "Forme",
+		"methodDetailsPlaceholder": "Détails de la méthode",
+		"gramsLabel": "Grammes",
+		"recentProgress": "Progrès récents",
+		"medicationDrug": "Médicament",
+		"medicationDose": "Dose",
+		"notes": "Notes",
+		"feedOptions": {
+			"mouse": "Souris",
+			"rat": "Rat",
+			"chick": "Poussin",
+			"other": "Autre"
+		},
+		"sizeOptions": {
+			"pinky": "pinky",
+			"fuzzy": "fuzzy",
+			"medium": "moyen",
+			"adult": "adulte",
+			"other": "Autre"
+		},
+		"formOptions": {
+			"live": "Vivant",
+			"fresh": "Fraîchement tué",
+			"frozen": "Congelé/décongelé",
+			"other": "Autre"
+		}
+	}
+}

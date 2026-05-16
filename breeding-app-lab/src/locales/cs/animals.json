@@ -1,0 +1,36 @@
+﻿{
+	"quickAdd": {
+		"date": "Date",
+		"feedType": "Feed type",
+		"size": "Size",
+		"selectPlaceholder": "Select",
+		"customSizePlaceholder": "Custom size",
+		"weight": "Weight (g)",
+		"form": "Form",
+		"methodDetailsPlaceholder": "Method details",
+		"gramsLabel": "Grams",
+		"recentProgress": "Recent progress",
+		"medicationDrug": "Drug",
+		"medicationDose": "Dose",
+		"notes": "Notes",
+		"feedOptions": {
+			"mouse": "Mouse",
+			"rat": "Rat",
+			"chick": "Chick",
+			"other": "Other"
+		},
+		"sizeOptions": {
+			"pinky": "pinky",
+			"fuzzy": "fuzzy",
+			"medium": "medium",
+			"adult": "adult",
+			"other": "Other"
+		},
+		"formOptions": {
+			"live": "Live",
+			"fresh": "Freshly killed",
+			"frozen": "Frozen/thawed",
+			"other": "Other"
+		}
+	}
+}
