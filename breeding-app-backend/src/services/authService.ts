@@ -2,14 +2,15 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
-import type { AppRole } from "../types/auth";
+import { normalizePersistedRole } from "../auth/identity";
+import type { AppRole, PersistedAppRole } from "../types/auth";
 
 type UserEntity = {
   id: string;
   email: string;
   passwordHash: string;
   fullName: string;
-  role: AppRole;
+  role: PersistedAppRole;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -32,7 +33,7 @@ export const registerUser = async (input: {
   email: string;
   password: string;
   fullName: string;
-  role?: AppRole;
+  role?: Extract<AppRole, "breeder" | "buyer">;
 }) => {
   const exists = await prisma.user.findUnique({ where: { email: input.email } });
   if (exists) {
@@ -64,7 +65,12 @@ export const loginUser = async (email: string, password: string) => {
     throw new HttpError(401, "Invalid credentials.");
   }
 
-  const tokenPayload = { sub: user.id, email: user.email, role: user.role };
+  const tokenPayload = {
+    sub: user.id,
+    email: user.email,
+    role: normalizePersistedRole(user.role),
+    persistedRole: user.role,
+  };
   const token = signAuthToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
 
@@ -94,7 +100,12 @@ export const refreshAuthToken = async (incomingRefreshToken: string) => {
     throw new HttpError(401, "Refresh token has been revoked.");
   }
 
-  const tokenPayload = { sub: user.id, email: user.email, role: user.role };
+  const tokenPayload = {
+    sub: user.id,
+    email: user.email,
+    role: normalizePersistedRole(user.role),
+    persistedRole: user.role,
+  };
   const token = signAuthToken(tokenPayload);
   const newRefreshToken = signRefreshToken(tokenPayload);
 

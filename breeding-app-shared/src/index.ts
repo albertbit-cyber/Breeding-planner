@@ -1,4 +1,7 @@
 export * from "./genetics";
+export * from "./auth";
+export * from "./api";
+export * from "./marketplace";
 export * from "./types/pairing";
 export * from "./features/animals/quickAddParser";
 export * from "./shared/config/api";

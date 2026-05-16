@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { verifyAuthToken } from "../utils/jwt";
+import { normalizePersistedRole } from "../auth/identity";
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization || "";
@@ -12,10 +13,12 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
 
   try {
     const payload = verifyAuthToken(token);
+    const persistedRole = payload.persistedRole || payload.role;
     req.user = {
       id: payload.sub,
       email: payload.email,
-      role: payload.role,
+      role: normalizePersistedRole(persistedRole),
+      persistedRole,
     };
 
     next();
