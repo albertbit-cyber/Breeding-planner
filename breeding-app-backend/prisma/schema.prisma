@@ -107,6 +107,49 @@ model User {
   mobileScanLogs   MobileScanLog[]
   mobileSyncQueue  MobileSyncQueue[]
   deviceSessions   UserDeviceSession[]
+  refreshSessions  RefreshSession[]
+  securityEvents   SecurityEvent[]
+  marketplaceMedia MarketplaceMedia[] @relation("MarketplaceMediaOwner")
+  marketplaceMessageReports MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
+  marketplaceBlocks MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocker")
+  marketplaceBlockedBy MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocked")
+}
+
+model RefreshSession {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash           String    @unique @map("token_hash") @db.Text
+  deviceName          String?   @map("device_name")
+  ipHash              String?   @map("ip_hash")
+  userAgent           String?   @map("user_agent") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+  lastUsedAt          DateTime? @map("last_used_at")
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedBySessionId String?   @map("replaced_by_session_id")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_sessions")
+}
+
+model SecurityEvent {
+  id          String   @id @default(cuid())
+  type        String
+  actorUserId String?  @map("actor_user_id")
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  outcome     String   @default("success")
+  reason      String?  @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([actorUserId])
+  @@index([outcome])
+  @@index([createdAt])
+  @@map("security_events")
 }
 
 model Profile {
@@ -137,19 +180,25 @@ model Profile {
 }
 
 model Animal {
-  id          String   @id @default(cuid())
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  appAnimalId String
-  name        String?
-  sex         String?
-  status      String?
-  payload     Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appAnimalId  String
+  name         String?
+  sex          String?
+  status       String?
+  payload      Json
+  globalId     String?
+  privacyLevel String   @default("private")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  asChild      ParentRelationship[] @relation("ChildOf")
+  asParent     ParentRelationship[] @relation("ParentOf")
+  ownershipHistory OwnershipHistory[]
 
   @@unique([ownerId, appAnimalId])
   @@index([ownerId])
+  @@index([globalId])
 }
 
 model Pairing {
@@ -618,6 +667,7 @@ model MarketplaceListing {
   publishedAt            DateTime? @map("published_at")
   archivedAt             DateTime? @map("archived_at")
   images                 MarketplaceListingImage[]
+  media                  MarketplaceMedia[]
   conversations          MarketplaceConversation[]
   favorites              MarketplaceFavorite[]
   sales                  MarketplaceSale[]
@@ -629,6 +679,30 @@ model MarketplaceListing {
   @@index([country])
   @@index([isFeatured])
   @@map("marketplace_listings")
+}
+
+model MarketplaceMedia {
+  id           String   @id @default(cuid())
+  ownerUserId  String   @map("owner_user_id")
+  owner        User     @relation("MarketplaceMediaOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  listingId    String?  @map("listing_id")
+  listing      MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  storageKey   String   @unique @map("storage_key") @db.Text
+  originalName String?  @map("original_name") @db.Text
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  checksum     String?
+  status       String   @default("pending_validation")
+  scanStatus   String   @default("not_scanned") @map("scan_status")
+  publicUrl    String?  @map("public_url") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerUserId])
+  @@index([listingId])
+  @@index([status])
+  @@index([scanStatus])
+  @@map("marketplace_media")
 }
 
 model MarketplaceListingImage {
@@ -700,10 +774,44 @@ model MarketplaceMessage {
   offerAmount    Decimal? @map("offer_amount") @db.Decimal(12, 2)
   createdAt      DateTime @default(now()) @map("created_at")
   readAt         DateTime? @map("read_at")
+  reports        MarketplaceMessageReport[]
 
   @@index([conversationId])
   @@index([senderUserId])
   @@map("marketplace_messages")
+}
+
+model MarketplaceMessageReport {
+  id             String   @id @default(cuid())
+  messageId      String   @map("message_id")
+  message        MarketplaceMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporterUserId String?  @map("reporter_user_id")
+  reporter       User?    @relation("MarketplaceMessageReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reason         String
+  status         String   @default("open")
+  note           String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([messageId])
+  @@index([reporterUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("marketplace_message_reports")
+}
+
+model MarketplaceUserBlock {
+  id            String   @id @default(cuid())
+  blockerUserId String   @map("blocker_user_id")
+  blocker       User     @relation("MarketplaceUserBlockBlocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blockedUserId String   @map("blocked_user_id")
+  blocked       User     @relation("MarketplaceUserBlockBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  reason        String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
+  @@map("marketplace_user_blocks")
 }
 
 model MarketplaceFavorite {
@@ -885,4 +993,44 @@ model ShedTestOrderResult {
   @@index([orderId])
   @@index([animalId])
   @@index([status])
+}
+
+// ── Family Tree models ──────────────────────────────────────
+
+// role: "sire" | "dam"
+// confidence: "confirmed" | "reported" | "unknown"
+model ParentRelationship {
+  id          String   @id @default(cuid())
+  childId     String
+  child       Animal   @relation("ChildOf",   fields: [childId],  references: [id], onDelete: Cascade)
+  parentId    String
+  parent      Animal   @relation("ParentOf",  fields: [parentId], references: [id], onDelete: Cascade)
+  role        String
+  confidence  String   @default("confirmed")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([childId, role])
+  @@index([childId])
+  @@index([parentId])
+  @@map("parent_relationships")
+}
+
+// transferType: "bred" | "sale" | "gift" | "trade" | "breeding_loan"
+model OwnershipHistory {
+  id           String    @id @default(cuid())
+  animalId     String
+  animal       Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  ownerId      String
+  ownerName    String?
+  fromDate     DateTime
+  toDate       DateTime?
+  transferType String
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+
+  @@index([animalId])
+  @@index([ownerId])
+  @@map("ownership_history")
 }
