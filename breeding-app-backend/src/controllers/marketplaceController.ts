@@ -18,6 +18,14 @@ import {
   upsertMarketplaceSale,
   upsertMarketplaceStore,
 } from "../services/marketplaceService";
+import {
+  blockMarketplaceUser,
+  createMarketplaceMediaUpload,
+  listMyMarketplaceBlocks,
+  listMyMarketplaceMedia,
+  reportMarketplaceMessage,
+  unblockMarketplaceUser,
+} from "../services/marketplaceRuntimeService";
 
 export const browseListings = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listMarketplaceListings(req.query));
@@ -74,6 +82,36 @@ export const conversations = async (req: Request, res: Response): Promise<void> 
 export const addMessage = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   res.status(201).json(await addMarketplaceMessage(req.user, req.params.id, req.body || {}));
+};
+
+export const uploadMedia = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(201).json(await createMarketplaceMediaUpload(req.user, req.body || {}));
+};
+
+export const myMedia = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listMyMarketplaceMedia(req.user));
+};
+
+export const reportMessage = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(201).json(await reportMarketplaceMessage(req.user, req.params.id, req.body || {}));
+};
+
+export const blockUser = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(201).json(await blockMarketplaceUser(req.user, req.body || {}));
+};
+
+export const unblockUser = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await unblockMarketplaceUser(req.user, req.params.blockedUserId));
+};
+
+export const myBlocks = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listMyMarketplaceBlocks(req.user));
 };
 
 export const createSale = async (req: Request, res: Response): Promise<void> => {

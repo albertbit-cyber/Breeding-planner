@@ -2,6 +2,12 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { createNotification } from "./notificationService";
 import { canAccessFeature } from "./subscriptionService";
+import {
+  toLegacyListingDto,
+  toLegacyModerationListingDto,
+  toLegacyPublicListingDto,
+} from "./marketplaceDtos";
+import { assertAdminActor } from "./permissionHelpers";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -49,24 +55,10 @@ const assertCanManageListings = async (ownerId: string) => {
   if (!access.allowed) throw new HttpError(403, access.reason || "Your subscription tier does not include marketplace selling.");
 };
 
-const toPublicListing = (row: any) => {
-  if (!row) return null;
-  return {
-    ...(row.payload && typeof row.payload === "object" ? row.payload : {}),
-    id: row.appListingId,
-    rowId: row.id,
-    ownerId: row.ownerId,
-    animalAppId: row.animalAppId,
-    title: row.title,
-    status: row.status,
-    priceCents: row.priceCents,
-    currency: row.currency,
-    updatedAt: row.updatedAt,
-  };
-};
-
 const assertAdmin = (actor: { role: string }) => {
-  if (actor.role !== "admin") {
+  try {
+    assertAdminActor(actor as any);
+  } catch {
     throw new HttpError(403, "Only admin users can moderate marketplace listings.");
   }
 };
@@ -77,7 +69,7 @@ export const listMyListings = async (ownerId: string) => {
     where: { ownerId },
     orderBy: [{ updatedAt: "desc" }],
   });
-  return rows.map(toPublicListing).filter(Boolean);
+  return rows.map(toLegacyListingDto).filter(Boolean);
 };
 
 export const replaceMyListings = async (ownerId: string, input: ListingPayload) => {
@@ -114,7 +106,7 @@ export const listPublicListingsByOwner = async (ownerId: string) => {
     where: { ownerId, status: "available" },
     orderBy: [{ updatedAt: "desc" }],
   });
-  return rows.map(toPublicListing).filter(Boolean);
+  return rows.map(toLegacyListingDto).filter(Boolean);
 };
 
 export const listPublicMarketplaceListings = async () => {
@@ -140,19 +132,7 @@ export const listPublicMarketplaceListings = async () => {
     orderBy: [{ updatedAt: "desc" }],
   });
 
-  return rows.map((row: any) => ({
-    ...toPublicListing(row),
-    breeder: row.owner?.profile
-      ? {
-          userId: row.owner.id,
-          breederName: row.owner.profile.breederName || row.owner.fullName,
-          location: row.owner.profile.location,
-          publicContactEmail: row.owner.profile.publicContactEmail,
-          publicContactPhone: row.owner.profile.publicContactPhone,
-          contactPreference: row.owner.profile.contactPreference,
-        }
-      : undefined,
-  })).filter(Boolean);
+  return rows.map(toLegacyPublicListingDto).filter(Boolean);
 };
 
 export const listModerationListings = async (actor: { role: string }) => {
@@ -172,19 +152,7 @@ export const listModerationListings = async (actor: { role: string }) => {
     orderBy: [{ updatedAt: "desc" }],
   });
 
-  return rows.map((row: any) => ({
-    ...toPublicListing(row),
-    breeder: row.owner
-      ? {
-          userId: row.owner.id,
-          fullName: row.owner.fullName,
-          email: row.owner.email,
-          role: row.owner.role,
-          breederName: row.owner.profile?.breederName || row.owner.fullName,
-          isPublic: row.owner.profile?.isPublic === true,
-        }
-      : undefined,
-  })).filter(Boolean);
+  return rows.map(toLegacyModerationListingDto).filter(Boolean);
 };
 
 export const listModerationAudit = async (actor: { role: string }) => {
@@ -309,17 +277,5 @@ export const updateListingModerationStatus = async (
     },
   });
 
-  return {
-    ...toPublicListing(row),
-    breeder: row.owner
-      ? {
-          userId: row.owner.id,
-          fullName: row.owner.fullName,
-          email: row.owner.email,
-          role: row.owner.role,
-          breederName: row.owner.profile?.breederName || row.owner.fullName,
-          isPublic: row.owner.profile?.isPublic === true,
-        }
-      : undefined,
-  };
+  return toLegacyModerationListingDto(row);
 };

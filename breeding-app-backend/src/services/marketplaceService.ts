@@ -3,6 +3,8 @@ import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
 import { canAccessFeature } from "./subscriptionService";
 import { createNotification } from "./notificationService";
+import { toMarketplaceListingDto, toMarketplaceStoreDto } from "./marketplaceDtos";
+import { assertAdminActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 
 const db = prisma as any;
 
@@ -54,87 +56,20 @@ const yearFromDate = (value: unknown): number | null => {
 };
 
 const assertSeller = async (actor: AuthenticatedUser) => {
-  if (!["breeder", "admin"].includes(actor.role)) throw new HttpError(403, "Only breeder or admin users can manage marketplace listings.");
+  try {
+    assertSellerActor(actor);
+  } catch {
+    throw new HttpError(403, "Only breeder or admin users can manage marketplace listings.");
+  }
 };
 
 const assertAdmin = (actor: AuthenticatedUser) => {
-  if (actor.role !== "admin") throw new HttpError(403, "Only admin users can manage marketplace moderation.");
+  try {
+    assertAdminActor(actor);
+  } catch {
+    throw new HttpError(403, "Only admin users can manage marketplace moderation.");
+  }
 };
-
-const normalizeListing = (row: any) => {
-  const store = row.seller?.marketplaceStores?.[0] || null;
-  const profile = row.seller?.profile || {};
-  return {
-    id: row.id,
-    sellerUserId: row.sellerUserId,
-    animalId: row.animalId,
-    title: row.title,
-    species: row.species || "Ball python",
-    category: row.category || "",
-    genetics: row.genetics || "",
-    sex: row.sex || "",
-    birthDate: row.birthDate,
-    year: row.year,
-    weight: row.weight === null || row.weight === undefined ? null : Number(row.weight),
-    price: row.price === null || row.price === undefined ? null : Number(row.price),
-    currency: row.currency,
-    status: row.status,
-    availability: row.availability,
-    country: row.country || profile.country || profile.location || "",
-    city: row.city || profile.city || "",
-    shippingAvailable: row.shippingAvailable,
-    pickupAvailable: row.pickupAvailable,
-    description: row.description || "",
-    feedingNotes: row.feedingNotes || "",
-    temperamentNotes: row.temperamentNotes || "",
-    publicDataSettings: row.publicDataSettingsJson || {},
-    viewsCount: row.viewsCount,
-    favoritesCount: row.favoritesCount,
-    isFeatured: row.isFeatured,
-    images: (row.images || []).map((image: any) => ({
-      id: image.id,
-      imageUrl: image.imageUrl,
-      sortOrder: image.sortOrder,
-      isPrimary: image.isPrimary,
-    })),
-    imageUrl: row.images?.[0]?.imageUrl || "",
-    seller: row.seller ? {
-      id: row.seller.id,
-      name: store?.storeName || profile.breederName || row.seller.fullName,
-      location: [profile.city, profile.country || profile.location].filter(Boolean).join(", "),
-      isVerified: Boolean(store?.isVerified || row.seller.verificationStatus === "approved"),
-      ratingAverage: store?.ratingAverage === undefined ? 0 : Number(store.ratingAverage),
-      reviewCount: store?.reviewCount || 0,
-      responseTime: "Usually within 24 hours",
-      accountAge: row.seller.id ? "Active seller" : "",
-    } : null,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    publishedAt: row.publishedAt,
-  };
-};
-
-const normalizeStore = (row: any, listings: any[] = [], reviews: any[] = []) => ({
-  id: row.id,
-  userId: row.userId,
-  storeName: row.storeName,
-  logoUrl: row.logoUrl || "",
-  bannerUrl: row.bannerUrl || "",
-  about: row.about || "",
-  country: row.country || "",
-  city: row.city || "",
-  websiteUrl: row.websiteUrl || "",
-  socialLinks: row.socialLinksJson || {},
-  terms: row.terms || "",
-  shippingPolicy: row.shippingPolicy || "",
-  paymentPolicy: row.paymentPolicy || "",
-  isVerified: row.isVerified,
-  ratingAverage: Number(row.ratingAverage || 0),
-  reviewCount: row.reviewCount || 0,
-  user: row.user,
-  listings: listings.map(normalizeListing),
-  reviews,
-});
 
 const listingData = (payload: Record<string, unknown>) => ({
   animalId: text(payload.animalId || payload.animalAppId, 160),
@@ -210,7 +145,7 @@ export const listMarketplaceListings = async (query: Record<string, unknown>) =>
   const sort = text(query.sort, 80) || "newest";
   const orderBy = sort === "price_low" ? [{ price: "asc" }] : sort === "price_high" ? [{ price: "desc" }] : sort === "updated" ? [{ updatedAt: "desc" }] : [{ isFeatured: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }];
   const rows = await db.marketplaceListing.findMany({ where, include: LISTING_INCLUDE, orderBy, take: 200 });
-  return { listings: rows.map(normalizeListing) };
+  return { listings: rows.map(toMarketplaceListingDto).filter(Boolean) };
 };
 
 export const getMarketplaceListing = async (id: string) => {
@@ -220,7 +155,7 @@ export const getMarketplaceListing = async (id: string) => {
     include: LISTING_INCLUDE,
   }).catch(async () => db.marketplaceListing.findUnique({ where: { id }, include: LISTING_INCLUDE }));
   if (!listing) throw new HttpError(404, "Marketplace listing not found.");
-  return { listing: normalizeListing(listing) };
+  return { listing: toMarketplaceListingDto(listing) };
 };
 
 export const listSellerDashboard = async (actor: AuthenticatedUser) => {
@@ -233,7 +168,7 @@ export const listSellerDashboard = async (actor: AuthenticatedUser) => {
   ]);
   return {
     store,
-    listings: listings.map(normalizeListing),
+    listings: listings.map(toMarketplaceListingDto).filter(Boolean),
     conversations,
     sales,
     analytics: {
@@ -268,7 +203,7 @@ export const upsertMarketplaceStore = async (actor: AuthenticatedUser, payload: 
     update: data,
     include: STORE_INCLUDE,
   });
-  return { store: normalizeStore(store) };
+  return { store: toMarketplaceStoreDto(store) };
 };
 
 export const getMarketplaceStore = async (userId: string) => {
@@ -278,7 +213,7 @@ export const getMarketplaceStore = async (userId: string) => {
     db.marketplaceListing.findMany({ where: { sellerUserId: userId, archivedAt: null }, include: LISTING_INCLUDE, orderBy: { updatedAt: "desc" } }),
     db.marketplaceReview.findMany({ where: { sellerUserId: userId }, orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
-  return { store: normalizeStore(store, listings, reviews) };
+  return { store: toMarketplaceStoreDto(store, listings, reviews) };
 };
 
 export const createMarketplaceListing = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
@@ -298,13 +233,13 @@ export const createMarketplaceListing = async (actor: AuthenticatedUser, payload
     });
     return tx.marketplaceListing.findUnique({ where: { id: row.id }, include: LISTING_INCLUDE });
   });
-  return { listing: normalizeListing(listing) };
+  return { listing: toMarketplaceListingDto(listing) };
 };
 
 export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: string, payload: Record<string, unknown>) => {
   const existing = await db.marketplaceListing.findUnique({ where: { id } });
   if (!existing) throw new HttpError(404, "Marketplace listing not found.");
-  if (actor.role !== "admin" && existing.sellerUserId !== actor.id) throw new HttpError(403, "You cannot edit this listing.");
+  assertOwnerOrAdmin(actor, existing.sellerUserId, "You cannot edit this listing.");
   const data = listingData(payload);
   const images = imageInputs(payload);
   const listing = await db.$transaction(async (tx: any) => {
@@ -318,7 +253,7 @@ export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: str
     }
     return tx.marketplaceListing.findUnique({ where: { id }, include: LISTING_INCLUDE });
   });
-  return { listing: normalizeListing(listing) };
+  return { listing: toMarketplaceListingDto(listing) };
 };
 
 export const updateMarketplaceListingStatus = async (actor: AuthenticatedUser, id: string, payload: Record<string, unknown>) => {
@@ -326,7 +261,7 @@ export const updateMarketplaceListingStatus = async (actor: AuthenticatedUser, i
   const availability = text(payload.availability, 40) || status;
   const existing = await db.marketplaceListing.findUnique({ where: { id } });
   if (!existing) throw new HttpError(404, "Marketplace listing not found.");
-  if (actor.role !== "admin" && existing.sellerUserId !== actor.id) throw new HttpError(403, "You cannot update this listing.");
+  assertOwnerOrAdmin(actor, existing.sellerUserId, "You cannot update this listing.");
   const listing = await db.marketplaceListing.update({
     where: { id },
     data: {
@@ -337,7 +272,7 @@ export const updateMarketplaceListingStatus = async (actor: AuthenticatedUser, i
     },
     include: LISTING_INCLUDE,
   });
-  return { listing: normalizeListing(listing) };
+  return { listing: toMarketplaceListingDto(listing) };
 };
 
 export const toggleMarketplaceFavorite = async (actor: AuthenticatedUser, listingId: string) => {
@@ -471,7 +406,7 @@ export const listAdminMarketplace = async (actor: AuthenticatedUser) => {
     db.marketplaceStore.findMany({ include: STORE_INCLUDE, orderBy: { updatedAt: "desc" }, take: 100 }),
     db.marketplaceConversation.findMany({ include: { listing: true }, orderBy: { updatedAt: "desc" }, take: 100 }),
   ]);
-  return { listings: listings.map(normalizeListing), stores: stores.map((store: any) => normalizeStore(store)), disputes: conversations };
+  return { listings: listings.map(toMarketplaceListingDto).filter(Boolean), stores: stores.map((store: any) => toMarketplaceStoreDto(store)), disputes: conversations };
 };
 
 export const adminUpdateStore = async (actor: AuthenticatedUser, userId: string, payload: Record<string, unknown>) => {
@@ -481,5 +416,5 @@ export const adminUpdateStore = async (actor: AuthenticatedUser, userId: string,
     data: { isVerified: payload.isVerified !== undefined ? bool(payload.isVerified) : undefined },
     include: STORE_INCLUDE,
   });
-  return { store: normalizeStore(store) };
+  return { store: toMarketplaceStoreDto(store) };
 };

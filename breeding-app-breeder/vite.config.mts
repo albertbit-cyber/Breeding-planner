@@ -79,6 +79,7 @@ export default defineConfig({
       "**/build/**",
       "**/.{idea,git,cache,output,temp}/**",
       "server/**",
+      "tests/e2e/**",
       "src/genetics/punnett.test.ts",
     ],
   },

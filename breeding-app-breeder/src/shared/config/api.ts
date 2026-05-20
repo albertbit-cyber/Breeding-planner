@@ -44,7 +44,7 @@ const resolveDevFallbackApiUrl = (): string => {
 const isLikelyDevBrowserSession = (): boolean => {
   const location = readBrowserLocation();
   const port = String(location?.port || "").trim();
-  return port === "5173" || port === "4173";
+  return port === "5173" || port === "4173" || port === "4174";
 };
 
 const isDevBuild = (): boolean => {

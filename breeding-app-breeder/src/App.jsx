@@ -8,6 +8,7 @@ import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
 import SuggestionsTab from "./features/suggestions/SuggestionsTab";
+import FamilyTreePage from "./features/familyTree/index.jsx";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
 import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
 import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
@@ -8982,6 +8983,7 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
                 <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
                 <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
+                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
               </div>
               <div className="w-full min-w-[230px] sm:w-auto">
                 <div className="header-search-shell">
@@ -9607,6 +9609,10 @@ export default function BreedingPlannerApp() {
             onResetToDefaults={resetAppToDefaults}
           />
         )}
+
+        {tab === "familyTree" && (
+          <FamilyTreePage />
+        )}
       </div>
 
       {photoGallerySnake && typeof document !== 'undefined' && createPortal((
@@ -10086,9 +10092,9 @@ export default function BreedingPlannerApp() {
           ), document.body)}
 
       {/* create pairing modal — breeders only, male-first */}
-    {showPairingModal && (
-  <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+    {showPairingModal && typeof document !== 'undefined' && createPortal((
+  <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
+          <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">Create pairing</div>
               <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>Close</button>
@@ -10270,7 +10276,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
@@ -12079,11 +12085,13 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
   const { t } = useTranslation();
   const [mode, setMode] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setMode('all');
       setSelectedIds([]);
+      setIsGenerating(false);
     }
   }, [open]);
 
@@ -12112,7 +12120,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
     });
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (typeof onGenerate !== 'function') {
       onClose();
       return;
@@ -12128,15 +12136,18 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
       }
       return;
     }
-    onGenerate(payload);
-    onClose();
+    try {
+      setIsGenerating(true);
+      await onGenerate(payload);
+      onClose();
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  if (!open) return null;
-
-  return (
-    <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-50', overlayClass(theme))} onClick={onClose}>
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
+  return open && typeof document !== 'undefined' ? createPortal((
+    <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-[10010]', overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
+      <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b font-semibold">
           {t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })}
         </div>
@@ -12184,14 +12195,16 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm text-white', primaryBtnClass(theme, true), !pairings.length && 'opacity-60 cursor-not-allowed')}
             onClick={handleGenerate}
-            disabled={!pairings.length}
+            disabled={!pairings.length || isGenerating}
           >
-            {t('pairingQrModal.generate', { defaultValue: 'Generate labels' })}
+            {isGenerating
+              ? t('pairingQrModal.generating', { defaultValue: 'Generating...' })
+              : t('pairingQrModal.generate', { defaultValue: 'Generate labels' })}
           </button>
         </div>
       </div>
     </div>
-  );
+  ), document.body) : null;
 }
 
 const PT_TO_MM = 0.352778;

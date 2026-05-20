@@ -1,6 +1,14 @@
 import type { Request, Response } from "express";
-import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser } from "../services/authService";
+import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser, logoutUser } from "../services/authService";
 import { loginSchema, recoverPasswordSchema, registerSchema } from "../validators/authValidators";
+import {
+  AUTH_REFRESH_COOKIE,
+  clearAuthCookies,
+  createCsrfToken,
+  getCookieValue,
+  setAuthCookies,
+  setCsrfCookie,
+} from "../utils/authCookies";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   const parsed = registerSchema.safeParse(req.body);
@@ -23,7 +31,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
   const { email, password } = parsed.data;
   const result = await loginUser(email, password);
-  res.status(200).json(result);
+  setAuthCookies(res, result);
+  const csrfToken = createCsrfToken();
+  setCsrfCookie(res, csrfToken);
+  res.status(200).json({ ...result, csrfToken });
 };
 
 export const me = async (req: Request, res: Response): Promise<void> => {
@@ -32,13 +43,28 @@ export const me = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const refresh = async (req: Request, res: Response): Promise<void> => {
-  const token = String(req.body?.refreshToken || "");
+  const token = String(req.body?.refreshToken || getCookieValue(req, AUTH_REFRESH_COOKIE) || "");
   if (!token) {
     res.status(400).json({ message: "refreshToken is required." });
     return;
   }
   const result = await refreshAuthToken(token);
-  res.status(200).json(result);
+  setAuthCookies(res, result);
+  const csrfToken = createCsrfToken();
+  setCsrfCookie(res, csrfToken);
+  res.status(200).json({ ...result, csrfToken });
+};
+
+export const csrfToken = async (_req: Request, res: Response): Promise<void> => {
+  const token = createCsrfToken();
+  setCsrfCookie(res, token);
+  res.status(200).json({ csrfToken: token });
+};
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  await logoutUser(String(req.user?.id || ""));
+  clearAuthCookies(res);
+  res.status(200).json({ message: "Signed out." });
 };
 
 export const recoverPassword = async (req: Request, res: Response): Promise<void> => {

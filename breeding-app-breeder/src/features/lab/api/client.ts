@@ -85,7 +85,12 @@ import { generateOrderLabelsPdf } from "../../../utils/pdf/labOrderLabelsPdf";
 import { getActiveLabelSize } from "../utils/labelSizing";
 import { toLabQrResolvePayload } from "../utils/qrLookupInput";
 
-const AUTH_STORAGE_KEY = "breedingPlannerLabAuthSession";
+const AUTH_STORAGE_KEYS = [
+  "breedingPlannerBreederAuthSession",
+  "breedingPlannerLabAuthSession",
+  "breedingPlannerAdminAuthSession",
+  "breedingPlannerAuthSession",
+];
 const DEFAULT_LAB_ID = "proherper-main-lab";
 type LegacyRole = "admin" | "lab_staff" | "breeder";
 
@@ -118,13 +123,17 @@ const normalizeRole = (value: unknown): LegacyRole => {
 
 const getSession = (): AuthSession | null => {
   if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AuthSession;
-  } catch {
-    return null;
+  for (const storageKey of AUTH_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as AuthSession;
+      if (parsed?.isAuthenticated) return parsed;
+    } catch {
+      // Try the next auth-session key.
+    }
   }
+  return null;
 };
 
 const requireSessionRole = (...roles: LegacyRole[]): LegacyRole => {
@@ -176,7 +185,9 @@ const toLegacyOrder = (order: any): TestOrder => {
     id: orderId,
     labId: DEFAULT_LAB_ID,
     animalId: String(firstAnimal?.animalId || ""),
+    animalName: String(firstAnimal?.animalName || "").trim(),
     animalIds: animals.map((a: any) => String(a?.animalId || "")).filter(Boolean),
+    animalNames: animals.map((a: any) => String(a?.animalName || "").trim()).filter(Boolean),
     orderNumber,
     status: backendStatus as any,
     requestedTests: Array.from(new Set(requestedTests)),
@@ -1058,15 +1069,22 @@ export const createLabApiClient = () => {
     return rows.map(toLegacyOrder);
   };
 
-  const listBreederTestOrdersForSnake = async (snakeId: string): Promise<TestOrder[]> => {
+  const listBreederTestOrdersForSnake = async (snakeId: string, snakeDisplayName?: string): Promise<TestOrder[]> => {
     const normalized = String(snakeId || "").trim();
+    const snakeName = String(snakeDisplayName || (await loadSnakeById(normalized))?.name || "").trim();
     const orders = await listBreederTestOrders();
-    return orders.filter((order) => {
+    const matches = orders.filter((order) => {
       const ids: string[] = Array.isArray(order.animalIds) && order.animalIds.length
         ? order.animalIds
         : [String(order.animalId || "").trim()].filter(Boolean);
-      return ids.some((id) => id === normalized);
+      const names: string[] = Array.isArray((order as any).animalNames)
+        ? (order as any).animalNames.map((name: unknown) => String(name || "").trim()).filter(Boolean)
+        : [];
+      const firstName = String((order as any).animalName || "").trim();
+      if (firstName) names.push(firstName);
+      return ids.some((id) => id === normalized) || (snakeName && names.some((name) => name === snakeName));
     });
+    return matches.length ? matches : [];
   };
 
   const getBreederTestOrderDetails = async (orderId: string): Promise<TestOrder> => {

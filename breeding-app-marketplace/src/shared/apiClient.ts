@@ -20,11 +20,25 @@ export const REFRESH_TOKEN_STORAGE_KEYS: Record<AuthScope, string> = {
   admin: "breedingPlannerAdminRefreshToken",
 };
 
+export const AUTH_MODE_STORAGE_KEYS: Record<AuthScope, string> = {
+  breeder: "breedingPlannerBreederAuthMode",
+  lab: "breedingPlannerLabAuthMode",
+  admin: "breedingPlannerAdminAuthMode",
+};
+
+export const CSRF_TOKEN_STORAGE_KEYS: Record<AuthScope, string> = {
+  breeder: "breedingPlannerBreederCsrfToken",
+  lab: "breedingPlannerLabCsrfToken",
+  admin: "breedingPlannerAdminCsrfToken",
+};
+
 export const AUTH_TOKEN_STORAGE_KEY = AUTH_TOKEN_STORAGE_KEYS.breeder;
 export const REFRESH_TOKEN_STORAGE_KEY = REFRESH_TOKEN_STORAGE_KEYS.breeder;
 
 const LEGACY_AUTH_TOKEN_STORAGE_KEY = "breedingPlannerAuthToken";
 const LEGACY_REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
+const COOKIE_PREFERRED_AUTH_MODE = "cookie-preferred";
+const CSRF_HEADER_NAME = "x-csrf-token";
 
 export const getAuthScopeForHash = (hashValue?: string): AuthScope => {
   const fallbackHash = typeof window !== "undefined" ? window.location.hash : "";
@@ -123,6 +137,27 @@ const clearStoredRefreshToken = (scope?: AuthScope): void => {
 const clearStoredAuth = (scope?: AuthScope): void => {
   clearStoredToken(scope);
   clearStoredRefreshToken(scope);
+  clearStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]);
+  clearStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
+};
+
+const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
+  getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
+
+const setCookiePreferredAuth = (scope?: AuthScope): void => {
+  setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
+};
+
+const getStoredCsrfToken = (scope?: AuthScope): string =>
+  getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
+
+const setStoredCsrfToken = (token: string, scope?: AuthScope): void => {
+  setStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)], token);
+};
+
+const isUnsafeHttpMethod = (method?: string): boolean => {
+  const normalized = String(method || "GET").toUpperCase();
+  return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 };
 
 const categorizeHttpError = (status: number): SharedApiErrorKind => {
@@ -206,6 +241,8 @@ type RequestOptions = RequestInit & {
   requiresAuth?: boolean;
   statusOnHttpError?: SharedBackendState;
   skipRefreshRetry?: boolean;
+  skipBearerFallback?: boolean;
+  forceBearerAuth?: boolean;
   authScope?: AuthScope;
 };
 
@@ -225,6 +262,42 @@ const markAuthorized = (reason = "Authenticated against shared backend."): void 
 };
 
 const refreshRequestPromises: Partial<Record<AuthScope, Promise<{ token: string; refreshToken: string }>>> = {};
+const csrfRequestPromises: Partial<Record<AuthScope, Promise<string>>> = {};
+
+export const fetchCsrfToken = async (scope?: AuthScope): Promise<string> => {
+  const authScope = normalizeAuthScope(scope);
+  const cached = getStoredCsrfToken(authScope);
+  if (cached) return cached;
+  if (csrfRequestPromises[authScope]) return csrfRequestPromises[authScope]!;
+
+  csrfRequestPromises[authScope] = (async () => {
+    const config = getSharedApiConfig();
+    if (!config.ok) {
+      const error = new SharedApiError(config.message, "config", null, config);
+      updateStatusForFailure(error);
+      throw error;
+    }
+
+    const response = await fetch(`${config.baseUrl}/auth/csrf-token`, {
+      method: "GET",
+      credentials: "include",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw mapResponseError(response, data);
+    }
+    const token = String(data?.csrfToken || "").trim();
+    if (!token) {
+      throw new SharedApiError("Shared backend did not return a CSRF token.", "server", response.status, data);
+    }
+    setStoredCsrfToken(token, authScope);
+    return token;
+  })().finally(() => {
+    csrfRequestPromises[authScope] = undefined;
+  });
+
+  return csrfRequestPromises[authScope]!;
+};
 
 const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; refreshToken: string }> => {
   if (refreshRequestPromises[scope]) {
@@ -240,7 +313,7 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
     }
 
     const refreshToken = getStoredRefreshToken(scope);
-    if (!refreshToken) {
+    if (!refreshToken && !isCookiePreferredAuth(scope)) {
       const error = new SharedApiError("Your shared backend session expired. Sign in again.", "unauthorized", 401, null);
       clearStoredAuth(scope);
       updateStatusForFailure(error);
@@ -250,7 +323,8 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
     const response = await fetch(`${config.baseUrl}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      credentials: "include",
+      body: JSON.stringify(refreshToken ? { refreshToken } : {}),
     });
     const data = await response.json().catch(() => ({}));
 
@@ -277,6 +351,8 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
 
     setStoredToken(nextToken, scope);
     setStoredRefreshToken(nextRefreshToken, scope);
+    setCookiePreferredAuth(scope);
+    if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
     return {
@@ -306,8 +382,14 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const token = getStoredToken(authScope);
-  if (requiresAuth && token) {
+  const preferCookieAuth = isCookiePreferredAuth(authScope);
+  if (requiresAuth && token && (options.forceBearerAuth || !preferCookieAuth)) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  if (requiresAuth && preferCookieAuth && isUnsafeHttpMethod(options.method) && !headers.has(CSRF_HEADER_NAME)) {
+    const csrfToken = await fetchCsrfToken(authScope);
+    headers.set(CSRF_HEADER_NAME, csrfToken);
   }
 
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -320,6 +402,7 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
       const response = await fetch(`${config.baseUrl}${path}`, {
         ...options,
         headers,
+        credentials: "include",
         signal: controller?.signal,
       });
       const data = await response.json().catch(() => ({}));
@@ -330,12 +413,26 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
           && requiresAuth
           && !options.skipRefreshRetry
           && path !== "/auth/refresh"
-          && getStoredRefreshToken(authScope)
+          && (getStoredRefreshToken(authScope) || preferCookieAuth)
         ) {
           await refreshAuthSession(authScope);
           return request<T>(path, {
             ...options,
             skipRefreshRetry: true,
+          });
+        }
+        if (
+          mapped.kind === "unauthorized"
+          && requiresAuth
+          && preferCookieAuth
+          && token
+          && !options.forceBearerAuth
+          && !options.skipBearerFallback
+        ) {
+          return request<T>(path, {
+            ...options,
+            forceBearerAuth: true,
+            skipBearerFallback: true,
           });
         }
         if (mapped.kind === "unauthorized") {
@@ -425,6 +522,8 @@ export const login = async (payload: { email: string; password: string }, authSc
   if (data?.token && data?.refreshToken) {
     setStoredToken(data.token, scope);
     setStoredRefreshToken(data.refreshToken, scope);
+    setCookiePreferredAuth(scope);
+    if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
   }
   return data;

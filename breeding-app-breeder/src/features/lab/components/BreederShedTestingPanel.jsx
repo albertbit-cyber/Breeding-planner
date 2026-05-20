@@ -104,7 +104,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
     setError("");
     try {
       const api = createLabApiClient();
-      const rows = await api.listBreederTestOrdersForSnake(snakeId);
+      const rows = await api.listBreederTestOrdersForSnake(snakeId, snake?.name);
       setOrders(rows);
       const completedRows = rows.filter((entry) => String(entry?.status || "").trim() === "completed");
       if (completedRows.length) {

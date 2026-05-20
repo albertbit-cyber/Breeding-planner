@@ -18,6 +18,7 @@ import { marketplaceRoutes } from "./routes/marketplaceRoutes";
 import { mobileRoutes } from "./routes/mobileRoutes";
 import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
+import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -59,7 +60,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "8mb" }));
 
 // This backend is the single source of truth for all app clients.
 // Every authenticated device calls the same hosted API and shared Postgres DB.
@@ -96,6 +97,7 @@ app.use("/api/mobile", mobileRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
+app.use("/api/family-tree", familyTreeRoutes);
 
 app.use(errorHandler);
 

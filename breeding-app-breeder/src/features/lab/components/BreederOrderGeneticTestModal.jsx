@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
@@ -90,13 +91,15 @@ export default function BreederOrderGeneticTestModal({
 
   if (!open || !snake) return null;
 
-  return (
+  const modal = (
     <div
-      className={`fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50 ${overlayClass || "bg-black/40"}`}
+      className={`fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 ${overlayClass || "bg-black/40"} z-[10020]`}
+      style={{ zIndex: 10020 }}
       onClick={closeAndReset}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
+        className="relative z-[10021] w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
+        style={{ zIndex: 10021 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -213,4 +216,6 @@ export default function BreederOrderGeneticTestModal({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modal, document.body) : modal;
 }

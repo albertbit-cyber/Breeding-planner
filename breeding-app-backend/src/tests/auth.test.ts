@@ -9,6 +9,14 @@ vi.mock("../lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    refreshSession: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    securityEvent: {
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -36,6 +44,17 @@ const mockUser = {
   refreshToken: null,
   createdAt: new Date(),
   updatedAt: new Date(),
+};
+
+const cookieHeaders = (res: request.Response): string[] => {
+  const value = res.headers["set-cookie"];
+  return Array.isArray(value) ? value : value ? [String(value)] : [];
+};
+
+const cookieHeaderValue = (res: request.Response, name: string): string => {
+  const header = cookieHeaders(res).find((entry) => entry.startsWith(`${name}=`));
+  if (!header) throw new Error(`Missing ${name} cookie`);
+  return header.split(";")[0];
 };
 
 beforeEach(() => {
@@ -123,6 +142,22 @@ describe("POST /api/auth/login", () => {
     expect(res.body.token).toBeDefined();
     expect(res.body.refreshToken).toBeDefined();
     expect(res.body.user.email).toBe("test@example.com");
+    expect(cookieHeaders(res).join(";")).toContain("bp_access_token=");
+    expect(cookieHeaders(res).join(";")).toContain("bp_refresh_token=");
+    expect(cookieHeaders(res).join(";")).toContain("bp_csrf_token=");
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        refreshToken: expect.stringMatching(/^sha256:/),
+      }),
+    }));
+    const storedRefreshToken = vi.mocked(prisma.user.update).mock.calls[0]?.[0]?.data?.refreshToken;
+    expect(storedRefreshToken).not.toBe(res.body.refreshToken);
+    expect((prisma as any).refreshSession.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        userId: "user-1",
+        tokenHash: expect.stringMatching(/^sha256:/),
+      }),
+    }));
   });
 
   it("returns 401 on wrong password", async () => {
@@ -153,6 +188,47 @@ describe("POST /api/auth/login", () => {
       password: "password123",
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/auth/refresh", () => {
+  it("refreshes using the httpOnly refresh cookie while keeping JSON token support", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.user.update).mockResolvedValue(mockUser);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "password123",
+    });
+    const refreshToken = loginRes.body.refreshToken;
+    const refreshCookie = cookieHeaderValue(loginRes, "bp_refresh_token");
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, refreshToken });
+    vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, refreshToken });
+    vi.mocked((prisma as any).refreshSession.findFirst).mockResolvedValue({ id: "session-1" });
+    vi.mocked((prisma as any).refreshSession.create).mockResolvedValue({ id: "session-2" });
+    vi.mocked((prisma as any).refreshSession.updateMany).mockResolvedValue({ count: 1 });
+
+    const res = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", refreshCookie)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
+    expect(res.body.refreshToken).toBeDefined();
+    expect(cookieHeaders(res).join(";")).toContain("bp_access_token=");
+    expect(prisma.user.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        refreshToken: expect.stringMatching(/^sha256:/),
+      }),
+    }));
+    expect((prisma as any).refreshSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        revokedAt: expect.any(Date),
+        replacedBySessionId: "session-2",
+      }),
+    }));
   });
 });
 
@@ -235,5 +311,74 @@ describe("GET /api/auth/me", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.user.email).toBe("test@example.com");
+  });
+
+  it("returns 200 with valid access cookie", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.user.update).mockResolvedValue(mockUser);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "password123",
+    });
+    const accessCookie = cookieHeaderValue(loginRes, "bp_access_token");
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+
+    const res = await request(app)
+      .get("/api/auth/me")
+      .set("Cookie", accessCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe("test@example.com");
+  });
+});
+
+describe("POST /api/auth/logout", () => {
+  it("requires CSRF for cookie-authenticated write requests", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.user.update).mockResolvedValue(mockUser);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "password123",
+    });
+    const accessCookie = cookieHeaderValue(loginRes, "bp_access_token");
+
+    const res = await request(app)
+      .post("/api/auth/logout")
+      .set("Cookie", accessCookie)
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
+
+  it("logs out with matching CSRF cookie and header", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.user.update).mockResolvedValue(mockUser);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "password123",
+    });
+    const accessCookie = cookieHeaderValue(loginRes, "bp_access_token");
+    const csrfCookie = cookieHeaderValue(loginRes, "bp_csrf_token");
+    const csrfValue = csrfCookie.split("=")[1];
+
+    const res = await request(app)
+      .post("/api/auth/logout")
+      .set("Cookie", [accessCookie, csrfCookie])
+      .set("x-csrf-token", csrfValue)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "user-1" },
+      data: { refreshToken: null },
+    }));
+    expect((prisma as any).refreshSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ userId: "user-1", revokedAt: null }),
+      data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+    }));
   });
 });

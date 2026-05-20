@@ -4,6 +4,15 @@ import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { normalizePersistedRole } from "../auth/identity";
 import type { AppRole, PersistedAppRole } from "../types/auth";
+import {
+  createRefreshSession,
+  hashRefreshToken,
+  findActiveRefreshSession,
+  matchesStoredRefreshToken,
+  revokeRefreshSessionsForUser,
+  rotateRefreshSession,
+} from "./refreshTokenSessionService";
+import { recordSecurityEvent } from "./securityEventService";
 
 type UserEntity = {
   id: string;
@@ -76,7 +85,14 @@ export const loginUser = async (email: string, password: string) => {
 
   await (prisma as any).user.update({
     where: { id: user.id },
-    data: { refreshToken, lastLoginAt: new Date(), status: "active" },
+    data: { refreshToken: hashRefreshToken(refreshToken), lastLoginAt: new Date(), status: "active" },
+  });
+  await createRefreshSession(user.id, refreshToken);
+  await recordSecurityEvent({
+    type: "auth.login.success",
+    actorUserId: user.id,
+    outcome: "success",
+    metadata: { email: user.email, role: user.role },
   });
 
   return {
@@ -96,7 +112,15 @@ export const refreshAuthToken = async (incomingRefreshToken: string) => {
 
   // Cast to access refreshToken field (present after migration).
   const storedToken = (user as unknown as { refreshToken: string | null }).refreshToken;
-  if (!storedToken || storedToken !== incomingRefreshToken) {
+  const refreshSession = await findActiveRefreshSession(user.id, incomingRefreshToken);
+  const legacyRefreshTokenMatches = matchesStoredRefreshToken(storedToken, incomingRefreshToken);
+  if (!refreshSession && !legacyRefreshTokenMatches) {
+    await recordSecurityEvent({
+      type: "auth.refresh.revoked_or_reused",
+      actorUserId: user.id,
+      outcome: "blocked",
+      reason: "stored refresh token did not match incoming token",
+    });
     throw new HttpError(401, "Refresh token has been revoked.");
   }
 
@@ -111,10 +135,35 @@ export const refreshAuthToken = async (incomingRefreshToken: string) => {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { refreshToken: newRefreshToken },
+    data: { refreshToken: hashRefreshToken(newRefreshToken) },
+  });
+  if (refreshSession) {
+    await rotateRefreshSession(user.id, incomingRefreshToken, newRefreshToken);
+  } else {
+    await createRefreshSession(user.id, newRefreshToken);
+  }
+  await recordSecurityEvent({
+    type: "auth.refresh.success",
+    actorUserId: user.id,
+    outcome: "success",
   });
 
   return { token, refreshToken: newRefreshToken };
+};
+
+export const logoutUser = async (userId: string) => {
+  if (!userId) return { message: "Signed out." };
+  await prisma.user.update({
+    where: { id: userId },
+    data: { refreshToken: null },
+  }).catch(() => null);
+  await revokeRefreshSessionsForUser(userId);
+  await recordSecurityEvent({
+    type: "auth.logout",
+    actorUserId: userId,
+    outcome: "success",
+  });
+  return { message: "Signed out." };
 };
 
 export const recoverPassword = async (input: {
@@ -134,6 +183,11 @@ export const recoverPassword = async (input: {
       passwordHash,
       refreshToken: null,
     },
+  });
+  await recordSecurityEvent({
+    type: "auth.password_recovery.success",
+    actorUserId: user.id,
+    outcome: "success",
   });
 
   return { message: "Password updated. You can sign in with your new password." };

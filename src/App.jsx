@@ -57,27 +57,20 @@ import defaultMorphAliasesJson from "./config/morphAliases.json";
 // use the CDN worker by version
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-const HEAT_RACK_TUB_PRESETS = ['V70', 'V35', 'V18', 'CB70'];
+const RACK_SIZES = [10, 18, 19, 20, 28, 35, 40, 70, 90, 100];
+const RACK_TYPES = ['V', 'LP', 'FB', 'W', 'ST'];
 
-// HeatRackFormModal now supports preset/custom tub sizes for rooms.
 function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
   const { t } = useTranslation();
   const getInitialFormState = useCallback(() => {
-    const label = String(rack?.tubSizeLabel || '').trim();
-    const presetMatch = HEAT_RACK_TUB_PRESETS.find(option => option.toLowerCase() === label.toLowerCase());
-    const preset = presetMatch || (label ? 'custom' : HEAT_RACK_TUB_PRESETS[0]);
+    const sizeNum = Number(String(rack?.tubSizeLabel || '').trim());
+    const size = RACK_SIZES.includes(sizeNum) ? sizeNum : RACK_SIZES[0];
     return {
       name: rack?.name || '',
-      tubSizePreset: preset,
-      customTubLabel: preset === 'custom' ? label : '',
+      rackSize: String(size),
+      rackType: rack?.rackType || RACK_TYPES[0],
       columns: rack?.columns ? String(rack.columns) : '1',
       levels: rack?.levels ? String(rack.levels) : '1',
-      tubDimensions: {
-        w: rack?.tubDimensions?.w ? String(rack.tubDimensions.w) : '',
-        d: rack?.tubDimensions?.d ? String(rack.tubDimensions.d) : '',
-        h: rack?.tubDimensions?.h ? String(rack.tubDimensions.h) : '',
-        unit: rack?.tubDimensions?.unit || 'cm',
-      },
     };
   }, [rack]);
 
@@ -90,51 +83,21 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
   if (!open || !room) return null;
 
   const totalTubs = computeTotalTubs(Number(form.columns) || 1, Number(form.levels) || 1);
-  const isCustomPreset = form.tubSizePreset === 'custom';
-  const hasValidCustomLabel = !isCustomPreset || Boolean(form.customTubLabel.trim());
-  const hasValidCustomDimensions = !isCustomPreset || ['w', 'd', 'h'].every(key => Number(form.tubDimensions[key]) > 0);
-  const canSubmit = Boolean(form.name.trim()) && hasValidCustomLabel && hasValidCustomDimensions;
-  const resolvedTubLabel = isCustomPreset
-    ? (form.customTubLabel.trim() || t('spaces.rack.tubSize', { defaultValue: 'Custom rack' }))
-    : form.tubSizePreset;
+  const canSubmit = Boolean(form.name.trim());
 
   const handleSubmit = (event) => {
     event.preventDefault();
     if (!canSubmit) return;
     const columns = clampInt(form.columns, { min: 1, fallback: 1 });
     const levels = clampInt(form.levels, { min: 1, fallback: 1 });
-    const payload = {
+    onSubmit?.({
       name: form.name.trim(),
       columns,
       levels,
-      tubSizeLabel: resolvedTubLabel,
-      tubDimensions: isCustomPreset && hasValidCustomDimensions
-        ? {
-            w: Number(form.tubDimensions.w),
-            d: Number(form.tubDimensions.d),
-            h: Number(form.tubDimensions.h),
-            unit: form.tubDimensions.unit,
-          }
-        : null,
+      tubSizeLabel: form.rackSize,
+      rackType: form.rackType,
       slots: rack?.slots,
-    };
-    onSubmit?.(payload);
-  };
-
-  const handlePresetChange = (event) => {
-    const nextPreset = event.target.value;
-    if (nextPreset === 'custom') {
-      setForm(prev => ({ ...prev, tubSizePreset: 'custom' }));
-    } else {
-      setForm(prev => ({ ...prev, tubSizePreset: nextPreset, customTubLabel: '' }));
-    }
-  };
-
-  const updateDimension = (key, value) => {
-    setForm(prev => ({
-      ...prev,
-      tubDimensions: { ...prev.tubDimensions, [key]: value },
-    }));
+    });
   };
 
   return (
@@ -150,7 +113,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
         </div>
 
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
               <span>{t('spaces.rack.name', { defaultValue: 'Rack name' })}</span>
               <input
@@ -161,16 +124,27 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
               />
             </label>
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
-              <span>{t('spaces.rack.tubSize', { defaultValue: 'Tub size' })}</span>
+              <span>{t('spaces.rack.size', { defaultValue: 'Tub size' })}</span>
               <select
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.tubSizePreset}
-                onChange={handlePresetChange}
+                value={form.rackSize}
+                onChange={e => setForm(prev => ({ ...prev, rackSize: e.target.value }))}
               >
-                {HEAT_RACK_TUB_PRESETS.map(option => (
-                  <option key={option} value={option}>{option}</option>
+                {RACK_SIZES.map(size => (
+                  <option key={size} value={String(size)}>{size}</option>
                 ))}
-                <option value="custom">{t('spaces.rack.customPreset', { defaultValue: 'Custom' })}</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
+              <span>{t('spaces.rack.type', { defaultValue: 'Type' })}</span>
+              <select
+                className="w-full border rounded-2xl px-3 py-2 text-sm"
+                value={form.rackType}
+                onChange={e => setForm(prev => ({ ...prev, rackType: e.target.value }))}
+              >
+                {RACK_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -206,55 +180,6 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
             </label>
           </div>
         </div>
-
-        {isCustomPreset && (
-          <div className="space-y-3">
-            <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
-              <span>{t('spaces.rack.customLabel', { defaultValue: 'Custom tub label' })}</span>
-              <input
-                className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.customTubLabel}
-                onChange={e => setForm(prev => ({ ...prev, customTubLabel: e.target.value }))}
-                placeholder={t('spaces.rack.tubSize', { defaultValue: 'Custom tub label' })}
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <input
-                type="number"
-                min="1"
-                className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.tubDimensions.w}
-                onChange={e => updateDimension('w', e.target.value)}
-                placeholder={t('spaces.dimensions.width', { defaultValue: 'Width' })}
-              />
-              <input
-                type="number"
-                min="1"
-                className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.tubDimensions.d}
-                onChange={e => updateDimension('d', e.target.value)}
-                placeholder={t('spaces.dimensions.depth', { defaultValue: 'Depth' })}
-              />
-              <input
-                type="number"
-                min="1"
-                className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.tubDimensions.h}
-                onChange={e => updateDimension('h', e.target.value)}
-                placeholder={t('spaces.dimensions.height', { defaultValue: 'Height' })}
-              />
-              <select
-                className="w-full border rounded-2xl px-3 py-2 text-sm"
-                value={form.tubDimensions.unit}
-                onChange={e => updateDimension('unit', e.target.value)}
-              >
-                <option value="cm">cm</option>
-                <option value="mm">mm</option>
-                <option value="in">in</option>
-              </select>
-            </div>
-          </div>
-        )}
 
         <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
           {t('spaces.derivedCapacity', { defaultValue: 'Total tubs: {{count}}', count: totalTubs })}
@@ -2206,6 +2131,29 @@ async function exportDatasetToXlsx(dataset, options = {}) {
   link.click();
   document.body.removeChild(link);
   window.setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function exportPairingToFile(pairing, snakes) {
+  const maleSnake = (snakes || []).find(s => s.id === pairing.maleId) || null;
+  const femaleSnake = (snakes || []).find(s => s.id === pairing.femaleId) || null;
+  const payload = {
+    __type: 'breeding-planner-pairing',
+    __version: 1,
+    exportedAt: new Date().toISOString(),
+    pairing,
+    snakes: [maleSnake, femaleSnake].filter(Boolean),
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/x-breeding-planner-pairing' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = String(pairing.label || 'pairing').replace(/[^a-z0-9_-]/gi, '_').slice(0, 60);
+  a.href = url;
+  a.download = `pairing-${safeName}.bppair`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 function groupFieldDefsBySection(defs = []) {
@@ -6415,6 +6363,7 @@ export default function BreedingPlannerApp() {
   // edit snake
   const [editSnake, setEditSnake] = useState(null);
   const [editSnakeDraft, setEditSnakeDraft] = useState(null);
+  const [editGeneticsText, setEditGeneticsText] = useState('');
   const [editForSalePublishing, setEditForSalePublishing] = useState(false);
   const [editForSalePublishError, setEditForSalePublishError] = useState('');
   const [qrFor, setQrFor] = useState(null);
@@ -6450,7 +6399,9 @@ export default function BreedingPlannerApp() {
       setEditSnake(prev => (prev && prev.id === snakeId ? sanitized : prev));
       setEditSnakeDraft(prev => {
         if (!prev || prev.id !== snakeId) return prev;
-        return initSnakeDraft(sanitized);
+        const next = initSnakeDraft(sanitized);
+        setEditGeneticsText(formatMorphHetForInput(next.morphs, next.hets));
+        return next;
       });
     };
 
@@ -7332,6 +7283,12 @@ export default function BreedingPlannerApp() {
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
   }, [activePairings, snakes]);
+
+  const sortedActivePairings = useMemo(
+    () => breedingDashboardItems.map(item => item.pairing),
+    [breedingDashboardItems]
+  );
+
   const completedPairingsWithYear = useMemo(() => {
     return completedPairings.map(pairing => {
       const normalized = withPairingLifecycleDefaults({ ...pairing });
@@ -7382,7 +7339,7 @@ export default function BreedingPlannerApp() {
       .map(item => item.pairing);
   }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter]);
 
-  const displayedPairings = pairingsView === 'completed' ? filteredCompletedPairings : activePairings;
+  const displayedPairings = pairingsView === 'completed' ? filteredCompletedPairings : sortedActivePairings;
   const filteredPairingsBySearch = useMemo(() => {
     const normalized = String(pairingsSearchQuery || '').trim().toLowerCase();
     const tokens = normalized ? normalized.split(/\s+/).filter(Boolean) : [];
@@ -7594,7 +7551,7 @@ export default function BreedingPlannerApp() {
     const value = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
     saveStoredJson(STORAGE_KEYS.leucisticType, value);
   }, [lastLeucisticType]);
-      if (s) { setEditSnake(s); setEditSnakeDraft(initSnakeDraft(s)); }
+      if (s) { const _d=initSnakeDraft(s); setEditSnake(s); setEditSnakeDraft(_d); setEditGeneticsText(formatMorphHetForInput(_d.morphs,_d.hets)); }
     }
   }, [snakes]);
 
@@ -8025,7 +7982,9 @@ export default function BreedingPlannerApp() {
     setTab('animals');
     setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
     setEditSnake(snake);
-    setEditSnakeDraft(initSnakeDraft(snake));
+    const draft = initSnakeDraft(snake);
+    setEditSnakeDraft(draft);
+    setEditGeneticsText(formatMorphHetForInput(draft.morphs, draft.hets));
   }, [animalView, tab]);
 
   const closeSnakeEditor = useCallback(() => {
@@ -8178,16 +8137,29 @@ export default function BreedingPlannerApp() {
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
+    const deletedSnake = snakes.find(s => s.id === id) || null;
     setSnakes(prev => {
       const next = prev.filter(s => s.id !== id);
       if (!next.length) return createFreshSnakes();
       return next;
     });
-    setPairings(prev => prev.filter(p => p.maleId !== id && p.femaleId !== id));
+    setPairings(prev => prev
+      .filter(p => p.maleId !== id && p.femaleId !== id ? true : isPairingCompleted(p))
+      .map(p => {
+        if (!isPairingCompleted(p) || !deletedSnake) return p;
+        if (p.maleId === id) {
+          return { ...p, maleSnapshot: { name: deletedSnake.name, morphs: deletedSnake.morphs, hets: deletedSnake.hets, possibleHets: deletedSnake.possibleHets } };
+        }
+        if (p.femaleId === id) {
+          return { ...p, femaleSnapshot: { name: deletedSnake.name, morphs: deletedSnake.morphs, hets: deletedSnake.hets, possibleHets: deletedSnake.possibleHets } };
+        }
+        return p;
+      })
+    );
     if (editSnake && editSnake.id === id) {
       closeSnakeEditor();
     }
-  }, [closeSnakeEditor, editSnake]);
+  }, [closeSnakeEditor, editSnake, snakes]);
 
   const confirmDeleteSnake = useCallback(() => {
     if (!pendingDeleteSnake) return;
@@ -8929,6 +8901,41 @@ export default function BreedingPlannerApp() {
     }
   }, [snakes, breederInfo, showAppAlert]);
 
+  const pairingImportRef = useRef(null);
+
+  const handleExportPairing = useCallback((pairing) => {
+    exportPairingToFile(pairing, snakes);
+  }, [snakes]);
+
+  const handleImportPairing = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data?.__type !== 'breeding-planner-pairing' || !data.pairing?.id) {
+        await showAppAlert('Invalid pairing file. Make sure you selected a valid export.');
+        return;
+      }
+      const importedPairing = data.pairing;
+      const importedSnakes = Array.isArray(data.snakes) ? data.snakes : [];
+      if (pairings.some(p => p.id === importedPairing.id)) {
+        await showAppAlert(`Pairing "${importedPairing.label || importedPairing.id}" is already in your planner.`);
+        return;
+      }
+      const existingIds = new Set(snakes.map(s => s.id));
+      const newSnakes = importedSnakes.filter(s => s?.id && !existingIds.has(s.id));
+      if (newSnakes.length > 0) setSnakes(prev => [...prev, ...newSnakes]);
+      setPairings(prev => [...prev, importedPairing]);
+      setTab('pairings');
+      setPairingsView(isPairingCompleted(importedPairing) ? 'completed' : 'active');
+      setFocusedPairingId(importedPairing.id);
+      await showAppAlert(`Pairing "${importedPairing.label || importedPairing.id}" imported successfully.`);
+    } catch (err) {
+      console.error('Failed to import pairing', err);
+      await showAppAlert('Failed to read pairing file. Make sure it is a valid export.');
+    }
+  }, [pairings, snakes, setSnakes, setPairings, setTab, setPairingsView, setFocusedPairingId, showAppAlert]);
+
   const handleAdvisorPairingExport = useCallback(async () => {
     try {
       const dataset = buildPairingMatrixExportDataset(pairings, snakes, {});
@@ -9229,7 +9236,7 @@ export default function BreedingPlannerApp() {
                   activeAnimalList.length ? (
                     <SnakeListTable
                       snakes={activeAnimalList}
-                      onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
+                      onEdit={(sn)=>{ const _d=initSnakeDraft(sn); setEditSnake(sn); setEditSnakeDraft(_d); setEditGeneticsText(formatMorphHetForInput(_d.morphs,_d.hets)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                       onDelete={requestDeleteSnake}
@@ -9248,7 +9255,7 @@ export default function BreedingPlannerApp() {
                           s={s}
                           groups={groups}
                           setSnakes={setSnakes}
-                          onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
+                          onEdit={(sn)=>{ const _d=initSnakeDraft(sn); setEditSnake(sn); setEditSnakeDraft(_d); setEditGeneticsText(formatMorphHetForInput(_d.morphs,_d.hets)); }}
                           onQuickPair={(sn)=> startPairingWithSnake(sn)}
                           onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                           onDelete={requestDeleteSnake}
@@ -9351,7 +9358,7 @@ export default function BreedingPlannerApp() {
                     setCompletedYearFilter('All');
                   }}
                 >
-                  {t("pairing.incubator")}
+                  {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
                 </TabButton>
               </div>
               <div className="flex flex-wrap items-center gap-2 ml-auto">
@@ -9380,6 +9387,24 @@ export default function BreedingPlannerApp() {
                   className="px-3 py-2 rounded-xl text-sm border bg-white"
                 >
                   {t("actions.exportPairingQr", { defaultValue: "Pairing QR labels" })}
+                </button>
+                <input
+                  ref={pairingImportRef}
+                  type="file"
+                  accept=".bppair"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImportPairing(file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => pairingImportRef.current?.click()}
+                  className="px-3 py-2 rounded-xl text-sm border bg-white"
+                >
+                  {t("pairing.importPairing", { defaultValue: "Import pairing" })}
                 </button>
                 <button
                   type="button"
@@ -9535,6 +9560,7 @@ export default function BreedingPlannerApp() {
               onOpenSnake={openSnakeCard}
               onUpdatePairing={handleUpdatePairing}
               onExportPairingQr={handleGeneratePairingQrLabels}
+              onExportPairing={handleExportPairing}
               showAppAlert={showAppAlert}
               clutchNumberByPairingId={clutchNumberByPairingId}
               clutchMetadataByPairingId={clutchMetadataByPairingId}
@@ -10086,9 +10112,9 @@ export default function BreedingPlannerApp() {
           ), document.body)}
 
       {/* create pairing modal — breeders only, male-first */}
-    {showPairingModal && (
-  <div className={cx("fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+    {showPairingModal && typeof document !== 'undefined' && createPortal((
+  <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
+          <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">Create pairing</div>
               <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>Close</button>
@@ -10270,7 +10296,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
@@ -10323,18 +10349,15 @@ export default function BreedingPlannerApp() {
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
-                              const normalizedGenetics = normalizeMorphHetLists([
-                                ...(Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []),
-                                ...(Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []),
-                              ]);
+                              const { morphs: savedMorphs, hets: savedHets } = splitMorphHetInput(editGeneticsText);
                               setSnakes(prev => prev.map(s => s.id === oldId ? ({
                                 ...editSnakeDraft,
                                 id: newId,
                                 sex: normalizedSex,
                                 status: normalizedStatus,
                                 groups: normalizedGroups,
-                                morphs: normalizedGenetics.morphs,
-                                hets: normalizedGenetics.hets,
+                                morphs: savedMorphs,
+                                hets: savedHets,
                               }) : s));
                           setPairings(prev => prev.map(p => ({
                             ...p,
@@ -10469,15 +10492,13 @@ export default function BreedingPlannerApp() {
                   <textarea
                     rows={3}
                     className="mt-0.5 w-full border rounded-xl px-2 py-2 text-sm"
-                    value={formatMorphHetForInput(editSnakeDraft.morphs, editSnakeDraft.hets)}
-                    onChange={async e=>{
+                    value={editGeneticsText}
+                    onChange={e => setEditGeneticsText(e.target.value)}
+                    onBlur={async e => {
                       const resolvedText = await resolveLeucisticInText(e.target.value, 'Edit Animal genetics');
                       const { morphs, hets } = splitMorphHetInput(resolvedText);
-                      setEditSnakeDraft(d=>({
-                        ...d,
-                        morphs,
-                        hets,
-                      }));
+                      setEditGeneticsText(formatMorphHetForInput(morphs, hets));
+                      setEditSnakeDraft(d => ({ ...d, morphs, hets }));
                     }}
                     placeholder={t("snakeEdit.geneticsPlaceholder")}
                   />
@@ -11404,32 +11425,17 @@ function GroupCheckboxes({
   setShowUnassigned
 }) {
   const { t } = useTranslation();
-  const toggleShow = (group) => {
-    if (typeof setShowGroups !== 'function' || typeof setHiddenGroups !== 'function') return;
+
+  const toggleGroup = (group) => {
+    if (typeof setShowGroups !== 'function') return;
     setShowGroups(prev => {
       const next = new Set(prev || []);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-        setHiddenGroups(prevHide => (prevHide || []).filter(g => g !== group));
-      }
+      if (next.has(group)) { next.delete(group); } else { next.add(group); }
       return [...next];
     });
-  };
-
-  const toggleHide = (group) => {
-    if (typeof setHiddenGroups !== 'function' || typeof setShowGroups !== 'function') return;
-    setHiddenGroups(prev => {
-      const next = new Set(prev || []);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-        setShowGroups(prevShow => (prevShow || []).filter(g => g !== group));
-      }
-      return [...next];
-    });
+    if (typeof setHiddenGroups === 'function') {
+      setHiddenGroups(prev => (prev || []).filter(g => g !== group));
+    }
   };
 
   const handleClear = () => {
@@ -11438,82 +11444,65 @@ function GroupCheckboxes({
   };
 
   const handleToggleUnassigned = () => {
-    if (typeof setShowUnassigned === 'function') {
-      setShowUnassigned(prev => !prev);
-    }
+    if (typeof setShowUnassigned === 'function') setShowUnassigned(prev => !prev);
   };
 
   const showSet = new Set(showGroups || []);
-  const hideSet = new Set(hiddenGroups || []);
-  const filtersActive = showSet.size > 0 || hideSet.size > 0;
+  const filtersActive = showSet.size > 0 || !(hiddenGroups?.length === 0 || !hiddenGroups);
 
   return (
     <div className="space-y-2 mb-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button
           type="button"
-          disabled={!filtersActive}
+          disabled={!filtersActive && showUnassigned}
           className={cx(
             'px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-            filtersActive
+            (filtersActive || !showUnassigned)
               ? 'bg-white hover:bg-neutral-50 border-neutral-300'
               : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
           )}
-          onClick={handleClear}
+          onClick={() => {
+            handleClear();
+            if (typeof setShowUnassigned === 'function') setShowUnassigned(true);
+          }}
         >
           {t("filters.clear")}
         </button>
-        <button
-          type="button"
-          className={cx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors', showUnassigned ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white hover:bg-neutral-50 border-neutral-300')}
-          onClick={handleToggleUnassigned}
-        >
-          {showUnassigned ? t("filters.hideUnassigned") : t("filters.showUnassigned")}
-        </button>
+        <label className={cx(
+          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer select-none transition-colors',
+          !showUnassigned ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+        )}>
+          <input
+            type="checkbox"
+            className="accent-amber-600 w-3.5 h-3.5"
+            checked={!showUnassigned}
+            onChange={handleToggleUnassigned}
+          />
+          {t("filters.hideUnassigned")}
+        </label>
       </div>
       <div className="flex flex-wrap gap-2">
         {groups.map(group => {
-          const status = showSet.has(group) ? 'show' : hideSet.has(group) ? 'hide' : 'neutral';
+          const checked = showSet.has(group);
           return (
-            <div
+            <label
               key={group}
               className={cx(
-                'inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg border transition-colors',
-                status === 'show'
-                  ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                  : status === 'hide'
-                    ? 'bg-rose-50 border-rose-400 text-rose-700'
-                    : 'bg-white border-neutral-300 text-neutral-700'
+                'inline-flex items-center gap-2 text-sm px-2.5 py-1 rounded-lg border cursor-pointer select-none transition-colors',
+                checked
+                  ? 'bg-sky-50 border-sky-400 text-sky-800'
+                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
               )}
             >
-              <span className="font-medium mr-0.5">{group}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => toggleShow(group)}
-                  className={cx(
-                    'px-1.5 py-0.5 rounded-md border text-[10px] uppercase tracking-wide',
-                    status === 'show'
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50'
-                  )}
-                >
-                  {t("filters.show")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleHide(group)}
-                  className={cx(
-                    'px-1.5 py-0.5 rounded-md border text-[10px] uppercase tracking-wide',
-                    status === 'hide'
-                      ? 'bg-rose-500 border-rose-500 text-white'
-                      : 'bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50'
-                  )}
-                >
-                  {t("filters.hide")}
-                </button>
-              </div>
-            </div>
+              <input
+                type="checkbox"
+                className="accent-sky-600 w-3.5 h-3.5"
+                checked={checked}
+                onChange={() => toggleGroup(group)}
+              />
+              <span className="font-medium">{group}</span>
+            </label>
           );
         })}
         {!groups.length && <span className="text-xs text-neutral-500">{t("groups.none", { defaultValue: "No groups yet." })}</span>}
@@ -12079,11 +12068,13 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
   const { t } = useTranslation();
   const [mode, setMode] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setMode('all');
       setSelectedIds([]);
+      setIsGenerating(false);
     }
   }, [open]);
 
@@ -12112,7 +12103,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
     });
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (typeof onGenerate !== 'function') {
       onClose();
       return;
@@ -12128,15 +12119,18 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
       }
       return;
     }
-    onGenerate(payload);
-    onClose();
+    try {
+      setIsGenerating(true);
+      await onGenerate(payload);
+      onClose();
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  if (!open) return null;
-
-  return (
-    <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-50', overlayClass(theme))} onClick={onClose}>
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
+  return open && typeof document !== 'undefined' ? createPortal((
+    <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-[10010]', overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
+      <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b font-semibold">
           {t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })}
         </div>
@@ -12184,14 +12178,16 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm text-white', primaryBtnClass(theme, true), !pairings.length && 'opacity-60 cursor-not-allowed')}
             onClick={handleGenerate}
-            disabled={!pairings.length}
+            disabled={!pairings.length || isGenerating}
           >
-            {t('pairingQrModal.generate', { defaultValue: 'Generate labels' })}
+            {isGenerating
+              ? t('pairingQrModal.generating', { defaultValue: 'Generating...' })
+              : t('pairingQrModal.generate', { defaultValue: 'Generate labels' })}
           </button>
         </div>
       </div>
     </div>
-  );
+  ), document.body) : null;
 }
 
 const PT_TO_MM = 0.352778;
@@ -17468,185 +17464,229 @@ function AppearancePreview({ resolvedAppearance, density, mode }) {
 function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, clutchNumberByPairingId, clutchMetadataByPairingId }) {
   const { t } = useTranslation();
   const list = Array.isArray(items) ? items : [];
-  const counts = list.reduce((acc, item) => {
-    const key = item?.urgency || 'none';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const activeStageCounts = list.reduce((acc, item) => {
-    const key = item?.stageKey || 'active';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+  const [activeFilter, setActiveFilter] = useState(null);
   const openPairing = useCallback((id) => {
     if (id && typeof onOpenPairing === 'function') onOpenPairing(id);
   }, [onOpenPairing]);
 
-  const summaryCards = [
+  const atAGlanceFilters = [
     {
+      key: 'overdue',
       label: t('pairing.dashboard.overdue', { defaultValue: 'Overdue' }),
-      value: counts.overdue || 0,
-      className: 'border-rose-200 bg-rose-50 text-rose-700',
+      count: list.filter(item => item.urgency === 'overdue').length,
+      activeClass: 'border-rose-400 bg-rose-100 text-rose-800 ring-2 ring-rose-300',
+      inactiveClass: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100',
+      match: item => item.urgency === 'overdue',
     },
     {
+      key: 'due',
       label: t('pairing.dashboard.dueSoon', { defaultValue: 'Due in 3 days' }),
-      value: counts.due || 0,
-      className: 'border-amber-200 bg-amber-50 text-amber-700',
+      count: list.filter(item => item.urgency === 'due').length,
+      activeClass: 'border-amber-400 bg-amber-100 text-amber-800 ring-2 ring-amber-300',
+      inactiveClass: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+      match: item => item.urgency === 'due',
     },
     {
+      key: 'soon',
       label: t('pairing.dashboard.nextWeek', { defaultValue: 'Next 7 days' }),
-      value: counts.soon || 0,
-      className: 'border-sky-200 bg-sky-50 text-sky-700',
+      count: list.filter(item => item.urgency === 'soon').length,
+      activeClass: 'border-emerald-400 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-300',
+      inactiveClass: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+      match: item => item.urgency === 'soon',
     },
     {
-      label: t('pairing.dashboard.tracking', { defaultValue: 'Tracking' }),
-      value: list.length,
-      className: 'border-neutral-200 bg-white text-neutral-700',
+      key: 'all',
+      label: t('pairing.dashboard.tracking', { defaultValue: 'Active' }),
+      count: list.length,
+      activeClass: 'border-blue-400 bg-blue-100 text-blue-800 ring-2 ring-blue-300',
+      inactiveClass: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+      match: () => true,
     },
   ];
 
-  const stageCards = [
-    { key: 'clutch', label: t('pairing.dashboard.stageClutch', { defaultValue: 'Clutch laid' }) },
-    { key: 'preLay', label: t('pairing.dashboard.stagePreLay', { defaultValue: 'Pre-lay shed' }) },
-    { key: 'ovulation', label: t('pairing.dashboard.stageOvulation', { defaultValue: 'In ovulation' }) },
-    { key: 'locks', label: t('pairing.dashboard.stageLocks', { defaultValue: 'Locks observed' }) },
+  const activeFilterObj = atAGlanceFilters.find(f => f.key === activeFilter);
+  const filteredList = activeFilterObj ? list.filter(activeFilterObj.match) : list;
+
+  const CYCLE_STAGE_KEYS = new Set(['clutch', 'preLay', 'ovulation']);
+
+  const cycleStages = [
+    {
+      key: 'clutch',
+      label: t('pairing.dashboard.stageClutch', { defaultValue: 'Egg-laying' }),
+      items: filteredList.filter(item => item.stageKey === 'clutch'),
+    },
+    {
+      key: 'preLay',
+      label: t('pairing.dashboard.stagePreLay', { defaultValue: 'Pre-lay/shed' }),
+      items: filteredList.filter(item => item.stageKey === 'preLay'),
+    },
+    {
+      key: 'ovulation',
+      label: t('pairing.dashboard.stageOvulation', { defaultValue: 'Ovulation observed' }),
+      items: filteredList.filter(item => item.stageKey === 'ovulation'),
+    },
+    {
+      key: 'active',
+      label: t('pairing.dashboard.stageActive', { defaultValue: 'Active pairings' }),
+      items: filteredList.filter(item => !CYCLE_STAGE_KEYS.has(item.stageKey)),
+    },
   ];
+
+  const renderPairingCard = (item) => {
+    const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
+    const clutch = item?.pairing?.clutch || {};
+    const clutchRecorded = item.stageKey === 'clutch' && !!clutch.recorded;
+    const clutchNumber = clutchNumberByPairingId?.get?.(item.id);
+    const clutchMetadata = clutchMetadataByPairingId?.get?.(item.id) || {};
+    const boxNumber = clutchMetadata.eggBoxNumber;
+    const eggsRaw = clutch.eggsTotal;
+    const fertileRaw = clutch.fertileEggs;
+    const slugsRaw = clutch.slugs;
+    const eggsCount = Number.isFinite(Number(eggsRaw))
+      ? Number(eggsRaw)
+      : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+    const slugsCount = Number.isFinite(Number(slugsRaw)) ? Number(slugsRaw) : null;
+    const splitBoxCounts = typeof eggsCount === 'number' ? splitEggBoxCounts(eggsCount) : [];
+    const eggBoxLabel = splitBoxCounts.length > 1
+      ? t('pairing.dashboard.eggBoxesForClutch', {
+          clutch: clutchNumber,
+          number: boxNumber,
+          defaultValue: 'Clutch #{{clutch}} egg boxes from #{{number}}',
+        })
+      : (boxNumber
+          ? t('pairing.dashboard.eggBoxNumber', { number: boxNumber, defaultValue: 'Egg box #{{number}}' })
+          : t('pairing.dashboard.eggBox', { defaultValue: 'Egg box' }));
+    const eggCountLabel = splitBoxCounts.length > 1
+      ? t('pairing.dashboard.splitEggBoxes', {
+          first: splitBoxCounts[0],
+          second: splitBoxCounts[1],
+          defaultValue: '{{first}} eggs + {{second}} eggs',
+        })
+      : (typeof eggsCount === 'number'
+          ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
+          : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
+    return (
+      <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col gap-2">
+          <div className="min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
+              <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-600">
+              <span className="inline-flex items-center gap-1">
+                <SexBadge sex="M" label={t('snake.sex.male', { defaultValue: 'Male' })} showText={false} />
+                {item.maleName}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <SexBadge sex="F" label={t('snake.sex.female', { defaultValue: 'Female' })} showText={false} />
+                {item.femaleName}
+              </span>
+            </div>
+          </div>
+          <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+            {item.countdownLabel}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 text-xs">
+          <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
+            <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+              {t('pairing.dashboard.nextStage', { defaultValue: 'Next stage' })}
+            </div>
+            <div className="mt-1 font-medium text-neutral-900 leading-snug">{item.nextStage}</div>
+          </div>
+          <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
+            <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+              {t('pairing.dashboard.targetDate', { defaultValue: 'Target date' })}
+            </div>
+            <div className="mt-1 font-medium text-neutral-900">{item.targetLabel || '—'}</div>
+          </div>
+          {clutchRecorded && (
+            <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
+              <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
+                {t('pairing.dashboard.eggBox', { defaultValue: 'Egg box' })}
+              </div>
+              <div className="mt-1 text-[11px] leading-snug text-neutral-600">
+                {[
+                  eggBoxLabel,
+                  eggCountLabel,
+                  typeof slugsCount === 'number' && slugsCount > 0
+                    ? t('pairing.dashboard.slugsInBox', { count: slugsCount, defaultValue: '{{count}} slugs' })
+                    : '',
+                ].filter(Boolean).join(' • ')}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="text-[11px] text-neutral-500 leading-snug">
+            {item.latestLockLabel
+              ? t('pairing.dashboard.latestLock', { date: item.latestLockLabel, defaultValue: 'Latest lock: {{date}}' })
+              : t('pairing.dashboard.noLock', { defaultValue: 'No lock recorded yet' })}
+          </div>
+          <button
+            type="button"
+            className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
+            onClick={() => openPairing(item.id)}
+          >
+            {item.actionLabel}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card title={t('pairing.dashboardTitle', { count: list.length, defaultValue: 'Breeding Dashboard ({{count}})' })}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {summaryCards.map(card => (
-            <div key={card.label} className={cx('border rounded-xl p-3', card.className)}>
-              <div className="text-2xl font-semibold leading-none">{card.value}</div>
-              <div className="mt-1 text-xs font-medium">{card.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {stageCards.map(card => (
-            <div key={card.key} className="border rounded-xl p-3 bg-neutral-50">
-              <div className="text-lg font-semibold text-neutral-900">{activeStageCounts[card.key] || 0}</div>
-              <div className="text-xs text-neutral-500">{card.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {list.length ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {list.map(item => {
-              const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
-              const clutch = item?.pairing?.clutch || {};
-              const clutchRecorded = item.stageKey === 'clutch' && !!clutch.recorded;
-              const clutchNumber = clutchNumberByPairingId?.get?.(item.id);
-              const clutchMetadata = clutchMetadataByPairingId?.get?.(item.id) || {};
-              const boxNumber = clutchMetadata.eggBoxNumber;
-              const eggsRaw = clutch.eggsTotal;
-              const fertileRaw = clutch.fertileEggs;
-              const slugsRaw = clutch.slugs;
-              const eggsCount = Number.isFinite(Number(eggsRaw))
-                ? Number(eggsRaw)
-                : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
-              const slugsCount = Number.isFinite(Number(slugsRaw)) ? Number(slugsRaw) : null;
-              const splitBoxCounts = typeof eggsCount === 'number' ? splitEggBoxCounts(eggsCount) : [];
-              const eggBoxLabel = splitBoxCounts.length > 1
-                ? t('pairing.dashboard.eggBoxesForClutch', {
-                  clutch: clutchNumber,
-                  number: boxNumber,
-                  defaultValue: 'Clutch #{{clutch}} egg boxes from #{{number}}',
-                })
-                : (boxNumber
-                  ? t('pairing.dashboard.eggBoxNumber', { number: boxNumber, defaultValue: 'Egg box #{{number}}' })
-                  : t('pairing.dashboard.eggBox', { defaultValue: 'Egg box' }));
-              const eggCountLabel = splitBoxCounts.length > 1
-                ? t('pairing.dashboard.splitEggBoxes', {
-                  first: splitBoxCounts[0],
-                  second: splitBoxCounts[1],
-                  defaultValue: '{{first}} eggs + {{second}} eggs',
-                })
-                : (typeof eggsCount === 'number'
-                  ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
-                  : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
-              return (
-                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
-                  <div className="flex flex-col gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
-                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-600">
-                        <span className="inline-flex items-center gap-1">
-                          <SexBadge sex="M" label={t('snake.sex.male', { defaultValue: 'Male' })} showText={false} />
-                          {item.maleName}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <SexBadge sex="F" label={t('snake.sex.female', { defaultValue: 'Female' })} showText={false} />
-                          {item.femaleName}
-                        </span>
-                      </div>
-                    </div>
-                    <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-                      {item.countdownLabel}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2 text-xs">
-                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
-                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
-                        {t('pairing.dashboard.currentStage', { defaultValue: 'Current stage' })}
-                      </div>
-                      <div className="mt-1 font-medium text-neutral-900 leading-snug">{item.stage}</div>
-                      {clutchRecorded && (
-                        <div className="mt-1 text-[11px] leading-snug text-neutral-600">
-                          {[
-                            eggBoxLabel,
-                            eggCountLabel,
-                            typeof slugsCount === 'number' && slugsCount > 0
-                              ? t('pairing.dashboard.slugsInBox', { count: slugsCount, defaultValue: '{{count}} slugs' })
-                              : '',
-                          ].filter(Boolean).join(' • ')}
-                        </div>
-                      )}
-                    </div>
-                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
-                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
-                        {t('pairing.dashboard.nextStage', { defaultValue: 'Next stage' })}
-                      </div>
-                      <div className="mt-1 font-medium text-neutral-900 leading-snug">{item.nextStage}</div>
-                    </div>
-                    <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
-                      <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
-                        {t('pairing.dashboard.targetDate', { defaultValue: 'Target date' })}
-                      </div>
-                      <div className="mt-1 font-medium text-neutral-900">{item.targetLabel || '\u2014'}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[11px] text-neutral-500 leading-snug">
-                      {item.latestLockLabel
-                        ? t('pairing.dashboard.latestLock', { date: item.latestLockLabel, defaultValue: 'Latest lock: {{date}}' })
-                        : t('pairing.dashboard.noLock', { defaultValue: 'No lock recorded yet' })}
-                    </div>
-                    <button
-                      type="button"
-                      className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
-                      onClick={() => openPairing(item.id)}
-                    >
-                      {item.actionLabel}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+              {t('pairing.dashboard.headerAtAGlance', { defaultValue: 'At a glance' })}
+            </span>
+            <div className="flex-1 border-t border-neutral-200" />
           </div>
-        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {atAGlanceFilters.map(filter => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setActiveFilter(activeFilter === filter.key ? null : filter.key)}
+                className={cx('border rounded-xl p-3 text-left transition-colors', activeFilter === filter.key ? filter.activeClass : filter.inactiveClass)}
+              >
+                <div className="text-2xl font-semibold leading-none">{filter.count}</div>
+                <div className="mt-1 text-xs font-medium">{filter.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!filteredList.length ? (
           <div className="text-sm text-neutral-500">
-            {t('pairing.dashboardEmpty', { defaultValue: 'No active pairings to track yet. Create a pairing to start the dashboard.' })}
+            {activeFilter
+              ? t('pairing.dashboard.filterEmpty', { defaultValue: 'No pairings match this filter.' })
+              : t('pairing.dashboardEmpty', { defaultValue: 'No active pairings to track yet. Create a pairing to start the dashboard.' })}
           </div>
-        )}
+        ) : cycleStages.map(stage => (
+          <div key={stage.key}>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{stage.label}</span>
+              <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">{stage.items.length}</span>
+              <div className="flex-1 border-t border-neutral-200" />
+            </div>
+            {stage.items.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                {stage.items.map(renderPairingCard)}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-400">
+                {t('pairing.dashboard.stageEmpty', { defaultValue: 'No pairings at this stage' })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </Card>
   );
@@ -17661,6 +17701,7 @@ function PairingsSection({
   onOpenSnake,
   onUpdatePairing,
   onExportPairingQr,
+  onExportPairing,
   clutchNumberByPairingId,
   clutchMetadataByPairingId,
   theme = 'blue',
@@ -17697,6 +17738,7 @@ function PairingsSection({
             onOpenSnake={openSnake}
             onUpdatePairing={onUpdatePairing}
             onExportPairingQr={onExportPairingQr}
+            onExportPairing={onExportPairing}
             theme={theme}
             isFocused={focusedPairingId === p.id}
             onFocus={onFocusPairing ? () => onFocusPairing(p.id) : undefined}
@@ -17725,6 +17767,7 @@ function PairingInlineCard({
   onOpenSnake,
   onUpdatePairing,
   onExportPairingQr,
+  onExportPairing,
   theme = 'blue',
   isFocused = false,
   onFocus,
@@ -17812,19 +17855,23 @@ function PairingInlineCard({
   const femaleSnake = useMemo(() => snakeById(snakes, edit.femaleId), [snakes, edit.femaleId]);
   const maleSnake = useMemo(() => snakeById(snakes, edit.maleId), [snakes, edit.maleId]);
 
-  const femaleName = femaleSnake?.name || edit.femaleId || 'Female';
-  const maleName = maleSnake?.name || edit.maleId || 'Male';
+  const femaleName = femaleSnake?.name || edit.femaleSnapshot?.name || edit.femaleId || 'Female';
+  const maleName = maleSnake?.name || edit.maleSnapshot?.name || edit.maleId || 'Male';
   const defaultLabel = `${femaleName} \u00D7 ${maleName}`;
   const femaleGeneticsTokens = useMemo(() => {
-    if (!femaleSnake) return [];
-    return combineMorphsAndHetsForDisplay(femaleSnake.morphs, femaleSnake.hets, femaleSnake.possibleHets);
-  }, [femaleSnake]);
+    if (femaleSnake) return combineMorphsAndHetsForDisplay(femaleSnake.morphs, femaleSnake.hets, femaleSnake.possibleHets);
+    const snap = edit.femaleSnapshot;
+    if (snap) return combineMorphsAndHetsForDisplay(snap.morphs, snap.hets, snap.possibleHets);
+    return [];
+  }, [femaleSnake, edit.femaleSnapshot]);
   const maleGeneticsTokens = useMemo(() => {
-    if (!maleSnake) return [];
-    return combineMorphsAndHetsForDisplay(maleSnake.morphs, maleSnake.hets, maleSnake.possibleHets);
-  }, [maleSnake]);
-  const femaleGeneticsLine = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
-  const maleGeneticsLine = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
+    if (maleSnake) return combineMorphsAndHetsForDisplay(maleSnake.morphs, maleSnake.hets, maleSnake.possibleHets);
+    const snap = edit.maleSnapshot;
+    if (snap) return combineMorphsAndHetsForDisplay(snap.morphs, snap.hets, snap.possibleHets);
+    return [];
+  }, [maleSnake, edit.maleSnapshot]);
+  const femaleGeneticsLine = (femaleSnake || edit.femaleSnapshot) ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
+  const maleGeneticsLine = (maleSnake || edit.maleSnapshot) ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
   const breederMaleOptions = useMemo(() => {
     if (Array.isArray(breederMales) && breederMales.length) return breederMales;
     return snakes.filter(isMaleSnake);
@@ -18066,9 +18113,20 @@ function PairingInlineCard({
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
               {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
             </div>
-            <div className="text-[11px] text-neutral-500 flex items-center gap-1">
-              <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
-              <span aria-hidden="true">{'\u203A'}</span>
+            <div className="flex items-center gap-2">
+              {typeof onExportPairing === 'function' && (
+                <button
+                  type="button"
+                  className="text-xs px-2 py-1 border rounded-lg bg-white"
+                  onClick={e => { e.stopPropagation(); onExportPairing(pairing); }}
+                >
+                  {t('pairing.exportFile', { defaultValue: 'Export' })}
+                </button>
+              )}
+              <div className="text-[11px] text-neutral-500 flex items-center gap-1">
+                <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
+                <span aria-hidden="true">{'\u203A'}</span>
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-800">
@@ -18169,6 +18227,15 @@ function PairingInlineCard({
               onClick={() => onExportPairingQr([pairing])}
             >
               {t('pairing.qrLabelButton', { defaultValue: 'QR label' })}
+            </button>
+          )}
+          {typeof onExportPairing === 'function' && (
+            <button
+              type="button"
+              className="text-xs px-2 py-1 border rounded-lg"
+              onClick={() => onExportPairing(pairing)}
+            >
+              {t('pairing.exportFile', { defaultValue: 'Export' })}
             </button>
           )}
           {typeof onDelete === 'function' && (

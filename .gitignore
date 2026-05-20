@@ -23,6 +23,15 @@
 .env.test.local
 .env.production.local
 /server/.env
+/breeding-app-backend/.env
+/breeding-app-lab/.env.e2e.local
+/breeding-app-lab/playwright/.auth
+/breeding-app-lab/playwright-report
+/breeding-app-lab/test-results
+/breeding-app-breeder/.env.e2e.local
+/breeding-app-breeder/playwright/.auth
+/breeding-app-breeder/playwright-report
+/breeding-app-breeder/test-results
 /server/node_modules
 /server/dist
 .codex-*.log

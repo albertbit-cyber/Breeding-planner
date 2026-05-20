@@ -9,21 +9,6 @@ import {
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
-  adminCorrectOrderStatusHandler,
-  createTestOrderHandler,
-  getAdminOrderOversightHandler,
-  getAllowedOrderStatusTransitionsHandler,
-  getBreederCertificateArtifactHandler,
-  getBreederOrderOutcomeHandler,
-  getOrderStatusHistoryHandler,
-  getTestOrderByIdHandler,
-  listAdminAllOrdersHandler,
-  listBreederTestOrdersHandler,
-  listLabTestOrdersHandler,
-  updateTestOrderPaymentStatusHandler,
-  updateTestOrderStatusHandler,
-} from "./testOrderHandlers";
-import {
   calculateLabOrderPriceHandler,
   getLabTestsCatalogHandler,
   getLabTestsPricingHandler,

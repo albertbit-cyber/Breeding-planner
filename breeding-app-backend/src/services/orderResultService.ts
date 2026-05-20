@@ -226,6 +226,15 @@ export const saveOrderResult = async (
     throw new HttpError(400, "Either animalResults or items is required.");
   }
 
+  if (mode === "draft") {
+    animalResultInputs = animalResultInputs.filter(
+      (animalInput) => Array.isArray(animalInput?.items) && animalInput.items.length > 0
+    );
+    if (!animalResultInputs.length) {
+      throw new HttpError(400, "At least one result item is required to save a draft.");
+    }
+  }
+
   // Validate all animals are present in submit mode
   if (mode === "submit") {
     const providedIds = new Set(animalResultInputs.map((ar) => ar.animalId));
