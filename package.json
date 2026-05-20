@@ -67,6 +67,8 @@
     "handoff:pdf": "node scripts/generate-handoff-pdf.cjs",
     "manual:pdf": "node scripts/generate-user-manual-pdf.cjs",
     "test": "vitest run",
+    "test:e2e:live": "powershell -ExecutionPolicy Bypass -File scripts/run-live-e2e.ps1",
+    "test:e2e:live:no-reset": "powershell -ExecutionPolicy Bypass -File scripts/run-live-e2e.ps1 -SkipReset",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "demo": "ts-node scripts/demo.ts"
