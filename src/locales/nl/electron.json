@@ -1,0 +1,32 @@
+{
+	"window": {
+		"title": "Breeding Planner"
+	},
+	"dialogs": {
+		"storageReadFailed": {
+			"title": "Gegevens kunnen niet worden geopend",
+			"message": "Breeding Planner kon je lokale gegevensbestand niet lezen. Er wordt een nieuwe werkruimte aangemaakt."
+		},
+		"storageWriteFailed": {
+			"title": "Gegevens kunnen niet worden opgeslagen",
+			"message": "Breeding Planner kon je laatste wijzigingen niet opslaan. Probeer het opnieuw of exporteer een handmatige back-up."
+		}
+	},
+	"locale": {
+		"set": "Taal gewijzigd naar {{language}}"
+	},
+	"prompts": {
+		"backupName": {
+			"title": "Geef dit back-upbestand een naam"
+		},
+		"backupRename": {
+			"title": "Back-up hernoemen"
+		},
+		"backupDelete": {
+			"message": "\"{{name}}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
+		},
+		"photoRemove": {
+			"message": "Deze foto verwijderen?"
+		}
+	}
+}

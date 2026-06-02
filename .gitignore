@@ -10,13 +10,40 @@
 
 # production
 /build
+/dist
+
+# Electron
+*.exe
 
 # misc
 .DS_Store
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+/server/.env
+/breeding-app-backend/.env
+/breeding-app-lab/.env.e2e.local
+/breeding-app-lab/playwright/.auth
+/breeding-app-lab/playwright-report
+/breeding-app-lab/test-results
+/breeding-app-breeder/.env.e2e.local
+/breeding-app-breeder/playwright/.auth
+/breeding-app-breeder/playwright-report
+/breeding-app-breeder/test-results
+/server/node_modules
+/server/dist
+.codex-*.log
+/server/*.log
+/.tools
+
+# Android signing secrets
+*.keystore
+*.jks
+android/key.properties
+android/app/*.keystore
+android/app/*.jks
 
 npm-debug.log*
 yarn-debug.log*

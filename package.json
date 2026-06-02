@@ -1,0 +1,159 @@
+{
+  "name": "breeding-planner",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": ".",
+  "main": "electron/main.js",
+  "description": "Breeding Planner app with Electron and Capacitor support.",
+  "author": "albertbit-cyber <albertbit@gmail.com>",
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8.2.0",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/push-notifications": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
+    "better-sqlite3": "^9.4.0",
+    "canvg": "^4.0.2",
+    "dagre": "^0.8.5",
+    "dompurify": "^3.1.7",
+    "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
+    "i18next": "^25.6.3",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "jspdf": "^2.5.1",
+    "jsqr": "^1.4.0",
+    "pdfjs-dist": "^3.6.172",
+    "qrcode": "^1.5.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^16.3.5",
+    "reactflow": "^11.11.4",
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite --host",
+    "dev:desktop": "npm run electron-dev",
+    "build": "vite build",
+    "build:android:dev": "cross-env VITE_API_URL=http://10.0.2.2:4000/api vite build",
+    "build:android:staging": "cross-env NODE_ENV=production vite build --mode android-staging",
+    "build:android:prod": "cross-env NODE_ENV=production vite build --mode android-production",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:debug": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment development -Artifact apk -BuildType debug",
+    "android:release:apk": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact apk -BuildType release",
+    "android:release:aab": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact aab -BuildType release",
+    "android:release:all": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact all -BuildType release",
+    "android:install:debug": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment development -Artifact apk -BuildType debug -Install",
+    "electron-dev": "concurrently -k \"npm:dev\" \"npm:electron-open\"",
+    "electron-open": "wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 NODE_ENV=development node scripts/start-electron.js",
+    "deploy": "cross-env PUBLIC_URL=https://albertbit-cyber.github.io/Breeding-planner/ vite build && gh-pages -d build",
+    "preview": "vite preview",
+    "dist": "npm run build && electron-builder -mwl",
+    "dist:win": "node scripts/build-win.js",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "i18n:extract": "i18next-scanner --config i18next-scanner.config.cjs",
+    "i18n:verify": "node scripts/check-locales.cjs",
+    "handoff:pdf": "node scripts/generate-handoff-pdf.cjs",
+    "manual:pdf": "node scripts/generate-user-manual-pdf.cjs",
+    "test": "vitest run",
+    "test:e2e:live": "powershell -ExecutionPolicy Bypass -File scripts/run-live-e2e.ps1",
+    "test:e2e:live:no-reset": "powershell -ExecutionPolicy Bypass -File scripts/run-live-e2e.ps1 -SkipReset",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "demo": "ts-node scripts/demo.ts"
+  },
+  "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "4.53.2",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^22.8.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.9",
+    "electron-builder": "^24.13.3",
+    "eslint": "^9.14.0",
+    "gh-pages": "^6.3.0",
+    "i18next-scanner": "^4.6.0",
+    "png-to-ico": "^3.0.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^1.6.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.breedingplanner.app",
+    "productName": "Breeding Planner",
+    "asar": true,
+    "artifactName": "${productName}-Setup-${version}-x64.${ext}",
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "buildResources"
+    },
+    "extraResources": [
+      {
+        "from": "src/locales",
+        "to": "locales"
+      },
+      {
+        "from": "src/i18n/settings.json",
+        "to": "i18n-settings.json"
+      }
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "buildResources/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/app-icons/icon_512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "guid": "4b7c44f7-4d6f-4ca7-b0fe-2fef3380566f",
+      "include": "buildResources/installer.nsh"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://example.com/updates/win"
+    }
+  }
+}

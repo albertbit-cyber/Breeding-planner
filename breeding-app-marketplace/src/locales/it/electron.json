@@ -1,0 +1,32 @@
+{
+	"window": {
+		"title": "Breeding Planner"
+	},
+	"dialogs": {
+		"storageReadFailed": {
+			"title": "Impossibile aprire i dati",
+			"message": "Breeding Planner non è riuscito a leggere il file di dati locale. Verrà creato un nuovo spazio di lavoro."
+		},
+		"storageWriteFailed": {
+			"title": "Impossibile salvare i dati",
+			"message": "Breeding Planner non è riuscito a salvare le ultime modifiche. Riprova o esporta un backup manuale."
+		}
+	},
+	"locale": {
+		"set": "Lingua cambiata in {{language}}"
+	},
+	"prompts": {
+		"backupName": {
+			"title": "Dai un nome a questo file di backup"
+		},
+		"backupRename": {
+			"title": "Rinomina backup"
+		},
+		"backupDelete": {
+			"message": "Eliminare \"{{name}}\"? Questa azione non può essere annullata."
+		},
+		"photoRemove": {
+			"message": "Rimuovere questa foto?"
+		}
+	}
+}

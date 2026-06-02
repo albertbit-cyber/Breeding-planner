@@ -1,0 +1,219 @@
+# Steps to Publish Breeding Planner to the Mac App Store
+
+1. **Enrollment & Accounts**
+   - Enroll in the Apple Developer Program (individual or company) and ensure the account is in good standing.
+   - Verify access to App Store Connect and ensure billing information and tax forms are completed.
+
+2. **Local Environment Prerequisites**
+   - Use macOS with the latest Xcode and command line tools installed (`xcode-select --install`).
+   - Install the latest version of `node`, `npm`, and `yarn` (if used).
+   - Ensure `electron-builder` is installed locally (already present in `devDependencies`).
+   - Install `brew install create-dmg` if planning to ship DMG builds for testing.
+
+3. **Certificates & Signing Assets**
+   - In the Apple Developer portal, create:
+     - A "Mac App Store" distribution certificate (type: "Mac App Store and Ad Hoc" or "Mac Installer Distribution").
+     - A "Mac App Store Connect" API key for automated uploads (optional but recommended).
+   - Download the certificate and install it in your macOS Keychain.
+   - Create an App-Specific Password if using Apple ID authentication.
+   - Generate a provisioning profile for the app bundle identifier (see step 4).
+
+4. **Define Bundle Identifier & App Metadata**
+   - Choose a reverse-DNS bundle identifier, e.g., `com.albertbitcyber.breedingplanner`.
+   - In App Store Connect, create a new macOS app record with:
+     - App name, bundle ID, SKU, and primary language.
+     - Placeholder marketing assets (icon, description, keywords, etc.).
+   - Update electron build config (`package.json` `build` section) to include:
+     - `appId`: new bundle ID.
+     - `mac` target type `mas` and optionally `dmg` for QA.
+     - `mac.category` set to a valid App Store category (e.g., `public.app-category.productivity`).
+     - Set hardened runtime and entitlements (see step 5).
+
+5. **Hardened Runtime & Entitlements**
+   - Create entitlements files in `electron/`:
+     - `entitlements.mas.plist` and `entitlements.mas.inherit.plist` with required permissions (App Sandbox, file access, network access, camera if needed for QR scanning, etc.).
+   - Update the `build` section in `package.json`:
+     ```json
+     "mac": {
+       "target": ["mas"],
+       "category": "public.app-category.productivity",
+       "hardenedRuntime": true,
+       "entitlements": "electron/entitlements.mas.plist",
+       "entitlementsInherit": "electron/entitlements.mas.inherit.plist",
+       "gatekeeperAssess": false,
+       "appStore": true
+     },
+     "mas": {
+       "entitlements": "electron/entitlements.mas.plist",
+       "entitlementsInherit": "electron/entitlements.mas.inherit.plist"
+     }
+     ```
+   - Ensure the app does not use restricted APIs; review QR scanning and file system access to comply with sandbox rules.
+
+6. **Adjust App Functionality for Sandbox Compliance**
+   - Audit IPC usage and file system access in `electron/main.js` and `preload.js` to ensure sandbox compatibility.
+   - Replace Node APIs that break sandbox restrictions; use `app.getPath()` for safe directories.
+   - Confirm the app tolerates App Sandbox restrictions (e.g., storing data in `~/Library/Containers/<bundle-id>/Data`).
+
+7. **App Icons & Branding**
+   - Provide App Store-compliant icon assets (1024x1024 PNG, macOS ICNS updates) and update `buildResources` or `app-icons` paths.
+   - Update marketing screenshots for 13"/14"/16" MacBook sizes.
+
+8. **Configure Electron Builder for MAS**
+   - Update `package.json` scripts:
+     ```json
+     "scripts": {
+       "dist:mas": "npm run build && electron-builder --mac mas",
+       "mas-dev": "electron-builder --mac mas --publish never --config.mac.entitlements=electron/entitlements.mas.dev.plist"
+     }
+     ```
+   - Ensure `electron-builder` version supports MAS builds.
+   - Add `build.mas` configuration for App Store packaging (bundle provisioning profile names, `extendInfo` if necessary).
+
+9. **Install Certificates & Provisioning Profiles Locally**
+   - Use `Xcode` or `Keychain Access` to import `.cer` and `.p12` files.
+   - Store provisioning profiles in `~/Library/MobileDevice/Provisioning Profiles/`.
+   - Verify codesign certifications using:
+     ```bash
+     security find-identity -p codesigning -v
+     ```
+
+10. **Build & Sign MAS Package**
+     ```bash
+     npm install
+     npm run dist:mas
+     ```
+   - Electron Builder will produce a `.pkg` (or `.pkg` plus `.mas` file) in the `dist/` folder.
+   - Validate the bundle:
+     ```bash
+     codesign --verify --deep --strict --verbose=2 dist/mac/*.app
+     spctl --assess --verbose dist/mac/*.app
+     ```
+
+11. **Test Sandboxed Build**
+   - Install the `.pkg` locally:
+     ```bash
+     sudo installer -store -pkg dist/mac/*.pkg -target /
+     ```
+   - Run the installed app from `/Applications`. Confirm functionality (QR scanning, file persistence, offline mode).
+
+12. **Upload to App Store Connect**
+   - Option A: Xcode Transporter app; drag the `.pkg` into Transporter and upload.
+   - Option B: Use `electron-builder` publish options or `xcrun altool --upload-app` (deprecated, but replaced by `notarytool` / Transporter).
+   - If using API key, configure `electron-builder` `mas.appleId`, `mas.appleIdPassword`/`mas.appleApiKey` credentials in `package.json` or environment variables.
+
+13. **Resolve App Store Validation Issues**
+   - Monitor email/Transporter logs for issues (missing icons, entitlements, sandbox violations).
+   - Address any errors (e.g., update entitlements, include usage descriptions in `Info.plist`).
+
+14. **Complete App Store Metadata**
+   - Fill in description, keywords, support URL, privacy policy URL.
+   - Upload screenshots and promotional graphics.
+   - Define pricing and availability.
+
+15. **Submit for Review**
+   - In App Store Connect, select the uploaded build, attach to a new version, answer export compliance, content rights, and privacy questions.
+   - Submit for review; monitor for reviewer feedback.
+
+16. **Post-Approval Checklist**
+   - After approval, schedule release or release manually.
+   - Set up `App Store Promotions` or `In-App Events` if desired.
+   - Configure crash reporting/analytics (App Store Connect metrics, third-party tools). Ensure privacy compliance for telemetry.
+
+17. **Ongoing Maintenance**
+   - Monitor App Store review timeline and crash reports.
+   - Keep dependencies updated and run sandbox checks each release.
+   - Maintain marketing assets and respond to user reviews.
+
+---
+
+**Tip:** Maintain separate channels for GitHub Pages (web) and MAS builds. Use feature gating if MAS sandbox restrictions require different behavior compared to the Electron desktop version.
+
+
+# Steps to Publish Breeding Planner to Google Play (Android)
+
+1. **Strategic Approach**
+   - Decide on the Android runtime: recommended options include wrapping the existing React build with Capacitor (web-to-native) or building a dedicated React Native client.
+   - Confirm that planned functionality complies with Google Play policies (no restricted content, clear privacy story for breeder data).
+
+2. **Environment Setup**
+   - Install Android Studio (latest) and configure the Android SDK, platform tools, and emulator images.
+   - Ensure Java 17 (or Google-recommended LTS version) is available on PATH.
+   - Install Capacitor CLI globally (`npm install -g @capacitor/cli`) if going with Capacitor.
+
+3. **Capacitor Integration (Web Wrapper Path)**
+   - From the project root, run:
+     ```bash
+     npm install @capacitor/core @capacitor/cli @capacitor/android
+     npx cap init "Breeding Planner" com.albertbitcyber.breedingplanner
+     ```
+   - In `capacitor.config.ts` (or `.json`), set:
+     - `webDir` to `build`
+     - `server.androidScheme` to `https`
+   - Generate a production build: `npm run build`.
+   - Sync assets: `npx cap sync android` (creates `android/` project).
+
+4. **Android Project Configuration**
+   - Open the generated `android/` project in Android Studio.
+   - Update `app/src/main/AndroidManifest.xml` for permissions (camera if QR scanning, internet access, storage if needed).
+   - Configure adaptive icons in `app/src/main/res/mipmap-*`.
+   - Update `strings.xml`, `app_name`, and versioning.
+
+5. **Native Integrations & Plugins**
+   - For camera/QR scanning inside Capacitor, add suitable plugins (e.g., `@capacitor/camera`, community QR plugins) or keep functionality within the web view if allowed.
+   - Ensure all plugins declare runtime permissions and fallback behavior when permission is denied.
+
+6. **Privacy & Data Compliance**
+   - Draft a Privacy Policy covering data the app collects/stores.
+   - Add privacy policy URL and data safety information in Google Play Console (required 2022+).
+
+7. **Build & Sign Release APK/AAB**
+   - In Android Studio, switch to the `android` project.
+   - Create a release keystore:
+     ```bash
+     keytool -genkey -v -keystore breedingplanner-release.keystore -alias breedingplanner -keyalg RSA -keysize 2048 -validity 10000
+     ```
+   - Store keystore securely (not in VCS). Configure `gradle.properties` with signing configs.
+   - Generate an Android App Bundle (AAB): Build > Generate Signed Bundle/APK > Android App Bundle.
+
+8. **Local Testing**
+   - Install debug builds via `npx cap run android` or `adb install` for AAB/APK.
+   - Test on various screen sizes; ensure offline mode, QR features, data persistence work.
+   - Validate performance and orientation handling.
+
+9. **Google Play Console Preparation**
+   - Create a Google Play Developer account and pay the registration fee.
+   - Create a new app entry; fill in default language, app name, short description, full description.
+   - Upload assets: feature graphic, phone/tablet screenshots, high-res icon (512x512, 32-bit PNG), promo video (optional).
+
+10. **App Content & Questionnaires**
+   - Complete Data Safety form (declare data collection/storage, encryption, sharing).
+   - Fill in Content Rating questionnaire.
+   - Provide target audience, COPPA compliance, and ads declaration.
+
+11. **Upload & Review**
+   - Upload the release AAB to the "Production" (or Internal testing) track.
+   - Attach release notes, increment versionCode/versionName.
+   - Run pre-launch report via Google Play (automated testing on virtual devices).
+   - Fix any policy violations or crash reports flagged.
+
+12. **Testing Tracks**
+   - Use Internal testing (max 100 testers) for quick verification.
+   - Promote builds to Closed/Beta for wider testing before Production release.
+
+13. **Submit for Publishing**
+   - After passes, roll out to Production.
+   - Monitor the review status; Google Play typically turns around in hours to days.
+
+14. **Post-Launch Monitoring**
+   - Track ANRs/crashes via Play Console.
+   - Respond to user reviews and keep release notes updated.
+   - Maintain signing keys and update dependencies regularly.
+
+15. **Future Enhancements**
+   - Consider adding native widgets, notifications, or background sync using Capacitor plugins.
+   - Automate builds with GitHub Actions using `ionic-team/publish-android` workflows or `fastlane supply`.
+
+---
+
+**Tip:** Keep MAS (macOS), Windows/Linux (Electron), and Android builds in separate CI jobs. Use shared logic in the React front-end but isolate platform-specific permissions and storage paths to stay compliant on each store.

@@ -1,0 +1,148 @@
+{
+	"title": "Consulente per l'Allevamento",
+	"description": "Esaminiamo solo gli animali etichettati nel gruppo <strong>Breeders</strong> e mostriamo accoppiamenti con un'altissima probabilità di produrre il morph obiettivo selezionato.",
+	"goal": {
+		"label": "Obiettivo (Nome e Tratti)",
+		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"tip": "Suggerimento formato: \"Nome obiettivo: tratto uno, tratto due\". Se elenchi solo tratti, creeremo un obiettivo generico.",
+		"defaultName": "Obiettivo personalizzato"
+	},
+	"status": {
+		"heading": "Stato"
+	},
+	"summary": {
+		"loading": "Calcolo dei quadrati di Punnett…",
+		"ready": "Avvia il consulente per scoprire accoppiamenti promettenti.",
+		"supportingOnly": "Nessuna coppia soddisfa ancora il livello di alta confidenza, ma ecco {{count}} opzioni da esaminare.",
+		"noConfidence": "Nessun accoppiamento ha superato la soglia di confidenza. Prova ad aggiustare le tue collezioni o gli obiettivi.",
+		"confidentCount": "{{count}} accoppiamento/i soddisfa/no l'obiettivo di confidenza ≥ {{threshold}}."
+	},
+	"stats": {
+		"males": "{{count}} maschio riproduttore",
+		"males_plural": "{{count}} maschi riproduttori",
+		"females": "{{count}} femmina riproduttrice",
+		"females_plural": "{{count}} femmine riproduttrici",
+		"confidenceBar": "Soglia di confidenza ≥ {{threshold}}"
+	},
+	"buttons": {
+		"run": "Avvia Consulente",
+		"generating": "Generazione in corso...",
+		"reset": "Reimposta Consulente"
+	},
+	"errors": {
+		"noBreeders": "Aggiungi animali al gruppo Breeders per vedere i consigli del consulente.",
+		"noGoals": "Aggiungi tratti obiettivo prima di avviare il consulente.",
+		"failure": "Impossibile generare suggerimenti."
+	},
+	"cards": {
+		"goalSuccessLabel": "Probabilità di successo dell'obiettivo:",
+		"belowTarget": "(sotto l'obiettivo di confidenza)",
+		"demandSignals": "Segnali di domanda:",
+		"priceRange": "Guida ai prezzi: {{range}}",
+		"sources": "Fonti:",
+		"additionalHeading": "Accoppiamenti aggiuntivi da esaminare",
+		"readyCallout": "Pronto quando vuoi — fai clic su <strong>Avvia Consulente</strong> per scoprire i migliori accoppiamenti dei tuoi riproduttori."
+	},
+	"genes": {
+		"goalVisuals": "Visuals dell'Obiettivo",
+		"goalHets": "Hets dell'Obiettivo",
+		"projectedVisuals": "Visuals Proiettati",
+		"projectedHets": "Hets Proiettati",
+		"holdbackVisuals": "Visuals Holdback",
+		"holdbackHets": "Hets Holdback",
+		"nextVisuals": "Visuals Prossima Generazione",
+		"nextHets": "Hets Prossima Generazione",
+		"focusVisuals": "Visuals Focus",
+		"focusHets": "Hets Focus"
+	},
+	"plan": {
+		"title": "Piano multigenerazionale ({{strategy}})",
+		"strategy": {
+			"multi": "2 fasi",
+			"direct": "diretto"
+		},
+		"combinedProbability": "Combinato ≈ {{value}}",
+		"generationLabel": "Generazione {{generation}}",
+		"prereqProbability": "Prereq ≈ {{value}}",
+		"goalProbability": "Obiettivo ≈ {{value}}",
+		"holdbackProbability": "Holdback ≈ {{value}}",
+		"holdbackGenes": "Geni Holdback: {{genes}}",
+		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
+		"status": {
+			"visual": "Visual",
+			"het": "Het",
+			"possibleHet": "Possible het",
+			"none": "Normale"
+		},
+		"expectation": {
+			"none-visual": "100% het",
+			"het-het": "≈66% het",
+			"het-none": "≈50% het"
+		}
+	},
+	"labels": {
+		"unknownAnimal": "Sconosciuto",
+		"holdbackMale": "Holdback Maschio",
+		"holdbackFemale": "Holdback Femmina",
+		"holdback": "Holdback"
+	},
+	"outcomes": {
+		"none": "Nessuna proiezione disponibile.",
+		"unknownMorph": "Morph sconosciuto",
+		"probability": "{{genotype}} ({{chance}} di probabilità di comparsa)"
+	},
+	"goals": {
+		"title": "Obiettivi",
+		"add": "Aggiungi Obiettivo",
+		"empty": "Nessun obiettivo ancora. Aggiungine uno per personalizzare i suggerimenti.",
+		"namePlaceholder": "Nome obiettivo",
+		"remove": "Rimuovi",
+		"requireAll": {
+			"label": "Richiedi tutti",
+			"placeholder": "Aggiungi un tratto e premi Invio"
+		},
+		"requireAny": {
+			"label": "Richiedi almeno uno",
+			"placeholder": "Tratti opzionali"
+		},
+		"avoid": {
+			"label": "Evita",
+			"placeholder": "Tratti problematici"
+		},
+		"recessiveState": {
+			"label": "Stato recessivo",
+			"any": "Qualsiasi",
+			"visual": "Visual",
+			"het": "Het",
+			"possibleHet": "Possible het"
+		},
+		"minProbability": "Probabilità minima ({{percent}}%)",
+		"weight": "Peso ({{value}})",
+		"idLabel": "ID: {{id}}",
+		"loadPreset": "Carica Preset",
+		"presets": {
+			"title": "Preset",
+			"close": "Chiudi"
+		},
+		"defaultName": "Nuovo obiettivo"
+	},
+	"api": {
+		"rationaleSummary": "Punteggio proiettato {{score}} con indice di domanda {{demand}}. {{goalSummary}}",
+		"noGoalTargets": "Nessun obiettivo specifico.",
+		"goalSummary": "{{prob}}% di probabilità di raggiungere l'obiettivo '{{goal}}'.",
+		"watchouts": " Avvertenze: {{list}}.",
+		"sources": " Fonti: {{list}}.",
+		"plan": {
+			"stepTitle": "Generazione {{generation}}: {{male}} × {{female}}",
+			"directSummary": "La probabilità diretta di raggiungere l'obiettivo è del {{chance}}%.",
+			"holdbackSummary": "Nessun visual diretto atteso; produrre holdback portatori di {{traits}}.",
+			"adjustedSummary": "Probabilità diretta dell'obiettivo {{chance}}%. Dare priorità alla produzione di holdback portatori di {{holdback}}.",
+			"secondTitle": "Generazione {{generation}}: Holdback × {{partner}}",
+			"secondSummary": "Conservare il holdback {{sex}} ({{holdback}}). Accoppiare con {{partner}} per una probabilità del {{chance}}% di raggiungere l'obiettivo.",
+			"holdbackSex": {
+				"female": "femmina",
+				"male": "maschio"
+			}
+		}
+	}
+}

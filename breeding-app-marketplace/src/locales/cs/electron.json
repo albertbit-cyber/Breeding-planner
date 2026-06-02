@@ -1,0 +1,32 @@
+{
+	"window": {
+		"title": "Breeding Planner"
+	},
+	"dialogs": {
+		"storageReadFailed": {
+			"title": "Unable to open data",
+			"message": "Breeding Planner could not read your local data file. A new workspace will be created."
+		},
+		"storageWriteFailed": {
+			"title": "Unable to save data",
+			"message": "Breeding Planner could not save your latest changes. Try again or export a manual backup."
+		}
+	},
+	"locale": {
+		"set": "Language switched to {{language}}"
+	},
+	"prompts": {
+		"backupName": {
+			"title": "Name this backup file"
+		},
+		"backupRename": {
+			"title": "Rename backup"
+		},
+		"backupDelete": {
+			"message": "Delete \"{{name}}\"? This cannot be undone."
+		},
+		"photoRemove": {
+			"message": "Remove this photo?"
+		}
+	}
+}

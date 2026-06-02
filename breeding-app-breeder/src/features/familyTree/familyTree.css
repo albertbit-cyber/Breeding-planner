@@ -1,0 +1,172 @@
+/* ============================================================
+   Family Tree — scoped layout styles
+   Uses CSS custom properties so it stays isolated from the
+   rest of the app and doesn't break existing pages.
+   ============================================================ */
+
+:root {
+  --ft-purple:         #7c3aed;
+  --ft-purple-light:   #ede9fe;
+  --ft-purple-medium:  #a78bfa;
+  --ft-purple-border:  #ddd6fe;
+  --ft-header-h:       52px;
+  --ft-stats-h:        44px;
+  --ft-left-w:         272px;
+  --ft-right-w:        288px;
+}
+
+/* ── Page shell ───────────────────────────────────────────── */
+.ft-page {
+  display: flex;
+  flex-direction: column;
+  /* Subtract header nav height (App.jsx sticky header ~64px) + small gap */
+  height: calc(100vh - 72px);
+  background: #faf9ff;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--ft-purple-border);
+  box-shadow: 0 4px 24px 0 rgba(124, 58, 237, 0.07);
+}
+
+/* ── Page header ──────────────────────────────────────────── */
+.ft-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--ft-header-h);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ft-purple-border);
+  background: white;
+  flex-shrink: 0;
+}
+
+/* ── Three-column body ────────────────────────────────────── */
+.ft-body {
+  display: grid;
+  grid-template-columns: var(--ft-left-w) 1fr var(--ft-right-w);
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.ft-left-col,
+.ft-right-col {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #faf9ff;
+}
+
+.ft-center-col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: white;
+}
+
+/* ── Left panel content ───────────────────────────────────── */
+.ft-left-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.ft-left-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.ft-left-panel::-webkit-scrollbar-thumb {
+  background: var(--ft-purple-border);
+  border-radius: 4px;
+}
+
+/* ── Right panel ──────────────────────────────────────────── */
+.ft-right-panel {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #faf9ff;
+}
+
+/* ── ReactFlow canvas area ────────────────────────────────── */
+.ft-canvas-area {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Bottom stats bar ─────────────────────────────────────── */
+.ft-stats-bar {
+  height: var(--ft-stats-h);
+  border-top: 1px solid var(--ft-purple-border);
+  background: white;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.ft-stats-bar::-webkit-scrollbar {
+  height: 3px;
+}
+.ft-stats-bar::-webkit-scrollbar-thumb {
+  background: var(--ft-purple-border);
+  border-radius: 3px;
+}
+
+/* ── ReactFlow overrides (scoped to .ft-canvas-area) ─────── */
+.ft-canvas-area .react-flow__attribution {
+  display: none;
+}
+
+.ft-canvas-area .react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ft-purple-border);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);
+}
+
+.ft-canvas-area .react-flow__controls-button {
+  background: white;
+  border-bottom: 1px solid var(--ft-purple-border);
+  color: var(--ft-purple);
+}
+
+.ft-canvas-area .react-flow__controls-button:hover {
+  background: var(--ft-purple-light);
+}
+
+.ft-canvas-area .react-flow__minimap {
+  border-radius: 10px;
+  border: 1px solid var(--ft-purple-border);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);
+}
+
+/* ── Responsive collapse: hide side panels on small screens ── */
+@media (max-width: 1024px) {
+  .ft-body {
+    grid-template-columns: 240px 1fr;
+  }
+  .ft-right-col {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .ft-body {
+    grid-template-columns: 1fr;
+  }
+  .ft-left-col {
+    display: none;
+  }
+  .ft-page {
+    border-radius: 0;
+    height: calc(100vh - 56px);
+  }
+}
