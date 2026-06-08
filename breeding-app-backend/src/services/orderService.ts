@@ -249,7 +249,7 @@ export const deleteOrderById = async (
 
   const deletedAnimals = existing.animals.length;
   const deletedAnimalTests = existing.animals.reduce(
-    (sum, animal) => sum + animal.tests.length,
+    (sum: number, animal: { tests: Array<{ id: string }> }) => sum + animal.tests.length,
     0
   );
   const deletedResults = existing.results.length;
