@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -10,46 +10,39 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import SnakeNode from './SnakeNode';
 import PlaceholderNode from './PlaceholderNode';
+import JunctionNode from './JunctionNode';
+import ClutchNode from './ClutchNode';
 
 const NODE_TYPES = {
   snakeNode: SnakeNode,
   placeholderNode: PlaceholderNode,
+  junctionNode: JunctionNode,
+  clutchNode: ClutchNode,
 };
 
-// Generation label overlay — rendered as a custom ReactFlow panel
+// Generation label overlay — uses generationLabel data field tagged at build time,
+// then groups by label so sibling stacks produce one label, not N.
+
 const GenLabelOverlay = ({ nodes }) => {
   const genGroups = useMemo(() => {
-    const groups = {};
+    const byLabel = new Map();
     for (const n of nodes) {
+      if (n.type !== 'snakeNode' && n.type !== 'placeholderNode') continue;
+      const label = n.data?.generationLabel
+        || (n.data?.isSelected ? 'Selected' : null);
+      if (!label) continue;
+      const entry = byLabel.get(label);
       const y = n.position.y;
-      if (!groups[y]) groups[y] = { y, minY: y, label: '' };
+      if (!entry) { byLabel.set(label, { label, minY: y }); }
+      else if (y < entry.minY) { entry.minY = y; }
     }
-    // Assign labels by y position (lower y = earlier generation)
-    const ys = Object.keys(groups)
-      .map(Number)
-      .sort((a, b) => a - b);
-    const labelMap = {
-      [ys[0]]: 'Great-grandparents',
-      [ys[1]]: 'Grandparents',
-      [ys[2]]: 'Parents',
-      [ys[3]]: 'Selected',
-      [ys[4]]: 'Offspring',
-    };
-    // 3-gen layout: [gen-2, gen-1, gen0, gen+1]
-    const fallback = ['Ancestors', 'Grandparents', 'Parents', 'Selected', 'Offspring'];
-    return ys.map((y, i) => ({
-      y,
-      label: labelMap[y] || fallback[i] || `Gen ${i}`,
-    }));
+    return [...byLabel.values()].sort((a, b) => a.minY - b.minY);
   }, [nodes]);
 
   return (
     <div className="absolute left-3 top-0 bottom-0 pointer-events-none flex flex-col justify-around z-10">
-      {genGroups.map(({ y, label }) => (
-        <div
-          key={y}
-          className="flex items-center gap-1.5"
-        >
+      {genGroups.map(({ label, minY }) => (
+        <div key={label} className="flex items-center gap-1.5">
           <div className="w-1 h-6 rounded-full bg-violet-300 opacity-60" />
           <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400 whitespace-nowrap">
             {label}
@@ -61,8 +54,16 @@ const GenLabelOverlay = ({ nodes }) => {
 };
 
 const FlowBody = ({ initialNodes, initialEdges, onNodeClick }) => {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
 
   const handleNodeClick = useCallback(
     (_event, node) => {
@@ -96,6 +97,8 @@ const FlowBody = ({ initialNodes, initialEdges, onNodeClick }) => {
           pannable
           nodeColor={(n) => {
             if (n.type === 'placeholderNode') return '#e5e7eb';
+            if (n.type === 'junctionNode') return '#7c3aed';
+            if (n.type === 'clutchNode') return '#8b5cf6';
             const role = n.data?.nodeRole;
             if (n.data?.isSelected) return '#7c3aed';
             if (role === 'sire')      return '#0ea5e9';

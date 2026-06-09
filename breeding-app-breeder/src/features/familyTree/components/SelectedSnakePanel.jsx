@@ -1,7 +1,15 @@
 import React from 'react';
 
-const SEX_ICON  = { male: '♂', female: '♀' };
-const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500' };
+// Handles both local ('M'/'F') and pedigree ('male'/'female') formats
+const normSex = (s) => {
+  if (!s) return 'unknown';
+  const v = String(s).toUpperCase();
+  if (v === 'M' || v === 'MALE')   return 'male';
+  if (v === 'F' || v === 'FEMALE') return 'female';
+  return 'unknown';
+};
+const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
+const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500', unknown: 'text-neutral-400' };
 
 const STATUS_CHIP = {
   breeding:  'bg-violet-100 text-violet-700 border-violet-200',
@@ -15,6 +23,7 @@ const LEGEND_ITEMS = [
   { color: 'bg-violet-400', label: 'Selected snake' },
   { color: 'bg-sky-400',    label: 'Sire (male parent)' },
   { color: 'bg-pink-400',   label: 'Dam (female parent)' },
+  { color: 'bg-amber-400',  label: 'Clutch sibling' },
   { color: 'bg-emerald-400',label: 'Offspring' },
   { color: 'bg-neutral-300',label: 'Unknown parent' },
 ];
@@ -22,7 +31,7 @@ const LEGEND_ITEMS = [
 const AvatarPlaceholder = ({ snake }) => {
   const initial = snake?.name?.charAt(0)?.toUpperCase() || '?';
   const gradient =
-    snake?.sex === 'male'
+    normSex(snake?.sex) === 'male'
       ? 'linear-gradient(135deg, #7c3aed, #a78bfa)'
       : 'linear-gradient(135deg, #7c3aed, #f472b6)';
 
@@ -65,8 +74,8 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
     );
   }
 
-  const sexIcon  = SEX_ICON[snake.sex]  || '?';
-  const sexColor = SEX_COLOR[snake.sex] || 'text-neutral-400';
+  const sexIcon  = SEX_ICON[normSex(snake.sex)];
+  const sexColor = SEX_COLOR[normSex(snake.sex)];
   const statusClass = STATUS_CHIP[snake.status] || 'bg-neutral-100 text-neutral-500 border-neutral-200';
 
   return (
@@ -115,11 +124,14 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
           Quick Info
         </div>
         <div className="space-y-0">
-          <InfoRow label="Species"  value={snake.species} />
-          <InfoRow label="Hatch"    value={snake.hatchDate} mono />
-          <InfoRow label="Breeder"  value={snake.breederName} />
-          <InfoRow label="ID"       value={snake.globalId || snake.localId} mono />
-          <InfoRow label="Parents"  value={
+          <InfoRow label="Species"   value={snake.species} />
+          <InfoRow label="Hatch"     value={snake.hatchDate} mono />
+          <InfoRow label="Breeder"   value={snake.breederName} />
+          <InfoRow label="ID"        value={snake.globalId || snake.localId} mono />
+          {snake.clutchId && (
+            <InfoRow label="Clutch ID" value={snake.clutchId} mono />
+          )}
+          <InfoRow label="Parents"   value={
             [parents?.sire?.name, parents?.dam?.name].filter(Boolean).join(' × ') || 'Unknown'
           } />
         </div>
@@ -139,13 +151,13 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
                 onClick={() => onSnakeSelect?.(s)}
                 className={[
                   'w-full text-left rounded-lg px-2 py-1.5 text-xs transition-colors flex items-center gap-2',
-                  s.id === snake.id
+                  s.id === snake.id || s.id === snake.localId
                     ? 'bg-violet-100 text-violet-800 font-semibold'
                     : 'text-neutral-600 hover:bg-neutral-50',
                 ].join(' ')}
               >
-                <span className={s.sex === 'male' ? 'text-sky-500' : 'text-pink-500'}>
-                  {SEX_ICON[s.sex] || '?'}
+                <span className={SEX_COLOR[normSex(s.sex)]}>
+                  {SEX_ICON[normSex(s.sex)]}
                 </span>
                 <span className="truncate">{s.name}</span>
               </button>

@@ -1352,9 +1352,11 @@
 
 .header-nav-button {
   border-radius: 999px !important;
-  padding: 0.4rem 1.1rem !important;
-  font-size: 0.9rem;
+  padding: 0.34rem 0.78rem !important;
+  font-size: 0.78rem;
   font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
   color: #4a188a;
   background: rgba(244, 217, 255, 0.7);
   border-color: rgba(169, 118, 255, 0.45) !important;

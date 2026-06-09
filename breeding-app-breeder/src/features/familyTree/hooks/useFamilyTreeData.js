@@ -76,10 +76,13 @@ export function useFamilyTreeData({ selectedSnakeId }) {
     [pedigree.snakes]
   );
 
-  const selectedSnake = useMemo(
-    () => (selectedSnakeId ? snakeMap.get(selectedSnakeId) ?? null : null),
-    [snakeMap, selectedSnakeId]
-  );
+  const selectedSnake = useMemo(() => {
+    if (!selectedSnakeId) return null;
+    // Try DB id first, then fall back to localId match (when caller passes app-local id)
+    return snakeMap.get(selectedSnakeId)
+      ?? pedigree.snakes.find((s) => s.localId === selectedSnakeId)
+      ?? null;
+  }, [snakeMap, selectedSnakeId, pedigree.snakes]);
 
   const { nodes, edges } = useMemo(() => {
     if (!selectedSnake || !pedigree.snakes.length) return { nodes: [], edges: [] };

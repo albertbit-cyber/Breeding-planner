@@ -92,6 +92,33 @@ const OverviewTab = ({ snake, parents, offspring, clutches, ownershipHistory }) 
       </div>
     </div>
 
+    {/* Clutch IDs */}
+    {clutches?.length > 0 && (
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
+          Clutches
+        </div>
+        <div className="space-y-1.5">
+          {clutches.map((c, i) => (
+            <div key={c.id || i} className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-violet-500">Clutch ID</div>
+                <div className="text-xs font-mono font-semibold text-violet-800 truncate">{c.displayId || c.id}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                {c.hatchDate && (
+                  <div className="text-[10px] text-neutral-400 font-mono">{c.hatchDate}</div>
+                )}
+                {c.eggCount != null && (
+                  <div className="text-[10px] text-neutral-500">{c.eggCount} eggs</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
     {/* Offspring list */}
     {offspring?.length > 0 && (
       <div>
@@ -191,6 +218,12 @@ const PedigreePassportPanel = ({ snake, parents, offspring, clutches, ownershipH
         </div>
         <div className="mt-1 text-sm font-bold text-neutral-900 truncate">{snake.name}</div>
         <div className="text-[11px] text-neutral-400 font-mono">{snake.globalId || snake.localId}</div>
+        {snake.clutchId && (
+          <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">Clutch ID</span>
+            <span className="text-[10px] font-mono font-semibold text-violet-700">{snake.clutchId}</span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

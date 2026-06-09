@@ -1,8 +1,8 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
-const SEX_ICON  = { male: '♂', female: '♀' };
-const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500' };
+const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
+const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500', unknown: 'text-neutral-400' };
 
 const STATUS_CHIP = {
   breeding:  'bg-violet-100 text-violet-700',
@@ -17,6 +17,7 @@ const ROLE_BORDER = {
   sire:      'border-sky-200',
   dam:       'border-pink-200',
   offspring: 'border-emerald-200',
+  sibling:   'border-amber-200',
   ancestor:  'border-neutral-200',
 };
 
@@ -25,6 +26,7 @@ const ROLE_BG = {
   sire:      'bg-sky-50',
   dam:       'bg-pink-50',
   offspring: 'bg-emerald-50',
+  sibling:   'bg-amber-50',
   ancestor:  'bg-white',
 };
 
@@ -33,6 +35,7 @@ const AVATAR_GRADIENT = {
   sire:      'linear-gradient(135deg, #0ea5e9, #38bdf8)',
   dam:       'linear-gradient(135deg, #ec4899, #f9a8d4)',
   offspring: 'linear-gradient(135deg, #10b981, #6ee7b7)',
+  sibling:   'linear-gradient(135deg, #f59e0b, #fcd34d)',
   ancestor:  'linear-gradient(135deg, #6366f1, #a5b4fc)',
 };
 

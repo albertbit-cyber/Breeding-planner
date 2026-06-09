@@ -6,6 +6,7 @@ const BREEDER_INFO_STORAGE_KEY = "breedingPlannerBreederInfo";
 
 type ElectronBridge = {
   loadData?: () => Promise<Record<string, unknown> | null>;
+  printCurrentWindow?: () => Promise<{ success: boolean; error?: string | null }>;
 };
 
 type StoredSnake = {
@@ -141,4 +142,52 @@ export const isLabLabelDebugEnabled = async (): Promise<boolean> => {
     }
   }
   return false;
+};
+
+// ── Label size preference (saved between sessions) ────────────────────────────
+// Printer choice is always left to the OS print dialog; only the label
+// dimensions are persisted here so the user doesn't have to re-select them.
+
+const LABEL_SIZE_PREF_KEY = "breedingPlannerLabelSizePref";
+
+export type SavedLabelSize = {
+  presetKey: string;
+  widthMm: number;
+  heightMm: number;
+};
+
+export const saveLabelSizePref = (settings: SavedLabelSize): void => {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(LABEL_SIZE_PREF_KEY, JSON.stringify(settings));
+  } catch {
+    // non-critical — storage unavailable
+  }
+};
+
+export const loadLabelSizePref = (): SavedLabelSize | null => {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LABEL_SIZE_PREF_KEY);
+    return raw ? (JSON.parse(raw) as SavedLabelSize) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const printCurrentWindowWithSystemDialog = async (): Promise<void> => {
+  const bridge = readBridge();
+  if (bridge?.printCurrentWindow) {
+    const result = await bridge.printCurrentWindow();
+    if (result && result.success === false && result.error) {
+      throw new Error(result.error);
+    }
+    return;
+  }
+
+  if (typeof window !== "undefined" && typeof window.print === "function") {
+    // The browser/OS print dialog controls printer choice, scale, and final media settings.
+    // This intentionally uses the standard dialog rather than silent or auto-selected printing.
+    window.print();
+  }
 };

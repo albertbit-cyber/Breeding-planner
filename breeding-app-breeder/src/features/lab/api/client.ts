@@ -922,7 +922,7 @@ const toSharedSampleLookupResult = async (
   };
 };
 
-const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabelsArtifactResponse> => {
+const buildSharedOrderLabelsPrintPayload = async (orderId: string) => {
   const data = await fetchOrderById(String(orderId || "").trim());
   const order = (data as any)?.order || null;
   if (!order) {
@@ -972,8 +972,10 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
     })
   );
 
-  const rendered = await generateOrderLabelsPdf({
-    size: labelSize,
+  return {
+    orderId: normalizedOrderId,
+    orderNumber,
+    labelSize,
     debug,
     shippingLabel: {
       orderId: normalizedOrderId,
@@ -991,14 +993,25 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
       sampleCount: sampleLabels.length,
     },
     sampleLabels,
+  };
+};
+
+const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabelsArtifactResponse> => {
+  const payload = await buildSharedOrderLabelsPrintPayload(orderId);
+
+  const rendered = await generateOrderLabelsPdf({
+    size: payload.labelSize,
+    debug: payload.debug,
+    shippingLabel: payload.shippingLabel,
+    sampleLabels: payload.sampleLabels,
   });
 
   return {
-    orderId: normalizedOrderId,
-    orderNumber,
-    sampleCount: sampleLabels.length,
-    sampleIds: sampleLabels.map((sample) => sample.sampleId),
-    fileName: `shed-order-labels-${sanitizeFilePart(orderNumber)}.pdf`,
+    orderId: payload.orderId,
+    orderNumber: payload.orderNumber,
+    sampleCount: payload.sampleLabels.length,
+    sampleIds: payload.sampleLabels.map((sample) => sample.sampleId),
+    fileName: `shed-order-labels-${sanitizeFilePart(payload.orderNumber)}.pdf`,
     mimeType: "application/pdf",
     base64: bytesToBase64(rendered.arrayBuffer),
     byteLength: rendered.byteLength,
@@ -1277,6 +1290,11 @@ export const createLabApiClient = () => {
       orderNumber: labelsPdf.orderNumber,
       labelsPdf,
     } satisfies AllOrderLabelsArtifactResponse;
+  };
+
+  const getBreederAllLabelsPrintData = async (orderId: string) => {
+    requireSessionRole("breeder", "admin", "lab_staff");
+    return buildSharedOrderLabelsPrintPayload(orderId);
   };
 
   const getLabTestsCatalog = async (options: { breederView?: boolean } = {}): Promise<ShedTestCatalogItem[]> => {
@@ -1572,6 +1590,7 @@ export const createLabApiClient = () => {
     getBreederShipmentLabelArtifact,
     getBreederSampleLabelsArtifact,
     getBreederAllLabelsArtifact,
+    getBreederAllLabelsPrintData,
     getLabTestsCatalog,
     getLabTestsPricing,
     calculateLabOrderPrice,

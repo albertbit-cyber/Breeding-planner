@@ -14,6 +14,7 @@ import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
 import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
+import { ReproductiveIntelligencePanel } from "./features/animals/ReproductiveIntelligencePanel.jsx";
 import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
 import {
   getActiveLabelSize,
@@ -898,7 +899,7 @@ function pairingLifecycleDefaults() {
   };
 }
 function resolveEggCountForClutch(eggsTotal, fertileEggs) {
-  const candidates = [eggsTotal, fertileEggs];
+  const candidates = [fertileEggs, eggsTotal];
   for (const value of candidates) {
     if (value === null || typeof value === 'undefined' || value === '') continue;
     const parsed = Number(value);
@@ -2014,6 +2015,12 @@ function resolvePairingLabel(pairing, femaleSnake, maleSnake) {
   const femaleName = femaleSnake?.name || pairing?.femaleId || 'Female';
   const maleName = maleSnake?.name || pairing?.maleId || 'Male';
   return `${femaleName} \u00D7 ${maleName}`;
+}
+
+// Canonical Clutch ID: "FemaleName x MaleName Year" \u2014 based on parent names, never internal IDs
+function buildClutchId(femaleName, maleName, year) {
+  const names = [femaleName, maleName].filter(Boolean).join(' x ');
+  return (names && year) ? `${names} ${year}` : names || null;
 }
 
 function summarizePairingStatus(derived) {
@@ -6425,6 +6432,7 @@ export default function BreedingPlannerApp() {
   const [showScanner, setShowScanner] = useState(false);
   const [passiveScanNotice, setPassiveScanNotice] = useState(null);
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
+  const [familyTreeFocusSnakeId, setFamilyTreeFocusSnakeId] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
   const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
   const editCameraInputRef = useRef(null);
@@ -6484,6 +6492,15 @@ export default function BreedingPlannerApp() {
     setEditStatusMenuOpen(false);
     setTagFilterMenuOpen(false);
   }, [statusTagOptions]);
+
+  const openFamilyTreeForSnake = useCallback((snakeOrId) => {
+    const id = typeof snakeOrId === 'string' ? snakeOrId : snakeOrId?.id;
+    if (!id) return;
+    setFamilyTreeFocusSnakeId(id);
+    setEditSnake(null);
+    setEditSnakeDraft(null);
+    setTab('familyTree');
+  }, []);
 
   useEffect(() => {
     if (!editStatusMenuOpen) return;
@@ -7489,6 +7506,7 @@ export default function BreedingPlannerApp() {
           pairingLabel,
           femaleName: female?.name || p.femaleId || 'Female',
           maleName: male?.name || p.maleId || 'Male',
+          clutchId: buildClutchId(female?.name || p.femaleId, male?.name || p.maleId, clutchYear),
           femaleGenetics: female ? (getDisplayedSnakeGeneticsTokens(female).length ? getDisplayedSnakeGeneticsTokens(female).join(', ') : 'Normal') : '\u2014',
           maleGenetics: male ? (getDisplayedSnakeGeneticsTokens(male).length ? getDisplayedSnakeGeneticsTokens(male).join(', ') : 'Normal') : '\u2014',
           eggs,
@@ -8739,6 +8757,22 @@ export default function BreedingPlannerApp() {
         const { morphs, hets } = splitMorphHetInput(entry.morph || '');
         const grams = Number(entry.weight);
         const weight = Number.isFinite(grams) && grams >= 0 ? grams : 0;
+        const sireSnake = pairing?.maleId ? snakeById(snakes, pairing.maleId) : null;
+        const damSnake = pairing?.femaleId ? snakeById(snakes, pairing.femaleId) : null;
+        const clutchYear = (pairing?.clutch?.date || '').slice(0, 4) || String(derivedYear || '');
+        const clutchId = buildClutchId(damSnake?.name, sireSnake?.name, clutchYear) || pairing?.id || prev.pairingId || null;
+        const hatchlingIndex = Number(prev.existingCount) + currentIndex + 1;
+        const makeParentSnapshot = (parent) => parent ? {
+          id: parent.id || null,
+          name: parent.name || parent.id || '',
+          sex: parent.sex || '',
+          morphs: Array.isArray(parent.morphs) ? [...parent.morphs] : [],
+          hets: Array.isArray(parent.hets) ? [...parent.hets] : [],
+          possibleHets: Array.isArray(parent.possibleHets) ? [...parent.possibleHets] : [],
+          genetics: getDisplayedSnakeGeneticsTokens(parent),
+        } : null;
+        const sireSnapshot = makeParentSnapshot(sireSnake);
+        const damSnapshot = makeParentSnapshot(damSnake);
         const created = {
           id: resolvedId,
           name: fallbackName,
@@ -8748,9 +8782,29 @@ export default function BreedingPlannerApp() {
           weight,
           year: derivedYear,
           birthDate: birthDateRaw,
+          clutchId,
+          hatchlingIndex,
           pairingId: pairing?.id || prev.pairingId || null,
           sireId: pairing?.maleId || null,
           damId: pairing?.femaleId || null,
+          sireName: sireSnapshot?.name || '',
+          damName: damSnapshot?.name || '',
+          sireGenetics: sireSnapshot?.genetics || [],
+          damGenetics: damSnapshot?.genetics || [],
+          parentGenetics: {
+            sire: sireSnapshot,
+            dam: damSnapshot,
+          },
+          metadata: {
+            pairingId: pairing?.id || prev.pairingId || null,
+            clutchId,
+            hatchlingIndex,
+            hatchDate: birthDateRaw,
+            parents: {
+              sire: sireSnapshot,
+              dam: damSnapshot,
+            },
+          },
           tags: ['hatchling'],
           groups: baseGroup ? normalizeSingleGroupValue(baseGroup) : [],
           status: 'Active',
@@ -8975,15 +9029,15 @@ export default function BreedingPlannerApp() {
               </div>
             </div>
             <div className="flex flex-1 flex-wrap items-center justify-end gap-3 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-1.5">
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
                 <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Planner" })}</TabButton>
                 <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
+                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
+                <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
                 <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
                 <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
                 <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
-                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
               </div>
               <div className="w-full min-w-[230px] sm:w-auto">
                 <div className="header-search-shell">
@@ -9233,6 +9287,7 @@ export default function BreedingPlannerApp() {
                       snakes={activeAnimalList}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
+                      onOpenFamilyTree={openFamilyTreeForSnake}
                       onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                       onDelete={requestDeleteSnake}
                       pairings={pairings}
@@ -9252,6 +9307,7 @@ export default function BreedingPlannerApp() {
                           setSnakes={setSnakes}
                           onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                           onQuickPair={(sn)=> startPairingWithSnake(sn)}
+                          onOpenFamilyTree={openFamilyTreeForSnake}
                           onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                           onDelete={requestDeleteSnake}
                           pairings={pairings}
@@ -9353,7 +9409,7 @@ export default function BreedingPlannerApp() {
                     setCompletedYearFilter('All');
                   }}
                 >
-                  {t("pairing.incubator")}
+                  {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
                 </TabButton>
               </div>
               <div className="flex flex-wrap items-center gap-2 ml-auto">
@@ -9428,7 +9484,7 @@ export default function BreedingPlannerApp() {
                 }}
               />
             ) : pairingsView === 'incubator' ? (
-              <Card title={t("pairing.incubatorTitle", { count: eggBoxes.length })}>
+              <Card title={t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}>
                 {eggBoxes.length ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -9464,6 +9520,12 @@ export default function BreedingPlannerApp() {
                           <div className="text-xs leading-snug text-neutral-700">
                             {t("pairing.eggBox.clutchLabel", { number: box.clutchNumber || box.number, pairing: box.pairingLabel })}
                           </div>
+                          {box.clutchId && (
+                            <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{box.clutchId}</span>
+                            </div>
+                          )}
                           <div className="text-xs text-neutral-500">
                             {t("pairing.eggBox.laidDue", { laid: box.laidLabel, due: box.dueLabel })}
                           </div>
@@ -9611,7 +9673,7 @@ export default function BreedingPlannerApp() {
         )}
 
         {tab === "familyTree" && (
-          <FamilyTreePage />
+          <FamilyTreePage snakes={snakes} pairings={pairings} focusSnakeId={familyTreeFocusSnakeId} />
         )}
       </div>
 
@@ -10289,6 +10351,12 @@ export default function BreedingPlannerApp() {
                             onClick={()=>requestDeleteSnake(editSnake)}>
                             {t("actions.delete", { defaultValue: "Delete" })}
                           </button>
+                          <button
+                            className="px-3 py-2 rounded-xl text-sm border"
+                            onClick={() => openFamilyTreeForSnake(editSnakeDraft || editSnake)}
+                          >
+                            {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                          </button>
                           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
                           <button
                             className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
@@ -10612,6 +10680,11 @@ export default function BreedingPlannerApp() {
               {/* Genetics picker removed from edit modal per user request */}
               <div className="md:col-span-2 space-y-5">
                 <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+
+                {/* Reproductive Intelligence — females only */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
+                  <ReproductiveIntelligencePanel snake={editSnake} />
+                )}
 
                 <div className="p-3 border rounded-xl bg-white">
                   <div className="flex items-center justify-between mb-2">
@@ -11410,32 +11483,17 @@ function GroupCheckboxes({
   setShowUnassigned
 }) {
   const { t } = useTranslation();
-  const toggleShow = (group) => {
-    if (typeof setShowGroups !== 'function' || typeof setHiddenGroups !== 'function') return;
+
+  const toggleGroup = (group) => {
+    if (typeof setShowGroups !== 'function') return;
     setShowGroups(prev => {
       const next = new Set(prev || []);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-        setHiddenGroups(prevHide => (prevHide || []).filter(g => g !== group));
-      }
+      if (next.has(group)) { next.delete(group); } else { next.add(group); }
       return [...next];
     });
-  };
-
-  const toggleHide = (group) => {
-    if (typeof setHiddenGroups !== 'function' || typeof setShowGroups !== 'function') return;
-    setHiddenGroups(prev => {
-      const next = new Set(prev || []);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-        setShowGroups(prevShow => (prevShow || []).filter(g => g !== group));
-      }
-      return [...next];
-    });
+    if (typeof setHiddenGroups === 'function') {
+      setHiddenGroups(prev => (prev || []).filter(g => g !== group));
+    }
   };
 
   const handleClear = () => {
@@ -11450,76 +11508,61 @@ function GroupCheckboxes({
   };
 
   const showSet = new Set(showGroups || []);
-  const hideSet = new Set(hiddenGroups || []);
-  const filtersActive = showSet.size > 0 || hideSet.size > 0;
+  const filtersActive = showSet.size > 0 || !(hiddenGroups?.length === 0 || !hiddenGroups);
 
   return (
     <div className="space-y-2 mb-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button
           type="button"
-          disabled={!filtersActive}
+          disabled={!filtersActive && showUnassigned}
           className={cx(
             'px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-            filtersActive
+            (filtersActive || !showUnassigned)
               ? 'bg-white hover:bg-neutral-50 border-neutral-300'
               : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
           )}
-          onClick={handleClear}
+          onClick={() => {
+            handleClear();
+            if (typeof setShowUnassigned === 'function') setShowUnassigned(true);
+          }}
         >
           {t("filters.clear")}
         </button>
-        <button
-          type="button"
-          className={cx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors', showUnassigned ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white hover:bg-neutral-50 border-neutral-300')}
-          onClick={handleToggleUnassigned}
-        >
-          {showUnassigned ? t("filters.hideUnassigned") : t("filters.showUnassigned")}
-        </button>
+        <label className={cx(
+          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer select-none transition-colors',
+          !showUnassigned ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+        )}>
+          <input
+            type="checkbox"
+            className="accent-amber-600 w-3.5 h-3.5"
+            checked={!showUnassigned}
+            onChange={handleToggleUnassigned}
+          />
+          {t("filters.hideUnassigned")}
+        </label>
       </div>
       <div className="flex flex-wrap gap-2">
         {groups.map(group => {
-          const status = showSet.has(group) ? 'show' : hideSet.has(group) ? 'hide' : 'neutral';
+          const checked = showSet.has(group);
           return (
-            <div
+            <label
               key={group}
               className={cx(
-                'inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg border transition-colors',
-                status === 'show'
-                  ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                  : status === 'hide'
-                    ? 'bg-rose-50 border-rose-400 text-rose-700'
-                    : 'bg-white border-neutral-300 text-neutral-700'
+                'inline-flex items-center gap-2 text-sm px-2.5 py-1 rounded-lg border cursor-pointer select-none transition-colors',
+                checked
+                  ? 'bg-sky-50 border-sky-400 text-sky-800'
+                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
               )}
             >
-              <span className="font-medium mr-0.5">{group}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => toggleShow(group)}
-                  className={cx(
-                    'px-1.5 py-0.5 rounded-md border text-[10px] uppercase tracking-wide',
-                    status === 'show'
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50'
-                  )}
-                >
-                  {t("filters.show")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleHide(group)}
-                  className={cx(
-                    'px-1.5 py-0.5 rounded-md border text-[10px] uppercase tracking-wide',
-                    status === 'hide'
-                      ? 'bg-rose-500 border-rose-500 text-white'
-                      : 'bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50'
-                  )}
-                >
-                  {t("filters.hide")}
-                </button>
-              </div>
-            </div>
+              <input
+                type="checkbox"
+                className="accent-sky-600 w-3.5 h-3.5"
+                checked={checked}
+                onChange={() => toggleGroup(group)}
+              />
+              <span className="font-medium">{group}</span>
+            </label>
           );
         })}
         {!groups.length && <span className="text-xs text-neutral-500">{t("groups.none", { defaultValue: "No groups yet." })}</span>}
@@ -11924,7 +11967,12 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
         <div className="p-4 border-b flex items-start justify-between gap-3">
           <div>
             <div className="font-semibold text-lg">{title}</div>
-            <div className="text-sm text-neutral-500">Clutch #{box.clutchNumber || box.number}</div>
+            {box.clutchId && (
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">Clutch ID</span>
+                <span className="text-[10px] font-mono font-semibold text-violet-700">{box.clutchId}</span>
+              </div>
+            )}
           </div>
           <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Close</button>
         </div>
@@ -13301,10 +13349,11 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
+function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
   const { t } = useTranslation();
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
+  const hasFamilyTree = typeof onOpenFamilyTree === "function";
   const hasDelete = typeof onDelete === "function";
   const [showPairingsModal, setShowPairingsModal] = useState(false);
   const [quickTagOpen, setQuickTagOpen] = useState(null);
@@ -13574,6 +13623,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, group
         {hasQuick && (
           <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => onQuickPair(s)}>
             {t("actions.pair", { defaultValue: "Pair" })}
+          </button>
+        )}
+        {hasFamilyTree && (
+          <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => onOpenFamilyTree(s)}>
+            {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
           </button>
         )}
         {hasDelete && (
@@ -14151,7 +14205,7 @@ function StatusDot({ status }) {
   return <span className={cx("inline-block w-2 h-2 rounded-full", bg)} />;
 }
 
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
 
@@ -14301,6 +14355,11 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOrderGeneticTest, 
                     )}
                     {typeof onQuickPair === 'function' && (
                       <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onQuickPair(snake)}>{t('actions.pair', { defaultValue: 'Pair' })}</button>
+                    )}
+                    {typeof onOpenFamilyTree === 'function' && (
+                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOpenFamilyTree(snake)}>
+                        {t('actions.openFamilyTree', { defaultValue: 'Open family tree' })}
+                      </button>
                     )}
                     {typeof onOrderGeneticTest === 'function' && (
                       <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOrderGeneticTest(snake)}>
@@ -17589,6 +17648,15 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                         <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
                         <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
                       </div>
+                      {(() => {
+                        const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);
+                        return dashClutchId ? (
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
+                            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                            <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{dashClutchId}</span>
+                          </div>
+                        ) : null;
+                      })()}
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-600">
                         <span className="inline-flex items-center gap-1">
                           <SexBadge sex="M" label={t('snake.sex.male', { defaultValue: 'Male' })} showText={false} />
@@ -18076,10 +18144,18 @@ function PairingInlineCard({
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
-              {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
+                {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
+              </div>
+              {buildClutchId(femaleName, maleName, cycleYear) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]">
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                  <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
+                </span>
+              )}
             </div>
-            <div className="text-[11px] text-neutral-500 flex items-center gap-1">
+            <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
               <span aria-hidden="true">{'\u203A'}</span>
             </div>
@@ -18134,6 +18210,12 @@ function PairingInlineCard({
           <div className="font-semibold leading-tight text-sm sm:text-base">
             <div className="truncate">{clutchTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}</div>
           </div>
+          {buildClutchId(femaleName, maleName, cycleYear) && (
+            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
+            </div>
+          )}
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
             <div>
               <div className="truncate text-[12px] text-neutral-800 flex items-center gap-1">

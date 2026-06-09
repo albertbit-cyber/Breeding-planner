@@ -1067,3 +1067,38 @@ export const updateOrderStatus = async (id: string, payload: { status: string })
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+
+// ── Reproductive Intelligence ─────────────────────────────────────────────────
+
+export const fetchFemaleReproductiveProfile = async (femaleAppId: string) =>
+  request<unknown>(`/reproductive/female/${encodeURIComponent(femaleAppId)}`);
+
+export const postManualLock = async (
+  femaleAppId: string,
+  payload: { lockDate: string; cycleId?: string; notes?: string }
+) =>
+  request<unknown>(`/reproductive/female/${encodeURIComponent(femaleAppId)}/lock`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const putCycleManual = async (
+  femaleAppId: string,
+  payload: {
+    season: number;
+    cycleIndex?: number;
+    maleAppId?: string;
+    pairingStartDate?: string;
+    ovulationDate?: string;
+    preLayShedDate?: string;
+    eggLayingDate?: string;
+    eggCount?: number;
+    fertileCount?: number;
+    slugCount?: number;
+    notes?: string;
+  }
+) =>
+  request<unknown>(`/reproductive/female/${encodeURIComponent(femaleAppId)}/cycle`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
