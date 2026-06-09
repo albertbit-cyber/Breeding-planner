@@ -124,8 +124,14 @@ export default defineConfig({
               if (id.includes("html2canvas")) return "html2canvas";
               if (id.includes("jspdf")) return "jspdf";
               if (id.includes("xlsx")) return "xlsx";
-              if (id.includes("react")) return "vendor-react";
-              return "vendor";
+              if (
+                id.includes("react") ||
+                id.includes("/scheduler/") ||
+                id.includes("\\scheduler\\") ||
+                id.includes("use-sync-external-store")
+              ) {
+                return "vendor-react";
+              }
             },
       },
     },
