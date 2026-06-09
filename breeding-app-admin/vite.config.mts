@@ -118,7 +118,18 @@ export default defineConfig({
               if (id.includes("html2canvas")) return "html2canvas";
               if (id.includes("jspdf")) return "jspdf";
               if (id.includes("xlsx")) return "xlsx";
-              if (id.includes("react")) return "vendor-react";
+              // React runtime — must be isolated to avoid circular chunk deps.
+              // scheduler and use-sync-external-store are react-dom internals;
+              // without them here, vendor → vendor-react creates a circular dep.
+              if (
+                id.includes("/react/") ||
+                id.includes("/react-dom/") ||
+                id.includes("/scheduler/") ||
+                id.includes("\\react\\") ||
+                id.includes("\\react-dom\\") ||
+                id.includes("\\scheduler\\") ||
+                id.includes("use-sync-external-store")
+              ) return "vendor-react";
               return "vendor";
             },
       },
