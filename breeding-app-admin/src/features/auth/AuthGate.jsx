@@ -452,6 +452,19 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
 
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
 
+const LANGUAGE_OPTIONS = [
+  { code: "en", label: "English" },
+  { code: "he", label: "עברית" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "nl", label: "Nederlands" },
+  { code: "pl", label: "Polski" },
+  { code: "pt", label: "Português" },
+  { code: "cs", label: "Čeština" },
+];
+
 const loadStoredAuth = (scope = "breeder") => {
   if (scope === "public") return { isAuthenticated: false };
   const storageKey = AUTH_SESSION_STORAGE_KEYS[scope] || AUTH_SESSION_STORAGE_KEYS.breeder;
@@ -590,7 +603,7 @@ export default function AuthGate({ children }) {
 
     if (authScope !== "public") clearAuthToken(authScope);
     persistAuth({ isAuthenticated: false });
-    setView("login");
+    setView("chooser");
     setIsRecoveringPassword(false);
     setLoginValues((prev) => ({
       username: authState.profile?.email || prev.username || "",
@@ -952,7 +965,7 @@ export default function AuthGate({ children }) {
           type="button"
           className={`ghost ${view === "login" ? "is-active" : ""}`}
           onClick={() => {
-            setView("login");
+            setView("chooser");
             setIsRecoveringPassword(false);
             setPasswordRecoveryError("");
           }}
@@ -1148,6 +1161,17 @@ export default function AuthGate({ children }) {
       </div>
       {overlayActive && (
         <div className="auth-overlay">
+          <div className="auth-lang-switcher">
+            <select
+              value={i18n.language?.split("-")[0] || "en"}
+              onChange={(e) => i18n.changeLanguage(e.target.value)}
+              aria-label={t("common.selectLanguage", { defaultValue: "Select language" })}
+            >
+              {LANGUAGE_OPTIONS.map((lang) => (
+                <option key={lang.code} value={lang.code}>{lang.label}</option>
+              ))}
+            </select>
+          </div>
           {showBackendBlocker ? (
             <div className="auth-card">
               <div className="auth-card-brand">
@@ -1156,31 +1180,4 @@ export default function AuthGate({ children }) {
                   {snapshot.state === "config-error"
                     ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
                     : snapshot.state === "unauthorized"
-                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
-                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
-                </h1>
-              </div>
-              <p className="auth-subtitle">{snapshot.message}</p>
-              <div className="text-xs text-neutral-500">
-                {t("auth.sharedBackend.requirements", {
-                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
-                })}
-              </div>
-              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  {snapshot.config.warnings.join(" ")}
-                </div>
-              ) : null}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" className="primary" onClick={retry}>
-                  {t("common.retry", { defaultValue: "Retry" })}
-                </button>
-              </div>
-            </div>
-          ) : view === "register" ? registrationCard : loginCard}
-        </div>
-      )}
-    </div>
-  );
-}
-
+                      ? t("auth.sharedBackend.unauthorizedTitle", { d

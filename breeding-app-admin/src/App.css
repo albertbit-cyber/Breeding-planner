@@ -1035,6 +1035,39 @@
   pointer-events: none;
 }
 
+.auth-lang-switcher {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  pointer-events: auto;
+}
+
+.auth-lang-switcher select {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+  padding: 0.35rem 2rem 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: #334155;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  backdrop-filter: blur(4px);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.auth-lang-switcher select:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.auth-lang-switcher select:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.7);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
 .auth-card {
   width: min(420px, 100%);
   background: rgba(255, 255, 255, 0.92);
@@ -2780,56 +2813,4 @@
   right: max(1rem, calc((100vw - 520px) / 2 + 1rem));
   bottom: 5rem;
   z-index: 18;
-  min-height: 56px;
-  border: 0;
-  border-radius: 999px;
-  background: #21a36d;
-  color: #07110d;
-  padding: 0 1.1rem;
-  font-weight: 900;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
-}
-
-.mobile-bottom-nav {
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  z-index: 20;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.2rem;
-  border-radius: 18px 18px 0 0;
-  background: #0b1712;
-  padding: 0.4rem;
-  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.36);
-}
-
-.mobile-bottom-nav button {
-  min-height: 54px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: #a9bab1;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.mobile-bottom-nav button.is-active {
-  background: #193426;
-  color: #f8fafc;
-}
-
-@media (max-width: 420px) {
-  .mobile-data-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .mobile-rack-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .mobile-task-card {
-    grid-template-columns: 1fr;
-  }
-}
+  min-height: 
