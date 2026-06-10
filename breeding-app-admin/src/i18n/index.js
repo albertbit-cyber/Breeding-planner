@@ -159,3 +159,47 @@ const getInitialLanguage = () => {
 
 if (!i18n.isInitialized) {
   i18n
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+      resources,
+      lng: getInitialLanguage(), // explicit > detector; ensures English on first load
+      fallbackLng: FALLBACK_LANGUAGE,
+      ns: NAMESPACES,
+      defaultNS: DEFAULT_NAMESPACE,
+      fallbackNS: DEFAULT_NAMESPACE,
+      supportedLngs: SUPPORTED_LANGS,
+      interpolation: {
+        escapeValue: false,
+      },
+      detection: {
+        // Only cache language changes the user explicitly makes via the selector.
+        order: ["localStorage"],
+        caches: ["localStorage"],
+      },
+    });
+}
+
+export default i18n;
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+      resources,
+      lng: getInitialLanguage(), // explicit > detector; ensures English on first load
+      fallbackLng: FALLBACK_LANGUAGE,
+      ns: NAMESPACES,
+      defaultNS: DEFAULT_NAMESPACE,
+      fallbackNS: DEFAULT_NAMESPACE,
+      supportedLngs: SUPPORTED_LANGS,
+      interpolation: {
+        escapeValue: false,
+      },
+      detection: {
+        // Only cache language changes the user explicitly makes via the selector.
+        order: ["localStorage"],
+        caches: ["localStorage"],
+      },
+    });
+}
+
+export default i18n;
