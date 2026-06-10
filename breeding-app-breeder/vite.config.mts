@@ -43,6 +43,25 @@ function networkUrlLogger(): Plugin {
   };
 }
 
+// Pre-transform plugin: the shared config file uses `(import.meta as any)?.env?.VITE_API_URL`
+// (TypeScript optional-chaining cast). Vite's static import.meta.env replacement does NOT
+// recognise the `?.` form, so the value is never baked in. This plugin rewrites the pattern
+// to a plain string literal before esbuild sees the file.
+function patchImportMetaEnv(): Plugin {
+  const apiUrl = process.env.VITE_API_URL ?? "";
+  return {
+    name: "patch-import-meta-env-optional-chain",
+    enforce: "pre",
+    transform(code) {
+      if (!code.includes("VITE_API_URL")) return null;
+      return code.replace(
+        /\(import\.meta\s+as\s+any\)\?\.env\?\.VITE_API_URL/g,
+        JSON.stringify(apiUrl)
+      );
+    },
+  };
+}
+
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
 const resolveBase = (publicUrl: string | undefined): string => {
@@ -71,7 +90,7 @@ const disableCodeSplitting = process.env.ELECTRON_BUILD === "true";
 
 export default defineConfig({
   base,
-  plugins: [react(), networkUrlLogger()],
+  plugins: [patchImportMetaEnv(), react(), networkUrlLogger()],
   test: {
     exclude: [
       "**/node_modules/**",

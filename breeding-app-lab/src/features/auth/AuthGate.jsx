@@ -13,7 +13,8 @@ const LEGACY_AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
 const getAuthSurfaceForHash = (hashValue) => {
   const raw = String(hashValue || "").replace(/^#/, "").trim();
   const path = raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "/";
-  if (path === "/") return "public";
+  // Only pricing is public; root "/" requires auth so the welcome screen
+  // always shows on first visit.
   if (path.startsWith("/pricing")) return "public";
   return getAuthScopeForHash(hashValue);
 };
