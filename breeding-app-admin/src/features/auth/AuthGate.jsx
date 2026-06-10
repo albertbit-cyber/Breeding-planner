@@ -13,7 +13,8 @@ const LEGACY_AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
 const getAuthSurfaceForHash = (hashValue) => {
   const raw = String(hashValue || "").replace(/^#/, "").trim();
   const path = raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "/";
-  if (path === "/") return "public";
+  // Only pricing is truly public; root "/" now requires auth so the
+  // welcome screen always shows on first visit.
   if (path.startsWith("/pricing")) return "public";
   return getAuthScopeForHash(hashValue);
 };
@@ -1180,4 +1181,31 @@ export default function AuthGate({ children }) {
                   {snapshot.state === "config-error"
                     ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
                     : snapshot.state === "unauthorized"
-                      ? t("auth.sharedBackend.unauthorizedTitle", { d
+                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
+                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
+                </h1>
+              </div>
+              <p className="auth-subtitle">{snapshot.message}</p>
+              <div className="text-xs text-neutral-500">
+                {t("auth.sharedBackend.requirements", {
+                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
+                })}
+              </div>
+              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {snapshot.config.warnings.join(" ")}
+                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" className="primary" onClick={retry}>
+                  {t("common.retry", { defaultValue: "Retry" })}
+                </button>
+              </div>
+            </div>
+          ) : view === "register" ? registrationCard : loginCard}
+        </div>
+      )}
+    </div>
+  );
+}
+

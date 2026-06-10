@@ -1407,6 +1407,103 @@
   border-color: rgba(169, 118, 255, 0.4) !important;
 }
 
+/* ── Mobile auth styles ───────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Slide card up from the bottom like a bottom sheet */
+  .auth-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .auth-overlay .auth-card,
+  .auth-card {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding: 1.5rem 1.25rem 2rem;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.35);
+  }
+
+  .auth-card.registration-card {
+    width: 100%;
+    padding: 1.5rem 1.25rem 2rem;
+    border-radius: 24px 24px 0 0;
+  }
+
+  /* Drag handle hint */
+  .auth-card::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: rgba(15, 23, 42, 0.15);
+    border-radius: 2px;
+    margin: 0 auto 1.25rem;
+  }
+
+  .auth-logo {
+    width: 60px;
+    height: 60px;
+  }
+
+  .auth-card-brand h1 {
+    font-size: 1.6rem;
+  }
+
+  .auth-subtitle {
+    font-size: 0.88rem;
+  }
+
+  /* Stack Register / Log in buttons full-width */
+  .auth-primary-actions {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .auth-primary-actions button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.8rem 1rem;
+  }
+
+  /* Make inputs taller for touch targets */
+  .auth-field input,
+  .auth-field select,
+  .auth-field textarea {
+    padding: 0.75rem 0.9rem;
+    font-size: 1rem;
+  }
+
+  /* Full-width submit button */
+  .auth-login-form button.primary.wide,
+  .auth-registration-actions .primary {
+    width: 100%;
+    padding: 0.8rem 1rem;
+  }
+
+  /* Language switcher: top-right, above the bottom sheet */
+  .auth-lang-switcher {
+    top: 1rem;
+    right: 1rem;
+    bottom: auto;
+  }
+
+  /* Signed-in chip: compress on mobile */
+  .auth-floating-chip {
+    top: auto;
+    bottom: 1rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    border-radius: 16px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    gap: 0.4rem;
+  }
+}
+
 .header-nav-button:hover {
   background: rgba(244, 217, 255, 0.95);
   color: #320e61;
@@ -2813,4 +2910,56 @@
   right: max(1rem, calc((100vw - 520px) / 2 + 1rem));
   bottom: 5rem;
   z-index: 18;
-  min-height: 
+  min-height: 56px;
+  border: 0;
+  border-radius: 999px;
+  background: #21a36d;
+  color: #07110d;
+  padding: 0 1.1rem;
+  font-weight: 900;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.mobile-bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 20;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.2rem;
+  border-radius: 18px 18px 0 0;
+  background: #0b1712;
+  padding: 0.4rem;
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.36);
+}
+
+.mobile-bottom-nav button {
+  min-height: 54px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #a9bab1;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.mobile-bottom-nav button.is-active {
+  background: #193426;
+  color: #f8fafc;
+}
+
+@media (max-width: 420px) {
+  .mobile-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-rack-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mobile-task-card {
+    grid-template-columns: 1fr;
+  }
+}
