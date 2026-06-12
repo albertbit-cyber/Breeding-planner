@@ -103,4 +103,34 @@ describe("applyConfirmedResultGeneticsUpdate", () => {
       possibleHets: [],
     });
   });
+
+  it("persists lab-confirmed genetics on the snake record", async () => {
+    const state = createGateway([{ id: "snake-1", morphs: [], hets: ["50% Clown"], possibleHets: [] }]);
+
+    await applyConfirmedResultGeneticsUpdate({
+      actor,
+      order,
+      result: {
+        id: "result-persisted",
+        animalId: "snake-1",
+        findings: [{ marker: "Clown", outcome: "carrierDetected" }],
+      } as any,
+    }, depsFor(state.gateway));
+
+    const [snake] = state.read();
+    expect(snake.hets).toEqual(["Clown"]);
+    expect(snake.labGeneticsConfirmation).toEqual(
+      expect.objectContaining({
+        source: "genetic-test",
+        markers: [
+          expect.objectContaining({
+            marker: "Clown",
+            outcome: "carrierDetected",
+            orderId: "order-1",
+            resultId: "result-persisted",
+          }),
+        ],
+      })
+    );
+  });
 });

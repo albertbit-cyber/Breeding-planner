@@ -3,6 +3,10 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
+import {
+  getSuggestedHetTestIds,
+  matchSuggestedHetTests,
+} from "../utils/shedTestSuggestions";
 
 const normalizeTokenList = (value) => {
   if (!Array.isArray(value)) return [];
@@ -25,6 +29,7 @@ export default function BreederOrderGeneticTestModal({
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [catalogError, setCatalogError] = useState("");
   const [added, setAdded] = useState(false);
+  const [hasAppliedSuggestions, setHasAppliedSuggestions] = useState(false);
 
   const snakeId = String(snake?.id || "").trim();
   const alreadyInCart = isInCart(snakeId);
@@ -35,6 +40,7 @@ export default function BreederOrderGeneticTestModal({
     const existing = getCartItem(snakeId);
     setSelectedTests(existing ? [...existing.selectedTestIds] : []);
     setAdded(false);
+    setHasAppliedSuggestions(false);
   }, [open, snakeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load catalog when modal opens
@@ -58,6 +64,20 @@ export default function BreederOrderGeneticTestModal({
     () => catalogTests.map((entry) => ({ id: entry.id, name: entry.name })),
     [catalogTests]
   );
+
+  const suggestedHetTests = useMemo(
+    () => matchSuggestedHetTests(snake, catalogTests),
+    [snake, catalogTests]
+  );
+
+  useEffect(() => {
+    if (!open || alreadyInCart || hasAppliedSuggestions || !catalogTests.length) return;
+    const suggestedIds = getSuggestedHetTestIds(snake, catalogTests);
+    if (suggestedIds.length) {
+      setSelectedTests(suggestedIds);
+    }
+    setHasAppliedSuggestions(true);
+  }, [alreadyInCart, catalogTests, hasAppliedSuggestions, open, snake]);
 
   const snakeTokens = useMemo(() => {
     const morphs = normalizeTokenList(snake?.morphs);
@@ -152,6 +172,50 @@ export default function BreederOrderGeneticTestModal({
             <div className="mb-2 text-xs text-neutral-600">
               {t("lab.orders.requestedTests", { defaultValue: "Requested Gene Tests" })}
             </div>
+            {suggestedHetTests.length ? (
+              <div className="mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
+                <div className="text-sm font-medium text-sky-950">
+                  {t("lab.orders.suggestedHetTests", {
+                    defaultValue: "Suggested het tests",
+                  })}
+                </div>
+                <div className="mt-1 text-xs text-sky-800">
+                  {t("lab.orders.suggestedHetTestsHelp", {
+                    defaultValue:
+                      "This snake has 66% het, 50% het, or possible het genetics. Select the genes you want the lab to confirm.",
+                  })}
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {suggestedHetTests.map((suggestion) =>
+                    suggestion.matched ? (
+                      <label
+                        key={suggestion.key}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-sky-950"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTests.includes(suggestion.testId)}
+                          onChange={() => toggleTest(suggestion.testId)}
+                        />
+                        <span>{suggestion.testName || suggestion.gene}</span>
+                      </label>
+                    ) : (
+                      <div
+                        key={suggestion.key}
+                        className="rounded-xl border border-sky-100 bg-white/70 px-3 py-2 text-sm text-sky-900"
+                      >
+                        <div>{suggestion.gene}</div>
+                        <div className="text-[11px] text-sky-700">
+                          {t("lab.orders.noMatchingHetTest", {
+                            defaultValue: "No matching breeder-visible catalog test",
+                          })}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            ) : null}
             <div className="grid max-h-52 grid-cols-1 gap-2 overflow-auto rounded-2xl border border-neutral-200 bg-white p-3 sm:grid-cols-2">
               {isLoadingCatalog ? (
                 <div className="col-span-2 py-2 text-center text-xs text-neutral-500">

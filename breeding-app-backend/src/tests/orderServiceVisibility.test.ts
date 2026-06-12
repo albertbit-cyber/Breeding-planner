@@ -5,6 +5,7 @@ vi.mock("../lib/prisma", () => ({
     shedTestOrder: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      delete: vi.fn(),
     },
   },
 }));
@@ -14,7 +15,11 @@ vi.mock("../services/orderNumberService", () => ({
 }));
 
 import { prisma } from "../lib/prisma";
-import { getOrderByIdForUser, listOrdersForUser } from "../services/orderService";
+import {
+  deleteOrderById,
+  getOrderByIdForUser,
+  listOrdersForUser,
+} from "../services/orderService";
 
 const order = {
   id: "order-1",
@@ -79,5 +84,34 @@ describe("orderService breeder visibility", () => {
       listOrdersForUser({ id: "buyer-1", role: "buyer" })
     ).rejects.toMatchObject({ statusCode: 403 });
     expect((prisma as any).shedTestOrder.findMany).not.toHaveBeenCalled();
+  });
+
+  it("deletes order rows without touching persisted animal genetics", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue({
+      id: "order-1",
+      animals: [
+        {
+          id: "order-animal-1",
+          animalId: "snake-1",
+          tests: [{ id: "test-1" }, { id: "test-2" }],
+        },
+      ],
+      results: [{ id: "result-1" }],
+    });
+    vi.mocked((prisma as any).shedTestOrder.delete).mockResolvedValue({ id: "order-1" });
+
+    await expect(
+      deleteOrderById("order-1", { role: "lab_staff" })
+    ).resolves.toEqual({
+      deletedOrderId: "order-1",
+      deletedAnimals: 1,
+      deletedAnimalTests: 2,
+      deletedResults: 1,
+    });
+
+    expect((prisma as any).shedTestOrder.delete).toHaveBeenCalledWith({
+      where: { id: "order-1" },
+    });
+    expect((prisma as any).animal).toBeUndefined();
   });
 });
