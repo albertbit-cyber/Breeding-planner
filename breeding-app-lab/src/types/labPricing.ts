@@ -2,6 +2,8 @@ export type PricingType = "morph" | "sex";
 
 export type CatalogCategory = "morph" | "sex-determination" | "other";
 
+export type GeneticType = "recessive" | "codominant" | "dominant";
+
 export interface CatalogTest {
   id: string;
   name: string;
@@ -11,6 +13,8 @@ export interface CatalogTest {
   visibleInBreederApp?: boolean;
   description?: string;
   sortOrder?: number;
+  geneticType?: GeneticType;
+  group?: string;
 }
 
 export interface AnimalTestSelection {
@@ -78,4 +82,6 @@ export interface PricingSnapshot {
   pricingConfig: PricingConfig;
   animals: AnimalTestSelection[];
   breakdown: OrderPriceBreakdown;
+}
+;
 }

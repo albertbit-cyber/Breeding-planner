@@ -966,7 +966,7 @@ export default function AuthGate({ children }) {
           type="button"
           className={`ghost ${view === "login" ? "is-active" : ""}`}
           onClick={() => {
-            setView("chooser");
+            setView("login");
             setIsRecoveringPassword(false);
             setPasswordRecoveryError("");
           }}

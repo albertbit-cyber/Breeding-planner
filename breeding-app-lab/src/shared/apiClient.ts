@@ -511,22 +511,67 @@ export const getHealth = async () =>
     return data;
   };
 
+// Dev-mode localStorage login — checks the breedingPlannerUsers array seeded by seedDemoUser.ts.
+// Only active when import.meta.env.DEV is true (Vite development builds).
+const devLocalStorageLogin = (
+  email: string,
+  password: string,
+  scope: AuthScope,
+): { token: string; refreshToken: string; user: { email: string; fullName: string; role: string } } | null => {
+  try {
+    const raw = localStorage.getItem("breedingPlannerUsers");
+    if (!raw) return null;
+    const users: Array<{ email: string; password: string; fullName?: string; displayName?: string; role?: string }> = JSON.parse(raw);
+    if (!Array.isArray(users)) return null;
+    const found = users.find(
+      (u) => String(u.email || "").toLowerCase().trim() === email.toLowerCase().trim() && u.password === password,
+    );
+    if (!found) return null;
+    const mockToken = `dev-mock-${scope}-${Date.now()}`;
+    const mockRefresh = `dev-mock-refresh-${scope}-${Date.now()}`;
+    setStoredToken(mockToken, scope);
+    setStoredRefreshToken(mockRefresh, scope);
+    markAuthorized("Dev-mode localStorage login.");
+    return {
+      token: mockToken,
+      refreshToken: mockRefresh,
+      user: {
+        email: found.email,
+        fullName: found.fullName || found.displayName || found.email,
+        role: found.role || "breeder",
+      },
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const login = async (payload: { email: string; password: string }, authScope?: AuthScope) => {
   const scope = normalizeAuthScope(authScope);
-  const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-    requiresAuth: false,
-    authScope: scope,
-  });
-  if (data?.token && data?.refreshToken) {
-    setStoredToken(data.token, scope);
-    setStoredRefreshToken(data.refreshToken, scope);
-    setCookiePreferredAuth(scope);
-    if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
-    markAuthorized();
+  try {
+    const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      requiresAuth: false,
+      authScope: scope,
+    });
+    if (data?.token && data?.refreshToken) {
+      setStoredToken(data.token, scope);
+      setStoredRefreshToken(data.refreshToken, scope);
+      setCookiePreferredAuth(scope);
+      if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
+      markAuthorized();
+    }
+    return data;
+  } catch (err) {
+    // In development, fall back to the localStorage demo users seeded by seedDemoUser.ts.
+    // This lets lab/admin users log in without a running backend.
+    if ((import.meta as any)?.env?.DEV) {
+      const local = devLocalStorageLogin(payload.email, payload.password, scope);
+      if (local) return local as unknown as { token: string; refreshToken: string; user: unknown };
+    }
+    throw err;
   }
-  return data;
 };
 
 export const register = async (payload: { email: string; password: string; fullName: string }) =>

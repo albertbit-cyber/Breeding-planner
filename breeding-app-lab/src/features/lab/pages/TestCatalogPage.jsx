@@ -237,12 +237,13 @@ export default function TestCatalogPage() {
             <thead className="border-b border-neutral-100 bg-neutral-50 text-left text-xs text-neutral-500">
               <tr>
                 <th className="px-3 py-2">{t("lab.catalog.colName", { defaultValue: "Name" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colGeneticType", { defaultValue: "Type" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colGroup", { defaultValue: "Group" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colCode", { defaultValue: "Code" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colGene", { defaultValue: "Gene" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colPricingType", { defaultValue: "Pricing Type" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colPricingType", { defaultValue: "Pricing" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colPrice", { defaultValue: "Price" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colActive", { defaultValue: "Active" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colBreederVisible", { defaultValue: "Breeder Visible" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colBreederVisible", { defaultValue: "Visible" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colActions", { defaultValue: "Actions" })}</th>
               </tr>
             </thead>
@@ -251,10 +252,23 @@ export default function TestCatalogPage() {
                 <tr key={test.id} className="hover:bg-neutral-50">
                   <td className="px-3 py-2">
                     <div className="font-medium text-neutral-900">{test.name}</div>
-                    {test.shortLabel ? <div className="text-xs text-neutral-500">{test.shortLabel}</div> : null}
+                    {test.description ? <div className="text-xs text-neutral-400 max-w-xs truncate">{test.description}</div> : null}
                   </td>
+                  <td className="px-3 py-2">
+                    {test.geneticType ? (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        test.geneticType === "recessive"
+                          ? "bg-purple-100 text-purple-800"
+                          : test.geneticType === "codominant"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-sky-100 text-sky-800"
+                      }`}>
+                        {test.geneticType}
+                      </span>
+                    ) : <span className="text-xs text-neutral-400">-</span>}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-neutral-600">{test.group || "-"}</td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-600">{test.internalCode}</td>
-                  <td className="px-3 py-2 text-xs text-neutral-600">{test.geneTarget || "-"}</td>
                   <td className="px-3 py-2 text-xs text-neutral-600">{test.pricingType || "morph"}</td>
                   <td className="px-3 py-2 text-xs">
                     {formatEuroFromCents(test.priceCents)}

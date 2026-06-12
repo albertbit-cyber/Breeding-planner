@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
+import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -270,6 +271,12 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         },
       });
     }
+  });
+
+  // Ingest reproductive events from all female pairings into the intelligence tables.
+  // Fire-and-forget: don't let ingestion failures block the snapshot response.
+  ingestAllPairingsIntoReproductiveCycles(ownerId, pairings, clutches).catch((err) => {
+    console.error("[reproductive] ingestion error:", err);
   });
 
   return listBreederSnapshot(ownerId);

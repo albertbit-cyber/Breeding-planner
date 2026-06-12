@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadData: () => ipcRenderer.invoke('app:load-data'),
   saveData: (payload) => ipcRenderer.invoke('app:save-data', payload),
   clearData: () => ipcRenderer.invoke('app:clear-data'),
+  printCurrentWindow: () => ipcRenderer.invoke('label-print:print-current-window'),
   locale: {
     getLanguage: () => ipcRenderer.invoke('i18n:get-language'),
     setLanguage: (language) => ipcRenderer.invoke('i18n:set-language', language),

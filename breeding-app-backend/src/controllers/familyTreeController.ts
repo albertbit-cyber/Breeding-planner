@@ -48,7 +48,8 @@ export const getDescendantsHandler = async (req: Request, res: Response): Promis
   res.status(200).json(result);
 };
 
-export const getStatsHandler = async (_req: Request, res: Response): Promise<void> => {
-  const stats = await getTreeStats();
+export const getStatsHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = String(req.user?.id || "");
+  const stats = await getTreeStats(userId);
   res.status(200).json(stats);
 };

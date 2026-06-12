@@ -109,6 +109,7 @@ model User {
   deviceSessions   UserDeviceSession[]
   refreshSessions  RefreshSession[]
   securityEvents   SecurityEvent[]
+  reproductiveCycles ReproductiveCycle[]
   marketplaceMedia MarketplaceMedia[] @relation("MarketplaceMediaOwner")
   marketplaceMessageReports MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
   marketplaceBlocks MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocker")
@@ -993,6 +994,116 @@ model ShedTestOrderResult {
   @@index([orderId])
   @@index([animalId])
   @@index([status])
+}
+
+// ── Reproductive Intelligence models ──────────────────────────
+//
+// One row per female per breeding season pairing.
+// Ingested automatically from Pairing.payload on every snapshot save.
+model ReproductiveCycle {
+  id             String  @id @default(cuid())
+  ownerId        String
+  owner          User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Female identity (both DB id and app-local id for fast lookup)
+  femaleAnimalId String
+  femaleAppId    String
+
+  // Male used this cycle (optional)
+  maleAnimalId   String?
+  maleAppId      String?
+
+  // Source pairing
+  pairingId      String?
+  pairingAppId   String?
+
+  season         Int    // year the pairing started
+  cycleIndex     Int    // 1st, 2nd... cycle for this female in this season
+
+  // Key reproductive dates (YYYY-MM-DD strings, matching existing payload convention)
+  pairingStartDate  String?
+  pairingEndDate    String?
+  ovulationDate     String?
+  preLayShedDate    String?
+  eggLayingDate     String?
+
+  // Clutch outcome
+  eggCount       Int?
+  fertileCount   Int?
+  slugCount      Int?
+
+  notes          String?  @db.Text
+  payload        Json?    // extensible: follicle data, weight, future fields
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  locks          LockEvent[]
+
+  @@unique([femaleAnimalId, season, cycleIndex])
+  @@index([femaleAnimalId])
+  @@index([ownerId])
+  @@index([pairingId])
+  @@map("reproductive_cycles")
+}
+
+// One row per confirmed lock event.
+// Natural dedup key: (femaleAnimalId, lockDate) — prevents double-entry from
+// calendar, log, snake card, etc.
+model LockEvent {
+  id             String  @id @default(cuid())
+  ownerId        String
+  femaleAnimalId String  // Animal.id (DB UUID)
+  femaleAppId    String  // appAnimalId (frontend id)
+
+  cycleId        String?
+  cycle          ReproductiveCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+
+  lockDate       String  // YYYY-MM-DD
+  notes          String? @db.Text
+
+  // Source attribution: where did this lock come from?
+  sourceType     String  // 'pairing_calendar' | 'log' | 'snake_card' | 'import' | 'manual'
+  sourceId       String? // appPairingId or other originating record id
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([femaleAnimalId, lockDate])
+  @@index([femaleAnimalId])
+  @@index([cycleId])
+  @@index([ownerId])
+  @@map("lock_events")
+}
+
+// Computed analytics cache — rebuilt after every cycle/lock write.
+// Raw cycle + lock rows are source of truth; this is a read-optimization.
+model ReproductiveAnalyticsCache {
+  id                       String   @id @default(cuid())
+  femaleAnimalId           String   @unique
+  femaleAppId              String
+  ownerId                  String
+
+  totalCycles              Int      @default(0)
+  avgLocksPerCycle         Decimal? @db.Decimal(6, 2)
+  avgDaysBetweenLocks      Decimal? @db.Decimal(6, 2)
+  avgFirstLockToOvulation  Decimal? @db.Decimal(6, 2)
+  avgLastLockToOvulation   Decimal? @db.Decimal(6, 2)
+  avgOvulationToPreLayShed Decimal? @db.Decimal(6, 2)
+  avgPreLayShedToEggLaying Decimal? @db.Decimal(6, 2)
+  avgOvulationToEggLaying  Decimal? @db.Decimal(6, 2)
+  avgFertilityRate         Decimal? @db.Decimal(5, 4)
+
+  // 'none' | 'low' | 'medium' | 'high'
+  confidenceLevel          String   @default("none")
+  // JSON string[] e.g. ["early_ovulator", "frequent_locker", "consistent"]
+  patternTagsJson          Json?
+
+  lastCalculatedAt         DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([ownerId])
+  @@map("reproductive_analytics_cache")
 }
 
 // ── Family Tree models ──────────────────────────────────────

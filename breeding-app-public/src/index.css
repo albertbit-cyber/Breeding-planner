@@ -1,0 +1,194 @@
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #fff;
+  color: #1c1c1a;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { text-decoration: none; color: inherit; }
+button, input, select, textarea { font: inherit; }
+img { max-width: 100%; }
+
+/* ── CSS variables ─────────────────────────────────── */
+:root {
+  /* Brand */
+  --dark:     #1c1c1a;
+  --dark2:    #2c2c28;
+  --gold:     #c8a840;
+  --gold-lt:  #f5edcc;
+  --gold-dk:  #7a6010;
+
+  /* Data cell colors (from actual app screenshot) */
+  --feed:     #7ea8a2;
+  --weight:   #8fa898;
+  --cleaning: #c49282;
+  --shed:     #d4b96a;
+  --meds:     #b8806a;
+  --group:    #f0ece0;
+
+  /* Genetics tag colors */
+  --coral:    #d86060;
+  --coral-lt: #fbd5d5;
+  --coral-dk: #a03030;
+  --purple:   #9b65d6;
+  --purple-lt:#e8dff8;
+  --purple-dk:#5a2896;
+
+  /* Surfaces */
+  --bg:       #faf8f3;
+  --bg-card:  #ffffff;
+  --border:   #e5e0d4;
+  --muted:    #7a7265;
+  --hint:     #a09888;
+
+  --radius:    8px;
+  --radius-lg: 12px;
+}
+
+/* ── Utility buttons ───────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: none; cursor: pointer; font-weight: 500; border-radius: var(--radius);
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:hover { opacity: .88; }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn-primary { background: var(--dark); color: #fff; padding: 10px 22px; font-size: 14px; }
+.btn-gold    { background: var(--gold); color: var(--dark); padding: 10px 22px; font-size: 14px; font-weight: 600; }
+.btn-outline { background: transparent; color: var(--dark); border: 1px solid var(--border); padding: 10px 22px; font-size: 14px; }
+.btn-lg      { padding: 13px 30px; font-size: 15px; }
+.btn-sm      { padding: 6px 14px; font-size: 13px; }
+.btn-full    { width: 100%; justify-content: center; }
+
+/* ── Pill / tag ────────────────────────────────────── */
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; font-size: 12px; font-weight: 500; padding: 5px 14px; }
+.tag-coral  { background: var(--coral-lt); color: var(--coral-dk); font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 6px; }
+.tag-purple { background: var(--purple-lt); color: var(--purple-dk); font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 6px; }
+.tag-purple-lt { background: #f0e8ff; color: #7840a8; font-size: 12px; font-weight: 400; padding: 4px 10px; border-radius: 6px; font-style: italic; }
+
+/* ── Badge ─────────────────────────────────────────── */
+.badge-gold {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--gold-lt); color: var(--gold-dk);
+  border-radius: 999px; font-size: 12px; font-weight: 500; padding: 4px 14px;
+}
+
+/* ── Section ───────────────────────────────────────── */
+.section     { padding: 4rem 1.5rem; }
+.section-soft{ background: var(--bg); }
+.section-dark{ background: var(--dark); color: #fff; }
+.container   { max-width: 860px; margin: 0 auto; }
+
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--gold-dk); margin-bottom: 8px;
+}
+.section-title      { font-size: 26px; font-weight: 500; color: var(--dark); }
+.section-title-light{ font-size: 26px; font-weight: 500; color: #f5f2ec; }
+.section-sub        { font-size: 15px; color: var(--muted); margin-top: 8px; }
+
+/* ── Form inputs ───────────────────────────────────── */
+.field { margin-bottom: 1rem; }
+.field label { display: block; font-size: 13px; font-weight: 500; color: var(--dark); margin-bottom: 5px; }
+.field input {
+  width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--radius); font-size: 14px; color: var(--dark);
+  background: #fff; transition: border-color .15s; outline: none;
+}
+.field input:focus { border-color: var(--gold); }
+.field-error { font-size: 12px; color: #c03030; margin-top: 4px; }
+
+/* ── Alert ─────────────────────────────────────────── */
+.alert { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 1rem; }
+.alert-error   { background: #fbd5d5; color: #8c2020; border: 1px solid #e8a8a8; }
+.alert-success { background: #d8f0dc; color: #1a5c28; border: 1px solid #9ed8a8; }
+
+/* ── Check list ────────────────────────────────────── */
+.check-list { list-style: none; }
+.check-list li { display: flex; gap: 7px; font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+.check-list li .ck { color: var(--gold); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Pricing card ──────────────────────────────────── */
+.plan-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.plan-card.featured { border: 2px solid var(--gold); }
+.plan-top  { height: 4px; }
+.plan-body { padding: 1.1rem; }
+.plan-name { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 4px; }
+.plan-price { font-size: 28px; font-weight: 500; color: var(--dark); }
+.plan-price span { font-size: 13px; font-weight: 400; color: var(--muted); }
+.plan-desc { font-size: 12px; color: var(--muted); margin: 6px 0 10px; line-height: 1.55; }
+
+/* ── Feature card ──────────────────────────────────── */
+.feat-card { border-radius: var(--radius-lg); padding: 1.5rem; border-width: 1px; border-style: solid; }
+.feat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.feat-icon .ti { color: #fff; font-size: 22px; }
+.feat-title { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.feat-desc  { font-size: 13px; line-height: 1.6; }
+
+/* ── Step card ─────────────────────────────────────── */
+.step-card { border-radius: var(--radius-lg); padding: 1.75rem; border-width: 1px; border-style: solid; text-align: center; }
+.step-num  { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 500; margin: 0 auto 14px; }
+.step-title{ font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.step-desc { font-size: 13px; line-height: 1.6; }
+
+/* ── App preview ───────────────────────────────────── */
+.app-preview  { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; max-width: 600px; margin: 0 auto; background: #fff; }
+.browser-bar  { background: #f5f2ec; border-bottom: 1px solid var(--border); padding: 7px 12px; display: flex; align-items: center; gap: 6px; }
+.browser-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.browser-url  { flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; font-size: 11px; color: var(--hint); margin: 0 8px; }
+
+/* Animal card components */
+.animal-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px; background: var(--bg); }
+.animal-card  { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.ac-header    { padding: 10px 12px; }
+.ac-photo     { width: 32px; height: 32px; border-radius: 50%; background: #e8e4dc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--hint); flex-shrink: 0; }
+.ac-name      { font-size: 12px; font-weight: 500; color: var(--dark); }
+.ac-id        { font-size: 10px; color: var(--hint); }
+.ac-gen-label { font-size: 10px; color: var(--hint); font-weight: 500; letter-spacing: .04em; margin-bottom: 5px; }
+.morph-tags   { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+.ac-actions   { display: flex; gap: 4px; }
+.ac-btn       { border: 1px solid var(--border); font-size: 9px; padding: 3px 7px; border-radius: 6px; color: #5a5650; background: #fff; cursor: pointer; }
+.ac-btn-del   { border: 1px solid var(--border); font-size: 9px; padding: 3px 7px; border-radius: 6px; color: #c03030; background: #fff; cursor: pointer; }
+.data-grid    { display: grid; grid-template-columns: 1fr 1fr; }
+.data-cell    { padding: 6px 8px; }
+.data-label   { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.data-val     { font-size: 9px; margin-top: 2px; color: var(--dark); }
+
+/* ── Toggle switch ─────────────────────────────────── */
+.toggle-row { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 14px; margin-bottom: 2rem; }
+.sw { position: relative; width: 40px; height: 20px; flex-shrink: 0; }
+.sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+.sw-track { position: absolute; inset: 0; background: #d4cfc4; border-radius: 10px; cursor: pointer; transition: background .2s; }
+.sw-track::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+.sw input:checked + .sw-track { background: var(--gold); }
+.sw input:checked + .sw-track::before { transform: translateX(20px); }
+
+/* ── Grid helpers ──────────────────────────────────── */
+.grid-2    { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.grid-3    { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
+
+/* ── Auth card ─────────────────────────────────────── */
+.auth-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 2rem;
+  width: 100%; max-width: 420px; margin: 0 auto;
+}
+
+/* ── Spin animation ────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin .8s linear infinite; }
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .section-title, .section-title-light { font-size: 20px; }
+  .hero-pills { display: none; }
+  .animal-grid { grid-template-columns: 1fr; }
+}

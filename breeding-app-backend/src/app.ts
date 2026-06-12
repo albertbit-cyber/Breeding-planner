@@ -19,6 +19,7 @@ import { mobileRoutes } from "./routes/mobileRoutes";
 import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
 import { familyTreeRoutes } from "./routes/familyTreeRoutes";
+import { reproductiveRoutes } from "./routes/reproductiveRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -98,6 +99,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
+app.use("/api/reproductive", reproductiveRoutes);
 
 app.use(errorHandler);
 

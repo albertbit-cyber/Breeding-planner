@@ -5,6 +5,10 @@ import './App.css';
 import './i18n/index.js';
 import App from './AppEntry.jsx';
 import reportWebVitals from './reportWebVitals';
+import { seedDemoUsersIfNeeded } from './features/lab/utils/seedDemoUser';
+
+// Seed demo users into localStorage for dev-mode login (no-op in production)
+seedDemoUsersIfNeeded();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,7 +17,4 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();

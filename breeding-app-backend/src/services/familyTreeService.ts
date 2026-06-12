@@ -87,7 +87,7 @@ function formatAnimal(animal: any): FamilyTreeAnimal {
     breederId:      animal.ownerId,
     breederName,
     currentOwnerId: animal.ownerId,
-    clutchId:       null,
+    clutchId:       (payload.clutchId as string) ?? null,
     hatchDate:      (payload.hatchDate as string) ?? null,
     status:         animal.status ?? (payload.status as string) ?? null,
     privacyLevel:   animal.privacyLevel ?? "private",
@@ -144,10 +144,17 @@ export async function listMyAnimals(userId: string): Promise<FamilyTreeAnimal[]>
  *   Gen +1  (direct offspring)
  */
 export async function getSnakePedigree(animalId: string, requesterId: string) {
-  const animal = await (prisma as any).animal.findUnique({
+  // Accept either the database UUID or the app-local appAnimalId (snake.id in the frontend)
+  let animal = await (prisma as any).animal.findUnique({
     where:   { id: animalId },
     include: animalWithOwner,
   });
+  if (!animal) {
+    animal = await (prisma as any).animal.findFirst({
+      where:   { appAnimalId: animalId, ownerId: requesterId },
+      include: animalWithOwner,
+    });
+  }
   if (!animal) throw new HttpError(404, "Animal not found");
 
   const selected = formatAnimal(animal);
@@ -314,10 +321,10 @@ export async function getMoreDescendants(animalId: string, depth: number, reques
  * Aggregate stats for the stats bar.
  * Counts are approximate — no expensive recursive queries.
  */
-export async function getTreeStats() {
+export async function getTreeStats(userId: string) {
   const [totalSnakes, totalClutches, totalBreeders, totalRelationships] = await Promise.all([
-    (prisma as any).animal.count(),
-    (prisma as any).clutch.count(),
+    (prisma as any).animal.count({ where: { ownerId: userId } }),
+    (prisma as any).clutch.count({ where: { ownerId: userId } }),
     (prisma as any).user.count({ where: { role: "breeder" } }),
     (prisma as any).parentRelationship.count(),
   ]);

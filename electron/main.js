@@ -154,6 +154,23 @@ if (gotSingleInstanceLock) {
 ipcMain.handle('app:load-data', () => loadData());
 ipcMain.handle('app:save-data', (_event, payload) => saveData(payload));
 ipcMain.handle('app:clear-data', () => clearData());
+ipcMain.handle('label-print:print-current-window', async (event) => {
+  const webContents = event.sender;
+  if (!webContents || webContents.isDestroyed()) {
+    return { success: false, error: 'Print window is no longer available.' };
+  }
+
+  return new Promise((resolve) => {
+    // The OS print dialog controls final printer selection and printer settings.
+    // Keep silent false so Electron never bypasses the user-facing system dialog.
+    webContents.print({
+      silent: false,
+      printBackground: true,
+    }, (success, failureReason) => {
+      resolve({ success, error: success ? null : failureReason || 'Print was cancelled or failed.' });
+    });
+  });
+});
 ipcMain.handle('i18n:get-language', async () => {
   await localeReady;
   return electronLocale.getLanguage();

@@ -18,7 +18,26 @@
       "Bash(findstr \"LISTENING\")",
       "Bash(findstr \":3000\\\\|:5173\\\\|:4000\\\\|:8080\\\\|:5000\\\\|:3001\\\\|:5174\")",
       "PowerShell(Stop-Process -Id 42260, 41764, 45844 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Set-Location \"d:\\\\Git Clone\\\\Breeding-planner\\\\server\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'd:\\\\Git Clone\\\\Breeding-planner\\\\server'; npm run dev\" -WindowStyle Normal)"
+      "PowerShell(Set-Location \"d:\\\\Git Clone\\\\Breeding-planner\\\\server\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'd:\\\\Git Clone\\\\Breeding-planner\\\\server'; npm run dev\" -WindowStyle Normal)",
+      "Read(//d/Git Clone/Brewing-planner/src/**)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\\\\src\" -Recurse -Include \"*.jsx\", \"*.js\", \"*.tsx\", \"*.ts\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(grep -E \"\\\\.\\(jsx|js|tsx|ts\\)$\")",
+      "Bash(grep -v \"//\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\\\\src\" -Name -Directory)",
+      "Bash(python3)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(findstr \":5173\")",
+      "Bash(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Id, CPU, StartTime, MainWindowTitle)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\")",
+      "PowerShell(Stop-Process -Id 27172 -Force)",
+      "Bash(npx tsx *)",
+      "Read(//c/Users/alber/AppData/Local/Temp/claude/d--Git-Clone-Brewing-planner/058e4f22-7250-4cb1-94f2-0bf9e4d97817/tasks/**)",
+      "PowerShell(Stop-Process -Id 26212 -Force)",
+      "Bash(findstr \":4000\")"
     ]
   }
 }
