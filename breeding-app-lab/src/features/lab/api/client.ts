@@ -1352,7 +1352,25 @@ export const createLabApiClient = () => {
 
   const createLabAvailableTest = async (input: CreateLabAvailableTestInput): Promise<LabAvailableTest> => {
     requireSessionRole("admin", "lab_staff");
-    return unsupported("Creating new catalog tests");
+    const payload: Record<string, unknown> = {
+      name: String(input.name || "").trim(),
+      category: input.category,
+      pricingType: input.pricingType,
+    };
+    if (input.shortLabel !== undefined) payload.shortLabel = String(input.shortLabel || "").trim() || null;
+    if (input.description !== undefined) payload.description = String(input.description || "").trim() || null;
+    if (input.geneTarget !== undefined) payload.geneTarget = String(input.geneTarget || "").trim() || null;
+    if (input.priceCents !== undefined) payload.priceCents = Number.isFinite(Number(input.priceCents)) ? Math.max(0, Math.round(Number(input.priceCents))) : null;
+    if (input.currency !== undefined) payload.currency = String(input.currency || "EUR").trim().toUpperCase() || "EUR";
+    if (input.allowedPriorities !== undefined) payload.allowedPriorities = normalizeAllowedPriorities(input.allowedPriorities);
+    if (input.sortOrder !== undefined) payload.sortOrder = Math.max(0, Math.round(Number(input.sortOrder) || 0));
+    if (input.isActive !== undefined) payload.active = Boolean(input.isActive);
+    if (input.isVisibleToBreeder !== undefined) payload.visibleInBreederApp = Boolean(input.isVisibleToBreeder);
+    const response = await apiRequest<{ test: any }>("/lab/tests/catalog", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return toLabAvailableTestRecord(response?.test || null);
   };
 
   const updateLabAvailableTest = async (input: UpdateLabAvailableTestInput): Promise<LabAvailableTest> => {

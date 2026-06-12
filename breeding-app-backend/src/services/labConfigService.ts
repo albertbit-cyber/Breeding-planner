@@ -58,6 +58,48 @@ export const listCatalog = async (breederView = false) => {
   });
 };
 
+export const createCatalogItem = async (body: {
+  name?: string;
+  shortLabel?: string | null;
+  geneTarget?: string | null;
+  category?: string;
+  pricingType?: TestPricingTypeValue;
+  priceCents?: number | null;
+  currency?: string;
+  allowedPriorities?: string[];
+  active?: boolean;
+  visibleInBreederApp?: boolean;
+  description?: string | null;
+  sortOrder?: number;
+}) => {
+  const name = String(body.name || "").trim();
+  if (!name) throw new HttpError(400, "Test name is required.");
+
+  const toCode = (s: string) =>
+    s.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "TEST";
+  const pricingType = normalizePricingType(body.pricingType);
+  const category = normalizeCategory(body.category, pricingType === "sex" ? "sex-determination" : "morph");
+  const id = `morph-${toCode(name).toLowerCase()}-${Date.now()}`;
+
+  return prisma.shedTestCatalog.create({
+    data: {
+      id,
+      name,
+      shortLabel: normalizeOptionalText(body.shortLabel) ?? name,
+      geneTarget: normalizeOptionalText(body.geneTarget),
+      category,
+      pricingType,
+      priceCents: typeof body.priceCents === "number" ? Math.max(0, Math.round(body.priceCents)) : null,
+      currency: String(body.currency || "EUR").trim().toUpperCase() || "EUR",
+      allowedPriorities: normalizeAllowedPriorities(body.allowedPriorities) ?? ["routine", "priority", "urgent"],
+      active: body.active !== false,
+      visibleInBreederApp: body.visibleInBreederApp !== false,
+      description: normalizeOptionalText(body.description),
+      sortOrder: typeof body.sortOrder === "number" ? Math.max(0, Math.round(body.sortOrder)) : 0,
+    },
+  });
+};
+
 export const getActivePricing = async () => {
   const pricing = await prisma.pricingConfig.findFirst({
     where: { isActive: true },

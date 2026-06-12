@@ -1,10 +1,15 @@
 import type { Request, Response } from "express";
-import { getActivePricing, listCatalog, updateCatalogItem, updatePricingConfig } from "../services/labConfigService";
+import { createCatalogItem, getActivePricing, listCatalog, updateCatalogItem, updatePricingConfig } from "../services/labConfigService";
 
 export const getCatalog = async (req: Request, res: Response): Promise<void> => {
   const breederView = String(req.query.breederView || "").toLowerCase() === "true";
   const tests = await listCatalog(breederView);
   res.status(200).json({ tests });
+};
+
+export const postCatalogItem = async (req: Request, res: Response): Promise<void> => {
+  const item = await createCatalogItem(req.body || {});
+  res.status(201).json({ test: item });
 };
 
 export const patchCatalogItem = async (req: Request, res: Response): Promise<void> => {
