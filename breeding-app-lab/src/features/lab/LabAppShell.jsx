@@ -130,6 +130,7 @@ const parseRoute = (path) => {
   if (normalized === "/lab/shed-tests") return { route: "/lab/incoming-orders" };
   if (normalized === "/lab/incoming-orders") return { route: "/lab/incoming-orders" };
   if (normalized === "/admin/shed-tests") return { route: "/lab/incoming-orders" };
+  if (normalized === "/admin" || normalized === "/admin/") return { route: "/lab/admin-oversight" };
   if (normalized === "/lab/sample-intake") return { route: "/lab/sample-intake" };
   if (normalized === "/lab/result-entry") return { route: "/lab/result-entry" };
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
