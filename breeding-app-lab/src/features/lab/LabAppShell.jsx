@@ -223,6 +223,17 @@ const pageForRoute = (parsedRoute, role) => {
   }
 };
 
+const getLabUserName = () => {
+  try {
+    const raw = localStorage.getItem("breedingPlannerLabAuthSession");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.profile?.displayName || parsed?.profile?.fullName || null;
+  } catch {
+    return null;
+  }
+};
+
 export default function LabAppShell() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
 
@@ -288,7 +299,7 @@ export default function LabAppShell() {
             <div className="text-xs uppercase tracking-wide text-neutral-500">ProHerper</div>
             <div className="text-lg font-semibold text-neutral-900">Laboratory</div>
           </div>
-          <nav className="mt-2 space-y-1">
+          <nav className="mt-2 flex flex-col gap-1">
             {isDevEnv && (
             <button
               type="button"
@@ -322,6 +333,20 @@ export default function LabAppShell() {
                 </button>
               );
             })}
+            <div className="mt-3 border-t border-neutral-200 pt-3">
+              {getLabUserName() ? (
+                <div className="mb-2 px-1 text-xs text-neutral-500 truncate">
+                  Signed in as <span className="font-medium text-neutral-700">{getLabUserName()}</span>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("lab:logout"))}
+                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+              >
+                Sign Out
+              </button>
+            </div>
           </nav>
         </aside>
 

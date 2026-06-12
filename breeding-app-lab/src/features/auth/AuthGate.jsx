@@ -584,6 +584,14 @@ export default function AuthGate({ children }) {
     setRegistrationData(createDefaultRegistrationData());
   }, [authScope, persistAuth]);
 
+  // Allow the lab shell to trigger logout via a custom event (avoids prop-drilling).
+  useEffect(() => {
+    if (authScope !== "lab") return;
+    const handler = () => handleLogout();
+    window.addEventListener("lab:logout", handler);
+    return () => window.removeEventListener("lab:logout", handler);
+  }, [authScope, handleLogout]);
+
   useEffect(() => {
     if (!authState.isAuthenticated || snapshot.state !== "unauthorized") {
       return;
@@ -1144,7 +1152,7 @@ export default function AuthGate({ children }) {
   return (
     <div className="auth-shell">
       <div className={`auth-shell__app ${overlayActive ? "is-blurred" : ""}`}>
-        {authState.isAuthenticated && signedInChip}
+        {authState.isAuthenticated && authScope !== "lab" && signedInChip}
         {children}
       </div>
       {overlayActive && (

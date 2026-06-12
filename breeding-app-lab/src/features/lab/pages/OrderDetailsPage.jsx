@@ -283,14 +283,42 @@ export default function OrderDetailsPage({ orderId }) {
     }
   };
 
+  // Workflow step indicator
+  const WORKFLOW_STEPS = [
+    { key: "submitted", label: "Submitted" },
+    { key: "payment", label: "Payment" },
+    { key: "intake", label: "Sample Intake" },
+    { key: "testing", label: "Testing" },
+    { key: "results", label: "Results" },
+    { key: "completed", label: "Certificate" },
+  ];
+
+  const getActiveStep = (status) => {
+    if (!status) return 0;
+    if (status === "completed") return 5;
+    if (status === "in_progress" || status === "testing") return 3;
+    if (status === "received" || status === "sample_received" || status === "intake_approved") return 2;
+    if (status === "pending_payment" || status === "awaiting_payment") return 1;
+    if (status === "cancelled") return -1;
+    return 0;
+  };
+
+  const activeStep = getActiveStep(order?.status);
+
   return (
     <section className="space-y-4">
+      {/* Header */}
       <header className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">Shed Test Order Details</h1>
-            <p className="mt-1 text-sm text-neutral-600">Operational order view for intake, testing progression, and timeline review.</p>
-            <div className="mt-2 text-xs font-mono text-neutral-500">Order route ID: {normalizedOrderId || "(missing)"}</div>
+            <h1 className="text-2xl font-semibold text-neutral-900">Order Details</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {order ? <StatusBadge status={order.status} /> : null}
+              {order ? <PaymentBadge paymentStatus={paymentStatus} /> : null}
+              {order?.orderNumber ? (
+                <span className="text-sm text-neutral-500">#{order.orderNumber}</span>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {order?.status === "completed" ? (
@@ -315,6 +343,29 @@ export default function OrderDetailsPage({ orderId }) {
             ) : null}
           </div>
         </div>
+
+        {/* Workflow progress bar */}
+        {order && activeStep >= 0 ? (
+          <div className="mt-4 flex items-center gap-1 overflow-x-auto pb-1">
+            {WORKFLOW_STEPS.map((step, idx) => (
+              <React.Fragment key={step.key}>
+                <div className={`flex shrink-0 flex-col items-center gap-1 ${idx <= activeStep ? "text-neutral-900" : "text-neutral-400"}`}>
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                    idx < activeStep ? "bg-emerald-500 text-white" :
+                    idx === activeStep ? "bg-neutral-900 text-white" :
+                    "bg-neutral-100 text-neutral-400"
+                  }`}>
+                    {idx < activeStep ? "✓" : idx + 1}
+                  </div>
+                  <span className="text-xs whitespace-nowrap">{step.label}</span>
+                </div>
+                {idx < WORKFLOW_STEPS.length - 1 ? (
+                  <div className={`h-0.5 flex-1 rounded ${idx < activeStep ? "bg-emerald-400" : "bg-neutral-200"}`} />
+                ) : null}
+              </React.Fragment>
+            ))}
+          </div>
+        ) : null}
       </header>
 
       {loading ? (
@@ -331,25 +382,21 @@ export default function OrderDetailsPage({ orderId }) {
 
       {!loading && !error && order ? (
         <>
+          {/* Step 1 — Order Submission & Breeder */}
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-neutral-900">Order Overview</h2>
-              <dl className="mt-3 grid gap-2 text-sm text-neutral-700">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">1</span>
+                <h2 className="text-base font-semibold text-neutral-900">Order Submission</h2>
+              </div>
+              <dl className="grid gap-2 text-sm text-neutral-700">
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-neutral-500">Order Number</dt>
                   <dd>{order.orderNumber || "-"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Internal Order ID</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Internal ID</dt>
                   <dd className="font-mono text-xs">{order.id}</dd>
-                </div>
-                <div className="flex items-center gap-2">
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Workflow Status</dt>
-                  <dd><StatusBadge status={order.status} /></dd>
-                </div>
-                <div className="flex items-center gap-2">
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Status</dt>
-                  <dd><PaymentBadge paymentStatus={paymentStatus} /></dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-neutral-500">Submitted</dt>
@@ -363,33 +410,32 @@ export default function OrderDetailsPage({ orderId }) {
             </section>
 
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-neutral-900">Snake & Breeder</h2>
-              <dl className="mt-3 grid gap-2 text-sm text-neutral-700">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-200 text-xs font-semibold text-neutral-600">→</span>
+                <h2 className="text-base font-semibold text-neutral-900">Snake & Breeder</h2>
+              </div>
+              <dl className="grid gap-2 text-sm text-neutral-700">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Snake</dt>
-                  <dd>{order.animalId || "-"} <span className="text-xs text-neutral-500">(shared backend)</span></dd>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Animal ID</dt>
+                  <dd>{order.animalId || "-"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Snake Code</dt>
-                  <dd>-</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Breeder</dt>
-                  <dd>{order.breederUserId || order.requestedByUserId || "-"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Breeder Contact Key</dt>
-                  <dd>{order.requestedByUserId || order.breederUserId || "-"}</dd>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Breeder User ID</dt>
+                  <dd className="font-mono text-xs">{order.breederUserId || order.requestedByUserId || "-"}</dd>
                 </div>
               </dl>
             </section>
           </div>
 
-          {/* Payment section — lab/admin only */}
+          {/* Step 2 — Payment */}
           {isLabOrAdmin ? (
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-neutral-900">Payment</h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">2</span>
+                  <h2 className="text-base font-semibold text-neutral-900">Payment</h2>
+                  <PaymentBadge paymentStatus={paymentStatus} />
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {paymentStatus !== "paid" && paymentStatus !== "manually_approved" ? (
                     <button
@@ -413,11 +459,7 @@ export default function OrderDetailsPage({ orderId }) {
                   ) : null}
                 </div>
               </div>
-              <dl className="mt-3 grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Status</dt>
-                  <dd><PaymentBadge paymentStatus={paymentStatus} /></dd>
-                </div>
+              <dl className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Requested</dt>
                   <dd>{formatDateTime(order.paymentRequestedAt)}</dd>
@@ -439,84 +481,98 @@ export default function OrderDetailsPage({ orderId }) {
             </section>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-neutral-900">Sample & Intake Details</h2>
-              <dl className="mt-3 grid gap-2 text-sm text-neutral-700">
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample IDs</dt>
-                  <dd>{(order.sampleIds || []).length ? order.sampleIds.join(", ") : "No sample IDs linked yet."}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">QR Token</dt>
-                  <dd className="font-mono text-xs break-all">{sampleQrToken || "Token available once sample lookup resolves."}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Received At</dt>
-                  <dd>{formatDateTime(intakeInfo.receivedAt)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Approved At</dt>
-                  <dd>{formatDateTime(intakeInfo.approvedAt)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Condition</dt>
-                  <dd>{intakeInfo.condition || "-"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Notes</dt>
-                  <dd>{intakeInfo.notes || "No intake notes captured yet."}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-neutral-900">Workflow Actions</h2>
-              <p className="mt-1 text-xs text-neutral-600">
-                Shared backend mode persists the hosted workflow stages only: sample received, testing in progress, completed, and cancelled.
-              </p>
-
-              <label className="mt-3 block text-sm">
-                <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Action Note / Reason</span>
-                <input
-                  className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                  value={actionReason}
-                  onChange={(event) => setActionReason(event.target.value)}
-                  placeholder="Optional transition note"
-                />
-              </label>
-
-              {actionError ? (
-                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{actionError}</div>
-              ) : null}
-
-              <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-                Payment status changes and persisted lab result records are not exposed by the shared backend yet. Use the workflow buttons below for the hosted status path.
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {nextStatuses.length ? nextStatuses.map((nextStatus) => (
-                  <button
-                    key={nextStatus}
-                    type="button"
-                    disabled={Boolean(actionLoading)}
-                    className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => handleAdvanceStatus(nextStatus)}
-                  >
-                    {actionLoading === nextStatus
-                      ? "Updating..."
-                      : `Set ${ORDER_STATUS_LABELS[nextStatus] || nextStatus}`}
-                  </button>
-                )) : (
-                  <div className="text-sm text-neutral-500">No further workflow actions available from current status.</div>
-                )}
-              </div>
-            </section>
-          </div>
-
+          {/* Step 3 — Sample Intake */}
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-neutral-900">Test Results & Certificate</h2>
-            <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">3</span>
+              <h2 className="text-base font-semibold text-neutral-900">Sample Intake</h2>
+            </div>
+            <dl className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample IDs</dt>
+                <dd>{(order.sampleIds || []).length ? order.sampleIds.join(", ") : "No sample IDs linked yet."}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">QR Token</dt>
+                <dd className="break-all font-mono text-xs">{sampleQrToken || "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Received</dt>
+                <dd>{formatDateTime(intakeInfo.receivedAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Approved</dt>
+                <dd>{formatDateTime(intakeInfo.approvedAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Condition</dt>
+                <dd>{intakeInfo.condition || "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Notes</dt>
+                <dd>{intakeInfo.notes || "-"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          {/* Step 4 — Testing / Workflow Actions */}
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">4</span>
+              <h2 className="text-base font-semibold text-neutral-900">Testing & Workflow</h2>
+            </div>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Transition Note (optional)</span>
+              <input
+                className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+                value={actionReason}
+                onChange={(event) => setActionReason(event.target.value)}
+                placeholder="Add a note before advancing the status"
+              />
+            </label>
+            {actionError ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{actionError}</div>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {nextStatuses.length ? nextStatuses.map((nextStatus) => (
+                <button
+                  key={nextStatus}
+                  type="button"
+                  disabled={Boolean(actionLoading)}
+                  className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => handleAdvanceStatus(nextStatus)}
+                >
+                  {actionLoading === nextStatus
+                    ? "Updating..."
+                    : `→ ${ORDER_STATUS_LABELS[nextStatus] || nextStatus}`}
+                </button>
+              )) : (
+                <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500">
+                  No further actions available for the current status.
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Step 5 — Enter Results (lab staff only, when eligible) */}
+          {canEnterResults ? (
+            <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-700 text-xs font-semibold text-white">5</span>
+                <h2 className="text-base font-semibold text-sky-900">Enter Results</h2>
+              </div>
+              <p className="mb-4 text-sm text-sky-700">Record gene findings for this order. Save a draft to work in stages, or submit to finalise and notify the breeder.</p>
+              <InlineResultEntry orderId={order.id} onSaved={loadAll} />
+            </section>
+          ) : null}
+
+          {/* Step 6 — Results & Certificate */}
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">6</span>
+              <h2 className="text-base font-semibold text-neutral-900">Results & Certificate</h2>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-2">
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                 <div className="text-xs uppercase tracking-wide text-neutral-500">Latest Result</div>
                 {orderOutcome?.latestResult ? (
@@ -577,10 +633,10 @@ export default function OrderDetailsPage({ orderId }) {
               </div>
             </div>
 
-            <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-neutral-500">Result History</div>
-              {(orderOutcome?.resultHistory || []).length ? (
-                <ul className="mt-2 space-y-1 text-sm text-neutral-700">
+            {(orderOutcome?.resultHistory || []).length > 0 ? (
+              <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                <div className="mb-2 text-xs uppercase tracking-wide text-neutral-500">Result History</div>
+                <ul className="space-y-1 text-sm text-neutral-700">
                   {orderOutcome.resultHistory.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-neutral-200 bg-white px-2 py-1">
                       <span className="font-medium">
@@ -594,47 +650,83 @@ export default function OrderDetailsPage({ orderId }) {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <div className="mt-1 text-sm text-neutral-600">No result history entries yet.</div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </section>
 
+          {/* Status History Timeline */}
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-neutral-900">Status History Timeline</h2>
+            <h2 className="mb-3 text-base font-semibold text-neutral-900">Status History</h2>
             {!history.length ? (
-              <div className="mt-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600">
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600">
                 No status history entries yet.
               </div>
             ) : (
-              <ol className="mt-3 space-y-2">
+              <ol className="space-y-2">
                 {history.map((entry) => (
                   <li key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={entry.toStatus} />
                       <span className="text-xs text-neutral-500">{formatDateTime(entry.changedAt)}</span>
                     </div>
-                    <div className="mt-1 text-neutral-700">
-                      {entry.fromStatus ? `From ${entry.fromStatus} -> ` : ""}
-                      <span className="font-medium">{entry.toStatus}</span>
-                    </div>
-                    {entry.reason ? <div className="mt-1 text-xs text-neutral-600">Reason: {entry.reason}</div> : null}
-                    {entry.changedByUserId ? <div className="mt-1 text-xs text-neutral-500">By: {entry.changedByUserId}</div> : null}
+                    {entry.fromStatus ? (
+                      <div className="mt-1 text-xs text-neutral-500">{entry.fromStatus} → {entry.toStatus}</div>
+                    ) : null}
+                    {entry.reason ? <div className="mt-1 text-xs text-neutral-600">Note: {entry.reason}</div> : null}
+                    {entry.changedByUserId ? <div className="mt-1 text-xs text-neutral-400">By: {entry.changedByUserId}</div> : null}
                   </li>
                 ))}
               </ol>
             )}
           </section>
+        </>
+      ) : null}
+    </section>
+  );
+}
 
-          {canEnterResults ? (
-            <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-sky-900">Enter Results</h2>
-              <p className="mt-1 text-sm text-sky-700">Enter gene results for this order. Save a draft to work in stages, or submit to finalise and notify the breeder.</p>
-              <div className="mt-4">
-                <InlineResultEntry orderId={order.id} onSaved={loadAll} />
+      ) : null}
+    </section>
+  );
+}r(
+                          entry.testCode,
+                          `${order.id}:${entry.id}`,
+                          entry.reportedAt || entry.releasedAt || entry.reviewedAt
+                        )}
+                      </span>
+                      <span className="text-xs text-neutral-500"> ({entry.status})</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </section>
-          ) : null}
+            ) : null}
+          </section>
+
+          {/* Status History Timeline */}
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-neutral-900">Status History</h2>
+            {!history.length ? (
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600">
+                No status history entries yet.
+              </div>
+            ) : (
+              <ol className="space-y-2">
+                {history.map((entry) => (
+                  <li key={entry.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={entry.toStatus} />
+                      <span className="text-xs text-neutral-500">{formatDateTime(entry.changedAt)}</span>
+                    </div>
+                    {entry.fromStatus ? (
+                      <div className="mt-1 text-xs text-neutral-500">{entry.fromStatus} → {entry.toStatus}</div>
+                    ) : null}
+                    {entry.reason ? <div className="mt-1 text-xs text-neutral-600">Note: {entry.reason}</div> : null}
+                    {entry.changedByUserId ? <div className="mt-1 text-xs text-neutral-400">By: {entry.changedByUserId}</div> : null}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </>
       ) : null}
     </section>
