@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -90,7 +91,7 @@ const disableCodeSplitting = process.env.ELECTRON_BUILD === "true";
 
 export default defineConfig({
   base,
-  plugins: [patchImportMetaEnv(), react(), networkUrlLogger()],
+  plugins: [tailwindcss(), patchImportMetaEnv(), react(), networkUrlLogger()],
   test: {
     exclude: [
       "**/node_modules/**",
