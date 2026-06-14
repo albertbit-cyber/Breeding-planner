@@ -1192,7 +1192,4 @@ export default function AuthGate({ children }) {
     </div>
   );
 }
-   </div>
-  );
-}
 
