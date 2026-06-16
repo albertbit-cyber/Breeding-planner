@@ -26,8 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: breeding-app-marketplace/package-lock.json
 
       - name: Install marketplace dependencies
         run: npm ci
