@@ -5786,6 +5786,8 @@ export default function BreedingPlannerApp() {
     return loadStoredPairingsForBrowser();
   });
   const [tab, setTab] = useState('animals');
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [pairingsView, setPairingsView] = useState('dashboard');
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
   const [animalView, setAnimalView] = useState('all');
@@ -7758,7 +7760,18 @@ export default function BreedingPlannerApp() {
   const animalsCardTitle = (
     <div className="flex flex-col items-center gap-2 w-full">
       <span className="text-base font-semibold">{`${activeAnimalLabel} (${activeAnimalList.length})`}</span>
-      <GeneLegend />
+      <div className="bp-genetics-legend">
+        <GeneLegend />
+      </div>
+      <button type="button" className="bp-genetics-legend-toggle" onClick={() => {
+        const panel = document.getElementById('bp-legend-tooltip');
+        if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
+      }}>
+        ? Gene colors
+      </button>
+      <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)'}}>
+        <GeneLegend />
+      </div>
     </div>
   );
 
@@ -9013,8 +9026,8 @@ export default function BreedingPlannerApp() {
       style={{ ...appRootStyle, '--breeder-logo-bg': breederLogoBackground }}
     >
       {appDialogOverlay}
-      {/* header */}
-      <div className="px-5 py-4 border-b bg-white sticky top-0 z-10">
+      {/* Desktop header — hidden on mobile via CSS */}
+      <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -9055,7 +9068,7 @@ export default function BreedingPlannerApp() {
                       aria-label={t("filters.clear", { defaultValue: "Clear" })}
                       title={t("filters.clear", { defaultValue: "Clear" })}
                     >
-                      x
+                      ✕
                     </button>
                   ) : null}
                 </div>
@@ -9065,12 +9078,89 @@ export default function BreedingPlannerApp() {
         </div>
       </div>
 
+      {/* Mobile header — shown only on mobile via CSS */}
+      <div className="bp-header-mobile">
+        <div className="bp-header-mobile__top">
+          {breederInfo.logoUrl ? (
+            <img src={breederInfo.logoUrl} alt="logo" className="bp-header-mobile__logo" />
+          ) : (
+            <div className="bp-header-mobile__logo-placeholder">BP</div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="bp-header-mobile__title">{t("app.title")}</div>
+            {(breederInfo.businessName || breederInfo.name) && (
+              <div className="bp-header-mobile__subtitle">
+                {breederInfo.businessName || breederInfo.name}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="bp-header-mobile__search">
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={t("header.search")}
+          />
+        </div>
+      </div>
+
+      {/* Mobile bottom navigation — shown only on mobile via CSS */}
+      <nav className="bp-mobile-bottom-nav">
+        <div className="bp-mobile-bottom-nav__items">
+          {[
+            { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }) },
+            { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
+            { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
+            { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }) },
+            { key: '__more', icon: '☰', label: 'More' },
+          ].map(({ key, icon, label }) => (
+            <button
+              key={key}
+              type="button"
+              className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
+              onClick={() => {
+                if (key === '__more') { setMobileMoreOpen(prev => !prev); }
+                else { setTab(key); setMobileMoreOpen(false); }
+              }}
+            >
+              <span className="bp-mobile-bottom-nav__icon">{icon}</span>
+              <span className="bp-mobile-bottom-nav__label">{label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* More menu overlay */}
+      {mobileMoreOpen && (
+        <div className="bp-more-menu">
+          <div className="bp-more-menu__backdrop" onClick={() => setMobileMoreOpen(false)} />
+          <div className="bp-more-menu__panel">
+            {[
+              { key: 'advisor', icon: '🧠', label: t("nav.advisor", { defaultValue: "Breeding Advisor" }) },
+              { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
+              { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
+              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminal", { defaultValue: "Shed Test" }) },
+            ].map(({ key, icon, label }) => (
+              <button
+                key={key}
+                type="button"
+                className="bp-more-menu__btn"
+                onClick={() => { setTab(key); setMobileMoreOpen(false); }}
+              >
+                <span className="bp-more-menu__btn-icon">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* body */}
       <div className="max-w-7xl mx-auto p-5">
         {tab === "animals" && (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="bp-toolbar flex flex-wrap items-center gap-2">
+              <div className="bp-filter-tabs flex flex-wrap items-center gap-2">
                 <TabButton theme={theme} active={animalView === "all"} onClick={()=>handleAnimalViewTabChange("all")}>{t("filters.all")}</TabButton>
                 <TabButton theme={theme} active={animalView === "males"} onClick={()=>handleAnimalViewTabChange("males")}>{t("filters.males")}</TabButton>
                 <TabButton theme={theme} active={animalView === "females"} onClick={()=>handleAnimalViewTabChange("females")}>{t("filters.females")}</TabButton>
@@ -9124,7 +9214,17 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
               )}
-              <div className="ml-auto flex flex-wrap items-center gap-2">
+              {/* Mobile FAB for Add Animal — only visible via CSS on mobile */}
+              <button
+                type="button"
+                className="bp-fab"
+                onClick={() => { setNewAnimal(createEmptyNewAnimalDraft()); setShowAddModal(true); }}
+                aria-label={t("actions.addAnimal")}
+                title={t("actions.addAnimal")}
+              >
+                +
+              </button>
+              <div className="ml-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
                 {isAnimalScannerView && (
                   <div
                     className={cx(
@@ -9272,15 +9372,134 @@ export default function BreedingPlannerApp() {
                     )}
                   </div>
                 </div>
-                <GroupCheckboxes
-                  groups={groups}
-                  showGroups={showGroups}
-                  setShowGroups={setShowGroups}
-                  hiddenGroups={hiddenGroups}
-                  setHiddenGroups={setHiddenGroups}
-                  showUnassigned={showUnassigned}
-                  setShowUnassigned={setShowUnassigned}
-                />
+                {/* Desktop group checkboxes — hidden on mobile */}
+                <div className="bp-group-filters-desktop">
+                  <GroupCheckboxes
+                    groups={groups}
+                    showGroups={showGroups}
+                    setShowGroups={setShowGroups}
+                    hiddenGroups={hiddenGroups}
+                    setHiddenGroups={setHiddenGroups}
+                    showUnassigned={showUnassigned}
+                    setShowUnassigned={setShowUnassigned}
+                  />
+                </div>
+                {/* Mobile: filter sheet trigger + active chip row */}
+                {(() => {
+                  const mobileFilterCount = (showGroups || []).length + (selectedStatusTags || []).length + (!showUnassigned ? 1 : 0);
+                  return (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          className={cx('bp-filter-sheet-trigger', mobileFilterCount > 0 ? 'has-filters' : '')}
+                          onClick={() => setFilterSheetOpen(true)}
+                        >
+                          ⚙ {t("filters.filters", { defaultValue: "Filters" })}
+                          {mobileFilterCount > 0 && <span className="bp-filter-badge">{mobileFilterCount}</span>}
+                        </button>
+                      </div>
+                      {mobileFilterCount > 0 && (
+                        <div className="bp-active-filters mb-2">
+                          {(showGroups || []).map(g => (
+                            <button
+                              key={g}
+                              type="button"
+                              className="bp-active-filter-chip"
+                              onClick={() => setShowGroups(prev => (prev || []).filter(x => x !== g))}
+                            >
+                              {g} <span className="bp-active-filter-chip__remove">✕</span>
+                            </button>
+                          ))}
+                          {(selectedStatusTags || []).map(tag => (
+                            <button
+                              key={tag}
+                              type="button"
+                              className="bp-active-filter-chip"
+                              onClick={() => toggleStatusTagFilter(tag)}
+                            >
+                              {tag} <span className="bp-active-filter-chip__remove">✕</span>
+                            </button>
+                          ))}
+                          {!showUnassigned && (
+                            <button
+                              type="button"
+                              className="bp-active-filter-chip"
+                              onClick={() => setShowUnassigned(true)}
+                            >
+                              {t("filters.hideUnassigned")} <span className="bp-active-filter-chip__remove">✕</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                {/* Mobile filter bottom sheet */}
+                {filterSheetOpen && (
+                  <div className="bp-filter-sheet">
+                    <div className="bp-filter-sheet__backdrop" onClick={() => setFilterSheetOpen(false)} />
+                    <div className="bp-filter-sheet__panel">
+                      <div className="bp-filter-sheet__handle" />
+                      <div className="bp-filter-sheet__title">{t("filters.filters", { defaultValue: "Filters" })}</div>
+                      {groups.length > 0 && (
+                        <>
+                          <div className="bp-filter-sheet__section-title">{t("filters.groups", { defaultValue: "Groups" })}</div>
+                          <div className="bp-filter-sheet__chips">
+                            {groups.map(g => {
+                              const active = (showGroups || []).includes(g);
+                              return (
+                                <button
+                                  key={g}
+                                  type="button"
+                                  className={cx('bp-filter-sheet__chip', active ? 'is-active' : '')}
+                                  onClick={() => setShowGroups(prev => {
+                                    const next = new Set(prev || []);
+                                    if (next.has(g)) { next.delete(g); } else { next.add(g); }
+                                    return [...next];
+                                  })}
+                                >
+                                  {g}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                      <div className="bp-filter-sheet__section-title">{t("filters.other", { defaultValue: "Other" })}</div>
+                      <div className="bp-filter-sheet__chips">
+                        <button
+                          type="button"
+                          className={cx('bp-filter-sheet__chip', !showUnassigned ? 'is-active' : '')}
+                          onClick={() => setShowUnassigned(prev => !prev)}
+                        >
+                          {t("filters.hideUnassigned")}
+                        </button>
+                      </div>
+                      <div className="bp-filter-sheet__actions">
+                        <button
+                          type="button"
+                          className="bp-filter-sheet__btn-clear"
+                          onClick={() => {
+                            setShowGroups([]);
+                            setHiddenGroups([]);
+                            setShowUnassigned(true);
+                            clearStatusTagFilters?.();
+                          }}
+                        >
+                          {t("filters.clear")}
+                        </button>
+                        <button
+                          type="button"
+                          className="bp-filter-sheet__btn-apply"
+                          onClick={() => setFilterSheetOpen(false)}
+                        >
+                          {t("filters.apply", { defaultValue: "Apply" })}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {animalLayout === 'list' ? (
                   activeAnimalList.length ? (
                     <SnakeListTable
@@ -9298,7 +9517,7 @@ export default function BreedingPlannerApp() {
                   )
                 ) : (
                   <>
-                    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div className="bp-cards-grid grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       {activeAnimalList.map(s => (
                         <SnakeCard
                           key={s.id}
@@ -13356,6 +13575,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
   const hasFamilyTree = typeof onOpenFamilyTree === "function";
   const hasDelete = typeof onDelete === "function";
   const [showPairingsModal, setShowPairingsModal] = useState(false);
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  const overflowMenuRef = useRef(null);
   const [quickTagOpen, setQuickTagOpen] = useState(null);
   const [quickDraft, setQuickDraft] = useState({
     date: localYMD(new Date()),
@@ -13570,7 +13791,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
     closeQuickAdd();
   }
   return (
-  <div ref={cardRef} className="relative bg-white border rounded-xl p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
+  <div ref={cardRef} className="bp-snake-card relative bg-white border rounded-xl p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
       <div className="flex items-start gap-3">
         {/* thumbnail top-left */}
         <div className="flex-shrink-0">
@@ -13614,35 +13835,50 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-center gap-2">
+      <div className="bp-card-actions flex items-center gap-2">
         {hasEdit && (
-          <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => onEdit(s)}>
+          <button className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onEdit(s)}>
             {t("actions.edit", { defaultValue: "Edit" })}
           </button>
         )}
         {hasQuick && (
-          <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => onQuickPair(s)}>
+          <button className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onQuickPair(s)}>
             {t("actions.pair", { defaultValue: "Pair" })}
           </button>
         )}
-        {hasFamilyTree && (
-          <button className="text-[11px] px-2 py-0.5 border rounded-lg" onClick={() => onOpenFamilyTree(s)}>
-            {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
-          </button>
-        )}
-        {hasDelete && (
-          <button
-            className="text-[11px] px-2 py-0.5 border rounded-lg text-rose-600"
-            onClick={() => onDelete(s)}
-            title="Delete snake"
-          >
-            {t("actions.delete")}
-          </button>
-        )}
         {isForSale && (
-          <span className="ml-auto text-[11px] font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-0.5">
+          <span className="text-[11px] font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-0.5">
             For Sale
           </span>
+        )}
+        {(hasFamilyTree || hasDelete) && (
+          <div className="relative ml-auto" ref={overflowMenuRef}>
+            <button
+              className="bp-card-overflow-btn bp-card-btn-primary text-[11px] px-2.5 py-1.5 border rounded-lg font-bold text-neutral-500 hover:bg-neutral-50 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(prev => !prev); }}
+              title="More actions"
+              aria-label="More actions"
+            >
+              ⋮
+            </button>
+            {overflowMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
+                <div className="bp-overflow-menu z-[150]">
+                  {hasFamilyTree && (
+                    <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
+                      🌳 {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                    </button>
+                  )}
+                  {hasDelete && (
+                    <button className="bp-overflow-menu__item bp-overflow-menu__item--danger" onClick={() => { setOverflowMenuOpen(false); onDelete(s); }}>
+                      🗑 {t("actions.delete")}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -13660,6 +13896,17 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           const lastMed = logs.meds && logs.meds.length ? logs.meds[logs.meds.length-1] : null;
           const groupsArr = s.groups || [];
 
+          const hasAnyActivityData = lastFeed || lastWeight || lastCleaning || lastShed || lastMed;
+          if (!hasAnyActivityData && !groupsArr.length) {
+            return (
+              <div className="col-span-2">
+                <div className="bp-no-logs-hint">
+                  {t("logs.noLogsYet", { defaultValue: "No activity logged yet — tap Edit to add records" })}
+                </div>
+              </div>
+            );
+          }
+
           const ordered = [
             { key: 'feeds', entry: lastFeed },
             { key: 'weights', entry: lastWeight },
@@ -13667,7 +13914,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             { key: 'sheds', entry: lastShed },
             { key: 'meds', entry: lastMed },
             { key: 'groups', groups: groupsArr }
-          ];
+          ].filter(a => a.entry != null || (a.groups && a.groups.length > 0));
 
           return ordered.map(a => {
             const k = a.key;
@@ -13922,8 +14169,8 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         </div>
       )}
       
-      {/* single-group selector (smaller; limited to ~3 lines) */}
-      <div className="mt-2">
+      {/* single-group selector: hidden on mobile — use Edit modal instead */}
+      <div className="bp-group-assignment mt-2">
         <div className="text-xs text-neutral-500 mb-1">{t("snakeEdit.assignGroup", { defaultValue: "Assign group" })}</div>
   <div className="flex flex-wrap gap-2 text-[11px]">
           {groups.map(g => (

@@ -2835,3 +2835,625 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ================================================================
+   BREEDER APP — MOBILE RESPONSIVE OVERRIDES
+   Applied on screens ≤ 768px (phone portrait + small tablets)
+   ================================================================ */
+
+/* ── Auth floating chip ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .auth-floating-chip {
+    display: none; /* hidden on mobile — sign-out lives in Settings */
+  }
+}
+
+/* ── Desktop header: hide on mobile ──────────────────────────── */
+@media (max-width: 768px) {
+  .bp-header-desktop {
+    display: none !important;
+  }
+  .bp-header-mobile {
+    display: flex !important;
+  }
+  .bp-mobile-bottom-nav {
+    display: flex !important;
+  }
+  /* Body gets bottom padding so content isn't hidden under nav */
+  .bp-app-body {
+    padding-bottom: 80px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: 12px !important;
+  }
+  /* Compact top-level body padding */
+  .max-w-7xl.mx-auto.p-5 {
+    padding: 12px !important;
+    padding-bottom: 84px !important;
+  }
+}
+
+/* ── Desktop nav: visible only on desktop ─────────────────────── */
+@media (min-width: 769px) {
+  .bp-header-mobile {
+    display: none !important;
+  }
+  .bp-mobile-bottom-nav {
+    display: none !important;
+  }
+}
+
+/* ── Mobile header ────────────────────────────────────────────── */
+.bp-header-mobile {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.bp-header-mobile__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 8px;
+}
+
+.bp-header-mobile__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.bp-header-mobile__logo-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.bp-header-mobile__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #3c1b73;
+  line-height: 1.2;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-header-mobile__subtitle {
+  font-size: 0.7rem;
+  color: #8257b1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-header-mobile__search {
+  padding: 0 14px 10px;
+}
+
+.bp-header-mobile__search input {
+  width: 100%;
+  padding: 9px 14px;
+  border: 1.5px solid rgba(82, 47, 124, 0.25);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  background: #fafafa;
+  outline: none;
+  box-sizing: border-box;
+  color: #0f172a;
+}
+
+.bp-header-mobile__search input:focus {
+  border-color: rgba(82, 47, 124, 0.5);
+  background: #fff;
+}
+
+/* ── Mobile bottom navigation bar ────────────────────────────── */
+.bp-mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  padding: 4px 0 env(safe-area-inset-bottom, 4px);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.bp-mobile-bottom-nav__items {
+  display: flex;
+  align-items: stretch;
+}
+
+.bp-mobile-bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  min-height: 56px;
+  color: #6b7280;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bp-mobile-bottom-nav__item.is-active {
+  color: #7c3aed;
+}
+
+.bp-mobile-bottom-nav__icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.bp-mobile-bottom-nav__label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── More menu overlay ───────────────────────────────────────── */
+.bp-more-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.bp-more-menu__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.bp-more-menu__panel {
+  position: absolute;
+  bottom: 72px;
+  left: 8px;
+  right: 8px;
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  padding: 12px 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.bp-more-menu__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fafafa;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.7rem;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.bp-more-menu__btn:active {
+  background: #f3f4f6;
+}
+
+.bp-more-menu__btn-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* ── Snake card mobile improvements ──────────────────────────── */
+@media (max-width: 768px) {
+  /* Make action buttons larger tap targets */
+  .bp-card-actions {
+    gap: 8px;
+    padding: 6px 0;
+  }
+  .bp-card-btn-primary {
+    padding: 8px 16px !important;
+    font-size: 0.8rem !important;
+    min-height: 40px;
+    border-radius: 10px !important;
+  }
+  /* Overflow menu button */
+  .bp-card-overflow-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+  }
+  /* Single-column cards grid on small phones */
+  .bp-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* Cards get full width and better padding */
+  .bp-snake-card {
+    padding: 12px !important;
+    min-height: auto !important;
+    max-height: none !important;
+  }
+  /* Hide group assignment radio on mobile */
+  .bp-group-assignment {
+    display: none !important;
+  }
+  /* Reduce stat box label font to readable sizes */
+  .bp-stat-label {
+    font-size: 0.65rem !important;
+  }
+  .bp-stat-value {
+    font-size: 0.8rem !important;
+  }
+}
+
+/* ── Overflow / context menu ─────────────────────────────────── */
+.bp-overflow-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 150;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.bp-overflow-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.1s;
+}
+
+.bp-overflow-menu__item:hover,
+.bp-overflow-menu__item:active {
+  background: #f9fafb;
+}
+
+.bp-overflow-menu__item--danger {
+  color: #dc2626;
+}
+
+.bp-overflow-menu__item--danger:hover,
+.bp-overflow-menu__item--danger:active {
+  background: #fef2f2;
+}
+
+/* ── Filter controls on mobile ───────────────────────────────── */
+@media (max-width: 768px) {
+  /* Compact filter tabs */
+  .bp-filter-tabs {
+    gap: 6px;
+  }
+  .bp-filter-tabs .appearance-tab {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    min-height: 36px;
+  }
+  /* Hide scanner status / export buttons inline; put them in the filters area */
+  .bp-toolbar-secondary {
+    display: none !important;
+  }
+}
+
+/* ── FAB — floating action button ───────────────────────────── */
+.bp-fab {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bp-fab {
+    display: flex;
+    position: fixed;
+    bottom: 76px;
+    right: 16px;
+    z-index: 190;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.45);
+    font-size: 1.6rem;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .bp-fab:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+  }
+}
+
+/* ── Mobile filter sheet ─────────────────────────────────────── */
+.bp-filter-sheet-trigger {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bp-filter-sheet-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bp-filter-sheet-trigger.has-filters {
+    border-color: #7c3aed;
+    color: #7c3aed;
+    background: #f5f3ff;
+  }
+  .bp-filter-badge {
+    background: #7c3aed;
+    color: #fff;
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+  /* Hide the full GroupCheckboxes block on mobile */
+  .bp-group-filters-desktop {
+    display: none !important;
+  }
+}
+
+/* ── Filter bottom sheet ─────────────────────────────────────── */
+.bp-filter-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.bp-filter-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.bp-filter-sheet__panel {
+  position: relative;
+  background: #fff;
+  border-radius: 22px 22px 0 0;
+  padding: 0 16px 32px;
+  max-height: 75vh;
+  overflow-y: auto;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.16);
+}
+
+.bp-filter-sheet__handle {
+  width: 40px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin: 12px auto 16px;
+}
+
+.bp-filter-sheet__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.bp-filter-sheet__section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.bp-filter-sheet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.bp-filter-sheet__chip {
+  padding: 7px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+
+.bp-filter-sheet__chip.is-active {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.bp-filter-sheet__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bp-filter-sheet__btn-clear {
+  flex: 1;
+  padding: 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.bp-filter-sheet__btn-apply {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #7c3aed;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ── Active filter chips row (shown after closing filter sheet) ─ */
+.bp-active-filters {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bp-active-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 0 0 6px;
+    scrollbar-width: none;
+  }
+  .bp-active-filters::-webkit-scrollbar {
+    display: none;
+  }
+  .bp-active-filter-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    padding: 4px 10px;
+    border: 1.5px solid #7c3aed;
+    border-radius: 999px;
+    background: #f5f3ff;
+    color: #7c3aed;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bp-active-filter-chip__remove {
+    font-size: 0.9rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+}
+
+/* ── Genetics legend: hide inline on mobile ───────────────────── */
+@media (max-width: 768px) {
+  .bp-genetics-legend {
+    display: none !important;
+  }
+  .bp-genetics-legend-toggle {
+    display: inline-flex !important;
+  }
+}
+
+.bp-genetics-legend-toggle {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.75rem;
+  color: #6b7280;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Cards grid — single column on narrow phones ─────────────── */
+@media (max-width: 640px) {
+  .sm\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Pairing cards: ensure info is readable on narrow screen ─── */
+@media (max-width: 768px) {
+  .bp-pairing-info {
+    font-size: 0.8rem;
+  }
+}
+
+/* ── Toolbar row on mobile: wrap cleanly ─────────────────────── */
+@media (max-width: 768px) {
+  .bp-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .bp-toolbar-right {
+    display: none !important;
+  }
+}
+
+/* ── No-logs empty state card ────────────────────────────────── */
+.bp-no-logs-hint {
+  padding: 10px 12px;
+  border: 1.5px dashed #d1d5db;
+  border-radius: 10px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  text-align: center;
+}
+

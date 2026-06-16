@@ -68,7 +68,7 @@ function AppSectionRouter() {
   }
 
   if (hashPath === "/" && isNativeMobileShell()) {
-    return <MobileApp />;
+    return <BreedingPlannerApp />;
   }
 
   if (hashPath === "/") {
