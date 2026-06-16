@@ -1,0 +1,29 @@
+# Local Node.js binaries — must not be sent to Railway build context
+node-v22.11.0-win-x64/
+node-v22.11.0-win-x64.zip
+
+# Local Android/JDK toolchains
+.tools/
+
+# Build artifacts
+build/
+dist/
+android/
+ios/
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Dev / test artifacts
+.playwright/
+playwright-report/
+test-results/
+coverage/
+
+# IDE / OS
+.claude/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
