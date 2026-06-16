@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "generatedAt": "2026-03-10",
+  "genes": [
+    { "geneName": "Albino", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Candy", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Toffee", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Clown", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Piebald", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Hypo (Orange Ghost)", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Desert Ghost", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Genetic Stripe", "geneType": "recessive", "complex": "Stripe/Line Pattern", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Monsoon", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Puzzle", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Sunset", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Ultramel", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Lavender Albino", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Axanthic VPI", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Axanthic TSK", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Axanthic MJ", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Cryptic", "geneType": "recessive", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Tri-Stripe", "geneType": "recessive", "complex": "Stripe/Line Pattern", "hasSuperForm": false, "superGeneName": null },
+
+    { "geneName": "Pastel", "geneType": "incomplete_dominant", "complex": "Color Enhancer", "hasSuperForm": true, "superGeneName": "Super Pastel" },
+    { "geneName": "Enchi", "geneType": "incomplete_dominant", "complex": "Color Enhancer", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Fire", "geneType": "incomplete_dominant", "complex": "Color Enhancer", "hasSuperForm": true, "superGeneName": "Super Fire" },
+    { "geneName": "Vanilla", "geneType": "incomplete_dominant", "complex": "Color Enhancer", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Cinnamon", "geneType": "incomplete_dominant", "complex": "Darkening", "hasSuperForm": true, "superGeneName": "Super Cinnamon" },
+    { "geneName": "Black Pastel", "geneType": "incomplete_dominant", "complex": "Darkening", "hasSuperForm": true, "superGeneName": "Super Black Pastel" },
+    { "geneName": "Spider", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Also listed in legacy dominant grouping." },
+    { "geneName": "Pinstripe", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Also listed in legacy dominant grouping." },
+    { "geneName": "Spotnose", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Leopard", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null, "notes": "Also listed in legacy dominant grouping." },
+    { "geneName": "Orange Dream", "geneType": "incomplete_dominant", "complex": "Color Enhancer", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Yellow Belly", "geneType": "incomplete_dominant", "complex": "Yellow Belly Complex", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Gravel", "geneType": "incomplete_dominant", "complex": "Yellow Belly Complex", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Asphalt", "geneType": "incomplete_dominant", "complex": "Yellow Belly Complex", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Specter", "geneType": "incomplete_dominant", "complex": "Yellow Belly Complex", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Red Stripe", "geneType": "incomplete_dominant", "complex": "Stripe/Line Pattern", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Blade", "geneType": "incomplete_dominant", "complex": "Stripe/Line Pattern", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Champagne", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Also listed in legacy dominant grouping." },
+    { "geneName": "Chocolate", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Hidden Gene Woma", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Also listed in legacy dominant grouping." },
+    { "geneName": "Mahogany", "geneType": "incomplete_dominant", "complex": "Darkening", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Calico (Sugar)", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Also listed as Calico in legacy dominant grouping." },
+    { "geneName": "Butter", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": "Super Butter" },
+    { "geneName": "Lesser", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": "Super Lesser" },
+    { "geneName": "Mojave", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": "Super Mojave" },
+    { "geneName": "Russo", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": null },
+    { "geneName": "Mystic", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": null },
+    { "geneName": "Phantom", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": null },
+    { "geneName": "Special", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": true, "superGeneName": null },
+    { "geneName": "Bamboo", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Falcon", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Sentinel", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Cypress", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Sable", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Acid", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Static", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Hurricane", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Blitz", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "GHI", "geneType": "incomplete_dominant", "complex": "Darkening", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Blackhead", "geneType": "incomplete_dominant", "complex": "Darkening", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Bongo", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Confusion", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Stranger", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Wookie", "geneType": "incomplete_dominant", "complex": "Pattern Modifier", "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Shatter", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+
+    { "geneName": "Calico", "geneType": "dominant", "complex": null, "hasSuperForm": false, "superGeneName": null },
+    { "geneName": "Super Pastel", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Cinnamon", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Black Pastel", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Mojave", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Butter", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Lesser", "geneType": "incomplete_dominant", "complex": "BEL Complex", "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." },
+    { "geneName": "Super Fire", "geneType": "incomplete_dominant", "complex": null, "hasSuperForm": false, "superGeneName": null, "notes": "Super form definition." }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino", "Candy", "Toffee", "Clown", "Piebald", "Hypo (Orange Ghost)", "Desert Ghost", "Genetic Stripe", "Monsoon", "Puzzle", "Sunset", "Ultramel", "Lavender Albino", "Axanthic VPI", "Axanthic TSK", "Axanthic MJ", "Cryptic", "Tri-Stripe"
+    ],
+    "incompleteDominantGenes": [
+      "Pastel", "Enchi", "Fire", "Vanilla", "Cinnamon", "Black Pastel", "Spider", "Pinstripe", "Spotnose", "Leopard", "Orange Dream", "Yellow Belly", "Gravel", "Asphalt", "Specter", "Red Stripe", "Blade", "Champagne", "Chocolate", "Hidden Gene Woma", "Mahogany", "Calico (Sugar)", "Butter", "Lesser", "Mojave", "Russo", "Mystic", "Phantom", "Special", "Bamboo", "Falcon", "Sentinel", "Cypress", "Sable", "Acid", "Static", "Hurricane", "Blitz", "GHI", "Blackhead", "Bongo", "Confusion", "Stranger", "Wookie", "Shatter"
+    ],
+    "dominantGenes": [
+      "Leopard", "Pinstripe", "Spider", "Champagne", "Calico", "Hidden Gene Woma"
+    ],
+    "belComplexGenes": [
+      "Mojave", "Lesser", "Butter", "Russo", "Mystic", "Phantom", "Special"
+    ],
+    "yellowBellyComplexGenes": [
+      "Yellow Belly", "Gravel", "Asphalt", "Specter"
+    ],
+    "patternModifierGenes": [
+      "Leopard", "Spotnose", "Hurricane", "Acid", "Blitz", "Confusion", "Stranger", "Wookie", "Cypress", "Bongo"
+    ],
+    "colorEnhancerGenes": [
+      "Orange Dream", "Enchi", "Pastel", "Vanilla", "Fire", "Yellow Belly"
+    ],
+    "darkeningGenes": [
+      "Black Pastel", "Cinnamon", "GHI", "Blackhead", "Mahogany"
+    ],
+    "stripeLinePatternGenes": [
+      "Red Stripe", "Blade", "Genetic Stripe", "Tri-Stripe"
+    ]
+  }
+}

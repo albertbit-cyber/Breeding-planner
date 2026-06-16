@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat:*)",
+      "Bash(cat \"d:/Git Clone/Breeding-planner/server/src/validators/\"*.ts)",
+      "Bash(node -e ':*)",
+      "Bash(curl -s -X POST http://localhost:4000/api/lab/orders/cmog6i12v0001jryw4thgna1f/results/submit -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW15NHRzbHcwMDAwanJxczFtbmp1a2RzIiwiZW1haWwiOiJhZG1pbkBwcm9oZXJwZXIuZGV2Iiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzc3MjQ4ODY4LCJleHAiOjE3NzcyNTI0Njh9.IgNDUclIcDkmp04JkOreIhDc--Tu0hyAUoNE18vtO-Q' -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{ try { const r=JSON.parse\\(d\\); console.log\\('Status:', r.mode, '| Order status:', r.order?.status, '| Results:', r.results?.length\\); } catch\\(e\\) { console.log\\(d.slice\\(0,300\\)\\); } }\\)\")",
+      "Bash(node scripts/check-locales.cjs)",
+      "Bash(python3 -c ':*)",
+      "Read(//c/Users/alber/Downloads/**)",
+      "Bash(cd /d \"d:\\\\Git Clone\\\\Breeding-planner\")",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(xargs grep *)",
+      "Bash(npm run *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr \":3000\\\\|:5173\\\\|:4000\\\\|:8080\\\\|:5000\\\\|:3001\\\\|:5174\")",
+      "PowerShell(Stop-Process -Id 42260, 41764, 45844 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Set-Location \"d:\\\\Git Clone\\\\Breeding-planner\\\\server\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'd:\\\\Git Clone\\\\Breeding-planner\\\\server'; npm run dev\" -WindowStyle Normal)",
+      "Read(//d/Git Clone/Brewing-planner/src/**)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\\\\src\" -Recurse -Include \"*.jsx\", \"*.js\", \"*.tsx\", \"*.ts\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(grep -E \"\\\\.\\(jsx|js|tsx|ts\\)$\")",
+      "Bash(grep -v \"//\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\\\\src\" -Name -Directory)",
+      "Bash(python3)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Git Clone\\\\Breeding-planner\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(findstr \":5173\")",
+      "Bash(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Id, CPU, StartTime, MainWindowTitle)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\")",
+      "PowerShell(Stop-Process -Id 27172 -Force)",
+      "Bash(npx tsx *)",
+      "Read(//c/Users/alber/AppData/Local/Temp/claude/d--Git-Clone-Brewing-planner/058e4f22-7250-4cb1-94f2-0bf9e4d97817/tasks/**)",
+      "PowerShell(Stop-Process -Id 26212 -Force)",
+      "Bash(findstr \":4000\")"
+    ]
+  }
+}

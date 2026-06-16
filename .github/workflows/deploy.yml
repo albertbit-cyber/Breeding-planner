@@ -1,0 +1,69 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ── Root app ────────────────────────────────────────────────────────────
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build main Vite site
+        env:
+          PUBLIC_URL: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      # ── Marketplace sub-app ─────────────────────────────────────────────────
+      - name: Install marketplace dependencies
+        run: npm ci
+        working-directory: breeding-app-marketplace
+
+      - name: Build marketplace
+        env:
+          PUBLIC_URL: /${{ github.event.repository.name }}/marketplace/
+        run: npm run build
+        working-directory: breeding-app-marketplace
+
+      - name: Copy marketplace into site
+        run: cp -r breeding-app-marketplace/build build/marketplace
+
+      # ── Upload & deploy ──────────────────────────────────────────────────────
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,32 @@
+# Breeding Planner App
+
+## Overview
+Breeding Planner is a cross-platform application designed to help users manage and optimize animal breeding programs. It supports desktop (Electron) and mobile (Capacitor) environments, providing a seamless experience for breeders, researchers, and hobbyists.
+
+## Features
+
+- **Animal Management**: Add, edit, and track animals with detailed records including genetics, lineage, health, and breeding status.
+- **Breeding Records**: Log breeding events, pairings, outcomes, and maintain historical data for analysis.
+- **QR Code Scanner**: Scan animal QR codes to instantly open their edit page for quick updates and review.
+- **Sync Integration**: Synchronize data between desktop and mobile devices for consistent access everywhere.
+- **PDF/Excel Export**: Export animal and breeding data to PDF or Excel for reporting and sharing.
+- **Photo & Document Attachments**: Attach images and documents to animal records for comprehensive documentation.
+- **Search & Filter**: Powerful search and filtering tools to quickly find animals, breeding events, or genetic lines.
+- **Notifications & Reminders**: Set reminders for breeding events, health checks, and other important tasks.
+- **User Authentication**: Secure login and user management for data protection.
+- **Modern UI**: Responsive, user-friendly interface optimized for both desktop and mobile use.
+
+## Technologies Used
+- React (frontend)
+- Electron (desktop)
+- Capacitor (mobile)
+- Node.js (backend logic)
+- html5-qrcode (QR scanner)
+- jsPDF, xlsx (export features)
+
+## Getting Started
+- Run `npm install` to install dependencies.
+- Use `npm run start` or the Electron launcher to start the app.
+- For mobile, build and deploy using Capacitor commands.
+
+For more details, see the README or documentation files.

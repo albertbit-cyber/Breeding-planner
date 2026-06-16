@@ -19,6 +19,7 @@ import {
   buildAnimalExportDataset,
   buildPairingExportDataset,
 } from './App.jsx';
+import { describe, expect, it } from 'vitest';
 
 describe('splitMorphHetInput', () => {
   it('parses morphs separated by spaces', () => {
@@ -54,6 +55,18 @@ describe('splitMorphHetInput', () => {
     const { morphs, hets } = splitMorphHetInput('Butter possiable het Clown');
     expect(morphs).toEqual(['Butter']);
     expect(hets).toEqual(['Possible Clown']);
+  });
+
+  it('expands known combo aliases into underlying genes', () => {
+    const { morphs, hets } = splitMorphHetInput('Pompeii');
+    expect(morphs).toEqual(['Black Pastel', 'Red Stripe', 'Spotnose', 'Yellow Belly', 'Clown']);
+    expect(hets).toEqual([]);
+  });
+
+  it('supports partial alias matching', () => {
+    const { morphs, hets } = splitMorphHetInput('Pomp');
+    expect(morphs).toEqual(['Black Pastel', 'Red Stripe', 'Spotnose', 'Yellow Belly', 'Clown']);
+    expect(hets).toEqual([]);
   });
 });
 
