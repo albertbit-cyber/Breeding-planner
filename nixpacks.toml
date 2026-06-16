@@ -1,2 +1,2 @@
 [phases.install]
-cmds = ["npm install --omit=optional --legacy-peer-deps"]
+cmds = ["npm ci --omit=optional || npm install --omit=optional"]
