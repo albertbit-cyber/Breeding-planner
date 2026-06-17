@@ -11,6 +11,10 @@ dist/
 android/
 ios/
 
+# Root lockfile — generated on Windows, causes EBADPLATFORM on Railway Linux.
+# Without it Nixpacks falls back to `npm install` which handles platform deps correctly.
+/package-lock.json
+
 # Dependencies
 node_modules/
 */node_modules/
