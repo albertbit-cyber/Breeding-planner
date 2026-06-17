@@ -11,6 +11,11 @@ dist/
 android/
 ios/
 
+# Backup/scratch files with potentially invalid encoding
+App_prev.jsx
+HEAD_App.jsx
+main_App.jsx
+
 # Root lockfile — generated on Windows, causes EBADPLATFORM on Railway Linux.
 # Without it Nixpacks falls back to `npm install` which handles platform deps correctly.
 /package-lock.json
