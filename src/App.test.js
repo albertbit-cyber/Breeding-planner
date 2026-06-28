@@ -18,6 +18,8 @@ import {
   DEFAULT_PAIRING_EXPORT_FIELDS,
   buildAnimalExportDataset,
   buildPairingExportDataset,
+  buildPairingDashboardItem,
+  formatCycleTimerDayLabel,
 } from './App.jsx';
 import { describe, expect, it } from 'vitest';
 
@@ -401,6 +403,29 @@ describe('normalizeExportFieldSelection', () => {
       ANIMAL_EXPORT_FIELD_DEFS
     );
     expect(result).toEqual(['name', 'id']);
+  });
+});
+
+describe('formatCycleTimerDayLabel', () => {
+  it('shows the current day inside a cycle timer window', () => {
+    expect(formatCycleTimerDayLabel('2025-02-22', 21, new Date(2025, 1, 1, 9))).toBe('Day 1 of 21');
+    expect(formatCycleTimerDayLabel('2025-02-22', 21, new Date(2025, 1, 10, 9))).toBe('Day 10 of 21');
+    expect(formatCycleTimerDayLabel('2025-02-22', 21, new Date(2025, 1, 22, 9))).toBe('Day 21 of 21');
+    expect(formatCycleTimerDayLabel('2025-02-22', 21, new Date(2025, 1, 23, 9))).toBe('Day 22 of 21');
+  });
+});
+
+describe('buildPairingDashboardItem', () => {
+  it('includes the current cycle day label for active pairing card timers', () => {
+    const pairing = {
+      ...clone(BASE_PAIRINGS[0]),
+      preLayShed: { observed: false, date: '', notes: '', intervalFromOvulation: null },
+      clutch: { recorded: false, date: '', eggsTotal: '', fertileEggs: '', slugs: '' },
+      hatch: { recorded: false, date: '', hatchedCount: 0 },
+    };
+    const item = buildPairingDashboardItem(pairing, clone(BASE_SNAKES), new Date(2025, 1, 10, 9));
+    expect(item.stageKey).toBe('ovulation');
+    expect(item.cycleDayLabel).toBe('Day 10 of 21');
   });
 });
 

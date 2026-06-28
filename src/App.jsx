@@ -10835,7 +10835,9 @@ export {
   buildPairingExportDataset,
   buildPairingMatrixExportDataset,
   getPairingExportRows,
+  buildPairingDashboardItem,
   exportDatasetToCsv,
+  formatCycleTimerDayLabel,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
@@ -17584,9 +17586,16 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
               </span>
             </div>
           </div>
-          <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-            {item.countdownLabel}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+              {item.countdownLabel}
+            </span>
+            {item.cycleDayLabel ? (
+              <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700">
+                {item.cycleDayLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-2 text-xs">
@@ -19241,6 +19250,10 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
 
   const daysUntil = targetDate ? diffCalendarDays(today, targetDate) : null;
   const urgency = getDashboardUrgency(daysUntil, !!targetDate);
+  const activeTimer = derived.activeTimer || null;
+  const cycleDayLabel = activeTimer?.targetDate
+    ? formatCycleTimerDayLabel(activeTimer.targetDate, activeTimer.totalDays, today)
+    : '';
   const cycleYear = computeBreedingCycleYear({
     clutchDate: derived.clutchDate,
     preLayDate: derived.preLayDate,
@@ -19264,6 +19277,7 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
     targetLabel: targetDate ? formatDateForDisplay(targetDate) : '',
     daysUntil,
     countdownLabel: targetDate ? describeDaysUntil(daysUntil) : 'No target date yet',
+    cycleDayLabel,
     urgency,
     actionLabel,
     latestLockLabel: latestLockDate ? formatDateForDisplay(latestLockDate) : '',
@@ -20125,6 +20139,7 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
   const diffMs = target.getTime() - now;
   const overdue = diffMs < 0;
   const remainingLabel = overdue ? `Overdue by ${formatDurationFromMs(-diffMs)}` : `Due in ${formatDurationFromMs(diffMs)}`;
+  const dayLabel = formatCycleTimerDayLabel(targetDate, totalDays, now);
 
   let progressPercent = null;
   if (totalDays && totalDays > 0) {
@@ -20141,10 +20156,25 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
     <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')}>
       {progressPercent !== null && <span className="countdown-progress" style={{ width: `${progressPercent}%` }} />}
       <span className="break-words leading-tight">{label}</span>
+      {dayLabel ? <span className="break-words leading-tight">{dayLabel}</span> : null}
       <span className="break-words leading-tight">{remainingLabel}</span>
       <span className="break-words leading-tight">{formatDateForDisplay(targetDate)}</span>
     </div>
   );
+}
+
+function formatCycleTimerDayLabel(targetDate, totalDays, now = Date.now()) {
+  if (!targetDate || !Number.isFinite(totalDays) || totalDays <= 0) return '';
+  const target = parseYmd(targetDate);
+  if (!target) return '';
+  const nowDate = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(nowDate.getTime())) return '';
+  const daysUntil = diffInDays(localYMD(nowDate), targetDate);
+  if (!Number.isFinite(daysUntil)) return '';
+  const dayNumber = daysUntil < 0
+    ? Math.floor(totalDays + Math.abs(daysUntil))
+    : Math.min(Math.floor(totalDays), Math.max(1, Math.floor(totalDays - daysUntil + 1)));
+  return `Day ${dayNumber} of ${Math.floor(totalDays)}`;
 }
 
 function formatDurationFromMs(ms) {
