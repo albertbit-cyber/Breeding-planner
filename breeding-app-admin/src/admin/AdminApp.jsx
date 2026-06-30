@@ -954,7 +954,7 @@ function TierOverviewPage() {
       </div>
       {error && <div className="admin-error">{error}</div>}
       {loading ? <Spinner label="Loading tiers…" /> : (
-        <div className="admin-card-grid">
+        <div className="admin-card-grid tier-card-grid">
           {tiers.map((tier) => {
             const limits = (tier.features || []).filter((f) => f.limitValue !== null && f.limitValue !== undefined).slice(0, 4);
             return (
