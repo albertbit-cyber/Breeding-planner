@@ -9940,7 +9940,7 @@ export default function BreedingPlannerApp() {
         );
       })()}
 
-      {hatchWizard && (() => {
+      {hatchWizard && typeof document !== 'undefined' && createPortal((() => {
         const total = Array.isArray(hatchWizard.entries) ? hatchWizard.entries.length : 0;
         const safeIndex = total ? Math.min(total - 1, Math.max(0, hatchWizard.currentIndex || 0)) : 0;
         const entry = total ? hatchWizard.entries[safeIndex] : null;
@@ -9954,13 +9954,13 @@ export default function BreedingPlannerApp() {
         return (
           <div
             className={cx(
-              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-50',
+              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]',
               overlayClass(theme)
             )}
             onClick={handleWizardCancel}
           >
             <div
-              className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh] flex flex-col"
+              className="relative z-[10011] bg-white w-full max-w-3xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 border-b bg-neutral-50">
@@ -10084,7 +10084,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         );
-      })()}
+      })(), document.body)}
 
           {showImportModal && typeof document !== 'undefined' && createPortal((
             <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
