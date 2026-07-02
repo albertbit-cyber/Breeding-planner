@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "./i18n";
 import QRCode from 'qrcode';
 import LanguageSwitcher from "./components/LanguageSwitcher.jsx";
+import GeneAutocomplete from "./components/GeneAutocomplete.jsx";
 import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
@@ -5652,22 +5653,16 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.genetics", { defaultValue: "Genetics (morphs & hets)" })}</label>
-              <textarea
-                rows={3}
-                className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
-                value={newAnimal.morphHetInput || ''}
-                onChange={async e=>{
-                  const value = e.target.value;
-                  const resolvedText = typeof onResolveLeucisticText === 'function'
-                    ? await onResolveLeucisticText(value, 'Add Animal genetics')
-                    : value;
-                  const { morphs, hets } = splitMorphHetInput(resolvedText);
-                  setNewAnimal(a=>({ ...a, morphHetInput: resolvedText, morphs, hets }));
-                }}
-                placeholder={"Clown\nPastel\nHet Hypo"}
-              />
+              <div className="mt-1">
+                <GeneAutocomplete
+                  morphs={Array.isArray(newAnimal.morphs) ? newAnimal.morphs : []}
+                  hets={Array.isArray(newAnimal.hets) ? newAnimal.hets : []}
+                  onChange={({ morphs, hets }) => setNewAnimal(a => ({ ...a, morphs, hets, morphHetInput: [...morphs, ...hets].join('\n') }))}
+                  placeholder="Type to search genes (e.g. Clown, Pastel, Spider…)"
+                />
+              </div>
               <div className="mt-1 text-[11px] text-neutral-500">
-                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "List each trait on its own line (commas, slashes, or percentages are still supported when pasting)." })}
+                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "Toggle Visual / Het, type a gene name or alias, then select. Click × to remove." })}
               </div>
             </div>
             <div>
@@ -10759,21 +10754,14 @@ export default function BreedingPlannerApp() {
                 </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.genetics")}</label>
-                  <textarea
-                    rows={3}
-                    className="mt-0.5 w-full border rounded-xl px-2 py-2 text-sm"
-                    value={formatMorphHetForInput(editSnakeDraft.morphs, editSnakeDraft.hets)}
-                    onChange={async e=>{
-                      const resolvedText = await resolveLeucisticInText(e.target.value, 'Edit Animal genetics');
-                      const { morphs, hets } = splitMorphHetInput(resolvedText);
-                      setEditSnakeDraft(d=>({
-                        ...d,
-                        morphs,
-                        hets,
-                      }));
-                    }}
-                    placeholder={t("snakeEdit.geneticsPlaceholder")}
-                  />
+                  <div className="mt-0.5">
+                    <GeneAutocomplete
+                      morphs={Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []}
+                      hets={Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []}
+                      onChange={({ morphs, hets }) => setEditSnakeDraft(d => ({ ...d, morphs, hets }))}
+                      placeholder="Type to search genes…"
+                    />
+                  </div>
                   <div className="text-[11px] text-neutral-500 mt-0.5">{t("snakeEdit.geneticsHelp")}</div>
                 </div>
                 <div>
