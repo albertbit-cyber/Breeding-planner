@@ -13497,28 +13497,32 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
     const map = new Map();
     readyRows.forEach((row) => {
       const feedType = String(row.profile.feedType || '').trim();
-      const feederClass = row.feederClass;
-      const key = `${feedType.toLowerCase()}::${feederClass.toLowerCase()}`;
+      const sizeClass = String(row.profile.sizeClass || '').trim();
+      const weightGrams = Number(row.profile.weightGrams);
+      const weightText = Number.isFinite(weightGrams) && weightGrams > 0 ? `${weightGrams} g` : '';
+      const key = `${feedType.toLowerCase()}::${sizeClass.toLowerCase()}::${weightText.toLowerCase()}`;
       const existing = map.get(key) || {
         feedType,
-        feederClass,
+        sizeClass,
+        weightText,
         quantity: 0,
-        snakes: [],
       };
       existing.quantity += row.quantity;
-      existing.snakes.push(row.name);
       map.set(key, existing);
     });
     return Array.from(map.values()).sort((a, b) => {
       const byFeed = a.feedType.localeCompare(b.feedType);
-      return byFeed || a.feederClass.localeCompare(b.feederClass);
+      const bySize = byFeed || a.sizeClass.localeCompare(b.sizeClass);
+      return bySize || a.weightText.localeCompare(b.weightText);
     });
   }, [readyRows]);
 
   const totalItems = reportRows.reduce((sum, row) => sum + row.quantity, 0);
   const reportText = useMemo(() => {
     if (!reportRows.length) return '';
-    return reportRows.map(row => `${row.feedType} ${row.feederClass}: ${row.quantity}`).join('\n');
+    return reportRows
+      .map(row => `${row.feedType} | ${row.sizeClass || '-'} | ${row.weightText || '-'}: ${row.quantity}`)
+      .join('\n');
   }, [reportRows]);
 
   const toggleSelected = (id) => {
@@ -13595,17 +13599,17 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
                       <tr>
                         <th className="text-left px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
                         <th className="text-left px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
+                        <th className="text-left px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
                         <th className="text-right px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
-                        <th className="text-left px-4 py-2">{t('feedPrep.snakes', { defaultValue: 'Snakes' })}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {reportRows.map(row => (
-                        <tr key={`${row.feedType}-${row.feederClass}`} className="border-b last:border-0">
+                        <tr key={`${row.feedType}-${row.sizeClass}-${row.weightText}`} className="border-b last:border-0">
                           <td className="px-4 py-3 font-medium">{row.feedType}</td>
-                          <td className="px-4 py-3">{row.feederClass}</td>
+                          <td className="px-4 py-3">{row.sizeClass || '-'}</td>
+                          <td className="px-4 py-3">{row.weightText || '-'}</td>
                           <td className="px-4 py-3 text-right font-semibold">{row.quantity}</td>
-                          <td className="px-4 py-3 text-neutral-600">{row.snakes.join(', ')}</td>
                         </tr>
                       ))}
                     </tbody>
