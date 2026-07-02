@@ -3281,7 +3281,7 @@ function initSnakeDraft(s) {
   };
 }
 
-const FEEDER_TYPE_OPTIONS = ['Mouse', 'Rat', 'Chick', 'ASF', 'Other'];
+const FEEDER_TYPE_OPTIONS = ['Rat', 'SF', 'Mouse', 'Other'];
 const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
 
 function createEmptyFeederProfile() {
@@ -3298,8 +3298,9 @@ function normalizeFeederProfileForDraft(profile) {
   const source = profile && typeof profile === 'object' ? profile : {};
   const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
   const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams);
+  const rawFeedType = String(source.feedType ?? source.foodType ?? source.feed ?? '').trim();
   return {
-    feedType: String(source.feedType ?? source.foodType ?? source.feed ?? '').trim(),
+    feedType: rawFeedType.toUpperCase() === 'ASF' ? 'SF' : rawFeedType,
     sizeClass: String(source.sizeClass ?? source.size ?? source.preySize ?? '').trim(),
     weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? String(weightGrams) : '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
@@ -3330,22 +3331,29 @@ function getLatestAcceptedFeedEntry(snake) {
 }
 
 function getSnakeFeederProfile(snake) {
-  const explicit = normalizeFeederProfileForDraft(snake?.feederProfile);
-  const latest = getLatestAcceptedFeedEntry(snake);
-  const latestWeight = Number(latest?.weightGrams ?? latest?.grams);
-  const profile = {
-    feedType: explicit.feedType || String(latest?.feed || '').trim(),
-    sizeClass: explicit.sizeClass || String(latest?.size || latest?.sizeDetail || '').trim(),
-    weightGrams: explicit.weightGrams || (Number.isFinite(latestWeight) && latestWeight > 0 ? String(latestWeight) : ''),
-    quantity: explicit.quantity || 1,
-    notes: explicit.notes,
-  };
-  return normalizeFeederProfileForDraft(profile);
+  return normalizeFeederProfileForDraft(snake?.feederProfile);
 }
 
 function hasCompleteFeederProfile(profile) {
   if (!profile) return false;
   return Boolean(String(profile.feedType || '').trim() && (String(profile.sizeClass || '').trim() || Number(profile.weightGrams) > 0));
+}
+
+function getFeedPrepExclusionReason(snake, pairings = []) {
+  if (!snake || normalizeSexValue(snake.sex) !== 'F' || !Array.isArray(pairings)) return '';
+  const snakeId = String(snake.id || '').trim();
+  if (!snakeId) return '';
+
+  const activeCycle = pairings.find(pairing => {
+    if (!pairing || String(pairing.femaleId || '').trim() !== snakeId) return false;
+    const derived = getBreedingCycleDerived(withPairingLifecycleDefaults({ ...pairing }));
+    return derived.ovulationObserved && !derived.clutchRecorded && !derived.hatchedRecorded;
+  });
+  if (!activeCycle) return '';
+
+  const derived = getBreedingCycleDerived(withPairingLifecycleDefaults({ ...activeCycle }));
+  if (derived.preLayObserved) return 'Past ovulation / pre-lay';
+  return 'Ovulating';
 }
 
 function formatFeederClass(profile) {
@@ -11320,6 +11328,7 @@ export default function BreedingPlannerApp() {
         open={showFeedPrepModal}
         onClose={() => setShowFeedPrepModal(false)}
         snakes={snakes}
+        pairings={pairings}
         onEditSnake={(snake) => {
           setShowFeedPrepModal(false);
           openSnakeCard(snake);
@@ -13847,7 +13856,7 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue' }) {
+function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake, theme = 'blue' }) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState([]);
   const [copied, setCopied] = useState(false);
@@ -13859,6 +13868,7 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
         const profile = getSnakeFeederProfile(snake);
         const complete = hasCompleteFeederProfile(profile);
         const feederClass = formatFeederClass(profile);
+        const excludedReason = getFeedPrepExclusionReason(snake, pairings);
         return {
           snake,
           id: snake.id,
@@ -13867,24 +13877,27 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
           complete,
           feederClass,
           quantity: Math.max(1, Number(profile.quantity) || 1),
+          excluded: Boolean(excludedReason),
+          excludedReason,
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [snakes, t]);
+  }, [pairings, snakes, t]);
 
   useEffect(() => {
     if (!open) return;
-    setSelectedIds(snakeRows.map(row => row.id).filter(Boolean));
+    setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean));
     setCopied(false);
   }, [open, snakeRows]);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedRows = useMemo(
-    () => snakeRows.filter(row => row.id && selectedIdSet.has(row.id)),
+    () => snakeRows.filter(row => row.id && selectedIdSet.has(row.id) && !row.excluded),
     [selectedIdSet, snakeRows]
   );
   const readyRows = useMemo(() => selectedRows.filter(row => row.complete), [selectedRows]);
   const missingRows = useMemo(() => selectedRows.filter(row => !row.complete), [selectedRows]);
+  const excludedRows = useMemo(() => snakeRows.filter(row => row.excluded), [snakeRows]);
   const reportRows = useMemo(() => {
     const map = new Map();
     readyRows.forEach((row) => {
@@ -13943,7 +13956,7 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
             <div className="text-sm text-neutral-500">{t('feedPrep.subtitle', { defaultValue: 'Select snakes and generate the grouped defrost list.' })}</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.map(row => row.id).filter(Boolean))}>
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean))}>
               {t('feedPrep.selectAll', { defaultValue: 'Select all' })}
             </button>
             <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds([])}>
@@ -13959,7 +13972,7 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
         </div>
 
         <div className="p-5 space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="rounded-xl border bg-neutral-50 p-3">
               <div className="text-xs text-neutral-500">{t('feedPrep.selectedSnakes', { defaultValue: 'Selected snakes' })}</div>
               <div className="text-2xl font-semibold">{selectedRows.length}</div>
@@ -13975,6 +13988,10 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
             <div className="rounded-xl border bg-neutral-50 p-3">
               <div className="text-xs text-neutral-500">{t('feedPrep.totalItems', { defaultValue: 'Items to defrost' })}</div>
               <div className="text-2xl font-semibold">{totalItems}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.excludedSnakes', { defaultValue: 'Excluded ovulation' })}</div>
+              <div className="text-2xl font-semibold">{excludedRows.length}</div>
             </div>
           </div>
 
@@ -14024,18 +14041,21 @@ function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue'
                       type="checkbox"
                       className="mt-1"
                       checked={selectedIdSet.has(row.id)}
+                      disabled={row.excluded}
                       onChange={() => toggleSelected(row.id)}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium truncate">{row.name}</span>
                       <span className="block text-xs text-neutral-500 truncate">{row.id}</span>
-                      {row.complete ? (
+                      {row.excluded ? (
+                        <span className="block text-xs text-sky-700">{row.excludedReason}</span>
+                      ) : row.complete ? (
                         <span className="block text-xs text-neutral-600">{row.quantity} x {row.profile.feedType} {row.feederClass}</span>
                       ) : (
                         <span className="block text-xs text-amber-700">{t('feedPrep.missingProfile', { defaultValue: 'Missing feeder data' })}</span>
                       )}
                     </span>
-                    {!row.complete && typeof onEditSnake === 'function' ? (
+                    {!row.excluded && !row.complete && typeof onEditSnake === 'function' ? (
                       <button
                         type="button"
                         className="text-xs px-2 py-1 rounded-lg border text-neutral-700"
@@ -14662,28 +14682,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         </div>
       )}
       
-      {/* single-group selector: hidden on mobile — use Edit modal instead */}
-      <div className="bp-group-assignment mt-2">
-        <div className="text-xs text-neutral-500 mb-1">{t("snakeEdit.assignGroup", { defaultValue: "Assign group" })}</div>
-  <div className="flex flex-wrap gap-2 text-[11px]">
-          {groups.map(g => (
-            <label key={g} className="inline-flex items-center gap-1 px-2 py-0.5 border rounded-lg bg-white text-[11px] min-w-0">
-              <input type="radio" name={`group-${s.id}`} className="w-3 h-3"
-                checked={(s.groups||[]).includes(g)}
-                onChange={() => {
-                  if (!setSnakes) return;
-                  setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [g] } : x));
-                }} />
-              <span className="truncate max-w-[8rem]">{g}</span>
-            </label>
-          ))}
-          <label className="inline-flex items-center gap-1 px-2 py-0.5 border rounded-lg bg-white text-[11px]">
-            <input type="radio" name={`group-${s.id}`} className="w-3 h-3" checked={!(s.groups||[]).length}
-              onChange={() => { if (!setSnakes) return; setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [] } : x)); }} />
-            <span>{t("snakeEdit.noGroup", { defaultValue: "None" })}</span>
-          </label>
-        </div>
-      </div>
       <div className="mt-2 flex items-center gap-2">
         <StatusDot status={displayStatus} />
         <div className="text-xs">{displayStatus}</div>
