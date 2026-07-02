@@ -63,9 +63,31 @@ function scoreMatch(gene, query) {
   return 99;
 }
 
+const HET_STRIP_RE = /^(?:\d{1,3}%\s*)?(?:(?:pos(?:s?i?a?ble)?|probable|maybe|ph)\s+)?het\s+/i;
+const PCT_STRIP_RE = /^(\d{1,3}%)\s+/i;
+const POS_STRIP_RE = /^(pos(?:s?i?a?ble)?|probable|maybe|ph)\s+/i;
+
+function detectQualifier(raw) {
+  const r = raw.trim();
+  if (HET_STRIP_RE.test(r)) return 'het';
+  if (PCT_STRIP_RE.test(r)) return PCT_STRIP_RE.exec(r)[1];
+  if (POS_STRIP_RE.test(r)) return 'possible';
+  return null;
+}
+
+function stripQualifier(raw) {
+  return raw.trim()
+    .replace(HET_STRIP_RE, '')
+    .replace(PCT_STRIP_RE, '')
+    .replace(POS_STRIP_RE, '')
+    .trim();
+}
+
 function searchGenes(allGenes, query) {
   if (!query || query.length < 1) return [];
-  const q = query.toLowerCase().trim();
+  const cleaned = stripQualifier(query.toLowerCase().trim());
+  const q = cleaned || query.toLowerCase().trim();
+  if (!q) return [];
   const results = [];
   for (const gene of allGenes) {
     const s = scoreMatch(gene, q);
@@ -106,6 +128,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
   const containerRef = useRef(null);
 
   useEffect(() => {
+    if (detectQualifier(inputValue) === 'het') setHetMode(true);
     const results = searchGenes(allGenes, inputValue);
     setSuggestions(results);
     setActiveIdx(0);

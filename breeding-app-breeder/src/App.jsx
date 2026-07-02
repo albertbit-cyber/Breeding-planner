@@ -10611,10 +10611,16 @@ export default function BreedingPlannerApp() {
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
-                              const normalizedGenetics = normalizeMorphHetLists([
-                                ...(Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []),
-                                ...(Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []),
-                              ]);
+                              const normalizedGenetics = {
+                                morphs: uniqueGeneTokens(
+                                  (Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : [])
+                                    .map(m => String(m).trim()).filter(Boolean)
+                                ),
+                                hets: uniqueGeneTokens(
+                                  (Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : [])
+                                    .map(h => String(h).trim()).filter(Boolean)
+                                ),
+                              };
                               setSnakes(prev => prev.map(s => s.id === oldId ? ({
                                 ...editSnakeDraft,
                                 id: newId,
