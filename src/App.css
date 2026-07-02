@@ -2837,3 +2837,787 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE APP REDESIGN — mbl-* namespace
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Shared shell ──────────────────────────────────────────────────────── */
+.mbl-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: 16px;
+  line-height: 1.5;
+  position: relative;
+}
+
+.mbl-screen {
+  padding: 0.75rem 0.85rem 7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* ─── Toast ─────────────────────────────────────────────────────────────── */
+.mbl-toast {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  min-width: 220px;
+  background: #1a2e24;
+  color: #d6f0de;
+  border: 1px solid #2d5a3e;
+  border-radius: 12px;
+  padding: 0.75rem 1.1rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  z-index: 9999;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+/* ─── Spinner ────────────────────────────────────────────────────────────── */
+.mbl-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: mbl-spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes mbl-spin { to { transform: rotate(360deg); } }
+
+.mbl-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* ─── Offline banner ─────────────────────────────────────────────────────── */
+.mbl-offline-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  background: color-mix(in srgb, var(--color-card) 90%, var(--color-secondary));
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.mbl-offline-bar.is-offline {
+  background: #5f2619;
+  color: #fff;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.mbl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-secondary) 20%, var(--color-card));
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mbl-btn--primary {
+  background: var(--color-primary);
+  color: var(--color-bg);
+  border-color: transparent;
+}
+.mbl-btn--wide { width: 100%; }
+.mbl-btn--sm { min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+.mbl-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+.mbl-text-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+}
+.mbl-text-btn--sm { font-size: 0.85rem; }
+
+.mbl-icon-btn {
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.mbl-back-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0;
+}
+
+/* ─── Inputs ─────────────────────────────────────────────────────────────── */
+.mbl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.mbl-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.mbl-field input,
+.mbl-field select,
+.mbl-field textarea {
+  min-height: 46px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  font-size: 1rem;
+}
+.mbl-field textarea { min-height: 80px; resize: vertical; }
+
+/* ─── Shared section helpers ─────────────────────────────────────────────── */
+.mbl-section-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  padding: 0.4rem 0 0.1rem;
+}
+.mbl-empty {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+/* ─── Animal row ─────────────────────────────────────────────────────────── */
+.mbl-animal-row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+  min-height: 68px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.mbl-animal-row > div { display: flex; flex-direction: column; gap: 0.1rem; }
+.mbl-animal-row strong { font-weight: 800; }
+.mbl-animal-row small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+.mbl-avatar-sm {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 25%, var(--color-card));
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1.1rem;
+  grid-row: 1 / span 3;
+}
+
+/* ─── Search ─────────────────────────────────────────────────────────────── */
+.mbl-search-row { padding: 0.5rem 0 0.25rem; }
+.mbl-search-input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+}
+
+/* ─── Manual entry row ───────────────────────────────────────────────────── */
+.mbl-manual-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+}
+.mbl-manual-row input {
+  min-height: 46px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+}
+
+/* ─── Camera ─────────────────────────────────────────────────────────────── */
+.mbl-camera-box {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #050908;
+  aspect-ratio: 4/3;
+}
+.mbl-camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.mbl-camera-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 55%;
+  aspect-ratio: 1;
+  border: 3px solid var(--color-primary);
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+}
+
+/* ─── Quick action buttons ───────────────────────────────────────────────── */
+.mbl-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.mbl-quick-btn {
+  min-height: 52px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 15%, var(--color-card));
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mbl-quick-actions--card { margin: 0.5rem 0; }
+
+/* ─── Segment control ────────────────────────────────────────────────────── */
+.mbl-seg {
+  display: flex;
+  gap: 0.5rem;
+}
+.mbl-seg button {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mbl-seg button.is-active {
+  background: var(--color-primary);
+  color: var(--color-bg);
+  border-color: transparent;
+}
+
+/* ─── Action sheet ───────────────────────────────────────────────────────── */
+.mbl-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: flex-end;
+  z-index: 800;
+}
+.mbl-sheet {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--color-card);
+  border-radius: 20px 20px 0 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+}
+.mbl-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: color-mix(in srgb, var(--color-text) 25%, transparent);
+  border-radius: 99px;
+  margin: 0.75rem auto 0;
+}
+.mbl-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem 0.25rem;
+}
+.mbl-sheet-head h2 { margin: 0; font-size: 1.1rem; }
+.mbl-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1.5rem;
+}
+.mbl-note-area {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 0.65rem;
+  font: inherit;
+  resize: vertical;
+}
+
+/* ─── LOGIN SCREEN ───────────────────────────────────────────────────────── */
+.mbl-login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  padding: 1.5rem;
+}
+.mbl-login-card {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+.mbl-login-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  object-fit: contain;
+  margin-bottom: 0.25rem;
+}
+.mbl-login-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  text-align: center;
+}
+.mbl-login-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  text-align: center;
+}
+.mbl-login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+.mbl-login-error {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(180,40,30,0.12);
+  color: #e05050;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* ─── MODE SELECT SCREEN ─────────────────────────────────────────────────── */
+.mbl-mode-shell {
+  min-height: 100vh;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2.5rem 1.25rem 2rem;
+  gap: 1rem;
+}
+.mbl-mode-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+.mbl-mode-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+.mbl-mode-greeting {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.mbl-mode-signout {
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.mbl-mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 400px;
+  margin-top: 0.5rem;
+}
+.mbl-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  min-height: 130px;
+  padding: 1.25rem;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.mbl-mode-card:active { transform: scale(0.97); }
+.mbl-mode-icon { font-size: 1.5rem; }
+.mbl-mode-card strong { font-size: 1.2rem; font-weight: 900; }
+.mbl-mode-card span { font-size: 0.88rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.mbl-mode-card--terminal { border-left: 4px solid var(--color-primary); }
+.mbl-mode-card--full { border-left: 4px solid var(--color-accent, var(--color-primary)); }
+
+/* ─── TERMINAL MODE ──────────────────────────────────────────────────────── */
+.mbl-terminal-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.mbl-terminal-topbar .mbl-text-btn:last-child { text-align: right; }
+.mbl-terminal-badge {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  justify-self: center;
+}
+
+.mbl-terminal-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+.mbl-terminal-hero { text-align: center; padding: 0.5rem 0; }
+.mbl-terminal-hero h1 { margin: 0; font-size: 1.8rem; }
+.mbl-terminal-hero p  { margin: 0.25rem 0 0; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+.mbl-recent-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.mbl-recent-section h2 { margin: 0; font-size: 0.9rem; font-weight: 800; }
+
+.mbl-terminal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 0.85rem 5rem;
+  overflow-y: auto;
+}
+.mbl-card-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.mbl-card-topbar span { font-weight: 700; flex: 1; }
+
+.mbl-card-identity {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.65rem 0;
+}
+.mbl-avatar-placeholder {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-card));
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+}
+.mbl-avatar-lg { width: 72px; height: 72px; font-size: 1.8rem; }
+.mbl-card-identity h2 { margin: 0; font-size: 1.3rem; }
+.mbl-card-identity p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.mbl-card-identity small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+
+/* ─── Edit form ──────────────────────────────────────────────────────────── */
+.mbl-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+.mbl-edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+/* ─── FULL MODE ──────────────────────────────────────────────────────────── */
+.mbl-full-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.mbl-full-title { font-weight: 900; font-size: 1rem; }
+
+.mbl-full-body { flex: 1; overflow-y: auto; }
+
+.mbl-hero-row { text-align: center; padding: 0.5rem 0; }
+.mbl-hero-row h1 { margin: 0; font-size: 1.5rem; }
+.mbl-hero-row p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+/* ─── Bottom navigation ──────────────────────────────────────────────────── */
+.mbl-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 520px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: var(--color-card);
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 100;
+}
+.mbl-nav-btn {
+  min-height: 56px;
+  background: none;
+  border: none;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.25rem;
+}
+.mbl-nav-btn.is-active {
+  color: var(--color-primary);
+  font-weight: 900;
+}
+
+/* ─── Animal profile (full mode) ─────────────────────────────────────────── */
+.mbl-profile { display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 0.85rem 7rem; }
+.mbl-profile-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.mbl-profile-topbar span { font-weight: 700; }
+.mbl-profile-hero {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 0.85rem;
+  align-items: center;
+}
+.mbl-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.mbl-profile-hero-text h1 { margin: 0; font-size: 1.35rem; }
+.mbl-profile-hero-text p  { margin: 0.25rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.mbl-profile-hero-text small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+
+.mbl-subtabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  padding-bottom: 0.5rem;
+}
+.mbl-subtabs button {
+  background: none;
+  border: none;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+}
+.mbl-subtabs button.is-active {
+  background: color-mix(in srgb, var(--color-primary) 15%, var(--color-card));
+  color: var(--color-primary);
+}
+
+.mbl-data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.mbl-data-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 12px;
+  background: var(--color-card);
+}
+.mbl-data-card span { font-size: 0.78rem; color: color-mix(in srgb, var(--color-text) 55%, transparent); font-weight: 700; }
+.mbl-data-card strong { font-size: 0.95rem; }
+
+.mbl-log-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.mbl-log-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 9%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+}
+.mbl-log-row strong { font-size: 0.85rem; font-weight: 800; }
+.mbl-log-row span   { font-size: 0.9rem; }
+.mbl-log-row small  { font-size: 0.78rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+
+/* ─── Task cards ─────────────────────────────────────────────────────────── */
+.mbl-task-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 12px;
+  background: var(--color-card);
+}
+.mbl-task-info { display: flex; flex-direction: column; gap: 0.15rem; }
+.mbl-task-info strong { font-weight: 800; }
+.mbl-task-info span  { font-size: 0.9rem; }
+.mbl-task-info small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.mbl-task-btns { display: flex; flex-direction: column; gap: 0.4rem; }
+
+/* ─── Rack mode ──────────────────────────────────────────────────────────── */
+.mbl-rack-room {
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 14px;
+  padding: 0.75rem;
+  background: var(--color-card);
+}
+.mbl-rack-room h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+.mbl-rack h3 { margin: 0.5rem 0 0.35rem; font-size: 0.85rem; font-weight: 700; }
+.mbl-rack-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+.mbl-tub {
+  min-height: 56px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-card));
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  cursor: pointer;
+  font: inherit;
+}
+.mbl-tub strong { font-size: 0.82rem; font-weight: 900; }
+.mbl-tub small  { font-size: 0.65rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.mbl-tub.is-alert  { border-color: #e05050; background: rgba(224,80,80,0.1); }
+.mbl-tub.is-feed   { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-card)); }
+
+/* ─── More tab ───────────────────────────────────────────────────────────── */
+.mbl-more-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+.mbl-more-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 90px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 14px;
+  background: var(--color-card);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0.85rem;
+}
+.mbl-more-card span { font-size: 1.5rem; }
+.mbl-more-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.mbl-more-row {
+  min-height: 52px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.mbl-more-row--danger { color: #e05050; border-color: rgba(224,80,80,0.25); }
+
+@media (max-width: 380px) {
+  .mbl-quick-actions { grid-template-columns: repeat(3, 1fr); }
+  .mbl-rack-grid { grid-template-columns: repeat(3, 1fr); }
+  .mbl-data-grid { grid-template-columns: 1fr; }
+}
