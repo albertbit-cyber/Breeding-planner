@@ -2538,6 +2538,148 @@ function sanitizePairingRecord(raw) {
   return withPairingLifecycleDefaults({ ...raw });
 }
 
+const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
+
+function getSyncRecordKey(record, fallbackPrefix, index) {
+  const candidates = [
+    record?.id,
+    record?.appAnimalId,
+    record?.animalId,
+    record?.appPairingId,
+    record?.pairingId,
+    record?.name,
+    record?.label,
+  ];
+  const value = candidates.map(item => String(item || '').trim()).find(Boolean);
+  return value || `${fallbackPrefix}-${index + 1}`;
+}
+
+function getSyncTimestamp(value) {
+  const candidates = [
+    value?.updatedAt,
+    value?.modifiedAt,
+    value?.lastModifiedAt,
+    value?.createdAt,
+    value?.metadata?.updatedAt,
+    value?.metadata?.modifiedAt,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const time = new Date(candidate).getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return 0;
+}
+
+function getLogEntryKey(entry, key, index) {
+  if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
+  const explicit = [entry.id, entry.logId, entry.createdAt && `${entry.createdAt}:${entry.actionType || key}`]
+    .map(item => String(item || '').trim())
+    .find(Boolean);
+  if (explicit) return explicit;
+  return [
+    key,
+    entry.date || '',
+    entry.time || '',
+    entry.result || entry.outcome || '',
+    entry.feed || entry.food || entry.prey || '',
+    entry.size || entry.weight || entry.grams || '',
+    entry.notes || entry.note || '',
+  ].map(part => String(part || '').trim()).join('|') || `${key}-${index}`;
+}
+
+function mergeLogArrays(localEntries = [], backendEntries = [], key) {
+  const rows = [
+    ...(Array.isArray(localEntries) ? localEntries : []),
+    ...(Array.isArray(backendEntries) ? backendEntries : []),
+  ].filter(entry => entry && typeof entry === 'object');
+  const byKey = new Map();
+  rows.forEach((entry, index) => {
+    const entryKey = getLogEntryKey(entry, key, index);
+    const existing = byKey.get(entryKey);
+    if (!existing || getSyncTimestamp(entry) >= getSyncTimestamp(existing)) {
+      byKey.set(entryKey, { ...existing, ...entry });
+    }
+  });
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTime = getSyncTimestamp(a) || new Date(a.date || a.createdAt || 0).getTime() || 0;
+    const bTime = getSyncTimestamp(b) || new Date(b.date || b.createdAt || 0).getTime() || 0;
+    return bTime - aTime;
+  });
+}
+
+function mergeArrayValues(...values) {
+  const merged = [];
+  const seen = new Set();
+  values.flatMap(value => (Array.isArray(value) ? value : [])).forEach(item => {
+    const normalized = String(item || '').trim();
+    if (!normalized || seen.has(normalized.toLowerCase())) return;
+    seen.add(normalized.toLowerCase());
+    merged.push(normalized);
+  });
+  return merged;
+}
+
+function mergeAnimalRecord(localAnimal, backendAnimal) {
+  if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
+  if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
+  const localTime = getSyncTimestamp(localAnimal);
+  const backendTime = getSyncTimestamp(backendAnimal);
+  const base = backendTime > localTime ? backendAnimal : localAnimal;
+  const other = backendTime > localTime ? localAnimal : backendAnimal;
+  const logs = {};
+  const allLogKeys = Array.from(new Set([
+    ...SYNC_LOG_KEYS,
+    ...Object.keys(localAnimal.logs || {}),
+    ...Object.keys(backendAnimal.logs || {}),
+  ]));
+  allLogKeys.forEach(key => {
+    logs[key] = mergeLogArrays(localAnimal.logs?.[key], backendAnimal.logs?.[key], key);
+  });
+  return sanitizeSnakeRecord({
+    ...other,
+    ...base,
+    morphs: mergeArrayValues(other.morphs, base.morphs),
+    hets: mergeArrayValues(other.hets, base.hets),
+    possibleHets: mergeArrayValues(other.possibleHets, base.possibleHets),
+    tags: mergeArrayValues(other.tags, base.tags),
+    groups: mergeArrayValues(other.groups, base.groups),
+    photos: mergeLogArrays(other.photos, base.photos, 'photo').slice(0, MAX_PHOTOS_PER_SNAKE),
+    logs,
+  });
+}
+
+function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord) {
+  const map = new Map();
+  const add = (item, source, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return;
+    const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, sanitized);
+      return;
+    }
+    map.set(key, mergeRecord ? mergeRecord(source === 'local' ? sanitized : existing, source === 'backend' ? sanitized : existing) : (
+      getSyncTimestamp(sanitized) > getSyncTimestamp(existing) ? { ...existing, ...sanitized } : existing
+    ));
+  };
+  (Array.isArray(localItems) ? localItems : []).forEach((item, index) => add(item, 'local', index));
+  (Array.isArray(backendItems) ? backendItems : []).forEach((item, index) => add(item, 'backend', index));
+  return Array.from(map.values());
+}
+
+function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
+  const localSnakes = Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [];
+  const backendSnakes = Array.isArray(backendSnapshot.snakes) ? backendSnapshot.snakes : [];
+  const localPairings = Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [];
+  const backendPairings = Array.isArray(backendSnapshot.pairings) ? backendSnapshot.pairings : [];
+  return {
+    snakes: mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord),
+    pairings: mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing'),
+  };
+}
+
 function normalizeBackupFileEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const payload = raw.payload && typeof raw.payload === 'object' ? raw.payload : null;
@@ -5955,6 +6097,11 @@ export default function BreedingPlannerApp() {
     lastSavedSignature: '',
   });
   const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const [cloudSyncStatus, setCloudSyncStatus] = useState({
+    state: 'idle',
+    lastSyncedAt: null,
+    message: '',
+  });
   const sharedBreederDataReady = sharedBackendSnapshot?.state === 'connected'
     && sharedBackendSnapshot?.authStatus === 'authorized';
   const handleAnimalViewTabChange = useCallback((nextView) => {
@@ -6277,69 +6424,69 @@ export default function BreedingPlannerApp() {
     latestPlannerSnapshotRef.current = { snakes, pairings };
   }, [snakes, pairings]);
 
+  const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+    if (!sharedBreederDataReady) {
+      const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
+      if (!silent) setCloudSyncStatus({ state: 'error', lastSyncedAt: null, message });
+      throw new Error(message);
+    }
+    if (backendPlannerSyncRef.current.status === 'loading') {
+      const message = 'Cloud sync is already running.';
+      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message }));
+      return null;
+    }
+
+    backendPlannerSyncRef.current.status = 'loading';
+    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+
+    try {
+      const localSnapshot = latestPlannerSnapshotRef.current;
+      const snapshot = await fetchBreederSnapshot();
+      const backendSnapshot = {
+        snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
+        pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
+      };
+      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
+      const signature = JSON.stringify(merged);
+
+      setSnakes(merged.snakes);
+      setPairings(merged.pairings);
+      latestPlannerSnapshotRef.current = merged;
+
+      await saveBreederSnapshot({
+        animals: merged.snakes,
+        pairings: merged.pairings,
+        clutches: [],
+      });
+
+      const syncedAt = new Date().toISOString();
+      backendPlannerSyncRef.current.seeded = true;
+      backendPlannerSyncRef.current.status = 'ready';
+      backendPlannerSyncRef.current.lastSavedSignature = signature;
+      setCloudSyncStatus({
+        state: 'success',
+        lastSyncedAt: syncedAt,
+        message: `Synced ${merged.snakes.length} snakes and ${merged.pairings.length} pairings with the cloud database.`,
+      });
+      return { ...merged, syncedAt };
+    } catch (error) {
+      backendPlannerSyncRef.current.status = 'idle';
+      const message = error?.message || 'Cloud sync failed.';
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
+      throw error;
+    }
+  }, [sharedBackendSnapshot?.message, sharedBreederDataReady]);
+
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'idle') return;
 
     let cancelled = false;
-    backendPlannerSyncRef.current.status = 'loading';
-
-    fetchBreederSnapshot()
-      .then((snapshot) => {
-        if (cancelled) return;
-        const backendSnakes = Array.isArray(snapshot?.animals)
-          ? snapshot.animals.map(sanitizeSnakeRecord).filter(Boolean)
-          : [];
-        const backendPairings = Array.isArray(snapshot?.pairings)
-          ? snapshot.pairings.map(sanitizePairingRecord).filter(Boolean)
-          : [];
-
-        if (backendSnakes.length || backendPairings.length) {
-          setSnakes(backendSnakes);
-          setPairings(backendPairings);
-          backendPlannerSyncRef.current.seeded = true;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({
-            snakes: backendSnakes,
-            pairings: backendPairings,
-          });
-          return;
-        }
-
-        const localSnapshot = latestPlannerSnapshotRef.current;
-        const hasLocalData = Array.isArray(localSnapshot.snakes) && localSnapshot.snakes.length > 0
-          || Array.isArray(localSnapshot.pairings) && localSnapshot.pairings.length > 0;
-        if (!hasLocalData) {
-          backendPlannerSyncRef.current.seeded = true;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({ snakes: [], pairings: [] });
-          return;
-        }
-
-        saveBreederSnapshot({
-          animals: localSnapshot.snakes,
-          pairings: localSnapshot.pairings,
-          clutches: [],
-        })
-          .then(() => {
-            if (cancelled) return;
-            backendPlannerSyncRef.current.seeded = true;
-            backendPlannerSyncRef.current.status = 'ready';
-            backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify(localSnapshot);
-          })
-          .catch((error) => {
-            if (!cancelled) {
-              backendPlannerSyncRef.current.status = 'idle';
-              console.warn('Failed to seed shared breeder snapshot', error);
-            }
-          });
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          backendPlannerSyncRef.current.status = 'idle';
-          console.warn('Failed to load shared breeder snapshot', error);
-        }
-      });
+    runCloudBreederSync({ silent: true }).catch((error) => {
+      if (!cancelled) {
+        console.warn('Failed to sync shared breeder snapshot', error);
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -6347,7 +6494,7 @@ export default function BreedingPlannerApp() {
         backendPlannerSyncRef.current.status = 'idle';
       }
     };
-  }, [electronDataReady, sharedBreederDataReady]);
+  }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6776,9 +6923,20 @@ export default function BreedingPlannerApp() {
     const saveTimer = setTimeout(() => {
       saveBreederSnapshot(payload)
         .then(() => {
+          const syncedAt = new Date().toISOString();
           backendPlannerSyncRef.current.lastSavedSignature = signature;
+          setCloudSyncStatus({
+            state: 'success',
+            lastSyncedAt: syncedAt,
+            message: `Saved ${snakes.length} snakes and ${pairings.length} pairings to the cloud database.`,
+          });
         })
         .catch((error) => {
+          setCloudSyncStatus(prev => ({
+            ...prev,
+            state: 'error',
+            message: error?.message || 'Failed to save shared breeder snapshot.',
+          }));
           console.warn('Failed to save shared breeder snapshot', error);
         });
     }, 600);
@@ -9906,6 +10064,9 @@ export default function BreedingPlannerApp() {
             onDeleteVaultEntry={deleteBackupVaultEntry}
             snakes={snakes}
             pairings={pairings}
+            sharedBackendSnapshot={sharedBackendSnapshot}
+            cloudSyncStatus={cloudSyncStatus}
+            onSyncCloudDatabase={runCloudBreederSync}
             animalExportFields={animalExportFields}
             setAnimalExportFields={setAnimalExportFields}
             pairingExportFields={pairingExportFields}
@@ -15051,6 +15212,9 @@ function BreederSection({
   onDeleteVaultEntry,
   snakes,
   pairings,
+  sharedBackendSnapshot,
+  cloudSyncStatus,
+  onSyncCloudDatabase,
   animalExportFields,
   setAnimalExportFields,
   pairingExportFields,
@@ -15205,6 +15369,15 @@ function BreederSection({
     && backupFeedback.context.startsWith('vault')
     ? backupFeedback
     : null;
+  const cloudFeedback = backupFeedback?.context === 'cloud' ? backupFeedback : null;
+  const backendStateLabel = sharedBackendSnapshot?.state
+    ? sharedBackendSnapshot.state.replace(/-/g, ' ')
+    : 'unknown';
+  const backendAuthLabel = sharedBackendSnapshot?.authStatus || 'unknown';
+  const backendUrlLabel = sharedBackendSnapshot?.baseUrl || sharedBackendSnapshot?.config?.baseUrl || 'Not configured';
+  const cloudLastSyncDisplay = cloudSyncStatus?.lastSyncedAt
+    ? formatDateTimeForDisplay(cloudSyncStatus.lastSyncedAt)
+    : 'Never';
   const animalExportFeedback = exportFeedback && exportFeedback.context === 'animals' ? exportFeedback : null;
   const pairingExportFeedback = exportFeedback && exportFeedback.context === 'pairings' ? exportFeedback : null;
   const hasAnimalData = Array.isArray(snakes) && snakes.length > 0;
@@ -16183,6 +16356,41 @@ function BreederSection({
       });
     }
   }, [onTriggerAutoBackup]);
+
+  const handleCloudSyncNow = useCallback(async () => {
+    if (typeof onSyncCloudDatabase !== 'function') {
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'error',
+        message: 'Cloud sync is unavailable.',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    setBackupFeedback({
+      context: 'cloud',
+      type: 'info',
+      message: 'Syncing local data with cloud database.',
+      timestamp: new Date().toISOString(),
+    });
+    try {
+      const result = await onSyncCloudDatabase({ silent: false });
+      if (!result) return;
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'success',
+        message: `Synced ${result.snakes?.length || 0} snakes and ${result.pairings?.length || 0} pairings.`,
+        timestamp: result.syncedAt || new Date().toISOString(),
+      });
+    } catch (err) {
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'error',
+        message: err?.message || 'Cloud sync failed.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [onSyncCloudDatabase]);
 
   const handleDownloadVaultEntry = useCallback((entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
@@ -17545,6 +17753,53 @@ function BreederSection({
               <div className={cx('text-xs', autoFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {autoFeedback.message}
                 {autoFeedback.timestamp ? ` • ${formatDateTimeForDisplay(autoFeedback.timestamp)}` : ''}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
+            <div>
+              <div className="font-semibold text-sm">Cloud database sync</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Backend URL</div>
+                <div className="mt-1 break-words text-neutral-800">{backendUrlLabel}</div>
+              </div>
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Connection</div>
+                <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
+              </div>
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Authentication</div>
+                <div className="mt-1 capitalize text-neutral-800">{backendAuthLabel}</div>
+              </div>
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Last cloud sync</div>
+                <div className="mt-1 text-neutral-800">{cloudLastSyncDisplay}</div>
+              </div>
+            </div>
+            <div className="text-xs text-neutral-500">
+              Ready to sync {Array.isArray(snakes) ? snakes.length : 0} snakes and {Array.isArray(pairings) ? pairings.length : 0} pairings.
+              {cloudSyncStatus?.message ? <span>{' '}Latest status: {cloudSyncStatus.message}</span> : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), cloudSyncStatus?.state === 'loading' ? 'opacity-60 cursor-wait' : '')}
+                onClick={handleCloudSyncNow}
+                disabled={cloudSyncStatus?.state === 'loading'}
+              >
+                {cloudSyncStatus?.state === 'loading' ? 'Syncing...' : 'Sync cloud database'}
+              </button>
+            </div>
+            {cloudFeedback && (
+              <div className={cx('text-xs', cloudFeedback.type === 'success' ? 'text-emerald-600' : cloudFeedback.type === 'info' ? 'text-neutral-600' : 'text-red-600')}>
+                {cloudFeedback.message}
+                {cloudFeedback.timestamp ? ` - ${formatDateTimeForDisplay(cloudFeedback.timestamp)}` : ''}
               </div>
             )}
           </div>
