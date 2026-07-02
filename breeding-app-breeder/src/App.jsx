@@ -5604,52 +5604,6 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   )}
                 </div>
               )}
-              <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  className="w-full border rounded-lg px-2 py-1 text-sm"
-                  value={statusTagInput}
-                  onChange={e => setStatusTagInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddStatusTag(); } }}
-                  placeholder={t("ui.animals.addAnimal.createNewTag", { defaultValue: "Create new tag" })}
-                />
-                <button
-                  type="button"
-                  className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', statusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
-                  onClick={handleAddStatusTag}
-                  disabled={!statusTagInput.trim()}
-                >
-                  {t("ui.animals.addAnimal.addTag", { defaultValue: "Add tag" })}
-                </button>
-              </div>
-              {Array.isArray(statusOptions) && statusOptions.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {statusOptions.map(tag => {
-                    const isCustom = customTagLookup.has(tag.toLowerCase());
-                    return (
-                      <span
-                        key={tag}
-                        className={cx(
-                          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px]',
-                          isCustom ? 'border border-neutral-200 bg-neutral-50 text-neutral-600' : 'border border-neutral-100 bg-white text-neutral-500'
-                        )}
-                      >
-                        <span>{resolveStatusLabel(tag)}</span>
-                        {typeof onDeleteStatusTag === 'function' && (
-                          <button
-                            type="button"
-                            className="h-4 w-4 rounded-full border border-neutral-300 text-[10px] leading-[10px] text-neutral-500 hover:border-rose-400 hover:text-rose-500"
-                            title="Delete tag"
-                            onClick={() => onDeleteStatusTag(tag)}
-                          >
-                            x
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="mt-1 text-[11px] text-neutral-500">{t("ui.animals.addAnimal.tagHelp", { defaultValue: "Tags let you group animals for availability. Removing a tag clears it from any animals using it." })}</div>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.genetics", { defaultValue: "Genetics (morphs & hets)" })}</label>
@@ -8301,15 +8255,14 @@ export default function BreedingPlannerApp() {
     const sex = ensureSex(newAnimal.sex, 'F');
     const resolvedMorphHetInput = await resolveLeucisticInText(newAnimal.morphHetInput || '', 'Add Animal save');
     const parsedMorphHet = splitMorphHetInput(resolvedMorphHetInput || '');
-    const rawMorphList = Array.isArray(newAnimal.morphs)
-      ? newAnimal.morphs.map(entry => String(entry).trim()).filter(Boolean)
-      : parsedMorphHet.morphs;
-    const rawHetList = Array.isArray(newAnimal.hets)
-      ? newAnimal.hets.map(entry => String(entry).trim()).filter(Boolean)
-      : parsedMorphHet.hets;
-    const normalizedGenetics = normalizeMorphHetLists([...(rawMorphList || []), ...(rawHetList || [])]);
-    const morphList = normalizedGenetics.morphs;
-    const hetList = normalizedGenetics.hets;
+    const morphList = uniqueGeneTokens(
+      (Array.isArray(newAnimal.morphs) ? newAnimal.morphs : parsedMorphHet.morphs)
+        .map(entry => String(entry).trim()).filter(Boolean)
+    );
+    const hetList = uniqueGeneTokens(
+      (Array.isArray(newAnimal.hets) ? newAnimal.hets : parsedMorphHet.hets)
+        .map(entry => String(entry).trim()).filter(Boolean)
+    );
     const existingIds = snakes.map(snake => snake.id);
     const normalizedBirthDate = normalizeBirthDateValue(newAnimal.birthDate || null);
     const birthYear = extractYearFromDateString(normalizedBirthDate);
