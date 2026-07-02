@@ -30,7 +30,16 @@ import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
-import { fetchBreederSnapshot, saveBreederSnapshot, fetchMyListings, saveMyListings } from "./shared/apiClient";
+import {
+  checkFeatureAccess,
+  clearAuthToken,
+  fetchBreederSnapshot,
+  fetchMyListings,
+  fetchPublicSubscriptionTiers,
+  getCurrentUser,
+  saveBreederSnapshot,
+  saveMyListings,
+} from "./shared/apiClient";
 import {
   GENE_GROUPS,
   GENE_ALIASES,
@@ -15324,6 +15333,14 @@ function BreederSection({
   const geneAliasImportInputRef = useRef(null);
   const [backupFeedback, setBackupFeedback] = useState(null);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
+  const [accountState, setAccountState] = useState({
+    loading: false,
+    loaded: false,
+    error: '',
+    user: null,
+    tiers: [],
+    access: {},
+  });
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
@@ -15340,6 +15357,15 @@ function BreederSection({
   const pairingFieldSections = useMemo(() => groupFieldDefsBySection(PAIRING_EXPORT_FIELD_DEFS), []);
   const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
   const pairingFieldSet = useMemo(() => new Set(normalizedPairingExportFields), [normalizedPairingExportFields]);
+  const accountFeatureLabels = useMemo(() => ({
+    'animals.create': 'Animal records',
+    'breeding.pairings': 'Pairings',
+    'mobile.scan': 'Mobile QR scan',
+    'mobile.profile': 'Mobile animal profile',
+    'mobile.quick_feed': 'Mobile feeding logs',
+    'lab.orders': 'Lab orders',
+    'marketplace.create_listing': 'Marketplace listings',
+  }), []);
   const vaultLimitValue = typeof normalizedBackupSettings.maxVaultEntries === 'number' && normalizedBackupSettings.maxVaultEntries > 0
     ? String(normalizedBackupSettings.maxVaultEntries)
     : 'unlimited';
@@ -16306,6 +16332,61 @@ function BreederSection({
     }
   }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
+  const loadAccountData = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, loading: true, error: '' }));
+    const featureKeys = Object.keys(accountFeatureLabels);
+    try {
+      const [userResult, tiersResult, ...accessResults] = await Promise.allSettled([
+        getCurrentUser(),
+        fetchPublicSubscriptionTiers(),
+        ...featureKeys.map(featureKey => checkFeatureAccess(featureKey)),
+      ]);
+      const user = userResult.status === 'fulfilled' ? userResult.value?.user || null : null;
+      const tiers = tiersResult.status === 'fulfilled' && Array.isArray(tiersResult.value?.tiers)
+        ? tiersResult.value.tiers
+        : [];
+      const access = {};
+      featureKeys.forEach((featureKey, index) => {
+        const result = accessResults[index];
+        access[featureKey] = result?.status === 'fulfilled'
+          ? result.value
+          : { allowed: false, featureKey, reason: result?.reason?.message || 'Unable to check access.' };
+      });
+      const firstError = [userResult, tiersResult, ...accessResults]
+        .find(result => result.status === 'rejected')?.reason;
+      setAccountState({
+        loading: false,
+        loaded: true,
+        error: firstError?.message || '',
+        user,
+        tiers,
+        access,
+      });
+    } catch (error) {
+      setAccountState(prev => ({
+        ...prev,
+        loading: false,
+        loaded: true,
+        error: error?.message || 'Unable to load account data.',
+      }));
+    }
+  }, [accountFeatureLabels]);
+
+  useEffect(() => {
+    if (setupTab !== 'account') return;
+    if (accountState.loading || accountState.loaded) return;
+    loadAccountData();
+  }, [accountState.loaded, accountState.loading, loadAccountData, setupTab]);
+
+  const handleAccountSignOut = useCallback(() => {
+    clearAuthToken('breeder');
+    setAccountState(prev => ({
+      ...prev,
+      user: null,
+      error: 'Signed out locally. Reload or sign in again to reconnect this device.',
+    }));
+  }, []);
+
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
     if (typeof updateBackupSettings === 'function') {
@@ -16634,6 +16715,7 @@ function BreederSection({
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
+        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>My Account</TabButton>
         <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
         {isDevEnvironment && (
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
@@ -17959,6 +18041,177 @@ function BreederSection({
           </div>
         </div>
       )}
+
+      {setupTab === 'account' && (
+        <div className="border-t pt-4 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-neutral-800">My Account</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg border text-sm"
+              onClick={loadAccountData}
+              disabled={accountState.loading}
+            >
+              {accountState.loading ? 'Refreshing...' : 'Refresh account'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <section className="rounded-xl border bg-white p-4 space-y-3">
+              <div>
+                <div className="font-semibold text-sm">Login information</div>
+                <div className="text-xs text-neutral-500 mt-1">This is the account connected to the shared backend.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
+                  <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
+                  <div className="mt-1">{accountState.user?.fullName || '-'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Role</div>
+                  <div className="mt-1 capitalize">{accountState.user?.role || '-'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">User ID</div>
+                  <div className="mt-1 break-words text-xs">{accountState.user?.id || '-'}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
+                  Sign out on this device
+                </button>
+              </div>
+            </section>
+
+            <section className="rounded-xl border bg-white p-4 space-y-3">
+              <div>
+                <div className="font-semibold text-sm">Backend connection</div>
+                <div className="text-xs text-neutral-500 mt-1">Cloud sync and subscription checks use this backend session.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Backend URL</div>
+                  <div className="mt-1 break-words">{sharedBackendSnapshot?.baseUrl || 'Not configured'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Connection</div>
+                  <div className="mt-1 capitalize">{String(sharedBackendSnapshot?.state || 'unknown').replace(/-/g, ' ')}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Authentication</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || 'unknown'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Sync readiness</div>
+                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? 'Ready' : 'Needs sign-in/configuration'}</div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <div className="font-semibold text-sm">Subscription and feature access</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  Feature access is checked against the backend subscription tier for this account.
+                </div>
+              </div>
+              <div className="text-xs text-neutral-500">
+                Current tier: {Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
+                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
+                  || 'Unknown'}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+              {Object.entries(accountFeatureLabels).map(([featureKey, label]) => {
+                const access = accountState.access?.[featureKey] || {};
+                const allowed = access.allowed === true;
+                const usageText = typeof access.currentUsage !== 'undefined'
+                  ? `${access.currentUsage}${typeof access.limit !== 'undefined' && access.limit !== null ? ` / ${access.limit}` : ''}`
+                  : '';
+                return (
+                  <div key={featureKey} className="rounded-lg border bg-neutral-50 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-medium">{label}</div>
+                      <span className={cx('text-[11px] px-2 py-0.5 rounded-full border', allowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700')}>
+                        {allowed ? 'Included' : 'Limited'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-neutral-500">{featureKey}</div>
+                    {access.reason ? <div className="mt-1 text-xs text-amber-700">{access.reason}</div> : null}
+                    {usageText ? <div className="mt-1 text-xs text-neutral-600">Usage: {usageText}</div> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div>
+              <div className="font-semibold text-sm">Plans</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Available public plans from the backend. Upgrade and downgrade checkout actions require a billing endpoint before they can be activated.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => (
+                <div key={tier.id || tier.key || tier.name} className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
+                      {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
+                    </div>
+                    {tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
+                  </div>
+                  <div className="text-sm">
+                    {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
+                  </div>
+                  <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
+                    Change plan
+                  </button>
+                </div>
+              ))}
+              {accountState.loaded && !accountState.tiers.length ? (
+                <div className="text-sm text-neutral-500">No public subscription plans are available from the backend.</div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div>
+              <div className="font-semibold text-sm">Email and password</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                These controls are reserved for account-security endpoints. They are disabled until the backend exposes authenticated email/password update routes.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
+                Change email
+              </button>
+              <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
+                Change password
+              </button>
+            </div>
+          </section>
+
+          {accountState.error ? (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              {accountState.error}
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {setupTab === 'language' && (
         <div className="border-t pt-4 space-y-4">
           <div className="space-y-2">
