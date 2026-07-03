@@ -48,7 +48,7 @@ export const getAuthScopeForHash = (hashValue?: string): AuthScope => {
   const path = raw.startsWith("/") ? raw : `/${raw}`;
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/lab")) return "lab";
-  return "breeder";
+  return "admin";
 };
 
 export type SharedApiErrorKind =
@@ -543,8 +543,8 @@ export const recoverPassword = async (payload: { email: string; fullName: string
     requiresAuth: false,
   });
 
-export const getCurrentUser = async () => {
-  const data = await request<{ user: unknown }>("/auth/me");
+export const getCurrentUser = async (authScope?: AuthScope) => {
+  const data = await request<{ user: unknown }>("/auth/me", { authScope });
   markAuthorized();
   return data;
 };
