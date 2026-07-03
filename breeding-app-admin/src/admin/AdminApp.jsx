@@ -2,10 +2,14 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import MarketplacePage from "../features/marketplace/MarketplacePage.jsx";
 import {
   fetchAdminDashboard,
+  fetchAdminAccountPanel,
   fetchAdminReports,
   fetchAdminVerificationRequests,
   fetchAdminUserDetail,
   fetchAdminUsers,
+  createAdminUser,
+  changeMyEmail,
+  changeMyPassword,
   addUserFeatureOverride,
   applyAdminReportAction,
   archiveSubscriptionTier,
@@ -23,6 +27,9 @@ import {
   removeUserFeatureOverride,
   resetUserUsage,
   sendAdminNotification,
+  sendAdminUserEmail,
+  resendAdminUserEmailVerification,
+  updateAdminUserEmailVerified,
   updateSubscriptionTier,
   updateAdminGdprRequest,
   updateAdminLabAccount,
@@ -163,7 +170,7 @@ const formatDate = (value) => {
 const ROLE_OPTIONS = ["buyer", "breeder", "lab", "moderator", "admin", "support"];
 const STATUS_OPTIONS = ["active", "pending", "restricted", "suspended", "banned", "deleted"];
 const VERIFICATION_OPTIONS = ["not_applied", "pending", "approved", "rejected", "revoked", "more_info_requested"];
-const SUBSCRIPTION_OPTIONS = ["free", "hobby", "breeder", "professional", "lab", "enterprise"];
+const SUBSCRIPTION_OPTIONS = ["free", "hobby", "breeder", "professional", "enterprise"];
 const ACTIVITY_OPTIONS = ["active_today", "active_this_week", "inactive_30_days"];
 const SUBSCRIPTION_STATUS_OPTIONS = ["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"];
 const PAYMENT_STATUS_OPTIONS = ["none", "paid", "pending", "failed", "waived", "refunded"];
@@ -202,6 +209,7 @@ function AdminLayout({ path, title, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const nav = [
     { label: "Dashboard", items: [["/admin", "Dashboard"]] },
+    { label: "Account", items: [["/admin/team", "Team & Account"]] },
     { label: "Users", items: [
       ["/admin/users", "All Users"],
       ["/admin/users?verification=pending", "Pending Verification"],
@@ -336,6 +344,249 @@ function AdminDashboard() {
           <DashboardCard label="Verified Breeders" value={cards.verifiedBreeders} onClick={() => go("/admin/users?role=breeder&verification=approved")} />
           <DashboardCard label="Active Subscriptions" value={cards.activeSubscriptions} onClick={() => go("/admin/users?subscription=breeder")} />
           <DashboardCard label="Expired Subscriptions" value={cards.expiredSubscriptions} onClick={() => go("/admin/users")} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TeamAccountPage() {
+  const toast = useToast();
+  const [account, setAccount] = useState(null);
+  const [team, setTeam] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [createForm, setCreateForm] = useState({
+    fullName: "",
+    email: "",
+    role: "support",
+    sendInvite: true,
+    temporaryPassword: "",
+  });
+  const [emailForm, setEmailForm] = useState({ userId: "", subject: "", message: "" });
+  const [ownerEmailForm, setOwnerEmailForm] = useState({ email: "", currentPassword: "" });
+  const [ownerPasswordForm, setOwnerPasswordForm] = useState({ currentPassword: "", newPassword: "" });
+  const [ownerBusy, setOwnerBusy] = useState("");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError("");
+    fetchAdminAccountPanel()
+      .then((data) => {
+        setAccount(data.account || null);
+        setTeam(Array.isArray(data.team) ? data.team : []);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load account panel."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const createTeamUser = async (event) => {
+    event.preventDefault();
+    try {
+      const result = await createAdminUser({
+        ...createForm,
+        reason: "Create admin team user",
+      });
+      toast(`Created ${result.user?.email || createForm.email}.`, "success");
+      setCreateForm({ fullName: "", email: "", role: "support", sendInvite: true, temporaryPassword: "" });
+      load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create team user.", "error");
+    }
+  };
+
+  const updateOwnerEmail = async (event) => {
+    event.preventDefault();
+    setOwnerBusy("email");
+    try {
+      const result = await changeMyEmail({
+        email: ownerEmailForm.email,
+        currentPassword: ownerEmailForm.currentPassword,
+      }, "admin");
+      setAccount(result.user || account);
+      setOwnerEmailForm({ email: "", currentPassword: "" });
+      toast(result.message || "Email updated.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update email.", "error");
+    } finally {
+      setOwnerBusy("");
+    }
+  };
+
+  const updateOwnerPassword = async (event) => {
+    event.preventDefault();
+    setOwnerBusy("password");
+    try {
+      const result = await changeMyPassword({
+        currentPassword: ownerPasswordForm.currentPassword,
+        newPassword: ownerPasswordForm.newPassword,
+      }, "admin");
+      setOwnerPasswordForm({ currentPassword: "", newPassword: "" });
+      toast(result.message || "Password updated.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update password.", "error");
+    } finally {
+      setOwnerBusy("");
+    }
+  };
+
+  const sendEmail = async (event) => {
+    event.preventDefault();
+    if (!emailForm.userId) {
+      toast("Choose a team user first.", "error");
+      return;
+    }
+    try {
+      await sendAdminUserEmail(emailForm.userId, {
+        subject: emailForm.subject,
+        message: emailForm.message,
+        reason: "Admin account communication",
+      });
+      toast("Email queued for the selected user.", "success");
+      setEmailForm({ userId: "", subject: "", message: "" });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to send email.", "error");
+    }
+  };
+
+  const resendVerification = async (userId) => {
+    try {
+      await resendAdminUserEmailVerification(userId, { reason: "Admin requested email verification" });
+      toast("Verification email queued.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to send verification email.", "error");
+    }
+  };
+
+  const markVerified = async (userId, verified) => {
+    try {
+      await updateAdminUserEmailVerified(userId, { verified, reason: verified ? "Admin verified email" : "Admin marked email unverified" });
+      toast(verified ? "Email marked verified." : "Email marked unverified.", "success");
+      load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update email verification.", "error");
+    }
+  };
+
+  return (
+    <section className="admin-section">
+      <div className="admin-section-header">
+        <div>
+          <h2>Team & Account</h2>
+          <p>Manage the admin owner login, team accounts, and account email communication.</p>
+        </div>
+        <button type="button" onClick={load}>Refresh</button>
+      </div>
+      {error && <div className="admin-error">{error}</div>}
+      {loading ? <Spinner label="Loading account..." /> : (
+        <div className="admin-detail-grid">
+          <section className="admin-panel">
+            <h3>Admin owner login</h3>
+            <dl className="admin-detail-list">
+              <dt>Name</dt><dd>{account?.name || "-"}</dd>
+              <dt>Email</dt><dd>{account?.email || "-"}</dd>
+              <dt>Role</dt><dd>{account?.role || "-"}</dd>
+              <dt>Email verified</dt><dd>{account?.emailVerified ? "Yes" : "No"}</dd>
+            </dl>
+            <form className="admin-form-grid" onSubmit={updateOwnerEmail}>
+              <input
+                value={ownerEmailForm.email}
+                onChange={(e) => setOwnerEmailForm((p) => ({ ...p, email: e.target.value }))}
+                placeholder="New login email"
+                type="email"
+                required
+              />
+              <input
+                value={ownerEmailForm.currentPassword}
+                onChange={(e) => setOwnerEmailForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                placeholder="Current password"
+                type="password"
+                required
+              />
+              <button type="submit" disabled={Boolean(ownerBusy)}>{ownerBusy === "email" ? "Saving..." : "Change email"}</button>
+            </form>
+            <form className="admin-form-grid" onSubmit={updateOwnerPassword} style={{ marginTop: 12 }}>
+              <input
+                value={ownerPasswordForm.currentPassword}
+                onChange={(e) => setOwnerPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                placeholder="Current password"
+                type="password"
+                required
+              />
+              <input
+                value={ownerPasswordForm.newPassword}
+                onChange={(e) => setOwnerPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                placeholder="New password"
+                type="password"
+                required
+                minLength={8}
+              />
+              <button type="submit" disabled={Boolean(ownerBusy)}>{ownerBusy === "password" ? "Saving..." : "Change password"}</button>
+            </form>
+          </section>
+
+          <section className="admin-panel">
+            <h3>Create team user</h3>
+            <form className="admin-form-grid" onSubmit={createTeamUser}>
+              <input value={createForm.fullName} onChange={(e) => setCreateForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Full name" required />
+              <input value={createForm.email} onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))} placeholder="Email" type="email" required />
+              <select value={createForm.role} onChange={(e) => setCreateForm((p) => ({ ...p, role: e.target.value }))}>
+                <option value="support">Support</option>
+                <option value="moderator">Moderator</option>
+                <option value="admin">Admin</option>
+                <option value="lab">Lab staff</option>
+              </select>
+              <input value={createForm.temporaryPassword} onChange={(e) => setCreateForm((p) => ({ ...p, temporaryPassword: e.target.value }))} placeholder="Temporary password (optional)" />
+              <label className="admin-checkbox-row">
+                <input type="checkbox" checked={createForm.sendInvite} onChange={(e) => setCreateForm((p) => ({ ...p, sendInvite: e.target.checked }))} />
+                Send invite and verification email
+              </label>
+              <button type="submit">Create user</button>
+            </form>
+          </section>
+
+          <section className="admin-panel admin-panel-wide">
+            <h3>Team users</h3>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Email</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {team.map((user) => (
+                    <tr key={user.id}>
+                      <td>{user.name || "-"}</td>
+                      <td>{user.email}</td>
+                      <td>{user.role}</td>
+                      <td>{user.status}</td>
+                      <td>{user.emailVerified ? "Verified" : "Not verified"}</td>
+                      <td>
+                        <button type="button" onClick={() => go(`/admin/users/${user.id}`)}>Open</button>
+                        <button type="button" onClick={() => resendVerification(user.id)}>Resend verify</button>
+                        <button type="button" onClick={() => markVerified(user.id, !user.emailVerified)}>
+                          {user.emailVerified ? "Mark unverified" : "Mark verified"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!team.length && <tr><td colSpan={6}>No team users found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="admin-panel admin-panel-wide">
+            <h3>Email communication</h3>
+            <form className="admin-form-grid" onSubmit={sendEmail}>
+              <select value={emailForm.userId} onChange={(e) => setEmailForm((p) => ({ ...p, userId: e.target.value }))} required>
+                <option value="">Choose team user</option>
+                {team.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
+              </select>
+              <input value={emailForm.subject} onChange={(e) => setEmailForm((p) => ({ ...p, subject: e.target.value }))} placeholder="Subject" required />
+              <textarea rows={4} value={emailForm.message} onChange={(e) => setEmailForm((p) => ({ ...p, message: e.target.value }))} placeholder="Message" required />
+              <button type="submit">Send email</button>
+            </form>
+          </section>
         </div>
       )}
     </section>
@@ -1392,6 +1643,9 @@ function UserDetailPage({ id }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("overview");
+  const [emailDraft, setEmailDraft] = useState({ subject: "", message: "" });
+  const [emailBusy, setEmailBusy] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -1409,6 +1663,56 @@ function UserDetailPage({ id }) {
   const permissions = rolePermissions(user.role);
   const socialLinks = user.socialLinks || {};
   const onUpdated = (nextUser) => setDetail((prev) => ({ ...prev, user: nextUser }));
+
+  const sendUserEmail = async (event) => {
+    event.preventDefault();
+    if (!emailDraft.subject.trim() || !emailDraft.message.trim()) {
+      toast("Subject and message are required.", "error");
+      return;
+    }
+    setEmailBusy("send");
+    try {
+      await sendAdminUserEmail(user.id, {
+        subject: emailDraft.subject,
+        message: emailDraft.message,
+        reason: "Admin user communication",
+      });
+      toast("Email queued for this user.");
+      setEmailDraft({ subject: "", message: "" });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to send email.", "error");
+    } finally {
+      setEmailBusy("");
+    }
+  };
+
+  const resendVerification = async () => {
+    setEmailBusy("verify");
+    try {
+      await resendAdminUserEmailVerification(user.id, { reason: "Admin resent email verification" });
+      toast("Verification email queued.");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to send verification email.", "error");
+    } finally {
+      setEmailBusy("");
+    }
+  };
+
+  const setEmailVerified = async (verified) => {
+    setEmailBusy("mark");
+    try {
+      const result = await updateAdminUserEmailVerified(user.id, {
+        verified,
+        reason: verified ? "Admin marked email verified" : "Admin marked email unverified",
+      });
+      onUpdated(result.user);
+      toast(verified ? "Email marked verified." : "Email marked unverified.");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update email verification.", "error");
+    } finally {
+      setEmailBusy("");
+    }
+  };
 
   const TABS = [
     { key: "overview", label: "Overview" },
@@ -1469,6 +1773,26 @@ function UserDetailPage({ id }) {
                 </React.Fragment>
               ))}
             </dl>
+          </div>
+          <div className="admin-panel wide">
+            <h3>Email communication</h3>
+            <form className="admin-form-grid" onSubmit={sendUserEmail}>
+              <label>
+                <span className="admin-field-label">Subject <Req /></span>
+                <input value={emailDraft.subject} onChange={(e) => setEmailDraft((p) => ({ ...p, subject: e.target.value }))} />
+              </label>
+              <label style={{ gridColumn: "1 / -1" }}>
+                <span className="admin-field-label">Message <Req /></span>
+                <textarea rows={4} value={emailDraft.message} onChange={(e) => setEmailDraft((p) => ({ ...p, message: e.target.value }))} />
+              </label>
+              <button type="submit" disabled={Boolean(emailBusy)}>{emailBusy === "send" ? "Sending..." : "Send email"}</button>
+              <button type="button" disabled={Boolean(emailBusy)} onClick={resendVerification}>
+                {emailBusy === "verify" ? "Sending..." : "Resend verification"}
+              </button>
+              <button type="button" disabled={Boolean(emailBusy)} onClick={() => setEmailVerified(!user.emailVerified)}>
+                {emailBusy === "mark" ? "Saving..." : user.emailVerified ? "Mark email unverified" : "Mark email verified"}
+              </button>
+            </form>
           </div>
           <ActionControls user={user} onUpdated={onUpdated} />
           <MarketplacePermissionPanel userId={user.id} />
@@ -2278,6 +2602,7 @@ export default function AdminApp() {
 
   const pageTitle = (() => {
     if (pathOnly === "/admin") return "Dashboard";
+    if (pathOnly === "/admin/team") return "Team & Account";
     if (userMatch) return "User Detail";
     if (tierMatch) return "Tier Editor";
     if (pathOnly === "/admin/users") return "All Users";
@@ -2294,6 +2619,7 @@ export default function AdminApp() {
     <ToastProvider>
       <AdminLayout path={pathOnly} title={pageTitle}>
         {pathOnly === "/admin" && <AdminDashboard />}
+        {pathOnly === "/admin/team" && <TeamAccountPage />}
         {pathOnly === "/admin/users" && <UsersPage path={path} />}
         {userMatch && <UserDetailPage id={decodeURIComponent(userMatch[1])} />}
         {pathOnly === "/admin/tiers" && <TierOverviewPage />}

@@ -246,6 +246,10 @@
   grid-column: 1 / -1;
 }
 
+.admin-panel-wide {
+  grid-column: 1 / -1;
+}
+
 .admin-definition-list {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);

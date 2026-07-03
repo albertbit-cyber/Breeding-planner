@@ -10,11 +10,16 @@ import {
   listAdminUsers,
   applyAdminReportAction,
   createAdminGdprRequest,
+  createAdminUser,
+  getAdminAccountPanel,
   getAdminMarketplacePermission,
   listAdminGdprRequests,
   listAdminLabAccounts,
   updateAdminVerificationRequest,
   sendAdminNotification,
+  sendAdminUserEmail,
+  resendUserEmailVerification,
+  markUserEmailVerified,
   updateAdminGdprRequest,
   updateAdminLabAccount,
   updateAdminMarketplacePermission,
@@ -29,8 +34,16 @@ export const dashboard = async (_req: Request, res: Response): Promise<void> => 
   res.status(200).json(await getAdminDashboard());
 };
 
+export const account = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getAdminAccountPanel(req.user!));
+};
+
 export const users = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listAdminUsers(req.query));
+};
+
+export const createUser = async (req: Request, res: Response): Promise<void> => {
+  res.status(201).json(await createAdminUser(req.user!, req.body || {}));
 };
 
 export const reports = async (req: Request, res: Response): Promise<void> => {
@@ -119,6 +132,18 @@ export const changeLabAccount = async (req: Request, res: Response): Promise<voi
 
 export const sendNotification = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await sendAdminNotification(req.user!, req.body || {}));
+};
+
+export const sendUserEmail = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await sendAdminUserEmail(req.user!, req.params.id, req.body || {}));
+};
+
+export const resendEmailVerification = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await resendUserEmailVerification(req.user!, req.params.id, req.body || {}));
+};
+
+export const changeEmailVerified = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await markUserEmailVerified(req.user!, req.params.id, req.body || {}));
 };
 
 export const gdprRequests = async (req: Request, res: Response): Promise<void> => {

@@ -543,6 +543,20 @@ export const recoverPassword = async (payload: { email: string; fullName: string
     requiresAuth: false,
   });
 
+export const changeMyEmail = async (payload: { email: string; currentPassword: string }, authScope?: AuthScope) =>
+  request<{ user: unknown; message: string }>("/auth/me/email", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    authScope,
+  });
+
+export const changeMyPassword = async (payload: { currentPassword: string; newPassword: string }, authScope?: AuthScope) =>
+  request<{ user: unknown; message: string }>("/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    authScope,
+  });
+
 export const getCurrentUser = async (authScope?: AuthScope) => {
   const data = await request<{ user: unknown }>("/auth/me", { authScope });
   markAuthorized();
@@ -922,6 +936,23 @@ export const fetchAdminUsers = async (params: Record<string, string | number | u
   return request<{ users: unknown[]; total: number; page: number; pageSize: number }>(`/admin/users${suffix}`);
 };
 
+export const fetchAdminAccountPanel = async () =>
+  request<{ account: unknown; team: unknown[] }>("/admin/account");
+
+export const createAdminUser = async (payload: {
+  email: string;
+  fullName: string;
+  role: string;
+  status?: string;
+  temporaryPassword?: string;
+  sendInvite?: boolean;
+  reason: string;
+}) =>
+  request<{ user: unknown; temporaryPassword?: string; email?: unknown }>("/admin/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchAdminUserDetail = async (id: string) =>
   request<{ user: unknown; auditLogs: unknown[]; reports: unknown[]; activity: unknown[] }>(`/admin/users/${encodeURIComponent(id)}`);
 
@@ -954,6 +985,24 @@ export const updateAdminUserSubscription = async (id: string, payload: {
 
 export const updateAdminUserVerification = async (id: string, payload: { verificationStatus: string; reason: string; internalNote?: string }) =>
   request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/verification`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const sendAdminUserEmail = async (id: string, payload: { subject: string; message: string; reason: string }) =>
+  request<{ user: unknown; email: unknown }>(`/admin/users/${encodeURIComponent(id)}/email`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const resendAdminUserEmailVerification = async (id: string, payload: { reason: string }) =>
+  request<{ user: unknown; email: unknown }>(`/admin/users/${encodeURIComponent(id)}/email-verification`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateAdminUserEmailVerified = async (id: string, payload: { verified: boolean; reason: string }) =>
+  request<{ user: unknown }>(`/admin/users/${encodeURIComponent(id)}/email-verification`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

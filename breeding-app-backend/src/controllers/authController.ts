@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser, logoutUser, changeEmailForUser, changePasswordForUser } from "../services/authService";
+import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser, logoutUser, changeEmailForUser, changePasswordForUser, verifyEmailForUser } from "../services/authService";
 import { changeEmailSchema, changePasswordSchema, loginSchema, recoverPasswordSchema, registerSchema } from "../validators/authValidators";
 import {
   AUTH_REFRESH_COOKIE,
@@ -100,4 +100,13 @@ export const recoverPassword = async (req: Request, res: Response): Promise<void
 
   const result = await recoverPasswordForUser(parsed.data);
   res.status(200).json(result);
+};
+
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+  const token = String(req.query.token || req.body?.token || "").trim();
+  if (!token) {
+    res.status(400).json({ message: "token is required." });
+    return;
+  }
+  res.status(200).json(await verifyEmailForUser(token));
 };
