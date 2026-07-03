@@ -37,6 +37,7 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
     return;
   }
 
-  console.error("Unhandled error:", error);
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.error("Unhandled error:", detail, error);
   res.status(500).json({ message: "Internal server error" });
 };

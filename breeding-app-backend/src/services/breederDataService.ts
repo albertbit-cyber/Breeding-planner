@@ -36,6 +36,11 @@ const numberValue = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const intValue = (value: unknown): number | null => {
+  const n = numberValue(value);
+  return n !== null ? Math.round(n) : null;
+};
+
 const centsValue = (value: unknown): number | null => {
   if (value === undefined || value === null || value === "") return null;
   const text = String(value).trim();
@@ -201,13 +206,13 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const explicitClutches = normalizeArray(input.clutches, "clutches");
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
-  const animalAccess: any = await canAccessFeature({ id: ownerId }, "animals.create").catch((error) => {
-    if (isOptionalBackendSchemaError(error)) {
-      console.warn("[breeder-sync] subscription schema unavailable; allowing animal snapshot sync.", error);
-      return { allowed: true, featureKey: "animals.create", source: "schema-unavailable", tier: "Unconfigured" };
-    }
-    throw error;
-  });
+  let animalAccess: any = { allowed: true, featureKey: "animals.create", source: "default", tier: "Unconfigured" };
+  try {
+    animalAccess = await canAccessFeature({ id: ownerId }, "animals.create");
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    console.warn("[breeder-sync] canAccessFeature error (proceeding without limit check):", error);
+  }
   if (!animalAccess.allowed && animalAccess.reason === "Usage limit reached") {
     throw new HttpError(403, `${animalAccess.reason}: ${animalAccess.currentUsage || 0} / ${animalAccess.limit || 0} animals.`);
   }
@@ -273,15 +278,15 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
           ownerId,
           pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
           appClutchId,
-          clutchNumber: numberValue(clutch.clutchNumber),
-          seasonYear: numberValue(clutch.seasonYear),
+          clutchNumber: intValue(clutch.clutchNumber),
+          seasonYear: intValue(clutch.seasonYear),
           laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
           payload: clutch,
         },
         update: {
           pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || undefined : undefined,
-          clutchNumber: numberValue(clutch.clutchNumber),
-          seasonYear: numberValue(clutch.seasonYear),
+          clutchNumber: intValue(clutch.clutchNumber),
+          seasonYear: intValue(clutch.seasonYear),
           laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
           payload: clutch,
         },
