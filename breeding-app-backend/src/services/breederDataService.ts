@@ -12,6 +12,10 @@ export type BreederSnapshotInput = {
 };
 
 const db = prisma as any;
+const SNAPSHOT_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 60_000,
+};
 
 const isOptionalBackendSchemaError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
@@ -178,7 +182,7 @@ const syncMarketplaceAutoListings = async (ownerId: string, animals: JsonRecord[
         },
       });
     }
-  });
+  }, SNAPSHOT_TRANSACTION_OPTIONS);
 };
 
 export const listBreederSnapshot = async (ownerId: string) => {
@@ -287,7 +291,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         },
       });
     }
-  });
+  }, SNAPSHOT_TRANSACTION_OPTIONS);
 
   await syncMarketplaceAutoListings(ownerId, animals).catch((error) => {
     if (isOptionalBackendSchemaError(error)) {

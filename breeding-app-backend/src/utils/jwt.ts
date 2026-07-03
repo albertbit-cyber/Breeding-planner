@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import type { AuthTokenPayload } from "../types/auth";
 import { env } from "../config/env";
 
@@ -9,7 +10,7 @@ export const verifyAuthToken = (token: string): AuthTokenPayload =>
   jwt.verify(token, env.jwtSecret) as AuthTokenPayload;
 
 export const signRefreshToken = (payload: AuthTokenPayload): string =>
-  jwt.sign({ ...payload, type: "refresh" }, env.jwtSecret, { expiresIn: "7d" });
+  jwt.sign({ ...payload, type: "refresh", jti: randomUUID() }, env.jwtSecret, { expiresIn: "7d" });
 
 export const verifyRefreshToken = (token: string): AuthTokenPayload => {
   const decoded = jwt.verify(token, env.jwtSecret) as AuthTokenPayload & { type?: string };
