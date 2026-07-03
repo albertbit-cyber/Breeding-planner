@@ -31,9 +31,13 @@ import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegrati
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
 import {
+  changeAccountEmail,
+  changeAccountPassword,
+  changeMySubscription,
   checkFeatureAccess,
   clearAuthToken,
   fetchBreederSnapshot,
+  fetchMySubscription,
   fetchMyListings,
   fetchPublicSubscriptionTiers,
   getCurrentUser,
@@ -777,9 +781,9 @@ function RoomModal({
   const canMoveDown = roomIndex < roomCount - 1;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-5xl rounded-[32px] bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex flex-col gap-4 border-b border-neutral-100 pb-4">
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-4" onClick={onClose}>
+      <div className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 bg-white px-4 pt-4 sm:px-6 sm:pt-6 flex flex-col gap-4 border-b border-neutral-100 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
@@ -7831,10 +7835,13 @@ export default function BreedingPlannerApp() {
       else delete nextEggBoxNotes[indexKey];
       if (badEggsValue > 0) nextEggBoxBadEggs[indexKey] = badEggsValue;
       else delete nextEggBoxBadEggs[indexKey];
+      const totalBadEggs = Object.values(nextEggBoxBadEggs).reduce((s, n) => s + (Number(n) || 0), 0);
+      const totalOriginalEggs = Math.max(0, Number(currentClutch.eggsTotal || currentClutch.fertileEggs) || 0);
       const nextClutch = {
         ...currentClutch,
         eggBoxNotes: nextEggBoxNotes,
         eggBoxBadEggs: nextEggBoxBadEggs,
+        allEggsLost: totalOriginalEggs > 0 && totalBadEggs >= totalOriginalEggs,
       };
       if ((box.eggBoxCount || 1) === 1) {
         nextClutch.notes = noteValue;
@@ -12163,7 +12170,7 @@ function SpacesSection({
 }) {
   const { t } = useTranslation();
   const [newRoomName, setNewRoomName] = useState('');
-  const [activeRoomId, setActiveRoomId] = useState(() => (rooms[0]?.id ?? null));
+  const [activeRoomId, setActiveRoomId] = useState(null);
   const [rackFormState, setRackFormState] = useState({ mode: null, roomId: null, rackId: null });
   const [terrariumFormState, setTerrariumFormState] = useState({ mode: null, roomId: null, terrariumId: null });
   const [rackViewId, setRackViewId] = useState(null);
@@ -12178,7 +12185,7 @@ function SpacesSection({
       if (prev && rooms.some(room => room.id === prev)) {
         return prev;
       }
-      return rooms[0]?.id ?? null;
+      return null;
     });
   }, [rooms]);
 
@@ -15387,11 +15394,21 @@ function BreederSection({
   const [restoreFeedback, setRestoreFeedback] = useState(null);
   const [accountState, setAccountState] = useState({
     loading: false,
+    actionLoading: '',
     loaded: false,
     error: '',
+    message: '',
     user: null,
     tiers: [],
+    subscription: null,
     access: {},
+  });
+  const [accountForms, setAccountForms] = useState({
+    email: '',
+    emailPassword: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
@@ -15450,7 +15467,6 @@ function BreederSection({
     ? sharedBackendSnapshot.state.replace(/-/g, ' ')
     : 'unknown';
   const backendAuthLabel = sharedBackendSnapshot?.authStatus || 'unknown';
-  const backendUrlLabel = sharedBackendSnapshot?.baseUrl || sharedBackendSnapshot?.config?.baseUrl || 'Not configured';
   const cloudLastSyncDisplay = cloudSyncStatus?.lastSyncedAt
     ? formatDateTimeForDisplay(cloudSyncStatus.lastSyncedAt)
     : 'Never';
@@ -16385,18 +16401,20 @@ function BreederSection({
   }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
   const loadAccountData = useCallback(async () => {
-    setAccountState(prev => ({ ...prev, loading: true, error: '' }));
+    setAccountState(prev => ({ ...prev, loading: true, error: '', message: '' }));
     const featureKeys = Object.keys(accountFeatureLabels);
     try {
-      const [userResult, tiersResult, ...accessResults] = await Promise.allSettled([
+      const [userResult, tiersResult, subscriptionResult, ...accessResults] = await Promise.allSettled([
         getCurrentUser(),
         fetchPublicSubscriptionTiers(),
+        fetchMySubscription(),
         ...featureKeys.map(featureKey => checkFeatureAccess(featureKey)),
       ]);
       const user = userResult.status === 'fulfilled' ? userResult.value?.user || null : null;
       const tiers = tiersResult.status === 'fulfilled' && Array.isArray(tiersResult.value?.tiers)
         ? tiersResult.value.tiers
         : [];
+      const subscription = subscriptionResult.status === 'fulfilled' ? subscriptionResult.value?.subscription || null : null;
       const access = {};
       featureKeys.forEach((featureKey, index) => {
         const result = accessResults[index];
@@ -16404,20 +16422,32 @@ function BreederSection({
           ? result.value
           : { allowed: false, featureKey, reason: result?.reason?.message || 'Unable to check access.' };
       });
-      const firstError = [userResult, tiersResult, ...accessResults]
+      const firstError = [userResult, tiersResult, subscriptionResult, ...accessResults]
         .find(result => result.status === 'rejected')?.reason;
       setAccountState({
         loading: false,
+        actionLoading: '',
         loaded: true,
         error: firstError?.message || '',
+        message: '',
         user,
         tiers,
+        subscription,
         access,
       });
+      setAccountForms(prev => ({
+        ...prev,
+        email: user?.email || '',
+        emailPassword: '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
     } catch (error) {
       setAccountState(prev => ({
         ...prev,
         loading: false,
+        actionLoading: '',
         loaded: true,
         error: error?.message || 'Unable to load account data.',
       }));
@@ -16438,6 +16468,86 @@ function BreederSection({
       error: 'Signed out locally. Reload or sign in again to reconnect this device.',
     }));
   }, []);
+
+  const handleAccountFormChange = useCallback((field, value) => {
+    setAccountForms(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleChangeAccountEmail = useCallback(async () => {
+    const email = accountForms.email.trim();
+    if (!email || !accountForms.emailPassword) {
+      setAccountState(prev => ({ ...prev, error: 'Enter the new email and current password first.', message: '' }));
+      return;
+    }
+    setAccountState(prev => ({ ...prev, actionLoading: 'email', error: '', message: '' }));
+    try {
+      const result = await changeAccountEmail({ email, currentPassword: accountForms.emailPassword });
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        user: result?.user || prev.user,
+        error: '',
+        message: result?.message || 'Email updated.',
+      }));
+      setAccountForms(prev => ({ ...prev, emailPassword: '' }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to update email.', message: '' }));
+    }
+  }, [accountForms.email, accountForms.emailPassword]);
+
+  const handleChangeAccountPassword = useCallback(async () => {
+    if (!accountForms.currentPassword || !accountForms.newPassword) {
+      setAccountState(prev => ({ ...prev, error: 'Enter the current password and new password first.', message: '' }));
+      return;
+    }
+    if (accountForms.newPassword !== accountForms.confirmPassword) {
+      setAccountState(prev => ({ ...prev, error: 'New password confirmation does not match.', message: '' }));
+      return;
+    }
+    setAccountState(prev => ({ ...prev, actionLoading: 'password', error: '', message: '' }));
+    try {
+      const result = await changeAccountPassword({ currentPassword: accountForms.currentPassword, newPassword: accountForms.newPassword });
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        user: result?.user || prev.user,
+        error: '',
+        message: result?.message || 'Password updated.',
+      }));
+      setAccountForms(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to update password.', message: '' }));
+    }
+  }, [accountForms.confirmPassword, accountForms.currentPassword, accountForms.newPassword]);
+
+  const handleChangeAccountPlan = useCallback(async (tier) => {
+    const tierId = tier?.id;
+    if (!tierId) return;
+    let confirmed = true;
+    if (typeof showAppConfirm === 'function') {
+      confirmed = await showAppConfirm(`Change your account plan to ${tier.name || tier.key || 'this plan'}?`, {
+        confirmLabel: 'Change plan',
+        cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
+      });
+    }
+    if (!confirmed) return;
+    setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
+    try {
+      const result = await changeMySubscription(tierId);
+      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tier.name || 'selected plan'}.`;
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        subscription: result?.subscription || null,
+        error: '',
+        message: successMessage,
+      }));
+      await loadAccountData();
+      setAccountState(prev => ({ ...prev, message: successMessage }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to change plan.', message: '' }));
+    }
+  }, [loadAccountData, showAppConfirm, t]);
 
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
@@ -17896,11 +18006,7 @@ function BreederSection({
                 Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places.
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Backend URL</div>
-                <div className="mt-1 break-words text-neutral-800">{backendUrlLabel}</div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="rounded-lg border bg-white p-3">
                 <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Connection</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
@@ -18149,11 +18255,7 @@ function BreederSection({
                 <div className="font-semibold text-sm">Backend connection</div>
                 <div className="text-xs text-neutral-500 mt-1">Cloud sync and subscription checks use this backend session.</div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Backend URL</div>
-                  <div className="mt-1 break-words">{sharedBackendSnapshot?.baseUrl || 'Not configured'}</div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Connection</div>
                   <div className="mt-1 capitalize">{String(sharedBackendSnapshot?.state || 'unknown').replace(/-/g, ' ')}</div>
@@ -18179,7 +18281,8 @@ function BreederSection({
                 </div>
               </div>
               <div className="text-xs text-neutral-500">
-                Current tier: {Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
+                Current tier: {accountState.subscription?.tier?.name
+                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
                   || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
                   || 'Unknown'}
               </div>
@@ -18212,27 +18315,37 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Plans</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Available public plans from the backend. Upgrade and downgrade checkout actions require a billing endpoint before they can be activated.
+                Available public plans from the backend. Changing a plan updates the subscription tier used by feature access and cloud sync.
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => (
-                <div key={tier.id || tier.key || tier.name} className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
-                      {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
+              {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => {
+                const isCurrentTier = Boolean(accountState.subscription?.tier?.id && tier.id === accountState.subscription.tier.id);
+                const isChangingThisPlan = accountState.actionLoading === `plan:${tier.id}`;
+                return (
+                  <div key={tier.id || tier.key || tier.name} className={cx('rounded-xl border p-3 space-y-2', isCurrentTier ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50')}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
+                        {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
+                      </div>
+                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">Current</span> : null}
+                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
                     </div>
-                    {tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
+                    <div className="text-sm">
+                      {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
+                    </div>
+                    <button
+                      type="button"
+                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
+                      disabled={isCurrentTier || Boolean(accountState.actionLoading)}
+                      onClick={() => handleChangeAccountPlan(tier)}
+                    >
+                      {isChangingThisPlan ? 'Changing...' : isCurrentTier ? 'Current plan' : 'Change plan'}
+                    </button>
                   </div>
-                  <div className="text-sm">
-                    {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
-                  </div>
-                  <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
-                    Change plan
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {accountState.loaded && !accountState.tiers.length ? (
                 <div className="text-sm text-neutral-500">No public subscription plans are available from the backend.</div>
               ) : null}
@@ -18243,18 +18356,75 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Email and password</div>
               <div className="text-xs text-neutral-500 mt-1">
-                These controls are reserved for account-security endpoints. They are disabled until the backend exposes authenticated email/password update routes.
+                Account security changes require your current password.
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
-                Change email
-              </button>
-              <button type="button" className="px-3 py-2 rounded-lg border text-sm opacity-60 cursor-not-allowed" disabled>
-                Change password
-              </button>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+                <div className="text-sm font-semibold">Change email</div>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="email"
+                  value={accountForms.email}
+                  onChange={event => handleAccountFormChange('email', event.target.value)}
+                  placeholder="New email"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.emailPassword}
+                  onChange={event => handleAccountFormChange('emailPassword', event.target.value)}
+                  placeholder="Current password"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleChangeAccountEmail}
+                >
+                  {accountState.actionLoading === 'email' ? 'Saving...' : 'Change email'}
+                </button>
+              </div>
+              <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+                <div className="text-sm font-semibold">Change password</div>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.currentPassword}
+                  onChange={event => handleAccountFormChange('currentPassword', event.target.value)}
+                  placeholder="Current password"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.newPassword}
+                  onChange={event => handleAccountFormChange('newPassword', event.target.value)}
+                  placeholder="New password"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.confirmPassword}
+                  onChange={event => handleAccountFormChange('confirmPassword', event.target.value)}
+                  placeholder="Confirm new password"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleChangeAccountPassword}
+                >
+                  {accountState.actionLoading === 'password' ? 'Saving...' : 'Change password'}
+                </button>
+              </div>
             </div>
           </section>
+
+          {accountState.message ? (
+            <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              {accountState.message}
+            </div>
+          ) : null}
 
           {accountState.error ? (
             <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -18766,9 +18936,11 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
               const eggsRaw = clutch.eggsTotal;
               const fertileRaw = clutch.fertileEggs;
               const slugsRaw = clutch.slugs;
-              const eggsCount = Number.isFinite(Number(eggsRaw))
+              const dashBadEggsTotal = Object.values(clutch.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+              const eggsRawCount = Number.isFinite(Number(eggsRaw))
                 ? Number(eggsRaw)
                 : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+              const eggsCount = typeof eggsRawCount === 'number' ? Math.max(0, eggsRawCount - dashBadEggsTotal) : null;
               const slugsCount = Number.isFinite(Number(slugsRaw)) ? Number(slugsRaw) : null;
               const splitBoxCounts = typeof eggsCount === 'number' ? splitEggBoxCounts(eggsCount) : [];
               const eggBoxLabel = splitBoxCounts.length > 1
@@ -19310,6 +19482,11 @@ function PairingInlineCard({
                   <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
                 </span>
               )}
+              {edit?.clutch?.allEggsLost && (
+                <span className="inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
+                  Clutch lost
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
@@ -19370,6 +19547,11 @@ function PairingInlineCard({
             <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
+            </div>
+          )}
+          {edit?.clutch?.allEggsLost && (
+            <div className="mt-1.5 inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+              Clutch lost
             </div>
           )}
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
@@ -20322,6 +20504,7 @@ function getBreedingCycleDerived(edit = {}) {
 
 function isPairingCompleted(pairing) {
   if (!pairing) return false;
+  if (pairing?.clutch?.allEggsLost) return true;
   const normalized = withPairingLifecycleDefaults({ ...pairing });
   const derived = getBreedingCycleDerived(normalized);
   return !!derived.hatchedRecorded;
@@ -20394,9 +20577,11 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
   } else if (derived.clutchRecorded) {
     const eggsRaw = normalized?.clutch?.eggsTotal;
     const fertileRaw = normalized?.clutch?.fertileEggs;
-    const eggsCount = Number.isFinite(Number(eggsRaw))
+    const stageBadEggs = Object.values(normalized?.clutch?.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+    const eggsRawCount = Number.isFinite(Number(eggsRaw))
       ? Number(eggsRaw)
       : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+    const eggsCount = typeof eggsRawCount === 'number' ? Math.max(0, eggsRawCount - stageBadEggs) : null;
     stage = typeof eggsCount === 'number'
       ? `Clutch laid - ${eggsCount} ${eggsCount === 1 ? 'egg' : 'eggs'}`
       : 'Clutch laid';
@@ -20601,8 +20786,13 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
     clutchSlugsValue,
   } = derived;
 
+  const badEggsTotal = useMemo(
+    () => Object.values(edit?.clutch?.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0),
+    [edit?.clutch?.eggBoxBadEggs]
+  );
   const totalEggsDisplay = useMemo(() => {
-    if (typeof eggsTotalNumber === 'number') return eggsTotalNumber;
+    const bad = badEggsTotal;
+    if (typeof eggsTotalNumber === 'number') return Math.max(0, eggsTotalNumber - bad);
     const fertileCount = typeof fertileEggsNumber === 'number'
       ? fertileEggsNumber
       : (() => {
@@ -20616,8 +20806,8 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
     })();
     if (fertileCount === null && slugCount === null) return null;
-    return Math.max(0, (fertileCount ?? 0)) + Math.max(0, (slugCount ?? 0));
-  }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue]);
+    return Math.max(0, Math.max(0, (fertileCount ?? 0)) + Math.max(0, (slugCount ?? 0)) - bad);
+  }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue, badEggsTotal]);
 
   const totalEggsText = useMemo(() => {
     return t('clutch.totalEggs', {
