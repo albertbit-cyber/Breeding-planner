@@ -575,6 +575,9 @@ export type BreederSnapshotPayload = {
   clutches?: unknown[];
 };
 
+const BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS = 30_000;
+const BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS = 90_000;
+
 export type BreederProfilePayload = {
   breederName?: string;
   logoUrl?: string;
@@ -605,12 +608,15 @@ export type MarketplaceListingPayload = {
 };
 
 export const fetchBreederSnapshot = async () =>
-  request<BreederSnapshotPayload>("/breeder/snapshot");
+  request<BreederSnapshotPayload>("/breeder/snapshot", {
+    timeoutMs: BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS,
+  });
 
 export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
   request<BreederSnapshotPayload>("/breeder/snapshot", {
     method: "PUT",
     body: JSON.stringify(payload),
+    timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
   });
 
 export const fetchMyBreederProfile = async () =>
