@@ -18687,6 +18687,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+  const [urgencyFilter, setUrgencyFilter] = useState(null);
   const openPairing = useCallback((id) => {
     if (id && typeof onOpenPairing === 'function') onOpenPairing(id);
   }, [onOpenPairing]);
@@ -18696,21 +18697,25 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
       label: t('pairing.dashboard.overdue', { defaultValue: 'Overdue' }),
       value: counts.overdue || 0,
       className: 'border-rose-200 bg-rose-50 text-rose-700',
+      filterKey: 'overdue',
     },
     {
       label: t('pairing.dashboard.dueSoon', { defaultValue: 'Due in 3 days' }),
       value: counts.due || 0,
       className: 'border-amber-200 bg-amber-50 text-amber-700',
+      filterKey: 'due',
     },
     {
       label: t('pairing.dashboard.nextWeek', { defaultValue: 'Next 7 days' }),
       value: counts.soon || 0,
       className: 'border-sky-200 bg-sky-50 text-sky-700',
+      filterKey: 'soon',
     },
     {
       label: t('pairing.dashboard.tracking', { defaultValue: 'Tracking' }),
       value: list.length,
       className: 'border-neutral-200 bg-white text-neutral-700',
+      filterKey: null,
     },
   ];
 
@@ -18726,7 +18731,14 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
       <div className="space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {summaryCards.map(card => (
-            <div key={card.label} className={cx('border rounded-xl p-3', card.className)}>
+            <div
+              key={card.label}
+              role="button"
+              tabIndex={0}
+              onClick={() => setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey))}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey)); } }}
+              className={cx('border rounded-xl p-3 cursor-pointer', card.className)}
+            >
               <div className="text-2xl font-semibold leading-none">{card.value}</div>
               <div className="mt-1 text-xs font-medium">{card.label}</div>
             </div>
@@ -18744,7 +18756,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
 
         {list.length ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {list.map(item => {
+            {(urgencyFilter ? list.filter(item => item.urgency === urgencyFilter) : list).map(item => {
               const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
               const clutch = item?.pairing?.clutch || {};
               const clutchRecorded = item.stageKey === 'clutch' && !!clutch.recorded;
