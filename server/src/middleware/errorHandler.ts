@@ -7,6 +7,12 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
     return;
   }
 
+  const bodyParserError = error as { type?: string; status?: number; message?: string };
+  if (bodyParserError?.type === "entity.too.large" || bodyParserError?.status === 413) {
+    res.status(413).json({ message: "Request payload too large. Try syncing fewer records or removing large photos." });
+    return;
+  }
+
   console.error("Unhandled error:", error);
   res.status(500).json({ message: "Internal server error" });
 };

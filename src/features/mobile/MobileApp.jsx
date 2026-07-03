@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import jsQR from "jsqr";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import {
   clearAuthToken,
   fetchBreederSnapshot,
@@ -21,10 +23,22 @@ import {
 } from "../../shared/apiClient";
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
-const DEVICE_KEY = "breedingPlannerMobileDeviceId";
-const RECENT_KEY = "breedingPlannerMobileRecentAnimals";
-const QUEUE_KEY  = "breedingPlannerMobileSyncQueue";
-const MODE_KEY   = "breedingPlannerMobileLastMode"; // terminal | full
+const DEVICE_KEY    = "breedingPlannerMobileDeviceId";
+const RECENT_KEY    = "breedingPlannerMobileRecentAnimals";
+const QUEUE_KEY     = "breedingPlannerMobileSyncQueue";
+const MODE_KEY      = "breedingPlannerMobileLastMode"; // terminal | full
+const ANIMALS_CACHE = "breedingPlannerMobileAnimalsCache";
+
+// Extract the animal ID from a full QR URL (e.g. https://…#snake=<id>) or
+// return the raw value when it's already a plain ID.
+const parseQrValue = (raw) => {
+  try {
+    const match = String(raw || "").match(/#snake=([^&\s]+)/);
+    return match ? decodeURIComponent(match[1]) : raw.trim();
+  } catch {
+    return String(raw || "").trim();
+  }
+};
 
 const getDeviceId = () => {
   try {
@@ -207,6 +221,7 @@ function ModeSelectScreen({ user, onMode, onSignOut }) {
 function QRScanner({ onScan, onError }) {
   const videoRef  = useRef(null);
   const activeRef = useRef(false);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     if (!navigator.mediaDevices?.getUserMedia) { onError("Camera not available."); return; }
@@ -215,28 +230,53 @@ function QRScanner({ onScan, onError }) {
     activeRef.current = true;
 
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
+      .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
       .then((s) => {
         stream = s;
-        if (videoRef.current) videoRef.current.srcObject = s;
-        if (!("BarcodeDetector" in window)) return;
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const tick = async () => {
-          if (!activeRef.current || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            const val = codes?.[0]?.rawValue;
-            if (val) { activeRef.current = false; onScan(val); return; }
-          } catch {}
-          timer = setTimeout(tick, 600);
-        };
-        timer = setTimeout(tick, 900);
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = s;
+
+        if ("BarcodeDetector" in window) {
+          // Use native BarcodeDetector when available
+          const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+          const tick = async () => {
+            if (!activeRef.current || !videoRef.current) return;
+            try {
+              const codes = await detector.detect(videoRef.current);
+              const val = codes?.[0]?.rawValue;
+              if (val) { activeRef.current = false; onScan(val); return; }
+            } catch {}
+            timer = setTimeout(tick, 500);
+          };
+          timer = setTimeout(tick, 800);
+        } else {
+          // Fallback: jsQR canvas scan loop
+          if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          const tick = () => {
+            if (!activeRef.current || !videoRef.current) return;
+            const v = videoRef.current;
+            if (v.readyState >= 2 && v.videoWidth > 0) {
+              canvas.width  = v.videoWidth;
+              canvas.height = v.videoHeight;
+              ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+              if (code?.data) { activeRef.current = false; onScan(code.data); return; }
+            }
+            timer = requestAnimationFrame(tick);
+          };
+          timer = requestAnimationFrame(tick);
+        }
       })
       .catch(() => onError("Camera access denied. Use manual entry below."));
 
     return () => {
       activeRef.current = false;
       clearTimeout(timer);
+      cancelAnimationFrame(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [onScan, onError]);
@@ -393,13 +433,343 @@ function NoteModal({ animal, onSave, onClose }) {
   );
 }
 
+// ─── PHOTO MODAL ─────────────────────────────────────────────────────────────
+function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, busy }) {
+  const photos = Array.isArray(animal?.photos) ? [...animal.photos].reverse() : [];
+  const currentIcon = animal?.imageUrl;
+  return (
+    <ActionSheet title="Photos" onClose={onClose}>
+      <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={onTakePhoto} disabled={busy}>
+        {busy ? <Spinner /> : "📷 Take Photo"}
+      </button>
+      {photos.length > 0 ? (
+        <div className="mbl-photo-grid">
+          {photos.map((photo) => (
+            <div key={photo.id} className="mbl-photo-item">
+              <img src={photo.url} alt="" className="mbl-photo-thumb" />
+              <div className="mbl-photo-btns">
+                <button
+                  type="button"
+                  className={`mbl-btn mbl-btn--sm ${currentIcon === photo.url ? "mbl-btn--icon-active" : ""}`}
+                  onClick={() => onSetIcon(photo.url)}
+                  disabled={busy || currentIcon === photo.url}
+                >
+                  {currentIcon === photo.url ? "✓ Icon" : "Set as icon"}
+                </button>
+                <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
+                  onClick={() => onDeletePhoto(photo.id)} disabled={busy}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mbl-empty">No photos yet. Tap above to take one.</p>
+      )}
+    </ActionSheet>
+  );
+}
+
+// ─── BREEDING CYCLE HELPERS ───────────────────────────────────────────────────
+const bpUid = () =>
+  `bp-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+
+const addDays = (ds, n) => {
+  try {
+    const d = new Date(`${ds}T12:00:00`);
+    if (isNaN(d)) return null;
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  } catch { return null; }
+};
+
+const fmtDate = (ds) => {
+  if (!ds) return "—";
+  try {
+    return new Date(`${ds}T12:00:00`).toLocaleDateString(undefined, {
+      month: "short", day: "numeric", year: "numeric",
+    });
+  } catch { return ds; }
+};
+
+// Sort a log array newest-first (by loggedAt)
+const sortLogs = (arr) =>
+  [...(arr || [])].sort((a, b) => (b.loggedAt || "").localeCompare(a.loggedAt || ""));
+
+// Write the most-recent mobile log entry back into the compat fields the desktop reads
+const syncCompatFields = (pairing) => {
+  const ov = sortLogs(pairing.mobileOvulationLogs)[0];
+  const pl = sortLogs(pairing.mobilePreLayShedLogs)[0];
+  const cl = sortLogs(pairing.mobileClutchLogs)[0];
+  const ha = sortLogs(pairing.mobileHatchLogs)[0];
+  return {
+    ...pairing,
+    ovulation:  ov ? { observed: true, date: ov.date, notes: ov.notes || "" }
+                   : pairing.ovulation,
+    preLayShed: pl ? { observed: true, date: pl.date, notes: pl.notes || "" }
+                   : pairing.preLayShed,
+    clutch:     cl ? { recorded: true, date: cl.date, eggsTotal: cl.eggsTotal || "",
+                       fertileEggs: cl.fertileEggs || "", slugs: cl.slugs || "",
+                       notes: cl.notes || "" }
+                   : pairing.clutch,
+    hatch:      ha ? { recorded: true, date: ha.date, hatchedCount: ha.hatchedCount || 0,
+                       notes: ha.notes || "", scheduledDate: pairing.hatch?.scheduledDate || "" }
+                   : pairing.hatch,
+  };
+};
+
+// ─── CYCLE STAGE LOG FORM ─────────────────────────────────────────────────────
+function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate]               = useState(today);
+  const [notes, setNotes]             = useState("");
+  const [eggsTotal, setEggsTotal]     = useState("");
+  const [fertileEggs, setFertileEggs] = useState("");
+  const [slugs, setSlugs]             = useState("");
+  const [hatchedCount, setHatchedCount] = useState("");
+
+  const STAGE_LABELS = {
+    ovulation: "Ovulation", preLayShed: "Pre-lay Shed",
+    clutch: "Lay / Clutch", hatch: "Hatch",
+  };
+
+  const save = () => {
+    if (!date) return;
+    const entry = { id: bpUid(), date, notes: notes.trim(), loggedAt: new Date().toISOString() };
+    if (stageKey === "clutch") {
+      entry.eggsTotal = eggsTotal;
+      entry.fertileEggs = fertileEggs;
+      entry.slugs = slugs;
+    }
+    if (stageKey === "hatch") { entry.hatchedCount = Number(hatchedCount) || 0; }
+    onSave(entry);
+  };
+
+  return (
+    <div className="mbl-cs-form">
+      <label className="mbl-field">
+        <span>Date observed</span>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      {stageKey === "clutch" && (
+        <>
+          <label className="mbl-field">
+            <span>Total eggs</span>
+            <input type="number" inputMode="numeric" value={eggsTotal}
+              onChange={(e) => setEggsTotal(e.target.value)} placeholder="—" />
+          </label>
+          <label className="mbl-field">
+            <span>Fertile eggs</span>
+            <input type="number" inputMode="numeric" value={fertileEggs}
+              onChange={(e) => setFertileEggs(e.target.value)} placeholder="—" />
+          </label>
+          <label className="mbl-field">
+            <span>Slugs</span>
+            <input type="number" inputMode="numeric" value={slugs}
+              onChange={(e) => setSlugs(e.target.value)} placeholder="—" />
+          </label>
+        </>
+      )}
+      {stageKey === "hatch" && (
+        <label className="mbl-field">
+          <span>Hatchlings</span>
+          <input type="number" inputMode="numeric" value={hatchedCount}
+            onChange={(e) => setHatchedCount(e.target.value)} placeholder="—" />
+        </label>
+      )}
+      <label className="mbl-field">
+        <span>Notes</span>
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+      </label>
+      <div className="mbl-edit-actions">
+        <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button type="button" className="mbl-btn mbl-btn--primary"
+          onClick={save} disabled={busy || !date}>
+          {busy ? <Spinner /> : `Log ${STAGE_LABELS[stageKey]}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PAIRING SECTION (one pairing, all 4 stages) ─────────────────────────────
+function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
+  const [openStage, setOpenStage] = useState(null);
+  const [saving, setSaving]       = useState(false);
+
+  const ovLogs = useMemo(() => sortLogs(pairing.mobileOvulationLogs),  [pairing.mobileOvulationLogs]);
+  const plLogs = useMemo(() => sortLogs(pairing.mobilePreLayShedLogs), [pairing.mobilePreLayShedLogs]);
+  const clLogs = useMemo(() => sortLogs(pairing.mobileClutchLogs),     [pairing.mobileClutchLogs]);
+  const haLogs = useMemo(() => sortLogs(pairing.mobileHatchLogs),      [pairing.mobileHatchLogs]);
+
+  // Fall back to compat fields so animals entered on desktop are visible immediately
+  const latestOv = ovLogs[0] ?? (pairing.ovulation?.date  ? { date: pairing.ovulation.date,  notes: pairing.ovulation.notes  } : null);
+  const latestPl = plLogs[0] ?? (pairing.preLayShed?.date ? { date: pairing.preLayShed.date, notes: pairing.preLayShed.notes } : null);
+  const latestCl = clLogs[0] ?? (pairing.clutch?.date     ? { date: pairing.clutch.date,     eggsTotal: pairing.clutch.eggsTotal, fertileEggs: pairing.clutch.fertileEggs, slugs: pairing.clutch.slugs, notes: pairing.clutch.notes } : null);
+  const latestHa = haLogs[0] ?? (pairing.hatch?.date      ? { date: pairing.hatch.date,      hatchedCount: pairing.hatch.hatchedCount, notes: pairing.hatch.notes } : null);
+
+  const toggle = (key) => setOpenStage((prev) => (prev === key ? null : key));
+
+  const handleAddEntry = async (stageKey, entry) => {
+    setSaving(true);
+    const KEY_MAP = {
+      ovulation:  "mobileOvulationLogs",
+      preLayShed: "mobilePreLayShedLogs",
+      clutch:     "mobileClutchLogs",
+      hatch:      "mobileHatchLogs",
+    };
+    try {
+      const arrKey  = KEY_MAP[stageKey];
+      const updated = { ...pairing, [arrKey]: [...(pairing[arrKey] || []), entry] };
+      await onSavePairing(syncCompatFields(updated));
+      setOpenStage(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Countdown strings from most-recent logged date per stage
+  const ovCd = latestOv?.date ? `Expected pre-lay shed: ${fmtDate(addDays(latestOv.date, 14))} – ${fmtDate(addDays(latestOv.date, 28))}` : null;
+  const plCd = latestPl?.date ? `Expected lay: ${fmtDate(addDays(latestPl.date, 14))} – ${fmtDate(addDays(latestPl.date, 28))}` : null;
+  const clCd = latestCl?.date ? `Expected hatch: ${fmtDate(addDays(latestCl.date, 55))} – ${fmtDate(addDays(latestCl.date, 65))}` : null;
+
+  const stages = [
+    { key: "ovulation",  label: "Ovulation",    logs: ovLogs, latest: latestOv, countdown: ovCd },
+    { key: "preLayShed", label: "Pre-lay Shed",  logs: plLogs, latest: latestPl, countdown: plCd },
+    { key: "clutch",     label: "Lay / Clutch",  logs: clLogs, latest: latestCl, countdown: clCd },
+    { key: "hatch",      label: "Hatch",          logs: haLogs, latest: latestHa, countdown: null },
+  ];
+
+  const statusCls = `mbl-bp-status--${(pairing.status || "unknown").toLowerCase().replace(/\s+/g, "-")}`;
+
+  return (
+    <div className="mbl-bp-card">
+      <div className="mbl-bp-header">
+        <div>
+          <strong>{pairing.label || `Pairing ${(pairing.id || "").slice(-6)}`}</strong>
+          <small className="mbl-bp-meta">
+            {isFemale ? "Female" : "Male"} · Partner: {partnerName}
+          </small>
+        </div>
+        <span className={`mbl-bp-status ${statusCls}`}>{pairing.status || "Unknown"}</span>
+      </div>
+
+      <div className="mbl-bp-stages">
+        {stages.map(({ key, label, logs, latest, countdown }) => (
+          <div key={key} className="mbl-cs">
+            <button type="button" className="mbl-cs-header" onClick={() => toggle(key)}>
+              <div className="mbl-cs-title">
+                <strong>{label}</strong>
+                {latest
+                  ? <span className="mbl-cs-latest">{fmtDate(latest.date)}</span>
+                  : <span className="mbl-cs-none">Not logged</span>}
+              </div>
+              <div className="mbl-cs-right">
+                {logs.length > 0 && <span className="mbl-cs-badge">{logs.length}</span>}
+                <span>{openStage === key ? "▲" : "▼"}</span>
+              </div>
+            </button>
+
+            {countdown && <div className="mbl-cs-countdown">{countdown}</div>}
+
+            {openStage === key && (
+              <div className="mbl-cs-body">
+                <CycleStageForm
+                  stageKey={key}
+                  onSave={(entry) => handleAddEntry(key, entry)}
+                  onCancel={() => setOpenStage(null)}
+                  busy={saving}
+                />
+                {logs.length > 0 && (
+                  <div className="mbl-cs-history">
+                    <div className="mbl-cs-history-label">History</div>
+                    {logs.map((entry, i) => (
+                      <div key={entry.id || `${key}-${i}`}
+                        className={`mbl-cs-entry ${i === 0 ? "is-latest" : ""}`}>
+                        <div className="mbl-cs-entry-row">
+                          <span className="mbl-cs-entry-date">{fmtDate(entry.date)}</span>
+                          {i === 0 && <span className="mbl-cs-tag">Latest</span>}
+                        </div>
+                        {(entry.eggsTotal || entry.fertileEggs || entry.slugs) && (
+                          <div className="mbl-cs-entry-detail">
+                            {entry.eggsTotal   && <span>{entry.eggsTotal} eggs</span>}
+                            {entry.fertileEggs && <span>{entry.fertileEggs} fertile</span>}
+                            {entry.slugs       && <span>{entry.slugs} slugs</span>}
+                          </div>
+                        )}
+                        {entry.hatchedCount > 0 && (
+                          <div className="mbl-cs-entry-detail">
+                            <span>{entry.hatchedCount} hatchlings</span>
+                          </div>
+                        )}
+                        {entry.notes && (
+                          <div className="mbl-cs-entry-notes">{entry.notes}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── BREEDING PANEL ───────────────────────────────────────────────────────────
+function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
+  const animalId = animal?.id || animal?.appAnimalId;
+  const related  = useMemo(
+    () => (pairings || []).filter((p) => p.femaleId === animalId || p.maleId === animalId),
+    [pairings, animalId]
+  );
+  const animalMap = useMemo(
+    () => new Map((allAnimals || []).map((a) => [a.id, a])),
+    [allAnimals]
+  );
+
+  if (!related.length) {
+    return <p className="mbl-empty">No pairings found for this animal.</p>;
+  }
+
+  return (
+    <div className="mbl-breeding-list">
+      {related.map((pairing) => {
+        const isFemale    = pairing.femaleId === animalId;
+        const partnerId   = isFemale ? pairing.maleId : pairing.femaleId;
+        const partnerName = animalMap.get(partnerId)?.name || partnerId || "Unknown";
+        return (
+          <PairingSection
+            key={pairing.id}
+            pairing={pairing}
+            isFemale={isFemale}
+            partnerName={partnerName}
+            onSavePairing={onSavePairing}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── ANIMAL PROFILE CARD (Full mode) ─────────────────────────────────────────
-function AnimalProfile({ animal, permissions, onQuickAction, onBack }) {
-  const [subtab, setSubtab] = useState("overview");
+function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickAction, onTakePhoto, onSetIcon, onDeletePhoto, onSavePairing, onBack }) {
+  const [subtab, setSubtab]   = useState("overview");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const logs = animal?.logs || {};
   const latestFeed   = first(logs.feeds);
   const latestWeight = first(logs.weights);
   const latestShed   = first(logs.sheds);
+
+  const handleTakePhoto = async () => {
+    setPhotoBusy(true);
+    try { await onTakePhoto(); } finally { setPhotoBusy(false); }
+  };
 
   const quickActions = [
     ["Feed",   "feed"],
@@ -408,6 +778,7 @@ function AnimalProfile({ animal, permissions, onQuickAction, onBack }) {
     ["Clean",  "clean"],
     ["Water",  "water"],
     ["Note",   "note"],
+    ["📷",     "photo"],
   ];
 
   return (
@@ -429,14 +800,15 @@ function AnimalProfile({ animal, permissions, onQuickAction, onBack }) {
 
       <div className="mbl-quick-actions">
         {quickActions.map(([label, action]) => (
-          <button key={action} type="button" className="mbl-quick-btn" onClick={() => onQuickAction(action)}>
+          <button key={action} type="button" className="mbl-quick-btn"
+            onClick={() => action === "photo" ? setSubtab("photos") : onQuickAction(action)}>
             {label}
           </button>
         ))}
       </div>
 
       <div className="mbl-subtabs">
-        {["overview", "logs"].map((t) => (
+        {["overview", "logs", "photos", "breeding"].map((t) => (
           <button key={t} type="button" className={subtab === t ? "is-active" : ""} onClick={() => setSubtab(t)}>
             {cap(t)}
           </button>
@@ -474,31 +846,99 @@ function AnimalProfile({ animal, permissions, onQuickAction, onBack }) {
           {!Object.values(logs).flat().length && <p className="mbl-empty">No logs yet.</p>}
         </div>
       )}
+
+      {subtab === "photos" && (
+        <div className="mbl-photo-panel">
+          <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={handleTakePhoto} disabled={photoBusy}>
+            {photoBusy ? <Spinner /> : "📷 Take Photo"}
+          </button>
+          {(animal.photos || []).length > 0 ? (
+            <div className="mbl-photo-grid">
+              {[...(animal.photos || [])].reverse().map((photo) => (
+                <div key={photo.id} className="mbl-photo-item">
+                  <img src={photo.url} alt="" className="mbl-photo-thumb" />
+                  <div className="mbl-photo-btns">
+                    <button type="button"
+                      className={`mbl-btn mbl-btn--sm ${animal.imageUrl === photo.url ? "mbl-btn--icon-active" : ""}`}
+                      onClick={() => onSetIcon(photo.url)}
+                      disabled={photoBusy || animal.imageUrl === photo.url}>
+                      {animal.imageUrl === photo.url ? "✓ Icon" : "Set as icon"}
+                    </button>
+                    <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
+                      onClick={() => onDeletePhoto(photo.id)} disabled={photoBusy}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mbl-empty">No photos yet. Tap above to take one.</p>
+          )}
+        </div>
+      )}
+
+      {subtab === "breeding" && (
+        <BreedingPanel animal={animal} pairings={pairings || []} allAnimals={allAnimals || []} onSavePairing={onSavePairing} />
+      )}
     </section>
   );
 }
 
 // ─── TERMINAL MODE ────────────────────────────────────────────────────────────
 function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
-  const [screen, setScreen]   = useState("scan");  // scan | card
-  const [animal, setAnimal]   = useState(null);
-  const [manual, setManual]   = useState("");
-  const [busy, setBusy]       = useState(false);
-  const [toast, setToast]     = useState("");
-  const [editBusy, setEditBusy] = useState(false);
-  const [modal, setModal]     = useState(null);
-  const [recent, setRecent]   = useState(() => readJson(RECENT_KEY, []));
+  const [screen, setScreen]       = useState("scan");  // scan | card
+  const [animal, setAnimal]       = useState(null);
+  const [manual, setManual]       = useState("");
+  const [busy, setBusy]           = useState(false);
+  const [toast, setToast]         = useState("");
+  const [editBusy, setEditBusy]   = useState(false);
+  const [modal, setModal]         = useState(null);
+  const [photoModal, setPhotoModal]   = useState(false);
+  const [photoBusy, setPhotoBusy]     = useState(false);
+  const [cardTab, setCardTab]         = useState("edit"); // edit | breeding
+  const [recent, setRecent]       = useState(() => readJson(RECENT_KEY, []));
+  const [localAnimals, setLocalAnimals] = useState(() => readJson(ANIMALS_CACHE, []));
+  const [pairings, setPairings]   = useState([]);
 
   useEffect(() => { writeJson(RECENT_KEY, recent); }, [recent]);
+
+  // Warm up the local cache (animals + pairings) so QR lookups bypass the tier-gated /mobile/scan
+  useEffect(() => {
+    fetchBreederSnapshot()
+      .then((snap) => {
+        const list  = Array.isArray(snap?.animals)  ? snap.animals  : [];
+        const pairs = Array.isArray(snap?.pairings) ? snap.pairings : [];
+        setLocalAnimals(list);
+        setPairings(pairs);
+        writeJson(ANIMALS_CACHE, list);
+      })
+      .catch(() => {});
+  }, []);
 
   const pushToast = useCallback((msg) => setToast(msg), []);
   const dismissToast = useCallback(() => setToast(""), []);
 
-  const resolveAnimal = useCallback(async (qrCode) => {
-    if (!qrCode?.trim()) return;
+  const resolveAnimal = useCallback(async (raw) => {
+    if (!raw?.trim()) return;
+    // Parse the animal ID out of the full QR URL (e.g. https://…#snake=<id>)
+    const animalId = parseQrValue(raw);
+
+    // Try local lookup first — no backend tier check needed
+    const local = localAnimals.find(
+      (a) => a.id === animalId || a.appAnimalId === animalId
+    );
+    if (local) {
+      setAnimal(local);
+      setRecent((prev) => [local, ...prev.filter((a) => a.appAnimalId !== local.appAnimalId)].slice(0, 10));
+      setScreen("card");
+      return;
+    }
+
+    // Fall back to backend (handles cases where cache is stale / empty)
     setBusy(true);
     try {
-      const res = await scanMobileQr({ qrCode: qrCode.trim(), metadata: { deviceId } });
+      const res = await fetchMobileAnimal(animalId);
       if (res?.animal) {
         setAnimal(res.animal);
         setRecent((prev) => [res.animal, ...prev.filter((a) => a.appAnimalId !== res.animal.appAnimalId)].slice(0, 10));
@@ -506,14 +946,96 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       } else {
         pushToast("No animal found for this QR code.");
       }
-    } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Scan failed.");
+    } catch {
+      pushToast("Animal not found. Make sure the snapshot is synced.");
     } finally {
       setBusy(false);
     }
-  }, [deviceId, pushToast]);
+  }, [localAnimals, pushToast]);
 
   const handleManual = (e) => { e.preventDefault(); resolveAnimal(manual); setManual(""); };
+
+  // ── Shared snapshot helper ─────────────────────────────────────────────────
+  const updateAnimalInSnapshot = useCallback(async (updated) => {
+    const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const list = Array.isArray(snap?.animals) ? snap.animals : [];
+    const idx  = list.findIndex((a) => a.id === updated.id || a.appAnimalId === updated.appAnimalId);
+    if (idx >= 0) list[idx] = updated; else list.push(updated);
+    await saveBreederSnapshot({ ...snap, animals: list });
+    setAnimal(updated);
+    setLocalAnimals((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+  }, []);
+
+  // ── Pairing save handler ───────────────────────────────────────────────────
+  const handleSavePairing = useCallback(async (updatedPairing) => {
+    const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const pairs = Array.isArray(snap?.pairings) ? snap.pairings : [];
+    const idx   = pairs.findIndex((p) => p.id === updatedPairing.id);
+    if (idx >= 0) pairs[idx] = updatedPairing; else pairs.push(updatedPairing);
+    await saveBreederSnapshot({ ...snap, pairings: pairs });
+    setPairings([...pairs]);
+  }, []);
+
+  // ── Photo handlers ─────────────────────────────────────────────────────────
+  const handleTakePhoto = useCallback(async () => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      const result = await Camera.getPhoto({
+        quality: 85,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+      });
+      const dataUrl  = `data:image/${result.format || "jpeg"};base64,${result.base64String}`;
+      const newPhoto = {
+        id: `photo-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`,
+        url: dataUrl,
+        addedAt: new Date().toISOString(),
+        source: "camera",
+        type: `image/${result.format || "jpeg"}`,
+      };
+      const updated = { ...animal, photos: [...(animal.photos || []), newPhoto] };
+      await updateAnimalInSnapshot(updated);
+      pushToast("Photo saved.");
+    } catch (err) {
+      if (!String(err?.message || "").toLowerCase().includes("cancel")) {
+        pushToast("Could not take photo.");
+      }
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
+
+  const handleSetIcon = useCallback(async (photoUrl) => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
+      pushToast("Icon updated.");
+    } catch {
+      pushToast("Could not update icon.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
+
+  const handleDeletePhoto = useCallback(async (photoId) => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      const remaining = (animal.photos || []).filter((p) => p.id !== photoId);
+      const nextIcon  = remaining.some((p) => p.url === animal.imageUrl)
+        ? animal.imageUrl
+        : (remaining.length ? remaining[remaining.length - 1].url : undefined);
+      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
+      pushToast("Photo deleted.");
+    } catch {
+      pushToast("Could not delete photo.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
 
   const saveEdit = useCallback(async (draft) => {
     setEditBusy(true);
@@ -612,16 +1134,16 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       {screen === "card" && animal && (
         <div className="mbl-terminal-card">
           <div className="mbl-card-topbar">
-            <button type="button" className="mbl-back-btn" onClick={() => { setScreen("scan"); setAnimal(null); }}>
+            <button type="button" className="mbl-back-btn" onClick={() => { setScreen("scan"); setAnimal(null); setCardTab("edit"); }}>
               ← Back to scan
             </button>
             <span>{animal.name || animal.appAnimalId}</span>
           </div>
 
           <div className="mbl-card-identity">
-            <div className="mbl-avatar-placeholder mbl-avatar-lg">
-              {String(animal.name || "?").slice(0, 1)}
-            </div>
+            {animal.imageUrl
+              ? <img src={animal.imageUrl} alt="" className="mbl-avatar mbl-avatar-lg" />
+              : <div className="mbl-avatar-placeholder mbl-avatar-lg">{String(animal.name || "?").slice(0, 1)}</div>}
             <div>
               <h2>{animal.name}</h2>
               <p>{animal.sex || "—"} · {animal.genetics || "No genetics"}</p>
@@ -630,17 +1152,30 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
           </div>
 
           <div className="mbl-quick-actions mbl-quick-actions--card">
-            {[["Feed","feed"],["Weight","weight"],["Shed","shed"],["Clean","clean"],["Water","water"],["Note","note"]].map(
+            {[["Feed","feed"],["Weight","weight"],["Shed","shed"],["Clean","clean"],["Water","water"],["Note","note"],["📷","photo"]].map(
               ([label, type]) => (
-                <button key={type} type="button" className="mbl-quick-btn" onClick={() => startModal(type)}>
+                <button key={type} type="button" className="mbl-quick-btn"
+                  onClick={() => type === "photo" ? setPhotoModal(true) : startModal(type)}>
                   {label}
                 </button>
               )
             )}
           </div>
 
-          <div className="mbl-section-label">Edit card</div>
-          <AnimalEditForm animal={animal} onSave={saveEdit} onCancel={() => { setScreen("scan"); setAnimal(null); }} busy={editBusy} />
+          <div className="mbl-subtabs">
+            {[["edit","Edit card"],["breeding","Breeding"]].map(([k, lbl]) => (
+              <button key={k} type="button" className={cardTab === k ? "is-active" : ""} onClick={() => setCardTab(k)}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+
+          {cardTab === "edit" && (
+            <AnimalEditForm animal={animal} onSave={saveEdit} onCancel={() => { setScreen("scan"); setAnimal(null); }} busy={editBusy} />
+          )}
+          {cardTab === "breeding" && (
+            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} />
+          )}
         </div>
       )}
 
@@ -648,6 +1183,16 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       {modal === "weight" && <WeightModal animal={animal} onSave={(p) => doQuickAction("weight", p)} onClose={() => setModal(null)} />}
       {modal === "shed"   && <ShedModal   animal={animal} onSave={(p) => doQuickAction("shed", p)}   onClose={() => setModal(null)} />}
       {modal === "note"   && <NoteModal   animal={animal} onSave={(p) => doQuickAction("note", p)}   onClose={() => setModal(null)} />}
+      {photoModal && animal && (
+        <PhotoModal
+          animal={animal}
+          onTakePhoto={handleTakePhoto}
+          onSetIcon={handleSetIcon}
+          onDeletePhoto={handleDeletePhoto}
+          onClose={() => setPhotoModal(false)}
+          busy={photoBusy}
+        />
+      )}
     </div>
   );
 }
@@ -656,12 +1201,14 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 function FullMode({ onSwitchMode, onSignOut, deviceId }) {
   const [tab, setTab]              = useState("scan");
   const [animals, setAnimals]      = useState([]);
+  const [pairings, setPairings]    = useState([]);
   const [tasks, setTasks]          = useState([]);
   const [rackData, setRackData]    = useState({ rooms: [] });
   const [comms, setComms]          = useState(null);
   const [permissions, setPerms]    = useState({});
   const [animal, setAnimal]        = useState(null);
   const [modal, setModal]          = useState(null);
+  const [photoBusy, setPhotoBusy]  = useState(false);
   const [online, setOnline]        = useState(() => navigator.onLine !== false);
   const [queue, setQueue]          = useState(() => readJson(QUEUE_KEY, []));
   const [recent, setRecent]        = useState(() => readJson(RECENT_KEY, []));
@@ -685,6 +1232,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId }) {
       setPerms(permData?.permissions || {});
       setTasks(Array.isArray(taskData?.tasks) ? taskData.tasks : []);
       setAnimals(Array.isArray(snapshot?.animals) ? snapshot.animals : []);
+      setPairings(Array.isArray(snapshot?.pairings) ? snapshot.pairings : []);
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Failed to load data.");
     } finally {
@@ -709,19 +1257,33 @@ function FullMode({ onSwitchMode, onSignOut, deviceId }) {
     if (tab === "messages") fetchMobileCommunication().then(setComms).catch(() => {});
   }, [tab]);
 
-  const openAnimal = useCallback(async (qrCode) => {
-    if (!qrCode) return;
+  const openAnimal = useCallback(async (raw) => {
+    if (!raw) return;
+    const animalId = parseQrValue(raw);
+
+    // Try local lookup first using already-loaded snapshot (no tier check)
+    const local = animals.find((a) => a.id === animalId || a.appAnimalId === animalId);
+    if (local) {
+      setAnimal(local);
+      setRecent((prev) => [local, ...prev.filter((a) => a.appAnimalId !== local.appAnimalId)].slice(0, 10));
+      setTab("animals");
+      return;
+    }
+
+    // Fall back to backend
     try {
-      const res = await scanMobileQr({ qrCode: String(qrCode).trim(), metadata: { deviceId } });
+      const res = await fetchMobileAnimal(animalId);
       if (res?.animal) {
         setAnimal(res.animal);
         setRecent((prev) => [res.animal, ...prev.filter((a) => a.appAnimalId !== res.animal.appAnimalId)].slice(0, 10));
         setTab("animals");
+      } else {
+        pushToast("No animal found for this QR code.");
       }
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Scan failed.");
     }
-  }, [deviceId, pushToast]);
+  }, [animals, pushToast]);
 
   const logActions = { feed: logMobileFeed, weight: logMobileWeight, shed: logMobileShed, note: logMobileNote, clean: logMobileClean, water: logMobileWater };
 
@@ -768,6 +1330,80 @@ function FullMode({ onSwitchMode, onSignOut, deviceId }) {
     const type = { Feed: "feed", Water: "water", Clean: "clean" }[task.type] || "note";
     await doQuickAction(type, { animalId: task.animalId, result, note: `${task.type} ${result}` });
   };
+
+  // ── Photo helpers (Full mode) ──────────────────────────────────────────────
+  const updateAnimalInSnapshot = useCallback(async (updated) => {
+    const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const list = Array.isArray(snap?.animals) ? snap.animals : [];
+    const idx  = list.findIndex((a) => a.id === updated.id || a.appAnimalId === updated.appAnimalId);
+    if (idx >= 0) list[idx] = updated; else list.push(updated);
+    await saveBreederSnapshot({ ...snap, animals: list });
+    setAnimal(updated);
+    setAnimals((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+  }, []);
+
+  // ── Pairing save handler ───────────────────────────────────────────────────
+  const handleSavePairing = useCallback(async (updatedPairing) => {
+    const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const pairs = Array.isArray(snap?.pairings) ? snap.pairings : [];
+    const idx   = pairs.findIndex((p) => p.id === updatedPairing.id);
+    if (idx >= 0) pairs[idx] = updatedPairing; else pairs.push(updatedPairing);
+    await saveBreederSnapshot({ ...snap, pairings: pairs });
+    setPairings([...pairs]);
+  }, []);
+
+  const handleTakePhoto = useCallback(async () => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      const result = await Camera.getPhoto({
+        quality: 85,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+      });
+      const dataUrl  = `data:image/${result.format || "jpeg"};base64,${result.base64String}`;
+      const newPhoto = {
+        id: `photo-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`,
+        url: dataUrl,
+        addedAt: new Date().toISOString(),
+        source: "camera",
+        type: `image/${result.format || "jpeg"}`,
+      };
+      await updateAnimalInSnapshot({ ...animal, photos: [...(animal.photos || []), newPhoto] });
+      pushToast("Photo saved.");
+    } catch (err) {
+      if (!String(err?.message || "").toLowerCase().includes("cancel")) {
+        pushToast("Could not take photo.");
+      }
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
+
+  const handleSetIcon = useCallback(async (photoUrl) => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
+      pushToast("Icon updated.");
+    } catch { pushToast("Could not update icon."); }
+    finally { setPhotoBusy(false); }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
+
+  const handleDeletePhoto = useCallback(async (photoId) => {
+    if (!animal) return;
+    setPhotoBusy(true);
+    try {
+      const remaining = (animal.photos || []).filter((p) => p.id !== photoId);
+      const nextIcon  = remaining.some((p) => p.url === animal.imageUrl)
+        ? animal.imageUrl
+        : (remaining.length ? remaining[remaining.length - 1].url : undefined);
+      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
+      pushToast("Photo deleted.");
+    } catch { pushToast("Could not delete photo."); }
+    finally { setPhotoBusy(false); }
+  }, [animal, updateAnimalInSnapshot, pushToast]);
 
   const filteredAnimals = useMemo(() => {
     if (!search.trim()) return animals;
@@ -829,8 +1465,18 @@ function FullMode({ onSwitchMode, onSignOut, deviceId }) {
         {!loading && tab === "animals" && (
           <div className="mbl-screen">
             {animal ? (
-              <AnimalProfile animal={animal} permissions={permissions}
-                onQuickAction={startModal} onBack={() => setAnimal(null)} />
+              <AnimalProfile
+                animal={animal}
+                permissions={permissions}
+                pairings={pairings}
+                allAnimals={animals}
+                onQuickAction={startModal}
+                onTakePhoto={handleTakePhoto}
+                onSetIcon={handleSetIcon}
+                onDeletePhoto={handleDeletePhoto}
+                onSavePairing={handleSavePairing}
+                onBack={() => setAnimal(null)}
+              />
             ) : (
               <>
                 <div className="mbl-search-row">

@@ -29,6 +29,9 @@ const isBreederPath = (path) => {
   return normalized === "/breeder" || normalized.startsWith("/breeder/");
 };
 const isNativeMobileShell = () => {
+  // VITE_PLATFORM=android is baked into the bundle at build time for android-production mode.
+  // This is the reliable check — window.Capacitor may not be injected yet at first render.
+  if (import.meta.env.VITE_PLATFORM === "android") return true;
   try {
     return Boolean(window?.Capacitor?.isNativePlatform?.() || window?.Capacitor?.getPlatform?.() === "android");
   } catch {
@@ -83,6 +86,19 @@ function AppSectionRouter() {
 }
 
 export default function AppShell() {
+  // On native Android (Capacitor), MobileApp handles its own auth flow.
+  // Wrapping in AuthGate would show the "backend unavailable" blocker before
+  // the mobile login screen even renders, so we skip it entirely here.
+  if (isNativeMobileShell()) {
+    return (
+      <AppearanceProvider>
+        <SharedBackendProvider>
+          <MobileApp />
+        </SharedBackendProvider>
+      </AppearanceProvider>
+    );
+  }
+
   return (
     <AppearanceProvider>
       <SharedBackendProvider>

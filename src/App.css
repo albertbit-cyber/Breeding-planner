@@ -3621,3 +3621,209 @@
   .mbl-rack-grid { grid-template-columns: repeat(3, 1fr); }
   .mbl-data-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Photo panel ────────────────────────────────────────────────────────── */
+.mbl-photo-panel { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem 0; }
+.mbl-photo-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+.mbl-photo-item  { display: flex; flex-direction: column; gap: 0.35rem; }
+.mbl-photo-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.mbl-photo-btns  { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.mbl-btn--danger { color: #e05050; border-color: rgba(224,80,80,0.3); }
+.mbl-btn--danger:active { background: rgba(224,80,80,0.1); }
+.mbl-btn--icon-active {
+  background: color-mix(in srgb, var(--color-primary) 18%, var(--color-card));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ─── Breeding panel ─────────────────────────────────────────────────────── */
+.mbl-breeding-list { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem 0; }
+.mbl-bp-card {
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  border-radius: 12px;
+  background: var(--color-card);
+  overflow: hidden;
+}
+.mbl-bp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-card));
+}
+.mbl-bp-header strong { font-size: 0.9rem; font-weight: 800; }
+.mbl-bp-status {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+.mbl-bp-status--active     { background: color-mix(in srgb, #22c55e 18%, transparent); color: #16a34a; }
+.mbl-bp-status--completed  { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #2563eb; }
+.mbl-bp-status--cancelled  { background: color-mix(in srgb, #e05050 12%, transparent); color: #e05050; }
+.mbl-bp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  padding: 0.65rem 0.85rem;
+}
+.mbl-data-card--full { grid-column: 1 / -1; }
+
+/* ─── Terminal card subtabs ──────────────────────────────────────────────── */
+.mbl-avatar.mbl-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+/* ─── Breeding stages (interactive cycle logging) ────────────────────────── */
+.mbl-bp-meta {
+  display: block;
+  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  margin-top: 0.1rem;
+}
+.mbl-bp-stages {
+  display: flex;
+  flex-direction: column;
+}
+.mbl-cs {
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.mbl-cs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text);
+  text-align: left;
+  gap: 0.5rem;
+}
+.mbl-cs-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+.mbl-cs-title strong { font-size: 0.85rem; font-weight: 700; }
+.mbl-cs-latest {
+  font-size: 0.76rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+.mbl-cs-none {
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.mbl-cs-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  flex-shrink: 0;
+}
+.mbl-cs-badge {
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 0.05rem 0.4rem;
+  line-height: 1.4;
+}
+.mbl-cs-countdown {
+  padding: 0.3rem 0.85rem 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-primary) 85%, var(--color-text));
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+.mbl-cs-body {
+  padding: 0.65rem 0.85rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: color-mix(in srgb, var(--color-secondary) 4%, var(--color-card));
+}
+.mbl-cs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.mbl-cs-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mbl-cs-history-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.mbl-cs-entry {
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-card));
+  border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.mbl-cs-entry.is-latest {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-card));
+}
+.mbl-cs-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.mbl-cs-entry-date {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.mbl-cs-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 99px;
+  background: var(--color-primary);
+  color: #fff;
+}
+.mbl-cs-entry-detail {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.mbl-cs-entry-detail span {
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.mbl-cs-entry-notes {
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  font-style: italic;
+}

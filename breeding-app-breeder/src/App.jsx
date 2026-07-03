@@ -2547,6 +2547,20 @@ function sanitizePairingRecord(raw) {
   return withPairingLifecycleDefaults({ ...raw });
 }
 
+function stripDataUrlPhotos(snake) {
+  if (!snake || !Array.isArray(snake.photos)) return snake;
+  const photos = snake.photos.filter(p => p && typeof p.url === 'string' && !p.url.startsWith('data:'));
+  return photos.length === snake.photos.length ? snake : { ...snake, photos };
+}
+
+function prepareSnapshotForBackend(animals, pairings) {
+  return {
+    animals: Array.isArray(animals) ? animals.map(stripDataUrlPhotos) : [],
+    pairings: Array.isArray(pairings) ? pairings : [],
+    clutches: [],
+  };
+}
+
 const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
 
 function getSyncRecordKey(record, fallbackPrefix, index) {
@@ -6470,11 +6484,7 @@ export default function BreedingPlannerApp() {
       setPairings(merged.pairings);
       latestPlannerSnapshotRef.current = merged;
 
-      await saveBreederSnapshot({
-        animals: merged.snakes,
-        pairings: merged.pairings,
-        clutches: [],
-      });
+      await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
 
       const syncedAt = new Date().toISOString();
       backendPlannerSyncRef.current.seeded = true;
@@ -6929,16 +6939,11 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'ready' || !backendPlannerSyncRef.current.seeded) return;
 
-    const payload = {
-      animals: snakes,
-      pairings,
-      clutches: [],
-    };
     const signature = JSON.stringify({ snakes, pairings });
     if (signature === backendPlannerSyncRef.current.lastSavedSignature) return;
 
     const saveTimer = setTimeout(() => {
-      saveBreederSnapshot(payload)
+      saveBreederSnapshot(prepareSnapshotForBackend(snakes, pairings))
         .then(() => {
           const syncedAt = new Date().toISOString();
           backendPlannerSyncRef.current.lastSavedSignature = signature;
