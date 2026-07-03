@@ -881,12 +881,95 @@ function FeatureCheckboxMatrix({ features, onChange }) {
   );
 }
 
+function TierQuickEditModal({ tier, onClose, onSaved, toast: showToast }) {
+  const [draft, setDraft] = useState({
+    name: tier.name || "",
+    shortDescription: tier.shortDescription || "",
+    badgeText: tier.badgeText || "",
+    monthlyPrice: tier.monthlyPrice ?? 0,
+    yearlyPrice: tier.yearlyPrice ?? 0,
+    currency: tier.currency || "EUR",
+    discountLabel: tier.discountLabel || "",
+    trialDays: tier.trialDays ?? 0,
+    isActive: Boolean(tier.isActive),
+    isPublic: Boolean(tier.isPublic),
+    isRecommended: Boolean(tier.isRecommended),
+    sortOrder: tier.sortOrder ?? 0,
+    customPrice: Boolean(tier.customPrice),
+    reason: "tier_updated",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const result = await updateSubscriptionTier(tier.id, {
+        ...draft,
+        monthlyPrice: Number(draft.monthlyPrice || 0),
+        yearlyPrice: Number(draft.yearlyPrice || 0),
+        trialDays: Number(draft.trialDays || 0),
+        sortOrder: Number(draft.sortOrder || 0),
+      });
+      showToast("Tier saved.");
+      onSaved(result.tier);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save tier.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="admin-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="admin-modal tier-quick-edit-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Edit: {tier.name}</h3>
+        {error && <div className="admin-error">{error}</div>}
+        <div className="tier-edit-sections">
+          <div>
+            <h4 className="tier-edit-section-label">Basic Info</h4>
+            <div className="admin-form-grid tier-edit-form-grid">
+              <label>Name<input value={draft.name} onChange={(e) => update("name", e.target.value)} /></label>
+              <label>Sort order<input type="number" value={draft.sortOrder} onChange={(e) => update("sortOrder", e.target.value)} /></label>
+              <label>Badge text<input value={draft.badgeText} onChange={(e) => update("badgeText", e.target.value)} /></label>
+              <label>Short description<input value={draft.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} /></label>
+            </div>
+            <div className="tier-edit-checks">
+              <label><input type="checkbox" checked={draft.isActive} onChange={(e) => update("isActive", e.target.checked)} /> Active</label>
+              <label><input type="checkbox" checked={draft.isPublic} onChange={(e) => update("isPublic", e.target.checked)} /> Publicly visible</label>
+              <label><input type="checkbox" checked={draft.isRecommended} onChange={(e) => update("isRecommended", e.target.checked)} /> Recommended</label>
+            </div>
+          </div>
+          <div>
+            <h4 className="tier-edit-section-label">Pricing</h4>
+            <div className="admin-form-grid tier-edit-form-grid">
+              <label>Monthly price<input type="number" value={draft.monthlyPrice} onChange={(e) => update("monthlyPrice", e.target.value)} /></label>
+              <label>Yearly price<input type="number" value={draft.yearlyPrice} onChange={(e) => update("yearlyPrice", e.target.value)} /></label>
+              <label>Currency<input value={draft.currency} onChange={(e) => update("currency", e.target.value)} /></label>
+              <label>Trial days<input type="number" value={draft.trialDays} onChange={(e) => update("trialDays", e.target.value)} /></label>
+              <label>Discount label<input value={draft.discountLabel} onChange={(e) => update("discountLabel", e.target.value)} /></label>
+              <label><input type="checkbox" checked={draft.customPrice} onChange={(e) => update("customPrice", e.target.checked)} /> Custom price</label>
+            </div>
+          </div>
+        </div>
+        <div className="admin-modal-actions">
+          <button type="button" className="admin-modal-cancel" onClick={onClose}>Cancel</button>
+          <button type="button" className="admin-modal-cancel" onClick={() => { onClose(); go(`/admin/tiers/${tier.id}`); }}>Edit features</button>
+          <button type="button" className="admin-modal-confirm" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TierOverviewPage() {
   const toast = useToast();
   const [tiers, setTiers] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [archiveTarget, setArchiveTarget] = useState(null);
+  const [editTier, setEditTier] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -932,8 +1015,26 @@ function TierOverviewPage() {
     }
   };
 
+  const sortedTiers = useMemo(
+    () => [...tiers].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [tiers]
+  );
+
+  const cumulativeMap = useMemo(() => {
+    const result = new Map();
+    const allInherited = [];
+    const inheritedSet = new Set();
+    sortedTiers.forEach((tier) => {
+      const ownEnabled = (tier.features || []).filter((f) => f.enabled);
+      const exclusive = ownEnabled.filter((f) => !inheritedSet.has(f.featureKey));
+      result.set(tier.id, { inheritedCount: allInherited.length, exclusive });
+      exclusive.forEach((f) => { inheritedSet.add(f.featureKey); allInherited.push(f); });
+    });
+    return result;
+  }, [sortedTiers]);
+
   return (
-    <section className="admin-section">
+    <section className="admin-section tier-overview-section">
       {archiveTarget && (
         <PromptModal
           title={`Archive "${archiveTarget.name}"`}
@@ -945,42 +1046,87 @@ function TierOverviewPage() {
           onCancel={() => setArchiveTarget(null)}
         />
       )}
+      {editTier && (
+        <TierQuickEditModal
+          tier={editTier}
+          toast={toast}
+          onClose={() => setEditTier(null)}
+          onSaved={(updated) => {
+            setTiers((prev) => prev.map((t) => t.id === updated.id ? { ...t, ...updated } : t));
+            setEditTier(null);
+          }}
+        />
+      )}
       <div className="admin-section-header">
         <div>
           <h2>Tier Overview</h2>
-          <p>Create, edit, price, activate, hide, duplicate, or archive subscription tiers.</p>
+          <p>Tiers are cumulative — each tier includes all features from the ones below it, plus its own.</p>
         </div>
         <button type="button" onClick={createTier}>Create new tier</button>
       </div>
       {error && <div className="admin-error">{error}</div>}
       {loading ? <Spinner label="Loading tiers…" /> : (
-        <div className="admin-card-grid tier-card-grid">
-          {tiers.map((tier) => {
-            const limits = (tier.features || []).filter((f) => f.limitValue !== null && f.limitValue !== undefined).slice(0, 4);
+        <div className="tier-overview-scroll">
+          {sortedTiers.map((tier, idx) => {
+            const { inheritedCount, exclusive } = cumulativeMap.get(tier.id) || { inheritedCount: 0, exclusive: [] };
+            const prevName = idx > 0 ? sortedTiers[idx - 1].name : null;
             return (
-              <div key={tier.id} className="admin-panel tier-card">
-                <div className="tier-card-title">
-                  <h3>{tier.name}</h3>
-                  {tier.isRecommended ? <span>Recommended</span> : null}
+              <div key={tier.id} className={`tier-card${tier.isRecommended ? " tier-card--recommended" : ""}${!tier.isActive ? " tier-card--inactive" : ""}`}>
+                <div className="tier-card-header">
+                  <div className="tier-card-title-row">
+                    <h3>{tier.name}</h3>
+                    <div className="tier-card-badges">
+                      {tier.isRecommended && <span className="tier-badge tier-badge--recommended">Recommended</span>}
+                      {!tier.isActive && <span className="tier-badge tier-badge--inactive">Inactive</span>}
+                      {!tier.isPublic && <span className="tier-badge tier-badge--hidden">Hidden</span>}
+                    </div>
+                  </div>
+                  <p className="tier-card-desc">{tier.shortDescription || <span className="admin-muted">No description</span>}</p>
                 </div>
-                <p>{tier.shortDescription || "-"}</p>
-                <dl className="admin-definition-list">
-                  <dt>Monthly</dt><dd>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.monthlyPrice}`}</dd>
-                  <dt>Yearly</dt><dd>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.yearlyPrice}`}</dd>
-                  <dt>Active users</dt><dd>{tier.activeUsers || 0}</dd>
-                  <dt>Status</dt><dd><StatusBadge value={tier.isActive ? "active" : "inactive"} /></dd>
-                  <dt>Visibility</dt><dd>{tier.isPublic ? "public" : "hidden"}</dd>
-                  <dt>Main limits</dt><dd>{limits.map((f) => `${f.featureKey}: ${f.limitValue}`).join(", ") || "Unlimited / unset"}</dd>
-                </dl>
-                <div className="admin-report-actions">
-                  <button type="button" onClick={() => go(`/admin/tiers/${tier.id}`)}>Edit</button>
+                <div className="tier-card-pricing">
+                  <div className="tier-price-block">
+                    <span>Monthly</span>
+                    <strong>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.monthlyPrice}`}</strong>
+                  </div>
+                  <div className="tier-price-block">
+                    <span>Yearly</span>
+                    <strong>{tier.customPrice ? "Custom" : `${tier.currency} ${tier.yearlyPrice}`}</strong>
+                  </div>
+                  <div className="tier-price-block">
+                    <span>Active users</span>
+                    <strong>{tier.activeUsers || 0}</strong>
+                  </div>
+                </div>
+                <div className="tier-card-features">
+                  <p className="tier-inherits-label">
+                    {prevName ? <><strong>{prevName}</strong> features, plus:</> : "Base tier features:"}
+                  </p>
+                  {exclusive.length === 0 ? (
+                    <p className="admin-muted tier-no-features">No exclusive features configured.</p>
+                  ) : (
+                    <ul className="tier-feature-list">
+                      {exclusive.slice(0, 8).map((f) => (
+                        <li key={f.featureKey}>
+                          <span className="tier-feature-name">{f.featureName || f.featureKey}</span>
+                          {(f.limitValue != null && f.limitValue !== "") && <span className="tier-feature-limit">{f.limitValue}</span>}
+                        </li>
+                      ))}
+                      {exclusive.length > 8 && <li className="tier-feature-more">+{exclusive.length - 8} more</li>}
+                    </ul>
+                  )}
+                  {inheritedCount > 0 && (
+                    <p className="tier-inherited-count">+{inheritedCount} inherited feature{inheritedCount !== 1 ? "s" : ""}</p>
+                  )}
+                </div>
+                <div className="tier-card-actions">
+                  <button type="button" className="tier-action-edit" onClick={() => setEditTier(tier)}>Edit</button>
                   <button type="button" onClick={() => duplicate(tier)}>Duplicate</button>
-                  <button type="button" onClick={() => setArchiveTarget(tier)}>Archive</button>
+                  <button type="button" className="tier-action-danger" onClick={() => setArchiveTarget(tier)}>Archive</button>
                 </div>
               </div>
             );
           })}
-          {!tiers.length && <p className="admin-muted">No tiers found.</p>}
+          {!sortedTiers.length && <p className="admin-muted">No tiers found.</p>}
         </div>
       )}
     </section>
