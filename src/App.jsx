@@ -5147,6 +5147,39 @@ function parseCsvToRows(csvText) {
   return rows;
 }
 
+function isMorphMarketCsv(headerRow) {
+  const normalized = new Set((headerRow || []).map(c => normalizeHeaderLabel(c)));
+  return normalized.has('animal id') && normalized.has('traits') && normalized.has('dob');
+}
+
+function parseMorphMarketRows(rows) {
+  if (!rows || rows.length < 2) return [];
+  const colMap = {};
+  (rows[0] || []).forEach((cell, idx) => {
+    const key = normalizeHeaderLabel(cell);
+    if (key && !(key in colMap)) colMap[key] = idx;
+  });
+  const get = (row, key) => {
+    const idx = colMap[key];
+    return idx !== undefined ? String(row[idx] || '').trim() : '';
+  };
+  return rows.slice(1).map(row => {
+    if (!row || row.every(c => !String(c || '').trim())) return null;
+    const id = get(row, 'animal id');
+    const sex = ensureSex(get(row, 'sex'), 'F');
+    const dobRaw = get(row, 'dob');
+    const birthDate = normalizeDateInput(dobRaw) || dobRaw || null;
+    const weightRaw = get(row, 'weight');
+    const weight = weightRaw ? Number(weightRaw) || 0 : 0;
+    const traitsRaw = get(row, 'traits');
+    const parsedGenetics = parseAnimalText(traitsRaw);
+    const morphs = parsedGenetics.morphs || [];
+    const hets = parsedGenetics.hets || [];
+    if (!id && !morphs.length && !hets.length) return null;
+    return { id, name: '', sex, birthDate, weight, morphs, hets };
+  }).filter(Boolean);
+}
+
 function normalizeHeaderLabel(label) {
   return String(label || '')
     .toLowerCase()
@@ -20811,6 +20844,19 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
 
                   const rows = parseCsvToRows(text || '');
                   if (!rows || !rows.length) { setImportPreview([]); return; }
+
+                  if (isMorphMarketCsv(rows[0] || [])) {
+                    const mmParsed = parseMorphMarketRows(rows);
+                    if (!mmParsed.length) { setImportPreview([]); return; }
+                    const resolvedRows = [];
+                    for (const row of mmParsed) {
+                      const resolvedRow = await resolveLeucisticEntry(row, 'MorphMarket import genetics');
+                      resolvedRows.push({ ...resolvedRow, previewText: formatParsedPreview(resolvedRow) });
+                    }
+                    setImportPreview(resolvedRows);
+                    setImportText(text);
+                    return;
+                  }
 
                   const { index: headerIndex, hasHeader } = buildHeaderIndex(rows[0] || []);
 
