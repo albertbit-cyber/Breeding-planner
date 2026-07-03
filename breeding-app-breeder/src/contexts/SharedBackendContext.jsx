@@ -17,9 +17,7 @@ export function SharedBackendProvider({ children }) {
   const runHealthCheck = async () => {
     resetSharedBackendState();
     const config = getSharedApiConfig();
-    console.info("[shared-backend] resolved VITE_API_URL:", config.rawUrl || "(missing)");
     console.info("[shared-backend] env loaded:", config.rawUrl ? "yes" : "no");
-    console.info("[shared-backend] normalized API base:", config.baseUrl || "(missing)");
     console.info("[shared-backend] active storage mode:", "backend-only");
     if (!config.ok) {
       console.warn("[shared-backend] local mode reason:", config.message);
@@ -79,8 +77,6 @@ export function SharedBackendProvider({ children }) {
       reachable: snapshot.reachable,
       backendModeEnabled: snapshot.backendModeEnabled,
       reason: snapshot.reason,
-      rawUrl: snapshot.config.rawUrl,
-      baseUrl: snapshot.baseUrl,
       authStatus: snapshot.authStatus,
       backendReachable: snapshot.reachable,
       storageMode: snapshot.activeStorageMode,

@@ -6,9 +6,11 @@ import {
   adminTiers,
   archiveTier,
   assignSubscription,
+  changeMySubscription,
   createTier,
   deleteOverride,
   duplicateTier,
+  mySubscription,
   publicTiers,
   resetUsage,
   tierDetail,
@@ -22,6 +24,9 @@ import { requireRole } from "../middleware/roles";
 export const subscriptionRoutes = Router();
 
 subscriptionRoutes.get("/public/tiers", asyncHandler(publicTiers));
+
+subscriptionRoutes.get("/me", requireAuth, asyncHandler(mySubscription));
+subscriptionRoutes.patch("/me", requireAuth, asyncHandler(changeMySubscription));
 
 subscriptionRoutes.get("/access", requireAuth, asyncHandler(accessCheck));
 subscriptionRoutes.get("/access/:featureKey", requireAuth, asyncHandler(accessCheck));

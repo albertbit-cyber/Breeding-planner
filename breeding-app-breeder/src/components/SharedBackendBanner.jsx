@@ -24,8 +24,6 @@ export default function SharedBackendBanner() {
   const toneClass = bannerTone[snapshot.state] || bannerTone.checking;
   const title = bannerTitle[snapshot.state] || bannerTitle.checking;
   const diagnostics = useMemo(() => ({
-    viteApiUrl: snapshot.config.rawUrl || "(missing)",
-    normalizedApiUrl: snapshot.baseUrl || "(missing)",
     envLoaded: snapshot.envLoaded ? "yes" : "no",
     configured: snapshot.configured ? "yes" : "no",
     reachable: snapshot.reachable ? "yes" : "no",
@@ -58,8 +56,6 @@ export default function SharedBackendBanner() {
       </div>
       {showDiagnostics ? (
         <div className="mx-auto mt-3 max-w-7xl rounded-xl border border-current/20 bg-white/70 p-3 text-xs">
-          <div><strong>VITE_API_URL:</strong> {diagnostics.viteApiUrl}</div>
-          <div><strong>Normalized API base:</strong> {diagnostics.normalizedApiUrl}</div>
           <div><strong>Env loaded:</strong> {diagnostics.envLoaded}</div>
           <div><strong>Configured:</strong> {diagnostics.configured}</div>
           <div><strong>Reachable:</strong> {diagnostics.reachable}</div>

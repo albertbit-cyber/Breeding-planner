@@ -30,6 +30,13 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
     return;
   }
 
+  const prismaCode = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+  if (prismaCode === "P2021" || prismaCode === "P2022") {
+    console.error("Database schema error:", error);
+    res.status(503).json({ message: "Server database needs an update before cloud sync can run. Please run backend migrations and try again." });
+    return;
+  }
+
   console.error("Unhandled error:", error);
   res.status(500).json({ message: "Internal server error" });
 };

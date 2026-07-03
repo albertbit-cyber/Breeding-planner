@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser, logoutUser } from "../services/authService";
-import { loginSchema, recoverPasswordSchema, registerSchema } from "../validators/authValidators";
+import { loginUser, registerUser, getMe, refreshAuthToken, recoverPassword as recoverPasswordForUser, logoutUser, changeEmailForUser, changePasswordForUser } from "../services/authService";
+import { changeEmailSchema, changePasswordSchema, loginSchema, recoverPasswordSchema, registerSchema } from "../validators/authValidators";
 import {
   AUTH_REFRESH_COOKIE,
   clearAuthCookies,
@@ -65,6 +65,30 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
   await logoutUser(String(req.user?.id || ""));
   clearAuthCookies(res);
   res.status(200).json({ message: "Signed out." });
+};
+
+export const changeEmail = async (req: Request, res: Response): Promise<void> => {
+  const parsed = changeEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const result = await changeEmailForUser(String(req.user?.id || ""), parsed.data);
+  clearAuthCookies(res);
+  res.status(200).json(result);
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const result = await changePasswordForUser(String(req.user?.id || ""), parsed.data);
+  clearAuthCookies(res);
+  res.status(200).json(result);
 };
 
 export const recoverPassword = async (req: Request, res: Response): Promise<void> => {

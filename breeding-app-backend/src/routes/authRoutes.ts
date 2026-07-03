@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { csrfToken, login, logout, me, recoverPassword, refresh, register } from "../controllers/authController";
+import { changeEmail, changePassword, csrfToken, login, logout, me, recoverPassword, refresh, register } from "../controllers/authController";
 import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { authRecoveryLimiter, authRefreshLimiter, authWriteLimiter } from "../middleware/rateLimiters";
@@ -13,3 +13,5 @@ authRoutes.post("/recover-password", authRecoveryLimiter, asyncHandler(recoverPa
 authRoutes.post("/refresh", authRefreshLimiter, asyncHandler(refresh));
 authRoutes.post("/logout", requireAuth, asyncHandler(logout));
 authRoutes.get("/me", requireAuth, asyncHandler(me));
+authRoutes.patch("/me/email", requireAuth, authWriteLimiter, asyncHandler(changeEmail));
+authRoutes.patch("/me/password", requireAuth, authWriteLimiter, asyncHandler(changePassword));
