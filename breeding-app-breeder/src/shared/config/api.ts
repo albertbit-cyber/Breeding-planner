@@ -139,7 +139,7 @@ export const validateSharedApiUrl = (
       rawUrl: raw,
       baseUrl: "",
       issueCode: "invalid-url",
-      message: `VITE_API_URL is invalid: "${raw}". Expected a full URL such as https://api.example.com.`,
+      message: "Backend configuration is invalid. Expected a full API URL.",
       warnings: [],
       isLocalhost: false,
     };

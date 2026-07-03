@@ -13,6 +13,12 @@ export type BreederSnapshotInput = {
 
 const db = prisma as any;
 
+const isOptionalBackendSchemaError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "P2021" || code === "P2022";
+};
+
 const asRecord = (value: unknown): JsonRecord | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as JsonRecord;
@@ -140,6 +146,41 @@ const buildAutoListing = (ownerId: string, animal: JsonRecord, index: number) =>
   };
 };
 
+const syncMarketplaceAutoListings = async (ownerId: string, animals: JsonRecord[]) => {
+  const saleListings = animals
+    .map((animal, index) => (isSaleAnimal(animal) && isPublishedToMarketplace(animal))
+      ? buildAutoListing(ownerId, animal, index)
+      : null)
+    .filter((item): item is ReturnType<typeof buildAutoListing> => !!item);
+  const saleListingIds = saleListings.map((listing) => listing.appListingId);
+
+  await db.$transaction(async (tx: any) => {
+    await tx.listing.updateMany({
+      where: {
+        ownerId,
+        appListingId: { startsWith: "auto-animal-" },
+        ...(saleListingIds.length ? { NOT: { appListingId: { in: saleListingIds } } } : {}),
+      },
+      data: { status: "hidden" },
+    });
+
+    for (const listing of saleListings) {
+      await tx.listing.upsert({
+        where: { ownerId_appListingId: { ownerId, appListingId: listing.appListingId } },
+        create: listing,
+        update: {
+          animalAppId: listing.animalAppId,
+          title: listing.title,
+          status: listing.status,
+          priceCents: listing.priceCents,
+          currency: listing.currency,
+          payload: listing.payload,
+        },
+      });
+    }
+  });
+};
+
 export const listBreederSnapshot = async (ownerId: string) => {
   const [animals, pairings, clutches] = await Promise.all([
     db.animal.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
@@ -160,7 +201,13 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const explicitClutches = normalizeArray(input.clutches, "clutches");
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
-  const animalAccess = await canAccessFeature({ id: ownerId }, "animals.create");
+  const animalAccess: any = await canAccessFeature({ id: ownerId }, "animals.create").catch((error) => {
+    if (isOptionalBackendSchemaError(error)) {
+      console.warn("[breeder-sync] subscription schema unavailable; allowing animal snapshot sync.", error);
+      return { allowed: true, featureKey: "animals.create", source: "schema-unavailable", tier: "Unconfigured" };
+    }
+    throw error;
+  });
   if (!animalAccess.allowed && animalAccess.reason === "Usage limit reached") {
     throw new HttpError(403, `${animalAccess.reason}: ${animalAccess.currentUsage || 0} / ${animalAccess.limit || 0} animals.`);
   }
@@ -186,37 +233,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
           sex: textValue(animal.sex),
           status: textValue(animal.status),
           payload: animal,
-        },
-      });
-    }
-
-    const saleListings = animals
-      .map((animal, index) => (isSaleAnimal(animal) && isPublishedToMarketplace(animal))
-        ? buildAutoListing(ownerId, animal, index)
-        : null)
-      .filter((item): item is ReturnType<typeof buildAutoListing> => !!item);
-    const saleListingIds = saleListings.map((listing) => listing.appListingId);
-
-    await tx.listing.updateMany({
-      where: {
-        ownerId,
-        appListingId: { startsWith: "auto-animal-" },
-        ...(saleListingIds.length ? { NOT: { appListingId: { in: saleListingIds } } } : {}),
-      },
-      data: { status: "hidden" },
-    });
-
-    for (const listing of saleListings) {
-      await tx.listing.upsert({
-        where: { ownerId_appListingId: { ownerId, appListingId: listing.appListingId } },
-        create: listing,
-        update: {
-          animalAppId: listing.animalAppId,
-          title: listing.title,
-          status: listing.status,
-          priceCents: listing.priceCents,
-          currency: listing.currency,
-          payload: listing.payload,
         },
       });
     }
@@ -271,6 +287,14 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         },
       });
     }
+  });
+
+  await syncMarketplaceAutoListings(ownerId, animals).catch((error) => {
+    if (isOptionalBackendSchemaError(error)) {
+      console.warn("[breeder-sync] marketplace listing schema unavailable; skipped auto-listing sync.", error);
+      return;
+    }
+    console.warn("[breeder-sync] marketplace auto-listing sync failed; breeder snapshot was saved.", error);
   });
 
   // Ingest reproductive events from all female pairings into the intelligence tables.

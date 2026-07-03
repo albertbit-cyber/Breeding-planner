@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
+import jwt from "jsonwebtoken";
+import { env } from "../config/env";
 import { normalizePersistedRole } from "../auth/identity";
 import type { AppRole, PersistedAppRole } from "../types/auth";
 import {
@@ -166,6 +168,70 @@ export const logoutUser = async (userId: string) => {
   return { message: "Signed out." };
 };
 
+export const changeEmailForUser = async (userId: string, input: { email: string; currentPassword: string }) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.isActive) {
+    throw new HttpError(404, "User not found.");
+  }
+
+  const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new HttpError(401, "Current password is incorrect.");
+  }
+
+  if (input.email !== user.email) {
+    const exists = await prisma.user.findUnique({ where: { email: input.email } });
+    if (exists && exists.id !== user.id) {
+      throw new HttpError(409, "Email already exists.");
+    }
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      email: input.email,
+      emailVerified: false,
+      refreshToken: null,
+    },
+  });
+  await revokeRefreshSessionsForUser(user.id);
+  await recordSecurityEvent({
+    type: "auth.email_change.success",
+    actorUserId: user.id,
+    outcome: "success",
+    metadata: { previousEmail: user.email, email: input.email },
+  });
+  return { user: publicUser(updated), message: "Email updated. Please sign in again on your other devices." };
+};
+
+export const changePasswordForUser = async (userId: string, input: { currentPassword: string; newPassword: string }) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.isActive) {
+    throw new HttpError(404, "User not found.");
+  }
+
+  const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new HttpError(401, "Current password is incorrect.");
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, 12);
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      refreshToken: null,
+    },
+  });
+  await revokeRefreshSessionsForUser(user.id);
+  await recordSecurityEvent({
+    type: "auth.password_change.success",
+    actorUserId: user.id,
+    outcome: "success",
+  });
+  return { user: publicUser(updated), message: "Password updated. Please sign in again on your other devices." };
+};
+
 export const recoverPassword = async (input: {
   email: string;
   fullName: string;
@@ -199,4 +265,33 @@ export const getMe = async (userId: string) => {
     throw new HttpError(404, "User not found.");
   }
   return publicUser(user);
+};
+
+export const signEmailVerificationToken = (user: { id: string; email: string }): string =>
+  jwt.sign({ sub: user.id, email: user.email, type: "email_verification" }, env.jwtSecret, { expiresIn: "48h" });
+
+export const verifyEmailForUser = async (token: string) => {
+  let decoded: { sub?: string; email?: string; type?: string };
+  try {
+    decoded = jwt.verify(token, env.jwtSecret) as { sub?: string; email?: string; type?: string };
+  } catch {
+    throw new HttpError(400, "Email verification link is invalid or expired.");
+  }
+  if (decoded.type !== "email_verification" || !decoded.sub || !decoded.email) {
+    throw new HttpError(400, "Email verification link is invalid.");
+  }
+  const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+  if (!user || user.email !== decoded.email) {
+    throw new HttpError(400, "Email verification link no longer matches this account.");
+  }
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerified: true },
+  });
+  await recordSecurityEvent({
+    type: "auth.email_verified",
+    actorUserId: user.id,
+    outcome: "success",
+  });
+  return { user: publicUser(updated), message: "Email verified." };
 };

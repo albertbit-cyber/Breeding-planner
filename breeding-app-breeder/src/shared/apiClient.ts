@@ -549,6 +549,18 @@ export const getCurrentUser = async () => {
   return data;
 };
 
+export const changeAccountEmail = async (payload: { email: string; currentPassword: string }) =>
+  request<{ user: unknown; message: string }>("/auth/me/email", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const changeAccountPassword = async (payload: { currentPassword: string; newPassword: string }) =>
+  request<{ user: unknown; message: string }>("/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchTestCatalog = async () => request<{ tests: unknown[] }>("/lab/tests/catalog?breederView=true");
 
 export const fetchPricingConfig = async () => request<{ pricing: unknown }>("/lab/tests/pricing");
@@ -779,6 +791,15 @@ export const fetchFeatureCatalog = async () =>
 
 export const fetchPublicSubscriptionTiers = async () =>
   request<{ tiers: unknown[] }>("/subscriptions/public/tiers");
+
+export const fetchMySubscription = async () =>
+  request<{ user: unknown; subscription: unknown; overrides: unknown[]; enabledFeatures: string[]; disabledFeatures: string[]; usage: unknown[] }>("/subscriptions/me");
+
+export const changeMySubscription = async (tierId: string) =>
+  request<{ user: unknown; subscription: unknown; overrides: unknown[]; enabledFeatures: string[]; disabledFeatures: string[]; usage: unknown[] }>("/subscriptions/me", {
+    method: "PATCH",
+    body: JSON.stringify({ tierId }),
+  });
 
 export const fetchSubscriptionTiers = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();

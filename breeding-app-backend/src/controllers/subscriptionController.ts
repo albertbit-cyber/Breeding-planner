@@ -4,6 +4,7 @@ import {
   archiveSubscriptionTier,
   assignUserSubscription,
   canAccessFeature,
+  changeOwnSubscription,
   createFeatureOverride,
   createSubscriptionTier,
   duplicateSubscriptionTier,
@@ -27,6 +28,16 @@ export const adminTiers = async (req: Request, res: Response): Promise<void> => 
 
 export const publicTiers = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listPublicSubscriptionTiers());
+};
+
+export const mySubscription = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await getUserSubscriptionPanel(req.user.id));
+};
+
+export const changeMySubscription = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await changeOwnSubscription(req.user, req.body || {}));
 };
 
 export const tierDetail = async (req: Request, res: Response): Promise<void> => {

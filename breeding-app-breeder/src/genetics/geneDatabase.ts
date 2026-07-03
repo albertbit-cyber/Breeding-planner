@@ -1,6 +1,8 @@
 import databaseJson from '../config/ballPythonGeneticsDatabase.json';
 
-export type GeneType = 'recessive' | 'incomplete_dominant' | 'dominant';
+export type GeneType = 'recessive' | 'incomplete_dominant' | 'dominant' | 'polygenic';
+
+export type HealthFlag = 'wobble' | 'lethal_super' | 'infertility' | 'kinking';
 
 export type BallPythonGeneRecord = {
   geneName: string;
@@ -10,6 +12,7 @@ export type BallPythonGeneRecord = {
   superGeneName: string | null;
   aliases: string[];
   shorthand: string[];
+  healthFlags: HealthFlag[];
   notes?: string;
 };
 
@@ -23,12 +26,23 @@ export type BallPythonGeneGroups = {
   recessiveGenes: string[];
   incompleteDominantGenes: string[];
   dominantGenes: string[];
+  polygenicGenes?: string[];
   belComplexGenes: string[];
-  yellowBellyComplexGenes: string[];
-  patternModifierGenes: string[];
-  colorEnhancerGenes: string[];
-  darkeningGenes: string[];
-  stripeLinePatternGenes: string[];
+  blkELComplexGenes?: string[];
+  spiderComplexGenes?: string[];
+  eightBallComplexGenes?: string[];
+  mahoganyComplexGenes?: string[];
+  superStripeComplexGenes?: string[];
+  axanthicLines?: string[];
+  acidComplexGenes?: string[];
+  clownComplexGenes?: string[];
+  wobbleGenes?: string[];
+  lethalSuperGenes?: string[];
+  yellowBellyComplexGenes?: string[];
+  patternModifierGenes?: string[];
+  colorEnhancerGenes?: string[];
+  darkeningGenes?: string[];
+  stripeLinePatternGenes?: string[];
 };
 
 export type BallPythonGeneticsDatabase = {
@@ -38,9 +52,10 @@ export type BallPythonGeneticsDatabase = {
   groups: BallPythonGeneGroups;
 };
 
-type RawGeneRecord = Omit<BallPythonGeneRecord, 'aliases' | 'shorthand'> & {
+type RawGeneRecord = Omit<BallPythonGeneRecord, 'aliases' | 'shorthand' | 'healthFlags'> & {
   aliases?: string[];
   shorthand?: string[];
+  healthFlags?: string[];
 };
 
 type RawDatabase = Omit<BallPythonGeneticsDatabase, 'genes'> & {
@@ -127,6 +142,11 @@ function normalizeGeneRecord(raw: RawGeneRecord): BallPythonGeneRecord | null {
     ...(Array.isArray(raw?.shorthand) ? raw.shorthand : []),
   ]);
 
+  const VALID_HEALTH_FLAGS = new Set(['wobble', 'lethal_super', 'infertility', 'kinking']);
+  const healthFlags = (Array.isArray(raw.healthFlags) ? raw.healthFlags : [])
+    .map(f => String(f).trim())
+    .filter(f => VALID_HEALTH_FLAGS.has(f)) as HealthFlag[];
+
   return {
     geneName,
     geneType: raw.geneType,
@@ -135,6 +155,7 @@ function normalizeGeneRecord(raw: RawGeneRecord): BallPythonGeneRecord | null {
     superGeneName: raw.superGeneName ? String(raw.superGeneName).trim() : null,
     aliases,
     shorthand,
+    healthFlags,
     ...(raw.notes ? { notes: String(raw.notes) } : {}),
   };
 }

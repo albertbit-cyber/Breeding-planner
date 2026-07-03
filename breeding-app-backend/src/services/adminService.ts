@@ -1,6 +1,9 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AppRole, AuthenticatedUser } from "../types/auth";
+import bcrypt from "bcryptjs";
+import { sendEmail } from "./emailService";
+import { signEmailVerificationToken } from "./authService";
 
 const db = prisma as any;
 
@@ -27,7 +30,7 @@ const USER_SELECT = {
 
 const ADMIN_ROLES = new Set(["admin", "lab", "breeder", "buyer", "moderator", "support"]);
 const USER_STATUSES = new Set(["active", "pending", "restricted", "suspended", "banned", "deleted"]);
-const SUBSCRIPTION_PLANS = new Set(["free", "hobby", "breeder", "professional", "lab", "enterprise"]);
+const SUBSCRIPTION_PLANS = new Set(["free", "hobby", "breeder", "professional", "enterprise"]);
 const SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"]);
 const PAYMENT_STATUSES = new Set(["none", "paid", "pending", "failed", "waived", "refunded"]);
 const VERIFICATION_STATUSES = new Set(["not_applied", "pending", "approved", "rejected", "revoked", "more_info_requested"]);
@@ -318,6 +321,96 @@ export const getAdminUserDetail = async (id: string) => {
   return { user: normalizeUser(user), auditLogs, reports: reports.map(normalizeReport), activity };
 };
 
+export const getAdminAccountPanel = async (actor: AuthenticatedUser) => {
+  const user = await db.user.findUnique({ where: { id: actor.id }, select: USER_SELECT });
+  if (!user) throw new HttpError(404, "Admin account not found.");
+  const team = await db.user.findMany({
+    where: { role: { in: ["admin", "moderator", "support", "lab"] } },
+    select: USER_SELECT,
+    orderBy: [{ role: "asc" }, { createdAt: "desc" }],
+    take: 200,
+  });
+  return { account: normalizeUser(user), team: team.map(normalizeUser) };
+};
+
+const randomPassword = (): string => {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let result = "";
+  for (let i = 0; i < 14; i += 1) result += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return result;
+};
+
+const appUrl = (): string => String(process.env.PUBLIC_APP_URL || process.env.ADMIN_APP_URL || process.env.CORS_ORIGIN || "").split(",")[0].trim();
+const apiUrl = (): string => String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.BACKEND_PUBLIC_URL || process.env.VITE_API_URL || "").split(",")[0].trim();
+
+const verificationLinkFor = (user: { id: string; email: string }): string => {
+  const token = signEmailVerificationToken(user);
+  const authPath = `/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const backendBaseUrl = apiUrl();
+  if (backendBaseUrl) return `${backendBaseUrl.replace(/\/$/, "")}${authPath}`;
+  const publicBaseUrl = appUrl();
+  const appPath = `/api${authPath}`;
+  return publicBaseUrl ? `${publicBaseUrl.replace(/\/$/, "")}${appPath}` : appPath;
+};
+
+export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
+  const email = String(payload.email || "").trim().toLowerCase();
+  const fullName = String(payload.fullName || "").trim();
+  const role = String(payload.role || "support").trim().toLowerCase();
+  const status = String(payload.status || "active").trim().toLowerCase();
+  const sendInvite = payload.sendInvite !== false;
+  const reason = assertReason(payload.reason || "Create team user");
+  if (!email || !email.includes("@")) throw new HttpError(400, "A valid email is required.");
+  if (!fullName) throw new HttpError(400, "fullName is required.");
+  if (!["admin", "moderator", "support", "lab"].includes(role)) throw new HttpError(400, "Unsupported team role.");
+  if (!USER_STATUSES.has(status)) throw new HttpError(400, "Unsupported status.");
+  const exists = await db.user.findUnique({ where: { email } });
+  if (exists) throw new HttpError(409, "Email already exists.");
+  const temporaryPassword = String(payload.temporaryPassword || "").trim() || randomPassword();
+  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const created = await db.user.create({
+    data: {
+      email,
+      fullName,
+      role: role as AppRole,
+      status,
+      isActive: ["active", "pending", "restricted"].includes(status),
+      emailVerified: false,
+      passwordHash,
+      subscriptionPlan: "free",
+      subscriptionStatus: "inactive",
+      subscriptionPaymentStatus: "none",
+    },
+    select: USER_SELECT,
+  });
+  let emailResult: { delivered: boolean; provider: string } | null = null;
+  if (sendInvite) {
+    const verificationLink = verificationLinkFor(created);
+    emailResult = await sendEmail({
+      to: email,
+      subject: "Your Breeding Planner admin account",
+      text: [
+        `Hello ${fullName},`,
+        "",
+        "An admin account was created for you.",
+        `Temporary password: ${temporaryPassword}`,
+        `Verify your email: ${verificationLink}`,
+        "",
+        "Sign in and change your password from My Account.",
+      ].join("\n"),
+      metadata: { type: "admin_invite", userId: created.id },
+    });
+  }
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: created.id,
+    action: "team_user_created",
+    afterJson: { email, role, status, inviteSent: Boolean(emailResult) },
+    reason,
+  });
+  return { user: normalizeUser(created), temporaryPassword: sendInvite ? undefined : temporaryPassword, email: emailResult };
+};
+
 const REPORT_INCLUDE = {
   reporterUser: { select: { id: true, fullName: true, email: true, role: true } },
   reportedUser: { select: { id: true, fullName: true, email: true, role: true } },
@@ -576,6 +669,85 @@ export const sendAdminNotification = async (
     reason,
   });
   return { sent: recipients.length };
+};
+
+export const sendAdminUserEmail = async (
+  actor: AuthenticatedUser,
+  userId: string,
+  payload: { subject?: unknown; message?: unknown; reason?: unknown }
+) => {
+  const subject = String(payload.subject || "").trim();
+  const message = String(payload.message || "").trim();
+  const reason = assertReason(payload.reason || subject);
+  if (!subject || !message) throw new HttpError(400, "Email subject and message are required.");
+  const user = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
+  if (!user) throw new HttpError(404, "User not found.");
+  const email = await sendEmail({
+    to: user.email,
+    subject,
+    text: message,
+    metadata: { type: "admin_user_email", userId },
+  });
+  await db.notification.create({
+    data: {
+      recipientId: user.id,
+      actorId: actor.id,
+      type: "admin_email",
+      title: subject,
+      message,
+      metadata: { deliveredByEmail: email.delivered, provider: email.provider },
+    },
+  });
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: userId,
+    action: "admin_user_email_sent",
+    afterJson: { subject, email },
+    reason,
+  });
+  return { user: normalizeUser(user), email };
+};
+
+export const resendUserEmailVerification = async (actor: AuthenticatedUser, userId: string, payload: { reason?: unknown }) => {
+  const reason = assertReason(payload.reason || "Resend email verification");
+  const user = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
+  if (!user) throw new HttpError(404, "User not found.");
+  const verificationLink = verificationLinkFor(user);
+  const email = await sendEmail({
+    to: user.email,
+    subject: "Verify your Breeding Planner account",
+    text: `Please verify your email address:\n\n${verificationLink}`,
+    metadata: { type: "email_verification", userId },
+  });
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: userId,
+    action: "email_verification_resent",
+    afterJson: { email },
+    reason,
+  });
+  return { user: normalizeUser(user), email };
+};
+
+export const markUserEmailVerified = async (actor: AuthenticatedUser, userId: string, payload: { verified?: unknown; reason?: unknown }) => {
+  const verified = payload.verified !== false;
+  const reason = assertReason(payload.reason || (verified ? "Mark email verified" : "Mark email unverified"));
+  const before = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
+  if (!before) throw new HttpError(404, "User not found.");
+  const updated = await db.user.update({
+    where: { id: userId },
+    data: { emailVerified: verified },
+    select: USER_SELECT,
+  });
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: userId,
+    action: "email_verification_status_change",
+    beforeJson: { emailVerified: before.emailVerified },
+    afterJson: { emailVerified: updated.emailVerified },
+    reason,
+  });
+  return { user: normalizeUser(updated) };
 };
 
 const GDPR_INCLUDE = {

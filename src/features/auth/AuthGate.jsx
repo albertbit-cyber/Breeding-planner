@@ -1138,7 +1138,10 @@ export default function AuthGate({ children }) {
   ) : null;
 
   const overlayActive = authScope !== "public" && !authState.isAuthenticated;
-  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
+  // Only block when the backend has been confirmed unreachable. During the initial
+  // "checking" phase (and when no backend is configured) we show the login form
+  // immediately so the user isn't staring at a spinner waiting for a health check.
+  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state === "disconnected";
 
   return (
     <div className="auth-shell">

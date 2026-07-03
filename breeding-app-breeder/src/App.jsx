@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "./i18n";
 import QRCode from 'qrcode';
 import LanguageSwitcher from "./components/LanguageSwitcher.jsx";
+import GeneAutocomplete from "./components/GeneAutocomplete.jsx";
 import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
@@ -29,7 +30,20 @@ import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
-import { fetchBreederSnapshot, saveBreederSnapshot, fetchMyListings, saveMyListings } from "./shared/apiClient";
+import {
+  changeAccountEmail,
+  changeAccountPassword,
+  changeMySubscription,
+  checkFeatureAccess,
+  clearAuthToken,
+  fetchBreederSnapshot,
+  fetchMySubscription,
+  fetchMyListings,
+  fetchPublicSubscriptionTiers,
+  getCurrentUser,
+  saveBreederSnapshot,
+  saveMyListings,
+} from "./shared/apiClient";
 import {
   GENE_GROUPS,
   GENE_ALIASES,
@@ -767,9 +781,9 @@ function RoomModal({
   const canMoveDown = roomIndex < roomCount - 1;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-5xl rounded-[32px] bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex flex-col gap-4 border-b border-neutral-100 pb-4">
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-4" onClick={onClose}>
+      <div className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 bg-white px-4 pt-4 sm:px-6 sm:pt-6 flex flex-col gap-4 border-b border-neutral-100 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
@@ -2537,6 +2551,209 @@ function sanitizePairingRecord(raw) {
   return withPairingLifecycleDefaults({ ...raw });
 }
 
+const BACKEND_MEDIA_FIELD_KEYS = new Set([
+  'imageUrl',
+  'photoUrl',
+  'pictureUrl',
+  'thumbnailUrl',
+  'certificateUrl',
+  'labCertificateUrl',
+  'logoUrl',
+  'url',
+  'src',
+  'dataUrl',
+]);
+const BACKEND_MEDIA_STRING_LIMIT = 200000;
+
+function isEmbeddedMediaString(value) {
+  return typeof value === 'string' && value.trim().startsWith('data:');
+}
+
+function sanitizeBackendMediaValue(value, key = '') {
+  if (typeof value === 'string') {
+    if (isEmbeddedMediaString(value)) return undefined;
+    if (BACKEND_MEDIA_FIELD_KEYS.has(key) && value.length > BACKEND_MEDIA_STRING_LIMIT) return undefined;
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map(item => sanitizeBackendMediaValue(item, key))
+      .filter(item => {
+        if (item == null) return false;
+        if (typeof item === 'object') return Object.keys(item).length > 0;
+        return true;
+      });
+  }
+  if (value && typeof value === 'object') {
+    const cleaned = {};
+    Object.entries(value).forEach(([entryKey, entryValue]) => {
+      const nextValue = sanitizeBackendMediaValue(entryValue, entryKey);
+      if (typeof nextValue !== 'undefined') cleaned[entryKey] = nextValue;
+    });
+    return cleaned;
+  }
+  return value;
+}
+
+function prepareAnimalForBackend(snake) {
+  if (!snake || typeof snake !== 'object') return snake;
+  const cleaned = sanitizeBackendMediaValue(snake);
+  if (!cleaned || typeof cleaned !== 'object') return cleaned;
+  if (!Array.isArray(cleaned.photos)) return cleaned;
+  const photos = cleaned.photos.filter(photo => photo && typeof photo.url === 'string' && photo.url.trim());
+  return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
+}
+
+function prepareSnapshotForBackend(animals, pairings) {
+  return {
+    animals: Array.isArray(animals) ? animals.map(prepareAnimalForBackend) : [],
+    pairings: Array.isArray(pairings) ? pairings : [],
+    clutches: [],
+  };
+}
+
+const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
+
+function getSyncRecordKey(record, fallbackPrefix, index) {
+  const candidates = [
+    record?.id,
+    record?.appAnimalId,
+    record?.animalId,
+    record?.appPairingId,
+    record?.pairingId,
+    record?.name,
+    record?.label,
+  ];
+  const value = candidates.map(item => String(item || '').trim()).find(Boolean);
+  return value || `${fallbackPrefix}-${index + 1}`;
+}
+
+function getSyncTimestamp(value) {
+  const candidates = [
+    value?.updatedAt,
+    value?.modifiedAt,
+    value?.lastModifiedAt,
+    value?.createdAt,
+    value?.metadata?.updatedAt,
+    value?.metadata?.modifiedAt,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const time = new Date(candidate).getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return 0;
+}
+
+function getLogEntryKey(entry, key, index) {
+  if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
+  const explicit = [entry.id, entry.logId, entry.createdAt && `${entry.createdAt}:${entry.actionType || key}`]
+    .map(item => String(item || '').trim())
+    .find(Boolean);
+  if (explicit) return explicit;
+  return [
+    key,
+    entry.date || '',
+    entry.time || '',
+    entry.result || entry.outcome || '',
+    entry.feed || entry.food || entry.prey || '',
+    entry.size || entry.weight || entry.grams || '',
+    entry.notes || entry.note || '',
+  ].map(part => String(part || '').trim()).join('|') || `${key}-${index}`;
+}
+
+function mergeLogArrays(localEntries = [], backendEntries = [], key) {
+  const rows = [
+    ...(Array.isArray(localEntries) ? localEntries : []),
+    ...(Array.isArray(backendEntries) ? backendEntries : []),
+  ].filter(entry => entry && typeof entry === 'object');
+  const byKey = new Map();
+  rows.forEach((entry, index) => {
+    const entryKey = getLogEntryKey(entry, key, index);
+    const existing = byKey.get(entryKey);
+    if (!existing || getSyncTimestamp(entry) >= getSyncTimestamp(existing)) {
+      byKey.set(entryKey, { ...existing, ...entry });
+    }
+  });
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTime = getSyncTimestamp(a) || new Date(a.date || a.createdAt || 0).getTime() || 0;
+    const bTime = getSyncTimestamp(b) || new Date(b.date || b.createdAt || 0).getTime() || 0;
+    return bTime - aTime;
+  });
+}
+
+function mergeArrayValues(...values) {
+  const merged = [];
+  const seen = new Set();
+  values.flatMap(value => (Array.isArray(value) ? value : [])).forEach(item => {
+    const normalized = String(item || '').trim();
+    if (!normalized || seen.has(normalized.toLowerCase())) return;
+    seen.add(normalized.toLowerCase());
+    merged.push(normalized);
+  });
+  return merged;
+}
+
+function mergeAnimalRecord(localAnimal, backendAnimal) {
+  if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
+  if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
+  const localTime = getSyncTimestamp(localAnimal);
+  const backendTime = getSyncTimestamp(backendAnimal);
+  const base = backendTime > localTime ? backendAnimal : localAnimal;
+  const other = backendTime > localTime ? localAnimal : backendAnimal;
+  const logs = {};
+  const allLogKeys = Array.from(new Set([
+    ...SYNC_LOG_KEYS,
+    ...Object.keys(localAnimal.logs || {}),
+    ...Object.keys(backendAnimal.logs || {}),
+  ]));
+  allLogKeys.forEach(key => {
+    logs[key] = mergeLogArrays(localAnimal.logs?.[key], backendAnimal.logs?.[key], key);
+  });
+  return sanitizeSnakeRecord({
+    ...other,
+    ...base,
+    morphs: mergeArrayValues(other.morphs, base.morphs),
+    hets: mergeArrayValues(other.hets, base.hets),
+    possibleHets: mergeArrayValues(other.possibleHets, base.possibleHets),
+    tags: mergeArrayValues(other.tags, base.tags),
+    groups: mergeArrayValues(other.groups, base.groups),
+    photos: mergeLogArrays(other.photos, base.photos, 'photo').slice(0, MAX_PHOTOS_PER_SNAKE),
+    logs,
+  });
+}
+
+function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord) {
+  const map = new Map();
+  const add = (item, source, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return;
+    const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, sanitized);
+      return;
+    }
+    map.set(key, mergeRecord ? mergeRecord(source === 'local' ? sanitized : existing, source === 'backend' ? sanitized : existing) : (
+      getSyncTimestamp(sanitized) > getSyncTimestamp(existing) ? { ...existing, ...sanitized } : existing
+    ));
+  };
+  (Array.isArray(localItems) ? localItems : []).forEach((item, index) => add(item, 'local', index));
+  (Array.isArray(backendItems) ? backendItems : []).forEach((item, index) => add(item, 'backend', index));
+  return Array.from(map.values());
+}
+
+function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
+  const localSnakes = Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [];
+  const backendSnakes = Array.isArray(backendSnapshot.snakes) ? backendSnapshot.snakes : [];
+  const localPairings = Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [];
+  const backendPairings = Array.isArray(backendSnapshot.pairings) ? backendSnapshot.pairings : [];
+  return {
+    snakes: mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord),
+    pairings: mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing'),
+  };
+}
+
 function normalizeBackupFileEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const payload = raw.payload && typeof raw.payload === 'object' ? raw.payload : null;
@@ -3118,7 +3335,7 @@ function withPairingLifecycleDefaults(pairing = {}) {
 }
 
 function initSnakeDraft(s) {
-  if (!s) return { name:'', sex:'F', status:'Active', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null };
+  if (!s) return { name:'', sex:'F', status:'Active', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null, feederProfile: createEmptyFeederProfile() };
   const existingSequence = Number(s?.idSequence);
   const resolvedSequence = Number.isFinite(existingSequence) && existingSequence > 0
     ? existingSequence
@@ -3134,7 +3351,92 @@ function initSnakeDraft(s) {
     groups: normalizeSingleGroupValue(s.groups),
     logs: cloneLogs(s.logs),
     photos: normalizeSnakePhotos(s.photos),
+    feederProfile: normalizeFeederProfileForDraft(s.feederProfile),
   };
+}
+
+const FEEDER_TYPE_OPTIONS = ['Rat', 'SF', 'Mouse', 'Other'];
+const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
+
+function createEmptyFeederProfile() {
+  return {
+    feedType: '',
+    sizeClass: '',
+    weightGrams: '',
+    quantity: 1,
+    notes: '',
+  };
+}
+
+function normalizeFeederProfileForDraft(profile) {
+  const source = profile && typeof profile === 'object' ? profile : {};
+  const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
+  const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams);
+  const rawFeedType = String(source.feedType ?? source.foodType ?? source.feed ?? '').trim();
+  return {
+    feedType: rawFeedType.toUpperCase() === 'ASF' ? 'SF' : rawFeedType,
+    sizeClass: String(source.sizeClass ?? source.size ?? source.preySize ?? '').trim(),
+    weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? String(weightGrams) : '',
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    notes: String(source.notes ?? '').trim(),
+  };
+}
+
+function normalizeFeederProfileForSave(profile) {
+  const draft = normalizeFeederProfileForDraft(profile);
+  const weightGrams = Number(draft.weightGrams);
+  const quantity = Number(draft.quantity);
+  return {
+    feedType: draft.feedType,
+    sizeClass: draft.sizeClass,
+    weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? weightGrams : '',
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    notes: draft.notes,
+  };
+}
+
+function getLatestAcceptedFeedEntry(snake) {
+  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
+  for (let i = feeds.length - 1; i >= 0; i -= 1) {
+    const entry = feeds[i];
+    if (entry && !entry.refused) return entry;
+  }
+  return null;
+}
+
+function getSnakeFeederProfile(snake) {
+  return normalizeFeederProfileForDraft(snake?.feederProfile);
+}
+
+function hasCompleteFeederProfile(profile) {
+  if (!profile) return false;
+  return Boolean(String(profile.feedType || '').trim() && (String(profile.sizeClass || '').trim() || Number(profile.weightGrams) > 0));
+}
+
+function getFeedPrepExclusionReason(snake, pairings = []) {
+  if (!snake || normalizeSexValue(snake.sex) !== 'F' || !Array.isArray(pairings)) return '';
+  const snakeId = String(snake.id || '').trim();
+  if (!snakeId) return '';
+
+  const activeCycle = pairings.find(pairing => {
+    if (!pairing || String(pairing.femaleId || '').trim() !== snakeId) return false;
+    const derived = getBreedingCycleDerived(withPairingLifecycleDefaults({ ...pairing }));
+    return derived.ovulationObserved && !derived.clutchRecorded && !derived.hatchedRecorded;
+  });
+  if (!activeCycle) return '';
+
+  const derived = getBreedingCycleDerived(withPairingLifecycleDefaults({ ...activeCycle }));
+  if (derived.preLayObserved) return 'Past ovulation / pre-lay';
+  return 'Ovulating';
+}
+
+function formatFeederClass(profile) {
+  const size = String(profile?.sizeClass || '').trim();
+  const grams = Number(profile?.weightGrams);
+  if (size && Number.isFinite(grams) && grams > 0) return `${size} (${grams} g)`;
+  if (size) return size;
+  if (Number.isFinite(grams) && grams > 0) return `${grams} g`;
+  return '';
 }
 
 function createEmptyNewAnimalDraft() {
@@ -3156,7 +3458,8 @@ function createEmptyNewAnimalDraft() {
     imageUrl: "",
     photos: [],
     groups: [],
-    logs: cloneLogs()
+    logs: cloneLogs(),
+    feederProfile: createEmptyFeederProfile()
   };
 }
 
@@ -5603,71 +5906,19 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   )}
                 </div>
               )}
-              <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  className="w-full border rounded-lg px-2 py-1 text-sm"
-                  value={statusTagInput}
-                  onChange={e => setStatusTagInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddStatusTag(); } }}
-                  placeholder={t("ui.animals.addAnimal.createNewTag", { defaultValue: "Create new tag" })}
-                />
-                <button
-                  type="button"
-                  className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', statusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
-                  onClick={handleAddStatusTag}
-                  disabled={!statusTagInput.trim()}
-                >
-                  {t("ui.animals.addAnimal.addTag", { defaultValue: "Add tag" })}
-                </button>
-              </div>
-              {Array.isArray(statusOptions) && statusOptions.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {statusOptions.map(tag => {
-                    const isCustom = customTagLookup.has(tag.toLowerCase());
-                    return (
-                      <span
-                        key={tag}
-                        className={cx(
-                          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px]',
-                          isCustom ? 'border border-neutral-200 bg-neutral-50 text-neutral-600' : 'border border-neutral-100 bg-white text-neutral-500'
-                        )}
-                      >
-                        <span>{resolveStatusLabel(tag)}</span>
-                        {typeof onDeleteStatusTag === 'function' && (
-                          <button
-                            type="button"
-                            className="h-4 w-4 rounded-full border border-neutral-300 text-[10px] leading-[10px] text-neutral-500 hover:border-rose-400 hover:text-rose-500"
-                            title="Delete tag"
-                            onClick={() => onDeleteStatusTag(tag)}
-                          >
-                            x
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="mt-1 text-[11px] text-neutral-500">{t("ui.animals.addAnimal.tagHelp", { defaultValue: "Tags let you group animals for availability. Removing a tag clears it from any animals using it." })}</div>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.genetics", { defaultValue: "Genetics (morphs & hets)" })}</label>
-              <textarea
-                rows={3}
-                className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
-                value={newAnimal.morphHetInput || ''}
-                onChange={async e=>{
-                  const value = e.target.value;
-                  const resolvedText = typeof onResolveLeucisticText === 'function'
-                    ? await onResolveLeucisticText(value, 'Add Animal genetics')
-                    : value;
-                  const { morphs, hets } = splitMorphHetInput(resolvedText);
-                  setNewAnimal(a=>({ ...a, morphHetInput: resolvedText, morphs, hets }));
-                }}
-                placeholder={"Clown\nPastel\nHet Hypo"}
-              />
+              <div className="mt-1">
+                <GeneAutocomplete
+                  morphs={Array.isArray(newAnimal.morphs) ? newAnimal.morphs : []}
+                  hets={Array.isArray(newAnimal.hets) ? newAnimal.hets : []}
+                  onChange={({ morphs, hets }) => setNewAnimal(a => ({ ...a, morphs, hets, morphHetInput: [...morphs, ...hets].join('\n') }))}
+                  placeholder="Type to search genes (e.g. Clown, Pastel, Spider…)"
+                />
+              </div>
               <div className="mt-1 text-[11px] text-neutral-500">
-                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "List each trait on its own line (commas, slashes, or percentages are still supported when pasting)." })}
+                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "Toggle Visual / Het, type a gene name or alias, then select. Click × to remove." })}
               </div>
             </div>
             <div>
@@ -5911,6 +6162,7 @@ export default function BreedingPlannerApp() {
   const [listExportFeedback, setListExportFeedback] = useState(null);
   const [appDialog, setAppDialog] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showFeedPrepModal, setShowFeedPrepModal] = useState(false);
   const [newAnimal, setNewAnimal] = useState(createEmptyNewAnimalDraft);
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState([]);
@@ -5927,6 +6179,11 @@ export default function BreedingPlannerApp() {
     lastSavedSignature: '',
   });
   const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const [cloudSyncStatus, setCloudSyncStatus] = useState({
+    state: 'idle',
+    lastSyncedAt: null,
+    message: '',
+  });
   const sharedBreederDataReady = sharedBackendSnapshot?.state === 'connected'
     && sharedBackendSnapshot?.authStatus === 'authorized';
   const handleAnimalViewTabChange = useCallback((nextView) => {
@@ -6249,69 +6506,65 @@ export default function BreedingPlannerApp() {
     latestPlannerSnapshotRef.current = { snakes, pairings };
   }, [snakes, pairings]);
 
+  const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+    if (!sharedBreederDataReady) {
+      const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
+      if (!silent) setCloudSyncStatus({ state: 'error', lastSyncedAt: null, message });
+      throw new Error(message);
+    }
+    if (backendPlannerSyncRef.current.status === 'loading') {
+      const message = 'Cloud sync is already running.';
+      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message }));
+      return null;
+    }
+
+    backendPlannerSyncRef.current.status = 'loading';
+    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+
+    try {
+      const localSnapshot = latestPlannerSnapshotRef.current;
+      const snapshot = await fetchBreederSnapshot();
+      const backendSnapshot = {
+        snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
+        pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
+      };
+      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
+      const signature = JSON.stringify(merged);
+
+      setSnakes(merged.snakes);
+      setPairings(merged.pairings);
+      latestPlannerSnapshotRef.current = merged;
+
+      await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+
+      const syncedAt = new Date().toISOString();
+      backendPlannerSyncRef.current.seeded = true;
+      backendPlannerSyncRef.current.status = 'ready';
+      backendPlannerSyncRef.current.lastSavedSignature = signature;
+      setCloudSyncStatus({
+        state: 'success',
+        lastSyncedAt: syncedAt,
+        message: `Synced ${merged.snakes.length} snakes and ${merged.pairings.length} pairings with the cloud database.`,
+      });
+      return { ...merged, syncedAt };
+    } catch (error) {
+      backendPlannerSyncRef.current.status = 'idle';
+      const message = error?.message || 'Cloud sync failed.';
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
+      throw error;
+    }
+  }, [sharedBackendSnapshot?.message, sharedBreederDataReady]);
+
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'idle') return;
 
     let cancelled = false;
-    backendPlannerSyncRef.current.status = 'loading';
-
-    fetchBreederSnapshot()
-      .then((snapshot) => {
-        if (cancelled) return;
-        const backendSnakes = Array.isArray(snapshot?.animals)
-          ? snapshot.animals.map(sanitizeSnakeRecord).filter(Boolean)
-          : [];
-        const backendPairings = Array.isArray(snapshot?.pairings)
-          ? snapshot.pairings.map(sanitizePairingRecord).filter(Boolean)
-          : [];
-
-        if (backendSnakes.length || backendPairings.length) {
-          setSnakes(backendSnakes);
-          setPairings(backendPairings);
-          backendPlannerSyncRef.current.seeded = true;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({
-            snakes: backendSnakes,
-            pairings: backendPairings,
-          });
-          return;
-        }
-
-        const localSnapshot = latestPlannerSnapshotRef.current;
-        const hasLocalData = Array.isArray(localSnapshot.snakes) && localSnapshot.snakes.length > 0
-          || Array.isArray(localSnapshot.pairings) && localSnapshot.pairings.length > 0;
-        if (!hasLocalData) {
-          backendPlannerSyncRef.current.seeded = true;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify({ snakes: [], pairings: [] });
-          return;
-        }
-
-        saveBreederSnapshot({
-          animals: localSnapshot.snakes,
-          pairings: localSnapshot.pairings,
-          clutches: [],
-        })
-          .then(() => {
-            if (cancelled) return;
-            backendPlannerSyncRef.current.seeded = true;
-            backendPlannerSyncRef.current.status = 'ready';
-            backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify(localSnapshot);
-          })
-          .catch((error) => {
-            if (!cancelled) {
-              backendPlannerSyncRef.current.status = 'idle';
-              console.warn('Failed to seed shared breeder snapshot', error);
-            }
-          });
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          backendPlannerSyncRef.current.status = 'idle';
-          console.warn('Failed to load shared breeder snapshot', error);
-        }
-      });
+    runCloudBreederSync({ silent: true }).catch((error) => {
+      if (!cancelled) {
+        console.warn('Failed to sync shared breeder snapshot', error);
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -6319,7 +6572,7 @@ export default function BreedingPlannerApp() {
         backendPlannerSyncRef.current.status = 'idle';
       }
     };
-  }, [electronDataReady, sharedBreederDataReady]);
+  }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6737,20 +6990,26 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'ready' || !backendPlannerSyncRef.current.seeded) return;
 
-    const payload = {
-      animals: snakes,
-      pairings,
-      clutches: [],
-    };
     const signature = JSON.stringify({ snakes, pairings });
     if (signature === backendPlannerSyncRef.current.lastSavedSignature) return;
 
     const saveTimer = setTimeout(() => {
-      saveBreederSnapshot(payload)
+      saveBreederSnapshot(prepareSnapshotForBackend(snakes, pairings))
         .then(() => {
+          const syncedAt = new Date().toISOString();
           backendPlannerSyncRef.current.lastSavedSignature = signature;
+          setCloudSyncStatus({
+            state: 'success',
+            lastSyncedAt: syncedAt,
+            message: `Saved ${snakes.length} snakes and ${pairings.length} pairings to the cloud database.`,
+          });
         })
         .catch((error) => {
+          setCloudSyncStatus(prev => ({
+            ...prev,
+            state: 'error',
+            message: error?.message || 'Failed to save shared breeder snapshot.',
+          }));
           console.warn('Failed to save shared breeder snapshot', error);
         });
     }, 600);
@@ -7576,10 +7835,13 @@ export default function BreedingPlannerApp() {
       else delete nextEggBoxNotes[indexKey];
       if (badEggsValue > 0) nextEggBoxBadEggs[indexKey] = badEggsValue;
       else delete nextEggBoxBadEggs[indexKey];
+      const totalBadEggs = Object.values(nextEggBoxBadEggs).reduce((s, n) => s + (Number(n) || 0), 0);
+      const totalOriginalEggs = Math.max(0, Number(currentClutch.eggsTotal || currentClutch.fertileEggs) || 0);
       const nextClutch = {
         ...currentClutch,
         eggBoxNotes: nextEggBoxNotes,
         eggBoxBadEggs: nextEggBoxBadEggs,
+        allEggsLost: totalOriginalEggs > 0 && totalBadEggs >= totalOriginalEggs,
       };
       if ((box.eggBoxCount || 1) === 1) {
         nextClutch.notes = noteValue;
@@ -8306,15 +8568,14 @@ export default function BreedingPlannerApp() {
     const sex = ensureSex(newAnimal.sex, 'F');
     const resolvedMorphHetInput = await resolveLeucisticInText(newAnimal.morphHetInput || '', 'Add Animal save');
     const parsedMorphHet = splitMorphHetInput(resolvedMorphHetInput || '');
-    const rawMorphList = Array.isArray(newAnimal.morphs)
-      ? newAnimal.morphs.map(entry => String(entry).trim()).filter(Boolean)
-      : parsedMorphHet.morphs;
-    const rawHetList = Array.isArray(newAnimal.hets)
-      ? newAnimal.hets.map(entry => String(entry).trim()).filter(Boolean)
-      : parsedMorphHet.hets;
-    const normalizedGenetics = normalizeMorphHetLists([...(rawMorphList || []), ...(rawHetList || [])]);
-    const morphList = normalizedGenetics.morphs;
-    const hetList = normalizedGenetics.hets;
+    const morphList = uniqueGeneTokens(
+      (Array.isArray(newAnimal.morphs) ? newAnimal.morphs : parsedMorphHet.morphs)
+        .map(entry => String(entry).trim()).filter(Boolean)
+    );
+    const hetList = uniqueGeneTokens(
+      (Array.isArray(newAnimal.hets) ? newAnimal.hets : parsedMorphHet.hets)
+        .map(entry => String(entry).trim()).filter(Boolean)
+    );
     const existingIds = snakes.map(snake => snake.id);
     const normalizedBirthDate = normalizeBirthDateValue(newAnimal.birthDate || null);
     const birthYear = extractYearFromDateString(normalizedBirthDate);
@@ -9250,6 +9511,7 @@ export default function BreedingPlannerApp() {
                   </div>
                 )}
                 <button onClick={()=>setShowExportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowFeedPrepModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("feedPrep.open", { defaultValue: "Feed prep" })}</button>
                 <button onClick={()=>setShowScanner(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.scanQr")}</button>
                 <button
                   onClick={() => {
@@ -9878,6 +10140,9 @@ export default function BreedingPlannerApp() {
             onDeleteVaultEntry={deleteBackupVaultEntry}
             snakes={snakes}
             pairings={pairings}
+            sharedBackendSnapshot={sharedBackendSnapshot}
+            cloudSyncStatus={cloudSyncStatus}
+            onSyncCloudDatabase={runCloudBreederSync}
             animalExportFields={animalExportFields}
             setAnimalExportFields={setAnimalExportFields}
             pairingExportFields={pairingExportFields}
@@ -10201,7 +10466,7 @@ export default function BreedingPlannerApp() {
         );
       })()}
 
-      {hatchWizard && (() => {
+      {hatchWizard && typeof document !== 'undefined' && createPortal((() => {
         const total = Array.isArray(hatchWizard.entries) ? hatchWizard.entries.length : 0;
         const safeIndex = total ? Math.min(total - 1, Math.max(0, hatchWizard.currentIndex || 0)) : 0;
         const entry = total ? hatchWizard.entries[safeIndex] : null;
@@ -10215,13 +10480,13 @@ export default function BreedingPlannerApp() {
         return (
           <div
             className={cx(
-              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-50',
+              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]',
               overlayClass(theme)
             )}
             onClick={handleWizardCancel}
           >
             <div
-              className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh] flex flex-col"
+              className="relative z-[10011] bg-white w-full max-w-3xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 border-b bg-neutral-50">
@@ -10345,7 +10610,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         );
-      })()}
+      })(), document.body)}
 
           {showImportModal && typeof document !== 'undefined' && createPortal((
             <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
@@ -10616,10 +10881,17 @@ export default function BreedingPlannerApp() {
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
-                              const normalizedGenetics = normalizeMorphHetLists([
-                                ...(Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []),
-                                ...(Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []),
-                              ]);
+                              const normalizedFeederProfile = normalizeFeederProfileForSave(editSnakeDraft.feederProfile);
+                              const normalizedGenetics = {
+                                morphs: uniqueGeneTokens(
+                                  (Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : [])
+                                    .map(m => String(m).trim()).filter(Boolean)
+                                ),
+                                hets: uniqueGeneTokens(
+                                  (Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : [])
+                                    .map(h => String(h).trim()).filter(Boolean)
+                                ),
+                              };
                               setSnakes(prev => prev.map(s => s.id === oldId ? ({
                                 ...editSnakeDraft,
                                 id: newId,
@@ -10628,6 +10900,7 @@ export default function BreedingPlannerApp() {
                                 groups: normalizedGroups,
                                 morphs: normalizedGenetics.morphs,
                                 hets: normalizedGenetics.hets,
+                                feederProfile: normalizedFeederProfile,
                               }) : s));
                           setPairings(prev => prev.map(p => ({
                             ...p,
@@ -10759,21 +11032,14 @@ export default function BreedingPlannerApp() {
                 </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.genetics")}</label>
-                  <textarea
-                    rows={3}
-                    className="mt-0.5 w-full border rounded-xl px-2 py-2 text-sm"
-                    value={formatMorphHetForInput(editSnakeDraft.morphs, editSnakeDraft.hets)}
-                    onChange={async e=>{
-                      const resolvedText = await resolveLeucisticInText(e.target.value, 'Edit Animal genetics');
-                      const { morphs, hets } = splitMorphHetInput(resolvedText);
-                      setEditSnakeDraft(d=>({
-                        ...d,
-                        morphs,
-                        hets,
-                      }));
-                    }}
-                    placeholder={t("snakeEdit.geneticsPlaceholder")}
-                  />
+                  <div className="mt-0.5">
+                    <GeneAutocomplete
+                      morphs={Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []}
+                      hets={Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []}
+                      onChange={({ morphs, hets }) => setEditSnakeDraft(d => ({ ...d, morphs, hets }))}
+                      placeholder="Type to search genes…"
+                    />
+                  </div>
                   <div className="text-[11px] text-neutral-500 mt-0.5">{t("snakeEdit.geneticsHelp")}</div>
                 </div>
                 <div>
@@ -10781,6 +11047,83 @@ export default function BreedingPlannerApp() {
                   <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                </div>
+                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
+                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Normal feeder" })}</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                      <select
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm bg-white"
+                        value={editSnakeDraft.feederProfile?.feedType || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
+                        }))}
+                      >
+                        <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                        {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.sizeClass", { defaultValue: "Size / weight class" })}</label>
+                      <input
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        value={editSnakeDraft.feederProfile?.sizeClass || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
+                        }))}
+                        list="feed-prep-size-options"
+                        placeholder={t("feedPrep.sizePlaceholder", { defaultValue: "e.g., fuzzy, small rat, 30-50g" })}
+                      />
+                      <datalist id="feed-prep-size-options">
+                        {FEEDER_SIZE_OPTIONS.map(option => <option key={option} value={option} />)}
+                      </datalist>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          value={editSnakeDraft.feederProfile?.weightGrams || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), weightGrams: e.target.value },
+                          }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.quantity", { defaultValue: "Quantity" })}</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          value={editSnakeDraft.feederProfile?.quantity || 1}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), quantity: Number(e.target.value) || 1 },
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <input
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        value={editSnakeDraft.feederProfile?.notes || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), notes: e.target.value },
+                        }))}
+                        placeholder={t("feedPrep.notesPlaceholder", { defaultValue: "Optional preparation note" })}
+                      />
+                    </div>
+                  </div>
                 </div>
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
@@ -11049,6 +11392,17 @@ export default function BreedingPlannerApp() {
         );
       })()}
   <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
+      <FeedPrepModal
+        open={showFeedPrepModal}
+        onClose={() => setShowFeedPrepModal(false)}
+        snakes={snakes}
+        pairings={pairings}
+        onEditSnake={(snake) => {
+          setShowFeedPrepModal(false);
+          openSnakeCard(snake);
+        }}
+        theme={theme}
+      />
       <ExportPairingQrModal
         open={showPairingQrModal}
         onClose={() => setShowPairingQrModal(false)}
@@ -11112,7 +11466,9 @@ export {
   buildPairingExportDataset,
   buildPairingMatrixExportDataset,
   getPairingExportRows,
+  buildPairingDashboardItem,
   exportDatasetToCsv,
+  formatCycleTimerDayLabel,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
@@ -11814,7 +12170,7 @@ function SpacesSection({
 }) {
   const { t } = useTranslation();
   const [newRoomName, setNewRoomName] = useState('');
-  const [activeRoomId, setActiveRoomId] = useState(() => (rooms[0]?.id ?? null));
+  const [activeRoomId, setActiveRoomId] = useState(null);
   const [rackFormState, setRackFormState] = useState({ mode: null, roomId: null, rackId: null });
   const [terrariumFormState, setTerrariumFormState] = useState({ mode: null, roomId: null, terrariumId: null });
   const [rackViewId, setRackViewId] = useState(null);
@@ -11829,7 +12185,7 @@ function SpacesSection({
       if (prev && rooms.some(room => room.id === prev)) {
         return prev;
       }
-      return rooms[0]?.id ?? null;
+      return null;
     });
   }, [rooms]);
 
@@ -13568,6 +13924,231 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
+function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake, theme = 'blue' }) {
+  const { t } = useTranslation();
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [copied, setCopied] = useState(false);
+
+  const snakeRows = useMemo(() => {
+    return (Array.isArray(snakes) ? snakes : [])
+      .filter(Boolean)
+      .map((snake) => {
+        const profile = getSnakeFeederProfile(snake);
+        const complete = hasCompleteFeederProfile(profile);
+        const feederClass = formatFeederClass(profile);
+        const excludedReason = getFeedPrepExclusionReason(snake, pairings);
+        return {
+          snake,
+          id: snake.id,
+          name: snake.name || snake.id || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' }),
+          profile,
+          complete,
+          feederClass,
+          quantity: Math.max(1, Number(profile.quantity) || 1),
+          excluded: Boolean(excludedReason),
+          excludedReason,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [pairings, snakes, t]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean));
+    setCopied(false);
+  }, [open, snakeRows]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedRows = useMemo(
+    () => snakeRows.filter(row => row.id && selectedIdSet.has(row.id) && !row.excluded),
+    [selectedIdSet, snakeRows]
+  );
+  const readyRows = useMemo(() => selectedRows.filter(row => row.complete), [selectedRows]);
+  const missingRows = useMemo(() => selectedRows.filter(row => !row.complete), [selectedRows]);
+  const excludedRows = useMemo(() => snakeRows.filter(row => row.excluded), [snakeRows]);
+  const reportRows = useMemo(() => {
+    const map = new Map();
+    readyRows.forEach((row) => {
+      const feedType = String(row.profile.feedType || '').trim();
+      const sizeClass = String(row.profile.sizeClass || '').trim();
+      const weightGrams = Number(row.profile.weightGrams);
+      const weightText = Number.isFinite(weightGrams) && weightGrams > 0 ? `${weightGrams} g` : '';
+      const key = `${feedType.toLowerCase()}::${sizeClass.toLowerCase()}::${weightText.toLowerCase()}`;
+      const existing = map.get(key) || {
+        feedType,
+        sizeClass,
+        weightText,
+        quantity: 0,
+      };
+      existing.quantity += row.quantity;
+      map.set(key, existing);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const byFeed = a.feedType.localeCompare(b.feedType);
+      const bySize = byFeed || a.sizeClass.localeCompare(b.sizeClass);
+      return bySize || a.weightText.localeCompare(b.weightText);
+    });
+  }, [readyRows]);
+
+  const totalItems = reportRows.reduce((sum, row) => sum + row.quantity, 0);
+  const reportText = useMemo(() => {
+    if (!reportRows.length) return '';
+    return reportRows
+      .map(row => `${row.feedType} | ${row.sizeClass || '-'} | ${row.weightText || '-'}: ${row.quantity}`)
+      .join('\n');
+  }, [reportRows]);
+
+  const toggleSelected = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  };
+
+  const copyReport = async () => {
+    if (!reportText || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      console.warn('Failed to copy feed prep report', error);
+    }
+  };
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal((
+    <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]", overlayClass(theme))} onClick={onClose}>
+      <div className="relative z-[10021] bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border" onClick={event => event.stopPropagation()}>
+        <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold text-neutral-900">{t('feedPrep.title', { defaultValue: 'Feed preparation' })}</div>
+            <div className="text-sm text-neutral-500">{t('feedPrep.subtitle', { defaultValue: 'Select snakes and generate the grouped defrost list.' })}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean))}>
+              {t('feedPrep.selectAll', { defaultValue: 'Select all' })}
+            </button>
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds([])}>
+              {t('feedPrep.clearSelection', { defaultValue: 'Clear' })}
+            </button>
+            <button type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
+              {copied ? t('feedPrep.copied', { defaultValue: 'Copied' }) : t('feedPrep.copyReport', { defaultValue: 'Copy report' })}
+            </button>
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
+              {t('common.close', { defaultValue: 'Close' })}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.selectedSnakes', { defaultValue: 'Selected snakes' })}</div>
+              <div className="text-2xl font-semibold">{selectedRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.readySnakes', { defaultValue: 'With feeder data' })}</div>
+              <div className="text-2xl font-semibold">{readyRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.missingSnakes', { defaultValue: 'Missing data' })}</div>
+              <div className="text-2xl font-semibold">{missingRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.totalItems', { defaultValue: 'Items to defrost' })}</div>
+              <div className="text-2xl font-semibold">{totalItems}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.excludedSnakes', { defaultValue: 'Excluded ovulation' })}</div>
+              <div className="text-2xl font-semibold">{excludedRows.length}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] gap-5">
+            <section className="rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-neutral-50">
+                <h3 className="font-semibold text-neutral-900">{t('feedPrep.reportTitle', { defaultValue: 'Defrost report' })}</h3>
+                <p className="text-xs text-neutral-500">{t('feedPrep.reportHint', { defaultValue: 'Grouped by food type and size or weight class.' })}</p>
+              </div>
+              {reportRows.length ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-white border-b text-xs uppercase text-neutral-500">
+                      <tr>
+                        <th className="text-left px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
+                        <th className="text-left px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
+                        <th className="text-left px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
+                        <th className="text-right px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportRows.map(row => (
+                        <tr key={`${row.feedType}-${row.sizeClass}-${row.weightText}`} className="border-b last:border-0">
+                          <td className="px-4 py-3 font-medium">{row.feedType}</td>
+                          <td className="px-4 py-3">{row.sizeClass || '-'}</td>
+                          <td className="px-4 py-3">{row.weightText || '-'}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{row.quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 text-sm text-neutral-500">{t('feedPrep.noReport', { defaultValue: 'No defrost report yet. Select snakes with feeder data.' })}</div>
+              )}
+            </section>
+
+            <section className="rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-neutral-50">
+                <h3 className="font-semibold text-neutral-900">{t('feedPrep.snakeSelection', { defaultValue: 'Snake selection' })}</h3>
+                <p className="text-xs text-neutral-500">{t('feedPrep.selectionHint', { defaultValue: 'Missing profiles are listed but excluded from the grouped totals.' })}</p>
+              </div>
+              <div className="max-h-[32rem] overflow-y-auto divide-y">
+                {snakeRows.map(row => (
+                  <label key={row.id} className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-neutral-50">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={selectedIdSet.has(row.id)}
+                      disabled={row.excluded}
+                      onChange={() => toggleSelected(row.id)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium truncate">{row.name}</span>
+                      <span className="block text-xs text-neutral-500 truncate">{row.id}</span>
+                      {row.excluded ? (
+                        <span className="block text-xs text-sky-700">{row.excludedReason}</span>
+                      ) : row.complete ? (
+                        <span className="block text-xs text-neutral-600">{row.quantity} x {row.profile.feedType} {row.feederClass}</span>
+                      ) : (
+                        <span className="block text-xs text-amber-700">{t('feedPrep.missingProfile', { defaultValue: 'Missing feeder data' })}</span>
+                      )}
+                    </span>
+                    {!row.excluded && !row.complete && typeof onEditSnake === 'function' ? (
+                      <button
+                        type="button"
+                        className="text-xs px-2 py-1 rounded-lg border text-neutral-700"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          onEditSnake(row.snake);
+                        }}
+                      >
+                        {t('feedPrep.editSnake', { defaultValue: 'Edit' })}
+                      </button>
+                    ) : null}
+                  </label>
+                ))}
+                {!snakeRows.length && (
+                  <div className="p-4 text-sm text-neutral-500">{t('feedPrep.noSnakes', { defaultValue: 'No snakes available.' })}</div>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  ), document.body);
+}
+
 function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
   const { t } = useTranslation();
   const hasEdit = typeof onEdit === "function";
@@ -14169,28 +14750,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         </div>
       )}
       
-      {/* single-group selector: hidden on mobile — use Edit modal instead */}
-      <div className="bp-group-assignment mt-2">
-        <div className="text-xs text-neutral-500 mb-1">{t("snakeEdit.assignGroup", { defaultValue: "Assign group" })}</div>
-  <div className="flex flex-wrap gap-2 text-[11px]">
-          {groups.map(g => (
-            <label key={g} className="inline-flex items-center gap-1 px-2 py-0.5 border rounded-lg bg-white text-[11px] min-w-0">
-              <input type="radio" name={`group-${s.id}`} className="w-3 h-3"
-                checked={(s.groups||[]).includes(g)}
-                onChange={() => {
-                  if (!setSnakes) return;
-                  setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [g] } : x));
-                }} />
-              <span className="truncate max-w-[8rem]">{g}</span>
-            </label>
-          ))}
-          <label className="inline-flex items-center gap-1 px-2 py-0.5 border rounded-lg bg-white text-[11px]">
-            <input type="radio" name={`group-${s.id}`} className="w-3 h-3" checked={!(s.groups||[]).length}
-              onChange={() => { if (!setSnakes) return; setSnakes(prev => prev.map(x => x.id === s.id ? { ...x, groups: [] } : x)); }} />
-            <span>{t("snakeEdit.noGroup", { defaultValue: "None" })}</span>
-          </label>
-        </div>
-      </div>
       <div className="mt-2 flex items-center gap-2">
         <StatusDot status={displayStatus} />
         <div className="text-xs">{displayStatus}</div>
@@ -14719,6 +15278,9 @@ function BreederSection({
   onDeleteVaultEntry,
   snakes,
   pairings,
+  sharedBackendSnapshot,
+  cloudSyncStatus,
+  onSyncCloudDatabase,
   animalExportFields,
   setAnimalExportFields,
   pairingExportFields,
@@ -14830,6 +15392,24 @@ function BreederSection({
   const geneAliasImportInputRef = useRef(null);
   const [backupFeedback, setBackupFeedback] = useState(null);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
+  const [accountState, setAccountState] = useState({
+    loading: false,
+    actionLoading: '',
+    loaded: false,
+    error: '',
+    message: '',
+    user: null,
+    tiers: [],
+    subscription: null,
+    access: {},
+  });
+  const [accountForms, setAccountForms] = useState({
+    email: '',
+    emailPassword: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
@@ -14846,6 +15426,15 @@ function BreederSection({
   const pairingFieldSections = useMemo(() => groupFieldDefsBySection(PAIRING_EXPORT_FIELD_DEFS), []);
   const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
   const pairingFieldSet = useMemo(() => new Set(normalizedPairingExportFields), [normalizedPairingExportFields]);
+  const accountFeatureLabels = useMemo(() => ({
+    'animals.create': 'Animal records',
+    'breeding.pairings': 'Pairings',
+    'mobile.scan': 'Mobile QR scan',
+    'mobile.profile': 'Mobile animal profile',
+    'mobile.quick_feed': 'Mobile feeding logs',
+    'lab.orders': 'Lab orders',
+    'marketplace.create_listing': 'Marketplace listings',
+  }), []);
   const vaultLimitValue = typeof normalizedBackupSettings.maxVaultEntries === 'number' && normalizedBackupSettings.maxVaultEntries > 0
     ? String(normalizedBackupSettings.maxVaultEntries)
     : 'unlimited';
@@ -14873,6 +15462,14 @@ function BreederSection({
     && backupFeedback.context.startsWith('vault')
     ? backupFeedback
     : null;
+  const cloudFeedback = backupFeedback?.context === 'cloud' ? backupFeedback : null;
+  const backendStateLabel = sharedBackendSnapshot?.state
+    ? sharedBackendSnapshot.state.replace(/-/g, ' ')
+    : 'unknown';
+  const backendAuthLabel = sharedBackendSnapshot?.authStatus || 'unknown';
+  const cloudLastSyncDisplay = cloudSyncStatus?.lastSyncedAt
+    ? formatDateTimeForDisplay(cloudSyncStatus.lastSyncedAt)
+    : 'Never';
   const animalExportFeedback = exportFeedback && exportFeedback.context === 'animals' ? exportFeedback : null;
   const pairingExportFeedback = exportFeedback && exportFeedback.context === 'pairings' ? exportFeedback : null;
   const hasAnimalData = Array.isArray(snakes) && snakes.length > 0;
@@ -15803,6 +16400,155 @@ function BreederSection({
     }
   }, [buildPairingExportPayload, pairingExportType, setExportFeedback, t, translateExportDataset]);
 
+  const loadAccountData = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, loading: true, error: '', message: '' }));
+    const featureKeys = Object.keys(accountFeatureLabels);
+    try {
+      const [userResult, tiersResult, subscriptionResult, ...accessResults] = await Promise.allSettled([
+        getCurrentUser(),
+        fetchPublicSubscriptionTiers(),
+        fetchMySubscription(),
+        ...featureKeys.map(featureKey => checkFeatureAccess(featureKey)),
+      ]);
+      const user = userResult.status === 'fulfilled' ? userResult.value?.user || null : null;
+      const tiers = tiersResult.status === 'fulfilled' && Array.isArray(tiersResult.value?.tiers)
+        ? tiersResult.value.tiers
+        : [];
+      const subscription = subscriptionResult.status === 'fulfilled' ? subscriptionResult.value?.subscription || null : null;
+      const access = {};
+      featureKeys.forEach((featureKey, index) => {
+        const result = accessResults[index];
+        access[featureKey] = result?.status === 'fulfilled'
+          ? result.value
+          : { allowed: false, featureKey, reason: result?.reason?.message || 'Unable to check access.' };
+      });
+      const firstError = [userResult, tiersResult, subscriptionResult, ...accessResults]
+        .find(result => result.status === 'rejected')?.reason;
+      setAccountState({
+        loading: false,
+        actionLoading: '',
+        loaded: true,
+        error: firstError?.message || '',
+        message: '',
+        user,
+        tiers,
+        subscription,
+        access,
+      });
+      setAccountForms(prev => ({
+        ...prev,
+        email: user?.email || '',
+        emailPassword: '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
+    } catch (error) {
+      setAccountState(prev => ({
+        ...prev,
+        loading: false,
+        actionLoading: '',
+        loaded: true,
+        error: error?.message || 'Unable to load account data.',
+      }));
+    }
+  }, [accountFeatureLabels]);
+
+  useEffect(() => {
+    if (setupTab !== 'account') return;
+    if (accountState.loading || accountState.loaded) return;
+    loadAccountData();
+  }, [accountState.loaded, accountState.loading, loadAccountData, setupTab]);
+
+  const handleAccountSignOut = useCallback(() => {
+    clearAuthToken('breeder');
+    setAccountState(prev => ({
+      ...prev,
+      user: null,
+      error: 'Signed out locally. Reload or sign in again to reconnect this device.',
+    }));
+  }, []);
+
+  const handleAccountFormChange = useCallback((field, value) => {
+    setAccountForms(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleChangeAccountEmail = useCallback(async () => {
+    const email = accountForms.email.trim();
+    if (!email || !accountForms.emailPassword) {
+      setAccountState(prev => ({ ...prev, error: 'Enter the new email and current password first.', message: '' }));
+      return;
+    }
+    setAccountState(prev => ({ ...prev, actionLoading: 'email', error: '', message: '' }));
+    try {
+      const result = await changeAccountEmail({ email, currentPassword: accountForms.emailPassword });
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        user: result?.user || prev.user,
+        error: '',
+        message: result?.message || 'Email updated.',
+      }));
+      setAccountForms(prev => ({ ...prev, emailPassword: '' }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to update email.', message: '' }));
+    }
+  }, [accountForms.email, accountForms.emailPassword]);
+
+  const handleChangeAccountPassword = useCallback(async () => {
+    if (!accountForms.currentPassword || !accountForms.newPassword) {
+      setAccountState(prev => ({ ...prev, error: 'Enter the current password and new password first.', message: '' }));
+      return;
+    }
+    if (accountForms.newPassword !== accountForms.confirmPassword) {
+      setAccountState(prev => ({ ...prev, error: 'New password confirmation does not match.', message: '' }));
+      return;
+    }
+    setAccountState(prev => ({ ...prev, actionLoading: 'password', error: '', message: '' }));
+    try {
+      const result = await changeAccountPassword({ currentPassword: accountForms.currentPassword, newPassword: accountForms.newPassword });
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        user: result?.user || prev.user,
+        error: '',
+        message: result?.message || 'Password updated.',
+      }));
+      setAccountForms(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to update password.', message: '' }));
+    }
+  }, [accountForms.confirmPassword, accountForms.currentPassword, accountForms.newPassword]);
+
+  const handleChangeAccountPlan = useCallback(async (tier) => {
+    const tierId = tier?.id;
+    if (!tierId) return;
+    let confirmed = true;
+    if (typeof showAppConfirm === 'function') {
+      confirmed = await showAppConfirm(`Change your account plan to ${tier.name || tier.key || 'this plan'}?`, {
+        confirmLabel: 'Change plan',
+        cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
+      });
+    }
+    if (!confirmed) return;
+    setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
+    try {
+      const result = await changeMySubscription(tierId);
+      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tier.name || 'selected plan'}.`;
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        subscription: result?.subscription || null,
+        error: '',
+        message: successMessage,
+      }));
+      await loadAccountData();
+      setAccountState(prev => ({ ...prev, message: successMessage }));
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to change plan.', message: '' }));
+    }
+  }, [loadAccountData, showAppConfirm, t]);
+
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
     if (typeof updateBackupSettings === 'function') {
@@ -15851,6 +16597,41 @@ function BreederSection({
       });
     }
   }, [onTriggerAutoBackup]);
+
+  const handleCloudSyncNow = useCallback(async () => {
+    if (typeof onSyncCloudDatabase !== 'function') {
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'error',
+        message: 'Cloud sync is unavailable.',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    setBackupFeedback({
+      context: 'cloud',
+      type: 'info',
+      message: 'Syncing local data with cloud database.',
+      timestamp: new Date().toISOString(),
+    });
+    try {
+      const result = await onSyncCloudDatabase({ silent: false });
+      if (!result) return;
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'success',
+        message: `Synced ${result.snakes?.length || 0} snakes and ${result.pairings?.length || 0} pairings.`,
+        timestamp: result.syncedAt || new Date().toISOString(),
+      });
+    } catch (err) {
+      setBackupFeedback({
+        context: 'cloud',
+        type: 'error',
+        message: err?.message || 'Cloud sync failed.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [onSyncCloudDatabase]);
 
   const handleDownloadVaultEntry = useCallback((entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
@@ -16096,6 +16877,7 @@ function BreederSection({
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
+        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>My Account</TabButton>
         <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
         {isDevEnvironment && (
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
@@ -17219,6 +18001,49 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
+              <div className="font-semibold text-sm">Cloud database sync</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Connection</div>
+                <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
+              </div>
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Authentication</div>
+                <div className="mt-1 capitalize text-neutral-800">{backendAuthLabel}</div>
+              </div>
+              <div className="rounded-lg border bg-white p-3">
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Last cloud sync</div>
+                <div className="mt-1 text-neutral-800">{cloudLastSyncDisplay}</div>
+              </div>
+            </div>
+            <div className="text-xs text-neutral-500">
+              Ready to sync {Array.isArray(snakes) ? snakes.length : 0} snakes and {Array.isArray(pairings) ? pairings.length : 0} pairings.
+              {cloudSyncStatus?.message ? <span>{' '}Latest status: {cloudSyncStatus.message}</span> : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), cloudSyncStatus?.state === 'loading' ? 'opacity-60 cursor-wait' : '')}
+                onClick={handleCloudSyncNow}
+                disabled={cloudSyncStatus?.state === 'loading'}
+              >
+                {cloudSyncStatus?.state === 'loading' ? 'Syncing...' : 'Sync cloud database'}
+              </button>
+            </div>
+            {cloudFeedback && (
+              <div className={cx('text-xs', cloudFeedback.type === 'success' ? 'text-emerald-600' : cloudFeedback.type === 'info' ? 'text-neutral-600' : 'text-red-600')}>
+                {cloudFeedback.message}
+                {cloudFeedback.timestamp ? ` - ${formatDateTimeForDisplay(cloudFeedback.timestamp)}` : ''}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
+            <div>
               <div className="font-semibold text-sm">Backup vault</div>
               <div className="text-xs text-neutral-500 mt-1">
                 Stored backups with unique identifiers. Rename, download, restore, or remove them here.
@@ -17374,6 +18199,241 @@ function BreederSection({
           </div>
         </div>
       )}
+
+      {setupTab === 'account' && (
+        <div className="border-t pt-4 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-neutral-800">My Account</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg border text-sm"
+              onClick={loadAccountData}
+              disabled={accountState.loading}
+            >
+              {accountState.loading ? 'Refreshing...' : 'Refresh account'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <section className="rounded-xl border bg-white p-4 space-y-3">
+              <div>
+                <div className="font-semibold text-sm">Login information</div>
+                <div className="text-xs text-neutral-500 mt-1">This is the account connected to the shared backend.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
+                  <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
+                  <div className="mt-1">{accountState.user?.fullName || '-'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Role</div>
+                  <div className="mt-1 capitalize">{accountState.user?.role || '-'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">User ID</div>
+                  <div className="mt-1 break-words text-xs">{accountState.user?.id || '-'}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
+                  Sign out on this device
+                </button>
+              </div>
+            </section>
+
+            <section className="rounded-xl border bg-white p-4 space-y-3">
+              <div>
+                <div className="font-semibold text-sm">Backend connection</div>
+                <div className="text-xs text-neutral-500 mt-1">Cloud sync and subscription checks use this backend session.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Connection</div>
+                  <div className="mt-1 capitalize">{String(sharedBackendSnapshot?.state || 'unknown').replace(/-/g, ' ')}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Authentication</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || 'unknown'}</div>
+                </div>
+                <div className="rounded-lg border bg-neutral-50 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Sync readiness</div>
+                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? 'Ready' : 'Needs sign-in/configuration'}</div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <div className="font-semibold text-sm">Subscription and feature access</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  Feature access is checked against the backend subscription tier for this account.
+                </div>
+              </div>
+              <div className="text-xs text-neutral-500">
+                Current tier: {accountState.subscription?.tier?.name
+                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
+                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
+                  || 'Unknown'}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+              {Object.entries(accountFeatureLabels).map(([featureKey, label]) => {
+                const access = accountState.access?.[featureKey] || {};
+                const allowed = access.allowed === true;
+                const usageText = typeof access.currentUsage !== 'undefined'
+                  ? `${access.currentUsage}${typeof access.limit !== 'undefined' && access.limit !== null ? ` / ${access.limit}` : ''}`
+                  : '';
+                return (
+                  <div key={featureKey} className="rounded-lg border bg-neutral-50 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-medium">{label}</div>
+                      <span className={cx('text-[11px] px-2 py-0.5 rounded-full border', allowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700')}>
+                        {allowed ? 'Included' : 'Limited'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-neutral-500">{featureKey}</div>
+                    {access.reason ? <div className="mt-1 text-xs text-amber-700">{access.reason}</div> : null}
+                    {usageText ? <div className="mt-1 text-xs text-neutral-600">Usage: {usageText}</div> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div>
+              <div className="font-semibold text-sm">Plans</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Available public plans from the backend. Changing a plan updates the subscription tier used by feature access and cloud sync.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => {
+                const isCurrentTier = Boolean(accountState.subscription?.tier?.id && tier.id === accountState.subscription.tier.id);
+                const isChangingThisPlan = accountState.actionLoading === `plan:${tier.id}`;
+                return (
+                  <div key={tier.id || tier.key || tier.name} className={cx('rounded-xl border p-3 space-y-2', isCurrentTier ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50')}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
+                        {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
+                      </div>
+                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">Current</span> : null}
+                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
+                    </div>
+                    <div className="text-sm">
+                      {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
+                    </div>
+                    <button
+                      type="button"
+                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
+                      disabled={isCurrentTier || Boolean(accountState.actionLoading)}
+                      onClick={() => handleChangeAccountPlan(tier)}
+                    >
+                      {isChangingThisPlan ? 'Changing...' : isCurrentTier ? 'Current plan' : 'Change plan'}
+                    </button>
+                  </div>
+                );
+              })}
+              {accountState.loaded && !accountState.tiers.length ? (
+                <div className="text-sm text-neutral-500">No public subscription plans are available from the backend.</div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="rounded-xl border bg-white p-4 space-y-3">
+            <div>
+              <div className="font-semibold text-sm">Email and password</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Account security changes require your current password.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+                <div className="text-sm font-semibold">Change email</div>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="email"
+                  value={accountForms.email}
+                  onChange={event => handleAccountFormChange('email', event.target.value)}
+                  placeholder="New email"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.emailPassword}
+                  onChange={event => handleAccountFormChange('emailPassword', event.target.value)}
+                  placeholder="Current password"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleChangeAccountEmail}
+                >
+                  {accountState.actionLoading === 'email' ? 'Saving...' : 'Change email'}
+                </button>
+              </div>
+              <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+                <div className="text-sm font-semibold">Change password</div>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.currentPassword}
+                  onChange={event => handleAccountFormChange('currentPassword', event.target.value)}
+                  placeholder="Current password"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.newPassword}
+                  onChange={event => handleAccountFormChange('newPassword', event.target.value)}
+                  placeholder="New password"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  value={accountForms.confirmPassword}
+                  onChange={event => handleAccountFormChange('confirmPassword', event.target.value)}
+                  placeholder="Confirm new password"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleChangeAccountPassword}
+                >
+                  {accountState.actionLoading === 'password' ? 'Saving...' : 'Change password'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {accountState.message ? (
+            <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              {accountState.message}
+            </div>
+          ) : null}
+
+          {accountState.error ? (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              {accountState.error}
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {setupTab === 'language' && (
         <div className="border-t pt-4 space-y-4">
           <div className="space-y-2">
@@ -17797,6 +18857,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+  const [urgencyFilter, setUrgencyFilter] = useState(null);
   const openPairing = useCallback((id) => {
     if (id && typeof onOpenPairing === 'function') onOpenPairing(id);
   }, [onOpenPairing]);
@@ -17806,21 +18867,25 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
       label: t('pairing.dashboard.overdue', { defaultValue: 'Overdue' }),
       value: counts.overdue || 0,
       className: 'border-rose-200 bg-rose-50 text-rose-700',
+      filterKey: 'overdue',
     },
     {
       label: t('pairing.dashboard.dueSoon', { defaultValue: 'Due in 3 days' }),
       value: counts.due || 0,
       className: 'border-amber-200 bg-amber-50 text-amber-700',
+      filterKey: 'due',
     },
     {
       label: t('pairing.dashboard.nextWeek', { defaultValue: 'Next 7 days' }),
       value: counts.soon || 0,
       className: 'border-sky-200 bg-sky-50 text-sky-700',
+      filterKey: 'soon',
     },
     {
       label: t('pairing.dashboard.tracking', { defaultValue: 'Tracking' }),
       value: list.length,
       className: 'border-neutral-200 bg-white text-neutral-700',
+      filterKey: null,
     },
   ];
 
@@ -17836,7 +18901,14 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
       <div className="space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {summaryCards.map(card => (
-            <div key={card.label} className={cx('border rounded-xl p-3', card.className)}>
+            <div
+              key={card.label}
+              role="button"
+              tabIndex={0}
+              onClick={() => setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey))}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey)); } }}
+              className={cx('border rounded-xl p-3 cursor-pointer', card.className)}
+            >
               <div className="text-2xl font-semibold leading-none">{card.value}</div>
               <div className="mt-1 text-xs font-medium">{card.label}</div>
             </div>
@@ -17854,7 +18926,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
 
         {list.length ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {list.map(item => {
+            {(urgencyFilter ? list.filter(item => item.urgency === urgencyFilter) : list).map(item => {
               const urgencyClass = BREEDING_DASHBOARD_URGENCY_STYLES[item.urgency] || BREEDING_DASHBOARD_URGENCY_STYLES.none;
               const clutch = item?.pairing?.clutch || {};
               const clutchRecorded = item.stageKey === 'clutch' && !!clutch.recorded;
@@ -17864,9 +18936,11 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
               const eggsRaw = clutch.eggsTotal;
               const fertileRaw = clutch.fertileEggs;
               const slugsRaw = clutch.slugs;
-              const eggsCount = Number.isFinite(Number(eggsRaw))
+              const dashBadEggsTotal = Object.values(clutch.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+              const eggsRawCount = Number.isFinite(Number(eggsRaw))
                 ? Number(eggsRaw)
                 : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+              const eggsCount = typeof eggsRawCount === 'number' ? Math.max(0, eggsRawCount - dashBadEggsTotal) : null;
               const slugsCount = Number.isFinite(Number(slugsRaw)) ? Number(slugsRaw) : null;
               const splitBoxCounts = typeof eggsCount === 'number' ? splitEggBoxCounts(eggsCount) : [];
               const eggBoxLabel = splitBoxCounts.length > 1
@@ -17915,9 +18989,16 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                         </span>
                       </div>
                     </div>
-                    <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-                      {item.countdownLabel}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+                        {item.countdownLabel}
+                      </span>
+                      {item.cycleDayLabel ? (
+                        <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700">
+                          {item.cycleDayLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 text-xs">
@@ -18401,6 +19482,11 @@ function PairingInlineCard({
                   <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
                 </span>
               )}
+              {edit?.clutch?.allEggsLost && (
+                <span className="inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
+                  Clutch lost
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
@@ -18461,6 +19547,11 @@ function PairingInlineCard({
             <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
+            </div>
+          )}
+          {edit?.clutch?.allEggsLost && (
+            <div className="mt-1.5 inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+              Clutch lost
             </div>
           )}
           <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
@@ -19413,6 +20504,7 @@ function getBreedingCycleDerived(edit = {}) {
 
 function isPairingCompleted(pairing) {
   if (!pairing) return false;
+  if (pairing?.clutch?.allEggsLost) return true;
   const normalized = withPairingLifecycleDefaults({ ...pairing });
   const derived = getBreedingCycleDerived(normalized);
   return !!derived.hatchedRecorded;
@@ -19485,9 +20577,11 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
   } else if (derived.clutchRecorded) {
     const eggsRaw = normalized?.clutch?.eggsTotal;
     const fertileRaw = normalized?.clutch?.fertileEggs;
-    const eggsCount = Number.isFinite(Number(eggsRaw))
+    const stageBadEggs = Object.values(normalized?.clutch?.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+    const eggsRawCount = Number.isFinite(Number(eggsRaw))
       ? Number(eggsRaw)
       : (Number.isFinite(Number(fertileRaw)) ? Number(fertileRaw) : null);
+    const eggsCount = typeof eggsRawCount === 'number' ? Math.max(0, eggsRawCount - stageBadEggs) : null;
     stage = typeof eggsCount === 'number'
       ? `Clutch laid - ${eggsCount} ${eggsCount === 1 ? 'egg' : 'eggs'}`
       : 'Clutch laid';
@@ -19516,6 +20610,10 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
 
   const daysUntil = targetDate ? diffCalendarDays(today, targetDate) : null;
   const urgency = getDashboardUrgency(daysUntil, !!targetDate);
+  const activeTimer = derived.activeTimer || null;
+  const cycleDayLabel = activeTimer?.targetDate
+    ? formatCycleTimerDayLabel(activeTimer.targetDate, activeTimer.totalDays, today)
+    : '';
   const cycleYear = computeBreedingCycleYear({
     clutchDate: derived.clutchDate,
     preLayDate: derived.preLayDate,
@@ -19539,6 +20637,7 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
     targetLabel: targetDate ? formatDateForDisplay(targetDate) : '',
     daysUntil,
     countdownLabel: targetDate ? describeDaysUntil(daysUntil) : 'No target date yet',
+    cycleDayLabel,
     urgency,
     actionLabel,
     latestLockLabel: latestLockDate ? formatDateForDisplay(latestLockDate) : '',
@@ -19687,8 +20786,13 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
     clutchSlugsValue,
   } = derived;
 
+  const badEggsTotal = useMemo(
+    () => Object.values(edit?.clutch?.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0),
+    [edit?.clutch?.eggBoxBadEggs]
+  );
   const totalEggsDisplay = useMemo(() => {
-    if (typeof eggsTotalNumber === 'number') return eggsTotalNumber;
+    const bad = badEggsTotal;
+    if (typeof eggsTotalNumber === 'number') return Math.max(0, eggsTotalNumber - bad);
     const fertileCount = typeof fertileEggsNumber === 'number'
       ? fertileEggsNumber
       : (() => {
@@ -19702,8 +20806,8 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
     })();
     if (fertileCount === null && slugCount === null) return null;
-    return Math.max(0, (fertileCount ?? 0)) + Math.max(0, (slugCount ?? 0));
-  }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue]);
+    return Math.max(0, Math.max(0, (fertileCount ?? 0)) + Math.max(0, (slugCount ?? 0)) - bad);
+  }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue, badEggsTotal]);
 
   const totalEggsText = useMemo(() => {
     return t('clutch.totalEggs', {
@@ -20400,6 +21504,7 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
   const diffMs = target.getTime() - now;
   const overdue = diffMs < 0;
   const remainingLabel = overdue ? `Overdue by ${formatDurationFromMs(-diffMs)}` : `Due in ${formatDurationFromMs(diffMs)}`;
+  const dayLabel = formatCycleTimerDayLabel(targetDate, totalDays, now);
 
   let progressPercent = null;
   if (totalDays && totalDays > 0) {
@@ -20416,10 +21521,25 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
     <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')}>
       {progressPercent !== null && <span className="countdown-progress" style={{ width: `${progressPercent}%` }} />}
       <span className="break-words leading-tight">{label}</span>
+      {dayLabel ? <span className="break-words leading-tight">{dayLabel}</span> : null}
       <span className="break-words leading-tight">{remainingLabel}</span>
       <span className="break-words leading-tight">{formatDateForDisplay(targetDate)}</span>
     </div>
   );
+}
+
+function formatCycleTimerDayLabel(targetDate, totalDays, now = Date.now()) {
+  if (!targetDate || !Number.isFinite(totalDays) || totalDays <= 0) return '';
+  const target = parseYmd(targetDate);
+  if (!target) return '';
+  const nowDate = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(nowDate.getTime())) return '';
+  const daysUntil = diffInDays(localYMD(nowDate), targetDate);
+  if (!Number.isFinite(daysUntil)) return '';
+  const dayNumber = daysUntil < 0
+    ? Math.floor(totalDays + Math.abs(daysUntil))
+    : Math.min(Math.floor(totalDays), Math.max(1, Math.floor(totalDays - daysUntil + 1)));
+  return `Day ${dayNumber} of ${Math.floor(totalDays)}`;
 }
 
 function formatDurationFromMs(ms) {

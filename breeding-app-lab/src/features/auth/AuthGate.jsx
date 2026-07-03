@@ -840,20 +840,6 @@ export default function AuthGate({ children }) {
     setRegistrationData(createDefaultRegistrationData());
   };
 
-  const activeRole = String(authState?.role || authState?.profile?.role || "").trim().toLowerCase();
-  const canOpenLabApp = activeRole === "lab_staff" || activeRole === "admin";
-  const canOpenMarketplace = Boolean(activeRole);
-
-  const openLabApp = () => {
-    if (typeof window === "undefined") return;
-    window.location.hash = "/lab/dashboard";
-  };
-
-  const openMarketplace = () => {
-    if (typeof window === "undefined") return;
-    window.location.hash = "/marketplace";
-  };
-
   const renderField = (field) => {
     if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
       return null;
@@ -1130,16 +1116,6 @@ export default function AuthGate({ children }) {
           authState.profile?.fullName ||
           t("auth.status.defaultName", { defaultValue: "Keeper" })}
       </span>
-      {canOpenLabApp ? (
-        <button type="button" onClick={openLabApp}>
-          {t("auth.actions.openLabApp", { defaultValue: "Open Lab App" })}
-        </button>
-      ) : null}
-      {canOpenMarketplace ? (
-        <button type="button" onClick={openMarketplace}>
-          {t("auth.actions.openMarketplace", { defaultValue: "Marketplace" })}
-        </button>
-      ) : null}
       <button type="button" onClick={handleLogout}>
         {t("auth.actions.signOut", { defaultValue: "Sign out" })}
       </button>
@@ -1152,8 +1128,8 @@ export default function AuthGate({ children }) {
   return (
     <div className="auth-shell">
       <div className={`auth-shell__app ${overlayActive ? "is-blurred" : ""}`}>
-        {authState.isAuthenticated && authScope !== "lab" && signedInChip}
-        {children}
+        {authState.isAuthenticated && signedInChip}
+        {!overlayActive ? children : null}
       </div>
       {overlayActive && (
         <div className="auth-overlay">

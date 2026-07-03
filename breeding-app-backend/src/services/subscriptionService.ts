@@ -413,6 +413,51 @@ export const getUserSubscriptionPanel = async (userId: string) => {
   };
 };
 
+export const changeOwnSubscription = async (user: AuthenticatedUser, payload: Record<string, unknown>) => {
+  if (!user?.id) throw new HttpError(401, "Unauthorized");
+  const tierId = String(payload.tierId || "").trim();
+  if (!tierId) throw new HttpError(400, "tierId is required.");
+
+  const tier = await db.subscriptionTier.findFirst({
+    where: { id: tierId, isActive: true, isPublic: true, archivedAt: null },
+  });
+  if (!tier) throw new HttpError(404, "Public subscription tier not found.");
+
+  const now = new Date();
+  await db.$transaction(async (tx: any) => {
+    await tx.userSubscription.updateMany({
+      where: {
+        userId: user.id,
+        status: { in: ["active", "trialing", "paused", "past_due"] },
+      },
+      data: { status: "cancelled", cancelledAt: now },
+    });
+    await tx.userSubscription.create({
+      data: {
+        userId: user.id,
+        tierId: tier.id,
+        status: "active",
+        paymentStatus: "none",
+        paymentProvider: "self_service",
+        internalNote: "Selected by user from My Account.",
+      },
+    });
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        subscriptionPlan: tier.key,
+        subscriptionStatus: "active",
+        subscriptionPaymentStatus: "none",
+        subscriptionStartedAt: now,
+        subscriptionRenewalAt: null,
+        subscriptionTrialEndsAt: null,
+      },
+    });
+  });
+
+  return getUserSubscriptionPanel(user.id);
+};
+
 export const assignUserSubscription = async (actor: AuthenticatedUser, userId: string, payload: Record<string, unknown>) => {
   const tierId = String(payload.tierId || "").trim();
   const status = String(payload.status || "active").trim();

@@ -3,6 +3,8 @@ import { getHealth, getCurrentUser, hasStoredAuthSession, normalizeSharedApiErro
 import { getSharedApiConfig } from "../shared/config/api";
 import { getSharedBackendSnapshot, subscribeSharedBackendStatus } from "../shared/backendStatus";
 
+const ADMIN_AUTH_SCOPE = "admin";
+
 const SharedBackendContext = createContext({
   snapshot: getSharedBackendSnapshot(),
   retry: async () => {},
@@ -17,9 +19,7 @@ export function SharedBackendProvider({ children }) {
   const runHealthCheck = async () => {
     resetSharedBackendState();
     const config = getSharedApiConfig();
-    console.info("[shared-backend] resolved VITE_API_URL:", config.rawUrl || "(missing)");
     console.info("[shared-backend] env loaded:", config.rawUrl ? "yes" : "no");
-    console.info("[shared-backend] normalized API base:", config.baseUrl || "(missing)");
     console.info("[shared-backend] active storage mode:", "backend-only");
     if (!config.ok) {
       console.warn("[shared-backend] local mode reason:", config.message);
@@ -28,9 +28,9 @@ export function SharedBackendProvider({ children }) {
     try {
       const health = await getHealth();
       console.info("[shared-backend] backend health check success:", health);
-      if (hasStoredAuthSession()) {
+      if (hasStoredAuthSession(ADMIN_AUTH_SCOPE)) {
         try {
-          await getCurrentUser();
+          await getCurrentUser(ADMIN_AUTH_SCOPE);
           console.info("[shared-backend] auth status: authorized");
         } catch (error) {
           const normalized = normalizeSharedApiError(error);
@@ -79,8 +79,6 @@ export function SharedBackendProvider({ children }) {
       reachable: snapshot.reachable,
       backendModeEnabled: snapshot.backendModeEnabled,
       reason: snapshot.reason,
-      rawUrl: snapshot.config.rawUrl,
-      baseUrl: snapshot.baseUrl,
       authStatus: snapshot.authStatus,
       backendReachable: snapshot.reachable,
       storageMode: snapshot.activeStorageMode,

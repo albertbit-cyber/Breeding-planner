@@ -3058,7 +3058,7 @@ function withPairingLifecycleDefaults(pairing = {}) {
 }
 
 function initSnakeDraft(s) {
-  if (!s) return { name:'', sex:'F', status:'Active', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null };
+  if (!s) return { name:'', sex:'F', status:'Active', morphs:[], hets:[], tags:[], groups:[], logs: cloneLogs(), idSequence: null, feederProfile: createEmptyFeederProfile() };
   const existingSequence = Number(s?.idSequence);
   const resolvedSequence = Number.isFinite(existingSequence) && existingSequence > 0
     ? existingSequence
@@ -3074,7 +3074,84 @@ function initSnakeDraft(s) {
     groups: normalizeSingleGroupValue(s.groups),
     logs: cloneLogs(s.logs),
     photos: normalizeSnakePhotos(s.photos),
+    feederProfile: normalizeFeederProfileForDraft(s.feederProfile),
   };
+}
+
+const FEEDER_TYPE_OPTIONS = ['Mouse', 'Rat', 'Chick', 'ASF', 'Other'];
+const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
+
+function createEmptyFeederProfile() {
+  return {
+    feedType: '',
+    sizeClass: '',
+    weightGrams: '',
+    quantity: 1,
+    notes: '',
+  };
+}
+
+function normalizeFeederProfileForDraft(profile) {
+  const source = profile && typeof profile === 'object' ? profile : {};
+  const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
+  const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams);
+  return {
+    feedType: String(source.feedType ?? source.foodType ?? source.feed ?? '').trim(),
+    sizeClass: String(source.sizeClass ?? source.size ?? source.preySize ?? '').trim(),
+    weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? String(weightGrams) : '',
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    notes: String(source.notes ?? '').trim(),
+  };
+}
+
+function normalizeFeederProfileForSave(profile) {
+  const draft = normalizeFeederProfileForDraft(profile);
+  const weightGrams = Number(draft.weightGrams);
+  const quantity = Number(draft.quantity);
+  return {
+    feedType: draft.feedType,
+    sizeClass: draft.sizeClass,
+    weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? weightGrams : '',
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    notes: draft.notes,
+  };
+}
+
+function getLatestAcceptedFeedEntry(snake) {
+  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
+  for (let i = feeds.length - 1; i >= 0; i -= 1) {
+    const entry = feeds[i];
+    if (entry && !entry.refused) return entry;
+  }
+  return null;
+}
+
+function getSnakeFeederProfile(snake) {
+  const explicit = normalizeFeederProfileForDraft(snake?.feederProfile);
+  const latest = getLatestAcceptedFeedEntry(snake);
+  const latestWeight = Number(latest?.weightGrams ?? latest?.grams);
+  const profile = {
+    feedType: explicit.feedType || String(latest?.feed || '').trim(),
+    sizeClass: explicit.sizeClass || String(latest?.size || latest?.sizeDetail || '').trim(),
+    weightGrams: explicit.weightGrams || (Number.isFinite(latestWeight) && latestWeight > 0 ? String(latestWeight) : ''),
+    quantity: explicit.quantity || 1,
+    notes: explicit.notes,
+  };
+  return normalizeFeederProfileForDraft(profile);
+}
+
+function hasCompleteFeederProfile(profile) {
+  if (!profile) return false;
+  return Boolean(String(profile.feedType || '').trim() && (String(profile.sizeClass || '').trim() || Number(profile.weightGrams) > 0));
+}
+
+function formatFeederClass(profile) {
+  const size = String(profile?.sizeClass || '').trim();
+  const grams = Number(profile?.weightGrams);
+  if (size && Number.isFinite(grams) && grams > 0) return `${size} (${grams} g)`;
+  if (size) return size;
+  if (Number.isFinite(grams) && grams > 0) return `${grams} g`;
+  return '';
 }
 
 function createEmptyNewAnimalDraft() {
@@ -3096,7 +3173,8 @@ function createEmptyNewAnimalDraft() {
     imageUrl: "",
     photos: [],
     groups: [],
-    logs: cloneLogs()
+    logs: cloneLogs(),
+    feederProfile: createEmptyFeederProfile()
   };
 }
 
@@ -5849,6 +5927,7 @@ export default function BreedingPlannerApp() {
   const [listExportFeedback, setListExportFeedback] = useState(null);
   const [appDialog, setAppDialog] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showFeedPrepModal, setShowFeedPrepModal] = useState(false);
   const [newAnimal, setNewAnimal] = useState(createEmptyNewAnimalDraft);
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState([]);
@@ -9101,6 +9180,7 @@ export default function BreedingPlannerApp() {
                   </div>
                 )}
                 <button onClick={()=>setShowExportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowFeedPrepModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("feedPrep.open", { defaultValue: "Feed prep" })}</button>
                 <button onClick={()=>setShowScanner(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.scanQr")}</button>
                 <button
                   onClick={() => {
@@ -9940,7 +10020,7 @@ export default function BreedingPlannerApp() {
         );
       })()}
 
-      {hatchWizard && (() => {
+      {hatchWizard && typeof document !== 'undefined' && createPortal((() => {
         const total = Array.isArray(hatchWizard.entries) ? hatchWizard.entries.length : 0;
         const safeIndex = total ? Math.min(total - 1, Math.max(0, hatchWizard.currentIndex || 0)) : 0;
         const entry = total ? hatchWizard.entries[safeIndex] : null;
@@ -9954,13 +10034,13 @@ export default function BreedingPlannerApp() {
         return (
           <div
             className={cx(
-              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-50',
+              'fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]',
               overlayClass(theme)
             )}
             onClick={handleWizardCancel}
           >
             <div
-              className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh] flex flex-col"
+              className="relative z-[10011] bg-white w-full max-w-3xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 border-b bg-neutral-50">
@@ -10084,7 +10164,7 @@ export default function BreedingPlannerApp() {
             </div>
           </div>
         );
-      })()}
+      })(), document.body)}
 
           {showImportModal && typeof document !== 'undefined' && createPortal((
             <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
@@ -10349,6 +10429,7 @@ export default function BreedingPlannerApp() {
                               const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
+                              const normalizedFeederProfile = normalizeFeederProfileForSave(editSnakeDraft.feederProfile);
                               const { morphs: savedMorphs, hets: savedHets } = splitMorphHetInput(editGeneticsText);
                               setSnakes(prev => prev.map(s => s.id === oldId ? ({
                                 ...editSnakeDraft,
@@ -10358,6 +10439,7 @@ export default function BreedingPlannerApp() {
                                 groups: normalizedGroups,
                                 morphs: savedMorphs,
                                 hets: savedHets,
+                                feederProfile: normalizedFeederProfile,
                               }) : s));
                           setPairings(prev => prev.map(p => ({
                             ...p,
@@ -10509,6 +10591,83 @@ export default function BreedingPlannerApp() {
                   <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                </div>
+                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
+                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Normal feeder" })}</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                      <select
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm bg-white"
+                        value={editSnakeDraft.feederProfile?.feedType || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
+                        }))}
+                      >
+                        <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                        {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.sizeClass", { defaultValue: "Size / weight class" })}</label>
+                      <input
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        value={editSnakeDraft.feederProfile?.sizeClass || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
+                        }))}
+                        list="feed-prep-size-options"
+                        placeholder={t("feedPrep.sizePlaceholder", { defaultValue: "e.g., fuzzy, small rat, 30-50g" })}
+                      />
+                      <datalist id="feed-prep-size-options">
+                        {FEEDER_SIZE_OPTIONS.map(option => <option key={option} value={option} />)}
+                      </datalist>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          value={editSnakeDraft.feederProfile?.weightGrams || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), weightGrams: e.target.value },
+                          }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.quantity", { defaultValue: "Quantity" })}</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          value={editSnakeDraft.feederProfile?.quantity || 1}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), quantity: Number(e.target.value) || 1 },
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <input
+                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        value={editSnakeDraft.feederProfile?.notes || ''}
+                        onChange={e => setEditSnakeDraft(d => ({
+                          ...d,
+                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), notes: e.target.value },
+                        }))}
+                        placeholder={t("feedPrep.notesPlaceholder", { defaultValue: "Optional preparation note" })}
+                      />
+                    </div>
+                  </div>
                 </div>
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
@@ -10772,6 +10931,16 @@ export default function BreedingPlannerApp() {
         );
       })()}
   <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
+      <FeedPrepModal
+        open={showFeedPrepModal}
+        onClose={() => setShowFeedPrepModal(false)}
+        snakes={snakes}
+        onEditSnake={(snake) => {
+          setShowFeedPrepModal(false);
+          openSnakeCard(snake);
+        }}
+        theme={theme}
+      />
       <ExportPairingQrModal
         open={showPairingQrModal}
         onClose={() => setShowPairingQrModal(false)}
@@ -10835,7 +11004,9 @@ export {
   buildPairingExportDataset,
   buildPairingMatrixExportDataset,
   getPairingExportRows,
+  buildPairingDashboardItem,
   exportDatasetToCsv,
+  formatCycleTimerDayLabel,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
@@ -13282,6 +13453,220 @@ async function exportClutchCardToPdf(details = {}) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'clutch-card';
   doc.save(`${fileSafe}.pdf`);
+}
+
+function FeedPrepModal({ open, onClose, snakes = [], onEditSnake, theme = 'blue' }) {
+  const { t } = useTranslation();
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [copied, setCopied] = useState(false);
+
+  const snakeRows = useMemo(() => {
+    return (Array.isArray(snakes) ? snakes : [])
+      .filter(Boolean)
+      .map((snake) => {
+        const profile = getSnakeFeederProfile(snake);
+        const complete = hasCompleteFeederProfile(profile);
+        const feederClass = formatFeederClass(profile);
+        return {
+          snake,
+          id: snake.id,
+          name: snake.name || snake.id || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' }),
+          profile,
+          complete,
+          feederClass,
+          quantity: Math.max(1, Number(profile.quantity) || 1),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [snakes, t]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedIds(snakeRows.map(row => row.id).filter(Boolean));
+    setCopied(false);
+  }, [open, snakeRows]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedRows = useMemo(
+    () => snakeRows.filter(row => row.id && selectedIdSet.has(row.id)),
+    [selectedIdSet, snakeRows]
+  );
+  const readyRows = useMemo(() => selectedRows.filter(row => row.complete), [selectedRows]);
+  const missingRows = useMemo(() => selectedRows.filter(row => !row.complete), [selectedRows]);
+  const reportRows = useMemo(() => {
+    const map = new Map();
+    readyRows.forEach((row) => {
+      const feedType = String(row.profile.feedType || '').trim();
+      const sizeClass = String(row.profile.sizeClass || '').trim();
+      const weightGrams = Number(row.profile.weightGrams);
+      const weightText = Number.isFinite(weightGrams) && weightGrams > 0 ? `${weightGrams} g` : '';
+      const key = `${feedType.toLowerCase()}::${sizeClass.toLowerCase()}::${weightText.toLowerCase()}`;
+      const existing = map.get(key) || {
+        feedType,
+        sizeClass,
+        weightText,
+        quantity: 0,
+      };
+      existing.quantity += row.quantity;
+      map.set(key, existing);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const byFeed = a.feedType.localeCompare(b.feedType);
+      const bySize = byFeed || a.sizeClass.localeCompare(b.sizeClass);
+      return bySize || a.weightText.localeCompare(b.weightText);
+    });
+  }, [readyRows]);
+
+  const totalItems = reportRows.reduce((sum, row) => sum + row.quantity, 0);
+  const reportText = useMemo(() => {
+    if (!reportRows.length) return '';
+    return reportRows
+      .map(row => `${row.feedType} | ${row.sizeClass || '-'} | ${row.weightText || '-'}: ${row.quantity}`)
+      .join('\n');
+  }, [reportRows]);
+
+  const toggleSelected = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  };
+
+  const copyReport = async () => {
+    if (!reportText || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      console.warn('Failed to copy feed prep report', error);
+    }
+  };
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal((
+    <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]", overlayClass(theme))} onClick={onClose}>
+      <div className="relative z-[10021] bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border" onClick={event => event.stopPropagation()}>
+        <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold text-neutral-900">{t('feedPrep.title', { defaultValue: 'Feed preparation' })}</div>
+            <div className="text-sm text-neutral-500">{t('feedPrep.subtitle', { defaultValue: 'Select snakes and generate the grouped defrost list.' })}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.map(row => row.id).filter(Boolean))}>
+              {t('feedPrep.selectAll', { defaultValue: 'Select all' })}
+            </button>
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds([])}>
+              {t('feedPrep.clearSelection', { defaultValue: 'Clear' })}
+            </button>
+            <button type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
+              {copied ? t('feedPrep.copied', { defaultValue: 'Copied' }) : t('feedPrep.copyReport', { defaultValue: 'Copy report' })}
+            </button>
+            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
+              {t('common.close', { defaultValue: 'Close' })}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.selectedSnakes', { defaultValue: 'Selected snakes' })}</div>
+              <div className="text-2xl font-semibold">{selectedRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.readySnakes', { defaultValue: 'With feeder data' })}</div>
+              <div className="text-2xl font-semibold">{readyRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.missingSnakes', { defaultValue: 'Missing data' })}</div>
+              <div className="text-2xl font-semibold">{missingRows.length}</div>
+            </div>
+            <div className="rounded-xl border bg-neutral-50 p-3">
+              <div className="text-xs text-neutral-500">{t('feedPrep.totalItems', { defaultValue: 'Items to defrost' })}</div>
+              <div className="text-2xl font-semibold">{totalItems}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] gap-5">
+            <section className="rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-neutral-50">
+                <h3 className="font-semibold text-neutral-900">{t('feedPrep.reportTitle', { defaultValue: 'Defrost report' })}</h3>
+                <p className="text-xs text-neutral-500">{t('feedPrep.reportHint', { defaultValue: 'Grouped by food type and size or weight class.' })}</p>
+              </div>
+              {reportRows.length ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-white border-b text-xs uppercase text-neutral-500">
+                      <tr>
+                        <th className="text-left px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
+                        <th className="text-left px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
+                        <th className="text-left px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
+                        <th className="text-right px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportRows.map(row => (
+                        <tr key={`${row.feedType}-${row.sizeClass}-${row.weightText}`} className="border-b last:border-0">
+                          <td className="px-4 py-3 font-medium">{row.feedType}</td>
+                          <td className="px-4 py-3">{row.sizeClass || '-'}</td>
+                          <td className="px-4 py-3">{row.weightText || '-'}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{row.quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 text-sm text-neutral-500">{t('feedPrep.noReport', { defaultValue: 'No defrost report yet. Select snakes with feeder data.' })}</div>
+              )}
+            </section>
+
+            <section className="rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-neutral-50">
+                <h3 className="font-semibold text-neutral-900">{t('feedPrep.snakeSelection', { defaultValue: 'Snake selection' })}</h3>
+                <p className="text-xs text-neutral-500">{t('feedPrep.selectionHint', { defaultValue: 'Missing profiles are listed but excluded from the grouped totals.' })}</p>
+              </div>
+              <div className="max-h-[32rem] overflow-y-auto divide-y">
+                {snakeRows.map(row => (
+                  <label key={row.id} className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-neutral-50">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={selectedIdSet.has(row.id)}
+                      onChange={() => toggleSelected(row.id)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium truncate">{row.name}</span>
+                      <span className="block text-xs text-neutral-500 truncate">{row.id}</span>
+                      {row.complete ? (
+                        <span className="block text-xs text-neutral-600">{row.quantity} x {row.profile.feedType} {row.feederClass}</span>
+                      ) : (
+                        <span className="block text-xs text-amber-700">{t('feedPrep.missingProfile', { defaultValue: 'Missing feeder data' })}</span>
+                      )}
+                    </span>
+                    {!row.complete && typeof onEditSnake === 'function' ? (
+                      <button
+                        type="button"
+                        className="text-xs px-2 py-1 rounded-lg border text-neutral-700"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          onEditSnake(row.snake);
+                        }}
+                      >
+                        {t('feedPrep.editSnake', { defaultValue: 'Edit' })}
+                      </button>
+                    ) : null}
+                  </label>
+                ))}
+                {!snakeRows.length && (
+                  <div className="p-4 text-sm text-neutral-500">{t('feedPrep.noSnakes', { defaultValue: 'No snakes available.' })}</div>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  ), document.body);
 }
 
 function SnakeCard({ s, onEdit, onQuickPair, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
@@ -17584,9 +17969,16 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
               </span>
             </div>
           </div>
-          <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-            {item.countdownLabel}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+              {item.countdownLabel}
+            </span>
+            {item.cycleDayLabel ? (
+              <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700">
+                {item.cycleDayLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-2 text-xs">
@@ -19241,6 +19633,10 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
 
   const daysUntil = targetDate ? diffCalendarDays(today, targetDate) : null;
   const urgency = getDashboardUrgency(daysUntil, !!targetDate);
+  const activeTimer = derived.activeTimer || null;
+  const cycleDayLabel = activeTimer?.targetDate
+    ? formatCycleTimerDayLabel(activeTimer.targetDate, activeTimer.totalDays, today)
+    : '';
   const cycleYear = computeBreedingCycleYear({
     clutchDate: derived.clutchDate,
     preLayDate: derived.preLayDate,
@@ -19264,6 +19660,7 @@ function buildPairingDashboardItem(pairing, snakes = [], today = new Date()) {
     targetLabel: targetDate ? formatDateForDisplay(targetDate) : '',
     daysUntil,
     countdownLabel: targetDate ? describeDaysUntil(daysUntil) : 'No target date yet',
+    cycleDayLabel,
     urgency,
     actionLabel,
     latestLockLabel: latestLockDate ? formatDateForDisplay(latestLockDate) : '',
@@ -20125,6 +20522,7 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
   const diffMs = target.getTime() - now;
   const overdue = diffMs < 0;
   const remainingLabel = overdue ? `Overdue by ${formatDurationFromMs(-diffMs)}` : `Due in ${formatDurationFromMs(diffMs)}`;
+  const dayLabel = formatCycleTimerDayLabel(targetDate, totalDays, now);
 
   let progressPercent = null;
   if (totalDays && totalDays > 0) {
@@ -20141,10 +20539,25 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
     <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')}>
       {progressPercent !== null && <span className="countdown-progress" style={{ width: `${progressPercent}%` }} />}
       <span className="break-words leading-tight">{label}</span>
+      {dayLabel ? <span className="break-words leading-tight">{dayLabel}</span> : null}
       <span className="break-words leading-tight">{remainingLabel}</span>
       <span className="break-words leading-tight">{formatDateForDisplay(targetDate)}</span>
     </div>
   );
+}
+
+function formatCycleTimerDayLabel(targetDate, totalDays, now = Date.now()) {
+  if (!targetDate || !Number.isFinite(totalDays) || totalDays <= 0) return '';
+  const target = parseYmd(targetDate);
+  if (!target) return '';
+  const nowDate = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(nowDate.getTime())) return '';
+  const daysUntil = diffInDays(localYMD(nowDate), targetDate);
+  if (!Number.isFinite(daysUntil)) return '';
+  const dayNumber = daysUntil < 0
+    ? Math.floor(totalDays + Math.abs(daysUntil))
+    : Math.min(Math.floor(totalDays), Math.max(1, Math.floor(totalDays - daysUntil + 1)));
+  return `Day ${dayNumber} of ${Math.floor(totalDays)}`;
 }
 
 function formatDurationFromMs(ms) {

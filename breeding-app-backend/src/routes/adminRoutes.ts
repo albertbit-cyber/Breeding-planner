@@ -1,17 +1,20 @@
 import { Router } from "express";
 import {
+  account,
   approveVerificationRequest,
   auditLogs,
   changeUserRole,
   changeUserStatus,
   changeUserSubscription,
   changeUserVerification,
+  changeEmailVerified,
   changeGdprRequest,
   changeLabAccount,
   changeMarketplacePermission,
   changeReportStatus,
   changeVerificationRequest,
   createGdprRequest,
+  createUser,
   dashboard,
   gdprRequests,
   labAccounts,
@@ -23,6 +26,8 @@ import {
   requestMoreVerificationInfo,
   revokeVerificationRequest,
   sendNotification,
+  sendUserEmail,
+  resendEmailVerification,
   userDetail,
   users,
   verificationRequests,
@@ -37,6 +42,7 @@ export const adminRoutes = Router();
 adminRoutes.use(requireAuth, requireRole("admin"));
 
 adminRoutes.get("/dashboard", asyncHandler(dashboard));
+adminRoutes.get("/account", asyncHandler(account));
 adminRoutes.get("/reports", asyncHandler(reports));
 adminRoutes.get("/reports/:id", asyncHandler(reportDetail));
 adminRoutes.patch("/reports/:id/status", asyncHandler(changeReportStatus));
@@ -58,7 +64,11 @@ adminRoutes.get("/gdpr-requests", asyncHandler(gdprRequests));
 adminRoutes.post("/users/:id/gdpr-requests", asyncHandler(createGdprRequest));
 adminRoutes.patch("/gdpr-requests/:id", asyncHandler(changeGdprRequest));
 adminRoutes.get("/users", asyncHandler(users));
+adminRoutes.post("/users", asyncHandler(createUser));
 adminRoutes.get("/users/:id/audit-logs", asyncHandler(auditLogs));
+adminRoutes.post("/users/:id/email", asyncHandler(sendUserEmail));
+adminRoutes.post("/users/:id/email-verification", asyncHandler(resendEmailVerification));
+adminRoutes.patch("/users/:id/email-verification", asyncHandler(changeEmailVerified));
 adminRoutes.get("/users/:id", asyncHandler(userDetail));
 adminRoutes.patch("/users/:id/role", asyncHandler(changeUserRole));
 adminRoutes.patch("/users/:id/status", asyncHandler(changeUserStatus));

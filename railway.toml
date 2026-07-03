@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd breeding-app-breeder && npm install --omit=optional && npm run build"
+
+[deploy]
+startCommand = "cd breeding-app-breeder && npx serve -s build -l ${PORT:-3000}"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
