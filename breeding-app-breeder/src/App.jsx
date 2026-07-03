@@ -2547,15 +2547,62 @@ function sanitizePairingRecord(raw) {
   return withPairingLifecycleDefaults({ ...raw });
 }
 
-function stripDataUrlPhotos(snake) {
-  if (!snake || !Array.isArray(snake.photos)) return snake;
-  const photos = snake.photos.filter(p => p && typeof p.url === 'string' && !p.url.startsWith('data:'));
-  return photos.length === snake.photos.length ? snake : { ...snake, photos };
+const BACKEND_MEDIA_FIELD_KEYS = new Set([
+  'imageUrl',
+  'photoUrl',
+  'pictureUrl',
+  'thumbnailUrl',
+  'certificateUrl',
+  'labCertificateUrl',
+  'logoUrl',
+  'url',
+  'src',
+  'dataUrl',
+]);
+const BACKEND_MEDIA_STRING_LIMIT = 200000;
+
+function isEmbeddedMediaString(value) {
+  return typeof value === 'string' && value.trim().startsWith('data:');
+}
+
+function sanitizeBackendMediaValue(value, key = '') {
+  if (typeof value === 'string') {
+    if (isEmbeddedMediaString(value)) return undefined;
+    if (BACKEND_MEDIA_FIELD_KEYS.has(key) && value.length > BACKEND_MEDIA_STRING_LIMIT) return undefined;
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map(item => sanitizeBackendMediaValue(item, key))
+      .filter(item => {
+        if (item == null) return false;
+        if (typeof item === 'object') return Object.keys(item).length > 0;
+        return true;
+      });
+  }
+  if (value && typeof value === 'object') {
+    const cleaned = {};
+    Object.entries(value).forEach(([entryKey, entryValue]) => {
+      const nextValue = sanitizeBackendMediaValue(entryValue, entryKey);
+      if (typeof nextValue !== 'undefined') cleaned[entryKey] = nextValue;
+    });
+    return cleaned;
+  }
+  return value;
+}
+
+function prepareAnimalForBackend(snake) {
+  if (!snake || typeof snake !== 'object') return snake;
+  const cleaned = sanitizeBackendMediaValue(snake);
+  if (!cleaned || typeof cleaned !== 'object') return cleaned;
+  if (!Array.isArray(cleaned.photos)) return cleaned;
+  const photos = cleaned.photos.filter(photo => photo && typeof photo.url === 'string' && photo.url.trim());
+  return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
 function prepareSnapshotForBackend(animals, pairings) {
   return {
-    animals: Array.isArray(animals) ? animals.map(stripDataUrlPhotos) : [],
+    animals: Array.isArray(animals) ? animals.map(prepareAnimalForBackend) : [],
     pairings: Array.isArray(pairings) ? pairings : [],
     clutches: [],
   };
