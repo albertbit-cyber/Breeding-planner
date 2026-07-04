@@ -840,7 +840,7 @@
   "calendar.daysAfterOvulation": "{{count}} days after ovulation",
   "calendar.noAppointmentsView": "No appointments in this view.",
   "feedPrep.open": "Feed prep",
-  "feedPrep.profileTitle": "Normal feeder",
+  "feedPrep.profileTitle": "Feed Cycle",
   "feedPrep.foodType": "Food type",
   "feedPrep.sizeClass": "Size / weight class",
   "feedPrep.weightGrams": "Weight (g)",
@@ -868,5 +868,9 @@
   "feedPrep.selectionHint": "Missing profiles are listed but excluded from the grouped totals.",
   "feedPrep.missingProfile": "Missing feeder data",
   "feedPrep.editSnake": "Edit",
-  "feedPrep.noSnakes": "No snakes available."
+  "feedPrep.noSnakes": "No snakes available.",
+  "feedPrep.intervalDays": "Interval (days)",
+  "feedPrep.intervalHelp": "Reminder starts after the first accepted feed log.",
+  "calendar.feedDue": "Feed due: {{name}}",
+  "calendar.feedDueEvery": "Every {{count}} days"
 }

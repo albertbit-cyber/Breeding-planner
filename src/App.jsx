@@ -3344,7 +3344,7 @@ function initSnakeDraft(s) {
   };
 }
 
-const FEEDER_TYPE_OPTIONS = ['Mouse', 'Rat', 'Chick', 'ASF', 'Other'];
+const FEEDER_TYPE_OPTIONS = ['Rat', 'SF', 'Mouse', 'Other'];
 const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
 
 function createEmptyFeederProfile() {
@@ -3353,6 +3353,7 @@ function createEmptyFeederProfile() {
     sizeClass: '',
     weightGrams: '',
     quantity: 1,
+    intervalDays: '',
     notes: '',
   };
 }
@@ -3361,11 +3362,14 @@ function normalizeFeederProfileForDraft(profile) {
   const source = profile && typeof profile === 'object' ? profile : {};
   const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
   const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams);
+  const intervalDays = Number(source.intervalDays ?? source.feedIntervalDays ?? source.feedingIntervalDays ?? source.interval ?? '');
+  const rawFeedType = String(source.feedType ?? source.foodType ?? source.feed ?? '').trim();
   return {
-    feedType: String(source.feedType ?? source.foodType ?? source.feed ?? '').trim(),
+    feedType: rawFeedType.toUpperCase() === 'ASF' ? 'SF' : rawFeedType,
     sizeClass: String(source.sizeClass ?? source.size ?? source.preySize ?? '').trim(),
     weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? String(weightGrams) : '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    intervalDays: Number.isFinite(intervalDays) && intervalDays > 0 ? String(Math.round(intervalDays)) : '',
     notes: String(source.notes ?? '').trim(),
   };
 }
@@ -3374,11 +3378,13 @@ function normalizeFeederProfileForSave(profile) {
   const draft = normalizeFeederProfileForDraft(profile);
   const weightGrams = Number(draft.weightGrams);
   const quantity = Number(draft.quantity);
+  const intervalDays = Number(draft.intervalDays);
   return {
     feedType: draft.feedType,
     sizeClass: draft.sizeClass,
     weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? weightGrams : '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    intervalDays: Number.isFinite(intervalDays) && intervalDays > 0 ? Math.round(intervalDays) : '',
     notes: draft.notes,
   };
 }
@@ -3401,9 +3407,66 @@ function getSnakeFeederProfile(snake) {
     sizeClass: explicit.sizeClass || String(latest?.size || latest?.sizeDetail || '').trim(),
     weightGrams: explicit.weightGrams || (Number.isFinite(latestWeight) && latestWeight > 0 ? String(latestWeight) : ''),
     quantity: explicit.quantity || 1,
+    intervalDays: explicit.intervalDays,
     notes: explicit.notes,
   };
   return normalizeFeederProfileForDraft(profile);
+}
+
+function getFeedEntryDateValue(entry) {
+  return entry?.date || entry?.fedAt || entry?.createdAt || entry?.updatedAt || '';
+}
+
+function parseFeedEntryDate(entry) {
+  const raw = getFeedEntryDateValue(entry);
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    const datePart = raw.slice(0, 10);
+    const parsedYmd = parseYmd(datePart);
+    if (parsedYmd) return parsedYmd;
+  }
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function getFeedEntryTime(entry) {
+  const parsed = parseFeedEntryDate(entry);
+  return parsed ? parsed.getTime() : 0;
+}
+
+function isFeedEntryRefused(entry) {
+  return entry?.refused === true || String(entry?.result || entry?.status || '').toLowerCase() === 'refused';
+}
+
+function getNextFeedCycleEvent(snake) {
+  if (!snake) return null;
+  const profile = normalizeFeederProfileForDraft(snake.feederProfile);
+  const intervalDays = Number(profile.intervalDays);
+  if (!Number.isFinite(intervalDays) || intervalDays <= 0) return null;
+
+  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
+  const latestFeed = feeds
+    .filter(entry => entry && !isFeedEntryRefused(entry) && getFeedEntryTime(entry) > 0)
+    .sort((a, b) => getFeedEntryTime(b) - getFeedEntryTime(a))[0];
+  if (!latestFeed) return null;
+
+  const lastFeedDate = parseFeedEntryDate(latestFeed);
+  if (!lastFeedDate || !Number.isFinite(lastFeedDate.getTime())) return null;
+  lastFeedDate.setHours(0, 0, 0, 0);
+
+  const dueDate = new Date(lastFeedDate);
+  dueDate.setDate(dueDate.getDate() + Math.round(intervalDays));
+  if (!Number.isFinite(dueDate.getTime())) return null;
+
+  return {
+    date: localYMD(dueDate),
+    type: 'feedDue',
+    activityKey: 'feeds',
+    snakeId: snake.id,
+    intervalDays: Math.round(intervalDays),
+    lastFeedDate: localYMD(lastFeedDate),
+    profile,
+  };
 }
 
 function hasCompleteFeederProfile(profile) {
@@ -10935,7 +10998,7 @@ export default function BreedingPlannerApp() {
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
-                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Normal feeder" })}</div>
+                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
                   <div className="mt-2 grid grid-cols-1 gap-2">
                     <div>
                       <label className="text-xs font-medium text-neutral-600">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
@@ -10967,7 +11030,7 @@ export default function BreedingPlannerApp() {
                         {FEEDER_SIZE_OPTIONS.map(option => <option key={option} value={option} />)}
                       </datalist>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
                         <label className="text-xs font-medium text-neutral-600">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
                         <input
@@ -10996,7 +11059,23 @@ export default function BreedingPlannerApp() {
                           }))}
                         />
                       </div>
+                      <div>
+                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.intervalDays", { defaultValue: "Interval (days)" })}</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          value={editSnakeDraft.feederProfile?.intervalDays || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), intervalDays: e.target.value },
+                          }))}
+                          placeholder="7"
+                        />
+                      </div>
                     </div>
+                    <div className="text-[11px] text-neutral-500">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
                     <div>
                       <label className="text-xs font-medium text-neutral-600">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
                       <input
@@ -21936,6 +22015,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
         });
       };
       ['feeds', 'weights', 'sheds', 'cleanings', 'meds'].forEach(addLogs);
+
+      const feedDueEvent = getNextFeedCycleEvent(s);
+      if (feedDueEvent) {
+        const dt = new Date(`${feedDueEvent.date}T00:00:00`);
+        if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === targetYear && dt.getMonth() === targetMonth) {
+          newEvents.push(feedDueEvent);
+        }
+      }
     });
 
     return newEvents;
@@ -21948,6 +22035,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   useEffect(() => { loadAppointmentsIntoCalendar(); }, [loadAppointmentsIntoCalendar]);
 
   const passesFilters = useCallback((ev) => {
+    if (ev.type === 'feedDue') {
+      return filters.feeds !== false;
+    }
     if (ev.type === 'activity') {
       const key = ev.activityKey;
       if (!key) return true;
@@ -22683,6 +22773,32 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   {isToday ? <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{t('calendar.today', { defaultValue: 'Today' })}</div> : null}
                 </div>
                 {filteredEvents.filter(e => e.date === cellDate).map((e, idx) => {
+                  if (e.type === 'feedDue') {
+                    const s = snakes.find(x => x.id === e.snakeId);
+                    const profile = e.profile || getSnakeFeederProfile(s);
+                    const grams = Number(profile.weightGrams);
+                    const quantity = Math.max(1, Number(profile.quantity) || 1);
+                    const feedParts = [
+                      quantity > 1 ? `${quantity} x` : '',
+                      profile.feedType,
+                      profile.sizeClass,
+                      Number.isFinite(grams) && grams > 0 ? `${grams} g` : '',
+                    ].filter(Boolean);
+                    return (
+                      <div
+                        key={idx}
+                        className="text-[11px] px-2 py-1 rounded-full border flex items-start gap-2 border-amber-200 bg-amber-50"
+                      >
+                        <div className="truncate">
+                          <div className="font-medium truncate">{t('calendar.feedDue', { name: s?.name || e.snakeId, defaultValue: 'Feed due: {{name}}' })}</div>
+                          <div className="text-[11px] text-neutral-500 truncate">
+                            {t('calendar.feedDueEvery', { count: e.intervalDays, defaultValue: 'Every {{count}} days' })}
+                            {feedParts.length ? ` - ${feedParts.join(' ')}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                   if (e.type === 'activity') {
                     const pal = activityPalettes[e.activityKey] || { bg: '#efefef', border: '#ddd' };
                     const s = snakes.find(x => x.id === e.snakeId);
@@ -22923,6 +23039,22 @@ function prepareCalendarEventExport(event, context) {
     summary = `${cap(baseLabel)}${snakeName ? `: ${snakeName}` : ''}`;
     const detail = describeActivityEntry(event.activityKey, event.entry);
     if (detail) descriptionParts.push(detail);
+  } else if (event.type === 'feedDue') {
+    const snake = context.snakesById?.[event.snakeId];
+    const snakeName = snake?.name || event.snakeId || '';
+    summary = `Feed due${snakeName ? `: ${snakeName}` : ''}`;
+    if (event.intervalDays) descriptionParts.push(`Feed cycle: every ${event.intervalDays} days`);
+    if (event.lastFeedDate) descriptionParts.push(`Last accepted feed: ${event.lastFeedDate}`);
+    const profile = event.profile || normalizeFeederProfileForDraft(snake?.feederProfile);
+    const grams = Number(profile.weightGrams);
+    const feedParts = [
+      profile.feedType,
+      profile.sizeClass,
+      Number.isFinite(grams) && grams > 0 ? `${grams} g` : '',
+    ].filter(Boolean);
+    if (feedParts.length) descriptionParts.push(`Feeder: ${feedParts.join(' ')}`);
+    if (profile.quantity) descriptionParts.push(`Quantity: ${profile.quantity}`);
+    if (profile.notes) descriptionParts.push(`Notes: ${profile.notes}`);
   } else {
     return null;
   }
@@ -22939,7 +23071,8 @@ function prepareCalendarEventExport(event, context) {
     event.apptId || '',
     event.snakeId || '',
     event.activityKey || '',
-    event.stage || ''
+    event.stage || '',
+    event.intervalDays || ''
   ].filter(Boolean);
   const baseUid = uidParts.join('-') || `event-${formatDateToIcs(startDate)}`;
 
@@ -23173,6 +23306,8 @@ function computeCalendarEventBounds({ pairings = [], snakes = [] }) {
       const entries = Array.isArray(snake.logs[key]) ? snake.logs[key] : [];
       entries.forEach(entry => consider(entry?.date));
     });
+    const feedDueEvent = getNextFeedCycleEvent(snake);
+    if (feedDueEvent) consider(feedDueEvent.date);
   });
 
   return { start: minDate, end: maxDate };

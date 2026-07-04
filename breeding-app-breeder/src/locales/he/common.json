@@ -881,7 +881,7 @@
   "calendar.daysAfterOvulation": "{{count}} ימים אחרי ביוץ",
   "calendar.noAppointmentsView": "אין תורים בתצוגה הזו.",
   "feedPrep.open": "Feed prep",
-  "feedPrep.profileTitle": "Normal feeder",
+  "feedPrep.profileTitle": "מחזור האכלה",
   "feedPrep.foodType": "Food type",
   "feedPrep.sizeClass": "Size / weight class",
   "feedPrep.weightGrams": "Weight (g)",
@@ -909,5 +909,9 @@
   "feedPrep.selectionHint": "Missing profiles are listed but excluded from the grouped totals.",
   "feedPrep.missingProfile": "Missing feeder data",
   "feedPrep.editSnake": "Edit",
-  "feedPrep.noSnakes": "No snakes available."
+  "feedPrep.noSnakes": "No snakes available.",
+  "feedPrep.intervalDays": "מרווח (ימים)",
+  "feedPrep.intervalHelp": "התזכורת מתחילה אחרי רישום ההאכלה המאושר הראשון.",
+  "calendar.feedDue": "האכלה נדרשת: {{name}}",
+  "calendar.feedDueEvery": "כל {{count}} ימים"
 }

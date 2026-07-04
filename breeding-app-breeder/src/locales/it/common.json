@@ -840,7 +840,7 @@
   "setup.aliases.import.failedMorphAliases": "Importazione del JSON degli alias non riuscita.",
   "setup.aliases.import.failedGeneAliases": "Importazione del JSON degli alias dei geni non riuscita.",
   "feedPrep.open": "Prepara pasti",
-  "feedPrep.profileTitle": "Pasto normale",
+  "feedPrep.profileTitle": "Ciclo di alimentazione",
   "feedPrep.foodType": "Tipo alimento",
   "feedPrep.sizeClass": "Taglia / classe peso",
   "feedPrep.weightGrams": "Peso (g)",
@@ -868,5 +868,9 @@
   "feedPrep.selectionHint": "I profili mancanti sono elencati ma esclusi dai totali.",
   "feedPrep.missingProfile": "Dati alimento mancanti",
   "feedPrep.editSnake": "Modifica",
-  "feedPrep.noSnakes": "Nessun serpente disponibile."
+  "feedPrep.noSnakes": "Nessun serpente disponibile.",
+  "feedPrep.intervalDays": "Intervallo (giorni)",
+  "feedPrep.intervalHelp": "Il promemoria inizia dopo il primo registro di alimentazione accettato.",
+  "calendar.feedDue": "Pasto dovuto: {{name}}",
+  "calendar.feedDueEvery": "Ogni {{count}} giorni"
 }

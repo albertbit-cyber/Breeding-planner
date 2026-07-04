@@ -876,7 +876,7 @@
   "setup.aliases.import.failedMorphAliases": "Alias-JSON importeren mislukt.",
   "setup.aliases.import.failedGeneAliases": "Genalias-JSON importeren mislukt.",
   "feedPrep.open": "Voer voorbereiden",
-  "feedPrep.profileTitle": "Normaal voer",
+  "feedPrep.profileTitle": "Voercyclus",
   "feedPrep.foodType": "Voertype",
   "feedPrep.sizeClass": "Maat / gewichtsklasse",
   "feedPrep.weightGrams": "Gewicht (g)",
@@ -904,5 +904,9 @@
   "feedPrep.selectionHint": "Ontbrekende profielen worden getoond maar niet meegeteld.",
   "feedPrep.missingProfile": "Voergegevens ontbreken",
   "feedPrep.editSnake": "Bewerken",
-  "feedPrep.noSnakes": "Geen slangen beschikbaar."
+  "feedPrep.noSnakes": "Geen slangen beschikbaar.",
+  "feedPrep.intervalDays": "Interval (dagen)",
+  "feedPrep.intervalHelp": "Herinnering start na de eerste geaccepteerde voerregistratie.",
+  "calendar.feedDue": "Voeding gepland: {{name}}",
+  "calendar.feedDueEvery": "Elke {{count}} dagen"
 }

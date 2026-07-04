@@ -95,6 +95,7 @@ const normalizeAnimal = (row: any) => {
     rack: payload.rack || location.rack || "",
     tub: payload.tub || location.tub || payload.tubNumber || "",
     tags: Array.isArray(payload.tags) ? payload.tags : [],
+    feederProfile: asRecord(payload.feederProfile),
     badges: [
       payload.feedingStatus || "",
       payload.shedStatus || "",
@@ -160,6 +161,28 @@ const daysSince = (value: unknown): number | null => {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return null;
   return Math.floor((Date.now() - date.getTime()) / 86_400_000);
+};
+
+const isRefusedFeed = (entry: any): boolean => (
+  entry?.refused === true || text(entry?.result || entry?.status, 80).toLowerCase() === "refused"
+);
+
+const recentAcceptedFeedEntry = (items: any[] = []) => (
+  recentEntry((Array.isArray(items) ? items : []).filter((entry) => entry && !isRefusedFeed(entry)))
+);
+
+const feedCycleIntervalDays = (animal: any): number | null => {
+  const profile = asRecord(animal?.feederProfile);
+  const value = Number(profile.intervalDays ?? profile.feedIntervalDays ?? profile.feedingIntervalDays ?? profile.interval);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value);
+};
+
+const isFeedDue = (animal: any, lastFeed = recentAcceptedFeedEntry(animal?.logs?.feeds)): boolean => {
+  const interval = feedCycleIntervalDays(animal);
+  if (!interval || !lastFeed) return false;
+  const feedDays = daysSince(lastFeed?.date || lastFeed?.createdAt);
+  return feedDays !== null && feedDays >= interval;
 };
 
 const ensureAccess = async (actor: AuthenticatedUser, featureKey: string) => {
@@ -260,16 +283,17 @@ export const getTodayMobileTasks = async (actor: AuthenticatedUser) => {
   const tasks: any[] = [];
   for (const row of rows) {
     const animal = normalizeAnimal(row);
-    const lastFeed = recentEntry(animal.logs.feeds);
+    const lastFeed = recentAcceptedFeedEntry(animal.logs.feeds);
     const lastWater = recentEntry(animal.logs.water);
     const lastClean = recentEntry(animal.logs.cleanings);
     const lastShed = recentEntry(animal.logs.sheds);
     const feedDays = daysSince(lastFeed?.date || lastFeed?.createdAt);
+    const feedInterval = feedCycleIntervalDays(animal);
     const waterDays = daysSince(lastWater?.date || lastWater?.createdAt);
     const cleanDays = daysSince(lastClean?.date || lastClean?.createdAt);
     const shedDays = daysSince(lastShed?.date || lastShed?.createdAt);
     const base = { animalId: animal.appAnimalId, name: animal.name, location: [animal.room, animal.rack, animal.tub].filter(Boolean).join(" / ") };
-    if (feedDays === null || feedDays >= 7) tasks.push({ ...base, id: `feed-${animal.appAnimalId}`, type: "Feed", dueStatus: feedDays === null ? "no record" : `${feedDays} days` });
+    if (feedInterval && lastFeed && feedDays !== null && feedDays >= feedInterval) tasks.push({ ...base, id: `feed-${animal.appAnimalId}`, type: "Feed", dueStatus: `${feedDays} / ${feedInterval} days` });
     if (waterDays === null || waterDays >= 3) tasks.push({ ...base, id: `water-${animal.appAnimalId}`, type: "Water", dueStatus: waterDays === null ? "no record" : `${waterDays} days` });
     if (cleanDays === null || cleanDays >= 14) tasks.push({ ...base, id: `clean-${animal.appAnimalId}`, type: "Clean", dueStatus: cleanDays === null ? "no record" : `${cleanDays} days` });
     if (shedDays !== null && shedDays >= 35) tasks.push({ ...base, id: `shed-${animal.appAnimalId}`, type: "Shed check", dueStatus: `${shedDays} days` });
@@ -295,17 +319,20 @@ export const getRackMode = async (actor: AuthenticatedUser) => {
       roomName,
       racks: Array.from(racks.entries()).map(([rackName, rackAnimals]) => ({
         rackName,
-        tubs: rackAnimals.map((animal) => ({
-          tub: animal.tub || animal.appAnimalId,
-          animalId: animal.appAnimalId,
-          name: animal.name,
-          occupied: true,
-          alert: animal.badges.includes("health alert"),
-          feedingDue: !recentEntry(animal.logs.feeds) || (daysSince(recentEntry(animal.logs.feeds)?.date) || 0) >= 7,
-          cleaningDue: !recentEntry(animal.logs.cleanings) || (daysSince(recentEntry(animal.logs.cleanings)?.date) || 0) >= 14,
-          shed: animal.badges.includes("shedding"),
-          paired: animal.badges.includes("paired"),
-        })),
+        tubs: rackAnimals.map((animal) => {
+          const lastFeed = recentAcceptedFeedEntry(animal.logs.feeds);
+          return {
+            tub: animal.tub || animal.appAnimalId,
+            animalId: animal.appAnimalId,
+            name: animal.name,
+            occupied: true,
+            alert: animal.badges.includes("health alert"),
+            feedingDue: isFeedDue(animal, lastFeed),
+            cleaningDue: !recentEntry(animal.logs.cleanings) || (daysSince(recentEntry(animal.logs.cleanings)?.date) || 0) >= 14,
+            shed: animal.badges.includes("shedding"),
+            paired: animal.badges.includes("paired"),
+          };
+        }),
       })),
     })),
   };

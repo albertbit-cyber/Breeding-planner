@@ -876,7 +876,7 @@
   "setup.aliases.import.failedMorphAliases": "Alias-JSON konnte nicht importiert werden.",
   "setup.aliases.import.failedGeneAliases": "Gen-Alias-JSON konnte nicht importiert werden.",
   "feedPrep.open": "Futtervorbereitung",
-  "feedPrep.profileTitle": "Normales Futter",
+  "feedPrep.profileTitle": "Fütterungszyklus",
   "feedPrep.foodType": "Futtertyp",
   "feedPrep.sizeClass": "Groesse / Gewichtsklasse",
   "feedPrep.weightGrams": "Gewicht (g)",
@@ -904,5 +904,9 @@
   "feedPrep.selectionHint": "Fehlende Profile werden angezeigt, aber nicht in die Summen eingerechnet.",
   "feedPrep.missingProfile": "Futterdaten fehlen",
   "feedPrep.editSnake": "Bearbeiten",
-  "feedPrep.noSnakes": "Keine Schlangen verfuegbar."
+  "feedPrep.noSnakes": "Keine Schlangen verfuegbar.",
+  "feedPrep.intervalDays": "Intervall (Tage)",
+  "feedPrep.intervalHelp": "Erinnerung beginnt nach dem ersten akzeptierten Fütterungsprotokoll.",
+  "calendar.feedDue": "Fütterung fällig: {{name}}",
+  "calendar.feedDueEvery": "Alle {{count}} Tage"
 }

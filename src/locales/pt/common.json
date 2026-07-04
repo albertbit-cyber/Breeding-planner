@@ -840,7 +840,7 @@
   "setup.aliases.import.failedMorphAliases": "Falha ao importar JSON de alias.",
   "setup.aliases.import.failedGeneAliases": "Falha ao importar JSON de alias de genes.",
   "feedPrep.open": "Preparar alimento",
-  "feedPrep.profileTitle": "Alimento normal",
+  "feedPrep.profileTitle": "Ciclo de alimentação",
   "feedPrep.foodType": "Tipo de alimento",
   "feedPrep.sizeClass": "Tamanho / classe de peso",
   "feedPrep.weightGrams": "Peso (g)",
@@ -868,5 +868,9 @@
   "feedPrep.selectionHint": "Perfis incompletos aparecem, mas ficam fora dos totais.",
   "feedPrep.missingProfile": "Dados de alimento ausentes",
   "feedPrep.editSnake": "Editar",
-  "feedPrep.noSnakes": "Nenhuma cobra disponivel."
+  "feedPrep.noSnakes": "Nenhuma cobra disponivel.",
+  "feedPrep.intervalDays": "Intervalo (dias)",
+  "feedPrep.intervalHelp": "O lembrete começa após o primeiro registro de alimentação aceito.",
+  "calendar.feedDue": "Alimentação prevista: {{name}}",
+  "calendar.feedDueEvery": "A cada {{count}} dias"
 }

@@ -840,7 +840,7 @@
   "setup.aliases.import.failedMorphAliases": "Echec de l import du JSON des alias.",
   "setup.aliases.import.failedGeneAliases": "Echec de l import du JSON des alias de genes.",
   "feedPrep.open": "Preparation repas",
-  "feedPrep.profileTitle": "Proie habituelle",
+  "feedPrep.profileTitle": "Cycle d'alimentation",
   "feedPrep.foodType": "Type de proie",
   "feedPrep.sizeClass": "Taille / classe de poids",
   "feedPrep.weightGrams": "Poids (g)",
@@ -868,5 +868,9 @@
   "feedPrep.selectionHint": "Les profils incomplets sont listes mais exclus des totaux.",
   "feedPrep.missingProfile": "Donnees de proie manquantes",
   "feedPrep.editSnake": "Modifier",
-  "feedPrep.noSnakes": "Aucun serpent disponible."
+  "feedPrep.noSnakes": "Aucun serpent disponible.",
+  "feedPrep.intervalDays": "Intervalle (jours)",
+  "feedPrep.intervalHelp": "Le rappel commence après le premier journal d'alimentation accepté.",
+  "calendar.feedDue": "Repas à prévoir : {{name}}",
+  "calendar.feedDueEvery": "Tous les {{count}} jours"
 }
