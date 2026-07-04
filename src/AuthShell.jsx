@@ -93,7 +93,9 @@ export default function AppShell() {
     return (
       <AppearanceProvider>
         <SharedBackendProvider>
-          <MobileApp />
+          <BatchOrderProvider>
+            <MobileApp />
+          </BatchOrderProvider>
         </SharedBackendProvider>
       </AppearanceProvider>
     );

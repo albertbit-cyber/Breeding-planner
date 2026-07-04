@@ -53,6 +53,78 @@ const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: numb
   return textValue(record.id) || textValue(record.appId) || `${fallbackPrefix}-${index + 1}`;
 };
 
+const isoDateValue = (value: unknown): string | null => {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  const text = textValue(value);
+  if (!text) return null;
+  const parsed = new Date(text);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+};
+
+const withBackendSyncMetadata = (row: { payload: unknown; createdAt?: unknown; updatedAt?: unknown }) => {
+  const payload = asRecord(row.payload);
+  if (!payload) return row.payload;
+
+  const createdAt = isoDateValue(row.createdAt);
+  const updatedAt = isoDateValue(row.updatedAt);
+  const payloadMetadata = asRecord(payload.metadata);
+  const result: JsonRecord = { ...payload };
+
+  if (!textValue(result.createdAt) && createdAt) result.createdAt = createdAt;
+  if (updatedAt) {
+    result.updatedAt = updatedAt;
+  } else if (!textValue(result.updatedAt) && createdAt) {
+    result.updatedAt = createdAt;
+  }
+
+  const metadata: JsonRecord = payloadMetadata ? { ...payloadMetadata } : {};
+  if (createdAt) metadata.backendCreatedAt = createdAt;
+  if (updatedAt) {
+    metadata.backendUpdatedAt = updatedAt;
+    metadata.updatedAt = updatedAt;
+  }
+  if (payloadMetadata || Object.keys(metadata).length) result.metadata = metadata;
+
+  return result;
+};
+
+const timestampMs = (value: unknown): number => {
+  const iso = isoDateValue(value);
+  return iso ? new Date(iso).getTime() : 0;
+};
+
+const payloadUpdatedAtMs = (payload: JsonRecord | null): number => {
+  if (!payload) return 0;
+  const metadata = asRecord(payload.metadata);
+  return Math.max(
+    timestampMs(payload.updatedAt),
+    timestampMs(payload.modifiedAt),
+    timestampMs(payload.lastModifiedAt),
+    timestampMs(payload.createdAt),
+    timestampMs(metadata?.updatedAt),
+    timestampMs(metadata?.modifiedAt),
+    timestampMs(metadata?.backendUpdatedAt),
+    timestampMs(metadata?.backendCreatedAt),
+  );
+};
+
+const rowUpdatedAtMs = (row: { payload?: unknown; updatedAt?: unknown } | null): number => {
+  if (!row) return 0;
+  return Math.max(timestampMs(row.updatedAt), payloadUpdatedAtMs(asRecord(row.payload)));
+};
+
+const shouldApplyIncomingPayload = (
+  incoming: JsonRecord,
+  existing: { payload?: unknown; updatedAt?: unknown } | null,
+): boolean => {
+  if (!existing) return true;
+  const existingTimestamp = rowUpdatedAtMs(existing);
+  if (!existingTimestamp) return true;
+  const incomingTimestamp = payloadUpdatedAtMs(incoming);
+  if (!incomingTimestamp) return false;
+  return incomingTimestamp >= existingTimestamp;
+};
+
 const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   const clutch = asRecord(pairing.clutch);
   if (!clutch) return null;
@@ -193,9 +265,9 @@ export const listBreederSnapshot = async (ownerId: string) => {
   ]);
 
   return {
-    animals: animals.map((row: any) => row.payload),
-    pairings: pairings.map((row: any) => row.payload),
-    clutches: clutches.map((row: any) => row.payload),
+    animals: animals.map(withBackendSyncMetadata),
+    pairings: pairings.map(withBackendSyncMetadata),
+    clutches: clutches.map(withBackendSyncMetadata),
   };
 };
 
@@ -222,78 +294,101 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   await db.$transaction(async (tx: any) => {
     for (const [index, animal] of animals.entries()) {
       const appAnimalId = requireRecordId(animal, "animal", index);
-      await tx.animal.upsert({
+      const existing = await tx.animal.findUnique({
         where: { ownerId_appAnimalId: { ownerId, appAnimalId } },
-        create: {
-          ownerId,
-          appAnimalId,
-          name: textValue(animal.name),
-          sex: textValue(animal.sex),
-          status: textValue(animal.status),
-          payload: animal,
-        },
-        update: {
-          name: textValue(animal.name),
-          sex: textValue(animal.sex),
-          status: textValue(animal.status),
-          payload: animal,
-        },
+        select: { id: true, payload: true, updatedAt: true },
       });
+      const data = {
+        name: textValue(animal.name),
+        sex: textValue(animal.sex),
+        status: textValue(animal.status),
+        payload: animal,
+      };
+      if (!existing) {
+        await tx.animal.create({
+          data: {
+            ownerId,
+            appAnimalId,
+            ...data,
+          },
+        });
+      } else if (shouldApplyIncomingPayload(animal, existing)) {
+        await tx.animal.update({
+          where: { id: existing.id },
+          data,
+        });
+      }
     }
 
     const pairingRowsByAppId = new Map<string, string>();
     for (const [index, pairing] of pairings.entries()) {
       const appPairingId = requireRecordId(pairing, "pairing", index);
-      const row = await tx.pairing.upsert({
+      const existing = await tx.pairing.findUnique({
         where: { ownerId_appPairingId: { ownerId, appPairingId } },
-        create: {
-          ownerId,
-          appPairingId,
-          label: textValue(pairing.label),
-          maleAnimalAppId: textValue(pairing.maleId),
-          femaleAnimalAppId: textValue(pairing.femaleId),
-          status: textValue(pairing.status),
-          startDate: textValue(pairing.startDate),
-          payload: pairing,
-        },
-        update: {
-          label: textValue(pairing.label),
-          maleAnimalAppId: textValue(pairing.maleId),
-          femaleAnimalAppId: textValue(pairing.femaleId),
-          status: textValue(pairing.status),
-          startDate: textValue(pairing.startDate),
-          payload: pairing,
-        },
+        select: { id: true, payload: true, updatedAt: true },
       });
+      const data = {
+        label: textValue(pairing.label),
+        maleAnimalAppId: textValue(pairing.maleId),
+        femaleAnimalAppId: textValue(pairing.femaleId),
+        status: textValue(pairing.status),
+        startDate: textValue(pairing.startDate),
+        payload: pairing,
+      };
+      const row = !existing
+        ? await tx.pairing.create({
+          data: {
+            ownerId,
+            appPairingId,
+            ...data,
+          },
+        })
+        : shouldApplyIncomingPayload(pairing, existing)
+          ? await tx.pairing.update({
+            where: { id: existing.id },
+            data,
+          })
+          : existing;
       pairingRowsByAppId.set(appPairingId, row.id);
     }
 
     for (const [index, clutch] of clutches.entries()) {
       const appClutchId = requireRecordId(clutch, "clutch", index);
       const pairingAppId = textValue(clutch.pairingAppId) || textValue(clutch.pairingId);
-      await tx.clutch.upsert({
+      const existing = await tx.clutch.findUnique({
         where: { ownerId_appClutchId: { ownerId, appClutchId } },
-        create: {
-          ownerId,
-          pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
-          appClutchId,
-          clutchNumber: numberValue(clutch.clutchNumber),
-          seasonYear: numberValue(clutch.seasonYear),
-          laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
-          payload: clutch,
-        },
-        update: {
-          pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || undefined : undefined,
-          clutchNumber: numberValue(clutch.clutchNumber),
-          seasonYear: numberValue(clutch.seasonYear),
-          laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
-          payload: clutch,
-        },
+        select: { id: true, payload: true, updatedAt: true },
       });
+      const data = {
+        pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
+        clutchNumber: numberValue(clutch.clutchNumber),
+        seasonYear: numberValue(clutch.seasonYear),
+        laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
+        payload: clutch,
+      };
+      if (!existing) {
+        await tx.clutch.create({
+          data: {
+            ownerId,
+            appClutchId,
+            ...data,
+          },
+        });
+      } else if (shouldApplyIncomingPayload(clutch, existing)) {
+        await tx.clutch.update({
+          where: { id: existing.id },
+          data: {
+            ...data,
+            pairingId: data.pairingId || undefined,
+          },
+        });
+      }
     }
   }, SNAPSHOT_TRANSACTION_OPTIONS);
 
-  await syncMarketplaceAutoListings(ownerId, animals).catch((error) => {
+  const savedSnapshot = await listBreederSnapshot(ownerId);
+
+  await syncMarketplaceAutoListings(ownerId, savedSnapshot.animals as JsonRecord[]).catch((error) => {
     if (isOptionalBackendSchemaError(error)) {
       console.warn("[breeder-sync] marketplace listing schema unavailable; skipped auto-listing sync.", error);
       return;
@@ -303,9 +398,13 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
 
   // Ingest reproductive events from all female pairings into the intelligence tables.
   // Fire-and-forget: don't let ingestion failures block the snapshot response.
-  ingestAllPairingsIntoReproductiveCycles(ownerId, pairings, clutches).catch((err) => {
+  ingestAllPairingsIntoReproductiveCycles(
+    ownerId,
+    savedSnapshot.pairings as JsonRecord[],
+    savedSnapshot.clutches as JsonRecord[],
+  ).catch((err) => {
     console.error("[reproductive] ingestion error:", err);
   });
 
-  return listBreederSnapshot(ownerId);
+  return savedSnapshot;
 };

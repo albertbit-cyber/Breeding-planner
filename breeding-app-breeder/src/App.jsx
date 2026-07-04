@@ -2636,6 +2636,7 @@ function getSyncTimestamp(value) {
     value?.createdAt,
     value?.metadata?.updatedAt,
     value?.metadata?.modifiedAt,
+    value?.metadata?.backendUpdatedAt,
   ];
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -2751,6 +2752,68 @@ function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
   return {
     snakes: mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord),
     pairings: mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing'),
+  };
+}
+
+function buildSyncRecordMap(items = [], sanitizer, fallbackPrefix) {
+  const map = new Map();
+  (Array.isArray(items) ? items : []).forEach((item, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return;
+    map.set(getSyncRecordKey(sanitized, fallbackPrefix, index), sanitized);
+  });
+  return map;
+}
+
+function syncComparableRecord(record) {
+  if (!record || typeof record !== 'object') return record;
+  const clone = { ...record };
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    const metadata = { ...clone.metadata };
+    delete metadata.backendCreatedAt;
+    delete metadata.backendUpdatedAt;
+    clone.metadata = metadata;
+  }
+  return clone;
+}
+
+function stampChangedSyncRecords(items = [], baselineItems = [], sanitizer, fallbackPrefix) {
+  const baselineMap = buildSyncRecordMap(baselineItems, sanitizer, fallbackPrefix);
+  return (Array.isArray(items) ? items : []).map((item, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return item;
+    const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+    const baseline = baselineMap.get(key);
+    if (!baseline) return sanitized;
+    if (JSON.stringify(syncComparableRecord(sanitized)) === JSON.stringify(syncComparableRecord(baseline))) {
+      return sanitized;
+    }
+    const updatedAt = nowIsoString();
+    return {
+      ...sanitized,
+      updatedAt,
+      metadata: {
+        ...(sanitized.metadata && typeof sanitized.metadata === 'object' ? sanitized.metadata : {}),
+        updatedAt,
+      },
+    };
+  });
+}
+
+function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) {
+  return {
+    snakes: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [],
+      Array.isArray(baselineSnapshot.snakes) ? baselineSnapshot.snakes : [],
+      sanitizeSnakeRecord,
+      'animal'
+    ),
+    pairings: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [],
+      Array.isArray(baselineSnapshot.pairings) ? baselineSnapshot.pairings : [],
+      sanitizePairingRecord,
+      'pairing'
+    ),
   };
 }
 
@@ -6179,6 +6242,8 @@ export default function BreedingPlannerApp() {
     lastSavedSignature: '',
   });
   const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const cloudBaselineSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const cloudSaveRequestIdRef = useRef(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
     lastSyncedAt: null,
@@ -6522,7 +6587,10 @@ export default function BreedingPlannerApp() {
     if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
 
     try {
-      const localSnapshot = latestPlannerSnapshotRef.current;
+      const localSnapshot = stampChangedSnapshotForSync(
+        latestPlannerSnapshotRef.current,
+        cloudBaselineSnapshotRef.current
+      );
       const snapshot = await fetchBreederSnapshot();
       const backendSnapshot = {
         snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
@@ -6541,6 +6609,7 @@ export default function BreedingPlannerApp() {
       backendPlannerSyncRef.current.seeded = true;
       backendPlannerSyncRef.current.status = 'ready';
       backendPlannerSyncRef.current.lastSavedSignature = signature;
+      cloudBaselineSnapshotRef.current = merged;
       setCloudSyncStatus({
         state: 'success',
         lastSyncedAt: syncedAt,
@@ -6988,23 +7057,53 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
-    if (backendPlannerSyncRef.current.status !== 'ready' || !backendPlannerSyncRef.current.seeded) return;
+    if (!backendPlannerSyncRef.current.seeded) return;
 
     const signature = JSON.stringify({ snakes, pairings });
-    if (signature === backendPlannerSyncRef.current.lastSavedSignature) return;
+    const saveRequestId = ++cloudSaveRequestIdRef.current;
+    if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
+      backendPlannerSyncRef.current.status = 'ready';
+      return;
+    }
 
     const saveTimer = setTimeout(() => {
-      saveBreederSnapshot(prepareSnapshotForBackend(snakes, pairings))
+      if (saveRequestId !== cloudSaveRequestIdRef.current) return;
+      backendPlannerSyncRef.current.status = 'loading';
+      const localSnapshot = stampChangedSnapshotForSync(
+        { snakes, pairings },
+        cloudBaselineSnapshotRef.current
+      );
+
+      fetchBreederSnapshot()
+        .then((snapshot) => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
+          const backendSnapshot = {
+            snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
+            pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
+          };
+          const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
+          setSnakes(merged.snakes);
+          setPairings(merged.pairings);
+          latestPlannerSnapshotRef.current = merged;
+          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+        })
         .then(() => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
           const syncedAt = new Date().toISOString();
-          backendPlannerSyncRef.current.lastSavedSignature = signature;
+          const currentSnapshot = latestPlannerSnapshotRef.current;
+          const currentSignature = JSON.stringify(currentSnapshot);
+          backendPlannerSyncRef.current.status = 'ready';
+          backendPlannerSyncRef.current.lastSavedSignature = currentSignature;
+          cloudBaselineSnapshotRef.current = currentSnapshot;
           setCloudSyncStatus({
             state: 'success',
             lastSyncedAt: syncedAt,
-            message: `Saved ${snakes.length} snakes and ${pairings.length} pairings to the cloud database.`,
+            message: `Saved ${currentSnapshot.snakes.length} snakes and ${currentSnapshot.pairings.length} pairings to the cloud database.`,
           });
         })
         .catch((error) => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
+          backendPlannerSyncRef.current.status = 'ready';
           setCloudSyncStatus(prev => ({
             ...prev,
             state: 'error',
@@ -7014,7 +7113,9 @@ export default function BreedingPlannerApp() {
         });
     }, 600);
 
-    return () => clearTimeout(saveTimer);
+    return () => {
+      clearTimeout(saveTimer);
+    };
   }, [electronDataReady, pairings, sharedBreederDataReady, snakes]);
 
   useEffect(() => {

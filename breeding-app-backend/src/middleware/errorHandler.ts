@@ -30,6 +30,15 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
     return;
   }
 
+  if (error instanceof Error && (
+    error.name === "JsonWebTokenError" ||
+    error.name === "TokenExpiredError" ||
+    error.name === "NotBeforeError"
+  )) {
+    res.status(401).json({ message: "Session expired. Please log in again." });
+    return;
+  }
+
   const prismaCode = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
   if (prismaCode === "P2021" || prismaCode === "P2022") {
     console.error("Database schema error:", error);

@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd breeding-app-breeder && npm install --omit=optional && npm run build"
+buildCommand = "cd breeding-app-breeder && npm install --no-audit --no-fund && npm run build"
 
 [deploy]
 startCommand = "cd breeding-app-breeder && npx serve -s build -l ${PORT:-3000}"
