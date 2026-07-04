@@ -211,7 +211,7 @@ function ActionSheet({ title, onClose, children }) {
         <div className="mbl-sheet-handle" />
         <div className="mbl-sheet-head">
           <h2>{title}</h2>
-          <button type="button" className="mbl-icon-btn" onClick={onClose} aria-label="Close">ג•</button>
+          <button type="button" className="mbl-icon-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="mbl-sheet-body">{children}</div>
       </div>
@@ -267,7 +267,7 @@ function LoginScreen({ onLogin }) {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="ג€¢ג€¢ג€¢ג€¢ג€¢ג€¢ג€¢ג€¢"
+              placeholder="••••••••"
               disabled={busy}
             />
           </label>
@@ -310,9 +310,9 @@ function ModeSelectScreen({ user, onMode, onSignOut }) {
           className="mbl-mode-card mbl-mode-card--full"
           onClick={() => onMode("full")}
         >
-          <span className="mbl-mode-icon">ג˜°</span>
+          <span className="mbl-mode-icon">≡</span>
           <strong>Full Access</strong>
-          <span>Animals, pairings, tasks, rack mode and more ג€” full desktop features on mobile.</span>
+          <span>Animals, pairings, tasks, rack mode and more — full desktop features on mobile.</span>
         </button>
       </div>
     </div>
@@ -434,7 +434,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
           <span>{label}</span>
           {type === "select" ? (
             <select value={draft[key]} onChange={set(key)}>
-              {opts.map((o) => <option key={o} value={o}>{o || "ג€” not set ג€”"}</option>)}
+              {opts.map((o) => <option key={o} value={o}>{o || "— not set —"}</option>)}
             </select>
           ) : type === "textarea" ? (
             <textarea rows={3} value={draft[key]} onChange={set(key)} />
@@ -525,7 +525,7 @@ function NoteModal({ animal, onSave, onClose }) {
       <textarea className="mbl-note-area" rows={5} value={note}
         onChange={(e) => setNote(e.target.value)} placeholder="Type or use voice…" />
       <div className="mbl-edit-actions">
-        <button type="button" className="mbl-btn" onClick={startVoice}>נ₪ Voice</button>
+        <button type="button" className="mbl-btn" onClick={startVoice}>🎤 Voice</button>
         <button type="button" className="mbl-btn mbl-btn--primary"
           onClick={() => onSave({ animalId: animal.appAnimalId, note })}>
           Save note
@@ -542,7 +542,7 @@ function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, bu
   return (
     <ActionSheet title="Photos" onClose={onClose}>
       <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={onTakePhoto} disabled={busy}>
-        {busy ? <Spinner /> : "נ“· Take Photo"}
+        {busy ? <Spinner /> : "📷 Take Photo"}
       </button>
       {photos.length > 0 ? (
         <div className="mbl-photo-grid">
@@ -556,7 +556,7 @@ function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, bu
                   onClick={() => onSetIcon(photo.url)}
                   disabled={busy || currentIcon === photo.url}
                 >
-                  {currentIcon === photo.url ? "ג“ Icon" : "Set as icon"}
+                  {currentIcon === photo.url ? "✓ Icon" : "Set as icon"}
                 </button>
                 <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
                   onClick={() => onDeletePhoto(photo.id)} disabled={busy}>
@@ -608,7 +608,7 @@ function FullScreenPanel({ title, onClose, children }) {
   return (
     <section className="mbl-profile">
       <div className="mbl-profile-topbar">
-        <button type="button" className="mbl-back-btn" onClick={onClose}>ג† Back</button>
+        <button type="button" className="mbl-back-btn" onClick={onClose}>← Back</button>
         <span className="mbl-profile-topbar-name">{title}</span>
         <div style={{ width: 56 }} />
       </div>
@@ -631,7 +631,7 @@ const addDays = (ds, n) => {
 };
 
 const fmtDate = (ds) => {
-  if (!ds) return "ג€”";
+  if (!ds) return "—";
   try {
     return new Date(`${ds}T12:00:00`).toLocaleDateString(undefined, {
       month: "short", day: "numeric", year: "numeric",
@@ -703,17 +703,17 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
           <label className="mbl-field">
             <span>Total eggs</span>
             <input type="number" inputMode="numeric" value={eggsTotal}
-              onChange={(e) => setEggsTotal(e.target.value)} placeholder="ג€”" />
+              onChange={(e) => setEggsTotal(e.target.value)} placeholder="—" />
           </label>
           <label className="mbl-field">
             <span>Fertile eggs</span>
             <input type="number" inputMode="numeric" value={fertileEggs}
-              onChange={(e) => setFertileEggs(e.target.value)} placeholder="ג€”" />
+              onChange={(e) => setFertileEggs(e.target.value)} placeholder="—" />
           </label>
           <label className="mbl-field">
             <span>Slugs</span>
             <input type="number" inputMode="numeric" value={slugs}
-              onChange={(e) => setSlugs(e.target.value)} placeholder="ג€”" />
+              onChange={(e) => setSlugs(e.target.value)} placeholder="—" />
           </label>
         </>
       )}
@@ -721,7 +721,7 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
         <label className="mbl-field">
           <span>Hatchlings</span>
           <input type="number" inputMode="numeric" value={hatchedCount}
-            onChange={(e) => setHatchedCount(e.target.value)} placeholder="ג€”" />
+            onChange={(e) => setHatchedCount(e.target.value)} placeholder="—" />
         </label>
       )}
       <label className="mbl-field">
@@ -778,9 +778,9 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
   };
 
   // Countdown strings from most-recent logged date per stage
-  const ovCd = latestOv?.date ? `Expected pre-lay shed: ${fmtDate(addDays(latestOv.date, 14))} ג€“ ${fmtDate(addDays(latestOv.date, 28))}` : null;
-  const plCd = latestPl?.date ? `Expected lay: ${fmtDate(addDays(latestPl.date, 14))} ג€“ ${fmtDate(addDays(latestPl.date, 28))}` : null;
-  const clCd = latestCl?.date ? `Expected hatch: ${fmtDate(addDays(latestCl.date, 55))} ג€“ ${fmtDate(addDays(latestCl.date, 65))}` : null;
+  const ovCd = latestOv?.date ? `Expected pre-lay shed: ${fmtDate(addDays(latestOv.date, 14))} – ${fmtDate(addDays(latestOv.date, 28))}` : null;
+  const plCd = latestPl?.date ? `Expected lay: ${fmtDate(addDays(latestPl.date, 14))} – ${fmtDate(addDays(latestPl.date, 28))}` : null;
+  const clCd = latestCl?.date ? `Expected hatch: ${fmtDate(addDays(latestCl.date, 55))} – ${fmtDate(addDays(latestCl.date, 65))}` : null;
 
   const stages = [
     { key: "ovulation",  label: "Ovulation",    logs: ovLogs, latest: latestOv, countdown: ovCd },
@@ -797,7 +797,7 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
         <div>
           <strong>{pairing.label || `Pairing ${(pairing.id || "").slice(-6)}`}</strong>
           <small className="mbl-bp-meta">
-            {isFemale ? "Female" : "Male"} ֲ· Partner: {partnerName}
+            {isFemale ? "Female" : "Male"} · Partner: {partnerName}
           </small>
         </div>
         <span className={`mbl-bp-status ${statusCls}`}>{pairing.status || "Unknown"}</span>
@@ -815,7 +815,7 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
               </div>
               <div className="mbl-cs-right">
                 {logs.length > 0 && <span className="mbl-cs-badge">{logs.length}</span>}
-                <span>{openStage === key ? "ג–²" : "ג–¼"}</span>
+                <span>{openStage === key ? "▲" : "▼"}</span>
               </div>
             </button>
 
@@ -921,14 +921,14 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
   };
 
   const quickActions = [
-    { label: "Feed",       icon: "נ–", action: "feed"       },
-    { label: "Weight",     icon: "ג–ן¸", action: "weight"     },
-    { label: "Shed",       icon: "נ", action: "shed"       },
-    { label: "Clean",      icon: "נ§¹", action: "clean"      },
-    { label: "Water",      icon: "נ’§", action: "water"      },
-    { label: "Note",       icon: "נ“", action: "note"       },
-    { label: "Photo",      icon: "נ“·", action: "photo"      },
-    { label: "Order Test", icon: "נ§¬", action: "order-test" },
+    { label: "Feed",       icon: "🍗", action: "feed"       },
+    { label: "Weight",     icon: "⚖", action: "weight"     },
+    { label: "Shed",       icon: "🐍", action: "shed"       },
+    { label: "Clean",      icon: "🧹", action: "clean"      },
+    { label: "Water",      icon: "💧", action: "water"      },
+    { label: "Note",       icon: "📝", action: "note"       },
+    { label: "Photo",      icon: "📷", action: "photo"      },
+    { label: "Order Test", icon: "🧬", action: "order-test" },
   ];
 
   const statusColor = STATUS_COLORS[(animal?.status || "").toLowerCase()] || "gray";
@@ -936,7 +936,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
   return (
     <section className="mbl-profile">
       <div className="mbl-profile-topbar">
-        <button type="button" className="mbl-back-btn" onClick={onBack}>ג† Back</button>
+        <button type="button" className="mbl-back-btn" onClick={onBack}>← Back</button>
         <span className="mbl-profile-topbar-name">{animal.name || animal.appAnimalId}</span>
         <div style={{ width: 56 }} />
       </div>
@@ -985,15 +985,15 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
           <div className="mbl-data-grid">
             <div className="mbl-data-card">
               <span>Last feed</span>
-              <strong>{latestFeed ? `${latestFeed.result || "fed"} ֲ· ${latestFeed.food || ""}` : "ג€”"}</strong>
+              <strong>{latestFeed ? `${latestFeed.result || "fed"} · ${latestFeed.food || ""}` : "—"}</strong>
             </div>
             <div className="mbl-data-card">
               <span>Weight</span>
-              <strong>{latestWeight ? `${latestWeight.grams ?? animal.weight} g` : `${animal.weight || "ג€”"} g`}</strong>
+              <strong>{latestWeight ? `${latestWeight.grams ?? animal.weight} g` : `${animal.weight || "—"} g`}</strong>
             </div>
             <div className="mbl-data-card">
               <span>Last shed</span>
-              <strong>{latestShed ? latestShed.result || latestShed.date : "ג€”"}</strong>
+              <strong>{latestShed ? latestShed.result || latestShed.date : "—"}</strong>
             </div>
             <div className="mbl-data-card">
               <span>Breeding</span>
@@ -1014,10 +1014,10 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
       {subtab === "logs" && (
         <div className="mbl-log-list">
           {[
-            ...(logs.feeds   || []).map((e) => ({ ...e, type: "Feed",   typeIcon: "נ–" })),
-            ...(logs.weights || []).map((e) => ({ ...e, type: "Weight", typeIcon: "ג–ן¸" })),
-            ...(logs.sheds   || []).map((e) => ({ ...e, type: "Shed",   typeIcon: "נ" })),
-            ...(logs.notes   || []).map((e) => ({ ...e, type: "Note",   typeIcon: "נ“" })),
+            ...(logs.feeds   || []).map((e) => ({ ...e, type: "Feed",   typeIcon: "🍗" })),
+            ...(logs.weights || []).map((e) => ({ ...e, type: "Weight", typeIcon: "⚖" })),
+            ...(logs.sheds   || []).map((e) => ({ ...e, type: "Shed",   typeIcon: "🐍" })),
+            ...(logs.notes   || []).map((e) => ({ ...e, type: "Note",   typeIcon: "📝" })),
           ]
             .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")))
             .slice(0, 50)
@@ -1038,7 +1038,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
       {subtab === "photos" && (
         <div className="mbl-photo-panel">
           <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={handleTakePhoto} disabled={photoBusy}>
-            {photoBusy ? <Spinner /> : "נ“· Take Photo"}
+            {photoBusy ? <Spinner /> : "📷 Take Photo"}
           </button>
           {(animal.photos || []).length > 0 ? (
             <div className="mbl-photo-grid">
@@ -1050,7 +1050,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
                       className={`mbl-btn mbl-btn--sm ${animal.imageUrl === photo.url ? "mbl-btn--icon-active" : ""}`}
                       onClick={() => onSetIcon(photo.url)}
                       disabled={photoBusy || animal.imageUrl === photo.url}>
-                      {animal.imageUrl === photo.url ? "ג“ Icon" : "Set icon"}
+                      {animal.imageUrl === photo.url ? "✓ Icon" : "Set icon"}
                     </button>
                     <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
                       onClick={() => onDeletePhoto(photo.id)} disabled={photoBusy}>
@@ -1118,7 +1118,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     // Parse the animal ID out of the full QR URL (e.g. https://…#snake=<id>)
     const animalId = parseQrValue(raw);
 
-    // Try local lookup first ג€” no backend tier check needed
+    // Try local lookup first — no backend tier check needed
     const local = localAnimals.find(
       (a) => a.id === animalId || a.appAnimalId === animalId
     );
@@ -1278,7 +1278,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   return (
     <div className="mbl-shell">
       <div className="mbl-terminal-topbar">
-        <button type="button" className="mbl-text-btn" onClick={onSwitchMode}>ג‡„ Switch mode</button>
+        <button type="button" className="mbl-text-btn" onClick={onSwitchMode}>⇄ Switch mode</button>
         <span className="mbl-terminal-badge">TERMINAL</span>
         <button type="button" className="mbl-text-btn" onClick={onSignOut}>Sign out</button>
       </div>
@@ -1325,7 +1325,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         <div className="mbl-terminal-card">
           <div className="mbl-card-topbar">
             <button type="button" className="mbl-back-btn" onClick={() => { setScreen("scan"); setAnimal(null); setCardTab("edit"); }}>
-              ג† Back to scan
+              ← Back to scan
             </button>
             <span>{animal.name || animal.appAnimalId}</span>
           </div>
@@ -1336,13 +1336,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
               : <div className="mbl-avatar-placeholder mbl-avatar-lg">{String(animal.name || "?").slice(0, 1)}</div>}
             <div>
               <h2>{animal.name}</h2>
-              <p>{animal.sex || "ג€”"} ֲ· {animal.genetics || "No genetics"}</p>
+              <p>{animal.sex || "—"} · {animal.genetics || "No genetics"}</p>
               <small>{locationText(animal) || "No location"}</small>
             </div>
           </div>
 
           <div className="mbl-quick-actions mbl-quick-actions--card">
-            {[["Feed","feed"],["Weight","weight"],["Shed","shed"],["Clean","clean"],["Water","water"],["Note","note"],["נ“·","photo"]].map(
+            {[["Feed","feed"],["Weight","weight"],["Shed","shed"],["Clean","clean"],["Water","water"],["Note","note"],["📷","photo"]].map(
               ([label, type]) => (
                 <button key={type} type="button" className="mbl-quick-btn"
                   onClick={() => type === "photo" ? setPhotoModal(true) : startModal(type)}>
@@ -1388,18 +1388,18 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 }
 
 // ג”€ג”€ג”€ TASK CARD ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-const TASK_ICONS = { Feed: "נ–", Water: "נ’§", Clean: "נ§¹", Shed: "נ", Weight: "ג–ן¸" };
+const TASK_ICONS = { Feed: "🍗", Water: "💧", Clean: "🧹", Shed: "🐍", Weight: "⚖" };
 
 function TaskCard({ task, animalMap, onComplete, onOpen }) {
   const animal = animalMap?.get(task.animalId);
   const isDue = String(task.dueStatus || "").toLowerCase().includes("due");
   return (
     <div className={`mbl-task-card ${isDue ? "mbl-task-card--due" : ""}`}>
-      <div className="mbl-task-card-icon">{TASK_ICONS[task.type] || "ג“"}</div>
+      <div className="mbl-task-card-icon">{TASK_ICONS[task.type] || "✓"}</div>
       <div className="mbl-task-info">
         <strong>{task.type}</strong>
         <span>{animal?.name || task.animalId}</span>
-        <small>{[task.location, task.dueStatus].filter(Boolean).join(" ֲ· ") || "ג€”"}</small>
+        <small>{[task.location, task.dueStatus].filter(Boolean).join(" · ") || "—"}</small>
       </div>
       <div className="mbl-task-btns">
         <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--primary" onClick={() => onComplete(task, "done")}>Done</button>
@@ -1531,7 +1531,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     if (!online) {
       setQueue((prev) => [...prev, { id: `q-${Date.now()}`, actionType: type, payload, deviceId }]);
       setModal(null);
-      pushToast("Saved offline ג€” will sync when online.");
+      pushToast("Saved offline — will sync when online.");
       return;
     }
     try {
@@ -1693,9 +1693,9 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const navTabs = [
     { key: "animals",  label: "Animals",  icon: "🐍" },
     { key: "breeding", label: "Breeding", icon: "♥"  },
-    { key: "tasks",    label: "Tasks",    icon: "ג“"  },
+    { key: "tasks",    label: "Tasks",    icon: "✓"  },
     { key: "rack",     label: "Rack",     icon: "⬛" },
-    { key: "more",     label: "More",     icon: "ג˜°"  },
+    { key: "more",     label: "More",     icon: "≡"  },
   ];
 
   const switchTab = (key) => { setAnimal(null); setExpandedPairing(null); setMorePanel(null); setTab(key); };
@@ -1863,7 +1863,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                     </div>
                     <div className="mbl-pairing-header-right">
                       <span className={statusCls}>{pairing.status || "Unknown"}</span>
-                      <span className="mbl-pairing-chevron">{isExpanded ? "ג–²" : "ג–¼"}</span>
+                      <span className="mbl-pairing-chevron">{isExpanded ? "▲" : "▼"}</span>
                     </div>
                   </button>
                   <div className="mbl-pairing-progress">
@@ -1896,10 +1896,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         {/* ג”€ג”€ TASKS TAB ג”€ג”€ */}
         {!loading && !morePanel && tab === "tasks" && (
           <div className="mbl-screen">
-            {tasks.length === 0 && <p className="mbl-empty">No tasks for today. נ‰</p>}
+            {tasks.length === 0 && <p className="mbl-empty">No tasks for today. 🎉</p>}
             {taskGroups.overdue.length > 0 && (
               <>
-                <div className="mbl-section-label mbl-section-label--danger">ג  Overdue ({taskGroups.overdue.length})</div>
+                <div className="mbl-section-label mbl-section-label--danger">⚠ Overdue ({taskGroups.overdue.length})</div>
                 {taskGroups.overdue.map((t) => <TaskCard key={t.id} task={t} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
               </>
             )}
@@ -1934,7 +1934,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                           className={`mbl-tub ${tub.alert ? "is-alert" : ""} ${tub.feedingDue ? "is-feed" : ""} ${!tub.animalId ? "is-empty" : ""}`}
                           onClick={() => tub.animalId && openAnimal(tub.animalId)}>
                           <strong>{tub.tub}</strong>
-                          <small>{tub.name || (tub.animalId ? "ֲ·ֲ·ֲ·" : "Empty")}</small>
+                          <small>{tub.name || (tub.animalId ? "···" : "Empty")}</small>
                         </button>
                       ))}
                     </div>
