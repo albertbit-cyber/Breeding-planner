@@ -2743,6 +2743,63 @@ function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) 
   };
 }
 
+function normalizeBackendBreederSnapshot(snapshot = {}) {
+  return {
+    snakes: Array.isArray(snapshot?.animals) ? snapshot.animals.map(sanitizeSnakeRecord).filter(Boolean) : [],
+    pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings.map(sanitizePairingRecord).filter(Boolean) : [],
+  };
+}
+
+function syncRecordForLocalChangeCompare(record) {
+  if (!record || typeof record !== 'object') return record;
+  const clone = syncComparableRecord(record);
+  if (!clone || typeof clone !== 'object') return clone;
+  delete clone.updatedAt;
+  delete clone.modifiedAt;
+  delete clone.lastModifiedAt;
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    const metadata = { ...clone.metadata };
+    delete metadata.updatedAt;
+    delete metadata.modifiedAt;
+    delete metadata.lastModifiedAt;
+    delete metadata.backendCreatedAt;
+    delete metadata.backendUpdatedAt;
+    clone.metadata = metadata;
+  }
+  return clone;
+}
+
+function markLocalSyncRecordUpdated(record, updatedAt = nowIsoString()) {
+  if (!record || typeof record !== 'object') return record;
+  const metadata = record.metadata && typeof record.metadata === 'object' ? record.metadata : {};
+  return {
+    ...record,
+    updatedAt,
+    metadata: {
+      ...metadata,
+      updatedAt,
+    },
+  };
+}
+
+function stampLocallyChangedSyncRecords(nextItems = [], previousItems = [], sanitizer, fallbackPrefix) {
+  const previousMap = buildSyncRecordMap(previousItems, sanitizer, fallbackPrefix);
+  const updatedAt = nowIsoString();
+  return (Array.isArray(nextItems) ? nextItems : [])
+    .map((item, index) => {
+      const sanitized = sanitizer(item);
+      if (!sanitized) return null;
+      const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+      const previous = previousMap.get(key);
+      if (!previous) return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      if (JSON.stringify(syncRecordForLocalChangeCompare(sanitized)) !== JSON.stringify(syncRecordForLocalChangeCompare(previous))) {
+        return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      }
+      return sanitized;
+    })
+    .filter(Boolean);
+}
+
 function normalizeBackupFileEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const payload = raw.payload && typeof raw.payload === 'object' ? raw.payload : null;
@@ -6149,7 +6206,7 @@ export default function BreedingPlannerApp() {
   }), [resolvedAppearance]);
   // logs helpers are defined at module scope (updateLog, LogsEditor)
   // component state
-  const [snakes, setSnakes] = useState(() => {
+  const [snakes, setSnakesState] = useState(() => {
     // In Electron the bridge load-data effect (below) will overwrite this.
     // In browser mode there is no bridge, so seed from localStorage if available.
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
@@ -6160,11 +6217,29 @@ export default function BreedingPlannerApp() {
     }
     return createFreshSnakes();
   });
-  const [pairings, setPairings] = useState(() => {
+  const [pairings, setPairingsState] = useState(() => {
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
     if (bridge?.loadData) return createFreshPairings();
     return loadStoredPairingsForBrowser();
   });
+  const setSyncedSnakes = useCallback((nextSnakes) => {
+    setSnakesState(Array.isArray(nextSnakes) ? nextSnakes.map(sanitizeSnakeRecord).filter(Boolean) : []);
+  }, []);
+  const setSyncedPairings = useCallback((nextPairings) => {
+    setPairingsState(Array.isArray(nextPairings) ? nextPairings.map(sanitizePairingRecord).filter(Boolean) : []);
+  }, []);
+  const setSnakes = useCallback((updater) => {
+    setSnakesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal');
+    });
+  }, []);
+  const setPairings = useCallback((updater) => {
+    setPairingsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
+    });
+  }, []);
   const [tab, setTab] = useState('animals');
   const [pairingsView, setPairingsView] = useState('dashboard');
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
@@ -6656,37 +6731,34 @@ export default function BreedingPlannerApp() {
         cloudBaselineSnapshotRef.current
       );
       const snapshot = await fetchBreederSnapshot();
-      const backendSnapshot = {
-        snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
-        pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
-      };
+      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
       const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-      const signature = JSON.stringify(merged);
+      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+      const syncedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+      const signature = JSON.stringify(syncedSnapshot);
 
-      setSnakes(merged.snakes);
-      setPairings(merged.pairings);
-      latestPlannerSnapshotRef.current = merged;
-
-      await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+      setSyncedSnakes(syncedSnapshot.snakes);
+      setSyncedPairings(syncedSnapshot.pairings);
+      latestPlannerSnapshotRef.current = syncedSnapshot;
 
       const syncedAt = new Date().toISOString();
       backendPlannerSyncRef.current.seeded = true;
       backendPlannerSyncRef.current.status = 'ready';
       backendPlannerSyncRef.current.lastSavedSignature = signature;
-      cloudBaselineSnapshotRef.current = merged;
+      cloudBaselineSnapshotRef.current = syncedSnapshot;
       setCloudSyncStatus({
         state: 'success',
         lastSyncedAt: syncedAt,
-        message: `Synced ${merged.snakes.length} snakes and ${merged.pairings.length} pairings with the cloud database.`,
+        message: `Synced ${syncedSnapshot.snakes.length} snakes and ${syncedSnapshot.pairings.length} pairings with the cloud database.`,
       });
-      return { ...merged, syncedAt };
+      return { ...syncedSnapshot, syncedAt };
     } catch (error) {
       backendPlannerSyncRef.current.status = 'idle';
       const message = error?.message || 'Cloud sync failed.';
       setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
       throw error;
     }
-  }, [sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
@@ -6724,7 +6796,7 @@ export default function BreedingPlannerApp() {
 
         if (Array.isArray(payload.snakes)) {
           const sanitized = payload.snakes.map(sanitizeSnakeRecord).filter(Boolean);
-          setSnakes(sanitized);
+          setSyncedSnakes(sanitized);
         }
         {
           const backupPairings = [
@@ -6737,7 +6809,7 @@ export default function BreedingPlannerApp() {
             ? payload.pairings
             : backupPairings;
           const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
-          setPairings(sanitizedPairings);
+          setSyncedPairings(sanitizedPairings);
         }
         if (Array.isArray(payload.groups)) {
           setGroups(payload.groups);
@@ -7134,19 +7206,16 @@ export default function BreedingPlannerApp() {
       fetchBreederSnapshot()
         .then((snapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
-          const backendSnapshot = {
-            snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
-            pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
-          };
+          const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
           const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-          setSnakes(merged.snakes);
-          setPairings(merged.pairings);
-          latestPlannerSnapshotRef.current = merged;
           return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
         })
-        .then(() => {
+        .then((savedSnapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          const currentSnapshot = latestPlannerSnapshotRef.current;
+          const currentSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+          setSyncedSnakes(currentSnapshot.snakes);
+          setSyncedPairings(currentSnapshot.pairings);
+          latestPlannerSnapshotRef.current = currentSnapshot;
           backendPlannerSyncRef.current.status = 'ready';
           backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify(currentSnapshot);
           cloudBaselineSnapshotRef.current = currentSnapshot;
@@ -7171,7 +7240,7 @@ export default function BreedingPlannerApp() {
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [electronDataReady, pairings, sharedBreederDataReady, snakes]);
+  }, [electronDataReady, pairings, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

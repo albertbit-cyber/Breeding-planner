@@ -165,6 +165,15 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => ({
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing"),
 });
 
+const normalizeMobileSnapshot = (snapshot = {}) => ({
+  animals: Array.isArray(snapshot?.animals)
+    ? snapshot.animals
+    : Array.isArray(snapshot?.snakes)
+      ? snapshot.snakes
+      : [],
+  pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
+});
+
 const upsertSnapshotRecord = (records, updated, fallbackPrefix) => {
   const list = Array.isArray(records) ? [...records] : [];
   const updatedKey = recordIdentity(updated, fallbackPrefix, 0);
@@ -1154,9 +1163,11 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
     const changed = markRecordUpdated(updated);
     const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
-    await saveBreederSnapshot({ ...snap, animals: list });
-    setAnimal(changed);
-    setLocalAnimals((prev) => upsertSnapshotRecord(prev, changed, "animal"));
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    const changedKey = recordIdentity(changed, "animal", 0);
+    const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
+    setAnimal(savedAnimal);
+    setLocalAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
   }, []);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1164,8 +1175,8 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
     const changed = markRecordUpdated(updatedPairing);
     const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
-    await saveBreederSnapshot({ ...snap, pairings: pairs });
-    setPairings([...pairs]);
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
+    setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
   }, []);
 
   // ג”€ג”€ Photo handlers ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1235,8 +1246,10 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       const snapshot = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
       const merged = markRecordUpdated({ ...animal, ...draft });
       const animals = upsertSnapshotRecord(snapshot.animals, merged, "animal");
-      await saveBreederSnapshot({ ...snapshot, animals });
-      setAnimal(merged);
+      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
+      const mergedKey = recordIdentity(merged, "animal", 0);
+      const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
+      setAnimal(savedAnimal);
       pushToast("Changes saved.");
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Save failed.");
@@ -1472,9 +1485,9 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     try {
       const latest = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
       const merged = mergeMobileSnapshot({ animals, pairings }, latest);
-      await saveBreederSnapshot(merged);
-      setAnimals(merged.animals);
-      setPairings(merged.pairings);
+      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot(merged));
+      setAnimals(savedSnapshot.animals);
+      setPairings(savedSnapshot.pairings);
       recordSync();
       pushToast("Data merged to cloud.");
     } catch (err) {
@@ -1574,9 +1587,11 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
     const changed = markRecordUpdated(updated);
     const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
-    await saveBreederSnapshot({ ...snap, animals: list });
-    setAnimal(changed);
-    setAnimals((prev) => upsertSnapshotRecord(prev, changed, "animal"));
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    const changedKey = recordIdentity(changed, "animal", 0);
+    const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
+    setAnimal(savedAnimal);
+    setAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
   }, []);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1584,8 +1599,8 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
     const changed = markRecordUpdated(updatedPairing);
     const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
-    await saveBreederSnapshot({ ...snap, pairings: pairs });
-    setPairings([...pairs]);
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
+    setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
   }, []);
 
   const handleTakePhoto = useCallback(async () => {
@@ -2155,4 +2170,3 @@ export default function MobileApp() {
 
   return <FullMode onSwitchMode={handleSwitchMode} onSignOut={handleSignOut} deviceId={deviceId} user={user} />;
 }
-
