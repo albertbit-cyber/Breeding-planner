@@ -33,7 +33,7 @@ const origins = env.corsOrigin
   .filter(Boolean);
 
 if (env.nodeEnv === "production" && !origins.length) {
-  throw new Error("CORS_ORIGIN must list at least one allowed origin in production.");
+  console.warn("[server] CORS_ORIGIN is empty; browser origins will not receive CORS headers.");
 }
 
 app.use(
@@ -48,6 +48,11 @@ app.use(
         // Development should allow localhost and LAN-hosted frontends without
         // forcing CORS_ORIGIN updates every time the host IP changes.
         callback(null, true);
+        return;
+      }
+
+      if (!origins.length) {
+        callback(null, false);
         return;
       }
 

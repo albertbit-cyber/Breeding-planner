@@ -10,6 +10,10 @@ build/
 dist/
 android/
 ios/
+apk-backups/
+*.apk
+*.aab
+Breeding-planner-project.zip
 
 # Backup/scratch files with potentially invalid encoding
 App_prev.jsx
