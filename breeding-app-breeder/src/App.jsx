@@ -3549,8 +3549,13 @@ function initSnakeDraft(s) {
   };
 }
 
-const FEEDER_TYPE_OPTIONS = ['Rat', 'SF', 'Mouse', 'Other'];
-const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
+const FEEDER_TYPE_OPTIONS = ['Rat', 'Multimammate', 'Mouse'];
+const FEEDER_SIZE_OPTIONS_BY_TYPE = {
+  Rat: ['5-10g','10-20g','20-30g','30-50g','50-70g','70-90g','90-110g','120-150g','150-170g','170-200g','200-250g','250-300g','301-350g','350-400g'],
+  Mouse: ['1-3g','3-4g','5-7g','7-10g','10-16g','16-24g','25-30g','30-35g','35-40g','40-50g'],
+  Multimammate: ['1-3g','3-6g','6-10g','10-19g','20-29g','30-39g','40-49g','50-60g','60-70g','70-80g','80-90g','90-100g'],
+};
+const FEEDER_SIZE_OPTIONS = [...new Set(Object.values(FEEDER_SIZE_OPTIONS_BY_TYPE).flat())];
 
 function createEmptyFeederProfile() {
   return {
@@ -11357,46 +11362,48 @@ export default function BreedingPlannerApp() {
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
-                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
-                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2">
-                    <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
-                      <select
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm bg-white"
-                        value={editSnakeDraft.feederProfile?.feedType || ''}
-                        onChange={e => setEditSnakeDraft(d => ({
-                          ...d,
-                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
-                        }))}
-                      >
-                        <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
-                        {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.sizeClass", { defaultValue: "Size / weight class" })}</label>
-                      <input
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
-                        value={editSnakeDraft.feederProfile?.sizeClass || ''}
-                        onChange={e => setEditSnakeDraft(d => ({
-                          ...d,
-                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
-                        }))}
-                        list="feed-prep-size-options"
-                        placeholder={t("feedPrep.sizePlaceholder", { defaultValue: "e.g., fuzzy, small rat, 30-50g" })}
-                      />
-                      <datalist id="feed-prep-size-options">
-                        {FEEDER_SIZE_OPTIONS.map(option => <option key={option} value={option} />)}
-                      </datalist>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="border rounded-xl p-2 bg-neutral-50 mt-1">
+                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <div>
-                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                        <select
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          value={editSnakeDraft.feederProfile?.feedType || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
+                          }))}
+                        >
+                          <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                          {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
+                        <select
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          value={editSnakeDraft.feederProfile?.sizeClass || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
+                          }))}
+                        >
+                          <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                          {(FEEDER_SIZE_OPTIONS_BY_TYPE[editSnakeDraft.feederProfile?.feedType] || FEEDER_SIZE_OPTIONS).map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
-                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.weightGrams || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -11406,12 +11413,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.quantity", { defaultValue: "Quantity" })}</label>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.quantity || 1}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -11420,12 +11427,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.intervalDays", { defaultValue: "Interval (days)" })}</label>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.intervalDays || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -11435,11 +11442,11 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                     </div>
-                    <div className="text-[11px] text-neutral-500">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
+                    <div className="text-[10px] text-neutral-400">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
                     <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
                       <input
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                         value={editSnakeDraft.feederProfile?.notes || ''}
                         onChange={e => setEditSnakeDraft(d => ({
                           ...d,
@@ -14976,37 +14983,20 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                 <>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.feedType", { defaultValue: "Feed type" })}</div>
-                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: (e.target.value === 'Mouse' || e.target.value === 'Rat') ? (d.size||'pinky') : ''}))}>
+                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: ''}))}>
                       <option value="Mouse">{t("animals.quickAdd.feedOptions.mouse", { defaultValue: "Mouse" })}</option>
                       <option value="Rat">{t("animals.quickAdd.feedOptions.rat", { defaultValue: "Rat" })}</option>
-                      <option value="Chick">{t("animals.quickAdd.feedOptions.chick", { defaultValue: "Chick" })}</option>
-                      <option value="Other">{t("animals.quickAdd.feedOptions.other", { defaultValue: "Other" })}</option>
+                      <option value="Multimammate">{t("animals.quickAdd.feedOptions.multimammate", { defaultValue: "Multimammate" })}</option>
                     </select>
                   </div>
                   <div>
-                    <div className="text-xs text-neutral-500">{t("animals.quickAdd.size", { defaultValue: "Size" })}</div>
-                    {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
-                      <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
-                        <option value="pinky">{t("animals.quickAdd.sizeOptions.pinky", { defaultValue: "pinky" })}</option>
-                        <option value="fuzzy">{t("animals.quickAdd.sizeOptions.fuzzy", { defaultValue: "fuzzy" })}</option>
-                        <option value="medium">{t("animals.quickAdd.sizeOptions.medium", { defaultValue: "medium" })}</option>
-                        <option value="adult">{t("animals.quickAdd.sizeOptions.adult", { defaultValue: "adult" })}</option>
-                        <option value="Other">{t("animals.quickAdd.sizeOptions.other", { defaultValue: "Other" })}</option>
-                      </select>
-                    ) : (
-                      <>
-                        <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
-                          <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
-                          <option value="Other">{t("animals.quickAdd.sizeOptions.other", { defaultValue: "Other" })}</option>
-                        </select>
-                        {quickDraft.size === 'Other' && (
-                          <input className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.customSizePlaceholder", { defaultValue: "Custom size" })} value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
-                        )}
-                      </>
-                    )}
-                    {quickDraft.size === 'Other' && quickDraft.feed !== 'Mouse' && quickDraft.feed !== 'Rat' && (
-                      <input className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.customSizePlaceholder", { defaultValue: "Custom size" })} value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
-                    )}
+                    <div className="text-xs text-neutral-500">{t("animals.quickAdd.size", { defaultValue: "Weight class" })}</div>
+                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                      <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
+                      {(FEEDER_SIZE_OPTIONS_BY_TYPE[quickDraft.feed] || FEEDER_SIZE_OPTIONS).map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.weight", { defaultValue: "Weight (g)" })}</div>
@@ -22493,25 +22483,18 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 
                 {/* feed type */}
                 <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
-                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: (e.target.value === 'Mouse' || e.target.value === 'Rat') ? (x.size||'pinky') : ''})}>
+                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
                   <option value="Mouse">Mouse</option>
                   <option value="Rat">Rat</option>
-                  <option value="Chick">Chick</option>
-                  <option value="Other">Other</option>
+                  <option value="Multimammate">Multimammate</option>
                 </select>
 
-                {/* size - only relevant for Mouse/Rat */}
-                {(x.feed === 'Mouse' || x.feed === 'Rat') ? (
-                  <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
-                    onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
-                    <option value="pinky">pinky</option>
-                    <option value="fuzzy">fuzzy</option>
-                    <option value="medium">medium</option>
-                    <option value="adult">adult</option>
-                  </select>
-                ) : (
-                  <input className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" placeholder="Size" value={x.size||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})} />
-                )}
+                {/* weight class */}
+                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
+                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
+                  <option value=""></option>
+                  {(FEEDER_SIZE_OPTIONS_BY_TYPE[x.feed] || FEEDER_SIZE_OPTIONS).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
 
                 {/* weight in grams */}
                 <input type="number" className="border rounded-lg px-2 py-1 text-xs w-full sm:col-span-1" placeholder="g"
