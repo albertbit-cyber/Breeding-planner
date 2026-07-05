@@ -31,9 +31,9 @@ Latest committed baseline before this APK:
 | `app-release-2026-07-02.apk` | Release | 19623154 | `4F1379CA18FA267E15DCF8072D15C994D873E8AFD5DD1790BD6A6ED4C48B75A8` | Historical APK from gh-pages cache, now copied here. |
 | `app-debug-2026-07-03-debug-build.apk` | Debug | 28279335 | `C882A95FC5039FF010193FD014138C84D283826A1F1F972CDE11E6DFBC69B1D1` | Debug APK copied from Android build outputs. |
 
-## Source APK Locations Found
+## Historical Duplicate APK Locations
 
-These source locations were scanned on July 5, 2026:
+These duplicate source locations were scanned on July 5, 2026 and removed on July 6, 2026 after each APK hash was verified against a matching file in `apk-backups/`:
 
 - `android/app/build/outputs/apk/debug/app-debug.apk`
 - `android/app/build/outputs/apk/release/app-release.apk`
@@ -44,7 +44,9 @@ These source locations were scanned on July 5, 2026:
 - `node_modules/.cache/gh-pages/.../apk-backups/app-release-2026-07-03-breeding-logging.apk`
 - `node_modules/.cache/gh-pages/.../apk-backups/app-release-2026-07-03-photos-breeding.apk`
 
-The `node_modules/.cache/gh-pages/...` APKs are cache copies only. They were copied into `apk-backups/` so future work does not depend on the cache.
+The `node_modules/.cache/gh-pages/...` APKs were cache copies only. They were copied into `apk-backups/` before removal so future work does not depend on the cache.
+
+As of July 6, 2026, `apk-backups/` must be the only folder in the workspace that keeps APK files.
 
 ## Required Naming Rule
 
@@ -95,7 +97,8 @@ After creating a new APK:
 3. Update `apk-backups/APK_CHANGELOG.md` with the date, time, agent, APK filename, changes, hash, and verification.
 4. Update this file with the new APK name, notes, size, and SHA256.
 5. State whether the APK came from release, debug, or AAB work.
-6. Leave `dist/android/app-release.apk` and Android Gradle output files as build outputs only.
+6. Verify the generated APK output hash matches the named `apk-backups/` file.
+7. Remove duplicate APK files from `dist/android/`, Android Gradle output folders, and cache folders so `apk-backups/` stays the single APK location.
 
 Recommended release build command:
 
@@ -112,6 +115,6 @@ Get-FileHash apk-backups\*.apk -Algorithm SHA256
 ## Notes For Next Agent
 
 - The current latest APK is the demo snakes local-only APK from July 5, 2026.
-- The latest release APK and `dist/android/app-release.apk` currently have the same SHA256.
+- As of July 6, 2026, all retained APK files are under `apk-backups/`; duplicate APK build outputs and cache APKs were removed after SHA256 verification.
 - A release AAB also exists under `android/app/build/outputs/bundle/release/app-release.aab`, but this handoff folder is for APK files unless the user asks for AAB collection too.
 - Do not delete old APKs from this folder without explicit user approval.

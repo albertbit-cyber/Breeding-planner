@@ -16,8 +16,9 @@ SHA256:
 
 Built from the July 5, 2026 release APK after the demo snakes local-only fix. The same binary also exists at:
 
-- `dist/android/app-release.apk`
-- `android/app/build/outputs/apk/release/app-release.apk`
+- `apk-backups/app-release-2026-07-05-demo-snakes-local-only.apk`
+
+As of July 6, 2026, `apk-backups/` is the only folder that should keep APK files. Generated APK outputs under `dist/android/`, `android/app/build/outputs/apk/`, or cache folders must be treated as temporary build output and removed after their hashes are verified against the named copy in `apk-backups/`.
 
 ## Naming Rule
 
@@ -88,7 +89,9 @@ The release APK command runs:
 Get-FileHash apk-backups\*.apk -Algorithm SHA256
 ```
 
-6. Keep all distinct APKs unless the user explicitly asks to delete old builds.
+6. Verify the generated APK output hash matches the named `apk-backups/` file.
+7. Remove duplicate APK files from generated output or cache folders so `apk-backups/` remains the single APK location.
+8. Keep all distinct APKs in `apk-backups/` unless the user explicitly asks to delete old builds.
 
 ## Files That Commonly Affect APK Behavior
 
