@@ -156,22 +156,44 @@ const mergeSnapshotList = (localItems, backendItems, fallbackPrefix) => {
   return order.map((key) => merged.get(key));
 };
 
-const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => ({
+const isDemoAnimal = (animal) => !!animal && typeof animal === "object" && animal.isDemo === true;
+
+const demoAnimalIds = (animals = []) => new Set(
+  (Array.isArray(animals) ? animals : [])
+    .filter(isDemoAnimal)
+    .map((animal) => String(animal.id || animal.appAnimalId || animal.animalId || "").trim())
+    .filter(Boolean)
+);
+
+const filterDemoPairings = (pairings = [], demoIds = new Set()) => (
+  (Array.isArray(pairings) ? pairings : []).filter((pairing) => {
+    if (!pairing || typeof pairing !== "object" || pairing.isDemo === true) return false;
+    const maleId = String(pairing.maleId || pairing.maleAnimalAppId || "").trim();
+    const femaleId = String(pairing.femaleId || pairing.femaleAnimalAppId || "").trim();
+    return !demoIds.has(maleId) && !demoIds.has(femaleId);
+  })
+);
+
+const normalizeMobileSnapshot = (snapshot = {}) => {
+  const animals = Array.isArray(snapshot?.animals)
+    ? snapshot.animals
+    : Array.isArray(snapshot?.snakes)
+      ? snapshot.snakes
+      : [];
+  const demoIds = demoAnimalIds(animals);
+  return {
+    animals: animals.filter((animal) => !isDemoAnimal(animal)),
+    pairings: filterDemoPairings(snapshot?.pairings, demoIds),
+  };
+};
+
+const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normalizeMobileSnapshot({
   animals: mergeSnapshotList(
     localSnapshot.animals || localSnapshot.snakes,
     backendSnapshot.animals || backendSnapshot.snakes,
     "animal"
   ),
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing"),
-});
-
-const normalizeMobileSnapshot = (snapshot = {}) => ({
-  animals: Array.isArray(snapshot?.animals)
-    ? snapshot.animals
-    : Array.isArray(snapshot?.snakes)
-      ? snapshot.snakes
-      : [],
-  pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
 });
 
 const upsertSnapshotRecord = (records, updated, fallbackPrefix) => {
@@ -1101,7 +1123,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const [photoBusy, setPhotoBusy]     = useState(false);
   const [cardTab, setCardTab]         = useState("edit"); // edit | breeding
   const [recent, setRecent]       = useState(() => readJson(RECENT_KEY, []));
-  const [localAnimals, setLocalAnimals] = useState(() => readJson(ANIMALS_CACHE, []));
+  const [localAnimals, setLocalAnimals] = useState(() => normalizeMobileSnapshot({ animals: readJson(ANIMALS_CACHE, []) }).animals);
   const [pairings, setPairings]   = useState([]);
 
   useEffect(() => { writeJson(RECENT_KEY, recent); }, [recent]);
@@ -1110,11 +1132,10 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   useEffect(() => {
     fetchBreederSnapshot()
       .then((snap) => {
-        const list  = Array.isArray(snap?.animals)  ? snap.animals  : [];
-        const pairs = Array.isArray(snap?.pairings) ? snap.pairings : [];
-        setLocalAnimals(list);
-        setPairings(pairs);
-        writeJson(ANIMALS_CACHE, list);
+        const normalizedSnapshot = normalizeMobileSnapshot(snap);
+        setLocalAnimals(normalizedSnapshot.animals);
+        setPairings(normalizedSnapshot.pairings);
+        writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
       })
       .catch(() => {});
   }, []);
@@ -1160,7 +1181,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 
   // ג”€ג”€ Shared snapshot helper ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const updateAnimalInSnapshot = useCallback(async (updated) => {
-    const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updated);
     const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
@@ -1172,7 +1193,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const handleSavePairing = useCallback(async (updatedPairing) => {
-    const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updatedPairing);
     const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
@@ -1243,7 +1264,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const saveEdit = useCallback(async (draft) => {
     setEditBusy(true);
     try {
-      const snapshot = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+      const snapshot = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
       const merged = markRecordUpdated({ ...animal, ...draft });
       const animals = upsertSnapshotRecord(snapshot.animals, merged, "animal");
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
@@ -1470,8 +1491,9 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       ]);
       setPerms(permData?.permissions || {});
       setTasks(Array.isArray(taskData?.tasks) ? taskData.tasks : []);
-      setAnimals(Array.isArray(snapshot?.animals) ? snapshot.animals : []);
-      setPairings(Array.isArray(snapshot?.pairings) ? snapshot.pairings : []);
+      const normalizedSnapshot = normalizeMobileSnapshot(snapshot);
+      setAnimals(normalizedSnapshot.animals);
+      setPairings(normalizedSnapshot.pairings);
       recordSync();
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Failed to load data.");
@@ -1584,7 +1606,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
   // ג”€ג”€ Photo helpers (Full mode) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const updateAnimalInSnapshot = useCallback(async (updated) => {
-    const snap = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updated);
     const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
@@ -1596,7 +1618,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const handleSavePairing = useCallback(async (updatedPairing) => {
-    const snap  = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updatedPairing);
     const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
