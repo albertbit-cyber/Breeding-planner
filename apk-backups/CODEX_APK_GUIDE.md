@@ -33,6 +33,22 @@ Use lowercase kebab case for the change name. Examples:
 - `app-release-2026-07-04-encoding-fixed.apk`
 - `app-debug-2026-07-03-debug-build.apk`
 
+## Required Change Log Rule
+
+Codex and Claude must both log every APK edit, rebuild, replacement, or handoff in `apk-backups/APK_CHANGELOG.md`.
+
+Each log entry must include:
+
+- Date and time in Europe/Berlin local time, including UTC offset.
+- Agent name: `Codex`, `Claude`, or both if both worked on the APK.
+- APK filename.
+- Build type: release, debug, or AAB-related work.
+- Short summary of the changes included in the APK.
+- SHA256 hash when an APK file is created or replaced.
+- Verification performed, or `Not run` with the reason.
+
+Do this before telling the user which APK to install.
+
 ## Build Commands
 
 Release APK:
@@ -64,14 +80,15 @@ The release APK command runs:
 
 1. Copy the generated APK into `apk-backups/`.
 2. Use the naming rule above with the date and the work summary.
-3. Update `apk-backups/CLAUDE_APK_HANDOFF.md`.
-4. Record the SHA256 hash:
+3. Update `apk-backups/APK_CHANGELOG.md` with the date, time, agent, APK filename, changes, hash, and verification.
+4. Update `apk-backups/CLAUDE_APK_HANDOFF.md`.
+5. Record the SHA256 hash:
 
 ```powershell
 Get-FileHash apk-backups\*.apk -Algorithm SHA256
 ```
 
-5. Keep all distinct APKs unless the user explicitly asks to delete old builds.
+6. Keep all distinct APKs unless the user explicitly asks to delete old builds.
 
 ## Files That Commonly Affect APK Behavior
 

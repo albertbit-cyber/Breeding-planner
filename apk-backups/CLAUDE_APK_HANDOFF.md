@@ -68,6 +68,22 @@ Examples:
 - `app-release-2026-07-04-encoding-fixed.apk`
 - `app-release-2026-07-03-breeding-logging.apk`
 
+## Required APK Change Log Rule
+
+Claude and Codex must both update `apk-backups/APK_CHANGELOG.md` whenever an APK is edited, rebuilt, replaced, renamed, copied into `apk-backups/`, or recommended to the user as the latest installable APK.
+
+Each entry must record:
+
+- Date and time in Europe/Berlin local time, including UTC offset.
+- Agent name: `Claude`, `Codex`, or both.
+- APK filename.
+- Build type: release, debug, or AAB-related work.
+- Clear short summary of what changed in that APK.
+- SHA256 hash when an APK file is created or replaced.
+- Verification performed, or `Not run` with the reason.
+
+No agent should tell the user an APK is the latest installable build until this log has been updated for that APK state.
+
 ## Claude/Codex Coordination Instructions
 
 Claude and Codex should both use `apk-backups/` as the single APK coordination folder.
@@ -76,9 +92,10 @@ After creating a new APK:
 
 1. Run the build command.
 2. Copy the generated APK into `apk-backups/` using the naming rule.
-3. Update this file with the new APK name, notes, size, and SHA256.
-4. State whether the APK came from release, debug, or AAB work.
-5. Leave `dist/android/app-release.apk` and Android Gradle output files as build outputs only.
+3. Update `apk-backups/APK_CHANGELOG.md` with the date, time, agent, APK filename, changes, hash, and verification.
+4. Update this file with the new APK name, notes, size, and SHA256.
+5. State whether the APK came from release, debug, or AAB work.
+6. Leave `dist/android/app-release.apk` and Android Gradle output files as build outputs only.
 
 Recommended release build command:
 
