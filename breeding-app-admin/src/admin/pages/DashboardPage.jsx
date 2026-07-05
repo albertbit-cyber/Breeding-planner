@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../components/AdminLayout.jsx";
 import Spinner from "../components/Spinner.jsx";
-import { fetchAdminDashboard } from "../../shared/apiClient.js";
+import { fetchAdminDashboard } from "../../shared/apiClient";
 
 function StatCard({ label, value, onClick }) {
   return (

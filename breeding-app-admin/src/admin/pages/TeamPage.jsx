@@ -11,7 +11,7 @@ import {
   sendAdminUserEmail,
   resendAdminUserEmailVerification,
   updateAdminUserEmailVerified,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 export default function TeamPage() {
   const toast = useToast();

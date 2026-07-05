@@ -6,7 +6,7 @@ import { useToast } from "../hooks/useToast.jsx";
 import {
   fetchSubscriptionTiers, fetchFeatureCatalog,
   createSubscriptionTier, updateSubscriptionTier,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 const EMPTY = {
   name: "", displayName: "", description: "", price: "", currency: "USD",

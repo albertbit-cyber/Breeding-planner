@@ -7,7 +7,7 @@ import PaginationControls from "../components/PaginationControls.jsx";
 import Spinner from "../components/Spinner.jsx";
 import { useToast } from "../hooks/useToast.jsx";
 import { STATUS_OPTIONS, formatDate } from "../constants.js";
-import { fetchAdminLabAccounts, createAdminUser } from "../../shared/apiClient.js";
+import { fetchAdminLabAccounts, createAdminUser } from "../../shared/apiClient";
 
 export default function LabsPage() {
   const navigate = useNavigate();

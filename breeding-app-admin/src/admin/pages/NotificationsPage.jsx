@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import AdminLayout from "../components/AdminLayout.jsx";
 import { useToast } from "../hooks/useToast.jsx";
-import { sendAdminNotification } from "../../shared/apiClient.js";
+import { sendAdminNotification } from "../../shared/apiClient";
 
 const AUDIENCE_OPTIONS = [
   { value: "all", label: "All users" },

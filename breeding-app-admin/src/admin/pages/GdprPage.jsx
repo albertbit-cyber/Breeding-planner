@@ -7,7 +7,7 @@ import { useToast } from "../hooks/useToast.jsx";
 import { GDPR_WORKFLOW, formatDate } from "../constants.js";
 import {
   fetchAdminGdprRequests, createAdminGdprRequest, updateAdminGdprRequest,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 export default function GdprPage() {
   const toast = useToast();

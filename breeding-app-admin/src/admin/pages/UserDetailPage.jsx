@@ -31,7 +31,7 @@ import {
   addUserFeatureOverride,
   removeUserFeatureOverride,
   resetUserUsage,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 /* ── Req asterisk ─────────────────────────────────────────────────────────── */
 function Req() { return <span className="admin-required">*</span>; }

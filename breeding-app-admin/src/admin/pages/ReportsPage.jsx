@@ -12,7 +12,7 @@ import {
 } from "../constants.js";
 import {
   fetchAdminReports, updateAdminReportStatus, applyAdminReportAction,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 function ReportActionModal({ report, onClose, onDone }) {
   const toast = useToast();

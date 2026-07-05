@@ -10,7 +10,7 @@ import { VERIFICATION_REQUEST_STATUS_OPTIONS, formatDate } from "../constants.js
 import {
   fetchAdminVerificationRequests,
   updateAdminVerificationRequest,
-} from "../../shared/apiClient.js";
+} from "../../shared/apiClient";
 
 export default function VerificationPage() {
   const navigate = useNavigate();

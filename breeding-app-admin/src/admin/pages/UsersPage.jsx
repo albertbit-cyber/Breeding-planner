@@ -9,7 +9,7 @@ import {
   ROLE_OPTIONS, STATUS_OPTIONS, VERIFICATION_OPTIONS,
   SUBSCRIPTION_OPTIONS, ACTIVITY_OPTIONS, formatDate,
 } from "../constants.js";
-import { fetchAdminUsers } from "../../shared/apiClient.js";
+import { fetchAdminUsers } from "../../shared/apiClient";
 
 export default function UsersPage() {
   const navigate = useNavigate();

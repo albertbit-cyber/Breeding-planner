@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "../components/AdminLayout.jsx";
 import Spinner from "../components/Spinner.jsx";
 import { useToast } from "../hooks/useToast.jsx";
-import { fetchSubscriptionTiers, fetchFeatureCatalog, updateSubscriptionTier } from "../../shared/apiClient.js";
+import { fetchSubscriptionTiers, fetchFeatureCatalog, updateSubscriptionTier } from "../../shared/apiClient";
 
 function TierQuickEditModal({ tier, features, onClose, onSaved }) {
   const toast = useToast();
