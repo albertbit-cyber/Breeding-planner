@@ -8,6 +8,7 @@ const tx = {
   },
   pairing: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   clutch: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  breederPlannerState: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
 };
 
 vi.mock("../lib/prisma", () => ({
@@ -16,6 +17,7 @@ vi.mock("../lib/prisma", () => ({
     animal: { findMany: vi.fn() },
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
+    breederPlannerState: { findUnique: vi.fn() },
   },
 }));
 
@@ -35,9 +37,13 @@ beforeEach(() => {
   tx.clutch.findUnique.mockResolvedValue(null);
   tx.clutch.create.mockResolvedValue({ id: "clutch-row-1" });
   tx.clutch.update.mockResolvedValue({ id: "clutch-row-1" });
+  tx.breederPlannerState.findUnique.mockResolvedValue(null);
+  tx.breederPlannerState.create.mockResolvedValue({ id: "planner-state-row-1" });
+  tx.breederPlannerState.update.mockResolvedValue({ id: "planner-state-row-1" });
   vi.mocked((prisma as any).animal.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
 });
 
 describe("breederDataService", () => {
@@ -165,6 +171,86 @@ describe("breederDataService", () => {
     expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
+  it("merges nested animal logs when the incoming animal is newer", async () => {
+    tx.animal.findUnique.mockResolvedValueOnce({
+      id: "animal-row-1",
+      payload: {
+        id: "snake-1",
+        name: "Original",
+        updatedAt: "2026-07-03T10:00:00.000Z",
+        logs: {
+          feeds: [{ id: "feed-old", date: "2026-07-02", result: "Fed" }],
+        },
+        photos: [{ id: "photo-old", addedAt: "2026-07-03T09:00:00.000Z", url: "old.jpg" }],
+      },
+      updatedAt: new Date("2026-07-03T10:00:00.000Z"),
+    });
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        name: "Updated",
+        updatedAt: "2026-07-04T10:00:00.000Z",
+        logs: {
+          feeds: [{ id: "feed-new", date: "2026-07-04", result: "Fed" }],
+        },
+        photos: [{ id: "photo-new", addedAt: "2026-07-04T09:00:00.000Z", url: "new.jpg" }],
+      }],
+      pairings: [],
+    });
+
+    expect(tx.animal.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        payload: expect.objectContaining({
+          name: "Updated",
+          logs: expect.objectContaining({
+            feeds: expect.arrayContaining([
+              expect.objectContaining({ id: "feed-old" }),
+              expect.objectContaining({ id: "feed-new" }),
+            ]),
+          }),
+          photos: expect.arrayContaining([
+            expect.objectContaining({ id: "photo-old" }),
+            expect.objectContaining({ id: "photo-new" }),
+          ]),
+        }),
+      }),
+    }));
+  });
+
+  it("persists and lists owner planner state", async () => {
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [],
+      plannerState: {
+        updatedAt: "2026-07-04T12:00:00.000Z",
+        groups: ["Breeders"],
+        rooms: [{ id: "room-1", name: "Main room" }],
+      },
+    });
+
+    expect(tx.breederPlannerState.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ownerId: "breeder-1",
+        payload: expect.objectContaining({
+          groups: ["Breeders"],
+          rooms: [expect.objectContaining({ id: "room-1" })],
+        }),
+      }),
+    });
+
+    vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue({
+      payload: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+    });
+
+    await expect(listBreederSnapshot("breeder-1")).resolves.toEqual({
+      animals: [],
+      pairings: [],
+      clutches: [],
+      plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+    });
+  });
+
   it("lists persisted payloads without leaking database wrapper fields", async () => {
     vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: { id: "snake-1" } }]);
     vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([{ payload: { id: "pairing-1" } }]);
@@ -174,6 +260,7 @@ describe("breederDataService", () => {
       animals: [{ id: "snake-1" }],
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
+      plannerState: null,
     });
   });
 });

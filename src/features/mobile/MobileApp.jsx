@@ -135,10 +135,125 @@ const markRecordUpdated = (record, at = new Date().toISOString()) => {
   };
 };
 
-const mergeSnapshotList = (localItems, backendItems, fallbackPrefix) => {
+const mergeStringList = (...values) => {
+  const merged = [];
+  const seen = new Set();
+  values.flatMap((value) => (Array.isArray(value) ? value : [])).forEach((item) => {
+    const text = String(item || "").trim();
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(text);
+  });
+  return merged;
+};
+
+const entryIdentity = (entry, label, index) => {
+  if (!entry || typeof entry !== "object") return `${label}:blank:${index}`;
+  const explicit = [
+    entry.id,
+    entry.logId,
+    entry.uuid,
+    entry.createdAt && `${entry.createdAt}:${entry.actionType || label}`,
+    entry.addedAt && `${entry.addedAt}:${entry.source || label}`,
+  ].map((value) => String(value || "").trim()).find(Boolean);
+  if (explicit) return explicit;
+  return [
+    label,
+    entry.date || "",
+    entry.time || "",
+    entry.result || entry.outcome || "",
+    entry.feed || entry.food || entry.prey || "",
+    entry.size || entry.weight || entry.grams || "",
+    entry.notes || entry.note || "",
+  ].map((part) => String(part || "").trim()).join("|") || `${label}:${index}`;
+};
+
+const mergeEntryArrays = (localEntries, backendEntries, label) => {
+  const rows = [
+    ...(Array.isArray(backendEntries) ? backendEntries : []),
+    ...(Array.isArray(localEntries) ? localEntries : []),
+  ].filter((entry) => entry && typeof entry === "object");
+  const merged = new Map();
+  rows.forEach((entry, index) => {
+    const key = entryIdentity(entry, label, index);
+    const current = merged.get(key);
+    if (!current || recordTimestamp(entry) >= recordTimestamp(current)) {
+      merged.set(key, current ? { ...current, ...entry } : entry);
+    }
+  });
+  return Array.from(merged.values()).sort((a, b) => recordTimestamp(b) - recordTimestamp(a));
+};
+
+const mergeLogs = (localLogs, backendLogs) => {
+  const local = localLogs && typeof localLogs === "object" ? localLogs : {};
+  const backend = backendLogs && typeof backendLogs === "object" ? backendLogs : {};
+  const keys = Array.from(new Set([
+    "feeds",
+    "weights",
+    "sheds",
+    "cleanings",
+    "meds",
+    "water",
+    "notes",
+    "health",
+    ...Object.keys(local),
+    ...Object.keys(backend),
+  ]));
+  return keys.reduce((acc, key) => {
+    acc[key] = mergeEntryArrays(local[key], backend[key], key);
+    return acc;
+  }, {});
+};
+
+const mergeAnimalRecord = (localAnimal, backendAnimal) => {
+  if (!localAnimal) return backendAnimal;
+  if (!backendAnimal) return localAnimal;
+  const localTime = recordTimestamp(localAnimal);
+  const backendTime = recordTimestamp(backendAnimal);
+  const base = localTime >= backendTime ? localAnimal : backendAnimal;
+  const other = localTime >= backendTime ? backendAnimal : localAnimal;
+  return {
+    ...other,
+    ...base,
+    morphs: mergeStringList(other.morphs, base.morphs),
+    hets: mergeStringList(other.hets, base.hets),
+    possibleHets: mergeStringList(other.possibleHets, base.possibleHets),
+    tags: mergeStringList(other.tags, base.tags),
+    groups: mergeStringList(other.groups, base.groups),
+    photos: mergeEntryArrays(other.photos, base.photos, "photo"),
+    logs: mergeLogs(other.logs, base.logs),
+  };
+};
+
+const mergePairingRecord = (localPairing, backendPairing) => {
+  if (!localPairing) return backendPairing;
+  if (!backendPairing) return localPairing;
+  const localTime = recordTimestamp(localPairing);
+  const backendTime = recordTimestamp(backendPairing);
+  const base = localTime >= backendTime ? localPairing : backendPairing;
+  const other = localTime >= backendTime ? backendPairing : localPairing;
+  return {
+    ...other,
+    ...base,
+    goals: mergeStringList(other.goals, base.goals),
+    tags: mergeStringList(other.tags, base.tags),
+    locks: mergeEntryArrays(other.locks, base.locks, "locks"),
+    lockLogs: mergeEntryArrays(other.lockLogs, base.lockLogs, "lockLogs"),
+    appointments: mergeEntryArrays(other.appointments, base.appointments, "appointments"),
+    mobileOvulationLogs: mergeEntryArrays(other.mobileOvulationLogs, base.mobileOvulationLogs, "mobileOvulationLogs"),
+    mobilePreLayShedLogs: mergeEntryArrays(other.mobilePreLayShedLogs, base.mobilePreLayShedLogs, "mobilePreLayShedLogs"),
+    mobileClutchLogs: mergeEntryArrays(other.mobileClutchLogs, base.mobileClutchLogs, "mobileClutchLogs"),
+    mobileHatchLogs: mergeEntryArrays(other.mobileHatchLogs, base.mobileHatchLogs, "mobileHatchLogs"),
+    logs: mergeLogs(other.logs, base.logs),
+  };
+};
+
+const mergeSnapshotList = (localItems, backendItems, fallbackPrefix, mergeRecord) => {
   const merged = new Map();
   const order = [];
-  const add = (record, sourceIndex) => {
+  const add = (record, source, sourceIndex) => {
     if (!record || typeof record !== "object") return;
     const key = recordIdentity(record, fallbackPrefix, sourceIndex);
     const current = merged.get(key);
@@ -147,12 +262,16 @@ const mergeSnapshotList = (localItems, backendItems, fallbackPrefix) => {
       order.push(key);
       return;
     }
+    if (typeof mergeRecord === "function") {
+      merged.set(key, source === "local" ? mergeRecord(record, current) : mergeRecord(current, record));
+      return;
+    }
     if (recordTimestamp(record) >= recordTimestamp(current)) {
       merged.set(key, record);
     }
   };
-  (Array.isArray(backendItems) ? backendItems : []).forEach((record, index) => add(record, index));
-  (Array.isArray(localItems) ? localItems : []).forEach((record, index) => add(record, index));
+  (Array.isArray(backendItems) ? backendItems : []).forEach((record, index) => add(record, "backend", index));
+  (Array.isArray(localItems) ? localItems : []).forEach((record, index) => add(record, "local", index));
   return order.map((key) => merged.get(key));
 };
 
@@ -191,9 +310,10 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normal
   animals: mergeSnapshotList(
     localSnapshot.animals || localSnapshot.snakes,
     backendSnapshot.animals || backendSnapshot.snakes,
-    "animal"
+    "animal",
+    mergeAnimalRecord
   ),
-  pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing"),
+  pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing", mergePairingRecord),
 });
 
 const upsertSnapshotRecord = (records, updated, fallbackPrefix) => {
@@ -1183,7 +1303,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const updateAnimalInSnapshot = useCallback(async (updated) => {
     const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updated);
-    const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
+    const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
     const changedKey = recordIdentity(changed, "animal", 0);
     const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
@@ -1195,7 +1315,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const handleSavePairing = useCallback(async (updatedPairing) => {
     const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updatedPairing);
-    const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
+    const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
     setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
   }, []);
@@ -1266,7 +1386,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     try {
       const snapshot = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
       const merged = markRecordUpdated({ ...animal, ...draft });
-      const animals = upsertSnapshotRecord(snapshot.animals, merged, "animal");
+      const animals = mergeSnapshotList([merged], snapshot.animals, "animal", mergeAnimalRecord);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
       const mergedKey = recordIdentity(merged, "animal", 0);
       const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
@@ -1608,7 +1728,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const updateAnimalInSnapshot = useCallback(async (updated) => {
     const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updated);
-    const list = upsertSnapshotRecord(snap?.animals, changed, "animal");
+    const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
     const changedKey = recordIdentity(changed, "animal", 0);
     const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
@@ -1620,7 +1740,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const handleSavePairing = useCallback(async (updatedPairing) => {
     const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
     const changed = markRecordUpdated(updatedPairing);
-    const pairs = upsertSnapshotRecord(snap?.pairings, changed, "pairing");
+    const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
     setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
   }, []);

@@ -9,6 +9,7 @@ export type BreederSnapshotInput = {
   animals?: unknown[];
   pairings?: unknown[];
   clutches?: unknown[];
+  plannerState?: unknown;
 };
 
 const db = prisma as any;
@@ -93,6 +94,40 @@ const timestampMs = (value: unknown): number => {
   return iso ? new Date(iso).getTime() : 0;
 };
 
+const nestedUpdatedAtMs = (value: unknown, depth = 0): number => {
+  if (!value || depth > 5) return 0;
+  if (Array.isArray(value)) {
+    return value.reduce((max, item) => Math.max(max, nestedUpdatedAtMs(item, depth + 1)), 0);
+  }
+  const record = asRecord(value);
+  if (!record) return 0;
+  const metadata = asRecord(record.metadata);
+  let max = Math.max(
+    timestampMs(record.updatedAt),
+    timestampMs(record.modifiedAt),
+    timestampMs(record.lastModifiedAt),
+    timestampMs(record.createdAt),
+    timestampMs(record.addedAt),
+    timestampMs(record.date),
+    timestampMs(metadata?.updatedAt),
+    timestampMs(metadata?.modifiedAt),
+    timestampMs(metadata?.backendUpdatedAt),
+    timestampMs(metadata?.backendCreatedAt),
+  );
+  Object.entries(record).forEach(([key, entry]) => {
+    if (
+      key === "logs" ||
+      key === "photos" ||
+      key === "locks" ||
+      key === "appointments" ||
+      key.endsWith("Logs")
+    ) {
+      max = Math.max(max, nestedUpdatedAtMs(entry, depth + 1));
+    }
+  });
+  return max;
+};
+
 const payloadUpdatedAtMs = (payload: JsonRecord | null): number => {
   if (!payload) return 0;
   const metadata = asRecord(payload.metadata);
@@ -105,6 +140,14 @@ const payloadUpdatedAtMs = (payload: JsonRecord | null): number => {
     timestampMs(metadata?.modifiedAt),
     timestampMs(metadata?.backendUpdatedAt),
     timestampMs(metadata?.backendCreatedAt),
+    nestedUpdatedAtMs(payload.logs),
+    nestedUpdatedAtMs(payload.photos),
+    nestedUpdatedAtMs(payload.locks),
+    nestedUpdatedAtMs(payload.appointments),
+    nestedUpdatedAtMs(payload.mobileOvulationLogs),
+    nestedUpdatedAtMs(payload.mobilePreLayShedLogs),
+    nestedUpdatedAtMs(payload.mobileClutchLogs),
+    nestedUpdatedAtMs(payload.mobileHatchLogs),
   );
 };
 
@@ -124,6 +167,124 @@ const shouldApplyIncomingPayload = (
   if (!incomingTimestamp) return false;
   return incomingTimestamp >= existingTimestamp;
 };
+
+const mergeStringArrays = (...values: unknown[]): string[] => {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  values.flatMap((value) => Array.isArray(value) ? value : []).forEach((item) => {
+    const text = textValue(item);
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(text);
+  });
+  return merged;
+};
+
+const mergeRecordKey = (record: JsonRecord, label: string, index: number): string => {
+  const explicit = [
+    record.id,
+    record.logId,
+    record.uuid,
+    record.appId,
+    record.createdAt && `${record.createdAt}:${record.actionType || label}`,
+    record.addedAt && `${record.addedAt}:${record.source || label}`,
+  ].map(textValue).find(Boolean);
+  if (explicit) return explicit;
+  return [
+    label,
+    record.date,
+    record.time,
+    record.result || record.outcome,
+    record.feed || record.food || record.prey,
+    record.size || record.weight || record.grams,
+    record.notes || record.note,
+  ].map((part) => textValue(part) || "").join("|") || `${label}-${index + 1}`;
+};
+
+const mergeRecordArrays = (olderValue: unknown, newerValue: unknown, label: string): JsonRecord[] => {
+  const rows = [
+    ...(Array.isArray(olderValue) ? olderValue : []),
+    ...(Array.isArray(newerValue) ? newerValue : []),
+  ].map(asRecord).filter((item): item is JsonRecord => !!item);
+  const merged = new Map<string, JsonRecord>();
+  rows.forEach((row, index) => {
+    const key = mergeRecordKey(row, label, index);
+    const existing = merged.get(key);
+    if (!existing || payloadUpdatedAtMs(row) >= payloadUpdatedAtMs(existing)) {
+      merged.set(key, existing ? { ...existing, ...row } : row);
+    }
+  });
+  return Array.from(merged.values()).sort((a, b) => payloadUpdatedAtMs(b) - payloadUpdatedAtMs(a));
+};
+
+const mergeLogsObject = (olderValue: unknown, newerValue: unknown): JsonRecord => {
+  const older = asRecord(olderValue) || {};
+  const newer = asRecord(newerValue) || {};
+  const result: JsonRecord = {};
+  const keys = Array.from(new Set([...Object.keys(older), ...Object.keys(newer)]));
+  keys.forEach((key) => {
+    result[key] = mergeRecordArrays(older[key], newer[key], key);
+  });
+  return result;
+};
+
+const mergePayloadMetadata = (older: JsonRecord, newer: JsonRecord): JsonRecord | undefined => {
+  const olderMetadata = asRecord(older.metadata) || {};
+  const newerMetadata = asRecord(newer.metadata) || {};
+  const metadata = { ...olderMetadata, ...newerMetadata };
+  return Object.keys(metadata).length ? metadata : undefined;
+};
+
+const mergeSnapshotPayload = (
+  existingPayload: unknown,
+  incomingPayload: JsonRecord,
+  options: { stringArrayKeys?: string[]; recordArrayKeys?: string[]; mergeLogs?: boolean } = {},
+): JsonRecord => {
+  const existing = asRecord(existingPayload) || {};
+  const incomingTime = payloadUpdatedAtMs(incomingPayload);
+  const existingTime = payloadUpdatedAtMs(existing);
+  const newer = incomingTime >= existingTime ? incomingPayload : existing;
+  const older = incomingTime >= existingTime ? existing : incomingPayload;
+  const merged: JsonRecord = { ...older, ...newer };
+  (options.stringArrayKeys || []).forEach((key) => {
+    merged[key] = mergeStringArrays(older[key], newer[key]);
+  });
+  (options.recordArrayKeys || []).forEach((key) => {
+    merged[key] = mergeRecordArrays(older[key], newer[key], key);
+  });
+  if (options.mergeLogs) {
+    merged.logs = mergeLogsObject(older.logs, newer.logs);
+  }
+  const metadata = mergePayloadMetadata(older, newer);
+  if (metadata) merged.metadata = metadata;
+  return merged;
+};
+
+const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => (
+  mergeSnapshotPayload(existingPayload, incomingPayload, {
+    stringArrayKeys: ["morphs", "hets", "possibleHets", "tags", "groups"],
+    recordArrayKeys: ["photos"],
+    mergeLogs: true,
+  })
+);
+
+const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => (
+  mergeSnapshotPayload(existingPayload, incomingPayload, {
+    stringArrayKeys: ["goals", "tags"],
+    recordArrayKeys: [
+      "locks",
+      "lockLogs",
+      "appointments",
+      "mobileOvulationLogs",
+      "mobilePreLayShedLogs",
+      "mobileClutchLogs",
+      "mobileHatchLogs",
+    ],
+    mergeLogs: true,
+  })
+);
 
 const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   const clutch = asRecord(pairing.clutch);
@@ -258,16 +419,18 @@ const syncMarketplaceAutoListings = async (ownerId: string, animals: JsonRecord[
 };
 
 export const listBreederSnapshot = async (ownerId: string) => {
-  const [animals, pairings, clutches] = await Promise.all([
+  const [animals, pairings, clutches, plannerState] = await Promise.all([
     db.animal.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
     db.pairing.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
     db.clutch.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
+    db.breederPlannerState.findUnique({ where: { ownerId } }),
   ]);
 
   return {
     animals: animals.map(withBackendSyncMetadata),
     pairings: pairings.map(withBackendSyncMetadata),
     clutches: clutches.map(withBackendSyncMetadata),
+    plannerState: plannerState ? withBackendSyncMetadata(plannerState) : null,
   };
 };
 
@@ -275,6 +438,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const animals = normalizeArray(input.animals, "animals");
   const pairings = normalizeArray(input.pairings, "pairings");
   const explicitClutches = normalizeArray(input.clutches, "clutches");
+  const plannerState = asRecord(input.plannerState);
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
   const animalAccess: any = await canAccessFeature({ id: ownerId }, "animals.create").catch((error) => {
@@ -302,7 +466,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         name: textValue(animal.name),
         sex: textValue(animal.sex),
         status: textValue(animal.status),
-        payload: animal,
+        payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
       };
       if (!existing) {
         await tx.animal.create({
@@ -333,7 +497,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         femaleAnimalAppId: textValue(pairing.femaleId),
         status: textValue(pairing.status),
         startDate: textValue(pairing.startDate),
-        payload: pairing,
+        payload: existing ? mergePairingPayload(existing.payload, pairing) : pairing,
       };
       const row = !existing
         ? await tx.pairing.create({
@@ -364,7 +528,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         clutchNumber: numberValue(clutch.clutchNumber),
         seasonYear: numberValue(clutch.seasonYear),
         laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
-        payload: clutch,
+        payload: existing ? mergeSnapshotPayload(existing.payload, clutch, { recordArrayKeys: ["photos"], mergeLogs: true }) : clutch,
       };
       if (!existing) {
         await tx.clutch.create({
@@ -381,6 +545,33 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
             ...data,
             pairingId: data.pairingId || undefined,
           },
+        });
+      }
+    }
+
+    if (plannerState) {
+      const existing = await tx.breederPlannerState.findUnique({
+        where: { ownerId },
+        select: { id: true, payload: true, updatedAt: true },
+      });
+      const data = {
+        payload: existing
+          ? mergeSnapshotPayload(existing.payload, plannerState, {
+            stringArrayKeys: ["groups", "showGroups", "hiddenGroups", "customStatusTags", "removedStatusTags"],
+          })
+          : plannerState,
+      };
+      if (!existing) {
+        await tx.breederPlannerState.create({
+          data: {
+            ownerId,
+            ...data,
+          },
+        });
+      } else if (shouldApplyIncomingPayload(plannerState, existing)) {
+        await tx.breederPlannerState.update({
+          where: { id: existing.id },
+          data,
         });
       }
     }

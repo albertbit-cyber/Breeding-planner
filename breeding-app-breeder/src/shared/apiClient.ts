@@ -585,6 +585,7 @@ export type BreederSnapshotPayload = {
   animals: unknown[];
   pairings: unknown[];
   clutches?: unknown[];
+  plannerState?: Record<string, unknown> | null;
 };
 
 const BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS = 30_000;

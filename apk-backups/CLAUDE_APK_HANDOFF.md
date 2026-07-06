@@ -10,19 +10,20 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 Most recent release APK:
 
-`app-release-2026-07-05-demo-snakes-local-only.apk`
+`app-release-2026-07-06-unified-cloud-sync.apk`
 
-This APK was built after the demo snakes local-only fix. It should be the starting APK if Claude needs to test or continue mobile release work.
+This APK was built after the unified cloud sync fix for three-device convergence. It should be the starting APK if Claude needs to test or continue mobile release work.
 
 Latest committed baseline before this APK:
 
-`2b9826e Fix cloud sync convergence`
+This commit: `Fix unified cloud sync across devices`
 
 ## Collected APK Inventory
 
 | APK | Type | Size bytes | SHA256 | Notes |
 | --- | --- | ---: | --- | --- |
-| `app-release-2026-07-05-demo-snakes-local-only.apk` | Release | 24843730 | `CCA6FBFE3C9AE317EB472176E70672140F4A6098C61053F49A4FBA7526312C15` | Most recent. Built July 5, 2026 after making demo snakes local-only preview data. |
+| `app-release-2026-07-06-unified-cloud-sync.apk` | Release | 24845494 | `BA4194036827CF5E50394725DECA5E46515578D8879D79DA1DC69FF2C2327515` | Most recent. Built July 6, 2026 after backend nested merge, owner planner-state sync, mobile save-before-upload merge, and first-sync default overwrite protection. |
+| `app-release-2026-07-05-demo-snakes-local-only.apk` | Release | 24843730 | `CCA6FBFE3C9AE317EB472176E70672140F4A6098C61053F49A4FBA7526312C15` | Prior July 5 build after making demo snakes local-only preview data. |
 | `app-release-2026-07-05-cloud-sync-convergence.apk` | Release | 24843198 | `C458A6B68488733B465736136312B933AFFE94233B8896481FF2C678EB7A25B9` | Prior July 5 build after cloud sync convergence work. |
 | `app-release-2026-07-04-encoding-fixed.apk` | Release | 24841322 | `296B013A872BD0A60B9147F1C7CCC5029A4E408641541600807467728D6C7E2F` | Prior release backup for encoding fix work. |
 | `app-release-2026-07-03-photos-breeding.apk` | Release | 24831838 | `085F24A98DCC0A2F63F485062436FDF8E757AA754BA74387B15BC018BE5DF4C9` | Historical APK from gh-pages cache, now copied here. |
@@ -114,7 +115,7 @@ Get-FileHash apk-backups\*.apk -Algorithm SHA256
 
 ## Notes For Next Agent
 
-- The current latest APK is the demo snakes local-only APK from July 5, 2026.
+- The current latest APK is `app-release-2026-07-06-unified-cloud-sync.apk`.
 - As of July 6, 2026, all retained APK files are under `apk-backups/`; duplicate APK build outputs and cache APKs were removed after SHA256 verification.
 - A release AAB also exists under `android/app/build/outputs/bundle/release/app-release.aab`, but this handoff folder is for APK files unless the user asks for AAB collection too.
 - Do not delete old APKs from this folder without explicit user approval.

@@ -72,6 +72,7 @@ model User {
   animals          Animal[]
   pairings         Pairing[]
   clutches         Clutch[]
+  plannerState     BreederPlannerState?
   listings         Listing[]
   inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
   inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
@@ -239,6 +240,18 @@ model Clutch {
   @@unique([ownerId, appClutchId])
   @@index([ownerId])
   @@index([pairingId])
+}
+
+model BreederPlannerState {
+  id        String   @id @default(cuid())
+  ownerId   String   @unique
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@map("breeder_planner_states")
 }
 
 model Listing {

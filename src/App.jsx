@@ -2527,6 +2527,7 @@ function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {
     return {
       snakes: syncedSnakes,
       pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+      plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
     };
   }
 
@@ -2539,6 +2540,7 @@ function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {
   return {
     snakes: !localHasRealSnakes && localDemoSnakes.length ? localDemoSnakes : [],
     pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+    plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
   };
 }
 
@@ -2595,13 +2597,18 @@ function prepareAnimalForBackend(snake) {
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
-function prepareSnapshotForBackend(animals, pairings) {
+function prepareSnapshotForBackend(animals, pairings, plannerState = null) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
-  return {
+  const payload = {
     animals: persistable.snakes.map(prepareAnimalForBackend).filter(Boolean),
     pairings: persistable.pairings,
     clutches: [],
   };
+  const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
+  if (normalizedPlannerState) {
+    payload.plannerState = sanitizeBackendMediaValue(normalizedPlannerState);
+  }
+  return payload;
 }
 
 const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
@@ -2687,6 +2694,130 @@ function mergeArrayValues(...values) {
   return merged;
 }
 
+function sanitizePlannerObjectRecord(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : null;
+}
+
+function normalizePlannerStringList(value) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.map(item => String(item || '').trim()).filter(Boolean)))
+    : [];
+}
+
+function normalizePlannerStateRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const state = { ...value };
+  const structuredSpaces = {
+    rooms: Array.isArray(state.rooms) ? state.rooms : [],
+    heatRacks: Array.isArray(state.heatRacks) ? state.heatRacks : [],
+    terrariums: Array.isArray(state.terrariums) ? state.terrariums : [],
+  };
+  if (Array.isArray(state.groups)) state.groups = normalizePlannerStringList(state.groups);
+  if (Array.isArray(state.showGroups)) state.showGroups = normalizePlannerStringList(state.showGroups);
+  if (Array.isArray(state.hiddenGroups)) state.hiddenGroups = normalizePlannerStringList(state.hiddenGroups);
+  if (Array.isArray(state.customStatusTags)) state.customStatusTags = normalizePlannerStringList(state.customStatusTags);
+  if (Array.isArray(state.removedStatusTags)) state.removedStatusTags = normalizePlannerStringList(state.removedStatusTags);
+  if (Array.isArray(state.morphAliases)) state.morphAliases = normalizeMorphAliasDatabase(state.morphAliases);
+  if (Array.isArray(state.geneAliases)) state.geneAliases = mergeGeneAliasRows(state.geneAliases);
+  if (state.breederInfo && typeof state.breederInfo === 'object') state.breederInfo = normalizeBreederInfo(state.breederInfo);
+  if (state.backupSettings && typeof state.backupSettings === 'object') state.backupSettings = normalizeBackupSettings(state.backupSettings);
+  if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
+    state.lastFeedDefaults = { ...DEFAULT_LAST_FEED_DEFAULTS, ...state.lastFeedDefaults };
+  }
+  if (state.leucisticType !== 'blackEye') state.leucisticType = 'bel';
+  const hasStructuredSpaces = structuredSpaces.rooms.length || structuredSpaces.heatRacks.length || structuredSpaces.terrariums.length;
+  if (hasStructuredSpaces || Array.isArray(state.spaces)) {
+    const normalizedSpaces = hasStructuredSpaces
+      ? normalizeSpacesDataset(structuredSpaces)
+      : normalizeSpacesDataset(state.spaces);
+    state.rooms = normalizedSpaces.rooms;
+    state.heatRacks = normalizedSpaces.heatRacks;
+    state.terrariums = normalizedSpaces.terrariums;
+    state.spaces = buildLegacySpacesSnapshot(normalizedSpaces.rooms, normalizedSpaces.heatRacks, normalizedSpaces.terrariums);
+  }
+  return state;
+}
+
+function plannerStateComparable(state) {
+  const normalized = normalizePlannerStateRecord(state);
+  if (!normalized) return null;
+  const clone = JSON.parse(JSON.stringify(normalized));
+  delete clone.updatedAt;
+  delete clone.modifiedAt;
+  delete clone.lastModifiedAt;
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    delete clone.metadata.updatedAt;
+    delete clone.metadata.modifiedAt;
+    delete clone.metadata.lastModifiedAt;
+    delete clone.metadata.backendCreatedAt;
+    delete clone.metadata.backendUpdatedAt;
+  }
+  return clone;
+}
+
+function plannerSnapshotSignature(snapshot = {}) {
+  return JSON.stringify({
+    snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
+    pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
+    plannerState: plannerStateComparable(snapshot.plannerState),
+  });
+}
+
+function markPlannerStateUpdated(state, updatedAt = nowIsoString()) {
+  if (!state || typeof state !== 'object') return state;
+  return {
+    ...state,
+    updatedAt,
+    metadata: {
+      ...(state.metadata && typeof state.metadata === 'object' ? state.metadata : {}),
+      updatedAt,
+    },
+  };
+}
+
+function stampPlannerStateForSync(localState, baselineState) {
+  const normalized = normalizePlannerStateRecord(localState);
+  if (!normalized) return null;
+  if (!baselineState) return normalized;
+  if (JSON.stringify(plannerStateComparable(normalized)) === JSON.stringify(plannerStateComparable(baselineState))) {
+    return normalized;
+  }
+  return markPlannerStateUpdated(normalized);
+}
+
+function mergePlannerObjectRecord(localRecord, backendRecord) {
+  if (!localRecord) return backendRecord;
+  if (!backendRecord) return localRecord;
+  return getSyncTimestamp(backendRecord) >= getSyncTimestamp(localRecord)
+    ? { ...localRecord, ...backendRecord }
+    : { ...backendRecord, ...localRecord };
+}
+
+function mergePlannerStates(localState, backendState) {
+  const local = normalizePlannerStateRecord(localState);
+  const backend = normalizePlannerStateRecord(backendState);
+  if (!local) return backend;
+  if (!backend) return local;
+  const localTime = getSyncTimestamp(local);
+  const backendTime = getSyncTimestamp(backend);
+  const base = backendTime > localTime ? backend : local;
+  const other = backendTime > localTime ? local : backend;
+  const merged = {
+    ...other,
+    ...base,
+    groups: mergeArrayValues(other.groups, base.groups),
+    showGroups: mergeArrayValues(other.showGroups, base.showGroups),
+    hiddenGroups: mergeArrayValues(other.hiddenGroups, base.hiddenGroups),
+    customStatusTags: mergeArrayValues(other.customStatusTags, base.customStatusTags),
+    removedStatusTags: mergeArrayValues(other.removedStatusTags, base.removedStatusTags),
+    rooms: mergeRecordsByKey(other.rooms, base.rooms, sanitizePlannerObjectRecord, 'room', mergePlannerObjectRecord),
+    heatRacks: mergeRecordsByKey(other.heatRacks, base.heatRacks, sanitizePlannerObjectRecord, 'heatRack', mergePlannerObjectRecord),
+    terrariums: mergeRecordsByKey(other.terrariums, base.terrariums, sanitizePlannerObjectRecord, 'terrarium', mergePlannerObjectRecord),
+  };
+  merged.spaces = buildLegacySpacesSnapshot(merged.rooms, merged.heatRacks, merged.terrariums);
+  return normalizePlannerStateRecord(merged);
+}
+
 function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
   if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
@@ -2750,6 +2881,7 @@ function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
     pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
       ? filterPairingsLinkedToDemoSnakes(mergedPairings, demoSnakeIds)
       : mergedPairings,
+    plannerState: mergePlannerStates(localSnapshot.plannerState, backendSnapshot.plannerState),
   };
 }
 
@@ -2812,6 +2944,7 @@ function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) 
       sanitizePairingRecord,
       'pairing'
     ),
+    plannerState: stampPlannerStateForSync(localSnapshot.plannerState, baselineSnapshot.plannerState),
   };
 }
 
@@ -2821,6 +2954,7 @@ function normalizeBackendBreederSnapshot(snapshot = {}) {
   return {
     snakes: snakes.filter(snake => !isDemoSnakeRecord(snake)),
     pairings: filterPairingsLinkedToDemoSnakes(snapshot?.pairings, demoSnakeIds),
+    plannerState: normalizePlannerStateRecord(snapshot?.plannerState),
   };
 }
 
@@ -6276,7 +6410,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
 export default function BreedingPlannerApp() {
   const { t } = useTranslation();
-  const { resolvedAppearance, effectiveThemeMode } = useAppearance();
+  const { appearanceState, resolvedAppearance, effectiveThemeMode, hydrateAppearance } = useAppearance();
   const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
   const appRootStyle = useMemo(() => ({
@@ -6409,6 +6543,10 @@ export default function BreedingPlannerApp() {
   const [backupSettings, setBackupSettings] = useState(() => normalizeBackupSettings(loadStoredJson(STORAGE_KEYS.backupSettings, null)));
   const [autoBackupSnapshot, setAutoBackupSnapshot] = useState(() => normalizeBackupSnapshot(loadStoredJson(STORAGE_KEYS.backupSnapshot, null)));
   const [backupVault, setBackupVault] = useState(() => normalizeBackupVault(loadStoredJson(STORAGE_KEYS.backupVault, [])));
+  const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
+    return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
+  });
   const quickAddAvailableGenetics = useMemo(
     () => buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases),
     [snakes, morphAliases, geneAliases]
@@ -6787,9 +6925,79 @@ export default function BreedingPlannerApp() {
     });
   }, []);
 
+  const plannerSyncState = useMemo(() => normalizePlannerStateRecord({
+    version: 1,
+    groups,
+    showGroups,
+    hiddenGroups,
+    customStatusTags,
+    removedStatusTags,
+    morphAliases: normalizeMorphAliasDatabase(morphAliases),
+    geneAliases: mergeGeneAliasRows(geneAliases),
+    leucisticType: lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel',
+    breederInfo: normalizeBreederInfo(breederInfo),
+    backupSettings: normalizeBackupSettings(backupSettings),
+    appearance: appearanceState,
+    theme,
+    lastFeedDefaults,
+    rooms,
+    heatRacks,
+    terrariums,
+    spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
+  }), [
+    appearanceState,
+    backupSettings,
+    breederInfo,
+    customStatusTags,
+    geneAliases,
+    groups,
+    heatRacks,
+    hiddenGroups,
+    lastFeedDefaults,
+    lastLeucisticType,
+    morphAliases,
+    removedStatusTags,
+    rooms,
+    showGroups,
+    terrariums,
+    theme,
+  ]);
+
+  const applyPlannerSyncState = useCallback((incomingState) => {
+    const state = normalizePlannerStateRecord(incomingState);
+    if (!state) return;
+    if (Array.isArray(state.groups)) setGroups(state.groups.length ? state.groups : [...DEFAULT_GROUPS]);
+    if (Array.isArray(state.showGroups)) setShowGroups(state.showGroups);
+    if (Array.isArray(state.hiddenGroups)) setHiddenGroups(state.hiddenGroups);
+    if (Array.isArray(state.customStatusTags)) setCustomStatusTags(state.customStatusTags);
+    if (Array.isArray(state.removedStatusTags)) setRemovedStatusTags(state.removedStatusTags);
+    if (Array.isArray(state.morphAliases)) {
+      const normalizedAliases = normalizeMorphAliasDatabase(state.morphAliases);
+      setMorphAliases(normalizedAliases.length ? normalizedAliases : [...DEFAULT_MORPH_ALIASES]);
+    }
+    if (Array.isArray(state.geneAliases)) setGeneAliases(mergeGeneAliasRows(state.geneAliases));
+    if (state.leucisticType === 'blackEye' || state.leucisticType === 'bel') setLastLeucisticType(state.leucisticType);
+    if (state.breederInfo && typeof state.breederInfo === 'object') setBreederInfo(normalizeBreederInfo(state.breederInfo));
+    if (state.backupSettings && typeof state.backupSettings === 'object') setBackupSettings(normalizeBackupSettings(state.backupSettings));
+    if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
+      setLastFeedDefaults(prev => ({ ...prev, ...state.lastFeedDefaults }));
+    }
+    if (state.appearance && typeof state.appearance === 'object') {
+      hydrateAppearance(state.appearance);
+    }
+    const hasSpaces = Array.isArray(state.rooms) || Array.isArray(state.heatRacks) || Array.isArray(state.terrariums) || Array.isArray(state.spaces);
+    if (hasSpaces) {
+      setSpacesState(normalizeSpacesDataset({
+        rooms: Array.isArray(state.rooms) ? state.rooms : [],
+        heatRacks: Array.isArray(state.heatRacks) ? state.heatRacks : [],
+        terrariums: Array.isArray(state.terrariums) ? state.terrariums : [],
+      }));
+    }
+  }, [hydrateAppearance]);
+
   useEffect(() => {
-    latestPlannerSnapshotRef.current = { snakes, pairings };
-  }, [snakes, pairings]);
+    latestPlannerSnapshotRef.current = { snakes, pairings, plannerState: plannerSyncState };
+  }, [snakes, pairings, plannerSyncState]);
 
   const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
@@ -6814,13 +7022,14 @@ export default function BreedingPlannerApp() {
       const snapshot = await fetchBreederSnapshot();
       const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
       const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState));
       const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
       const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-      const signature = JSON.stringify(syncedSnapshot);
+      const signature = plannerSnapshotSignature(syncedSnapshot);
 
       setSyncedSnakes(syncedSnapshot.snakes);
       setSyncedPairings(syncedSnapshot.pairings);
+      applyPlannerSyncState(syncedSnapshot.plannerState);
       latestPlannerSnapshotRef.current = syncedSnapshot;
 
       const syncedAt = new Date().toISOString();
@@ -6840,7 +7049,7 @@ export default function BreedingPlannerApp() {
       setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
       throw error;
     }
-  }, [setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
@@ -7161,10 +7370,6 @@ export default function BreedingPlannerApp() {
   }, []);
 
   // last feed defaults (persisted) - store feed/form/size/etc but not grams
-  const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
-    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
-    return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
-  });
   useEffect(() => { saveStoredJson(STORAGE_KEYS.lastFeedDefaults, lastFeedDefaults); }, [lastFeedDefaults]);
   useEffect(() => {
     saveStoredJson(STORAGE_KEYS.spaces, { rooms, heatRacks, terrariums });
@@ -7273,7 +7478,7 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (!backendPlannerSyncRef.current.seeded) return;
 
-    const signature = JSON.stringify({ snakes, pairings });
+    const signature = plannerSnapshotSignature({ snakes, pairings, plannerState: plannerSyncState });
     const saveRequestId = ++cloudSaveRequestIdRef.current;
     if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
       backendPlannerSyncRef.current.status = 'ready';
@@ -7284,7 +7489,7 @@ export default function BreedingPlannerApp() {
       if (saveRequestId !== cloudSaveRequestIdRef.current) return;
       backendPlannerSyncRef.current.status = 'loading';
       const localSnapshot = stampChangedSnapshotForSync(
-        { snakes, pairings },
+        { snakes, pairings, plannerState: plannerSyncState },
         cloudBaselineSnapshotRef.current
       );
 
@@ -7293,7 +7498,7 @@ export default function BreedingPlannerApp() {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
           const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
           const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState));
         })
         .then((savedSnapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
@@ -7301,9 +7506,10 @@ export default function BreedingPlannerApp() {
           const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
           setSyncedSnakes(currentSnapshot.snakes);
           setSyncedPairings(currentSnapshot.pairings);
+          applyPlannerSyncState(currentSnapshot.plannerState);
           latestPlannerSnapshotRef.current = currentSnapshot;
           backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = JSON.stringify(currentSnapshot);
+          backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(currentSnapshot);
           cloudBaselineSnapshotRef.current = currentSnapshot;
           setCloudSyncStatus({
             state: 'success',
@@ -7326,7 +7532,7 @@ export default function BreedingPlannerApp() {
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [electronDataReady, pairings, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
+  }, [applyPlannerSyncState, electronDataReady, pairings, plannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
