@@ -8,17 +8,17 @@ Do not use `dist/android/app-release.apk` or `android/app/build/outputs/apk/rele
 
 ## Current Latest APK
 
-`apk-backups/app-release-2026-07-05-demo-snakes-local-only.apk`
+`apk-backups/app-release-2026-07-07-mobile-full-redesign.apk`
 
 SHA256:
 
-`CCA6FBFE3C9AE317EB472176E70672140F4A6098C61053F49A4FBA7526312C15`
+`1D54F0B5EB0D2C039EEEEB044A2EB8BC1D01C869C8D312CB803E38441839CAB6`
 
-Built from the July 5, 2026 release APK after the demo snakes local-only fix. The same binary also exists at:
+Built from the July 7, 2026 release APK after the mobile full-version redesign. The same binary also exists at:
 
-- `apk-backups/app-release-2026-07-05-demo-snakes-local-only.apk`
+- `apk-backups/app-release-2026-07-07-mobile-full-redesign.apk`
 
-As of July 6, 2026, `apk-backups/` is the only folder that should keep APK files. Generated APK outputs under `dist/android/`, `android/app/build/outputs/apk/`, or cache folders must be treated as temporary build output and removed after their hashes are verified against the named copy in `apk-backups/`.
+As of July 7, 2026, `apk-backups/` is the only folder that should keep APK files. Generated APK outputs under `dist/android/`, `android/app/build/outputs/apk/`, or cache folders must be treated as temporary build output and removed after their hashes are verified against the named copy in `apk-backups/`.
 
 ## Naming Rule
 

@@ -86,8 +86,138 @@ const fmtSyncTime = (iso) => {
   } catch { return "Unknown"; }
 };
 const first = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
-const locationText = (a) => [a?.room, a?.rack, a?.tub].filter(Boolean).join(" / ") || "";
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
+
+const asArray = (value) => (Array.isArray(value) ? value : []);
+const isObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+const compactText = (...values) => values
+  .flatMap((value) => (Array.isArray(value) ? value : [value]))
+  .map((value) => String(value ?? "").trim())
+  .filter(Boolean);
+
+const firstText = (...values) => compactText(...values)[0] || "";
+const joinText = (value) => compactText(value).join(", ");
+
+const animalIdentity = (animal) => firstText(animal?.id, animal?.appAnimalId, animal?.animalId, animal?.snakeId);
+
+const animalLocationParts = (animal = {}) => {
+  const location = isObject(animal.location) ? animal.location : {};
+  const space = isObject(animal.space) ? animal.space : {};
+  return compactText(
+    firstText(animal.roomName, animal.room, location.roomName, location.room, space.roomName, space.room),
+    firstText(animal.rackName, animal.rack, animal.heatRackName, animal.heatRack, location.rackName, location.rack, space.rackName, space.rack),
+    firstText(animal.tubName, animal.tub, animal.tubLabel, animal.slotLabel, location.tubName, location.tub, space.tubName, space.tub)
+  );
+};
+
+const locationText = (animal) => animalLocationParts(animal).join(" / ");
+
+const formatGeneticsText = (animal = {}) => {
+  const explicit = firstText(animal.genetics, animal.morphHetText, animal.morphsText);
+  if (explicit) return explicit;
+  const morphs = joinText(animal.morphs);
+  const hets = joinText(animal.hets);
+  const possibleHets = joinText(animal.possibleHets);
+  return compactText(
+    morphs,
+    hets ? `het ${hets}` : "",
+    possibleHets ? `possible het ${possibleHets}` : ""
+  ).join(" | ");
+};
+
+const ymdFromDate = (value) => {
+  if (!value) return "";
+  const raw = String(value);
+  const datePart = raw.slice(0, 10);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(datePart)
+    ? new Date(`${datePart}T12:00:00`)
+    : new Date(raw);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : "";
+};
+
+const addDaysYmd = (ymd, days) => {
+  const date = ymdFromDate(ymd);
+  if (!date) return "";
+  const parsed = new Date(`${date}T12:00:00`);
+  parsed.setDate(parsed.getDate() + Number(days || 0));
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : "";
+};
+
+const entryDateValue = (entry = {}) => firstText(entry.date, entry.fedAt, entry.loggedAt, entry.createdAt, entry.updatedAt, entry.addedAt);
+const entryTime = (entry = {}) => {
+  const ymd = ymdFromDate(entryDateValue(entry));
+  if (ymd) return new Date(`${ymd}T12:00:00`).getTime();
+  const parsed = Date.parse(entryDateValue(entry));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const latestLogEntry = (entries = [], predicate = null) => {
+  return asArray(entries)
+    .filter((entry) => isObject(entry) && (!predicate || predicate(entry)))
+    .sort((a, b) => entryTime(b) - entryTime(a) || recordTimestamp(b) - recordTimestamp(a))[0] || null;
+};
+
+const isRefusedFeed = (entry = {}) => (
+  entry.refused === true || String(entry.result || entry.status || entry.outcome || "").toLowerCase() === "refused"
+);
+
+const normalizeFeederProfile = (animal = {}) => {
+  const source = isObject(animal.feederProfile)
+    ? animal.feederProfile
+    : isObject(animal.feedCycle)
+      ? animal.feedCycle
+      : isObject(animal.feeder)
+        ? animal.feeder
+        : {};
+  const latestFeed = latestLogEntry(animal?.logs?.feeds, (entry) => !isRefusedFeed(entry));
+  const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
+  const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams ?? latestFeed?.weightGrams ?? latestFeed?.grams);
+  const intervalDays = Number(source.intervalDays ?? source.feedIntervalDays ?? source.feedingIntervalDays ?? source.interval ?? "");
+  const rawType = firstText(source.feedType, source.foodType, source.feed, latestFeed?.feed, latestFeed?.food);
+  return {
+    feedType: rawType.toUpperCase() === "ASF" ? "SF" : rawType,
+    sizeClass: firstText(source.sizeClass, source.size, source.preySize, latestFeed?.size, latestFeed?.sizeDetail),
+    weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? weightGrams : "",
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    intervalDays: Number.isFinite(intervalDays) && intervalDays > 0 ? Math.round(intervalDays) : "",
+    notes: firstText(source.notes),
+  };
+};
+
+const getNextFeedCycle = (animal = {}) => {
+  const profile = normalizeFeederProfile(animal);
+  if (!profile.intervalDays) return null;
+  const latestFeed = latestLogEntry(animal?.logs?.feeds, (entry) => !isRefusedFeed(entry));
+  const lastFeedDate = latestFeed ? ymdFromDate(entryDateValue(latestFeed)) : "";
+  if (!lastFeedDate) return null;
+  const nextFeedDate = addDaysYmd(lastFeedDate, profile.intervalDays);
+  return nextFeedDate ? { profile, latestFeed, lastFeedDate, nextFeedDate } : null;
+};
+
+const isFeedDue = (animal = {}) => {
+  const cycle = getNextFeedCycle(animal);
+  return !!cycle && cycle.nextFeedDate <= new Date().toISOString().slice(0, 10);
+};
+
+const sexMatchesFilter = (animal, filter) => {
+  if (!filter) return true;
+  const sex = String(animal?.sex || "").trim().toLowerCase();
+  if (filter === "Male") return sex === "male" || sex === "m";
+  if (filter === "Female") return sex === "female" || sex === "f";
+  return sex === String(filter).toLowerCase();
+};
+
+const animalSearchBlob = (animal = {}) => compactText(
+  animal.name,
+  animalIdentity(animal),
+  animal.sex,
+  animal.status,
+  animal.species,
+  formatGeneticsText(animal),
+  animal.groups,
+  animal.tags,
+  animalLocationParts(animal)
+).join(" ").toLowerCase();
 
 const recordIdentity = (record, fallbackPrefix, index) => {
   if (!record || typeof record !== "object") return `${fallbackPrefix}:${index}`;
@@ -293,6 +423,42 @@ const filterDemoPairings = (pairings = [], demoIds = new Set()) => (
   })
 );
 
+const normalizeMobilePlannerState = (state = null) => {
+  if (!isObject(state)) return null;
+  const normalized = {
+    ...state,
+    rooms: asArray(state.rooms).filter(isObject),
+    heatRacks: asArray(state.heatRacks || state.racks).filter(isObject),
+    terrariums: asArray(state.terrariums).filter(isObject),
+    spaces: asArray(state.spaces).filter(isObject),
+    groups: asArray(state.groups).map((item) => String(item || "").trim()).filter(Boolean),
+  };
+  return normalized;
+};
+
+const extractMobilePlannerState = (snapshot = {}) => {
+  if (isObject(snapshot?.plannerState)) return normalizeMobilePlannerState(snapshot.plannerState);
+  if (asArray(snapshot?.rooms).length || asArray(snapshot?.heatRacks).length || asArray(snapshot?.terrariums).length || asArray(snapshot?.spaces).length) {
+    return normalizeMobilePlannerState({
+      rooms: snapshot.rooms,
+      heatRacks: snapshot.heatRacks,
+      terrariums: snapshot.terrariums,
+      spaces: snapshot.spaces,
+      groups: snapshot.groups,
+    });
+  }
+  return null;
+};
+
+const hasPlannerSpaces = (plannerState) => (
+  !!plannerState && (
+    asArray(plannerState.rooms).length > 0 ||
+    asArray(plannerState.heatRacks).length > 0 ||
+    asArray(plannerState.terrariums).length > 0 ||
+    asArray(plannerState.spaces).length > 0
+  )
+);
+
 const normalizeMobileSnapshot = (snapshot = {}) => {
   const animals = Array.isArray(snapshot?.animals)
     ? snapshot.animals
@@ -303,6 +469,7 @@ const normalizeMobileSnapshot = (snapshot = {}) => {
   return {
     animals: animals.filter((animal) => !isDemoAnimal(animal)),
     pairings: filterDemoPairings(snapshot?.pairings, demoIds),
+    plannerState: extractMobilePlannerState(snapshot),
   };
 };
 
@@ -314,7 +481,156 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normal
     mergeAnimalRecord
   ),
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing", mergePairingRecord),
+  plannerState: backendSnapshot.plannerState || localSnapshot.plannerState,
 });
+
+const animalMapByIdentity = (animals = []) => {
+  const map = new Map();
+  asArray(animals).forEach((animal) => {
+    compactText(animal?.id, animal?.appAnimalId, animal?.animalId, animal?.snakeId).forEach((key) => {
+      map.set(key, animal);
+    });
+  });
+  return map;
+};
+
+const rackSlotLabel = (slot = {}, index = 0) => {
+  const explicit = firstText(slot.label, slot.name, slot.tub, slot.tubLabel, slot.position);
+  if (explicit) return explicit;
+  const level = Number(slot.levelIndex);
+  const column = Number(slot.columnIndex);
+  if (Number.isFinite(level) && Number.isFinite(column)) return `L${level + 1}-${column + 1}`;
+  return `Tub ${index + 1}`;
+};
+
+const defaultRackSlots = (rack = {}) => {
+  const columns = Math.max(1, Number(rack.columns) || Number(rack.cols) || 1);
+  const levels = Math.max(1, Number(rack.levels) || Number(rack.rows) || 1);
+  const slots = [];
+  for (let levelIndex = 0; levelIndex < levels; levelIndex += 1) {
+    for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
+      slots.push({ levelIndex, columnIndex, snakeId: null });
+    }
+  }
+  return slots;
+};
+
+const makeTubRow = (slot, index, animalsById) => {
+  const animalId = firstText(slot?.snakeId, slot?.animalId, slot?.appAnimalId);
+  const occupant = animalId ? animalsById.get(animalId) : null;
+  return {
+    tub: rackSlotLabel(slot, index),
+    animalId,
+    name: occupant?.name || animalId || "",
+    feedingDue: occupant ? isFeedDue(occupant) : false,
+    alert: occupant ? String(occupant.status || "").toLowerCase().includes("quarantine") : false,
+  };
+};
+
+const buildRackDataFromAnimalLocations = (animals = []) => {
+  const roomMap = new Map();
+  asArray(animals).forEach((animal) => {
+    const [roomName, rackName, tubName] = animalLocationParts(animal);
+    if (!roomName && !rackName && !tubName) return;
+    const resolvedRoom = roomName || "Unassigned room";
+    const resolvedRack = rackName || "Loose housing";
+    if (!roomMap.has(resolvedRoom)) roomMap.set(resolvedRoom, new Map());
+    const rackMap = roomMap.get(resolvedRoom);
+    if (!rackMap.has(resolvedRack)) rackMap.set(resolvedRack, []);
+    rackMap.get(resolvedRack).push({
+      tub: tubName || "Open",
+      animalId: animalIdentity(animal),
+      name: animal.name || animalIdentity(animal),
+      feedingDue: isFeedDue(animal),
+      alert: String(animal.status || "").toLowerCase().includes("quarantine"),
+    });
+  });
+  return {
+    rooms: Array.from(roomMap.entries()).map(([roomName, rackMap]) => ({
+      roomName,
+      racks: Array.from(rackMap.entries()).map(([rackName, tubs]) => ({ rackName, tubs })),
+    })),
+  };
+};
+
+const buildRackDataFromPlannerState = (plannerState, animals = []) => {
+  const state = normalizeMobilePlannerState(plannerState);
+  if (!hasPlannerSpaces(state)) return buildRackDataFromAnimalLocations(animals);
+
+  const animalsById = animalMapByIdentity(animals);
+  if (!asArray(state.rooms).length && asArray(state.spaces).length) {
+    const legacyRooms = asArray(state.spaces).map((room) => {
+      const racks = asArray(room.racks).map((rack) => ({
+        rackName: firstText(rack.name, rack.type, rack.tubSize) || "Rack",
+        tubs: defaultRackSlots({
+          columns: rack.cols,
+          rows: rack.rows,
+        }).map((slot, index) => makeTubRow(slot, index, animalsById)),
+      }));
+      const terrariums = asArray(room.terrariums).map((terrarium) => ({
+        rackName: `${firstText(terrarium.name, terrarium.type) || "Terrarium"} (Terrarium)`,
+        tubs: Array.from({ length: Math.max(1, Number(terrarium.capacity) || Number(terrarium.occupants) || 1) }).map((_, index) => ({
+          tub: `Animal ${index + 1}`,
+          animalId: "",
+          name: "",
+          feedingDue: false,
+          alert: false,
+        })),
+      }));
+      return {
+        roomName: firstText(room.name, room.label) || "Room",
+        racks: [...racks, ...terrariums],
+      };
+    }).filter((room) => room.racks.length);
+    const fallback = buildRackDataFromAnimalLocations(animals);
+    return { rooms: [...legacyRooms, ...asArray(fallback.rooms)] };
+  }
+
+  const rooms = asArray(state.rooms);
+  const racks = asArray(state.heatRacks);
+  const terrariums = asArray(state.terrariums);
+
+  const roomRows = rooms.map((room) => {
+    const roomId = firstText(room.id, room.roomId);
+    const roomName = firstText(room.name, room.label) || "Room";
+    const rackRows = racks
+      .filter((rack) => firstText(rack.roomId) === roomId)
+      .map((rack) => {
+        const sourceSlots = asArray(rack.slots).length ? asArray(rack.slots) : defaultRackSlots(rack);
+        return {
+          rackName: firstText(rack.name, rack.label, rack.type) || "Rack",
+          tubs: sourceSlots.map((slot, index) => makeTubRow(slot, index, animalsById)),
+        };
+      });
+
+    const terrariumRows = terrariums
+      .filter((terrarium) => firstText(terrarium.roomId) === roomId)
+      .map((terrarium) => {
+        const occupantIds = asArray(terrarium.occupantIds).map((value) => String(value || "").trim()).filter(Boolean);
+        const capacity = Math.max(1, Number(terrarium.capacity) || occupantIds.length || 1);
+        const tubs = Array.from({ length: capacity }).map((_, index) => {
+          const animalId = occupantIds[index] || "";
+          const occupant = animalId ? animalsById.get(animalId) : null;
+          return {
+            tub: `Animal ${index + 1}`,
+            animalId,
+            name: occupant?.name || animalId || "",
+            feedingDue: occupant ? isFeedDue(occupant) : false,
+            alert: occupant ? String(occupant.status || "").toLowerCase().includes("quarantine") : false,
+          };
+        });
+        return {
+          rackName: `${firstText(terrarium.name, terrarium.label) || "Terrarium"} (Terrarium)`,
+          tubs,
+        };
+      });
+
+    return { roomName, racks: [...rackRows, ...terrariumRows] };
+  }).filter((room) => room.racks.length);
+
+  const fallback = buildRackDataFromAnimalLocations(animals);
+  return { rooms: [...roomRows, ...asArray(fallback.rooms)] };
+};
 
 const upsertSnapshotRecord = (records, updated, fallbackPrefix) => {
   const list = Array.isArray(records) ? [...records] : [];
@@ -727,6 +1043,7 @@ function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, bu
 // ג”€ג”€ג”€ ANIMAL CARD ROW (shared between flat list and groups view) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function AnimalCardRow({ animal, onOpen }) {
   const statusKey = (animal.status || "").toLowerCase().replace(/\s+/g, "-");
+  const genetics = formatGeneticsText(animal);
   return (
     <button
       type="button"
@@ -743,7 +1060,7 @@ function AnimalCardRow({ animal, onOpen }) {
           <strong className="mbl-animal-card-name">{animal.name || animal.id}</strong>
           {animal.status && <span className={`mbl-status-badge mbl-status--${statusKey}`}>{animal.status}</span>}
         </div>
-        {animal.genetics && <div className="mbl-animal-card-genetics">{animal.genetics}</div>}
+        {genetics && <div className="mbl-animal-card-genetics">{genetics}</div>}
         <div className="mbl-animal-card-row3">
           {animal.sex && <span className="mbl-sex-badge">{animal.sex}</span>}
           {locationText(animal) && <span className="mbl-animal-card-loc">📍 {locationText(animal)}</span>}
@@ -784,7 +1101,8 @@ const addDays = (ds, n) => {
 const fmtDate = (ds) => {
   if (!ds) return "—";
   try {
-    return new Date(`${ds}T12:00:00`).toLocaleDateString(undefined, {
+    const ymd = ymdFromDate(ds) || String(ds).slice(0, 10);
+    return new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, {
       month: "short", day: "numeric", year: "numeric",
     });
   } catch { return ds; }
@@ -1057,14 +1375,186 @@ function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
 // ג”€ג”€ג”€ ANIMAL PROFILE CARD (Full mode) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const STATUS_COLORS = { "active": "green", "for sale": "blue", "sold": "gray", "deceased": "red", "quarantine": "orange" };
 
+const LOG_META = {
+  feeds: { label: "Feed", icon: "F" },
+  weights: { label: "Weight", icon: "W" },
+  sheds: { label: "Shed", icon: "S" },
+  cleanings: { label: "Clean", icon: "C" },
+  meds: { label: "Medication", icon: "M" },
+  water: { label: "Water", icon: "H2O" },
+  notes: { label: "Note", icon: "N" },
+  health: { label: "Health", icon: "H" },
+};
+
+const displayValue = (value) => {
+  if (Array.isArray(value)) return joinText(value);
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value.trim();
+  return "";
+};
+
+function InfoRows({ rows = [] }) {
+  const visible = rows
+    .map((row) => ({ ...row, value: displayValue(row.value) }))
+    .filter((row) => row.value);
+  if (!visible.length) return null;
+  return (
+    <div className="mbl-info-list">
+      {visible.map((row) => (
+        <div key={row.label} className={`mbl-info-row ${row.full ? "mbl-info-row--full" : ""}`}>
+          <span>{row.label}</span>
+          {row.full ? <p>{row.value}</p> : <strong>{row.value}</strong>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailSection({ title, rows }) {
+  return (
+    <section className="mbl-detail-section">
+      <div className="mbl-detail-heading">{title}</div>
+      <InfoRows rows={rows} />
+    </section>
+  );
+}
+
+const formatWeight = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? `${number} g` : displayValue(value);
+};
+
+const formatDateValue = (value) => (firstText(value) ? fmtDate(value) : "");
+
+const feederSummary = (profile) => {
+  const weight = profile.weightGrams ? `${profile.weightGrams} g` : "";
+  return compactText(
+    profile.quantity ? `${profile.quantity}x` : "",
+    profile.feedType,
+    profile.sizeClass,
+    weight
+  ).join(" ");
+};
+
+const animalDetailSections = (animal = {}) => {
+  const breeder = isObject(animal.breeder) ? animal.breeder : {};
+  const sale = isObject(animal.sale) ? animal.sale : {};
+  const lab = isObject(animal.lab) ? animal.lab : {};
+  return [
+    {
+      title: "Identity",
+      rows: [
+        { label: "Animal ID", value: animalIdentity(animal) },
+        { label: "Name", value: animal.name },
+        { label: "Sex", value: animal.sex },
+        { label: "Status", value: animal.status },
+        { label: "Species", value: animal.species },
+        { label: "Year", value: animal.year || animal.hatchYear || animal.birthYear },
+        { label: "Date of birth", value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
+        { label: "Weight", value: formatWeight(animal.weight || animal.weightGrams) },
+      ],
+    },
+    {
+      title: "Genetics",
+      rows: [
+        { label: "Genetics", value: formatGeneticsText(animal) },
+        { label: "Morphs", value: animal.morphs },
+        { label: "Hets", value: animal.hets },
+        { label: "Possible hets", value: animal.possibleHets },
+        { label: "Line", value: firstText(animal.line, animal.bloodline, animal.project) },
+      ],
+    },
+    {
+      title: "Location",
+      rows: [
+        { label: "Location", value: locationText(animal) },
+        { label: "Room", value: firstText(animal.roomName, animal.room, animal.location?.roomName, animal.location?.room) },
+        { label: "Rack", value: firstText(animal.rackName, animal.rack, animal.heatRackName, animal.heatRack, animal.location?.rackName, animal.location?.rack) },
+        { label: "Tub", value: firstText(animal.tubName, animal.tub, animal.tubLabel, animal.slotLabel, animal.location?.tubName, animal.location?.tub) },
+      ],
+    },
+    {
+      title: "Groups",
+      rows: [
+        { label: "Groups", value: animal.groups },
+        { label: "Tags", value: animal.tags },
+      ],
+    },
+    {
+      title: "Lineage",
+      rows: [
+        { label: "Sire", value: firstText(animal.sireName, animal.sireId, animal.fatherName, animal.fatherId) },
+        { label: "Dam", value: firstText(animal.damName, animal.damId, animal.motherName, animal.motherId) },
+        { label: "Breeder", value: firstText(animal.breederName, breeder.name) },
+        { label: "Source", value: firstText(animal.source, animal.origin) },
+      ],
+    },
+    {
+      title: "Acquisition & sale",
+      rows: [
+        { label: "Acquired", value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
+        { label: "Price", value: firstText(animal.price, animal.purchasePrice) },
+        { label: "Currency", value: firstText(animal.currency, sale.currency) },
+        { label: "For sale", value: animal.forSale },
+        { label: "Sale status", value: firstText(sale.status, animal.saleStatus, animal.marketplaceStatus) },
+      ],
+    },
+    {
+      title: "Lab & marketplace",
+      rows: [
+        { label: "Lab order", value: firstText(lab.orderStatus, animal.labOrderStatus, animal.testOrderStatus) },
+        { label: "Lab result", value: firstText(lab.resultStatus, animal.labResultStatus, animal.testResultStatus) },
+        { label: "Listing", value: firstText(animal.listingStatus, animal.marketplaceListingStatus) },
+        { label: "Public contact", value: firstText(animal.publicContactEmail, animal.contactEmail) },
+      ],
+    },
+    {
+      title: "Notes",
+      rows: [
+        { label: "Notes", value: animal.notes, full: true },
+      ],
+    },
+  ];
+};
+
+const flattenLogs = (logs = {}) => Object.entries(isObject(logs) ? logs : {}).flatMap(([key, entries]) => (
+  asArray(entries)
+    .filter(isObject)
+    .map((entry, index) => ({
+      ...entry,
+      logKey: key,
+      type: LOG_META[key]?.label || cap(key),
+      typeIcon: LOG_META[key]?.icon || cap(key).slice(0, 1),
+      sortTime: entryTime(entry) || recordTimestamp(entry),
+      rowKey: entry.id || entry.logId || `${key}-${entryDateValue(entry)}-${index}`,
+    }))
+));
+
+const logEntrySummary = (entry = {}) => {
+  if (entry.logKey === "feeds") {
+    return compactText(entry.result || entry.status || "fed", entry.feed || entry.food, entry.size || entry.sizeDetail, entry.grams ? `${entry.grams} g` : "").join(" | ");
+  }
+  if (entry.logKey === "weights") return formatWeight(entry.grams || entry.weight || entry.weightGrams);
+  if (entry.logKey === "meds") return compactText(entry.medication, entry.dose, entry.note || entry.notes).join(" | ");
+  return firstText(entry.note, entry.notes, entry.result, entry.status, entry.outcome, entry.description) || "Saved";
+};
+
 function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickAction, onTakePhoto, onSetIcon, onDeletePhoto, onSavePairing, onBack }) {
   const [subtab, setSubtab]         = useState("overview");
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [orderTestOpen, setOrderTestOpen] = useState(false);
   const logs = animal?.logs || {};
-  const latestFeed   = first(logs.feeds);
-  const latestWeight = first(logs.weights);
-  const latestShed   = first(logs.sheds);
+  const latestFeed   = latestLogEntry(logs.feeds);
+  const latestWeight = latestLogEntry(logs.weights);
+  const latestShed   = latestLogEntry(logs.sheds);
+  const feederProfile = normalizeFeederProfile(animal);
+  const feedCycle = getNextFeedCycle(animal);
+  const detailSections = animalDetailSections(animal);
+  const logRows = flattenLogs(logs).sort((a, b) => (b.sortTime || 0) - (a.sortTime || 0)).slice(0, 80);
+  const genetics = formatGeneticsText(animal);
 
   const handleTakePhoto = async () => {
     setPhotoBusy(true);
@@ -1104,7 +1594,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
             {animal.sex    && <span className="mbl-pill mbl-pill--sex">{animal.sex}</span>}
             {animal.status && <span className={`mbl-pill mbl-pill--status mbl-pill--${statusColor}`}>{animal.status}</span>}
           </div>
-          {animal.genetics && <p className="mbl-profile-genetics">{animal.genetics}</p>}
+          {genetics && <p className="mbl-profile-genetics">{genetics}</p>}
           {locationText(animal) && <small className="mbl-profile-location">📍 {locationText(animal)}</small>}
         </div>
       </div>
@@ -1124,9 +1614,16 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
       </div>
 
       <div className="mbl-subtabs mbl-subtabs--scroll">
-        {["overview", "logs", "photos", "breeding"].map((t) => (
+        {[
+          ["overview", "Overview"],
+          ["feed", "Feed Cycle"],
+          ["details", "Details"],
+          ["logs", "Logs"],
+          ["photos", "Photos"],
+          ["breeding", "Breeding"],
+        ].map(([t, label]) => (
           <button key={t} type="button" className={subtab === t ? "is-active" : ""} onClick={() => setSubtab(t)}>
-            {cap(t)}
+            {label}
           </button>
         ))}
       </div>
@@ -1136,53 +1633,82 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
           <div className="mbl-data-grid">
             <div className="mbl-data-card">
               <span>Last feed</span>
-              <strong>{latestFeed ? `${latestFeed.result || "fed"} · ${latestFeed.food || ""}` : "—"}</strong>
+              <strong>{latestFeed ? compactText(latestFeed.result || latestFeed.status || "fed", latestFeed.feed || latestFeed.food, latestFeed.size || latestFeed.sizeDetail).join(" | ") : "No feed log"}</strong>
             </div>
             <div className="mbl-data-card">
               <span>Weight</span>
-              <strong>{latestWeight ? `${latestWeight.grams ?? animal.weight} g` : `${animal.weight || "—"} g`}</strong>
+              <strong>{formatWeight(latestWeight?.grams ?? latestWeight?.weight ?? animal.weight ?? animal.weightGrams) || "No weight"}</strong>
             </div>
             <div className="mbl-data-card">
               <span>Last shed</span>
-              <strong>{latestShed ? latestShed.result || latestShed.date : "—"}</strong>
+              <strong>{latestShed ? (latestShed.result || formatDateValue(entryDateValue(latestShed))) : "No shed log"}</strong>
             </div>
             <div className="mbl-data-card">
-              <span>Breeding</span>
-              <strong>{animal.breeding?.pairingStatus || "No pairing"}</strong>
+              <span>Next feed</span>
+              <strong>{feedCycle ? fmtDate(feedCycle.nextFeedDate) : "Set interval after feed"}</strong>
             </div>
           </div>
-          <div className="mbl-info-list">
-            {animal.species         && <div className="mbl-info-row"><span>Species</span><strong>{animal.species}</strong></div>}
-            {animal.dob             && <div className="mbl-info-row"><span>Date of birth</span><strong>{fmtDate(animal.dob)}</strong></div>}
-            {animal.acquisitionDate && <div className="mbl-info-row"><span>Acquired</span><strong>{fmtDate(animal.acquisitionDate)}</strong></div>}
-            {animal.price           && <div className="mbl-info-row"><span>Price</span><strong>{animal.price}</strong></div>}
-            {animal.lab?.orderStatus && <div className="mbl-info-row"><span>Lab order</span><strong>{animal.lab.orderStatus}</strong></div>}
-            {animal.notes           && <div className="mbl-info-row mbl-info-row--full"><span>Notes</span><p>{animal.notes}</p></div>}
+          <InfoRows rows={[
+            { label: "Feeder", value: feederSummary(feederProfile) },
+            { label: "Feed interval", value: feederProfile.intervalDays ? `Every ${feederProfile.intervalDays} days` : "" },
+            { label: "Species", value: animal.species },
+            { label: "Date of birth", value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
+            { label: "Acquired", value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
+            { label: "Price", value: animal.price },
+            { label: "Breeding", value: animal.breeding?.pairingStatus || "" },
+            { label: "Lab order", value: animal.lab?.orderStatus },
+            { label: "Notes", value: animal.notes, full: true },
+          ]} />
+        </div>
+      )}
+
+      {subtab === "feed" && (
+        <div className="mbl-feed-section">
+          <div className="mbl-feed-card">
+            <div>
+              <span>Feed Cycle</span>
+              <strong>{feederSummary(feederProfile) || "No feeder selected"}</strong>
+            </div>
+            {isFeedDue(animal) && <em>Due</em>}
           </div>
+          <InfoRows rows={[
+            { label: "Food type", value: feederProfile.feedType },
+            { label: "Size", value: feederProfile.sizeClass },
+            { label: "Weight class", value: feederProfile.weightGrams ? `${feederProfile.weightGrams} g` : "" },
+            { label: "Quantity", value: feederProfile.quantity },
+            { label: "Interval", value: feederProfile.intervalDays ? `Every ${feederProfile.intervalDays} days` : "" },
+            { label: "Last accepted feed", value: feedCycle?.lastFeedDate ? fmtDate(feedCycle.lastFeedDate) : "" },
+            { label: "Next feeding", value: feedCycle?.nextFeedDate ? fmtDate(feedCycle.nextFeedDate) : "" },
+            { label: "Notes", value: feederProfile.notes, full: true },
+          ]} />
+          {!feedCycle && (
+            <p className="mbl-settings-hint">
+              Feeding reminders start after this snake has both a feeding interval and an accepted feed log.
+            </p>
+          )}
+        </div>
+      )}
+
+      {subtab === "details" && (
+        <div className="mbl-detail-list">
+          {detailSections.map((section) => <DetailSection key={section.title} title={section.title} rows={section.rows} />)}
         </div>
       )}
 
       {subtab === "logs" && (
         <div className="mbl-log-list">
-          {[
-            ...(logs.feeds   || []).map((e) => ({ ...e, type: "Feed",   typeIcon: "🍗" })),
-            ...(logs.weights || []).map((e) => ({ ...e, type: "Weight", typeIcon: "⚖" })),
-            ...(logs.sheds   || []).map((e) => ({ ...e, type: "Shed",   typeIcon: "🐍" })),
-            ...(logs.notes   || []).map((e) => ({ ...e, type: "Note",   typeIcon: "📝" })),
-          ]
-            .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")))
-            .slice(0, 50)
+          {logRows
             .map((entry) => (
-              <div key={entry.id || `${entry.type}-${entry.createdAt}`} className="mbl-log-row">
+              <div key={entry.rowKey} className="mbl-log-row">
                 <span className="mbl-log-type-icon">{entry.typeIcon}</span>
                 <div className="mbl-log-body">
                   <strong>{entry.type}</strong>
-                  <span>{entry.note || entry.result || entry.food || (entry.grams ? `${entry.grams} g` : "") || "Saved"}</span>
+                  <span>{logEntrySummary(entry)}</span>
                 </div>
-                <small>{String(entry.createdAt || entry.date || "").slice(0, 10)}</small>
+                <small>{formatDateValue(entryDateValue(entry))}</small>
               </div>
             ))}
-          {!Object.values(logs).flat().length && <p className="mbl-empty">No logs yet.</p>}
+          {!logRows.length && <p className="mbl-empty">No logs yet.</p>}
         </div>
       )}
 
@@ -1270,7 +1796,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 
     // Try local lookup first — no backend tier check needed
     const local = localAnimals.find(
-      (a) => a.id === animalId || a.appAnimalId === animalId
+      (a) => compactText(a.id, a.appAnimalId, a.animalId, a.snakeId).includes(animalId)
     );
     if (local) {
       setAnimal(local);
@@ -1490,7 +2016,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
               : <div className="mbl-avatar-placeholder mbl-avatar-lg">{String(animal.name || "?").slice(0, 1)}</div>}
             <div>
               <h2>{animal.name}</h2>
-              <p>{animal.sex || "—"} · {animal.genetics || "No genetics"}</p>
+              <p>{animal.sex || "—"} · {formatGeneticsText(animal) || "No genetics"}</p>
               <small>{locationText(animal) || "No location"}</small>
             </div>
           </div>
@@ -1572,6 +2098,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const [tab, setTab]              = useState("animals");
   const [animals, setAnimals]          = useState([]);
   const [pairings, setPairings]        = useState([]);
+  const [plannerState, setPlannerState] = useState(null);
   const [tasks, setTasks]              = useState([]);
   const [rackData, setRackData]        = useState({ rooms: [] });
   const [permissions, setPerms]        = useState({});
@@ -1614,6 +2141,8 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       const normalizedSnapshot = normalizeMobileSnapshot(snapshot);
       setAnimals(normalizedSnapshot.animals);
       setPairings(normalizedSnapshot.pairings);
+      setPlannerState(normalizedSnapshot.plannerState);
+      setRackData(buildRackDataFromPlannerState(normalizedSnapshot.plannerState, normalizedSnapshot.animals));
       recordSync();
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Failed to load data.");
@@ -1626,16 +2155,18 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     if (!online) { pushToast("Cannot push while offline."); return; }
     try {
       const latest = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
-      const merged = mergeMobileSnapshot({ animals, pairings }, latest);
+      const merged = mergeMobileSnapshot({ animals, pairings, plannerState }, latest);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot(merged));
       setAnimals(savedSnapshot.animals);
       setPairings(savedSnapshot.pairings);
+      setPlannerState(savedSnapshot.plannerState);
+      setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
       recordSync();
       pushToast("Data merged to cloud.");
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Push failed.");
     }
-  }, [online, animals, pairings, recordSync, pushToast]);
+  }, [online, animals, pairings, plannerState, recordSync, pushToast]);
 
   useEffect(() => {
     refresh();
@@ -1650,14 +2181,34 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   }, [refresh]);
 
   useEffect(() => {
-    if (tab === "rack") fetchMobileRackMode().then(setRackData).catch(() => {});
-  }, [tab]);
+    if (tab !== "rack") return;
+    if (hasPlannerSpaces(plannerState)) {
+      setRackData(buildRackDataFromPlannerState(plannerState, animals));
+      return;
+    }
+    fetchMobileRackMode().then(setRackData).catch(() => {
+      setRackData(buildRackDataFromAnimalLocations(animals));
+    });
+  }, [tab, plannerState, animals]);
+
+  useEffect(() => {
+    if (!online) return undefined;
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    const timer = window.setInterval(refreshWhenVisible, 60000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [online, refresh]);
 
   const openAnimal = useCallback(async (raw) => {
     if (!raw) return;
     setScanOpen(false);
     const animalId = parseQrValue(raw);
-    const local = animals.find((a) => a.id === animalId || a.appAnimalId === animalId);
+    const local = animals.find((a) => compactText(a.id, a.appAnimalId, a.animalId, a.snakeId).includes(animalId));
     if (local) {
       setAnimal(local);
       setRecent((prev) => [local, ...prev.filter((a) => a.appAnimalId !== local.appAnimalId)].slice(0, 10));
@@ -1719,6 +2270,18 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     }
   };
 
+  const syncCloudDatabase = async () => {
+    if (queue.length) {
+      await runSync();
+    }
+    await pushToCloud();
+  };
+
+  useEffect(() => {
+    if (!online || !queue.length) return;
+    runSync();
+  }, [online, queue.length]);
+
   const completeTask = async (task, result) => {
     const type = { Feed: "feed", Water: "water", Clean: "clean" }[task.type] || "note";
     await doQuickAction(type, { animalId: task.animalId, result, note: `${task.type} ${result}` });
@@ -1734,6 +2297,8 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
     setAnimal(savedAnimal);
     setAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
+    setPlannerState(savedSnapshot.plannerState);
+    setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
   }, []);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1743,6 +2308,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
     setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
+    setPlannerState(savedSnapshot.plannerState);
   }, []);
 
   const handleTakePhoto = useCallback(async () => {
@@ -1799,18 +2365,16 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   }, [animal, updateAnimalInSnapshot, pushToast]);
 
   const animalMap = useMemo(
-    () => new Map(animals.map((a) => [a.id || a.appAnimalId, a])),
+    () => animalMapByIdentity(animals),
     [animals]
   );
 
   const filteredAnimals = useMemo(() => {
     let list = animals;
-    if (sexFilter && sexFilter !== "groups") list = list.filter((a) => a.sex === sexFilter);
+    if (sexFilter && sexFilter !== "groups") list = list.filter((a) => sexMatchesFilter(a, sexFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((a) =>
-        [a.name, a.genetics, a.sex, a.status, a.appAnimalId, a.id].some((v) => String(v || "").toLowerCase().includes(q))
-      );
+      list = list.filter((a) => animalSearchBlob(a).includes(q));
     }
     return list;
   }, [animals, search, sexFilter]);
@@ -1846,6 +2410,24 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const other   = tasks.filter((t) => { const s = String(t.dueStatus || "").toLowerCase(); return !s.includes("overdue") && !s.includes("today") && !s.includes("due"); });
     return { overdue, today, other };
   }, [tasks]);
+
+  const spacesSummary = useMemo(() => {
+    const state = normalizeMobilePlannerState(plannerState) || {};
+    return {
+      rooms: asArray(state.rooms).length,
+      racks: asArray(state.heatRacks).length,
+      terrariums: asArray(state.terrariums).length,
+      groups: asArray(state.groups).length || groupedAnimals.filter(([name]) => name !== "Ungrouped").length,
+    };
+  }, [plannerState, groupedAnimals]);
+
+  const dataSummary = useMemo(() => ({
+    animals: animals.length,
+    pairings: pairings.length,
+    feedCycles: animals.filter((item) => normalizeFeederProfile(item).intervalDays).length,
+    photos: animals.reduce((sum, item) => sum + asArray(item.photos).length, 0),
+    logs: animals.reduce((sum, item) => sum + flattenLogs(item.logs).length, 0),
+  }), [animals, pairings]);
 
   const navTabs = [
     { key: "animals",  label: "Animals",  icon: "🐍" },
@@ -1960,8 +2542,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                         const visible = search.trim()
                           ? groupList.filter((a) => {
                               const q = search.toLowerCase();
-                              return [a.name, a.genetics, a.sex, a.status, a.appAnimalId, a.id]
-                                .some((v) => String(v || "").toLowerCase().includes(q));
+                              return animalSearchBlob(a).includes(q);
                             })
                           : groupList;
                         if (!visible.length) return null;
@@ -2137,6 +2718,21 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
               </div>
             </div>
 
+            {/* Collection data */}
+            <div className="mbl-more-section">
+              <div className="mbl-section-label">Collection data</div>
+              <div className="mbl-summary-grid">
+                <div><span>Animals</span><strong>{dataSummary.animals}</strong></div>
+                <div><span>Pairings</span><strong>{dataSummary.pairings}</strong></div>
+                <div><span>Rooms</span><strong>{spacesSummary.rooms}</strong></div>
+                <div><span>Racks</span><strong>{spacesSummary.racks}</strong></div>
+                <div><span>Terrariums</span><strong>{spacesSummary.terrariums}</strong></div>
+                <div><span>Feed cycles</span><strong>{dataSummary.feedCycles}</strong></div>
+                <div><span>Photos</span><strong>{dataSummary.photos}</strong></div>
+                <div><span>Logs</span><strong>{dataSummary.logs}</strong></div>
+              </div>
+            </div>
+
             {/* Tools */}
             <div className="mbl-more-section">
               <div className="mbl-section-label">Tools</div>
@@ -2185,18 +2781,26 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                   <span>Last synced</span>
                   <span className="mbl-settings-muted">{fmtSyncTime(lastSyncAt)}</span>
                 </div>
+                <div className="mbl-settings-row">
+                  <span>Auto sync</span>
+                  <span className="mbl-settings-muted">On while signed in</span>
+                </div>
+                <div className="mbl-settings-row">
+                  <span>Synced spaces</span>
+                  <span className="mbl-settings-muted">{spacesSummary.rooms} rooms / {spacesSummary.racks} racks</span>
+                </div>
                 {queue.length > 0 && (
                   <div className="mbl-settings-row">
                     <span>{queue.length} pending action{queue.length !== 1 ? "s" : ""}</span>
                     <button type="button" className="mbl-text-btn mbl-text-btn--sm" onClick={runSync}>Sync now</button>
                   </div>
                 )}
-                <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={refresh}>
-                  <span>Pull from cloud</span>
+                <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={syncCloudDatabase} disabled={!online}>
+                  <span style={{ opacity: online ? 1 : 0.45 }}>Sync cloud database</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
-                <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={pushToCloud} disabled={!online}>
-                  <span style={{ opacity: online ? 1 : 0.45 }}>Push to cloud</span>
+                <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={refresh}>
+                  <span>Refresh from cloud</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
               </div>

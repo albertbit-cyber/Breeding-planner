@@ -4355,6 +4355,88 @@
   padding: 0.15rem 0.1rem 0;
 }
 
+.mbl-feed-section,
+.mbl-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.mbl-feed-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-card));
+}
+.mbl-feed-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.mbl-feed-card span {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.mbl-feed-card strong {
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+.mbl-feed-card em {
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 13%, var(--color-card));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+}
+
+.mbl-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.mbl-detail-heading {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  padding: 0 0.1rem;
+}
+
+.mbl-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.mbl-summary-grid > div {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--color-text) 9%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.mbl-summary-grid span {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--color-text) 54%, transparent);
+}
+.mbl-summary-grid strong {
+  font-size: 1.05rem;
+}
+
 @media (max-width: 380px) {
   .mbl-quick-actions--icon  { grid-template-columns: repeat(4, 1fr); }
   .mbl-more-quick-grid      { grid-template-columns: 1fr 1fr; }
