@@ -536,8 +536,15 @@ export const register = async (payload: { email: string; password: string; fullN
     requiresAuth: false,
   });
 
-export const recoverPassword = async (payload: { email: string; fullName: string; newPassword: string }) =>
-  request<{ message: string }>("/auth/recover-password", {
+export const forgotPassword = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resetPassword = async (payload: { token: string; newPassword: string }) =>
+  request<{ message: string }>("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,

@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
@@ -15,6 +16,7 @@ import {
   rotateRefreshSession,
 } from "./refreshTokenSessionService";
 import { recordSecurityEvent } from "./securityEventService";
+import { sendEmail } from "./emailService";
 
 type UserEntity = {
   id: string;
@@ -232,31 +234,52 @@ export const changePasswordForUser = async (userId: string, input: { currentPass
   return { user: publicUser(updated), message: "Password updated. Please sign in again on your other devices." };
 };
 
-export const recoverPassword = async (input: {
-  email: string;
-  fullName: string;
-  newPassword: string;
-}) => {
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
-  if (!user || !user.isActive || normalizeFullName(user.fullName) !== normalizeFullName(input.fullName)) {
-    throw new HttpError(404, "We couldn't verify that account.");
+export const requestPasswordReset = async (email: string) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  // Always respond the same way — don't reveal whether the email exists.
+  if (!user || !user.isActive) {
+    return { message: "If that email is registered, a reset link has been sent." };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordResetToken: tokenHash, passwordResetExpiry: expiry },
+  });
+
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your Breeding Planner password",
+    text: `You requested a password reset.\n\nClick the link below to set a new password (valid for 1 hour):\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`,
+    html: `<p>You requested a password reset.</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>`,
+  });
+
+  await recordSecurityEvent({ type: "auth.password_reset_requested", actorUserId: user.id, outcome: "success" });
+  return { message: "If that email is registered, a reset link has been sent." };
+};
+
+export const resetPassword = async (input: { token: string; newPassword: string }) => {
+  const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+  const user = await prisma.user.findUnique({ where: { passwordResetToken: tokenHash } });
+
+  if (!user || !user.isActive || !user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
+    throw new HttpError(400, "This reset link is invalid or has expired.");
   }
 
   const passwordHash = await bcrypt.hash(input.newPassword, 12);
   await prisma.user.update({
     where: { id: user.id },
-    data: {
-      passwordHash,
-      refreshToken: null,
-    },
+    data: { passwordHash, passwordResetToken: null, passwordResetExpiry: null, refreshToken: null },
   });
-  await recordSecurityEvent({
-    type: "auth.password_recovery.success",
-    actorUserId: user.id,
-    outcome: "success",
-  });
-
-  return { message: "Password updated. You can sign in with your new password." };
+  await revokeRefreshSessionsForUser(user.id);
+  await recordSecurityEvent({ type: "auth.password_reset.success", actorUserId: user.id, outcome: "success" });
+  return { message: "Password updated. You can now sign in with your new password." };
 };
 
 export const getMe = async (userId: string) => {

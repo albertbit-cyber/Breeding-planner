@@ -1,6 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
+import { clearAuthToken, forgotPassword as forgotPasswordApi, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, register as registerApi } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
 const AUTH_SESSION_STORAGE_KEYS = {
@@ -256,12 +256,7 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
 const createDefaultRegistrationData = () =>
   JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
 
-const createDefaultPasswordRecoveryData = (email = "") => ({
-  email,
-  fullName: "",
-  newPassword: "",
-  confirmNewPassword: "",
-});
+const createDefaultPasswordRecoveryData = (email = "") => ({ email });
 
 const buildRegistrationSteps = (t, optionSets = {}) => {
   const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
@@ -505,6 +500,7 @@ export default function AuthGate({ children }) {
     createDefaultPasswordRecoveryData()
   );
   const [passwordRecoveryError, setPasswordRecoveryError] = useState("");
+  const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -664,6 +660,7 @@ export default function AuthGate({ children }) {
   const closePasswordRecovery = () => {
     setIsRecoveringPassword(false);
     setPasswordRecoveryError("");
+    setRecoveryEmailSent(false);
     setPasswordRecoveryData((prev) => createDefaultPasswordRecoveryData(prev.email));
   };
 
@@ -677,65 +674,23 @@ export default function AuthGate({ children }) {
   const handlePasswordRecoverySubmit = async (event) => {
     event.preventDefault();
     setPasswordRecoveryError("");
-    setLoginMessage("");
 
     const recoveryEmail = normalizeIdentifier(passwordRecoveryData.email);
-    const recoveryFullName = String(passwordRecoveryData.fullName || "").trim();
-    const recoveryPassword = String(passwordRecoveryData.newPassword || "");
-    const recoveryConfirmPassword = String(passwordRecoveryData.confirmNewPassword || "");
-
     if (!recoveryEmail || !recoveryEmail.includes("@")) {
       setPasswordRecoveryError(t("auth.errors.emailRequired", {
-        defaultValue: "Use the account email address for password recovery.",
-      }));
-      return;
-    }
-
-    if (!recoveryFullName) {
-      setPasswordRecoveryError(t("auth.errors.requiredField", {
-        defaultValue: 'Please complete "{{field}}".',
-        field: t("auth.fields.fullName", { defaultValue: "Full name" }),
-      }));
-      return;
-    }
-
-    if (recoveryPassword.trim().length < 8) {
-      setPasswordRecoveryError(t("auth.errors.passwordLength", {
-        defaultValue: "Choose a password with at least 8 characters.",
-      }));
-      return;
-    }
-
-    if (recoveryPassword !== recoveryConfirmPassword) {
-      setPasswordRecoveryError(t("auth.errors.passwordMismatch", {
-        defaultValue: "Passwords do not match.",
+        defaultValue: "Enter the email address on your account.",
       }));
       return;
     }
 
     try {
-      const result = await recoverPasswordApi({
-        email: recoveryEmail,
-        fullName: recoveryFullName,
-        newPassword: recoveryPassword,
-      });
-
-      setIsRecoveringPassword(false);
-      setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
-      setLoginValues({
-        username: recoveryEmail,
-        password: "",
-      });
-      setLoginMessage(String(result?.message || t("auth.recovery.success", {
-        defaultValue: "Password updated. Sign in with your new password.",
-      })));
+      await forgotPasswordApi({ email: recoveryEmail });
+      setRecoveryEmailSent(true);
     } catch (error) {
       setPasswordRecoveryError(
         error instanceof Error
           ? error.message
-          : t("auth.recovery.error", {
-              defaultValue: "Password recovery failed.",
-            })
+          : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
       );
     }
   };
@@ -950,55 +905,36 @@ export default function AuthGate({ children }) {
       {view === "login" && (
           isRecoveringPassword ? (
             <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
-              <p className="auth-helper-copy">
-                {t("auth.recovery.instructions", {
-                  defaultValue: "Enter the email and full name on the account, then choose a new password.",
-                })}
-              </p>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.email", { defaultValue: "Email address" })}
-                </span>
-                <input
-                  type="email"
-                  value={passwordRecoveryData.email}
-                  onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.fullName", { defaultValue: "Full name" })}
-                </span>
-                <input
-                  type="text"
-                  value={passwordRecoveryData.fullName}
-                  onChange={(e) => handlePasswordRecoveryChange("fullName", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.newPassword", { defaultValue: "New password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.newPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("newPassword", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.confirmNewPassword", { defaultValue: "Confirm new password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.confirmNewPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("confirmNewPassword", e.target.value)}
-                />
-              </label>
-              {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
-              <button type="submit" className="primary wide">
-                {t("auth.actions.resetPassword", { defaultValue: "Reset password" })}
-              </button>
+              {recoveryEmailSent ? (
+                <p className="auth-helper-copy">
+                  {t("auth.recovery.emailSent", {
+                    defaultValue: "Check your email — we sent a reset link. It expires in 1 hour.",
+                  })}
+                </p>
+              ) : (
+                <>
+                  <p className="auth-helper-copy">
+                    {t("auth.recovery.instructions", {
+                      defaultValue: "Enter your account email and we'll send you a reset link.",
+                    })}
+                  </p>
+                  <label className="auth-field">
+                    <span className="auth-field-label">
+                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                    </span>
+                    <input
+                      type="email"
+                      value={passwordRecoveryData.email}
+                      onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
+                      autoComplete="email"
+                    />
+                  </label>
+                  {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
+                  <button type="submit" className="primary wide">
+                    {t("auth.actions.sendResetLink", { defaultValue: "Send reset link" })}
+                  </button>
+                </>
+              )}
               <div className="auth-secondary-action">
                 <button type="button" className="text-button" onClick={closePasswordRecovery}>
                   {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
