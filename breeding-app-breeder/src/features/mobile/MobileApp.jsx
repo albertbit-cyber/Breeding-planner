@@ -1,4 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./MobileApp.css";
 import { useAppearance } from "../../contexts/AppearanceContext.jsx";
 import jsQR from "jsqr";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
@@ -32,6 +33,7 @@ const RECENT_KEY    = "breedingPlannerMobileRecentAnimals";
 const QUEUE_KEY     = "breedingPlannerMobileSyncQueue";
 const MODE_KEY      = "breedingPlannerMobileLastMode"; // terminal | full
 const ANIMALS_CACHE = "breedingPlannerMobileAnimalsCache";
+const SNAPSHOT_CACHE = "breedingPlannerMobileSnapshotCache";
 const LAST_SYNC_KEY = "breedingPlannerMobileLastSync";
 
 // Extract the animal ID from a full QR URL (e.g. https://…#snake=<id>) or
@@ -68,6 +70,12 @@ const readJson = (key, fallback) => {
 
 const writeJson = (key, value) => {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+};
+
+const scopedStorageKey = (baseKey, user = {}) => {
+  const identity = String(user?.id || user?.email || "anonymous").trim().toLowerCase();
+  const safeIdentity = identity.replace(/[^a-z0-9@._-]+/g, "_");
+  return `${baseKey}:${safeIdentity || "anonymous"}`;
 };
 
 // ג”€ג”€ג”€ Tiny utilities ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1827,7 +1835,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 
   // ג”€ג”€ Shared snapshot helper ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const updateAnimalInSnapshot = useCallback(async (updated) => {
-    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
+    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot());
     const changed = markRecordUpdated(updated);
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
@@ -1839,7 +1847,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const handleSavePairing = useCallback(async (updatedPairing) => {
-    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
+    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot());
     const changed = markRecordUpdated(updatedPairing);
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
@@ -1910,7 +1918,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const saveEdit = useCallback(async (draft) => {
     setEditBusy(true);
     try {
-      const snapshot = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
+      const snapshot = normalizeMobileSnapshot(await fetchBreederSnapshot());
       const merged = markRecordUpdated({ ...animal, ...draft });
       const animals = mergeSnapshotList([merged], snapshot.animals, "animal", mergeAnimalRecord);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
@@ -2095,10 +2103,15 @@ function TaskCard({ task, animalMap, onComplete, onOpen }) {
 // ג”€ג”€ג”€ FULL MODE ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const { appearanceState, updateAppearance } = useAppearance();
+  const snapshotCacheKey = useMemo(() => scopedStorageKey(SNAPSHOT_CACHE, user), [user]);
+  const cachedSnapshot = useMemo(
+    () => normalizeMobileSnapshot(readJson(snapshotCacheKey, {})),
+    [snapshotCacheKey]
+  );
   const [tab, setTab]              = useState("animals");
-  const [animals, setAnimals]          = useState([]);
-  const [pairings, setPairings]        = useState([]);
-  const [plannerState, setPlannerState] = useState(null);
+  const [animals, setAnimals]          = useState(() => cachedSnapshot.animals);
+  const [pairings, setPairings]        = useState(() => cachedSnapshot.pairings);
+  const [plannerState, setPlannerState] = useState(() => cachedSnapshot.plannerState);
   const [tasks, setTasks]              = useState([]);
   const [rackData, setRackData]        = useState({ rooms: [] });
   const [permissions, setPerms]        = useState({});
@@ -2115,6 +2128,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const [expandedPairing, setExpandedPairing] = useState(null);
   const [toast, setToast]              = useState("");
   const [loading, setLoading]          = useState(true);
+  const [snapshotError, setSnapshotError] = useState("");
   const [morePanel, setMorePanel]      = useState(null); // null | "advisor" | "shed-test"
 
   const pushToast = useCallback((msg) => setToast(msg), []);
@@ -2131,42 +2145,69 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [permData, taskData, snapshot] = await Promise.all([
+      const [permResult, taskResult, snapshotResult] = await Promise.allSettled([
         fetchMobilePermissions({ deviceId, platform: "android" }),
         fetchMobileTasks().catch(() => ({ tasks: [] })),
-        fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })),
+        fetchBreederSnapshot(),
       ]);
-      setPerms(permData?.permissions || {});
-      setTasks(Array.isArray(taskData?.tasks) ? taskData.tasks : []);
-      const normalizedSnapshot = normalizeMobileSnapshot(snapshot);
+
+      if (permResult.status === "fulfilled") {
+        setPerms(permResult.value?.permissions || {});
+      }
+      if (taskResult.status === "fulfilled") {
+        setTasks(Array.isArray(taskResult.value?.tasks) ? taskResult.value.tasks : []);
+      }
+      if (snapshotResult.status === "rejected") {
+        throw snapshotResult.reason;
+      }
+
+      const normalizedSnapshot = normalizeMobileSnapshot(snapshotResult.value);
       setAnimals(normalizedSnapshot.animals);
       setPairings(normalizedSnapshot.pairings);
       setPlannerState(normalizedSnapshot.plannerState);
       setRackData(buildRackDataFromPlannerState(normalizedSnapshot.plannerState, normalizedSnapshot.animals));
+      writeJson(snapshotCacheKey, normalizedSnapshot);
+      writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
+      setSnapshotError("");
       recordSync();
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Failed to load data.");
+      const message = err instanceof Error ? err.message : "Failed to load data.";
+      setSnapshotError(message);
+      pushToast(message);
     } finally {
       setLoading(false);
     }
-  }, [deviceId, pushToast, recordSync]);
+  }, [deviceId, pushToast, recordSync, snapshotCacheKey]);
 
   const pushToCloud = useCallback(async () => {
     if (!online) { pushToast("Cannot push while offline."); return; }
+    let latest;
     try {
-      const latest = await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] }));
+      latest = await fetchBreederSnapshot();
+    } catch (err) {
+      const message = "Sync failed — your data was NOT saved to the cloud. Will retry when online.";
+      setSnapshotError(message);
+      pushToast(message);
+      return;
+    }
+    try {
       const merged = mergeMobileSnapshot({ animals, pairings, plannerState }, latest);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot(merged));
       setAnimals(savedSnapshot.animals);
       setPairings(savedSnapshot.pairings);
       setPlannerState(savedSnapshot.plannerState);
       setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
+      writeJson(snapshotCacheKey, savedSnapshot);
+      writeJson(ANIMALS_CACHE, savedSnapshot.animals);
+      setSnapshotError("");
       recordSync();
       pushToast("Data merged to cloud.");
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Push failed.");
+      const message = err instanceof Error ? err.message : "Push failed.";
+      setSnapshotError(message);
+      pushToast(message);
     }
-  }, [online, animals, pairings, plannerState, recordSync, pushToast]);
+  }, [online, animals, pairings, plannerState, recordSync, pushToast, snapshotCacheKey]);
 
   useEffect(() => {
     refresh();
@@ -2289,7 +2330,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
   // ג”€ג”€ Photo helpers (Full mode) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const updateAnimalInSnapshot = useCallback(async (updated) => {
-    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
+    const snap = normalizeMobileSnapshot(await fetchBreederSnapshot());
     const changed = markRecordUpdated(updated);
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
@@ -2299,17 +2340,20 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     setAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
     setPlannerState(savedSnapshot.plannerState);
     setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
-  }, []);
+    writeJson(snapshotCacheKey, savedSnapshot);
+    writeJson(ANIMALS_CACHE, savedSnapshot.animals);
+  }, [snapshotCacheKey]);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const handleSavePairing = useCallback(async (updatedPairing) => {
-    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot().catch(() => ({ animals: [], pairings: [] })));
+    const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot());
     const changed = markRecordUpdated(updatedPairing);
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
     setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
     setPlannerState(savedSnapshot.plannerState);
-  }, []);
+    writeJson(snapshotCacheKey, savedSnapshot);
+  }, [snapshotCacheKey]);
 
   const handleTakePhoto = useCallback(async () => {
     if (!animal) return;
@@ -2446,10 +2490,25 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       <div className="mbl-full-topbar">
         <span className="mbl-full-title">Breeding Planner</span>
         <div className="mbl-topbar-actions">
+          {lastSyncAt && online && (
+            <span className="mbl-topbar-sync-time" title={lastSyncAt}>
+              {fmtSyncTime(lastSyncAt)}
+            </span>
+          )}
           {!online && <span className="mbl-topbar-offline">Offline</span>}
           <button type="button" className="mbl-topbar-qr-btn" onClick={() => setScanOpen(true)} aria-label="Scan QR">▣</button>
         </div>
       </div>
+
+      {snapshotError && (
+        <div className="mbl-sync-error mbl-sync-error--global" role="alert">
+          <strong>Sync error</strong>
+          <span>{snapshotError}</span>
+          <button type="button" className="mbl-text-btn mbl-text-btn--sm" onClick={snapshotError.includes("NOT saved") ? pushToCloud : refresh}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <Toast msg={toast} onDismiss={dismissToast} />
 
@@ -2537,7 +2596,12 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                 {/* Groups view */}
                 {sexFilter === "groups" ? (
                   groupedAnimals.length === 0
-                    ? <p className="mbl-empty">No animals yet.</p>
+                    ? (
+                      <p className="mbl-empty">
+                        No animals are saved in the cloud for {user?.email || "this account"}.
+                        Sync the desktop app with the same account, then tap Refresh from cloud.
+                      </p>
+                    )
                     : groupedAnimals.map(([groupName, groupList]) => {
                         const visible = search.trim()
                           ? groupList.filter((a) => {
@@ -2880,9 +2944,11 @@ export default function MobileApp() {
 
   const handleLogin = useCallback((backendUser) => {
     const profile = {
+      id:          backendUser?.id          || "",
       fullName:    backendUser?.fullName    || "",
       displayName: backendUser?.displayName || backendUser?.fullName || "",
       email:       backendUser?.email       || "",
+      role:        backendUser?.role        || "",
     };
     setUser(profile);
     setMode(null);
