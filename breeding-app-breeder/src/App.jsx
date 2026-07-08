@@ -2457,6 +2457,21 @@ function cloneLogs(logs = {}) {
   };
 }
 
+function backfillLogIds(logs) {
+  const result = {};
+  for (const key of Object.keys(logs)) {
+    const entries = logs[key];
+    result[key] = Array.isArray(entries)
+      ? entries.map(entry =>
+          entry && typeof entry === 'object' && !entry.id
+            ? { ...entry, id: crypto.randomUUID() }
+            : entry
+        )
+      : entries;
+  }
+  return result;
+}
+
 const MAX_PHOTOS_PER_SNAKE = 60;
 
 function normalizePhotoEntry(raw) {
@@ -2538,7 +2553,7 @@ function sanitizeSnakeRecord(raw) {
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
-  snake.logs = cloneLogs(raw.logs);
+  snake.logs = backfillLogIds(cloneLogs(raw.logs));
   snake.photos = normalizeSnakePhotos(raw.photos);
   snake.labGeneticsConfirmation = normalizeLabGeneticsConfirmation(raw.labGeneticsConfirmation);
   if (snake.metadata && typeof snake.metadata === 'object') {
@@ -2696,8 +2711,6 @@ function getSyncRecordKey(record, fallbackPrefix, index) {
     record?.animalId,
     record?.appPairingId,
     record?.pairingId,
-    record?.name,
-    record?.label,
   ];
   const value = candidates.map(item => String(item || '').trim()).find(Boolean);
   return value || `${fallbackPrefix}-${index + 1}`;
@@ -2723,19 +2736,12 @@ function getSyncTimestamp(value) {
 
 function getLogEntryKey(entry, key, index) {
   if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
-  const explicit = [entry.id, entry.logId, entry.createdAt && `${entry.createdAt}:${entry.actionType || key}`]
-    .map(item => String(item || '').trim())
-    .find(Boolean);
-  if (explicit) return explicit;
-  return [
-    key,
-    entry.date || '',
-    entry.time || '',
-    entry.result || entry.outcome || '',
-    entry.feed || entry.food || entry.prey || '',
-    entry.size || entry.weight || entry.grams || '',
-    entry.notes || entry.note || '',
-  ].map(part => String(part || '').trim()).join('|') || `${key}-${index}`;
+  return (
+    String(entry.id || '').trim() ||
+    String(entry.logId || '').trim() ||
+    (entry.createdAt ? `${entry.createdAt}:${entry.actionType || key}` : '') ||
+    `${key}-${index}`
+  );
 }
 
 function mergeLogArrays(localEntries = [], backendEntries = [], key) {
@@ -22682,7 +22688,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               const def = lastFeedDefaults || { feed: 'Mouse', size: '', sizeDetail: '', form: 'Frozen/thawed', formDetail: '', notes: '' };
               const method = def.form || 'Frozen/thawed';
               const methodDetail = def.formDetail || '';
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22775,7 +22781,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{date:today,grams:0,notes:""}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{id:crypto.randomUUID(),date:today,grams:0,notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22801,7 +22807,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => {
               const today = localYMD(new Date());
-              setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { date: today, complete: true, notes: '' }] } }));
+              setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { id: crypto.randomUUID(), date: today, complete: true, notes: '' }] } }));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22829,7 +22835,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
         <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today = localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{date:today,deep:false,notes:''}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{id:crypto.randomUUID(),date:today,deep:false,notes:''}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22857,7 +22863,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{date:today,drug:"",dose:"",notes:""}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{id:crypto.randomUUID(),date:today,drug:"",dose:"",notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">

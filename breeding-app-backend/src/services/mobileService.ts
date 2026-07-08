@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
@@ -256,7 +257,7 @@ const appendAnimalLog = async (actor: AuthenticatedUser, actionType: string, pay
   const animalPayload = { ...asRecord(animal.payload) };
   const logs = { ...asRecord(animalPayload.logs) };
   const now = new Date().toISOString();
-  const entry = { ...payload, id: `mobile-${actionType}-${Date.now()}`, actionType, createdAt: now, date: text(payload.date, 80) || now.slice(0, 10) };
+  const entry = { ...payload, id: randomUUID(), actionType, createdAt: now, date: text(payload.date, 80) || now.slice(0, 10) };
   const logKey = actionType === "feed" ? "feeds" : actionType === "weight" ? "weights" : actionType === "shed" ? "sheds" : actionType === "clean" ? "cleanings" : actionType === "water" ? "water" : actionType === "note" ? "notes" : actionType;
   logs[logKey] = [entry, ...(Array.isArray(logs[logKey]) ? logs[logKey] : [])].slice(0, 500);
   if (actionType === "weight") animalPayload.weight = Number(payload.grams || payload.weight || payload.weightGrams || 0) || animalPayload.weight;
