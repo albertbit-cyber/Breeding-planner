@@ -1,7 +1,0 @@
-[build]
-builder = "NIXPACKS"
-buildCommand = "npm install && npm run prisma:generate && npm run build"
-
-[deploy]
-startCommand = "npm start"
-healthcheckPath = "/api/health"

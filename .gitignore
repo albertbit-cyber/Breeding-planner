@@ -48,3 +48,10 @@ android/app/*.jks
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Binaries and archives — never commit these
+*.apk
+*.zip
+*.tar.gz
+node-v*/
+node_installer/
