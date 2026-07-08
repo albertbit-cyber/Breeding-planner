@@ -2671,11 +2671,13 @@ function prepareAnimalForBackend(snake) {
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
-function prepareSnapshotForBackend(animals, pairings, plannerState = null) {
+function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
+  const snakeTombstones = Object.values(tombstones?.snakes || {});
+  const pairingTombstones = Object.values(tombstones?.pairings || {});
   const payload = {
-    animals: persistable.snakes.map(prepareAnimalForBackend).filter(Boolean),
-    pairings: persistable.pairings,
+    animals: [...persistable.snakes.map(prepareAnimalForBackend).filter(Boolean), ...snakeTombstones],
+    pairings: [...persistable.pairings, ...pairingTombstones],
     clutches: [],
   };
   const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
@@ -2938,7 +2940,7 @@ function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallba
   };
   (Array.isArray(localItems) ? localItems : []).forEach((item, index) => add(item, 'local', index));
   (Array.isArray(backendItems) ? backendItems : []).forEach((item, index) => add(item, 'backend', index));
-  return Array.from(map.values());
+  return Array.from(map.values()).filter(record => !record.deletedAt);
 }
 
 function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
@@ -6450,6 +6452,15 @@ export default function BreedingPlannerApp() {
       return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
     });
   }, []);
+  const [syncTombstones, setSyncTombstones] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}'); }
+    catch { return { snakes: {}, pairings: {} }; }
+  });
+  const syncTombstonesRef = useRef(syncTombstones);
+  useEffect(() => {
+    syncTombstonesRef.current = syncTombstones;
+    try { localStorage.setItem('bpSyncTombstones', JSON.stringify(syncTombstones)); } catch {}
+  }, [syncTombstones]);
   const [tab, setTab] = useState('animals');
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -7019,7 +7030,7 @@ export default function BreedingPlannerApp() {
       const snapshot = await fetchBreederSnapshot();
       const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
       const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState));
+      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
       const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
       const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
       const signature = plannerSnapshotSignature(syncedSnapshot);
@@ -7502,7 +7513,7 @@ export default function BreedingPlannerApp() {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
           const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
           const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState));
+          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
         })
         .then((savedSnapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
@@ -8993,11 +9004,22 @@ export default function BreedingPlannerApp() {
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
-    setSnakes(prev => {
-      const next = prev.filter(s => s.id !== id);
-      return next;
+    const deletedAt = nowIsoString();
+    setSyncTombstones(prev => ({
+      ...prev,
+      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt } },
+    }));
+    setSnakes(prev => prev.filter(s => s.id !== id));
+    setPairings(prev => {
+      const removed = prev.filter(p => p.maleId === id || p.femaleId === id);
+      removed.forEach(p => {
+        if (p.id) setSyncTombstones(t => ({
+          ...t,
+          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt } },
+        }));
+      });
+      return prev.filter(p => p.maleId !== id && p.femaleId !== id);
     });
-    setPairings(prev => prev.filter(p => p.maleId !== id && p.femaleId !== id));
     if (editSnake && editSnake.id === id) {
       closeSnakeEditor();
     }
@@ -10594,6 +10616,13 @@ export default function BreedingPlannerApp() {
               breederMales={males}
               breederFemales={females}
               onDelete={(pid)=>{
+                if (pid) {
+                  const deletedAt = nowIsoString();
+                  setSyncTombstones(prev => ({
+                    ...prev,
+                    pairings: { ...prev.pairings, [pid]: { id: pid, appPairingId: pid, deletedAt } },
+                  }));
+                }
                 setPairings(ps=>ps.filter(x=>x.id!==pid));
                 setFocusedPairingId(prev=>prev===pid?null:prev);
               }}

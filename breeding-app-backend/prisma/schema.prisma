@@ -184,18 +184,19 @@ model Profile {
 }
 
 model Animal {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   appAnimalId  String
   name         String?
   sex          String?
   status       String?
   payload      Json
   globalId     String?
-  privacyLevel String   @default("private")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  privacyLevel String    @default("private")
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   asChild      ParentRelationship[] @relation("ChildOf")
   asParent     ParentRelationship[] @relation("ParentOf")
   ownershipHistory OwnershipHistory[]
@@ -206,9 +207,9 @@ model Animal {
 }
 
 model Pairing {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   ownerId           String
-  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   appPairingId      String
   label             String?
   maleAnimalAppId   String?
@@ -216,8 +217,9 @@ model Pairing {
   status            String?
   startDate         String?
   payload           Json
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   clutches          Clutch[]
 
   @@unique([ownerId, appPairingId])
@@ -226,18 +228,19 @@ model Pairing {
 }
 
 model Clutch {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   ownerId       String
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   pairingId     String?
-  pairing       Pairing? @relation(fields: [pairingId], references: [id], onDelete: SetNull)
+  pairing       Pairing?  @relation(fields: [pairingId], references: [id], onDelete: SetNull)
   appClutchId   String
   clutchNumber  Int?
   seasonYear    Int?
   laidDate      String?
   payload       Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([ownerId, appClutchId])
   @@index([ownerId])

@@ -420,9 +420,9 @@ const syncMarketplaceAutoListings = async (ownerId: string, animals: JsonRecord[
 
 export const listBreederSnapshot = async (ownerId: string) => {
   const [animals, pairings, clutches, plannerState] = await Promise.all([
-    db.animal.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
-    db.pairing.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
-    db.clutch.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" } }),
+    db.animal.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
+    db.pairing.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
+    db.clutch.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
     db.breederPlannerState.findUnique({ where: { ownerId } }),
   ]);
 
@@ -462,6 +462,15 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         where: { ownerId_appAnimalId: { ownerId, appAnimalId } },
         select: { id: true, payload: true, updatedAt: true },
       });
+      const tombstoneAt = isoDateValue(animal.deletedAt);
+      if (tombstoneAt) {
+        if (existing) {
+          await tx.animal.update({ where: { id: existing.id }, data: { deletedAt: new Date(tombstoneAt) } });
+        } else {
+          await tx.animal.create({ data: { ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) } });
+        }
+        continue;
+      }
       const data = {
         name: textValue(animal.name),
         sex: textValue(animal.sex),
@@ -469,18 +478,9 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
       };
       if (!existing) {
-        await tx.animal.create({
-          data: {
-            ownerId,
-            appAnimalId,
-            ...data,
-          },
-        });
+        await tx.animal.create({ data: { ownerId, appAnimalId, ...data } });
       } else if (shouldApplyIncomingPayload(animal, existing)) {
-        await tx.animal.update({
-          where: { id: existing.id },
-          data,
-        });
+        await tx.animal.update({ where: { id: existing.id }, data });
       }
     }
 
@@ -491,6 +491,16 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         where: { ownerId_appPairingId: { ownerId, appPairingId } },
         select: { id: true, payload: true, updatedAt: true },
       });
+      const tombstoneAt = isoDateValue(pairing.deletedAt);
+      if (tombstoneAt) {
+        if (existing) {
+          await tx.pairing.update({ where: { id: existing.id }, data: { deletedAt: new Date(tombstoneAt) } });
+        } else {
+          await tx.pairing.create({ data: { ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) } });
+        }
+        pairingRowsByAppId.set(appPairingId, existing?.id || "");
+        continue;
+      }
       const data = {
         label: textValue(pairing.label),
         maleAnimalAppId: textValue(pairing.maleId),
@@ -500,18 +510,9 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         payload: existing ? mergePairingPayload(existing.payload, pairing) : pairing,
       };
       const row = !existing
-        ? await tx.pairing.create({
-          data: {
-            ownerId,
-            appPairingId,
-            ...data,
-          },
-        })
+        ? await tx.pairing.create({ data: { ownerId, appPairingId, ...data } })
         : shouldApplyIncomingPayload(pairing, existing)
-          ? await tx.pairing.update({
-            where: { id: existing.id },
-            data,
-          })
+          ? await tx.pairing.update({ where: { id: existing.id }, data })
           : existing;
       pairingRowsByAppId.set(appPairingId, row.id);
     }
