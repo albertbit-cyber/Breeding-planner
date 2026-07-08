@@ -1855,6 +1855,7 @@ function getPairingExportRows(pairings = [], snakes = [], options = {}) {
       notes: pairing.notes || '',
       sortIndex: numericSortIndex,
       orderWarning,
+      scheduleWarning: pairing.scheduleWarning || '',
     };
     if (row.maleId) {
       pairedMaleIds.add(row.maleId);
@@ -1922,6 +1923,9 @@ function buildPairingMatrixExportDataset(pairings = [], snakes = [], options = {
     if (row.notes) noteSegments.push(row.notes);
     if (row.orderWarning && !noteSegments.includes(row.orderWarning)) {
       noteSegments.push(row.orderWarning);
+    }
+    if (row.scheduleWarning && !noteSegments.includes(row.scheduleWarning)) {
+      noteSegments.push(row.scheduleWarning);
     }
     return {
       maleCode: row.maleCode || row.maleName || '',
@@ -4688,7 +4692,7 @@ function findNextAvailableDate(preferred, maleId, maleSchedule) {
     }
     candidate = cloneAndShiftDays(candidate, 1);
   }
-  return candidate;
+  return null;
 }
 
 function autoAdjustPairingAppointments(pairing, maleSchedule) {
@@ -4731,15 +4735,21 @@ function autoAdjustPairingAppointments(pairing, maleSchedule) {
     }
 
     const conflictFree = findNextAvailableDate(target, pairing.maleId, maleSchedule);
+    if (conflictFree === null) {
+      adjusted.push({ ...appt, scheduleConflict: true });
+      return;
+    }
     blockMaleSpan(maleSchedule, pairing.maleId, conflictFree);
     previousDate = new Date(conflictFree.getTime());
     adjusted.push({ ...appt, date: localYMD(conflictFree) });
   });
 
+  const hasConflict = adjusted.some(a => a.scheduleConflict);
   return {
     ...pairing,
     appointments: adjusted,
     startDate: adjusted[0]?.date || pairing.startDate || null,
+    ...(hasConflict && { scheduleWarning: 'No available slot found in the next 4 months.' }),
   };
 }
 

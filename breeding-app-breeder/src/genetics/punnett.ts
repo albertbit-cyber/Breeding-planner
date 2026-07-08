@@ -157,7 +157,10 @@ const gatherAnimalGenes = (animal: Animal): Map<string, ParentGeneEntry> => {
       const dist = emptyDistribution();
       dist[parsed.alleleCount] = 1;
       assign(parsed.gene, "co-dom", dist);
-    } else if (morph.type === "dominant" || morph.type === "polygenic" || morph.type === "co-dom") {
+    } else if (morph.type === "polygenic") {
+      // Polygenic traits follow quantitative inheritance — not Mendelian
+      // so we intentionally skip them here; punnettCross will add a disclaimer
+    } else if (morph.type === "dominant") {
       const dist = emptyDistribution();
       dist[1] = 1;
       assign(name, "dominant", dist);
@@ -345,9 +348,26 @@ const combineGeneOutcomes = (bundles: GeneBundle[]): Outcome[] => {
 };
 
 export const punnettCross = (a: Animal, b: Animal): Outcome[] => {
+  const polygenicNames = [
+    ...(a.morphs || []).filter((m) => m.type === "polygenic").map((m) => m.name),
+    ...(b.morphs || []).filter((m) => m.type === "polygenic").map((m) => m.name),
+  ];
+  const disclaimer: Outcome[] = polygenicNames.length
+    ? [
+        {
+          genotype: [
+            `Polygenic traits present (${[...new Set(polygenicNames)].join(", ")}) — outcome not Mendelian-predictable`,
+          ],
+          prob: 0,
+          flags: ["disclaimer"],
+        },
+      ]
+    : [];
+
   const bundles = buildGeneBundles(a, b);
   if (!bundles.length) {
     return [
+      ...disclaimer,
       {
         genotype: [],
         prob: 1,
@@ -355,5 +375,5 @@ export const punnettCross = (a: Animal, b: Animal): Outcome[] => {
       },
     ];
   }
-  return combineGeneOutcomes(bundles);
+  return [...disclaimer, ...combineGeneOutcomes(bundles)];
 };
