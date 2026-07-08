@@ -336,10 +336,9 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
     }
 
     const nextToken = String(data?.token || "").trim();
-    const nextRefreshToken = String(data?.refreshToken || "").trim();
-    if (!nextToken || !nextRefreshToken) {
+    if (!nextToken) {
       const error = new SharedApiError(
-        "Shared backend refresh did not return valid auth tokens.",
+        "Shared backend refresh did not return a valid access token.",
         "unauthorized",
         401,
         data
@@ -349,15 +348,16 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
-    setStoredToken(nextToken, scope);
-    setStoredRefreshToken(nextRefreshToken, scope);
+    // Refresh tokens travel via httpOnly cookies — don't persist in localStorage.
+    clearStoredToken(scope);
+    clearStoredRefreshToken(scope);
     setCookiePreferredAuth(scope);
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
     return {
       token: nextToken,
-      refreshToken: nextRefreshToken,
+      refreshToken: "",
     };
   })().finally(() => {
     refreshRequestPromises[scope] = undefined;
@@ -472,7 +472,8 @@ export const getRefreshToken = (scope?: AuthScope): string => getStoredRefreshTo
 
 export const setRefreshToken = (token: string, scope?: AuthScope): void => setStoredRefreshToken(String(token || "").trim(), scope);
 
-export const hasStoredAuthSession = (scope?: AuthScope): boolean => Boolean(getStoredToken(scope) || getStoredRefreshToken(scope));
+export const hasStoredAuthSession = (scope?: AuthScope): boolean =>
+  Boolean(getStoredToken(scope) || getStoredRefreshToken(scope) || isCookiePreferredAuth(scope));
 
 export const clearAuthToken = (scope?: AuthScope): void => clearStoredAuth(scope);
 
@@ -519,9 +520,12 @@ export const login = async (payload: { email: string; password: string }, authSc
     requiresAuth: false,
     authScope: scope,
   });
-  if (data?.token && data?.refreshToken) {
-    setStoredToken(data.token, scope);
-    setStoredRefreshToken(data.refreshToken, scope);
+  if (data?.token) {
+    // Tokens are delivered via httpOnly cookies (credentials: "include").
+    // We only persist the CSRF token (which JS must read to set as a header)
+    // and a flag so future requests know to use cookie auth.
+    clearStoredToken(scope);
+    clearStoredRefreshToken(scope);
     setCookiePreferredAuth(scope);
     if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
