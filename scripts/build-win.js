@@ -13,7 +13,7 @@ const env = { ...process.env };
 function runOrThrow(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: 'inherit',
-    cwd: rootDir,
+    cwd: options.cwd || rootDir,
     env: { ...env, ...options.env },
     shell: false,
   });
@@ -27,10 +27,6 @@ function cleanDist() {
   fs.rmSync(distDir, { recursive: true, force: true });
 }
 
-function runNpmScript(scriptName) {
-  runOrThrow(nodeCmd, [npmCli, 'run', scriptName]);
-}
-
 function runElectronBuilder(args) {
   if (!fs.existsSync(electronBuilderCli)) {
     throw new Error('electron-builder CLI not found. Ensure dependencies are installed.');
@@ -38,7 +34,25 @@ function runElectronBuilder(args) {
   runOrThrow(nodeCmd, [electronBuilderCli, ...args]);
 }
 
+// The desktop app's actual source lives in breeding-app-breeder/ (root's own
+// src/ was removed in the "consolidate to single source of truth" cleanup).
+// electron-builder and electron/main.js still expect a root-level build/
+// directory, so build breeding-app-breeder and copy its output there.
+function buildBreederAppForElectron() {
+  const breederDir = path.join(rootDir, 'breeding-app-breeder');
+  const breederBuildDir = path.join(breederDir, 'build');
+  const rootBuildDir = path.join(rootDir, 'build');
+
+  runOrThrow(nodeCmd, [npmCli, 'run', 'build'], {
+    env: { ...env, ELECTRON_BUILD: 'true' },
+    cwd: breederDir,
+  });
+
+  fs.rmSync(rootBuildDir, { recursive: true, force: true });
+  fs.cpSync(breederBuildDir, rootBuildDir, { recursive: true });
+}
+
 console.log(`Building Windows NSIS installer for version=${pkg.version}`);
 cleanDist();
-runNpmScript('build');
+buildBreederAppForElectron();
 runElectronBuilder(['--win', 'nsis', '--x64']);

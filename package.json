@@ -120,11 +120,11 @@
     },
     "extraResources": [
       {
-        "from": "src/locales",
+        "from": "breeding-app-breeder/src/locales",
         "to": "locales"
       },
       {
-        "from": "src/i18n/settings.json",
+        "from": "breeding-app-breeder/src/i18n/settings.json",
         "to": "i18n-settings.json"
       }
     ],
