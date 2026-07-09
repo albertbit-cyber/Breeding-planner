@@ -7,12 +7,15 @@ export const AUTH_REFRESH_COOKIE = "bp_refresh_token";
 export const CSRF_COOKIE = "bp_csrf_token";
 export const CSRF_HEADER = "x-csrf-token";
 
-const isProduction = () => env.nodeEnv === "production";
+// Every deployed environment (production, staging, ...) is accessed cross-origin
+// over HTTPS, so cookies need Secure+SameSite=None there. Only plain local
+// development runs the frontend and backend same-site over HTTP.
+const isDeployed = () => env.nodeEnv !== "development";
 
 const cookieOptions = (maxAgeMs?: number, httpOnly = true) => ({
   httpOnly,
-  secure: isProduction(),
-  sameSite: isProduction() ? "none" as const : "lax" as const,
+  secure: isDeployed(),
+  sameSite: isDeployed() ? "none" as const : "lax" as const,
   path: "/",
   ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
 });
