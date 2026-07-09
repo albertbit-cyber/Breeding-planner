@@ -8,17 +8,17 @@ Do not use `dist/android/app-release.apk` or `android/app/build/outputs/apk/rele
 
 ## Current Latest APK
 
-`apk-backups/app-release-2026-07-07-mobile-full-redesign.apk`
+`apk-backups/app-release-2026-07-09-mobile-cloud-animal-sync.apk`
 
 SHA256:
 
-`1D54F0B5EB0D2C039EEEEB044A2EB8BC1D01C869C8D312CB803E38441839CAB6`
+`447C7EB55D954A73A2D320EE04BF9CE48768A1FF6E60477E4E24846D63EA9969`
 
-Built from the July 7, 2026 release APK after the mobile full-version redesign. The same binary also exists at:
+Built on July 9, 2026 after restoring canonical native mobile routing/styles and correcting cloud animal snapshot failure handling. The single handoff binary is:
 
-- `apk-backups/app-release-2026-07-07-mobile-full-redesign.apk`
+- `apk-backups/app-release-2026-07-09-mobile-cloud-animal-sync.apk`
 
-As of July 7, 2026, `apk-backups/` is the only folder that should keep APK files. Generated APK outputs under `dist/android/`, `android/app/build/outputs/apk/`, or cache folders must be treated as temporary build output and removed after their hashes are verified against the named copy in `apk-backups/`.
+As of July 9, 2026, `apk-backups/` is the only folder that should keep APK files. Generated APK outputs under app `dist/android/`, Android Gradle output folders, or cache folders must be treated as temporary build output and removed after their hashes are verified against the named copy in `apk-backups/`.
 
 ## Naming Rule
 

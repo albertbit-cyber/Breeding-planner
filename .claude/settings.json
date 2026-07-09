@@ -37,7 +37,15 @@
       "Bash(npx tsx *)",
       "Read(//c/Users/alber/AppData/Local/Temp/claude/d--Git-Clone-Brewing-planner/058e4f22-7250-4cb1-94f2-0bf9e4d97817/tasks/**)",
       "PowerShell(Stop-Process -Id 26212 -Force)",
-      "Bash(findstr \":4000\")"
+      "Bash(findstr \":4000\")",
+      "PowerShell(railway whoami 2>&1)",
+      "PowerShell(railway list 2>&1)",
+      "Bash(curl -s --max-time 10 \"https://breeding-planner-production.up.railway.app/api/health\")",
+      "Read(//c/Users/alber/AppData/Local/Temp/**)",
+      "Bash(railway service *)",
+      "Bash(railway status *)",
+      "Bash(railway --version *)",
+      "Bash(curl -s -o /dev/null *)"
     ]
   }
 }

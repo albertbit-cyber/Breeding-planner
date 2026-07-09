@@ -8,7 +8,18 @@
       "Bash(curl -s http://localhost:4000/api/health)",
       "Bash(curl -s http://localhost:4000/api/lab/orders)",
       "Bash(wmic process:*)",
-      "Bash(tasklist /FI \"PID eq 28764\" /V)"
+      "Bash(tasklist /FI \"PID eq 28764\" /V)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "PowerShell(java -version 2>&1; Write-Host \"JAVA_HOME: $env:JAVA_HOME\"; Write-Host \"ANDROID_HOME: $env:ANDROID_HOME\")",
+      "Bash(grep -v \"//\\\\|tailwind\\\\|tooltip\\\\|sidebar\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); scripts=d.get\\('scripts',{}\\); [print\\(k+': '+v\\) for k,v in scripts.items\\(\\) if 'android' in k or 'build' in k]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); scripts=d.get\\('scripts',{}\\); [print\\(k+': '+v\\) for k,v in scripts.items\\(\\) if 'android' in k.lower\\(\\) or 'build' in k.lower\\(\\)]\")",
+      "Bash(npx cap *)",
+      "PowerShell(Get-Item \"D:\\\\Git Clone\\\\Breeding-planner\\\\breeding-app-breeder\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\release\\\\app-release.apk\" | Select-Object Name, LastWriteTime, @{N='SizeMB';E={[math]::Round\\($_.Length/1MB,1\\)}})",
+      "WebFetch(domain:www.morphmarket.com)"
     ]
   }
 }

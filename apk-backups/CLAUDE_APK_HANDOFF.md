@@ -10,19 +10,20 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 Most recent release APK:
 
-`app-release-2026-07-07-mobile-full-redesign.apk`
+`app-release-2026-07-09-mobile-cloud-animal-sync.apk`
 
-This APK was built after the mobile full-version redesign. It should be the starting APK if Claude needs to test or continue mobile release work.
+This APK includes the full mobile redesign plus the canonical Android entry/style restoration and cloud animal loading safeguards. It should be the starting APK if Claude needs to test or continue mobile release work.
 
 Latest committed baseline before this APK:
 
-Pending Codex commit for the mobile full-version redesign.
+`db4575a fix(cleanup): Phase 6 low-priority cleanup — console leaks, polygenic, scheduler (Findings 1.4, 2.5, 2.6)`
 
 ## Collected APK Inventory
 
 | APK | Type | Size bytes | SHA256 | Notes |
 | --- | --- | ---: | --- | --- |
-| `app-release-2026-07-07-mobile-full-redesign.apk` | Release | 24849810 | `1D54F0B5EB0D2C039EEEEB044A2EB8BC1D01C869C8D312CB803E38441839CAB6` | Most recent. Built July 7, 2026 after mobile full-version redesign: planner-state preservation, desktop spaces/racks/terrariums in mobile rack view, full animal details, Feed Cycle tab, full log category display, settings data summary, and automatic mobile sync refresh/queued-action upload. |
+| `app-release-2026-07-09-mobile-cloud-animal-sync.apk` | Release | 25248521 | `447C7EB55D954A73A2D320EE04BF9CE48768A1FF6E60477E4E24846D63EA9969` | Most recent. Restores native mobile routing and the full mobile stylesheet after consolidation, keeps account-specific cached snapshots, reports actual cloud read errors, and blocks unsafe writes when cloud loading fails. |
+| `app-release-2026-07-07-mobile-full-redesign.apk` | Release | 24849810 | `1D54F0B5EB0D2C039EEEEB044A2EB8BC1D01C869C8D312CB803E38441839CAB6` | Prior July 7 build after the mobile full-version redesign: planner-state preservation, desktop spaces/racks/terrariums in mobile rack view, full animal details, Feed Cycle tab, full log category display, settings data summary, and automatic mobile sync refresh/queued-action upload. |
 | `app-release-2026-07-06-unified-cloud-sync.apk` | Release | 24845494 | `BA4194036827CF5E50394725DECA5E46515578D8879D79DA1DC69FF2C2327515` | Prior July 6 build after backend nested merge, owner planner-state sync, mobile save-before-upload merge, and first-sync default overwrite protection. |
 | `app-release-2026-07-05-demo-snakes-local-only.apk` | Release | 24843730 | `CCA6FBFE3C9AE317EB472176E70672140F4A6098C61053F49A4FBA7526312C15` | Prior July 5 build after making demo snakes local-only preview data. |
 | `app-release-2026-07-05-cloud-sync-convergence.apk` | Release | 24843198 | `C458A6B68488733B465736136312B933AFFE94233B8896481FF2C678EB7A25B9` | Prior July 5 build after cloud sync convergence work. |
