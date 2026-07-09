@@ -148,6 +148,14 @@ const setCookiePreferredAuth = (scope?: AuthScope): void => {
   setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
 };
 
+// The Electron desktop build loads the app from a file:// origin in production
+// (see electron/main.js). Chromium does not reliably persist or send
+// cross-site SameSite=None cookies for file:// pages, so cookie-based auth
+// silently breaks there even though it works fine for real https:// origins
+// (web and the mobile WebView). Keep Electron on bearer-token storage instead.
+const isElectronRuntime = (): boolean =>
+  typeof window !== "undefined" && Boolean((window as unknown as { electronAPI?: unknown }).electronAPI);
+
 const getStoredCsrfToken = (scope?: AuthScope): string =>
   getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 
@@ -348,16 +356,23 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
-    // Refresh tokens travel via httpOnly cookies — don't persist in localStorage.
-    clearStoredToken(scope);
-    clearStoredRefreshToken(scope);
-    setCookiePreferredAuth(scope);
+    if (isElectronRuntime()) {
+      // file:// origin can't rely on cookies; keep the bearer token flow alive.
+      setStoredToken(nextToken, scope);
+      const nextRefreshToken = String(data?.refreshToken || "").trim();
+      if (nextRefreshToken) setStoredRefreshToken(nextRefreshToken, scope);
+    } else {
+      // Refresh tokens travel via httpOnly cookies — don't persist in localStorage.
+      clearStoredToken(scope);
+      clearStoredRefreshToken(scope);
+      setCookiePreferredAuth(scope);
+    }
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
     return {
       token: nextToken,
-      refreshToken: "",
+      refreshToken: String(data?.refreshToken || "").trim(),
     };
   })().finally(() => {
     refreshRequestPromises[scope] = undefined;
@@ -521,12 +536,18 @@ export const login = async (payload: { email: string; password: string }, authSc
     authScope: scope,
   });
   if (data?.token) {
-    // Tokens are delivered via httpOnly cookies (credentials: "include").
-    // We only persist the CSRF token (which JS must read to set as a header)
-    // and a flag so future requests know to use cookie auth.
-    clearStoredToken(scope);
-    clearStoredRefreshToken(scope);
-    setCookiePreferredAuth(scope);
+    if (isElectronRuntime()) {
+      // file:// origin can't rely on cookies; keep the bearer token flow alive.
+      setStoredToken(String(data.token), scope);
+      if (data.refreshToken) setStoredRefreshToken(String(data.refreshToken), scope);
+    } else {
+      // Tokens are delivered via httpOnly cookies (credentials: "include").
+      // We only persist the CSRF token (which JS must read to set as a header)
+      // and a flag so future requests know to use cookie auth.
+      clearStoredToken(scope);
+      clearStoredRefreshToken(scope);
+      setCookiePreferredAuth(scope);
+    }
     if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
   }
