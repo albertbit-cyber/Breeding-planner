@@ -42,6 +42,8 @@ const mockUser = {
   subscriptionPaymentStatus: "none",
   lastLoginAt: null,
   refreshToken: null,
+  passwordResetToken: null,
+  passwordResetExpiry: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

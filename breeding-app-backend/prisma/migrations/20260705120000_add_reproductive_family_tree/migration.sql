@@ -104,7 +104,7 @@ CREATE INDEX "reproductive_analytics_cache_ownerId_idx"
 -- Family tree: parent-child relationships between animals
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE "parent_relationships" (
+CREATE TABLE IF NOT EXISTS "parent_relationships" (
     "id"          TEXT NOT NULL,
     "childId"     TEXT NOT NULL,
     "parentId"    TEXT NOT NULL,
@@ -116,25 +116,31 @@ CREATE TABLE "parent_relationships" (
     CONSTRAINT "parent_relationships_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "parent_relationships_childId_role_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "parent_relationships_childId_role_key"
     ON "parent_relationships"("childId", "role");
 
-CREATE INDEX "parent_relationships_childId_idx"  ON "parent_relationships"("childId");
-CREATE INDEX "parent_relationships_parentId_idx" ON "parent_relationships"("parentId");
+CREATE INDEX IF NOT EXISTS "parent_relationships_childId_idx"  ON "parent_relationships"("childId");
+CREATE INDEX IF NOT EXISTS "parent_relationships_parentId_idx" ON "parent_relationships"("parentId");
 
-ALTER TABLE "parent_relationships"
-    ADD CONSTRAINT "parent_relationships_childId_fkey"
-    FOREIGN KEY ("childId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "parent_relationships"
-    ADD CONSTRAINT "parent_relationships_parentId_fkey"
-    FOREIGN KEY ("parentId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'parent_relationships_childId_fkey') THEN
+        ALTER TABLE "parent_relationships"
+            ADD CONSTRAINT "parent_relationships_childId_fkey"
+            FOREIGN KEY ("childId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'parent_relationships_parentId_fkey') THEN
+        ALTER TABLE "parent_relationships"
+            ADD CONSTRAINT "parent_relationships_parentId_fkey"
+            FOREIGN KEY ("parentId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Ownership history: transfer log per animal
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE "ownership_history" (
+CREATE TABLE IF NOT EXISTS "ownership_history" (
     "id"           TEXT NOT NULL,
     "animalId"     TEXT NOT NULL,
     "ownerId"      TEXT NOT NULL,
@@ -147,9 +153,14 @@ CREATE TABLE "ownership_history" (
     CONSTRAINT "ownership_history_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "ownership_history_animalId_idx" ON "ownership_history"("animalId");
-CREATE INDEX "ownership_history_ownerId_idx"  ON "ownership_history"("ownerId");
+CREATE INDEX IF NOT EXISTS "ownership_history_animalId_idx" ON "ownership_history"("animalId");
+CREATE INDEX IF NOT EXISTS "ownership_history_ownerId_idx"  ON "ownership_history"("ownerId");
 
-ALTER TABLE "ownership_history"
-    ADD CONSTRAINT "ownership_history_animalId_fkey"
-    FOREIGN KEY ("animalId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ownership_history_animalId_fkey') THEN
+        ALTER TABLE "ownership_history"
+            ADD CONSTRAINT "ownership_history_animalId_fkey"
+            FOREIGN KEY ("animalId") REFERENCES "Animal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
