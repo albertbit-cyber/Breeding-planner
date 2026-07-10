@@ -6,6 +6,9 @@
   "main": "electron/main.js",
   "description": "Breeding Planner app with Electron and Capacitor support.",
   "author": "albertbit-cyber <albertbit@gmail.com>",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
