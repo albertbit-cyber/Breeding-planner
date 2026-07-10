@@ -18062,13 +18062,14 @@ function BreederSection({
                       data={{
                         orderId: 'order_preview',
                         orderNumber: 'BP-ORDER-001',
-                        labName: 'ProHerper Genetics Laboratory',
+                        labName: 'ProHerper Lab',
                         labAddress: {
-                          line1: '123 Lab Lane',
-                          city: 'Phoenix',
-                          stateOrRegion: 'AZ',
-                          postalCode: '85001',
-                          country: 'US',
+                          contactName: 'Jurgen Wuyts',
+                          line1: 'Wijngaardstraat 27',
+                          city: 'Diest',
+                          postalCode: '3290',
+                          country: 'Belgium',
+                          phone: '+32 95 32 07 98',
                         },
                         breeder: {
                           name: info.name || info.businessName || 'Breeder Name',
@@ -18103,7 +18104,7 @@ function BreederSection({
                         sampleStatus: 'pending',
                         qrPayload: 'lab-sample-preview',
                         sampleType: 'shed',
-                        labName: 'ProHerper Genetics Laboratory',
+                        labName: 'ProHerper Lab',
                       }}
                     />
                   </div>

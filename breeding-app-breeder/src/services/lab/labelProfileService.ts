@@ -41,13 +41,14 @@ export type BreederInfo = {
 };
 
 export const LAB_PROFILE = {
-  name: "ProHerper Genetics Laboratory",
+  name: "ProHerper Lab",
   address: {
-    line1: "123 Lab Lane",
-    city: "Phoenix",
-    stateOrRegion: "AZ",
-    postalCode: "85001",
-    country: "US",
+    contactName: "Jurgen Wuyts",
+    line1: "Wijngaardstraat 27",
+    city: "Diest",
+    postalCode: "3290",
+    country: "Belgium",
+    phone: "+32 95 32 07 98",
   } satisfies LabAddress,
 };
 

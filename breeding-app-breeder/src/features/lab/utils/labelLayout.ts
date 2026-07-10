@@ -318,10 +318,12 @@ export const buildShippingLabelContent = (data: LabShippingLabelData) => ({
   destinationLines: normalizeLineList([
     "TO",
     data.labName,
+    data.labAddress?.contactName,
     data.labAddress?.line1,
     data.labAddress?.line2,
-    [data.labAddress?.city, data.labAddress?.stateOrRegion, data.labAddress?.postalCode].filter(Boolean).join(", "),
+    [[data.labAddress?.postalCode, data.labAddress?.city].filter(Boolean).join(" "), data.labAddress?.stateOrRegion].filter(Boolean).join(", "),
     data.labAddress?.country,
+    data.labAddress?.phone ? `Tel: ${data.labAddress.phone}` : undefined,
   ]),
   senderLines: normalizeLineList([
     "FROM",

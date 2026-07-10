@@ -1,10 +1,12 @@
 export interface LabAddress {
+  contactName?: string;
   line1: string;
   line2?: string;
   city: string;
   stateOrRegion?: string;
   postalCode: string;
   country: string;
+  phone?: string;
 }
 
 export interface BreederShippingContact {
