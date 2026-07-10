@@ -20,9 +20,13 @@ App_prev.jsx
 HEAD_App.jsx
 main_App.jsx
 
-# Root lockfile — generated on Windows, causes EBADPLATFORM on Railway Linux.
-# Without it Nixpacks falls back to `npm install` which handles platform deps correctly.
+# Windows-generated lockfiles — npm has a known bug (npm/cli#4828) where installing
+# from a lockfile generated on a different platform fails to pull the correct native
+# binary for packages like @tailwindcss/oxide, even though the lockfile lists it.
+# Without the lockfile, Nixpacks falls back to `npm install`, which resolves platform
+# deps fresh and correctly.
 /package-lock.json
+breeding-app-breeder/package-lock.json
 
 # Dependencies
 node_modules/
