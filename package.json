@@ -77,8 +77,6 @@
     "demo": "ts-node scripts/demo.ts"
   },
   "devDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "4.53.2",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.2",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^22.8.6",
@@ -95,7 +93,6 @@
     "gh-pages": "^6.3.0",
     "i18next-scanner": "^4.6.0",
     "lightningcss": "^1.32.0",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
