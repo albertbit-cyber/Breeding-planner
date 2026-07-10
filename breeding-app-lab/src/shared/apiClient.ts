@@ -141,12 +141,11 @@ const clearStoredAuth = (scope?: AuthScope): void => {
   clearStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 };
 
+// No platform sets this anymore (see login()/refreshAuthSession() below), but
+// a browser that hit the old cookie-based flow may still have it stored, so
+// keep honoring it defensively until that flag is cleared on next login.
 const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
   getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
-
-const setCookiePreferredAuth = (scope?: AuthScope): void => {
-  setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
-};
 
 const getStoredCsrfToken = (scope?: AuthScope): string =>
   getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
@@ -349,9 +348,14 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
+    // Cross-origin cookies are unreliable across platforms (Capacitor's native
+    // WebView origin, and Chrome's third-party cookie blocking for the web
+    // app), so every platform stores the bearer token/refresh token directly
+    // instead. Clear any stale cookie-preferred flag a previous session may
+    // have set.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
     setStoredToken(nextToken, scope);
     setStoredRefreshToken(nextRefreshToken, scope);
-    setCookiePreferredAuth(scope);
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
@@ -556,9 +560,9 @@ export const login = async (payload: { email: string; password: string }, authSc
       authScope: scope,
     });
     if (data?.token && data?.refreshToken) {
+      clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
       setStoredToken(data.token, scope);
       setStoredRefreshToken(data.refreshToken, scope);
-      setCookiePreferredAuth(scope);
       if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
       markAuthorized();
     }

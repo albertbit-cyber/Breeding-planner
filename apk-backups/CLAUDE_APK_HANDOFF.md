@@ -8,11 +8,17 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-Most recent release APK:
+Most recent **breeder** app release APK (`com.breedingplanner.mobile`):
 
 `app-release-2026-07-09-mobile-cloud-animal-sync.apk`
 
-This APK includes the full mobile redesign plus the canonical Android entry/style restoration and cloud animal loading safeguards. It should be the starting APK if Claude needs to test or continue mobile release work.
+This APK includes the full mobile redesign plus the canonical Android entry/style restoration and cloud animal loading safeguards. It should be the starting APK if Claude needs to test or continue breeder mobile release work.
+
+Most recent **lab** app build (`com.breedingplanner.lab`, separate app, installs side-by-side with the breeder app):
+
+`app-debug-2026-07-10-lab-mobile-app.apk`
+
+First build of the Laboratory portal's mobile companion — wraps the existing `breeding-app-lab` web app (same workflow as the browser portal: Incoming Orders, Sample Intake QR scan, Result Entry, Completed Tests) in a self-contained Capacitor Android project under `breeding-app-lab/android/`. Debug-signed only. See `APK_CHANGELOG.md` for full details and known caveats.
 
 Latest committed baseline before this APK:
 

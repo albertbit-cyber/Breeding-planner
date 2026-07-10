@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Breeding Planner Lab</string>
+    <string name="title_activity_main">Breeding Planner Lab</string>
+    <string name="package_name">com.breedingplanner.lab</string>
+    <string name="custom_url_scheme">com.breedingplanner.lab</string>
+</resources>
