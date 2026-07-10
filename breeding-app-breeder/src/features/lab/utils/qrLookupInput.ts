@@ -1,7 +1,9 @@
 import { parseQrPayload } from "../../../utils/labToken";
 
 const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
-const SAMPLE_ID_PATTERN = /^(?:sample[_-]?[A-Za-z0-9_-]{1,112}|smp-\d{3,}|[A-Za-z0-9_-]+-sample-\d+)$/i;
+// Sample IDs are `${orderNumber}-${index}` (e.g. "07AA00001-1"); the other
+// alternatives are older/legacy formats kept for backward compatibility.
+const SAMPLE_ID_PATTERN = /^(?:sample[_-]?[A-Za-z0-9_-]{1,112}|smp-\d{3,}|[A-Za-z0-9_-]+-sample-\d+|\d{2}[A-Za-z]{2}\d{5}-\d+)$/i;
 
 export const isLabQrToken = (value: string): boolean => QR_TOKEN_PATTERN.test(String(value || "").trim());
 export const isLabSampleId = (value: string): boolean => SAMPLE_ID_PATTERN.test(String(value || "").trim());

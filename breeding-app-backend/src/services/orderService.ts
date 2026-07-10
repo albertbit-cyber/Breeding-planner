@@ -221,12 +221,7 @@ export const updateOrderPayment = async (
   });
 };
 
-export const deleteOrderById = async (
-  orderId: string,
-  user: { role: AppRole }
-) => {
-  assertLabWorkflowUser(user);
-
+const loadOrderForDeletion = async (orderId: string) => {
   const existing = await prisma.shedTestOrder.findUnique({
     where: { id: orderId },
     include: {
@@ -247,6 +242,10 @@ export const deleteOrderById = async (
     throw new HttpError(404, "Order not found.");
   }
 
+  return existing;
+};
+
+const deleteOrderAndReturnCounts = async (existing: Awaited<ReturnType<typeof loadOrderForDeletion>>) => {
   const deletedAnimals = existing.animals.length;
   const deletedAnimalTests = existing.animals.reduce(
     (sum: number, animal: { tests: Array<{ id: string }> }) => sum + animal.tests.length,
@@ -255,7 +254,7 @@ export const deleteOrderById = async (
   const deletedResults = existing.results.length;
 
   await prisma.shedTestOrder.delete({
-    where: { id: orderId },
+    where: { id: existing.id },
   });
 
   return {
@@ -264,6 +263,32 @@ export const deleteOrderById = async (
     deletedAnimalTests,
     deletedResults,
   };
+};
+
+export const deleteOrderById = async (
+  orderId: string,
+  user: { role: AppRole }
+) => {
+  assertLabWorkflowUser(user);
+  const existing = await loadOrderForDeletion(orderId);
+  return deleteOrderAndReturnCounts(existing);
+};
+
+export const cancelOwnOrderById = async (
+  orderId: string,
+  user: { id?: string; role: AppRole }
+) => {
+  const existing = await loadOrderForDeletion(orderId);
+
+  if (existing.breederId !== user.id) {
+    throw new HttpError(403, "You can only cancel your own orders.");
+  }
+
+  if (existing.status !== "submitted") {
+    throw new HttpError(409, "Only orders that have not yet been received by the lab can be cancelled.");
+  }
+
+  return deleteOrderAndReturnCounts(existing);
 };
 
 export const deleteAllOrders = async (user: { role: AppRole }) => {

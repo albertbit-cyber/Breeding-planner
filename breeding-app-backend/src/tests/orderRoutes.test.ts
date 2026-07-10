@@ -5,6 +5,7 @@ import { HttpError } from "../utils/errors";
 
 vi.mock("../services/orderService", () => ({
   calculatePrice: vi.fn(),
+  cancelOwnOrderById: vi.fn(),
   createOrder: vi.fn(),
   deleteAllOrders: vi.fn(),
   deleteOrderById: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("../services/orderResultService", () => ({
 
 import { app } from "../app";
 import {
+  cancelOwnOrderById,
   createOrder,
   getOrderByIdForUser,
   listOrdersForUser,
@@ -270,5 +272,52 @@ describe("lab order routes", () => {
 
     expect(res.status).toBe(404);
     expect(res.body.message).toBe("Order not found.");
+  });
+
+  it("lets a breeder cancel their own submitted order", async () => {
+    vi.mocked(cancelOwnOrderById).mockResolvedValue({
+      deletedOrderId: "order-1",
+      deletedAnimals: 2,
+      deletedAnimalTests: 3,
+      deletedResults: 0,
+    });
+
+    const res = await request(app)
+      .delete("/api/lab/orders/order-1/cancel")
+      .set("Authorization", `Bearer ${tokenFor("breeder")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      deletedOrderId: "order-1",
+      deletedAnimals: 2,
+      deletedAnimalTests: 3,
+      deletedResults: 0,
+    });
+    expect(cancelOwnOrderById).toHaveBeenCalledWith(
+      "order-1",
+      expect.objectContaining({ id: "breeder-1", role: "breeder" })
+    );
+  });
+
+  it("rejects lab/admin roles from the breeder self-cancel route", async () => {
+    const res = await request(app)
+      .delete("/api/lab/orders/order-1/cancel")
+      .set("Authorization", `Bearer ${tokenFor("lab_staff")}`);
+
+    expect(res.status).toBe(403);
+    expect(cancelOwnOrderById).not.toHaveBeenCalled();
+  });
+
+  it("propagates ownership and status errors from the self-cancel service", async () => {
+    vi.mocked(cancelOwnOrderById).mockRejectedValue(
+      new HttpError(409, "Only orders that have not yet been received by the lab can be cancelled.")
+    );
+
+    const res = await request(app)
+      .delete("/api/lab/orders/order-1/cancel")
+      .set("Authorization", `Bearer ${tokenFor("breeder")}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe("Only orders that have not yet been received by the lab can be cancelled.");
   });
 });

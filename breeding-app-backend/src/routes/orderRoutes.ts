@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   calculateOrderPrice,
+  cancelMyOrder,
   createLabOrder,
   getOrderById,
   listOrders,
@@ -22,6 +23,7 @@ orderRoutes.post("/", requireAuth, requireRole("breeder"), asyncHandler(createLa
 orderRoutes.get("/", requireAuth, requireRole("admin", "lab", "breeder"), asyncHandler(listOrders));
 orderRoutes.delete("/", requireAuth, requireRole("admin"), asyncHandler(removeAllOrders));
 orderRoutes.delete("/:id", requireAuth, requireRole("admin", "lab"), asyncHandler(removeOrder));
+orderRoutes.delete("/:id/cancel", requireAuth, requireRole("breeder"), asyncHandler(cancelMyOrder));
 orderRoutes.get("/:id", requireAuth, requireRole("admin", "lab", "breeder"), asyncHandler(getOrderById));
 orderRoutes.post("/:id/results/draft", requireAuth, requireRole("admin", "lab"), asyncHandler(saveOrderResultDraft));
 orderRoutes.post("/:id/results/submit", requireAuth, requireRole("admin", "lab"), asyncHandler(submitOrderResult));

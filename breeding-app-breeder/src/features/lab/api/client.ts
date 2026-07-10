@@ -9,40 +9,6 @@ import {
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
-  adminCorrectOrderStatusHandler,
-  createTestOrderHandler,
-  getAdminOrderOversightHandler,
-  getAllowedOrderStatusTransitionsHandler,
-  getBreederCertificateArtifactHandler,
-  getBreederOrderOutcomeHandler,
-  getOrderStatusHistoryHandler,
-  getTestOrderByIdHandler,
-  listAdminAllOrdersHandler,
-  listBreederTestOrdersHandler,
-  listLabTestOrdersHandler,
-  updateTestOrderPaymentStatusHandler,
-  updateTestOrderStatusHandler,
-} from "./testOrderHandlers";
-import {
-  calculateLabOrderPriceHandler,
-  getLabTestsCatalogHandler,
-  getLabTestsPricingHandler,
-} from "./pricingHandlers";
-import {
-  createAvailableTestHandler,
-  listBreederVisibleTestsHandler,
-  listLabAvailableTestsHandler,
-  setAvailableTestActiveHandler,
-  setAvailableTestVisibilityHandler,
-  updateAvailableTestHandler,
-} from "./testCatalogHandlers";
-import { markSampleReceivedHandler, resolveQrTokenHandler } from "./qrLookupHandlers";
-import {
-  getBreederAllLabelsArtifactHandler,
-  getBreederSampleLabelsArtifactHandler,
-  getBreederShipmentLabelArtifactHandler,
-} from "./shipmentLabelHandlers";
-import {
   LAB_PROFILE,
   loadBreederInfo,
   loadSnakeById,
@@ -58,21 +24,6 @@ import {
   type SampleLabelsArtifactResponse,
   type ShippingLabelArtifactResponse,
 } from "../../../services/lab/shipmentLabelService";
-import {
-  getResultEntryTemplateHandler,
-  saveResultDraftHandler,
-  submitResultHandler,
-} from "./resultEntryHandlers";
-import {
-  addPendingShedTestHandler,
-  getShedBatchArtifactsHandler,
-  listPendingShedTestsHandler,
-  listShedSubmissionBatchesHandler,
-  quotePendingShedTestsHandler,
-  removePendingShedTestHandler,
-  submitPendingShedBatchHandler,
-  updatePendingShedTestHandler,
-} from "./shedTerminalHandlers";
 import type { LabAvailableTest, LabAvailableTestBreederView, CreateLabAvailableTestInput, UpdateLabAvailableTestInput } from "../../../types/labTestCatalog";
 import type { LabResultEntryTemplate } from "../../../types/labResultEntry";
 import type { PendingShedTestItem, ShedSubmissionBatch, ShedTerminalQuote } from "../../../types/labShedTerminal";
@@ -195,7 +146,7 @@ const toLegacyOrder = (order: any): TestOrder => {
     breederUserId: String(order?.breederId || ""),
     requestedByUserId: String(order?.breederId || ""),
     submittedAt: String(order?.createdAt || ""),
-    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderId)}-sample-${index + 1}`),
+    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderNumber)}-${index + 1}`),
     resultIds: Array.isArray(order?.results)
       ? order.results
           .map((result: any) => String(result?.id || "").trim())
@@ -342,7 +293,7 @@ const getSharedOrderNumber = (order: any): string =>
   String(order?.orderNumber || order?.id || "").trim();
 
 const getSharedSampleId = (order: any, index: number): string =>
-  `${sanitizeFilePart(String(order?.id || "").trim())}-sample-${index + 1}`;
+  `${sanitizeFilePart(getSharedOrderNumber(order))}-${index + 1}`;
 
 const getSharedRequestedTestsForAnimal = (animal: any): string[] =>
   Array.isArray(animal?.tests)
@@ -1106,6 +1057,22 @@ export const createLabApiClient = () => {
     return toLegacyOrder((data as any)?.order || null);
   };
 
+  const cancelBreederTestOrder = async (orderId: string): Promise<{
+    deletedOrderId: string;
+    deletedAnimals: number;
+    deletedAnimalTests: number;
+    deletedResults: number;
+  }> => {
+    requireSessionRole("breeder");
+    const normalized = String(orderId || "").trim();
+    if (!normalized) {
+      throw new Error("orderId is required.");
+    }
+    return apiRequest(`/lab/orders/${encodeURIComponent(normalized)}/cancel`, {
+      method: "DELETE",
+    });
+  };
+
   const getBreederOrderOutcome = async (orderId: string) => {
     const role = requireSessionRole("breeder");
     const order = await fetchSharedOrderRaw(orderId);
@@ -1575,6 +1542,7 @@ export const createLabApiClient = () => {
     listBreederTestOrders,
     listBreederTestOrdersForSnake,
     getBreederTestOrderDetails,
+    cancelBreederTestOrder,
     getBreederOrderOutcome,
     getBreederCertificateArtifact,
     listLabTestOrders,

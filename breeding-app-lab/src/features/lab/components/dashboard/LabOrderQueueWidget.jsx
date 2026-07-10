@@ -64,7 +64,39 @@ export default function LabOrderQueueWidget({
           {emptyMessage}
         </div>
       ) : (
-        <div className="mt-3 overflow-auto rounded-xl border border-neutral-200">
+        <>
+          {/* Card list on narrow screens — the wide table below needs horizontal
+              scrolling to fit six columns, so phones get a stacked card layout
+              with the same data instead. */}
+          <div className="mt-3 space-y-2 sm:hidden">
+            {orders.map((order) => (
+              <div key={order.id} className="rounded-xl border border-neutral-200 bg-white p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium text-neutral-800">{order.orderNumber || order.id}</div>
+                    <div className="text-xs text-neutral-500">Animal: {order.animalId || "-"}</div>
+                  </div>
+                  <span className="shrink-0 text-xs text-neutral-500">{formatDate(order.submittedAt || order.createdAt)}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <StatusBadge status={order.status} />
+                  <PaymentBadge paymentStatus={order.paymentStatus || "pending"} />
+                </div>
+                <div className="truncate text-xs text-neutral-700" title={(order.requestedTests || []).join(", ")}>
+                  {(order.requestedTests || []).join(", ") || "-"}
+                </div>
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs hover:border-neutral-400"
+                  onClick={() => onOpenOrder?.(order.id)}
+                >
+                  View details
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 hidden overflow-auto rounded-xl border border-neutral-200 sm:block">
           <table className="min-w-[820px] w-full text-sm">
             <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
@@ -110,7 +142,8 @@ export default function LabOrderQueueWidget({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </section>
   );

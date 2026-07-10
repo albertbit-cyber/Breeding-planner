@@ -83,6 +83,8 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
   const [showHistory, setShowHistory] = useState(false);
   const [testEditorItemId, setTestEditorItemId] = useState(null);
   const [testEditorSelection, setTestEditorSelection] = useState([]);
+  const [cancelingOrderId, setCancelingOrderId] = useState(null);
+  const [cancelInFlightId, setCancelInFlightId] = useState(null);
 
   const catalogMap = useMemo(() => new Map((catalog || []).map((entry) => [entry.id, entry])), [catalog]);
   const snakeNameById = useMemo(() => {
@@ -149,6 +151,24 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       setQueueUnavailable(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    setCancelInFlightId(orderId);
+    setError("");
+    try {
+      const api = createLabApiClient();
+      await api.cancelBreederTestOrder(orderId);
+      setCancelingOrderId(null);
+      await refreshData();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("lab:test-order-updated", { detail: { orderId, cancelled: true } }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to cancel order.");
+    } finally {
+      setCancelInFlightId(null);
     }
   };
 
@@ -538,6 +558,48 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                         </div>
                       </div>
                     </div>
+
+                    {status === "submitted" ? (
+                      <div className="mt-3 border-t border-neutral-100 pt-2">
+                        {cancelingOrderId === order.id ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5">
+                            <span className="text-[11px] text-rose-700">
+                              {t("lab.terminal.cancelConfirm", {
+                                defaultValue: "Cancel this order and delete all its data? This cannot be undone.",
+                              })}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                className="rounded-md border border-rose-300 bg-rose-600 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-60"
+                                disabled={cancelInFlightId === order.id}
+                                onClick={() => handleCancelOrder(order.id)}
+                              >
+                                {cancelInFlightId === order.id
+                                  ? t("common.working", { defaultValue: "Working..." })
+                                  : t("lab.terminal.cancelConfirmYes", { defaultValue: "Yes, delete" })}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-[11px]"
+                                disabled={cancelInFlightId === order.id}
+                                onClick={() => setCancelingOrderId(null)}
+                              >
+                                {t("common.no", { defaultValue: "No" })}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50"
+                            onClick={() => setCancelingOrderId(order.id)}
+                          >
+                            {t("lab.terminal.cancelOrder", { defaultValue: "Cancel Order" })}
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

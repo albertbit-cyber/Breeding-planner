@@ -16,9 +16,11 @@ This APK includes the full mobile redesign plus the canonical Android entry/styl
 
 Most recent **lab** app build (`com.breedingplanner.lab`, separate app, installs side-by-side with the breeder app):
 
-`app-debug-2026-07-10-lab-mobile-app.apk`
+`app-debug-2026-07-10-lab-staging-sampleid-fix.apk`
 
-First build of the Laboratory portal's mobile companion — wraps the existing `breeding-app-lab` web app (same workflow as the browser portal: Incoming Orders, Sample Intake QR scan, Result Entry, Completed Tests) in a self-contained Capacitor Android project under `breeding-app-lab/android/`. Debug-signed only. See `APK_CHANGELOG.md` for full details and known caveats.
+Fourth build of the Laboratory portal's mobile companion. Two fixes: sample IDs/QR codes now derive from the human-readable order number (`07AA00001-1`, `07AA00001-2`, ...) instead of the internal database ID; and the app is now built against the **staging** backend (`breeding-planner-staging.up.railway.app`), not production — confirmed via the deployed web app's JS bundle that staging is where the user's test orders actually live, which is why they weren't showing up in the mobile dashboard before (different database, not a bug). Debug-signed only. See `APK_CHANGELOG.md` for full details and known caveats. (Superseded: `app-debug-2026-07-10-lab-bottom-nav-scan-routing.apk`, `app-debug-2026-07-10-lab-mobile-nav-scan-fix.apk`, `app-debug-2026-07-10-lab-mobile-app.apk`.)
+
+Note: `breeding-app-lab` now has both `.env.android-production` and `.env.android-staging`. `npm run android:debug` now defaults to **staging** (matches where the user's actual test data is); use `npm run android:debug:prod` for a production-pointed debug build, and `npm run android:release:apk` for a production release build.
 
 Latest committed baseline before this APK:
 

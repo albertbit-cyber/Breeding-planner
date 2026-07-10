@@ -18,7 +18,8 @@
     "build:android:prod": "cross-env NODE_ENV=production vite build --mode android-production",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
-    "android:debug": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact apk -BuildType debug",
+    "android:debug": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment staging -Artifact apk -BuildType debug",
+    "android:debug:prod": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact apk -BuildType debug",
     "android:release:apk": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment production -Artifact apk -BuildType release"
   },
   "dependencies": {
