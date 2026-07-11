@@ -987,8 +987,71 @@ const STORAGE_KEYS = {
   backupVault: 'breedingPlannerBackupVault',
   spaces: 'breedingPlannerSpaces',
   animalLayout: 'breedingPlannerAnimalLayout',
+  animalSortBy: 'breedingPlannerAnimalSortBy',
+  animalSortDir: 'breedingPlannerAnimalSortDir',
   demoSnakesDismissed: 'breedingPlannerDemoSnakesDismissed',
 };
+const ANIMAL_SORT_FIELDS = [
+  { key: 'name', labelKey: 'animals.sort.name', defaultLabel: 'Name' },
+  { key: 'sex', labelKey: 'animals.sort.sex', defaultLabel: 'Sex' },
+  { key: 'status', labelKey: 'animals.sort.status', defaultLabel: 'Status' },
+  { key: 'weight', labelKey: 'animals.sort.weight', defaultLabel: 'Weight' },
+  { key: 'lastFeed', labelKey: 'animals.sort.lastFeed', defaultLabel: 'Last feed' },
+  { key: 'price', labelKey: 'animals.sort.price', defaultLabel: 'Price' },
+  { key: 'dateAdded', labelKey: 'animals.sort.dateAdded', defaultLabel: 'Date added' },
+];
+const ANIMAL_SORT_FIELD_KEYS = ANIMAL_SORT_FIELDS.map(f => f.key);
+
+function getAnimalSortValue(snake, sortBy) {
+  switch (sortBy) {
+    case 'name': {
+      const name = typeof snake?.name === 'string' ? snake.name.trim() : '';
+      return name ? name.toLowerCase() : null;
+    }
+    case 'sex': {
+      const normalized = normalizeSexValue(snake?.sex);
+      return normalized === 'M' || normalized === 'F' ? normalized : null;
+    }
+    case 'status': {
+      const status = typeof snake?.status === 'string' ? snake.status.trim() : '';
+      return status ? status.toLowerCase() : null;
+    }
+    case 'weight': {
+      const manualWeight = Number(snake?.weight);
+      if (Number.isFinite(manualWeight) && manualWeight > 0) return manualWeight;
+      const weightEntry = getLatestLogEntry(snake?.logs, 'weights');
+      const loggedWeight = Number(weightEntry?.grams ?? weightEntry?.weightGrams ?? weightEntry?.weight);
+      return Number.isFinite(loggedWeight) && loggedWeight > 0 ? loggedWeight : null;
+    }
+    case 'lastFeed': {
+      const entry = getLatestLogEntry(snake?.logs, 'feeds');
+      const time = entry?.date ? new Date(entry.date).getTime() : NaN;
+      return Number.isFinite(time) ? time : null;
+    }
+    case 'price': {
+      const price = Number(snake?.price);
+      return Number.isFinite(price) && price > 0 ? price : null;
+    }
+    case 'dateAdded': {
+      const seq = Number(snake?.idSequence);
+      return Number.isFinite(seq) ? seq : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function compareAnimalsBySort(a, b, sortBy, sortDir) {
+  const va = getAnimalSortValue(a, sortBy);
+  const vb = getAnimalSortValue(b, sortBy);
+  const aMissing = va === null || va === undefined;
+  const bMissing = vb === null || vb === undefined;
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  const cmp = typeof va === 'string' ? va.localeCompare(vb) : (va < vb ? -1 : va > vb ? 1 : 0);
+  return sortDir === 'desc' ? -cmp : cmp;
+}
 const DEFAULT_FAVICON_HREF = `${process.env.PUBLIC_URL || ''}/app-icons/icon_512x512.png`;
 const BACKUP_FREQUENCIES = ['off', 'nightly', 'weekly', 'monthly'];
 const DEFAULT_BACKUP_LIMIT = 20;
@@ -6498,6 +6561,26 @@ export default function BreedingPlannerApp() {
       return 'cards';
     }
   });
+  const [animalSortBy, setAnimalSortBy] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEYS.animalSortBy);
+      return ANIMAL_SORT_FIELD_KEYS.includes(stored) ? stored : '';
+    } catch (err) {
+      console.warn('Failed to restore animal sort field', err);
+      return '';
+    }
+  });
+  const [animalSortDir, setAnimalSortDir] = useState(() => {
+    if (typeof window === 'undefined') return 'asc';
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEYS.animalSortDir);
+      return stored === 'desc' ? 'desc' : 'asc';
+    } catch (err) {
+      console.warn('Failed to restore animal sort direction', err);
+      return 'asc';
+    }
+  });
   const [query, setQuery] = useState('');
   const tag = 'all';
   const [groupFilter, setGroupFilter] = useState('all');
@@ -6653,6 +6736,41 @@ export default function BreedingPlannerApp() {
       console.warn('Failed to persist animal layout', err);
     }
   }, [animalLayout]);
+
+  const persistAnimalSort = useCallback((nextSortBy, nextSortDir) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.animalSortBy, nextSortBy || '');
+      window.localStorage.setItem(STORAGE_KEYS.animalSortDir, nextSortDir === 'desc' ? 'desc' : 'asc');
+    } catch (err) {
+      console.warn('Failed to persist animal sort', err);
+    }
+  }, []);
+
+  const handleAnimalSortFieldChange = useCallback((nextSortBy) => {
+    setAnimalSortBy(nextSortBy);
+    setAnimalSortDir('asc');
+    persistAnimalSort(nextSortBy, 'asc');
+  }, [persistAnimalSort]);
+
+  const handleAnimalSortDirToggle = useCallback(() => {
+    const next = animalSortDir === 'asc' ? 'desc' : 'asc';
+    setAnimalSortDir(next);
+    persistAnimalSort(animalSortBy, next);
+  }, [animalSortBy, animalSortDir, persistAnimalSort]);
+
+  const handleAnimalSortHeaderClick = useCallback((field) => {
+    if (!field) return;
+    if (animalSortBy === field) {
+      const next = animalSortDir === 'asc' ? 'desc' : 'asc';
+      setAnimalSortDir(next);
+      persistAnimalSort(field, next);
+    } else {
+      setAnimalSortBy(field);
+      setAnimalSortDir('asc');
+      persistAnimalSort(field, 'asc');
+    }
+  }, [animalSortBy, animalSortDir, persistAnimalSort]);
 
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [eggBoxModal, setEggBoxModal] = useState(null);
@@ -8505,6 +8623,13 @@ export default function BreedingPlannerApp() {
     return filteredAll;
   }, [animalView, filteredAll, filteredFemales, filteredMales]);
 
+  const sortedAnimalList = useMemo(() => {
+    if (!animalSortBy) return activeAnimalList;
+    const list = activeAnimalList.slice();
+    list.sort((a, b) => compareAnimalsBySort(a, b, animalSortBy, animalSortDir));
+    return list;
+  }, [activeAnimalList, animalSortBy, animalSortDir]);
+
   const activeAnimalLabel = animalView === "groups"
     ? t("filters.groupsTitle", { defaultValue: "Groups" })
     : animalView === "females"
@@ -8514,7 +8639,7 @@ export default function BreedingPlannerApp() {
         : t("filters.allAnimals", { defaultValue: "All animals" });
 
   const handleListExportCsv = useCallback(async () => {
-    if (!activeAnimalList.length) {
+    if (!sortedAnimalList.length) {
       setListExportFeedback({
         type: 'error',
         message: t('animals.list.exportEmpty', { defaultValue: 'No animals match your filters.' }),
@@ -8547,7 +8672,7 @@ export default function BreedingPlannerApp() {
     };
     try {
       // No PDF dependencies here; Animal list export now streams through the CSV exporter exclusively.
-      await exportAnimalListToCsv(activeAnimalList, {
+      await exportAnimalListToCsv(sortedAnimalList, {
         allSnakes: snakes,
         pairings,
         labels: labelBundle,
@@ -8555,7 +8680,7 @@ export default function BreedingPlannerApp() {
       });
       setListExportFeedback({
         type: 'success',
-        message: t('animals.list.exportSuccess', { defaultValue: 'Exported list to CSV.', count: activeAnimalList.length }),
+        message: t('animals.list.exportSuccess', { defaultValue: 'Exported list to CSV.', count: sortedAnimalList.length }),
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -8566,7 +8691,7 @@ export default function BreedingPlannerApp() {
         timestamp: new Date().toISOString(),
       });
     }
-  }, [activeAnimalList, pairings, snakes, t]);
+  }, [sortedAnimalList, pairings, snakes, t]);
 
   const snakesById = useMemo(() => Object.fromEntries(snakes.map(snake => [snake.id, snake])), [snakes]);
   const malesById = useMemo(() => Object.fromEntries(snakes.filter(isMaleSnake).map(snake => [snake.id, snake])), [snakes]);
@@ -10034,6 +10159,38 @@ export default function BreedingPlannerApp() {
                       {t('ui.listControls.list', { defaultValue: 'List' })}
                     </button>
                   </div>
+                  <div className="flex items-center gap-1 border rounded-xl bg-white px-1 py-1 text-xs shadow-sm">
+                    <select
+                      className="bg-transparent px-2 py-1 rounded-lg font-medium text-neutral-700 focus:outline-none"
+                      value={animalSortBy}
+                      onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
+                      aria-label={t('animals.sort.label', { defaultValue: 'Sort by' })}
+                    >
+                      <option value="">{t('animals.sort.default', { defaultValue: 'Default order' })}</option>
+                      {ANIMAL_SORT_FIELDS.map(field => (
+                        <option key={field.key} value={field.key}>
+                          {t(field.labelKey, { defaultValue: field.defaultLabel })}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={cx(
+                        'px-2 py-1 rounded-lg font-medium transition-colors',
+                        animalSortBy ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-300 cursor-not-allowed'
+                      )}
+                      onClick={handleAnimalSortDirToggle}
+                      disabled={!animalSortBy}
+                      aria-label={animalSortDir === 'desc'
+                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                      title={animalSortDir === 'desc'
+                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                    >
+                      {animalSortDir === 'desc' ? '↓' : '↑'}
+                    </button>
+                  </div>
                   {animalLayout === 'list' && (
                     <button
                       type="button"
@@ -10340,9 +10497,9 @@ export default function BreedingPlannerApp() {
                   </div>
                 )}
                 {animalLayout === 'list' ? (
-                  activeAnimalList.length ? (
+                  sortedAnimalList.length ? (
                     <SnakeListTable
-                      snakes={activeAnimalList}
+                      snakes={sortedAnimalList}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onOpenFamilyTree={openFamilyTreeForSnake}
@@ -10350,6 +10507,9 @@ export default function BreedingPlannerApp() {
                       onDelete={requestDeleteSnake}
                       pairings={pairings}
                       onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
+                      sortBy={animalSortBy}
+                      sortDir={animalSortDir}
+                      onSortHeaderClick={handleAnimalSortHeaderClick}
                     />
                   ) : (
                     <div className="text-sm text-neutral-500">{t("animals.noMatches", { defaultValue: "No animals match your filters." })}</div>
@@ -10357,7 +10517,7 @@ export default function BreedingPlannerApp() {
                 ) : (
                   <>
                     <div className="bp-cards-grid grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {activeAnimalList.map(s => (
+                      {sortedAnimalList.map(s => (
                         <SnakeCard
                           key={s.id}
                           s={s}
@@ -10376,7 +10536,7 @@ export default function BreedingPlannerApp() {
                         />
                       ))}
                     </div>
-                    {!activeAnimalList.length && (
+                    {!sortedAnimalList.length && (
                       <div className="text-sm text-neutral-500">{t("animals.noMatches", { defaultValue: "No animals match your filters." })}</div>
                     )}
                   </>
@@ -15596,9 +15756,25 @@ function StatusDot({ status }) {
   return <span className={cx("inline-block w-2 h-2 rounded-full", bg)} />;
 }
 
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
+
+  const renderSortableHeader = (field, label) => {
+    const isActive = sortBy === field;
+    const arrow = isActive ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+    return (
+      <th className="text-left px-3 py-2 font-semibold">
+        <button
+          type="button"
+          className={cx('flex items-center gap-1 hover:text-neutral-900', isActive ? 'text-neutral-900' : 'text-neutral-500')}
+          onClick={() => typeof onSortHeaderClick === 'function' && onSortHeaderClick(field)}
+        >
+          {label}{arrow}
+        </button>
+      </th>
+    );
+  };
 
   const pairingsBySnake = useMemo(() => {
     const map = new Map();
@@ -15680,11 +15856,11 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
       <table className="min-w-[960px] w-full text-sm">
         <thead className="text-xs uppercase tracking-wide text-neutral-500 bg-neutral-50">
           <tr>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.animal', { defaultValue: 'Animal' })}</th>
+            {renderSortableHeader('name', t('animals.list.columns.animal', { defaultValue: 'Animal' }))}
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.status', { defaultValue: 'Status' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.weight', { defaultValue: 'Weight' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' })}</th>
+            {renderSortableHeader('status', t('animals.list.columns.status', { defaultValue: 'Status' }))}
+            {renderSortableHeader('weight', t('animals.list.columns.weight', { defaultValue: 'Weight' }))}
+            {renderSortableHeader('lastFeed', t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }))}
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
           </tr>
