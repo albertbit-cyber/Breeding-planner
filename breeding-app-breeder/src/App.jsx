@@ -909,7 +909,7 @@ function pairingLifecycleDefaults() {
     ovulation: { observed: false, date: '', notes: '' },
     preLayShed: { observed: false, date: '', notes: '', intervalFromOvulation: null },
   clutch: { recorded: false, date: '', eggsTotal: '', fertileEggs: '', slugs: '', notes: '' },
-    hatch: { scheduledDate: '', recorded: false, date: '', hatchedCount: 0, notes: '' }
+    hatch: { scheduledDate: '', recorded: false, date: '', hatchedCount: 0, notes: '', hatchlingsGeneratedThrough: 0 }
   };
 }
 function resolveEggCountForClutch(eggsTotal, fertileEggs) {
@@ -2996,6 +2996,27 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   });
 }
 
+function mergePairingRecord(localPairing, backendPairing) {
+  if (!localPairing) return sanitizePairingRecord(backendPairing);
+  if (!backendPairing) return sanitizePairingRecord(localPairing);
+  const localTime = getSyncTimestamp(localPairing);
+  const backendTime = getSyncTimestamp(backendPairing);
+  const base = backendTime > localTime ? backendPairing : localPairing;
+  const other = backendTime > localTime ? localPairing : backendPairing;
+  // hatchlingsGeneratedThrough is a monotonic high-water mark: always keep the max seen
+  // across devices so a stale write from a tab that hasn't generated a litter yet can't
+  // regress it and let the hatch wizard duplicate an already-created batch.
+  const hatchlingsGeneratedThrough = Math.max(
+    Number(localPairing?.hatch?.hatchlingsGeneratedThrough || 0),
+    Number(backendPairing?.hatch?.hatchlingsGeneratedThrough || 0)
+  );
+  return sanitizePairingRecord({
+    ...other,
+    ...base,
+    hatch: { ...other.hatch, ...base.hatch, hatchlingsGeneratedThrough },
+  });
+}
+
 function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord, tombstoneMap = null) {
   const map = new Map();
   const isTombstoned = (sanitized) => {
@@ -3029,7 +3050,7 @@ function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}, tombsto
   const mergedSnakes = mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord, tombstones?.snakes);
   const demoSnakeIds = getDemoSnakeIds(mergedSnakes);
   const displaySnakes = normalizeSnakeListForDisplay(mergedSnakes);
-  const mergedPairings = mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing', undefined, tombstones?.pairings);
+  const mergedPairings = mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing', mergePairingRecord, tombstones?.pairings);
   return {
     snakes: displaySnakes,
     pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
@@ -3699,6 +3720,11 @@ function withPairingLifecycleDefaults(pairing = {}) {
 
   hatch.hatchedCount = Number(hatch.hatchedCount || 0);
   if (!Number.isFinite(hatch.hatchedCount) || hatch.hatchedCount < 0) hatch.hatchedCount = 0;
+
+  hatch.hatchlingsGeneratedThrough = Number(hatch.hatchlingsGeneratedThrough || 0);
+  if (!Number.isFinite(hatch.hatchlingsGeneratedThrough) || hatch.hatchlingsGeneratedThrough < 0) {
+    hatch.hatchlingsGeneratedThrough = 0;
+  }
 
   const hatchLimit = typeof clutch.fertileEggs === 'number' && Number.isFinite(clutch.fertileEggs)
     ? Math.max(0, clutch.fertileEggs)
@@ -9462,7 +9488,13 @@ export default function BreedingPlannerApp() {
           .map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex))
           .filter(Number.isFinite)
       );
-      const alreadyRecorded = Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
+      const requestedThrough = Number(payload.existingCount) + payload.count;
+      // hatchlingsGeneratedThrough is a persistent, synced high-water mark, so it still
+      // blocks re-generation after the hatchling records themselves were deleted or on a
+      // device/tab that hasn't locally seen them yet (unlike existingHatchlingIndexes, which
+      // only reflects snakes currently present in this session's state).
+      const alreadyGenerated = Number(pairing.hatch?.hatchlingsGeneratedThrough || 0) >= requestedThrough;
+      const alreadyRecorded = alreadyGenerated || Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
         .some(index => existingHatchlingIndexes.has(index));
       if (alreadyRecorded) {
         showAppAlert(t('pairing.hatchlingsAlreadyRecorded', {
@@ -9799,6 +9831,19 @@ export default function BreedingPlannerApp() {
           if (baseGroup) {
             setGroups(prevGroups => (prevGroups.includes(baseGroup) ? prevGroups : [...prevGroups, baseGroup]));
           }
+          const generatedPairingId = pairing?.id || prev.pairingId || null;
+          if (generatedPairingId) {
+            setPairings(prevPairings => prevPairings.map(p => {
+              if (p.id !== generatedPairingId) return p;
+              const withDefaults = withPairingLifecycleDefaults({ ...p });
+              const throughSoFar = Number(withDefaults.hatch?.hatchlingsGeneratedThrough || 0);
+              if (hatchlingIndex <= throughSoFar) return p;
+              return {
+                ...withDefaults,
+                hatch: { ...withDefaults.hatch, hatchlingsGeneratedThrough: hatchlingIndex },
+              };
+            }));
+          }
         }
 
         const nextEntries = entries.map((item, idx) => idx === currentIndex
@@ -9812,7 +9857,7 @@ export default function BreedingPlannerApp() {
         }
         return { ...prev, entries: nextEntries, currentIndex: currentIndex + 1 };
       });
-  }, [snakes, setSnakes, setGroups, breederInfo, showAppAlert]);
+  }, [snakes, setSnakes, setGroups, setPairings, breederInfo, showAppAlert]);
 
   const handleGenerateIdForEditSnake = useCallback(() => {
     setEditSnakeDraft(draft => {

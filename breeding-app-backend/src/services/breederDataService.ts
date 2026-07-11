@@ -270,8 +270,8 @@ const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecor
   })
 );
 
-const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => (
-  mergeSnapshotPayload(existingPayload, incomingPayload, {
+const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
+  const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
     stringArrayKeys: ["goals", "tags"],
     recordArrayKeys: [
       "locks",
@@ -283,8 +283,22 @@ const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonReco
       "mobileHatchLogs",
     ],
     mergeLogs: true,
-  })
-);
+  });
+  // hatchlingsGeneratedThrough is a monotonic high-water mark used to stop the hatch
+  // wizard from duplicating an already-created litter. mergeSnapshotPayload otherwise
+  // replaces the whole `hatch` object with whichever side is newer, which could regress
+  // this value if two devices write concurrently, so pin it to the max of both sides.
+  const existingHatch = asRecord(asRecord(existingPayload)?.hatch);
+  const incomingHatch = asRecord(incomingPayload?.hatch);
+  if (existingHatch || incomingHatch) {
+    const hatchlingsGeneratedThrough = Math.max(
+      Number(existingHatch?.hatchlingsGeneratedThrough) || 0,
+      Number(incomingHatch?.hatchlingsGeneratedThrough) || 0,
+    );
+    merged.hatch = { ...asRecord(merged.hatch), hatchlingsGeneratedThrough };
+  }
+  return merged;
+};
 
 const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   const clutch = asRecord(pairing.clutch);
