@@ -2933,11 +2933,16 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   });
 }
 
-function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord) {
+function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord, tombstoneMap = null) {
   const map = new Map();
+  const isTombstoned = (sanitized) => {
+    if (!tombstoneMap) return false;
+    const id = sanitized?.id != null ? String(sanitized.id) : '';
+    return id ? Object.prototype.hasOwnProperty.call(tombstoneMap, id) : false;
+  };
   const add = (item, source, index) => {
     const sanitized = sanitizer(item);
-    if (!sanitized) return;
+    if (!sanitized || isTombstoned(sanitized)) return;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const existing = map.get(key);
     if (!existing) {
@@ -2953,15 +2958,15 @@ function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallba
   return Array.from(map.values()).filter(record => !record.deletedAt);
 }
 
-function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
+function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}, tombstones = {}) {
   const localSnakes = Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [];
   const backendSnakes = Array.isArray(backendSnapshot.snakes) ? backendSnapshot.snakes : [];
   const localPairings = Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [];
   const backendPairings = Array.isArray(backendSnapshot.pairings) ? backendSnapshot.pairings : [];
-  const mergedSnakes = mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord);
+  const mergedSnakes = mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord, tombstones?.snakes);
   const demoSnakeIds = getDemoSnakeIds(mergedSnakes);
   const displaySnakes = normalizeSnakeListForDisplay(mergedSnakes);
-  const mergedPairings = mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing');
+  const mergedPairings = mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing', undefined, tombstones?.pairings);
   return {
     snakes: displaySnakes,
     pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
@@ -7045,7 +7050,7 @@ export default function BreedingPlannerApp() {
       );
       const snapshot = await fetchBreederSnapshot();
       const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
+      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
       const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
       const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
       const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
@@ -7528,7 +7533,7 @@ export default function BreedingPlannerApp() {
         .then((snapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
           const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-          const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
+          const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
           return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
         })
         .then((savedSnapshot) => {
@@ -9326,6 +9331,20 @@ export default function BreedingPlannerApp() {
     const openHatchWizardForPayload = useCallback((payload) => {
       if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
       const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
+      const existingHatchlingIndexes = new Set(
+        snakes
+          .filter(s => s && (s.pairingId === pairing.id || s.metadata?.pairingId === pairing.id))
+          .map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex))
+          .filter(Number.isFinite)
+      );
+      const alreadyRecorded = Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
+        .some(index => existingHatchlingIndexes.has(index));
+      if (alreadyRecorded) {
+        showAppAlert(t('pairing.hatchlingsAlreadyRecorded', {
+          defaultValue: 'These hatchlings have already been recorded for this pairing.',
+        }));
+        return;
+      }
       const hatchedOn = payload.hatchedDate || localYMD(new Date());
       const parsedDate = parseYmd(hatchedOn) || new Date();
       const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
@@ -9388,7 +9407,7 @@ export default function BreedingPlannerApp() {
           existingRecordsBase: baseExistingRecords,
         },
       });
-    }, [snakes, breederInfo]);
+    }, [snakes, breederInfo, showAppAlert, t]);
 
     const regenerateWizardIdInState = useCallback((state, index, sexOverride) => {
       if (!state) return state;
