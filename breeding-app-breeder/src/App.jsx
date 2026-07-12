@@ -13638,6 +13638,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
 }
 
 const PT_TO_MM = 0.352778;
+const PDF_TEXT_SAFE_INSET_MM = 1.2;
 
 function fitTextToWidth(doc, text, maxWidth, maxFontSize = 18, minFontSize = 8) {
   if (!text) return minFontSize;
@@ -13657,13 +13658,14 @@ function estimateLineHeight(fontSize, multiplier = 1.2) {
 
 function splitOversizedPdfToken(doc, token, maxWidth) {
   const normalized = String(token || '').trim();
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
   if (!normalized) return [];
-  if (doc.getTextWidth(normalized) <= maxWidth) return [normalized];
+  if (doc.getTextWidth(normalized) <= safeMaxWidth) return [normalized];
   const chunks = [];
   let current = '';
   Array.from(normalized).forEach(char => {
     const candidate = `${current}${char}`;
-    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+    if (!current || doc.getTextWidth(candidate) <= safeMaxWidth) {
       current = candidate;
       return;
     }
@@ -13676,15 +13678,16 @@ function splitOversizedPdfToken(doc, token, maxWidth) {
 
 function wrapPdfTextToWidth(doc, source, maxWidth) {
   const normalized = String(source ?? '').replace(/\s+/g, ' ').trim();
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
   if (!normalized) return [];
   const words = normalized
     .split(' ')
-    .flatMap(word => splitOversizedPdfToken(doc, word, maxWidth));
+    .flatMap(word => splitOversizedPdfToken(doc, word, safeMaxWidth));
   const lines = [];
   let current = '';
   words.forEach(word => {
     const candidate = current ? `${current} ${word}` : word;
-    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+    if (!current || doc.getTextWidth(candidate) <= safeMaxWidth) {
       current = candidate;
       return;
     }
@@ -13697,9 +13700,10 @@ function wrapPdfTextToWidth(doc, source, maxWidth) {
 
 function ellipsizePdfLine(doc, source, maxWidth) {
   const ellipsis = '...';
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
   let text = String(source || '').trim();
-  if (!text || doc.getTextWidth(text) <= maxWidth) return text;
-  while (text.length && doc.getTextWidth(`${text}${ellipsis}`) > maxWidth) {
+  if (!text || doc.getTextWidth(text) <= safeMaxWidth) return text;
+  while (text.length && doc.getTextWidth(`${text}${ellipsis}`) > safeMaxWidth) {
     text = text.slice(0, -1).trimEnd();
   }
   return text ? `${text}${ellipsis}` : ellipsis;
@@ -13990,7 +13994,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       let nameFont = fitTextToWidth(doc, nameText, textWidth, 18, 10);
       const nameFontMin = 8;
       let idFont = 10;
-      const idFontMin = 8;
+      const idFontMin = 6;
       if (idText) {
         idFont = fitTextToWidth(doc, idText, textWidth, idFont, idFontMin);
       }
@@ -14030,7 +14034,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
 
       const recomputeIdHeights = () => {
         doc.setFontSize(idFont);
-        idLines = idText ? fitPdfLinesToWidth(doc, idText, textWidth, 2) : [];
+        idLines = idText ? fitPdfLinesToWidth(doc, idText, textWidth, 3) : [];
         sexLines = sexText ? fitPdfLinesToWidth(doc, sexText, textWidth, 1) : [];
         idHeight = idLines.length ? idLines.length * estimateLineHeight(idFont, 1) : 0;
         sexHeight = sexLines.length ? sexLines.length * estimateLineHeight(idFont, 1) : 0;

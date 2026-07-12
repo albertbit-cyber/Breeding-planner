@@ -7,6 +7,7 @@ export const LABEL_LAYOUT_CONSTANTS = Object.freeze({
   safeMarginMm: 5,
   boxGapMm: 2,
   innerPaddingMm: 2,
+  textSafeInsetMm: 1.2,
   qrMinMm: 18,
   qrMaxMm: 32,
   minFontPt: 6,
@@ -173,7 +174,10 @@ export const fitTextToBox = (
   const maxLines = Math.max(1, options.maxLines ?? 2);
   const linesSource = Array.isArray(text) ? text : [text];
   const normalized = normalizeLineList(linesSource);
-  const availableWidth = Math.max(4, box.widthMm - (LABEL_LAYOUT_CONSTANTS.innerPaddingMm * 2));
+  const availableWidth = Math.max(
+    4,
+    box.widthMm - (LABEL_LAYOUT_CONSTANTS.innerPaddingMm * 2) - LABEL_LAYOUT_CONSTANTS.textSafeInsetMm
+  );
   const availableHeight = Math.max(4, box.heightMm - (LABEL_LAYOUT_CONSTANTS.innerPaddingMm * 2));
 
   for (let fontSizePt = maxFontPt; fontSizePt >= minFontPt; fontSizePt -= 0.5) {
