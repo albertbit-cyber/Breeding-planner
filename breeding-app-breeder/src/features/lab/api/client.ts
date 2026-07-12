@@ -459,7 +459,7 @@ const parseSharedResultFindings = (result: any) => {
       confidence: typeof entry?.confidence === "number" ? entry.confidence : undefined,
       notes: String(entry?.notes || "").trim() || undefined,
     }))
-    .filter((entry) => entry.marker && entry.outcome);
+    .filter((entry: any) => entry.marker && entry.outcome);
 };
 
 const toStoredSnakeGeneticsSnapshot = (snake: any) => {
@@ -919,6 +919,8 @@ const buildSharedOrderLabelsPrintPayload = async (orderId: string) => {
         qrPayload: buildQrPayload(qrToken),
         sampleType: "shed",
         labName: LAB_PROFILE.name,
+        sampleIndex: index + 1,
+        sampleCount: animals.length,
       };
     })
   );

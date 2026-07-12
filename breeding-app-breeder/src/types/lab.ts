@@ -63,6 +63,8 @@ export interface TestOrder extends AuditedEntity {
   labId: LabId;
   animalId: AnimalId;
   animalIds?: AnimalId[];
+  animalName?: string;
+  animalNames?: string[];
   orderNumber: string;
   status: TestOrderStatus;
   requestedTests: string[];

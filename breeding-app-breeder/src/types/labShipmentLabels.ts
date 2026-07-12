@@ -40,6 +40,8 @@ export interface LabSampleLabelData {
   sampleType: string;
   labName: string;
   instructionText?: string;
+  sampleIndex?: number;
+  sampleCount?: number;
 }
 
 export interface RenderedLabelArtifact {

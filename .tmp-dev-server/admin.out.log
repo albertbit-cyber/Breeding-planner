@@ -1,0 +1,20 @@
+
+> breeding-app-admin@0.1.0 dev
+> vite --host --port 5176 --strictPort
+
+
+  [1mDev server ready[0m
+  Local:   [36mhttp://localhost:5176/[0m
+  Network: [36mhttp://192.168.178.21:5176/[0m
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m983[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5176[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.178.21:[1m5176[22m/[39m
+[2m12:14:22 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/admin/AdminApp.jsx[22m
+[2m12:14:25 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/features/auth/AuthGate.jsx[22m
+[2m12:17:10 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/features/auth/AuthGate.jsx[22m
+[2m12:17:14 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/admin/AdminApp.jsx[22m
+[2m1:47:27 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/admin/AdminApp.jsx[22m
+[2m1:47:37 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m

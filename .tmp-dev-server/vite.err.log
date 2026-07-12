@@ -1,0 +1,7 @@
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[BABEL] Note: The code generator has deoptimised the styling of D:\Git Clone\Breeding-planner\src\App.jsx as it exceeds the max of 500KB.
+[BABEL] Note: The code generator has deoptimised the styling of D:\Git Clone\Breeding-planner\src\App.jsx as it exceeds the max of 500KB.

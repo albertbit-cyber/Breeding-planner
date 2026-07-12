@@ -83,5 +83,3 @@ export interface PricingSnapshot {
   animals: AnimalTestSelection[];
   breakdown: OrderPriceBreakdown;
 }
-;
-}

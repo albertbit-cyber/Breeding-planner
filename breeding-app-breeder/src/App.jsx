@@ -13655,6 +13655,67 @@ function estimateLineHeight(fontSize, multiplier = 1.2) {
   return fontSize * PT_TO_MM * multiplier;
 }
 
+function splitOversizedPdfToken(doc, token, maxWidth) {
+  const normalized = String(token || '').trim();
+  if (!normalized) return [];
+  if (doc.getTextWidth(normalized) <= maxWidth) return [normalized];
+  const chunks = [];
+  let current = '';
+  Array.from(normalized).forEach(char => {
+    const candidate = `${current}${char}`;
+    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+      current = candidate;
+      return;
+    }
+    chunks.push(current);
+    current = char;
+  });
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [normalized];
+}
+
+function wrapPdfTextToWidth(doc, source, maxWidth) {
+  const normalized = String(source ?? '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  const words = normalized
+    .split(' ')
+    .flatMap(word => splitOversizedPdfToken(doc, word, maxWidth));
+  const lines = [];
+  let current = '';
+  words.forEach(word => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+      current = candidate;
+      return;
+    }
+    lines.push(current);
+    current = word;
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [];
+}
+
+function ellipsizePdfLine(doc, source, maxWidth) {
+  const ellipsis = '...';
+  let text = String(source || '').trim();
+  if (!text || doc.getTextWidth(text) <= maxWidth) return text;
+  while (text.length && doc.getTextWidth(`${text}${ellipsis}`) > maxWidth) {
+    text = text.slice(0, -1).trimEnd();
+  }
+  return text ? `${text}${ellipsis}` : ellipsis;
+}
+
+function fitPdfLinesToWidth(doc, source, maxWidth, maxLines = Infinity) {
+  const rawLines = Array.isArray(source) ? source : [source];
+  const wrapped = rawLines.flatMap(line => wrapPdfTextToWidth(doc, line, maxWidth));
+  if (!Number.isFinite(maxLines) || wrapped.length <= maxLines) {
+    return wrapped;
+  }
+  const visible = wrapped.slice(0, Math.max(1, maxLines));
+  visible[visible.length - 1] = ellipsizePdfLine(doc, visible[visible.length - 1], maxWidth);
+  return visible;
+}
+
 const canUseCanvas = typeof document !== 'undefined' && typeof document.createElement === 'function';
 
 async function createQrDataUrl(text, logoUrl) {
@@ -13917,7 +13978,8 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       doc.setLineWidth(0.3);
       doc.rect(qrX - framePadding, qrY - framePadding, qrSize + framePadding * 2, qrSize + framePadding * 2);
 
-      const textWidth = Math.max(12, (labelX + labelW) - (qrX + qrSize) - margin - 2);
+      const textX = qrX + qrSize + Math.max(3, margin);
+      const textWidth = Math.max(8, (labelX + labelW) - textX - margin);
       const nameText = s.name || 'Unnamed';
       const idText = s.id ? `ID: ${s.id}` : '';
       const normalizedSex = normalizeSexValue(s.sex);
@@ -13937,7 +13999,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
 
       const recomputeNameMetrics = () => {
         doc.setFontSize(nameFont);
-        const lines = doc.splitTextToSize(nameText, textWidth);
+        const lines = fitPdfLinesToWidth(doc, nameText, textWidth, 3);
         const lineHeight = estimateLineHeight(nameFont, 1);
         return { lines, lineHeight, height: lines.length * lineHeight };
       };
@@ -13948,13 +14010,9 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
 
       const maxContentHeight = labelH - margin * 2;
 
-      const calculateGeneticsLayout = (fontSize) => {
+      const calculateGeneticsLayout = (fontSize, maxLines = Infinity) => {
         doc.setFontSize(fontSize);
-        const lines = [];
-        geneticsSections.forEach(section => {
-          const sectionLines = doc.splitTextToSize(section, textWidth);
-          lines.push(...sectionLines);
-        });
+        const lines = fitPdfLinesToWidth(doc, geneticsSections, textWidth, maxLines);
         const height = lines.length ? lines.length * estimateLineHeight(fontSize, 1) : 0;
         return { lines, height };
       };
@@ -13964,14 +14022,21 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       const spacingAfterName = 3;
       let spacingAfterId = (sexText || geneticsLines.length) ? 2 : 0;
       let spacingAfterSex = geneticsLines.length ? 2 : 0;
-      let idHeight = idText ? estimateLineHeight(idFont, 1) : 0;
-      let sexHeight = sexText ? estimateLineHeight(idFont, 1) : 0;
+      let idLines = [];
+      let sexLines = [];
+      let idHeight = 0;
+      let sexHeight = 0;
       let totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
 
       const recomputeIdHeights = () => {
-        idHeight = idText ? estimateLineHeight(idFont, 1) : 0;
-        sexHeight = sexText ? estimateLineHeight(idFont, 1) : 0;
+        doc.setFontSize(idFont);
+        idLines = idText ? fitPdfLinesToWidth(doc, idText, textWidth, 2) : [];
+        sexLines = sexText ? fitPdfLinesToWidth(doc, sexText, textWidth, 1) : [];
+        idHeight = idLines.length ? idLines.length * estimateLineHeight(idFont, 1) : 0;
+        sexHeight = sexLines.length ? sexLines.length * estimateLineHeight(idFont, 1) : 0;
       };
+      recomputeIdHeights();
+      totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
 
       while (totalHeight > maxContentHeight) {
         if (geneticsFont > minGeneticsFont) {
@@ -13992,9 +14057,16 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
         totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
       }
 
+      if (totalHeight > maxContentHeight && geneticsLines.length) {
+        const geneticsLineHeight = estimateLineHeight(geneticsFont, 1);
+        const nonGeneticsHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex;
+        const maxGeneticsLines = Math.max(1, Math.floor((maxContentHeight - nonGeneticsHeight) / geneticsLineHeight));
+        ({ lines: geneticsLines, height: geneticsHeight } = calculateGeneticsLayout(geneticsFont, maxGeneticsLines));
+        totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
+      }
+
       let textY = labelY + ((labelH - totalHeight) / 2);
       if (textY < (labelY + margin)) textY = labelY + margin;
-      const textX = qrX + qrSize + 8;
 
     setPdfFont(doc, 'bold');
     doc.setFontSize(nameFont);
@@ -14004,13 +14076,13 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       setPdfFont(doc, 'normal');
       if (idText) {
         doc.setFontSize(idFont);
-        doc.text(idText, textX, textY, { baseline: 'top' });
+        doc.text(idLines, textX, textY, { baseline: 'top' });
         textY += idHeight + spacingAfterId;
       }
 
       if (sexText) {
         doc.setFontSize(idFont);
-        doc.text(sexText, textX, textY, { baseline: 'top' });
+        doc.text(sexLines, textX, textY, { baseline: 'top' });
         textY += sexHeight + spacingAfterSex;
       }
 
@@ -14115,19 +14187,19 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
 
       setPdfFont(doc, 'bold');
       doc.setFontSize(layoutConfig.labelFont);
-      const labelLines = doc.splitTextToSize(pairingLabel, textWidth);
+      const labelLines = fitPdfLinesToWidth(doc, pairingLabel, textWidth, 3);
       const labelHeight = labelLines.length * estimateLineHeight(layoutConfig.labelFont, 1);
       positions.labelY = cursorY;
       cursorY += labelHeight + 0.8;
 
       setPdfFont(doc, 'normal');
       doc.setFontSize(layoutConfig.infoFont);
-      const maleLines = doc.splitTextToSize(`Male: ${maleName}`, textWidth);
+      const maleLines = fitPdfLinesToWidth(doc, `Male: ${maleName}`, textWidth, 2);
       const maleHeight = maleLines.length * estimateLineHeight(layoutConfig.infoFont, 1);
       positions.maleY = cursorY;
       cursorY += maleHeight + 0.5;
 
-      const femaleLines = doc.splitTextToSize(`Female: ${femaleName}`, textWidth);
+      const femaleLines = fitPdfLinesToWidth(doc, `Female: ${femaleName}`, textWidth, 2);
       const femaleHeight = femaleLines.length * estimateLineHeight(layoutConfig.infoFont, 1);
       positions.femaleY = cursorY;
       cursorY += femaleHeight + 0.7;
@@ -14223,7 +14295,9 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
       const lineTop = positions.appointmentsY + idx * lineSpacing;
       doc.rect(textX, lineTop, checkboxSize, checkboxSize);
       if (label) {
-        doc.text(label, textX + checkboxSize + 2, lineTop + textBaselineOffset);
+        const appointmentX = textX + checkboxSize + 2;
+        const appointmentWidth = Math.max(4, (labelX + labelW) - appointmentX - margin);
+        doc.text(ellipsizePdfLine(doc, label, appointmentWidth), appointmentX, lineTop + textBaselineOffset);
       }
     });
 

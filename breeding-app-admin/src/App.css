@@ -6,8 +6,8 @@
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .admin-sidebar {
@@ -668,8 +668,8 @@
 }
 
 .pricing-page {
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
   min-height: 100vh;
   padding: 32px;
 }
@@ -742,8 +742,8 @@
 .pricing-actions button,
 .pricing-header button {
   border: 1px solid #d0d7e2;
-  background: #101828;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text);
   border-radius: 8px;
   padding: 8px 12px;
 }
@@ -776,8 +776,8 @@
 }
 
 .marketplace-v2 {
-  background: #f4f6f5;
-  color: #13201a;
+  background: var(--color-bg);
+  color: var(--color-text);
   min-height: 100vh;
   padding: 24px;
 }
@@ -812,8 +812,8 @@
 .market-chip-row button,
 .market-close {
   border: 1px solid #cfd8d3;
-  background: #12392b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text);
   border-radius: 8px;
   padding: 8px 12px;
 }
@@ -987,7 +987,7 @@
   background: #e7f5ee;
   border: 1px solid #b8dfcf;
   border-radius: 999px;
-  color: #14533f;
+  color: var(--color-primary);
   font-size: 12px;
   padding: 4px 8px;
 }
@@ -1075,9 +1075,9 @@
 .market-store-header > div:first-child {
   align-items: center;
   aspect-ratio: 1;
-  background: #12392b;
+  background: var(--color-primary);
   border-radius: 8px;
-  color: white;
+  color: var(--color-text);
   display: grid;
   font-size: 28px;
   font-weight: 800;
@@ -1176,8 +1176,8 @@
   place-content: center;
   gap: 12px;
   text-align: center;
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 @media (max-width: 980px) {
@@ -1968,12 +1968,12 @@
 }
 
 .launch-hero {
-  color: #172033;
+  color: var(--color-text);
 }
 
 .launch-kicker {
   margin: 0 0 0.5rem;
-  color: #235789;
+  color: var(--color-primary);
   font-size: 0.82rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -2016,7 +2016,7 @@
 }
 
 .launch-actions button:hover {
-  border-color: #235789;
+  border-color: var(--color-primary);
 }
 
 .launch-actions span {
@@ -2032,8 +2032,8 @@
 
 .marketplace-shell {
   min-height: 100vh;
-  background: #f8fafc;
-  color: #172033;
+  background: var(--color-bg);
+  color: var(--color-text);
   padding: 2rem;
 }
 
@@ -2048,7 +2048,7 @@
 .marketplace-header h1 {
   margin: 0;
   font-size: 2rem;
-  color: #172033;
+  color: var(--color-text);
 }
 
 .marketplace-header p {
@@ -2061,8 +2061,8 @@
 .marketplace-editor button {
   border: 0;
   border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;
@@ -2166,7 +2166,7 @@
 .marketplace-message {
   max-width: 1120px;
   margin: 0 auto 1rem;
-  color: #235789;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -2227,8 +2227,8 @@
 .marketplace-notifications__list button {
   border: 0;
   border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.55rem 0.8rem;
   cursor: pointer;
@@ -2416,8 +2416,8 @@
 .marketplace-saved-searches button {
   border: 0;
   border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.6rem 0.8rem;
   cursor: pointer;
@@ -2478,7 +2478,7 @@
   display: grid;
   place-items: center;
   background: #e2edf7;
-  color: #235789;
+  color: var(--color-primary);
   font-size: 1.35rem;
   font-weight: 800;
 }
@@ -2498,7 +2498,7 @@
 }
 
 .marketplace-card__links a {
-  color: #235789;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -2557,7 +2557,7 @@
 .marketplace-listing-card strong {
   display: inline-block;
   margin-top: 0.45rem;
-  color: #235789;
+  color: var(--color-primary);
 }
 
 .marketplace-listing-card__description {
@@ -2627,7 +2627,7 @@
 .marketplace-detail__panel strong {
   display: inline-block;
   margin-top: 0.5rem;
-  color: #235789;
+  color: var(--color-primary);
 }
 
 .marketplace-detail__panel dl {
@@ -2734,8 +2734,8 @@
 .marketplace-inquiry-followup button {
   border: 0;
   border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;

@@ -66,7 +66,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "8mb" }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "32mb" }));
 
 // This backend is the single source of truth for all app clients.
 // Every authenticated device calls the same hosted API and shared Postgres DB.

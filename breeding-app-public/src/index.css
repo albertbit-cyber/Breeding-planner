@@ -2,9 +2,9 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
   background: #fff;
-  color: #1c1c1a;
+  color: var(--color-text, #0f172a);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -15,11 +15,20 @@ img { max-width: 100%; }
 /* ── CSS variables ─────────────────────────────────── */
 :root {
   /* Brand */
-  --dark:     #1c1c1a;
-  --dark2:    #2c2c28;
-  --gold:     #c8a840;
-  --gold-lt:  #f5edcc;
-  --gold-dk:  #7a6010;
+  /* Shared visual language tokens — see VISUAL_LANGUAGE.md */
+  --color-primary: #0ea5e9;
+  --color-secondary: #2563eb;
+  --color-accent: #f59e0b;
+  --color-bg: #f6f7f9;
+  --color-card: #ffffff;
+  --color-text: #0f172a;
+  --font-family: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  --dark:     var(--color-text, #0f172a);
+  --dark2:    #1e293b;
+  --gold:     var(--color-primary, #0ea5e9);
+  --gold-lt:  #e0f2fe;
+  --gold-dk:  #075985;
 
   /* Data cell colors (from actual app screenshot) */
   --feed:     #7ea8a2;
@@ -38,7 +47,7 @@ img { max-width: 100%; }
   --purple-dk:#5a2896;
 
   /* Surfaces */
-  --bg:       #faf8f3;
+  --bg:       var(--color-bg, #f6f7f9);
   --bg-card:  #ffffff;
   --border:   #e5e0d4;
   --muted:    #7a7265;

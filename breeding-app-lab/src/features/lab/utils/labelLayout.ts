@@ -223,7 +223,11 @@ export const buildShippingLabelLayout = (
   safeArea: LabLabelSafeArea
 ): ShippingLabelLayout => {
   const gap = LABEL_LAYOUT_CONSTANTS.boxGapMm;
-  const destinationHeight = Math.max(12, (safeArea.heightMm * 0.58) - (gap / 2));
+  // Even split: both boxes carry a full postal address (destination = lab,
+  // sender = breeder), so neither should be shortchanged on vertical space —
+  // an uneven split was starving the sender box and truncating the breeder's
+  // address (including country) even at the default label size.
+  const destinationHeight = Math.max(12, (safeArea.heightMm * 0.5) - (gap / 2));
   const senderHeight = Math.max(10, safeArea.heightMm - destinationHeight - gap);
   return {
     type: "shipping",
@@ -315,28 +319,33 @@ export const buildSampleLabelLayout = (
 };
 
 export const buildShippingLabelContent = (data: LabShippingLabelData) => ({
+  // "TO"/labName share a line, and city/state/postal/country are combined
+  // onto a single line, so every line here carries real information — this
+  // buys back vertical space that was otherwise lost to standalone header
+  // words, which matters because fitTextToBox() truncates trailing lines
+  // first when a small label doesn't have room for everything, and the
+  // country must never be the thing that gets dropped.
   destinationLines: normalizeLineList([
-    "TO",
-    data.labName,
+    data.labName ? `TO: ${data.labName}` : "TO",
     data.labAddress?.contactName,
     data.labAddress?.line1,
     data.labAddress?.line2,
-    [[data.labAddress?.postalCode, data.labAddress?.city].filter(Boolean).join(" "), data.labAddress?.stateOrRegion].filter(Boolean).join(", "),
-    data.labAddress?.country,
+    [[data.labAddress?.postalCode, data.labAddress?.city].filter(Boolean).join(" "), data.labAddress?.stateOrRegion, data.labAddress?.country].filter(Boolean).join(", "),
     data.labAddress?.phone ? `Tel: ${data.labAddress.phone}` : undefined,
   ]),
   senderLines: normalizeLineList([
-    "FROM",
-    data.breeder?.name,
+    data.breeder?.name ? `FROM: ${data.breeder.name}` : "FROM",
     data.breeder?.address?.line1,
     data.breeder?.address?.line2,
-    [data.breeder?.address?.city, data.breeder?.address?.stateOrRegion, data.breeder?.address?.postalCode].filter(Boolean).join(", "),
-    data.breeder?.address?.country,
+    [data.breeder?.address?.city, data.breeder?.address?.stateOrRegion, data.breeder?.address?.postalCode, data.breeder?.address?.country].filter(Boolean).join(", "),
   ]),
 });
 
 export const buildSampleLabelContent = (sample: LabSampleLabelData) => ({
-  orderId: `Order ID: ${normalizeText(sample.orderNumber || sample.orderId) || "-"}`,
+  orderId: normalizeLineList([
+    `Order ID: ${normalizeText(sample.orderNumber || sample.orderId) || "-"}`,
+    sample.sampleIndex && sample.sampleCount ? `Sample ${sample.sampleIndex} of ${sample.sampleCount}` : undefined,
+  ]),
   animalId: `Animal ID: ${normalizeText(sample.animalId) || "-"}`,
   breederName: `Breeder: ${normalizeText(sample.breederName) || "-"}`,
   requestedTests: (() => {

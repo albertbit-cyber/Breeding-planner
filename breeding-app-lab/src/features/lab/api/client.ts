@@ -942,6 +942,8 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
         qrPayload: buildQrPayload(qrToken),
         sampleType: "shed",
         labName: LAB_PROFILE.name,
+        sampleIndex: index + 1,
+        sampleCount: animals.length,
       };
     })
   );

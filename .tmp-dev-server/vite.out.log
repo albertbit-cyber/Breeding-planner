@@ -1,0 +1,43 @@
+
+> breeding-planner@0.1.0 dev
+> vite --host
+
+
+  [1mDev server ready[0m
+  Local:   [36mhttp://localhost:5173/[0m
+  Network: [36mhttp://192.168.178.21:5173/[0m
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m1132[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.178.21:[1m5173[22m/[39m
+[2m10:51:39 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m10:51:39 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m10:51:43 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m12:15:14 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:15:14 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-marketplace/build/index.html[22m
+[2m12:15:14 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:15:14 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:15:16 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-marketplace/build/index.html[22m
+[2m12:15:16 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:15:31 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-lab/build/index.html[22m
+[2m12:15:32 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-lab/build/index.html[22m
+[2m12:15:34 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-lab/build/index.html[22m
+[2m12:15:38 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m12:15:38 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m12:15:42 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m12:17:36 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:17:36 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m12:17:37 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m6:08:03 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
+[2m6:08:19 pm[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/App.jsx[22m Could not Fast Refresh ("ANIMAL_EXPORT_FIELD_DEFS" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:08:19 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/AuthShell.jsx[22m
+[2m6:09:13 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m6:09:14 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m6:09:19 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-breeder/build/index.html[22m
+[2m6:15:23 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m6:15:23 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m6:15:24 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m1:48:59 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
+[2m1:49:00 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mbreeding-app-admin/build/index.html[22m
