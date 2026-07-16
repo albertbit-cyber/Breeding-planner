@@ -10,6 +10,8 @@ type StoredSnakeLike = {
   externalId?: string;
   morph?: string;
   genetics?: string;
+  imageUrl?: string;
+  photos?: unknown;
   morphs?: unknown;
   hets?: unknown;
   possibleHets?: unknown;
@@ -126,6 +128,20 @@ const buildMorphSummary = (snake: StoredSnakeLike | null | undefined): string | 
   }
 
   return firstNonEmpty(snake.morph);
+};
+
+const resolveSnakeImageUrl = (snake: StoredSnakeLike | null | undefined): string | undefined => {
+  const direct = firstNonEmpty(snake?.imageUrl);
+  if (direct) return direct;
+  if (!Array.isArray(snake?.photos) || !snake.photos.length) return undefined;
+
+  for (let index = snake.photos.length - 1; index >= 0; index -= 1) {
+    const photo = snake.photos[index] as { url?: unknown; imageUrl?: unknown } | null | undefined;
+    const candidate = firstNonEmpty(photo?.url, photo?.imageUrl);
+    if (candidate) return candidate;
+  }
+
+  return undefined;
 };
 
 const normalizeBreeder = (breeder: CertificatePartyInfo | null | undefined): CertificatePartyInfo => ({
@@ -265,6 +281,7 @@ export const buildLabCertificateTemplateData = ({
       displayId: snakeDisplayId,
       name: firstNonEmpty(snake?.name),
       morph: snakeMorph,
+      imageUrl: resolveSnakeImageUrl(snake),
     },
     breeder: normalizedBreeder,
     resultRows: toCertificateRows(order, result, resolvedIssueDateIso, snake),

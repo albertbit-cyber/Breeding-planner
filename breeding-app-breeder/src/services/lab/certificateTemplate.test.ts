@@ -44,6 +44,7 @@ describe("buildLabCertificateTemplateData", () => {
       snake: {
         id: "snake-1",
         displayId: "ARUN-01",
+        imageUrl: "data:image/png;base64,cover",
         morphs: ["GHI"],
         hets: ["Clown"],
       },
@@ -74,5 +75,6 @@ describe("buildLabCertificateTemplateData", () => {
     expect(template.resultRows[1].testNumber).toMatch(/^\d{6}[A-Z]{2}\d{4}B$/);
     expect(template.resultRows[2].testNumber).toMatch(/^\d{6}[A-Z]{2}\d{4}C$/);
     expect(template.resultRows[0].testCode).toBe(template.resultRows[0].testNumber);
+    expect(template.snake.imageUrl).toBe("data:image/png;base64,cover");
   });
 });
