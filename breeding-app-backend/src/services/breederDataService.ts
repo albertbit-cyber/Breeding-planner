@@ -35,6 +35,29 @@ const textValue = (value: unknown): string | null => {
   return text || null;
 };
 
+const completionReasons = new Set([
+  "eggs_laid",
+  "live_birth",
+  "no_ovulation_observed",
+  "follicles_reabsorbed",
+  "ovulated_no_eggs",
+  "season_skipped",
+  "season_ended",
+  "pairing_unsuccessful",
+  "health_reason",
+  "breeding_stopped",
+  "unknown_outcome",
+  "other",
+]);
+
+const outcomeConfidences = new Set(["confirmed", "likely", "unknown"]);
+const workflowStatuses = new Set(["active", "completed", "archived"]);
+
+const enumTextValue = (value: unknown, allowed: Set<string>): string | null => {
+  const text = textValue(value)?.toLowerCase() ?? null;
+  return text && allowed.has(text) ? text : null;
+};
+
 const numberValue = (value: unknown): number | null => {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
@@ -321,6 +344,21 @@ const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord
   return value.map(asRecord).filter((item): item is JsonRecord => !!item);
 };
 
+const validatePairingCompletion = (pairing: JsonRecord, index: number): void => {
+  const status = enumTextValue(pairing.workflowStatus ?? pairing.status, workflowStatuses);
+  const reason = enumTextValue(pairing.completionReason, completionReasons);
+  const confidence = enumTextValue(pairing.outcomeConfidence, outcomeConfidences);
+  if (status === "completed" && !reason) {
+    throw new HttpError(400, `pairings[${index}].completionReason is required when workflowStatus is completed.`);
+  }
+  if (reason === "other" && !textValue(pairing.completionNote)) {
+    throw new HttpError(400, `pairings[${index}].completionNote is required when completionReason is other.`);
+  }
+  if (reason && !confidence) {
+    throw new HttpError(400, `pairings[${index}].outcomeConfidence must be confirmed, likely, or unknown.`);
+  }
+};
+
 const listValue = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
   const text = textValue(value);
@@ -451,6 +489,7 @@ export const listBreederSnapshot = async (ownerId: string) => {
 export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnapshotInput) => {
   const animals = normalizeArray(input.animals, "animals");
   const pairings = normalizeArray(input.pairings, "pairings");
+  pairings.forEach(validatePairingCompletion);
   const explicitClutches = normalizeArray(input.clutches, "clutches");
   const plannerState = asRecord(input.plannerState);
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
@@ -515,13 +554,22 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         pairingRowsByAppId.set(appPairingId, existing?.id || "");
         continue;
       }
+      const mergedPairingPayload = existing ? mergePairingPayload(existing.payload, pairing) : pairing;
       const data = {
         label: textValue(pairing.label),
         maleAnimalAppId: textValue(pairing.maleId),
         femaleAnimalAppId: textValue(pairing.femaleId),
-        status: textValue(pairing.status),
+        status: textValue(mergedPairingPayload.status),
+        workflowStatus: enumTextValue(mergedPairingPayload.workflowStatus ?? mergedPairingPayload.status, workflowStatuses),
+        completionReason: enumTextValue(mergedPairingPayload.completionReason, completionReasons),
+        outcomeConfidence: enumTextValue(mergedPairingPayload.outcomeConfidence, outcomeConfidences),
+        completedAt: isoDateValue(mergedPairingPayload.completedAt) ? new Date(isoDateValue(mergedPairingPayload.completedAt) as string) : null,
+        completedByUserId: textValue(mergedPairingPayload.completedBy),
+        completionNote: textValue(mergedPairingPayload.completionNote),
+        reopenedAt: isoDateValue(mergedPairingPayload.reopenedAt) ? new Date(isoDateValue(mergedPairingPayload.reopenedAt) as string) : null,
+        reopenedByUserId: textValue(mergedPairingPayload.reopenedBy),
         startDate: textValue(pairing.startDate),
-        payload: existing ? mergePairingPayload(existing.payload, pairing) : pairing,
+        payload: mergedPairingPayload,
       };
       const row = !existing
         ? await tx.pairing.create({ data: { ownerId, appPairingId, ...data } })

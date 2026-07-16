@@ -81,6 +81,43 @@ describe("breederDataService", () => {
     });
   });
 
+  it("mirrors structured completion metadata when syncing a completed pairing", async () => {
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [{
+        id: "pairing-1",
+        label: "Season close",
+        workflowStatus: "completed",
+        status: "completed",
+        completionReason: "no_ovulation_observed",
+        outcomeConfidence: "likely",
+        completedAt: "2026-05-01T10:00:00.000Z",
+        completionNote: "No ovulation observed by end of season.",
+      }],
+    });
+
+    expect(tx.pairing.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workflowStatus: "completed",
+        completionReason: "no_ovulation_observed",
+        outcomeConfidence: "likely",
+        completedAt: new Date("2026-05-01T10:00:00.000Z"),
+        completionNote: "No ovulation observed by end of season.",
+      }),
+    });
+  });
+
+  it("rejects completed pairings without a completion reason", async () => {
+    await expect(upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [{
+        id: "pairing-1",
+        workflowStatus: "completed",
+        outcomeConfidence: "likely",
+      }],
+    })).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it("syncs animals tagged for sale into uniform marketplace listings", async () => {
     const animal = {
       id: "snake-1",

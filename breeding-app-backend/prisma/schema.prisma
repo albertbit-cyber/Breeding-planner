@@ -215,6 +215,14 @@ model Pairing {
   maleAnimalAppId   String?
   femaleAnimalAppId String?
   status            String?
+  workflowStatus    String?   @map("workflow_status")
+  completionReason  String?   @map("completion_reason")
+  outcomeConfidence String?   @map("outcome_confidence")
+  completedAt       DateTime? @map("completed_at")
+  completedByUserId String?   @map("completed_by_user_id")
+  completionNote    String?   @map("completion_note") @db.Text
+  reopenedAt        DateTime? @map("reopened_at")
+  reopenedByUserId  String?   @map("reopened_by_user_id")
   startDate         String?
   payload           Json
   deletedAt         DateTime?
@@ -225,6 +233,9 @@ model Pairing {
   @@unique([ownerId, appPairingId])
   @@index([ownerId])
   @@index([ownerId, status])
+  @@index([ownerId, workflowStatus])
+  @@index([ownerId, completionReason])
+  @@index([completedAt])
 }
 
 model Clutch {

@@ -62,6 +62,19 @@ import {
   parseAnimalText,
 } from "./features/animals/quickAddParser";
 import {
+  COMPLETION_REASON_GROUPS,
+  OUTCOME_CONFIDENCE_OPTIONS,
+  buildCompletionPatch,
+  buildReopenPatch,
+  didLateOutcomeOccur,
+  getCompletionReasonLabel,
+  getFinalKnownBiologicalOutcome,
+  getOutcomeConfidenceLabel,
+  normalizeCompletionMetadata,
+  normalizeWorkflowStatus,
+  needsOutcomeConfidence,
+} from "./services/breedingProjectCompletion";
+import {
   getLabelBrands,
   getLabelCategories,
   getLabelPresets,
@@ -906,6 +919,15 @@ const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '
 
 function pairingLifecycleDefaults() {
   return {
+    workflowStatus: 'active',
+    completionReason: '',
+    outcomeConfidence: '',
+    completedAt: null,
+    completedBy: null,
+    completionNote: '',
+    reopenedAt: null,
+    reopenedBy: null,
+    statusHistory: [],
     ovulation: { observed: false, date: '', notes: '' },
     preLayShed: { observed: false, date: '', notes: '', intervalFromOvulation: null },
   clutch: { recorded: false, date: '', eggsTotal: '', fertileEggs: '', slugs: '', notes: '' },
@@ -3760,6 +3782,7 @@ function withPairingLifecycleDefaults(pairing = {}) {
 
   return {
     ...pairing,
+    ...normalizeCompletionMetadata({ ...defaults, ...pairing }),
     ovulation,
     preLayShed,
     clutch,
@@ -6576,6 +6599,7 @@ export default function BreedingPlannerApp() {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [pairingsView, setPairingsView] = useState('dashboard');
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
+  const [completedOutcomeFilter, setCompletedOutcomeFilter] = useState('all');
   const [animalView, setAnimalView] = useState('all');
   const [animalLayout, setAnimalLayout] = useState(() => {
     if (typeof window === 'undefined') return 'cards';
@@ -8352,11 +8376,25 @@ export default function BreedingPlannerApp() {
 
   const filteredCompletedPairings = useMemo(() => {
     if (pairingsView !== 'completed') return completedPairings;
-    if (completedYearFilter === 'All') return completedPairingsWithYear.map(item => item.pairing);
-    return completedPairingsWithYear
-      .filter(item => item.year === completedYearFilter)
-      .map(item => item.pairing);
-  }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter]);
+    const byYear = completedYearFilter === 'All'
+      ? completedPairingsWithYear.map(item => item.pairing)
+      : completedPairingsWithYear
+        .filter(item => item.year === completedYearFilter)
+        .map(item => item.pairing);
+    if (completedOutcomeFilter === 'all') return byYear;
+    return byYear.filter(pairing => {
+      const normalized = withPairingLifecycleDefaults({ ...pairing });
+      if (completedOutcomeFilter === 'productive') {
+        const outcome = getFinalKnownBiologicalOutcome(normalized);
+        return outcome === 'eggs_laid' || outcome === 'live_birth';
+      }
+      if (completedOutcomeFilter === 'no_ovulation_observed') return normalized.completionReason === 'no_ovulation_observed';
+      if (completedOutcomeFilter === 'follicles_reabsorbed') return normalized.completionReason === 'follicles_reabsorbed';
+      if (completedOutcomeFilter === 'late_outcome') return didLateOutcomeOccur(normalized);
+      if (completedOutcomeFilter === 'reopened') return !!normalized.reopenedAt;
+      return true;
+    });
+  }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter, completedOutcomeFilter]);
 
   const displayedPairings = pairingsView === 'completed' ? filteredCompletedPairings : activePairings;
   const filteredPairingsBySearch = useMemo(() => {
@@ -10637,6 +10675,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('dashboard');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t('pairing.dashboard', { defaultValue: 'Dashboard' })}
@@ -10648,6 +10687,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('active');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.activeProjects", { count: activePairingsCount })}
@@ -10659,6 +10699,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('completed');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.completedProjects", { count: completedPairingsCount })}
@@ -10670,6 +10711,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('incubator');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
@@ -10712,24 +10754,51 @@ export default function BreedingPlannerApp() {
               </div>
             </div>
             {pairingsView === 'completed' && completedYearOptions.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <TabButton
-                  theme={theme}
-                  active={completedYearFilter === 'All'}
-                  onClick={() => setCompletedYearFilter('All')}
-                >
-                  All years
-                </TabButton>
-                {completedYearOptions.map(year => (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <TabButton
-                    key={year}
                     theme={theme}
-                    active={completedYearFilter === year}
-                    onClick={() => setCompletedYearFilter(year)}
+                    active={completedYearFilter === 'All'}
+                    onClick={() => setCompletedYearFilter('All')}
                   >
-                    {year}
+                    All years
                   </TabButton>
-                ))}
+                  {completedYearOptions.map(year => (
+                    <TabButton
+                      key={year}
+                      theme={theme}
+                      active={completedYearFilter === year}
+                      onClick={() => setCompletedYearFilter(year)}
+                    >
+                      {year}
+                    </TabButton>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TabButton
+                    theme={theme}
+                    active={completedOutcomeFilter === 'all'}
+                    onClick={() => setCompletedOutcomeFilter('all')}
+                  >
+                    All outcomes
+                  </TabButton>
+                  {[
+                    ['productive', 'Eggs or live birth'],
+                    ['no_ovulation_observed', 'No ovulation observed'],
+                    ['follicles_reabsorbed', 'Follicles reabsorbed'],
+                    ['late_outcome', 'Late outcome'],
+                    ['reopened', 'Reopened'],
+                  ].map(([key, label]) => (
+                    <TabButton
+                      key={key}
+                      theme={theme}
+                      active={completedOutcomeFilter === key}
+                      onClick={() => setCompletedOutcomeFilter(key)}
+                    >
+                      {label}
+                    </TabButton>
+                  ))}
+                </div>
               </div>
             )}
             {pairingsView === 'dashboard' ? (
@@ -20008,6 +20077,106 @@ function PairingsSection({
   );
 }
 
+function ProjectCompletionPanel({
+  completion,
+  isWorkflowCompleted,
+  lateOutcomeRecorded,
+  finalKnownOutcome,
+  onComplete,
+  onReopen,
+}) {
+  const [reason, setReason] = useState('season_ended');
+  const [confidence, setConfidence] = useState('likely');
+  const [note, setNote] = useState('');
+
+  const requiresConfidence = needsOutcomeConfidence(reason);
+  const completedAtLabel = completion.completedAt ? formatDateTimeForDisplay(completion.completedAt) : '';
+  const finalOutcomeLabel = getCompletionReasonLabel(finalKnownOutcome);
+
+  return (
+    <div className="mt-3 rounded-xl border bg-neutral-50 p-3 text-sm">
+      {isWorkflowCompleted ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold uppercase text-neutral-500">Completed</div>
+              <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
+            </div>
+            <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
+              Reopen project
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
+            <div><span className="font-semibold">Date:</span> {completedAtLabel || 'Unknown'}</div>
+            <div><span className="font-semibold">Confidence:</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
+            <div><span className="font-semibold">Final outcome:</span> {finalOutcomeLabel}</div>
+          </div>
+          {completion.completionNote ? (
+            <div className="text-xs text-neutral-700"><span className="font-semibold">Note:</span> {completion.completionNote}</div>
+          ) : null}
+          {lateOutcomeRecorded ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              A reproductive event was recorded after completion. The original completion record is preserved.
+            </div>
+          ) : null}
+          {completion.reopenedAt ? (
+            <div className="text-xs text-neutral-600">Previously reopened {formatDateTimeForDisplay(completion.reopenedAt) || 'after completion'}.</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {completion.completedAt ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Previously completed as {getCompletionReasonLabel(completion.completionReason)}. Reopening preserved that history.
+            </div>
+          ) : null}
+          <div className="text-xs text-neutral-600">
+            Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later.
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Completion reason</span>
+              <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
+                {COMPLETION_REASON_GROUPS.map(group => (
+                  <optgroup key={group.key} label={group.label}>
+                    {group.options.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Outcome confidence</span>
+              <select
+                className="border rounded-xl px-3 py-2 bg-white text-sm"
+                value={requiresConfidence ? confidence : 'confirmed'}
+                disabled={!requiresConfidence}
+                onChange={event => setConfidence(event.target.value)}
+              >
+                {OUTCOME_CONFIDENCE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Completion note</span>
+            <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
+            onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
+          >
+            Mark completed
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PairingInlineCard({
   pairing,
   pairingNumber,
@@ -20103,6 +20272,11 @@ function PairingInlineCard({
   const clutchCardViewDetailsLabel = t('clutchCard.viewDetails', { defaultValue: 'View details' });
   const missingValueLabel = '\u2014';
   const edit = useMemo(() => withPairingLifecycleDefaults(pairing || {}), [pairing]);
+  const completion = useMemo(() => normalizeCompletionMetadata(edit), [edit]);
+  const workflowStatus = completion.workflowStatus;
+  const isWorkflowCompleted = workflowStatus === 'completed';
+  const lateOutcomeRecorded = didLateOutcomeOccur(edit);
+  const finalKnownOutcome = getFinalKnownBiologicalOutcome(edit);
   const femaleSnake = useMemo(() => snakeById(snakes, edit.femaleId), [snakes, edit.femaleId]);
   const maleSnake = useMemo(() => snakeById(snakes, edit.maleId), [snakes, edit.maleId]);
 
@@ -20264,6 +20438,24 @@ function PairingInlineCard({
     });
   }, [setEdit]);
 
+  const handleCompleteProject = useCallback(async (input) => {
+    if (typeof onUpdatePairing !== 'function') return;
+    try {
+      const patch = buildCompletionPatch(edit, input);
+      onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
+    } catch (error) {
+      if (typeof showAppAlert === 'function') {
+        await showAppAlert(error?.message || 'Completion reason is required.');
+      }
+    }
+  }, [edit, onUpdatePairing, pairing.id, showAppAlert]);
+
+  const handleReopenProject = useCallback(() => {
+    if (typeof onUpdatePairing !== 'function') return;
+    const patch = buildReopenPatch(edit);
+    onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
+  }, [edit, onUpdatePairing, pairing.id]);
+
   const handleOpenMale = useCallback(() => {
     if (typeof onOpenSnake !== 'function' || !maleSnake) return;
     onOpenSnake(maleSnake);
@@ -20374,6 +20566,11 @@ function PairingInlineCard({
               )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
+              {isWorkflowCompleted && (
+                <span className="inline-flex items-center rounded-full border bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  Completed
+                </span>
+              )}
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
               <span aria-hidden="true">{'\u203A'}</span>
             </div>
@@ -20478,6 +20675,12 @@ function PairingInlineCard({
           <div className="flex gap-1 flex-wrap mt-1">
             {(pairing.goals || []).slice(0, 4).map(g => <Badge key={g}>{g}</Badge>)}
           </div>
+          {isWorkflowCompleted && (
+            <div className="mt-2 text-[11px] text-neutral-600">
+              Completed: {getCompletionReasonLabel(completion.completionReason)}
+              {lateOutcomeRecorded ? ' - late outcome recorded' : ''}
+            </div>
+          )}
         </div>
         <div className="flex gap-2 shrink-0">
           {typeof onExportPairingQr === 'function' && (
@@ -20511,6 +20714,15 @@ function PairingInlineCard({
           )}
         </div>
       </div>
+
+      <ProjectCompletionPanel
+        completion={completion}
+        isWorkflowCompleted={isWorkflowCompleted}
+        lateOutcomeRecorded={lateOutcomeRecorded}
+        finalKnownOutcome={finalKnownOutcome}
+        onComplete={handleCompleteProject}
+        onReopen={handleReopenProject}
+      />
 
       {isEditingParticipants && (
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -20750,7 +20962,15 @@ function PairingInlineCard({
           <CycleTimersFrame lifecycle={lifecycle} theme={theme} />
         </div>
 
-        <PairingLifecycleEditor edit={edit} setEdit={setEdit} theme={theme} onCreateClutchCard={handleCreateClutchCard} lifecycle={lifecycle} />
+        <PairingLifecycleEditor
+          edit={edit}
+          setEdit={setEdit}
+          theme={theme}
+          onCreateClutchCard={handleCreateClutchCard}
+          lifecycle={lifecycle}
+          isWorkflowCompleted={isWorkflowCompleted}
+          onReopenProject={handleReopenProject}
+        />
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
@@ -21389,6 +21609,8 @@ function getBreedingCycleDerived(edit = {}) {
 
 function isPairingCompleted(pairing) {
   if (!pairing) return false;
+  if (normalizeWorkflowStatus(pairing) === 'completed') return true;
+  if (normalizeWorkflowStatus(pairing) === 'archived') return true;
   if (pairing?.clutch?.allEggsLost) return true;
   const normalized = withPairingLifecycleDefaults({ ...pairing });
   const derived = getBreedingCycleDerived(normalized);
@@ -21625,7 +21847,7 @@ function getFemaleBreedingCyclesByYear(femaleId, pairings = []) {
     });
 }
 
-function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchCard, lifecycle }) {
+function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchCard, lifecycle, isWorkflowCompleted = false, onReopenProject }) {
   const { t } = useTranslation();
   const [activeDialog, setActiveDialog] = useState(null);
   const [ovulationDraft, setOvulationDraft] = useState({ date: '', notes: '' });
@@ -21920,6 +22142,21 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
   return (
     <>
       <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
+        {isWorkflowCompleted ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="font-semibold">This project is marked completed. You can still record this event.</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
+                Keep project completed and add event
+              </span>
+              {typeof onReopenProject === 'function' ? (
+                <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
+                  Reopen project and add event
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{breedingCycleLabel}</div>
           <div className="text-[12px] text-neutral-500">{breedingCycleHelper}</div>
