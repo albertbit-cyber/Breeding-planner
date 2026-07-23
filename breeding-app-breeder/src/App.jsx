@@ -7357,7 +7357,7 @@ export default function BreedingPlannerApp() {
         }
       })
       .catch((error) => {
-        console.error('Failed to load persisted Breeding Planner data', error);
+        console.error('Failed to load persisted Serpentora data', error);
       })
       .finally(() => {
         if (!cancelled) setElectronDataReady(true);
@@ -7621,7 +7621,7 @@ export default function BreedingPlannerApp() {
 
     const saveTimer = setTimeout(() => {
       bridge.saveData(payload).catch((error) => {
-        console.error('Failed to save Breeding Planner data', error);
+        console.error('Failed to save Serpentora data', error);
       });
     }, 300);
 
@@ -10090,7 +10090,7 @@ export default function BreedingPlannerApp() {
             <div className="flex flex-1 flex-wrap items-center justify-end gap-3 min-w-0">
               <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-1.5">
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Planner" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Serpentora" })}</TabButton>
                 <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
                 <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
                 <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
@@ -16911,7 +16911,7 @@ function BreederSection({
     let confirmed = true;
     if (typeof showAppConfirm === 'function') {
       confirmed = await showAppConfirm(
-        'This will permanently erase all local Breeding Planner data on this device and restore factory defaults. This cannot be undone.',
+        'This will permanently erase all local Serpentora data on this device and restore factory defaults. This cannot be undone.',
         {
           title: 'Return to Defaults',
           confirmLabel: 'Return to Defaults',
@@ -18873,7 +18873,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Manual backup</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download a Breeding Planner backup containing all animals, pairings, groups, breeder info, and settings.
+                Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings.
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -19102,7 +19102,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Restore from backup</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Upload a Breeding Planner backup file or import a legacy JSON export to replace the current data.
+                Upload a Serpentora backup file or import a legacy JSON export to replace the current data.
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -19183,6 +19183,16 @@ function BreederSection({
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
                   <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                  {accountState.user && (
+                    <div className={`mt-1 text-xs ${accountState.user.emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {accountState.user.emailVerified ? 'Verified' : 'Not verified'}
+                    </div>
+                  )}
+                  {accountState.user?.pendingEmail && (
+                    <div className="mt-1 text-xs text-amber-600 break-words">
+                      Pending confirmation for {accountState.user.pendingEmail} — check that inbox for a confirmation link. Your current email stays active until confirmed.
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
@@ -19316,6 +19326,9 @@ function BreederSection({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
                 <div className="text-sm font-semibold">Change email</div>
+                <div className="text-xs text-neutral-500">
+                  The new address must be confirmed via an emailed link before it becomes active.
+                </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="email"
@@ -19341,6 +19354,9 @@ function BreederSection({
               </div>
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
                 <div className="text-sm font-semibold">Change password</div>
+                <div className="text-xs text-neutral-500">
+                  We'll email a confirmation once your password is changed.
+                </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
@@ -20038,7 +20054,7 @@ function PairingsSection({
   const openSnake = typeof onOpenSnake === 'function' ? onOpenSnake : null;
 
   const list = Array.isArray(pairings) ? pairings : [];
-  const heading = title || `Breeding Planner (${list.length})`;
+  const heading = title || `Serpentora (${list.length})`;
   const isCollapsedVariant = variant === 'collapsed';
   const listContainerClass = isCollapsedVariant
     ? 'flex flex-col gap-3'
@@ -24638,9 +24654,9 @@ function buildGoogleCalendarICS({ events, pairingsById, snakesById, malesById, f
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Breeding Planner//EN',
+    'PRODID:-//Serpentora//EN',
     'CALSCALE:GREGORIAN',
-    'X-WR-CALNAME:Breeding Planner'
+    'X-WR-CALNAME:Serpentora'
   ];
 
   events.forEach(event => {
@@ -24784,11 +24800,11 @@ function convertCalendarEventToGooglePayload(event, context) {
   if (!startDate || !endDate) return null;
 
   const source = (() => {
-    if (typeof window === 'undefined') return { title: 'Breeding Planner' };
+    if (typeof window === 'undefined') return { title: 'Serpentora' };
     try {
-      return { title: 'Breeding Planner', url: window.location.origin };
+      return { title: 'Serpentora', url: window.location.origin };
     } catch (err) {
-      return { title: 'Breeding Planner' };
+      return { title: 'Serpentora' };
     }
   })();
 

@@ -29,6 +29,15 @@ export const authRecoveryLimiter = rateLimit({
   message: { message: "Too many password recovery attempts, please try again later." },
 });
 
+export const authVerificationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many verification email requests, please try again later." },
+});
+
 export const marketplaceMutationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 120,

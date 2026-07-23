@@ -1,6 +1,7 @@
 import "./config/env";
 import { app } from "./app";
 import { env } from "./config/env";
+import { startEmailWorker, stopEmailWorker } from "./email/worker";
 
 /*
 Setup steps for true multi-computer shared data:
@@ -16,6 +17,16 @@ Setup steps for true multi-computer shared data:
 10. Log in from any computer using seeded users and verify shared live data
 */
 
-app.listen(env.port, "0.0.0.0", () => {
+const server = app.listen(env.port, "0.0.0.0", () => {
   console.log(`[server] API running on port ${env.port}`);
+  startEmailWorker();
 });
+
+const shutdown = async (signal: string): Promise<void> => {
+  console.log(`[server] received ${signal}, shutting down gracefully`);
+  await stopEmailWorker();
+  server.close(() => process.exit(0));
+};
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

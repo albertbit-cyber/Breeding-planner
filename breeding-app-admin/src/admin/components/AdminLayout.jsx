@@ -35,6 +35,7 @@ const NAV = [
     label: "System",
     items: [
       { href: "/admin/notifications", label: "Announcements", icon: "◎" },
+      { href: "/admin/emails", label: "Emails", icon: "✉" },
       { href: "/admin/gdpr", label: "GDPR Tools", icon: "⊗" },
       { href: "/admin/team", label: "Team & Account", icon: "⊙" },
     ],

@@ -3,6 +3,16 @@ import request from "supertest";
 import { signAuthToken } from "../utils/jwt";
 import { HttpError } from "../utils/errors";
 
+// Order creation is gated by requireVerifiedEmail, which does a DB read for the
+// acting user's verification state.
+vi.mock("../lib/prisma", () => ({
+  prisma: {
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ emailVerified: true }),
+    },
+  },
+}));
+
 vi.mock("../services/orderService", () => ({
   calculatePrice: vi.fn(),
   cancelOwnOrderById: vi.fn(),

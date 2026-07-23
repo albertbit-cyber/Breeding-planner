@@ -33,6 +33,12 @@ import {
   verificationRequests,
   verificationRequestDetail,
 } from "../controllers/adminController";
+import {
+  adminEmailHistory,
+  adminRetryEmailJob,
+  adminEmailSuppressions,
+  adminReleaseEmailSuppression,
+} from "../controllers/adminEmailController";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/roles";
@@ -74,3 +80,7 @@ adminRoutes.patch("/users/:id/role", asyncHandler(changeUserRole));
 adminRoutes.patch("/users/:id/status", asyncHandler(changeUserStatus));
 adminRoutes.patch("/users/:id/subscription", asyncHandler(changeUserSubscription));
 adminRoutes.patch("/users/:id/verification", asyncHandler(changeUserVerification));
+adminRoutes.get("/emails", asyncHandler(adminEmailHistory));
+adminRoutes.post("/emails/:id/retry", asyncHandler(adminRetryEmailJob));
+adminRoutes.get("/email-suppressions", asyncHandler(adminEmailSuppressions));
+adminRoutes.post("/email-suppressions/:email/release", asyncHandler(adminReleaseEmailSuppression));

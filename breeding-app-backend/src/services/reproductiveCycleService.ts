@@ -1,4 +1,8 @@
 import { prisma } from "../lib/prisma";
+import { env } from "../config/env";
+import { enqueueEmail, cancelByIdempotencyKey } from "../email/queueService";
+import { breedingReminderIdempotencyKey } from "../email/idempotency";
+import { BREEDING_REMINDER_TEMPLATE_KEY, BREEDING_REMINDER_TEMPLATE_VERSION } from "../email/templates";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -409,6 +413,82 @@ function extractPreLayShedDate(pairing: JsonRecord): string | null {
   return textVal(shed.date)?.slice(0, 10) ?? null;
 }
 
+// ── Expected egg-laying reminder (email integration) ──────────────────────────
+
+const formatDateForTimezone = (isoDate: string, timeZone: string): string => {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(new Date(`${isoDate}T12:00:00.000Z`));
+  } catch {
+    return isoDate;
+  }
+};
+
+/**
+ * Keeps the "expected egg-laying window" reminder in sync with a cycle's
+ * ovulation date. Reuses the same species-default window math already used
+ * by the prediction engine above (`buildWindowFromDefault` / `SPECIES_DEFAULTS`)
+ * instead of recomputing the interval elsewhere.
+ */
+export async function syncExpectedEggLayingReminder(input: {
+  ownerId: string;
+  cycleId: string;
+  femaleDisplayName: string;
+  pairingAppId: string | null;
+  ovulationDate: string | null;
+  priorOvulationDate: string | null;
+}): Promise<void> {
+  const db = prisma as any;
+  const { ownerId, cycleId, femaleDisplayName, pairingAppId, ovulationDate, priorOvulationDate } = input;
+
+  if (ovulationDate === priorOvulationDate) return; // Nothing changed — leave any existing reminder as-is.
+
+  const idempotencyKey = breedingReminderIdempotencyKey(cycleId, "expected_egg_laying_window");
+  // The ovulation date moved (or was cleared): whatever was previously queued for
+  // this cycle no longer reflects reality and must be replaced, not left to fire late.
+  await cancelByIdempotencyKey(idempotencyKey);
+
+  if (!ovulationDate) return;
+
+  const owner = await db.user.findUnique({ where: { id: ownerId }, select: { email: true } });
+  if (!owner?.email) return;
+
+  const preference = await db.notificationPreference.findUnique({
+    where: { userId_category: { userId: ownerId, category: "breeding_reminders" } },
+    select: { timezone: true },
+  });
+  const timezone = preference?.timezone || "UTC";
+
+  const window = buildWindowFromDefault(SPECIES_DEFAULTS.ovulationToEggLaying, ovulationDate);
+  const projectDisplayName = pairingAppId ? `Pairing ${pairingAppId}` : "your breeding project";
+  const actionUrl = `${env.publicAppUrl || "https://app.breedingplanner.com"}/#/?focusPairing=${encodeURIComponent(pairingAppId || "")}`;
+
+  await enqueueEmail({
+    ownerId,
+    recipientEmail: owner.email,
+    category: "breeding_reminders",
+    templateKey: BREEDING_REMINDER_TEMPLATE_KEY,
+    templateVersion: BREEDING_REMINDER_TEMPLATE_VERSION,
+    templatePayload: {
+      animalDisplayName: femaleDisplayName,
+      projectDisplayName,
+      reminderType: "expected_egg_laying_window",
+      reminderDateDisplay: formatDateForTimezone(window.average, timezone),
+      explanation: `Based on the recorded ovulation date, egg-laying is expected around this date (earliest ${window.earliest}, latest ${window.latest}).`,
+      actionUrl,
+    },
+    subject: "Breeding reminder: expected egg-laying window",
+    idempotencyKey,
+    scheduledFor: new Date(`${window.average}T09:00:00.000Z`),
+    relatedEntityType: "reproductive_cycle",
+    relatedEntityId: cycleId,
+  });
+}
+
 // ── Core ingestion (called from upsertBreederSnapshot) ────────────────────────
 
 /**
@@ -442,7 +522,7 @@ export async function ingestAllPairingsIntoReproductiveCycles(
     // Resolve DB rows
     const femaleAnimal = await db.animal.findFirst({
       where: { ownerId, appAnimalId: femaleAppId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!femaleAnimal) continue;
 
@@ -468,6 +548,7 @@ export async function ingestAllPairingsIntoReproductiveCycles(
     let cycle = pairingRow?.id
       ? await db.reproductiveCycle.findFirst({ where: { pairingId: pairingRow.id } })
       : null;
+    const priorOvulationDate: string | null = cycle?.ovulationDate ?? null;
 
     if (!cycle) {
       const existingCount = await db.reproductiveCycle.count({
@@ -509,6 +590,17 @@ export async function ingestAllPairingsIntoReproductiveCycles(
         },
       });
     }
+
+    await syncExpectedEggLayingReminder({
+      ownerId,
+      cycleId: cycle.id,
+      femaleDisplayName: femaleAnimal.name || "your animal",
+      pairingAppId,
+      ovulationDate: ovulationDate ?? priorOvulationDate,
+      priorOvulationDate,
+    }).catch((err) => {
+      console.error("[reproductive] expected egg-laying reminder sync failed:", err);
+    });
 
     // Ingest lock events (upsert with dedup on femaleAnimalId + lockDate)
     const lockDates = extractLockDates(pairing);

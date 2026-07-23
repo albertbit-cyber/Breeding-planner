@@ -20,7 +20,11 @@
       "Bash(npx cap *)",
       "PowerShell(Get-Item \"D:\\\\Git Clone\\\\Breeding-planner\\\\breeding-app-breeder\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\release\\\\app-release.apk\" | Select-Object Name, LastWriteTime, @{N='SizeMB';E={[math]::Round\\($_.Length/1MB,1\\)}})",
       "WebFetch(domain:www.morphmarket.com)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npx prisma *)",
+      "Bash(PGPASSWORD=postgres psql -h localhost -U postgres -c \"DROP DATABASE IF EXISTS breeding_planner_fresh_test;\" -c \"CREATE DATABASE breeding_planner_fresh_test;\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/breeding_planner_fresh_test?schema=public&sslmode=disable\" npx prisma migrate deploy)",
+      "Bash(PGPASSWORD=postgres psql -h localhost -U postgres -c \"DROP DATABASE breeding_planner_fresh_test;\")"
     ]
   }
 }

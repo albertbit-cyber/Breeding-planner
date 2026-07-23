@@ -128,15 +128,27 @@ export default function TeamPage() {
                 <dt>Email</dt><dd>{account?.email || "-"}</dd>
                 <dt>Role</dt><dd>{account?.role || "-"}</dd>
                 <dt>Email verified</dt><dd>{account?.emailVerified ? "Yes" : "No"}</dd>
+                {account?.pendingEmail && (
+                  <>
+                    <dt>Pending email change</dt>
+                    <dd>{account.pendingEmail} (check that inbox for a confirmation link — your current email stays active until confirmed)</dd>
+                  </>
+                )}
               </dl>
               <div style={{ marginTop: 16 }}>
                 <div className="admin-field-label" style={{ marginBottom: 8 }}>Change Email</div>
+                <div className="admin-hint" style={{ marginBottom: 8 }}>
+                  The new address must be confirmed via an emailed link before it becomes active.
+                </div>
                 <form className="admin-form-grid" onSubmit={updateOwnerEmail} style={{ gridTemplateColumns: "1fr 1fr auto" }}>
                   <input value={ownerEmailForm.email} onChange={(e) => setOwnerEmailForm((p) => ({ ...p, email: e.target.value }))} placeholder="New email" type="email" required />
                   <input value={ownerEmailForm.currentPassword} onChange={(e) => setOwnerEmailForm((p) => ({ ...p, currentPassword: e.target.value }))} placeholder="Current password" type="password" required />
                   <button type="submit" disabled={Boolean(ownerBusy)}>{ownerBusy === "email" ? "Saving..." : "Change"}</button>
                 </form>
                 <div className="admin-field-label" style={{ margin: "14px 0 8px" }}>Change Password</div>
+                <div className="admin-hint" style={{ marginBottom: 8 }}>
+                  We'll email a confirmation once your password is changed.
+                </div>
                 <form className="admin-form-grid" onSubmit={updateOwnerPassword} style={{ gridTemplateColumns: "1fr 1fr auto" }}>
                   <input value={ownerPasswordForm.currentPassword} onChange={(e) => setOwnerPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))} placeholder="Current password" type="password" required />
                   <input value={ownerPasswordForm.newPassword} onChange={(e) => setOwnerPasswordForm((p) => ({ ...p, newPassword: e.target.value }))} placeholder="New password" type="password" required minLength={8} />

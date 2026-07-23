@@ -558,6 +558,27 @@ export const resetPassword = async (payload: { token: string; newPassword: strin
     requiresAuth: false,
   });
 
+export const verifyEmail = async (payload: { token: string }) =>
+  request<{ message: string; alreadyVerified?: boolean; user?: unknown }>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resendVerification = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const confirmEmailChange = async (payload: { token: string }) =>
+  request<{ message: string; user?: unknown }>("/auth/confirm-email-change", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
 export const getCurrentUser = async () => {
   const data = await request<{ user: unknown }>("/auth/me");
   markAuthorized();

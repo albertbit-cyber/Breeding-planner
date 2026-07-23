@@ -62,9 +62,23 @@ export const changePasswordSchema = z.object({
     .min(8, "Password must be at least 8 characters."),
 });
 
+export const resendVerificationSchema = z.object({
+  email: z
+    .string()
+    .email("A valid email is required.")
+    .toLowerCase()
+    .trim(),
+});
+
+export const confirmEmailChangeSchema = z.object({
+  token: z.string().min(1, "token is required."),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+export type ConfirmEmailChangeInput = z.infer<typeof confirmEmailChangeSchema>;

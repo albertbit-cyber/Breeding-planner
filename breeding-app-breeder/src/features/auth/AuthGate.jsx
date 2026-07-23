@@ -1,7 +1,41 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, forgotPassword as forgotPasswordApi, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, register as registerApi } from "../../shared/apiClient";
+import {
+  clearAuthToken,
+  confirmEmailChange as confirmEmailChangeApi,
+  forgotPassword as forgotPasswordApi,
+  getAuthScopeForHash,
+  hasStoredAuthSession,
+  login as loginApi,
+  register as registerApi,
+  resendVerification as resendVerificationApi,
+  resetPassword as resetPasswordApi,
+  verifyEmail as verifyEmailApi,
+} from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
+
+/**
+ * The account-lifecycle emails link back to plain paths (e.g. `${appUrl}/verify-email?token=...`),
+ * not hash routes — this app has no router, so these are read from the real
+ * pathname/search once on load and handled inline by AuthGate, ahead of the
+ * normal login/register overlay.
+ */
+const LINK_FLOW_PATHS = {
+  "/verify-email": "verify-email",
+  "/reset-password": "reset-password",
+  "/confirm-email-change": "confirm-email-change",
+};
+
+const getLinkFlowFromLocation = () => {
+  if (typeof window === "undefined") return null;
+  const path = String(window.location?.pathname || "").replace(/\/+$/, "") || "/";
+  const type = LINK_FLOW_PATHS[path];
+  if (!type) return null;
+  const params = new URLSearchParams(window.location.search || "");
+  const token = params.get("token") || "";
+  if (!token) return null;
+  return { type, token };
+};
 
 const AUTH_SESSION_STORAGE_KEYS = {
   breeder: "breedingPlannerBreederAuthSession",
@@ -347,7 +381,7 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
       key: "preferences",
       title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
       description: t("auth.steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Breeding Planner.",
+        defaultValue: "Tell us how you want to use Serpentora.",
       }),
       fields: [
         {
@@ -501,6 +535,16 @@ export default function AuthGate({ children }) {
   );
   const [passwordRecoveryError, setPasswordRecoveryError] = useState("");
   const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
+  const [linkFlow] = useState(() => getLinkFlowFromLocation());
+  const [linkFlowResult, setLinkFlowResult] = useState({ status: "pending", message: "" });
+  const [resetPasswordValues, setResetPasswordValues] = useState({ newPassword: "", confirmPassword: "" });
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [resetPasswordDone, setResetPasswordDone] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [resendVerificationEmail, setResendVerificationEmail] = useState("");
+  const [resendVerificationSent, setResendVerificationSent] = useState(false);
+  const [resendVerificationError, setResendVerificationError] = useState("");
+  const [resendVerificationBusy, setResendVerificationBusy] = useState(false);
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -549,11 +593,50 @@ export default function AuthGate({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!linkFlow) return undefined;
+    // Clear the token out of the URL immediately so it can't be re-submitted
+    // (e.g. on refresh) or leak via browser history/referrer headers.
+    try {
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      // ignore
+    }
+    if (linkFlow.type === "reset-password") return undefined;
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (linkFlow.type === "verify-email") {
+          const result = await verifyEmailApi({ token: linkFlow.token });
+          if (cancelled) return;
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth.verifyEmail.success", { defaultValue: "Your email address is verified." }) });
+        } else if (linkFlow.type === "confirm-email-change") {
+          const result = await confirmEmailChangeApi({ token: linkFlow.token });
+          if (cancelled) return;
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth.confirmEmailChange.success", { defaultValue: "Your new email address is confirmed." }) });
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setLinkFlowResult({
+          status: "error",
+          message: error instanceof Error ? error.message : t("auth.linkFlow.error", { defaultValue: "This link is invalid or has expired." }),
+        });
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkFlow]);
+
+  useEffect(() => {
     setAuthState(loadStoredAuth(authScope));
     setView("chooser");
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
   }, [authScope]);
 
   const persistAuth = useCallback((next) => {
@@ -574,6 +657,7 @@ export default function AuthGate({ children }) {
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
     setRegisterStep(0);
@@ -589,6 +673,7 @@ export default function AuthGate({ children }) {
     persistAuth({ isAuthenticated: false });
     setView("login");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
     setLoginValues((prev) => ({
       username: authState.profile?.email || prev.username || "",
       password: "",
@@ -639,6 +724,7 @@ export default function AuthGate({ children }) {
           email: String((backendUser && backendUser.email) || loginEmail),
           reptileCount: "",
           role: appRole,
+          emailVerified: backendUser?.emailVerified !== false,
         },
         authenticatedAt: new Date().toISOString(),
       });
@@ -651,6 +737,7 @@ export default function AuthGate({ children }) {
     const normalizedInput = normalizeIdentifier(loginValues.username);
     const recoveryEmail = normalizedInput.includes("@") ? normalizedInput : "";
     setIsRecoveringPassword(true);
+    setIsResendingVerification(false);
     setLoginError("");
     setLoginMessage("");
     setPasswordRecoveryError("");
@@ -692,6 +779,63 @@ export default function AuthGate({ children }) {
           ? error.message
           : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
       );
+    }
+  };
+
+  const handleResetPasswordSubmit = async (event) => {
+    event.preventDefault();
+    setResetPasswordError("");
+    const { newPassword, confirmPassword } = resetPasswordValues;
+    if (newPassword.trim().length < 8) {
+      setResetPasswordError(t("auth.errors.passwordLength", { defaultValue: "Choose a password with at least 8 characters." }));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError(t("auth.errors.passwordMismatch", { defaultValue: "Passwords do not match." }));
+      return;
+    }
+    try {
+      await resetPasswordApi({ token: linkFlow.token, newPassword });
+      setResetPasswordDone(true);
+    } catch (error) {
+      setResetPasswordError(
+        error instanceof Error ? error.message : t("auth.resetPassword.error", { defaultValue: "This link is invalid or has expired." })
+      );
+    }
+  };
+
+  const openResendVerification = (prefillEmail = "") => {
+    setIsResendingVerification(true);
+    setIsRecoveringPassword(false);
+    setResendVerificationEmail(prefillEmail);
+    setResendVerificationSent(false);
+    setResendVerificationError("");
+  };
+
+  const closeResendVerification = () => {
+    setIsResendingVerification(false);
+    setResendVerificationError("");
+    setResendVerificationSent(false);
+  };
+
+  const handleResendVerificationSubmit = async (event) => {
+    event.preventDefault();
+    setResendVerificationError("");
+    const email = normalizeIdentifier(resendVerificationEmail);
+    if (!email || !email.includes("@")) {
+      setResendVerificationError(t("auth.errors.emailRequired", { defaultValue: "Enter the email address on your account." }));
+      return;
+    }
+    setResendVerificationBusy(true);
+    try {
+      await resendVerificationApi({ email });
+      setResendVerificationSent(true);
+    } catch (error) {
+      setResendVerificationError(
+        error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
+      );
+    } finally {
+      setResendVerificationBusy(false);
     }
   };
 
@@ -763,6 +907,7 @@ export default function AuthGate({ children }) {
             email: String((backendUser && backendUser.email) || desiredEmail),
             reptileCount: registrationData.reptileCount,
             role: appRole,
+            emailVerified: backendUser?.emailVerified !== false,
           },
           registeredAt: new Date().toISOString(),
           preferences: {
@@ -869,8 +1014,11 @@ export default function AuthGate({ children }) {
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
+        <p className="auth-card-tagline">
+          {t("auth.tagline", { defaultValue: "Complete Reptile Management App" })}
+        </p>
       </div>
       <p className="auth-subtitle">
         {t("auth.subtitle", {
@@ -885,6 +1033,7 @@ export default function AuthGate({ children }) {
           onClick={() => {
             setView("register");
             setIsRecoveringPassword(false);
+            setIsResendingVerification(false);
             resetRegistration();
           }}
         >
@@ -896,6 +1045,7 @@ export default function AuthGate({ children }) {
           onClick={() => {
             setView("login");
             setIsRecoveringPassword(false);
+            setIsResendingVerification(false);
             setPasswordRecoveryError("");
           }}
         >
@@ -941,6 +1091,46 @@ export default function AuthGate({ children }) {
                 </button>
               </div>
             </form>
+          ) : isResendingVerification ? (
+            <form className="auth-login-form" onSubmit={handleResendVerificationSubmit}>
+              {resendVerificationSent ? (
+                <p className="auth-helper-copy">
+                  {t("auth.resendVerification.sent", {
+                    defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+                  })}
+                </p>
+              ) : (
+                <>
+                  <p className="auth-helper-copy">
+                    {t("auth.resendVerification.instructions", {
+                      defaultValue: "Enter your account email and we'll send a new verification link.",
+                    })}
+                  </p>
+                  <label className="auth-field">
+                    <span className="auth-field-label">
+                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                    </span>
+                    <input
+                      type="email"
+                      value={resendVerificationEmail}
+                      onChange={(e) => setResendVerificationEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                  </label>
+                  {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+                  <button type="submit" className="primary wide" disabled={resendVerificationBusy}>
+                    {resendVerificationBusy
+                      ? t("common.sending", { defaultValue: "Sending..." })
+                      : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+                  </button>
+                </>
+              )}
+              <div className="auth-secondary-action">
+                <button type="button" className="text-button" onClick={closeResendVerification}>
+                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+                </button>
+              </div>
+            </form>
           ) : (
             <form className="auth-login-form" onSubmit={handleLoginSubmit}>
               <label className="auth-field">
@@ -971,6 +1161,13 @@ export default function AuthGate({ children }) {
                 <button type="button" className="text-button" onClick={openPasswordRecovery}>
                   {t("auth.actions.forgotPassword", { defaultValue: "Forgot password?" })}
                 </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => openResendVerification(normalizeIdentifier(loginValues.username).includes("@") ? loginValues.username : "")}
+                >
+                  {t("auth.actions.resendVerificationLink", { defaultValue: "Resend verification email" })}
+                </button>
               </div>
               {loginMessage && <p className="auth-success">{loginMessage}</p>}
               {loginError && <p className="auth-error">{loginError}</p>}
@@ -987,7 +1184,7 @@ export default function AuthGate({ children }) {
                   {" "}
                   or
                   {" "}
-                  <code>admin@BreedingPlanner.dev</code>
+                  <code>admin@Serpentora.dev</code>
                   {" / "}
                   <code>admin1234</code>.
                   {" "}
@@ -1050,8 +1247,130 @@ export default function AuthGate({ children }) {
     </div>
   ) : null;
 
-  const overlayActive = authScope !== "public" && !authState.isAuthenticated;
-  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
+  const maskEmailForDisplay = (email) => {
+    const [local, domain] = String(email || "").split("@");
+    if (!domain) return email || "";
+    const visible = local.slice(0, 2);
+    return `${visible}${"*".repeat(Math.max(local.length - visible.length, 1))}@${domain}`;
+  };
+
+  const linkFlowCard = linkFlow ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
+      </div>
+      {linkFlow.type === "reset-password" ? (
+        resetPasswordDone ? (
+          <>
+            <p className="auth-helper-copy">
+              {t("auth.resetPassword.success", { defaultValue: "Your password has been updated. You can now sign in with your new password." })}
+            </p>
+            <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
+              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+            </button>
+          </>
+        ) : (
+          <form className="auth-login-form" onSubmit={handleResetPasswordSubmit}>
+            <p className="auth-helper-copy">
+              {t("auth.resetPassword.instructions", { defaultValue: "Choose a new password for your account." })}
+            </p>
+            <label className="auth-field">
+              <span className="auth-field-label">{t("auth.fields.newPassword", { defaultValue: "New password" })}</span>
+              <input
+                type="password"
+                value={resetPasswordValues.newPassword}
+                onChange={(e) => setResetPasswordValues((prev) => ({ ...prev, newPassword: e.target.value }))}
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="auth-field">
+              <span className="auth-field-label">{t("auth.fields.confirmPassword", { defaultValue: "Confirm password" })}</span>
+              <input
+                type="password"
+                value={resetPasswordValues.confirmPassword}
+                onChange={(e) => setResetPasswordValues((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                autoComplete="new-password"
+              />
+            </label>
+            {resetPasswordError && <p className="auth-error">{resetPasswordError}</p>}
+            <button type="submit" className="primary wide">
+              {t("auth.actions.setNewPassword", { defaultValue: "Set new password" })}
+            </button>
+          </form>
+        )
+      ) : (
+        <>
+          <p className={linkFlowResult.status === "error" ? "auth-error" : "auth-helper-copy"}>
+            {linkFlowResult.status === "pending"
+              ? t("auth.linkFlow.working", { defaultValue: "Working..." })
+              : linkFlowResult.message}
+          </p>
+          {linkFlowResult.status !== "pending" && (
+            <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
+              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const unverifiedGateActive = authScope !== "public" && authState.isAuthenticated && authState.profile?.emailVerified === false;
+  const unverifiedGateCard = unverifiedGateActive ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.unverified.title", { defaultValue: "Verify your email address" })}</h1>
+      </div>
+      <p className="auth-subtitle">
+        {t("auth.unverified.description", {
+          defaultValue: "Your email address ({{email}}) has not been verified yet. Check your inbox for the verification link, or request a new one.",
+          email: maskEmailForDisplay(authState.profile?.email),
+        })}
+      </p>
+      {resendVerificationSent ? (
+        <p className="auth-helper-copy">
+          {t("auth.resendVerification.sent", {
+            defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+          })}
+        </p>
+      ) : (
+        <>
+          {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+          <button
+            type="button"
+            className="primary wide"
+            disabled={resendVerificationBusy}
+            onClick={async () => {
+              setResendVerificationError("");
+              setResendVerificationBusy(true);
+              try {
+                await resendVerificationApi({ email: authState.profile?.email });
+                setResendVerificationSent(true);
+              } catch (error) {
+                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+              } finally {
+                setResendVerificationBusy(false);
+              }
+            }}
+          >
+            {resendVerificationBusy
+              ? t("common.sending", { defaultValue: "Sending..." })
+              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+          </button>
+        </>
+      )}
+      <div className="auth-secondary-action">
+        <button type="button" className="text-button" onClick={handleLogout}>
+          {t("auth.actions.signOut", { defaultValue: "Sign out" })}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const overlayActive = Boolean(linkFlow) || unverifiedGateActive || (authScope !== "public" && !authState.isAuthenticated);
+  const showBackendBlocker = !linkFlow && !unverifiedGateActive && authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
 
   return (
     <div className="auth-shell">
@@ -1064,7 +1383,7 @@ export default function AuthGate({ children }) {
           {showBackendBlocker ? (
             <div className="auth-card">
               <div className="auth-card-brand">
-                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
                 <h1 className="auth-card-title">
                   {snapshot.state === "config-error"
                     ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
@@ -1090,7 +1409,7 @@ export default function AuthGate({ children }) {
                 </button>
               </div>
             </div>
-          ) : view === "register" ? registrationCard : loginCard}
+          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : view === "register" ? registrationCard : loginCard}
         </div>
       )}
     </div>

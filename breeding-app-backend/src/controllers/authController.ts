@@ -1,6 +1,28 @@
 import type { Request, Response } from "express";
-import { loginUser, registerUser, getMe, refreshAuthToken, requestPasswordReset, resetPassword as resetPasswordForUser, logoutUser, changeEmailForUser, changePasswordForUser, verifyEmailForUser } from "../services/authService";
-import { changeEmailSchema, changePasswordSchema, forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "../validators/authValidators";
+import {
+  loginUser,
+  registerUser,
+  getMe,
+  refreshAuthToken,
+  requestPasswordReset,
+  resetPassword as resetPasswordForUser,
+  logoutUser,
+  changeEmailForUser,
+  changePasswordForUser,
+  verifyEmailForUser,
+  resendVerificationEmail,
+  confirmEmailChange as confirmEmailChangeForUser,
+} from "../services/authService";
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  resendVerificationSchema,
+  confirmEmailChangeSchema,
+} from "../validators/authValidators";
 import {
   AUTH_REFRESH_COOKIE,
   clearAuthCookies,
@@ -118,4 +140,24 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
     return;
   }
   res.status(200).json(await verifyEmailForUser(token));
+};
+
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+  const parsed = resendVerificationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const result = await resendVerificationEmail(parsed.data.email);
+  res.status(200).json(result);
+};
+
+export const confirmEmailChange = async (req: Request, res: Response): Promise<void> => {
+  const token = String(req.query.token || req.body?.token || "").trim();
+  const parsed = confirmEmailChangeSchema.safeParse({ token });
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  res.status(200).json(await confirmEmailChangeForUser(parsed.data.token));
 };

@@ -20,12 +20,18 @@ import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
 import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { reproductiveRoutes } from "./routes/reproductiveRoutes";
+import { emailRoutes } from "./routes/emailRoutes";
+import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 
 app.use(helmet());
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
+
+// Mounted before express.json() below: webhook signature verification needs the
+// exact raw request bytes, which a JSON body parser would already have consumed.
+app.use("/api/webhooks", emailWebhookRoutes);
 
 const origins = env.corsOrigin
   .split(",")
@@ -105,6 +111,7 @@ app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
 app.use("/api/reproductive", reproductiveRoutes);
+app.use("/api/emails", emailRoutes);
 
 app.use(errorHandler);
 

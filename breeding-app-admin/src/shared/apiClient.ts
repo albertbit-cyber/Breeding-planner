@@ -536,8 +536,36 @@ export const register = async (payload: { email: string; password: string; fullN
     requiresAuth: false,
   });
 
-export const recoverPassword = async (payload: { email: string; fullName: string; newPassword: string }) =>
-  request<{ message: string }>("/auth/recover-password", {
+export const forgotPassword = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resetPassword = async (payload: { token: string; newPassword: string }) =>
+  request<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const verifyEmail = async (payload: { token: string }) =>
+  request<{ message: string; alreadyVerified?: boolean; user?: unknown }>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resendVerification = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const confirmEmailChange = async (payload: { token: string }) =>
+  request<{ message: string; user?: unknown }>("/auth/confirm-email-change", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
@@ -1105,6 +1133,58 @@ export const createAdminGdprRequest = async (userId: string, payload: { type: st
 export const updateAdminGdprRequest = async (id: string, payload: { status: string; reason: string; adminNote?: string }) =>
   request<{ request: unknown }>(`/admin/gdpr-requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export type AdminEmailHistoryEntry = {
+  id: string;
+  ownerId: string;
+  templateKey: string;
+  category: string;
+  recipient: string;
+  status: string;
+  attemptCount: number;
+  maximumAttempts: number;
+  provider: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  scheduledFor: string;
+  nextAttemptAt: string | null;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+};
+
+export const fetchAdminEmailHistory = async (params: { status?: string } = {}) => {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ history: AdminEmailHistoryEntry[] }>(`/admin/emails${suffix}`);
+};
+
+export const retryAdminEmailJob = async (id: string, payload: { reason: string }) =>
+  request<{ job: AdminEmailHistoryEntry }>(`/admin/emails/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export type AdminEmailSuppression = {
+  emailAddress: string;
+  reason: string;
+  source: string;
+  createdAt: string;
+  releasedAt: string | null;
+  releasedBy: string | null;
+};
+
+export const fetchAdminEmailSuppressions = async () =>
+  request<{ suppressions: AdminEmailSuppression[] }>("/admin/email-suppressions");
+
+export const releaseAdminEmailSuppression = async (email: string, payload: { reason: string }) =>
+  request<{ suppression: AdminEmailSuppression }>(`/admin/email-suppressions/${encodeURIComponent(email)}/release`, {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 

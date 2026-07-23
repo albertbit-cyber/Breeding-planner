@@ -13,6 +13,7 @@ import LabsPage from "./pages/LabsPage.jsx";
 import TiersPage from "./pages/TiersPage.jsx";
 import TierEditorPage from "./pages/TierEditorPage.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
+import EmailsPage from "./pages/EmailsPage.jsx";
 import GdprPage from "./pages/GdprPage.jsx";
 import TeamPage from "./pages/TeamPage.jsx";
 import MarketplacePage from "../features/marketplace/MarketplacePage.jsx";
@@ -34,6 +35,7 @@ export default function AdminApp() {
             <Route path="/admin/tiers/:id" element={<TierEditorPage />} />
             <Route path="/admin/marketplace" element={<MarketplacePage adminMode />} />
             <Route path="/admin/notifications" element={<NotificationsPage />} />
+            <Route path="/admin/emails" element={<EmailsPage />} />
             <Route path="/admin/gdpr" element={<GdprPage />} />
             <Route path="/admin/team" element={<TeamPage />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />

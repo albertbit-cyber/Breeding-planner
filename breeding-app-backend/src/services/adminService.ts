@@ -3,7 +3,18 @@ import { HttpError } from "../utils/errors";
 import type { AppRole, AuthenticatedUser } from "../types/auth";
 import bcrypt from "bcryptjs";
 import { sendEmail } from "./emailService";
-import { signEmailVerificationToken } from "./authService";
+import { issueToken } from "./accountTokenService";
+import { enqueueEmail } from "../email/queueService";
+import { invitationIdempotencyKey, emailVerificationIdempotencyKey } from "../email/idempotency";
+import {
+  INVITATION_TEMPLATE_KEY,
+  INVITATION_TEMPLATE_VERSION,
+  ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_KEY,
+  ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_VERSION,
+} from "../email/templates";
+import { env } from "../config/env";
+
+const VERIFY_EMAIL_TTL_MS = 48 * 60 * 60 * 1000;
 
 const db = prisma as any;
 
@@ -14,6 +25,7 @@ const USER_SELECT = {
   role: true,
   isActive: true,
   emailVerified: true,
+  pendingEmail: true,
   status: true,
   verificationStatus: true,
   subscriptionPlan: true,
@@ -63,6 +75,7 @@ const normalizeUser = (row: any) => ({
   role: row.role,
   status: row.status || (row.isActive ? "active" : "suspended"),
   emailVerified: Boolean(row.emailVerified),
+  pendingEmail: row.pendingEmail || null,
   subscription: {
     plan: row.subscriptionPlan || "free",
     status: row.subscriptionStatus || "inactive",
@@ -340,17 +353,16 @@ const randomPassword = (): string => {
   return result;
 };
 
-const appUrl = (): string => String(process.env.PUBLIC_APP_URL || process.env.ADMIN_APP_URL || process.env.CORS_ORIGIN || "").split(",")[0].trim();
-const apiUrl = (): string => String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.BACKEND_PUBLIC_URL || process.env.VITE_API_URL || "").split(",")[0].trim();
-
-const verificationLinkFor = (user: { id: string; email: string }): string => {
-  const token = signEmailVerificationToken(user);
-  const authPath = `/auth/verify-email?token=${encodeURIComponent(token)}`;
-  const backendBaseUrl = apiUrl();
-  if (backendBaseUrl) return `${backendBaseUrl.replace(/\/$/, "")}${authPath}`;
-  const publicBaseUrl = appUrl();
-  const appPath = `/api${authPath}`;
-  return publicBaseUrl ? `${publicBaseUrl.replace(/\/$/, "")}${appPath}` : appPath;
+/**
+ * Issues a fresh verify_email AccountToken (superseding any prior one for
+ * this user) and returns a link to the frontend's verify-email page — the
+ * same trusted `env.publicAppUrl` base used by self-registration, not the
+ * request-derived/backend-API cascade this used to read.
+ */
+const verificationLinkFor = async (user: { id: string; email: string }, createdBy: string): Promise<string> => {
+  const { rawToken } = await issueToken(user.id, "verify_email", user.email, VERIFY_EMAIL_TTL_MS, createdBy);
+  const base = String(env.publicAppUrl || "").replace(/\/$/, "");
+  return `${base}/verify-email?token=${encodeURIComponent(rawToken)}`;
 };
 
 export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
@@ -383,23 +395,35 @@ export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<
     },
     select: USER_SELECT,
   });
-  let emailResult: { delivered: boolean; provider: string } | null = null;
+  let emailResult: { queued: boolean; jobId?: string } | null = null;
   if (sendInvite) {
-    const verificationLink = verificationLinkFor(created);
-    emailResult = await sendEmail({
-      to: email,
-      subject: "Your Breeding Planner admin account",
-      text: [
-        `Hello ${fullName},`,
-        "",
-        "An admin account was created for you.",
-        `Temporary password: ${temporaryPassword}`,
-        `Verify your email: ${verificationLink}`,
-        "",
-        "Sign in and change your password from My Account.",
-      ].join("\n"),
-      metadata: { type: "admin_invite", userId: created.id },
+    const verificationLink = await verificationLinkFor(created, `admin:${actor.id}`);
+    const inviter = await db.user.findUnique({ where: { id: actor.id }, select: { fullName: true } });
+    // Queued instead of sent inline: an invitation must persist even if the
+    // email provider is briefly unavailable, and idempotencyKey means retrying
+    // this call (e.g. a retried request) never produces a second invite email.
+    const job = await enqueueEmail({
+      ownerId: created.id,
+      recipientEmail: email,
+      category: "organization_invitations",
+      templateKey: INVITATION_TEMPLATE_KEY,
+      templateVersion: INVITATION_TEMPLATE_VERSION,
+      templatePayload: {
+        inviteeFullName: fullName,
+        inviterFullName: inviter?.fullName || null,
+        organizationName: "Breeding Planner",
+        role,
+        expiresAtDisplay: null,
+        actionUrl: verificationLink,
+      },
+      subject: "You're invited to Breeding Planner",
+      idempotencyKey: invitationIdempotencyKey(created.id),
+      relatedEntityType: "user_invitation",
+      relatedEntityId: created.id,
     });
+    emailResult = { queued: true, jobId: job?.id };
+    // The temporary password is still surfaced directly to the inviting admin
+    // in the API response below — never emailed or logged.
   }
   await logAdminAction({
     adminUserId: actor.id,
@@ -408,7 +432,10 @@ export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<
     afterJson: { email, role, status, inviteSent: Boolean(emailResult) },
     reason,
   });
-  return { user: normalizeUser(created), temporaryPassword: sendInvite ? undefined : temporaryPassword, email: emailResult };
+  // Always returned to the creating admin: the invitation email intentionally
+  // does not carry the password (never email plaintext credentials), so this
+  // is now the only channel that surfaces it — same audience as before.
+  return { user: normalizeUser(created), temporaryPassword, email: emailResult };
 };
 
 const REPORT_INCLUDE = {
@@ -712,21 +739,37 @@ export const resendUserEmailVerification = async (actor: AuthenticatedUser, user
   const reason = assertReason(payload.reason || "Resend email verification");
   const user = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
   if (!user) throw new HttpError(404, "User not found.");
-  const verificationLink = verificationLinkFor(user);
-  const email = await sendEmail({
-    to: user.email,
-    subject: "Verify your Breeding Planner account",
-    text: `Please verify your email address:\n\n${verificationLink}`,
-    metadata: { type: "email_verification", userId },
+  if (user.emailVerified) {
+    throw new HttpError(400, "This user's email is already verified.");
+  }
+
+  const { rawToken, record } = await issueToken(user.id, "verify_email", user.email, VERIFY_EMAIL_TTL_MS, `admin:${actor.id}`);
+  const base = String(env.publicAppUrl || "").replace(/\/$/, "");
+  const job = await enqueueEmail({
+    ownerId: user.id,
+    recipientEmail: user.email,
+    category: "account_and_security",
+    templateKey: ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_KEY,
+    templateVersion: ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_VERSION,
+    templatePayload: {
+      fullName: user.fullName,
+      actionUrl: `${base}/verify-email?token=${encodeURIComponent(rawToken)}`,
+      expiresInHoursDisplay: "48 hours",
+    },
+    subject: "Verify your Breeding Planner email address",
+    idempotencyKey: emailVerificationIdempotencyKey(user.id, record.id),
+    relatedEntityType: "user",
+    relatedEntityId: user.id,
   });
+
   await logAdminAction({
     adminUserId: actor.id,
     targetUserId: userId,
     action: "email_verification_resent",
-    afterJson: { email },
+    afterJson: { queued: true, jobId: job?.id },
     reason,
   });
-  return { user: normalizeUser(user), email };
+  return { user: normalizeUser(user), email: { queued: true, jobId: job?.id } };
 };
 
 export const markUserEmailVerified = async (actor: AuthenticatedUser, userId: string, payload: { verified?: unknown; reason?: unknown }) => {
