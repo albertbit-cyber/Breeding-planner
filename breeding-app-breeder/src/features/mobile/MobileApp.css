@@ -387,6 +387,15 @@
   font-weight: 900;
   text-align: center;
 }
+.mbl-login-tagline {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  text-align: center;
+}
 .mbl-login-sub {
   margin: 0;
   font-size: 0.9rem;

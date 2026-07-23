@@ -11,7 +11,7 @@ type CapacitorConfig = {
 
 const config: CapacitorConfig = {
   appId: "com.breedingplanner.mobile",
-  appName: "Breeding Planner Mobile",
+  appName: "Serpentora",
   webDir: "build",
   server: {
     androidScheme: "https",

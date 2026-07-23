@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Breeder-facing Breeding Planner app extracted from the combined repository.",
+  "description": "Serpentora - breeder-facing reptile management app extracted from the combined repository.",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",

@@ -214,7 +214,7 @@ function ListingDetail({ listing, onClose, onContact, onFavorite, onStore }) {
             <p>{listing.genetics || "Visual, het, possible het, parent genetics, and probability notes can be published by the breeder."}</p>
           </section>
           <section>
-            <h3>Breeding Planner Data</h3>
+            <h3>Serpentora Data</h3>
             <p>{listing.feedingNotes || "Feeding history summary, weight chart summary, shed history, lineage, certificates, and notes appear here when the breeder makes them public."}</p>
           </section>
           <section>

@@ -15,7 +15,7 @@ function PricingTierCard({ tier }) {
       {tier.isRecommended ? <span className="pricing-badge">Recommended</span> : null}
       <h2>{tier.name}</h2>
       <strong>{formatPrice(tier)}</strong>
-      <p>{tier.shortDescription || tier.longDescription || "Flexible Breeding Planner access."}</p>
+      <p>{tier.shortDescription || tier.longDescription || "Flexible Serpentora access."}</p>
       <ul>
         {mainFeatures.map((feature) => <li key={feature.featureKey}>{feature.featureName}</li>)}
       </ul>
@@ -54,7 +54,7 @@ export default function PricingPage() {
       <header className="pricing-header">
         <button type="button" onClick={() => { window.location.hash = "/"; }}>Back</button>
         <div>
-          <h1>Breeding Planner Pricing</h1>
+          <h1>Serpentora Pricing</h1>
           <p>Choose the plan that matches your collection, lab, or breeding business.</p>
         </div>
       </header>

@@ -9,7 +9,7 @@ export default function LaunchPage() {
     <main className="launch-shell">
       <section className="launch-hero">
         <div>
-          <p className="launch-kicker">Breeding Planner</p>
+          <p className="launch-kicker">Serpentora</p>
           <h1>Select workspace</h1>
           <p>
             Open the breeder tools, mobile rack terminal, marketplace, pricing, or admin portal.

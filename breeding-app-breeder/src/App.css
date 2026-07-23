@@ -1084,6 +1084,15 @@
   font-weight: 700;
 }
 
+.auth-card-tagline {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 .auth-subtitle {
   color: #475569;
   margin-bottom: 1.25rem;

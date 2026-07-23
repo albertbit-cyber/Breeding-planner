@@ -719,8 +719,9 @@ function LoginScreen({ onLogin }) {
   return (
     <div className="mbl-login-shell">
       <div className="mbl-login-card">
-        <img src={logoSrc} alt="Breeding Planner" className="mbl-login-logo" />
-        <h1 className="mbl-login-title">Breeding Planner</h1>
+        <img src={logoSrc} alt="Serpentora" className="mbl-login-logo" />
+        <h1 className="mbl-login-title">Serpentora</h1>
+        <p className="mbl-login-tagline">Complete Reptile Management App</p>
         <p className="mbl-login-sub">Sign in to sync with your desktop account</p>
         <form className="mbl-login-form" onSubmit={submit}>
           <label className="mbl-field">
@@ -2488,7 +2489,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       <OfflineBanner online={online} queued={queue.length} onSync={runSync} />
 
       <div className="mbl-full-topbar">
-        <span className="mbl-full-title">Breeding Planner</span>
+        <span className="mbl-full-title">Serpentora</span>
         <div className="mbl-topbar-actions">
           {lastSyncAt && online && (
             <span className="mbl-topbar-sync-time" title={lastSyncAt}>
