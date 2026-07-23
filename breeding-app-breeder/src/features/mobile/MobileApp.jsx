@@ -1840,8 +1840,11 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     const changed = markRecordUpdated(updated);
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    // saveBreederSnapshot strips embedded (data:) photos before the request body is built, so the
+    // echoed response won't carry them back — reconcile with the pre-send local list to keep photos.
+    const reconciledAnimals = mergeSnapshotList(list, savedSnapshot.animals, "animal", mergeAnimalRecord);
     const changedKey = recordIdentity(changed, "animal", 0);
-    const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
+    const savedAnimal = reconciledAnimals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
     setAnimal(savedAnimal);
     setLocalAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
   }, []);
@@ -1852,7 +1855,8 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     const changed = markRecordUpdated(updatedPairing);
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
-    setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
+    const reconciledPairings = mergeSnapshotList(pairs, savedSnapshot.pairings, "pairing", mergePairingRecord);
+    setPairings(reconciledPairings.length || !pairs.length ? reconciledPairings : [...pairs]);
   }, []);
 
   // ג”€ג”€ Photo handlers ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -1923,8 +1927,9 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       const merged = markRecordUpdated({ ...animal, ...draft });
       const animals = mergeSnapshotList([merged], snapshot.animals, "animal", mergeAnimalRecord);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
+      const reconciledAnimals = mergeSnapshotList(animals, savedSnapshot.animals, "animal", mergeAnimalRecord);
       const mergedKey = recordIdentity(merged, "animal", 0);
-      const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
+      const savedAnimal = reconciledAnimals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
       setAnimal(savedAnimal);
       pushToast("Changes saved.");
     } catch (err) {
@@ -2194,12 +2199,17 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     try {
       const merged = mergeMobileSnapshot({ animals, pairings, plannerState }, latest);
       const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot(merged));
-      setAnimals(savedSnapshot.animals);
-      setPairings(savedSnapshot.pairings);
+      // saveBreederSnapshot strips embedded (data:) photos before sending, so the echoed response
+      // won't carry them — reconcile with the pre-send local merge to keep photos in local storage.
+      const reconciledAnimals = mergeSnapshotList(merged.animals, savedSnapshot.animals, "animal", mergeAnimalRecord);
+      const reconciledPairings = mergeSnapshotList(merged.pairings, savedSnapshot.pairings, "pairing", mergePairingRecord);
+      const reconciledSnapshot = { ...savedSnapshot, animals: reconciledAnimals, pairings: reconciledPairings };
+      setAnimals(reconciledAnimals);
+      setPairings(reconciledPairings);
       setPlannerState(savedSnapshot.plannerState);
-      setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
-      writeJson(snapshotCacheKey, savedSnapshot);
-      writeJson(ANIMALS_CACHE, savedSnapshot.animals);
+      setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals));
+      writeJson(snapshotCacheKey, reconciledSnapshot);
+      writeJson(ANIMALS_CACHE, reconciledAnimals);
       setSnapshotError("");
       recordSync();
       pushToast("Data merged to cloud.");
@@ -2335,14 +2345,18 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const changed = markRecordUpdated(updated);
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    // saveBreederSnapshot strips embedded (data:) photos before the request body is built, so the
+    // echoed response won't carry them back — reconcile with the pre-send local list to keep photos.
+    const reconciledAnimals = mergeSnapshotList(list, savedSnapshot.animals, "animal", mergeAnimalRecord);
     const changedKey = recordIdentity(changed, "animal", 0);
-    const savedAnimal = savedSnapshot.animals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
+    const savedAnimal = reconciledAnimals.find((record, index) => recordIdentity(record, "animal", index) === changedKey) || changed;
+    const reconciledSnapshot = { ...savedSnapshot, animals: reconciledAnimals };
     setAnimal(savedAnimal);
     setAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
     setPlannerState(savedSnapshot.plannerState);
-    setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, savedSnapshot.animals));
-    writeJson(snapshotCacheKey, savedSnapshot);
-    writeJson(ANIMALS_CACHE, savedSnapshot.animals);
+    setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals));
+    writeJson(snapshotCacheKey, reconciledSnapshot);
+    writeJson(ANIMALS_CACHE, reconciledAnimals);
   }, [snapshotCacheKey]);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -2351,9 +2365,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     const changed = markRecordUpdated(updatedPairing);
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
     const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
-    setPairings(savedSnapshot.pairings.length || !pairs.length ? savedSnapshot.pairings : [...pairs]);
+    const reconciledPairings = mergeSnapshotList(pairs, savedSnapshot.pairings, "pairing", mergePairingRecord);
+    setPairings(reconciledPairings.length || !pairs.length ? reconciledPairings : [...pairs]);
     setPlannerState(savedSnapshot.plannerState);
-    writeJson(snapshotCacheKey, savedSnapshot);
+    writeJson(snapshotCacheKey, { ...savedSnapshot, pairings: reconciledPairings });
   }, [snapshotCacheKey]);
 
   const handleTakePhoto = useCallback(async () => {

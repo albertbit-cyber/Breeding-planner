@@ -661,10 +661,55 @@ export const fetchBreederSnapshot = async () =>
     timeoutMs: BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS,
   });
 
+const BREEDER_SNAPSHOT_MEDIA_FIELD_KEYS = new Set([
+  "imageUrl",
+  "photoUrl",
+  "pictureUrl",
+  "thumbnailUrl",
+  "certificateUrl",
+  "labCertificateUrl",
+  "logoUrl",
+  "url",
+  "src",
+  "dataUrl",
+]);
+const BREEDER_SNAPSHOT_MEDIA_STRING_LIMIT = 200000;
+
+const isEmbeddedMediaString = (value: string): boolean => value.trim().startsWith("data:");
+
+// Camera captures and file uploads land here as base64 data: URIs. The backend body-size
+// limit exists to protect the server, not to store media, so strip embedded media before
+// it ever hits the wire — regardless of which UI (desktop or mobile) built the payload.
+const stripEmbeddedMediaForSync = (value: unknown, key = ""): unknown => {
+  if (typeof value === "string") {
+    if (isEmbeddedMediaString(value)) return undefined;
+    if (BREEDER_SNAPSHOT_MEDIA_FIELD_KEYS.has(key) && value.length > BREEDER_SNAPSHOT_MEDIA_STRING_LIMIT) return undefined;
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripEmbeddedMediaForSync(item, key))
+      .filter((item) => {
+        if (item == null) return false;
+        if (typeof item === "object") return Object.keys(item as object).length > 0;
+        return true;
+      });
+  }
+  if (value && typeof value === "object") {
+    const cleaned: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([entryKey, entryValue]) => {
+      const nextValue = stripEmbeddedMediaForSync(entryValue, entryKey);
+      if (typeof nextValue !== "undefined") cleaned[entryKey] = nextValue;
+    });
+    return cleaned;
+  }
+  return value;
+};
+
 export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
   request<BreederSnapshotPayload>("/breeder/snapshot", {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(stripEmbeddedMediaForSync(payload)),
     timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
   });
 
