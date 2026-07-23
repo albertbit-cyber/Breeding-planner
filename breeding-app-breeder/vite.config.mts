@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 
 /**
@@ -67,6 +68,10 @@ function patchImportMetaEnv(): Plugin {
 }
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
+// Bumped automatically by .git/hooks/pre-commit on every commit that touches
+// this app, so the Settings panel always shows the exact build in use.
+const appVersion = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8")).version as string;
 
 const resolveBase = (publicUrl: string | undefined): string => {
   const ensureTrailingSlash = (value: string): string =>
@@ -134,6 +139,7 @@ export default defineConfig(({ mode }) => {
       ...process.env,
       PUBLIC_URL: process.env.PUBLIC_URL ?? "",
     },
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   build: {
     outDir: "build",

@@ -17821,7 +17821,7 @@ function BreederSection({
   }, [idConfig, previewName, previewYear, previewBirthYear, previewSex, previewSequence, previewGenes]);
 
   return (
-    <Card title={t("nav.setup", { defaultValue: "Settings" })}>
+    <Card title={`${t("nav.setup", { defaultValue: "Settings" })} · Serpentora v${__APP_VERSION__}`}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
