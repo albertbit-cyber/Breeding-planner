@@ -1,17 +1,36 @@
 import type { NextFunction, Request, Response } from "express";
 import { HttpError } from "../utils/errors";
+import { verifyAuthToken } from "../utils/jwt";
+import { AUTH_ACCESS_COOKIE, getCookieValue } from "../utils/authCookies";
 
-const getErrorDetail = (error: unknown): { status?: number; type?: string } => {
+const getErrorDetail = (error: unknown): { status?: number; type?: string; length?: number } => {
   if (!error || typeof error !== "object") return {};
-  const detail = error as { status?: unknown; statusCode?: unknown; type?: unknown };
+  const detail = error as { status?: unknown; statusCode?: unknown; type?: unknown; length?: unknown };
   const status = typeof detail.status === "number"
     ? detail.status
     : (typeof detail.statusCode === "number" ? detail.statusCode : undefined);
   const type = typeof detail.type === "string" ? detail.type : undefined;
-  return { status, type };
+  const length = typeof detail.length === "number" ? detail.length : undefined;
+  return { status, type, length };
 };
 
-export const errorHandler = (error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
+// Best-effort caller identity for the oversized-payload log line below. Auth middleware
+// hasn't run yet at this point (body parsing rejects before routing), so this repeats the
+// same token verification requireAuth does, purely for logging — never trusted for access.
+const identifyCallerForLogging = (req: Request): string => {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const token = bearerToken || getCookieValue(req, AUTH_ACCESS_COOKIE);
+    if (!token) return "unknown";
+    const payload = verifyAuthToken(token);
+    return payload.email || payload.sub || "unknown";
+  } catch {
+    return "unknown";
+  }
+};
+
+export const errorHandler = (error: unknown, req: Request, res: Response, _next: NextFunction): void => {
   if (error instanceof HttpError) {
     res.status(error.statusCode).json({ message: error.message });
     return;
@@ -19,6 +38,11 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
 
   const detail = getErrorDetail(error);
   if (detail.status === 413 || detail.type === "entity.too.large") {
+    const contentLength = req.headers["content-length"];
+    console.warn(
+      `[cloud-sync] 413 payload too large: path=${req.path} caller=${identifyCallerForLogging(req)} ` +
+      `content-length=${contentLength || "unknown"} parser-measured-length=${detail.length ?? "unknown"}`
+    );
     res.status(413).json({
       message: "Cloud sync payload is too large. Photos are already excluded from sync — this account has more breeding/log history than a single sync request can carry. Contact support if this keeps happening.",
     });
