@@ -105,6 +105,9 @@ export const cancelJob = async (jobId: string) => {
  * poll ticks) never claim the same job twice.
  */
 export const claimNextBatch = async (batchSize: number): Promise<any[]> => {
+  // RETURNING * gives raw snake_case Postgres column names, not the Prisma-model
+  // camelCase fields the rest of the codebase (worker.ts, etc.) reads — every
+  // column below must be aliased or job.templateKey/ownerId/etc. come back undefined.
   return db.$queryRaw`
     UPDATE email_jobs
     SET status = 'processing',
@@ -120,7 +123,34 @@ export const claimNextBatch = async (batchSize: number): Promise<any[]> => {
       LIMIT ${batchSize}
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING *;
+    RETURNING
+      id,
+      owner_id AS "ownerId",
+      recipient_email AS "recipientEmail",
+      category,
+      template_key AS "templateKey",
+      template_version AS "templateVersion",
+      template_payload AS "templatePayload",
+      subject,
+      scheduled_for AS "scheduledFor",
+      status,
+      attempt_count AS "attemptCount",
+      maximum_attempts AS "maximumAttempts",
+      next_attempt_at AS "nextAttemptAt",
+      last_error_code AS "lastErrorCode",
+      last_error_message AS "lastErrorMessage",
+      provider,
+      provider_message_id AS "providerMessageId",
+      idempotency_key AS "idempotencyKey",
+      related_entity_type AS "relatedEntityType",
+      related_entity_id AS "relatedEntityId",
+      created_at AS "createdAt",
+      processing_started_at AS "processingStartedAt",
+      sent_at AS "sentAt",
+      delivered_at AS "deliveredAt",
+      failed_at AS "failedAt",
+      cancelled_at AS "cancelledAt",
+      updated_at AS "updatedAt";
   `;
 };
 
