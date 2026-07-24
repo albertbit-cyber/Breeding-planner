@@ -20,7 +20,7 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
   const detail = getErrorDetail(error);
   if (detail.status === 413 || detail.type === "entity.too.large") {
     res.status(413).json({
-      message: "Cloud sync payload is too large. Remove embedded images or reduce saved media before syncing again.",
+      message: "Cloud sync payload is too large. Photos are already excluded from sync — this account has more breeding/log history than a single sync request can carry. Contact support if this keeps happening.",
     });
     return;
   }

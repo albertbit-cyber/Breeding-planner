@@ -72,7 +72,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "32mb" }));
+// Embedded photos are stripped client-side before every sync request (see
+// breeding-app-breeder/src/shared/apiClient.ts), so remaining payload growth is plain
+// breeding/log data accumulated over the life of an account, not media. 32mb was tight
+// enough for long-running accounts to hit it on text alone; give more headroom.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "64mb" }));
 
 // This backend is the single source of truth for all app clients.
 // Every authenticated device calls the same hosted API and shared Postgres DB.
