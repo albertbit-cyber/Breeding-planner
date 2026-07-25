@@ -2127,6 +2127,38 @@ function buildClutchId(femaleName, maleName, year) {
   return (names && year) ? `${names} ${year}` : names || null;
 }
 
+// One-time backfill ordering for legacy clutches that predate persisted eggBoxNumber/clutchNumber.
+// Mirrors the old position-derived numbering so existing numbers don't visibly jump when the
+// migration runs. Only used to seed missing numbers \u2014 never to renumber a clutch that already has one.
+function computeLegacyClutchOrder(list, snakes) {
+  const sortByClutchDate = (a, b) => {
+    const dateDiff = new Date(a.clutchDate) - new Date(b.clutchDate);
+    if (dateDiff) return dateDiff;
+    return String(a.pairingId || '').localeCompare(String(b.pairingId || ''));
+  };
+  const clutchesWithDates = (Array.isArray(list) ? list : [])
+    .filter(p => p?.clutch?.date)
+    .map(p => ({
+      pairingId: p.id,
+      clutchDate: p.clutch.date,
+      completed: isPairingCompleted(p),
+      label: resolvePairingLabel(p, snakeById(snakes, p.femaleId), snakeById(snakes, p.maleId)),
+    }))
+    .sort(sortByClutchDate);
+  const completedClutches = clutchesWithDates.filter(item => item.completed).sort(sortByClutchDate);
+  const activeClutches = clutchesWithDates.filter(item => !item.completed).sort(sortByClutchDate);
+  const starterCompletedIndex = completedClutches.findIndex(item => /salon\s+in\s+guglia/i.test(String(item.label || '')));
+  const starterCompleted = starterCompletedIndex >= 0
+    ? completedClutches[starterCompletedIndex]
+    : completedClutches[0] || null;
+  const remainingCompleted = completedClutches.filter(item => item.pairingId !== starterCompleted?.pairingId);
+  return [
+    ...(starterCompleted ? [starterCompleted] : []),
+    ...activeClutches,
+    ...remainingCompleted,
+  ].map(item => item.pairingId);
+}
+
 function summarizePairingStatus(derived) {
   if (!derived) return 'Planned';
   if (derived.hatchedRecorded) return 'Hatched';
@@ -8419,48 +8451,59 @@ export default function BreedingPlannerApp() {
       return tokens.every(token => fields.some(field => field.includes(token)));
     });
   }, [displayedPairings, pairingsSearchQuery, snakes]);
+  // Numbers are assigned once (see handleUpdatePairing / the backfill effect below) and persisted on
+  // pairing.clutch, so a clutch keeps its number permanently even after it's completed/removed from
+  // the incubator. This just reads what was stored — it must never re-derive numbers from list position.
   const clutchMetadataByPairingId = useMemo(() => {
     const list = Array.isArray(pairings) ? pairings : [];
-    const sortByClutchDate = (a, b) => {
-      const dateDiff = new Date(a.clutchDate) - new Date(b.clutchDate);
-      if (dateDiff) return dateDiff;
-      return String(a.pairingId || '').localeCompare(String(b.pairingId || ''));
-    };
-    const clutchesWithDates = list
-      .filter(p => p?.clutch?.date)
-      .map(p => ({
-        pairingId: p.id,
-        clutchDate: p.clutch.date,
-        eggs: resolveEggCountForClutch(p?.clutch?.eggsTotal, p?.clutch?.fertileEggs) || 0,
-        completed: isPairingCompleted(p),
-        label: resolvePairingLabel(p, snakeById(snakes, p.femaleId), snakeById(snakes, p.maleId)),
-      }))
-      .sort(sortByClutchDate);
-    const completedClutches = clutchesWithDates.filter(item => item.completed).sort(sortByClutchDate);
-    const activeClutches = clutchesWithDates.filter(item => !item.completed).sort(sortByClutchDate);
-    const starterCompletedIndex = completedClutches.findIndex(item => /salon\s+in\s+guglia/i.test(String(item.label || '')));
-    const starterCompleted = starterCompletedIndex >= 0
-      ? completedClutches[starterCompletedIndex]
-      : completedClutches[0] || null;
-    const remainingCompleted = completedClutches.filter(item => item.pairingId !== starterCompleted?.pairingId);
-    const numberedClutches = [
-      ...(starterCompleted ? [starterCompleted] : []),
-      ...activeClutches,
-      ...remainingCompleted,
-    ];
     const map = new Map();
-    let nextEggBoxNumber = 1;
-    numberedClutches.forEach((item, idx) => {
-      if (!item?.pairingId || map.has(item.pairingId)) return;
-      const eggBoxCount = splitEggBoxCounts(item.eggs).length;
-      map.set(item.pairingId, {
-        clutchNumber: idx + 1,
-        eggBoxNumber: nextEggBoxNumber,
-        eggBoxCount,
+    list.forEach(p => {
+      if (!p?.id || !p?.clutch?.date) return;
+      const storedEggBoxNumber = Number(p.clutch.eggBoxNumber) || 0;
+      const storedClutchNumber = Number(p.clutch.clutchNumber) || 0;
+      const eggBoxNumber = storedEggBoxNumber || storedClutchNumber;
+      const clutchNumber = storedClutchNumber || storedEggBoxNumber;
+      if (!eggBoxNumber && !clutchNumber) return;
+      const eggs = resolveEggCountForClutch(p?.clutch?.eggsTotal, p?.clutch?.fertileEggs) || 0;
+      map.set(p.id, {
+        clutchNumber,
+        eggBoxNumber,
+        eggBoxCount: splitEggBoxCounts(eggs).length,
       });
-      nextEggBoxNumber += 1;
     });
     return map;
+  }, [pairings]);
+  // One-time (per missing entry) backfill: assigns a permanent number to any clutch that doesn't have
+  // one yet. On the very first run after this fix ships, none of them do, so it reuses the old
+  // chronological ordering to keep today's visible numbers stable. Afterward it only ever appends new
+  // numbers above the current max — it never touches a clutch that already has a number.
+  useEffect(() => {
+    setPairings(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      const clutchesWithDates = list.filter(p => p?.clutch?.date);
+      const missing = clutchesWithDates.filter(p => !(Number(p.clutch.eggBoxNumber) > 0));
+      if (!missing.length) return prev;
+      const maxAssigned = clutchesWithDates.reduce((max, p) => Math.max(max, Number(p.clutch.eggBoxNumber) || 0), 0);
+      const missingIds = new Set(missing.map(p => p.id));
+      const orderedIds = missing.length === clutchesWithDates.length
+        ? computeLegacyClutchOrder(list, snakes)
+        : missing.slice().sort((a, b) => new Date(a.clutch.date) - new Date(b.clutch.date)).map(p => p.id);
+      let nextNumber = maxAssigned + 1;
+      const numberByPairingId = new Map();
+      orderedIds.forEach(id => {
+        if (!missingIds.has(id) || numberByPairingId.has(id)) return;
+        numberByPairingId.set(id, nextNumber);
+        nextNumber += 1;
+      });
+      let changed = false;
+      const next = list.map(p => {
+        const assigned = numberByPairingId.get(p?.id);
+        if (!assigned) return p;
+        changed = true;
+        return { ...p, clutch: { ...p.clutch, clutchNumber: assigned, eggBoxNumber: assigned } };
+      });
+      return changed ? next : prev;
+    });
   }, [pairings, snakes]);
   const clutchNumberByPairingId = useMemo(() => {
     const map = new Map();
@@ -9979,6 +10022,11 @@ export default function BreedingPlannerApp() {
         const nextRaw = typeof updater === 'function' ? updater(current) : updater;
         const merged = withPairingLifecycleDefaults({ ...current, ...(nextRaw || {}) });
         merged.id = p.id;
+
+        if (merged?.clutch?.date && !(Number(merged.clutch.eggBoxNumber) > 0)) {
+          const nextNumber = prev.reduce((max, other) => Math.max(max, Number(other?.clutch?.eggBoxNumber) || 0), 0) + 1;
+          merged.clutch = { ...merged.clutch, clutchNumber: nextNumber, eggBoxNumber: nextNumber };
+        }
 
         if (merged.femaleId) {
           const blocking = prev.find(other => (
