@@ -49,7 +49,7 @@ All variables are server-only (`breeding-app-backend`), never exposed to a front
 | `EMAIL_PROVIDER` | `resend` (unused while disabled) | `resend` | `resend` |
 | `RESEND_API_KEY` | unset | staging key | restricted production key |
 | `RESEND_WEBHOOK_SECRET` | unset | staging webhook secret | production webhook secret |
-| `EMAIL_FROM_ADDRESS` | n/a | `notifications@mail-staging.yourdomain.com` (or a Resend test address) | `notifications@mail.yourdomain.com` |
+| `EMAIL_FROM_ADDRESS` | n/a | `notifications@mail-staging.serpentora.com` (or a Resend test address) | `notifications@serpentora.com` |
 | `PUBLIC_APP_URL` | `http://localhost:5173` | staging frontend URL | production frontend URL |
 
 With `EMAIL_ENABLED=false`, every code path uses `MockEmailProvider` regardless of what

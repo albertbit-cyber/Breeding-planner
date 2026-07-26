@@ -545,6 +545,9 @@ export default function AuthGate({ children }) {
   const [resendVerificationSent, setResendVerificationSent] = useState(false);
   const [resendVerificationError, setResendVerificationError] = useState("");
   const [resendVerificationBusy, setResendVerificationBusy] = useState(false);
+  // Set right after a successful registration, before any session exists — registration isn't
+  // "done" until the user clicks the emailed link, so no login/persistAuth happens until then.
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -637,6 +640,7 @@ export default function AuthGate({ children }) {
     setLoginMessage("");
     setIsRecoveringPassword(false);
     setIsResendingVerification(false);
+    setPendingVerificationEmail("");
   }, [authScope]);
 
   const persistAuth = useCallback((next) => {
@@ -658,6 +662,7 @@ export default function AuthGate({ children }) {
     setLoginMessage("");
     setIsRecoveringPassword(false);
     setIsResendingVerification(false);
+    setPendingVerificationEmail("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
     setRegisterStep(0);
@@ -876,7 +881,6 @@ export default function AuthGate({ children }) {
     }
 
     if (registerStep === totalSteps - 1) {
-      const desiredDisplayName = (registrationData.displayName || registrationData.fullName).trim();
       const desiredEmail = registrationData.email.trim();
       const desiredFullName = registrationData.fullName.trim();
 
@@ -888,35 +892,11 @@ export default function AuthGate({ children }) {
           role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
         });
 
-        const loginResponse = await loginApi({
-          email: desiredEmail,
-          password: registrationData.password,
-        }, authScope === "public" ? "breeder" : authScope);
-
-        const backendUser = loginResponse?.user || {};
-        const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-        const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
-
-        persistAuth({
-          isAuthenticated: true,
-          mode: "registered",
-          role: appRole,
-          profile: {
-            fullName: String((backendUser && backendUser.fullName) || desiredFullName),
-            displayName: desiredDisplayName,
-            email: String((backendUser && backendUser.email) || desiredEmail),
-            reptileCount: registrationData.reptileCount,
-            role: appRole,
-            emailVerified: backendUser?.emailVerified !== false,
-          },
-          registeredAt: new Date().toISOString(),
-          preferences: {
-            enableCloudSync: registrationData.enableCloudSync,
-            enableAutomaticReptileSync:
-              registrationData.enableAutomaticReptileSync,
-            devicePreference: registrationData.devicePreference,
-          },
-        });
+        // Registration isn't complete until the emailed link is clicked — no session is
+        // created here. Show the "check your inbox" card instead of logging the user in.
+        setResendVerificationSent(false);
+        setResendVerificationError("");
+        setPendingVerificationEmail(desiredEmail);
       } catch (error) {
         setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
       }
@@ -1369,8 +1349,73 @@ export default function AuthGate({ children }) {
     </div>
   ) : null;
 
-  const overlayActive = Boolean(linkFlow) || unverifiedGateActive || (authScope !== "public" && !authState.isAuthenticated);
-  const showBackendBlocker = !linkFlow && !unverifiedGateActive && authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
+  // Shown right after registration, before any session exists. The user must click the
+  // emailed verification link (which lands on the linkFlowCard above, possibly in a
+  // different tab) before they can sign in for the first time.
+  const pendingVerificationCard = pendingVerificationEmail ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
+      </div>
+      <p className="auth-subtitle">
+        {t("auth.pendingVerification.description", {
+          defaultValue: "We sent a verification link to {{email}}. Click it to finish creating your account, then sign in below.",
+          email: maskEmailForDisplay(pendingVerificationEmail),
+        })}
+      </p>
+      {resendVerificationSent ? (
+        <p className="auth-helper-copy">
+          {t("auth.resendVerification.sent", {
+            defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+          })}
+        </p>
+      ) : (
+        <>
+          {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+          <button
+            type="button"
+            className="primary wide"
+            disabled={resendVerificationBusy}
+            onClick={async () => {
+              setResendVerificationError("");
+              setResendVerificationBusy(true);
+              try {
+                await resendVerificationApi({ email: pendingVerificationEmail });
+                setResendVerificationSent(true);
+              } catch (error) {
+                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+              } finally {
+                setResendVerificationBusy(false);
+              }
+            }}
+          >
+            {resendVerificationBusy
+              ? t("common.sending", { defaultValue: "Sending..." })
+              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+          </button>
+        </>
+      )}
+      <div className="auth-secondary-action">
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            setLoginValues({ username: pendingVerificationEmail, password: "" });
+            setResendVerificationSent(false);
+            setResendVerificationError("");
+            setPendingVerificationEmail("");
+            setView("login");
+          }}
+        >
+          {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const overlayActive = Boolean(linkFlow) || unverifiedGateActive || Boolean(pendingVerificationEmail) || (authScope !== "public" && !authState.isAuthenticated);
+  const showBackendBlocker = !linkFlow && !unverifiedGateActive && !pendingVerificationEmail && authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
 
   return (
     <div className="auth-shell">
@@ -1409,7 +1454,7 @@ export default function AuthGate({ children }) {
                 </button>
               </div>
             </div>
-          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : view === "register" ? registrationCard : loginCard}
+          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : pendingVerificationEmail ? pendingVerificationCard : view === "register" ? registrationCard : loginCard}
         </div>
       )}
     </div>
