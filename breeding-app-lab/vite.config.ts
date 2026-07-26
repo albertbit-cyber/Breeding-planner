@@ -5,11 +5,17 @@ import react from "@vitejs/plugin-react";
 // (TypeScript optional-chaining cast). Vite's static import.meta.env replacement does NOT
 // recognise the `?.` form, so the value is never baked in. This plugin rewrites the pattern
 // to a plain string literal before esbuild sees the file.
+// NOTE: apiUrl must be captured in configResolved (not at plugin-creation time) because
+// Vite loads .env.{mode} files AFTER evaluating vite.config.ts. Reading process.env.VITE_API_URL
+// at creation time always yields "" for mode-specific env files (e.g. android-production).
 function patchImportMetaEnv(): import("vite").Plugin {
-  const apiUrl = process.env.VITE_API_URL ?? "";
+  let apiUrl = "";
   return {
     name: "patch-import-meta-env-optional-chain",
     enforce: "pre",
+    configResolved(config) {
+      apiUrl = (config.env as Record<string, string>).VITE_API_URL ?? "";
+    },
     transform(code) {
       if (!code.includes("VITE_API_URL")) return null;
       return code.replace(

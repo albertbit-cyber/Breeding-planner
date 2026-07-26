@@ -10,6 +10,10 @@ build/
 dist/
 android/
 ios/
+apk-backups/
+*.apk
+*.aab
+Breeding-planner-project.zip
 
 # Dependencies (Railway installs fresh)
 node_modules/

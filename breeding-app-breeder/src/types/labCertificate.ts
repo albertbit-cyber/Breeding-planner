@@ -51,6 +51,7 @@ export interface LabCertificateTemplateData {
     displayId: string;
     name?: string;
     morph?: string;
+    imageUrl?: string;
   };
   breeder: CertificatePartyInfo;
   resultRows: CertificateResultRow[];

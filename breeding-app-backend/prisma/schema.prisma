@@ -55,16 +55,23 @@ model User {
   role             UserRole
   isActive         Boolean        @default(true)
   emailVerified    Boolean        @default(false)
+  emailVerifiedAt  DateTime?
+  pendingEmail     String?
+  pendingEmailRequestedAt DateTime?
+  passwordChangedAt DateTime?
   status           String         @default("active")
   verificationStatus String       @default("not_applied")
   subscriptionPlan String         @default("free")
-  subscriptionStatus String       @default("inactive")
+  subscriptionStatus String         @default("inactive")
   subscriptionStartedAt DateTime?
   subscriptionRenewalAt DateTime?
   subscriptionTrialEndsAt DateTime?
   subscriptionPaymentStatus String @default("none")
-  lastLoginAt      DateTime?
-  refreshToken     String?        @db.Text
+  lastLoginAt           DateTime?
+  refreshToken          String?        @db.Text
+  // Deprecated: superseded by AccountToken (purpose "reset_password"). Columns kept, no longer written.
+  passwordResetToken    String?        @unique
+  passwordResetExpiry   DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   profile          Profile?
@@ -72,6 +79,7 @@ model User {
   animals          Animal[]
   pairings         Pairing[]
   clutches         Clutch[]
+  plannerState     BreederPlannerState?
   listings         Listing[]
   inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
   inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
@@ -114,6 +122,27 @@ model User {
   marketplaceMessageReports MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
   marketplaceBlocks MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocker")
   marketplaceBlockedBy MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocked")
+  emailJobs          EmailJob[]
+  notificationPreferences NotificationPreference[]
+  accountTokens      AccountToken[]
+}
+
+// purpose: verify_email | reset_password | verify_new_email
+model AccountToken {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose      String
+  tokenHash    String    @unique @map("token_hash")
+  emailAddress String    @map("email_address")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  revokedAt    DateTime? @map("revoked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String    @default("self") @map("created_by")
+
+  @@index([userId, purpose])
+  @@map("account_tokens")
 }
 
 model RefreshSession {
@@ -181,18 +210,19 @@ model Profile {
 }
 
 model Animal {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   appAnimalId  String
   name         String?
   sex          String?
   status       String?
   payload      Json
   globalId     String?
-  privacyLevel String   @default("private")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  privacyLevel String    @default("private")
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   asChild      ParentRelationship[] @relation("ChildOf")
   asParent     ParentRelationship[] @relation("ParentOf")
   ownershipHistory OwnershipHistory[]
@@ -203,42 +233,67 @@ model Animal {
 }
 
 model Pairing {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   ownerId           String
-  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   appPairingId      String
   label             String?
   maleAnimalAppId   String?
   femaleAnimalAppId String?
   status            String?
+  workflowStatus    String?   @map("workflow_status")
+  completionReason  String?   @map("completion_reason")
+  outcomeConfidence String?   @map("outcome_confidence")
+  completedAt       DateTime? @map("completed_at")
+  completedByUserId String?   @map("completed_by_user_id")
+  completionNote    String?   @map("completion_note") @db.Text
+  reopenedAt        DateTime? @map("reopened_at")
+  reopenedByUserId  String?   @map("reopened_by_user_id")
   startDate         String?
   payload           Json
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   clutches          Clutch[]
 
   @@unique([ownerId, appPairingId])
   @@index([ownerId])
   @@index([ownerId, status])
+  @@index([ownerId, workflowStatus])
+  @@index([ownerId, completionReason])
+  @@index([completedAt])
 }
 
 model Clutch {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   ownerId       String
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   pairingId     String?
-  pairing       Pairing? @relation(fields: [pairingId], references: [id], onDelete: SetNull)
+  pairing       Pairing?  @relation(fields: [pairingId], references: [id], onDelete: SetNull)
   appClutchId   String
   clutchNumber  Int?
   seasonYear    Int?
   laidDate      String?
   payload       Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([ownerId, appClutchId])
   @@index([ownerId])
   @@index([pairingId])
+}
+
+model BreederPlannerState {
+  id        String   @id @default(cuid())
+  ownerId   String   @unique
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@map("breeder_planner_states")
 }
 
 model Listing {
@@ -1144,4 +1199,93 @@ model OwnershipHistory {
   @@index([animalId])
   @@index([ownerId])
   @@map("ownership_history")
+}
+
+// ── Email notification system ─────────────────────────────────────────────────
+// status: pending | processing | provider_accepted | delivered | delivery_delayed
+//       | failed | bounced | complained | suppressed | cancelled
+model EmailJob {
+  id                  String    @id @default(cuid())
+  ownerId             String    @map("owner_id")
+  owner               User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  recipientEmail      String    @map("recipient_email")
+  category            String
+  templateKey         String    @map("template_key")
+  templateVersion     Int       @map("template_version")
+  templatePayload     Json      @map("template_payload")
+  subject             String
+  scheduledFor        DateTime  @default(now()) @map("scheduled_for")
+  status              String    @default("pending")
+  attemptCount        Int       @default(0) @map("attempt_count")
+  maximumAttempts     Int       @default(5) @map("maximum_attempts")
+  nextAttemptAt       DateTime? @map("next_attempt_at")
+  lastErrorCode       String?   @map("last_error_code")
+  lastErrorMessage    String?   @map("last_error_message") @db.Text
+  provider            String?
+  providerMessageId   String?   @map("provider_message_id")
+  idempotencyKey      String    @unique @map("idempotency_key")
+  relatedEntityType   String?   @map("related_entity_type")
+  relatedEntityId     String?   @map("related_entity_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  processingStartedAt DateTime? @map("processing_started_at")
+  sentAt              DateTime? @map("sent_at")
+  deliveredAt         DateTime? @map("delivered_at")
+  failedAt            DateTime? @map("failed_at")
+  cancelledAt         DateTime? @map("cancelled_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  events              EmailEvent[]
+
+  @@index([ownerId])
+  @@index([status, nextAttemptAt])
+  @@index([status, scheduledFor])
+  @@index([providerMessageId])
+  @@index([relatedEntityType, relatedEntityId])
+  @@map("email_jobs")
+}
+
+// type: sent | delivered | delivery_delayed | bounced | complained | failed
+model EmailEvent {
+  id              String   @id @default(cuid())
+  emailJobId      String   @map("email_job_id")
+  emailJob        EmailJob @relation(fields: [emailJobId], references: [id], onDelete: Cascade)
+  providerEventId String?  @unique @map("provider_event_id")
+  type            String
+  occurredAt      DateTime @map("occurred_at")
+  rawSummary      Json?    @map("raw_summary")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([emailJobId])
+  @@map("email_events")
+}
+
+// category: account_and_security | organization_invitations | breeding_reminders
+//         | incubation_reminders | unexpected_breeding_events | weekly_summary | product_updates
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        String
+  enabled         Boolean  @default(true)
+  timezone        String   @default("UTC")
+  leadTimeMinutes Int?     @map("lead_time_minutes")
+  digest          String   @default("immediate")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+// reason: hard_bounce | complaint | unsubscribe | admin
+model EmailSuppression {
+  id           String    @id @default(cuid())
+  emailAddress String    @unique @map("email_address")
+  reason       String
+  source       String
+  createdAt    DateTime  @default(now()) @map("created_at")
+  releasedAt   DateTime? @map("released_at")
+  releasedBy   String?   @map("released_by")
+
+  @@map("email_suppressions")
 }

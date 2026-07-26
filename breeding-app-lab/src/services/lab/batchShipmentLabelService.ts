@@ -5,13 +5,14 @@ import type { TestOrder } from "../../types/lab";
 const BREEDER_INFO_STORAGE_KEY = "breedingPlannerBreederInfo";
 
 const LAB_PROFILE = {
-  name: "ProHerper Genetics Laboratory",
+  name: "ProHerper Lab",
   address: {
-    line1: "123 Lab Lane",
-    city: "Phoenix",
-    stateOrRegion: "AZ",
-    postalCode: "85001",
-    country: "US",
+    contactName: "Jurgen Wuyts",
+    line1: "Wijngaardstraat 27",
+    city: "Diest",
+    postalCode: "3290",
+    country: "Belgium",
+    phone: "+32 95 32 07 98",
   },
 };
 
@@ -90,12 +91,10 @@ export const generateMasterShipmentLabelArtifact = async (
   doc.text("SHIP TO", 15, 54);
   doc.setFont("helvetica", "normal");
   doc.text(LAB_PROFILE.name, 15, 60);
-  doc.text(LAB_PROFILE.address.line1, 15, 66);
-  doc.text(
-    `${LAB_PROFILE.address.city}, ${LAB_PROFILE.address.stateOrRegion} ${LAB_PROFILE.address.postalCode} ${LAB_PROFILE.address.country}`,
-    15,
-    72
-  );
+  doc.text(LAB_PROFILE.address.contactName, 15, 66);
+  doc.text(LAB_PROFILE.address.line1, 15, 72);
+  doc.text(`${LAB_PROFILE.address.postalCode} ${LAB_PROFILE.address.city}, ${LAB_PROFILE.address.country}`, 15, 78);
+  doc.text(`Tel: ${LAB_PROFILE.address.phone}`, 15, 84);
 
   doc.setFont("helvetica", "bold");
   doc.text("FROM", 110, 54);
@@ -105,10 +104,10 @@ export const generateMasterShipmentLabelArtifact = async (
   if (senderLine3) doc.text(senderLine3, 110, 72);
 
   doc.setFont("helvetica", "bold");
-  doc.text("Included Snake Orders", 15, 88);
+  doc.text("Included Snake Orders", 15, 96);
   doc.setFont("helvetica", "normal");
 
-  let y = 96;
+  let y = 104;
   orders.forEach((order, index) => {
     if (y > 280) {
       doc.addPage();

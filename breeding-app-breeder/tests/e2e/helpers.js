@@ -96,7 +96,7 @@ export const installBreederAuthInPage = async (page, auth) => {
 
 export const openAuthenticatedBreeder = async (page, hashPath = "/breeder") => {
   await page.goto(`/#${hashPath}`);
-  await expect(page.getByText("Breeding Planner").first()).toBeVisible();
+  await expect(page.getByText("Serpentora").first()).toBeVisible();
   await expect(page.getByText(/signed in as/i)).toBeVisible();
 };
 

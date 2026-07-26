@@ -46,12 +46,12 @@ const initAnimalRows = (animalGroup) => {
   });
 };
 
-export default function ResultEntryPage() {
+export default function ResultEntryPage({ presetOrderId }) {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState("");
 
-  const [orderId, setOrderId] = useState("");
+  const [orderId, setOrderId] = useState(() => String(presetOrderId || "").trim());
   const [testCode, setTestCode] = useState("");
   const [method, setMethod] = useState(DEFAULT_METHOD);
   const [summary, setSummary] = useState("");
@@ -89,6 +89,14 @@ export default function ResultEntryPage() {
 
     return () => { mounted = false; };
   }, []);
+
+  // Arrived here from the global Scan action, which already knows this
+  // order is awaiting/undergoing testing — jump straight to it instead of
+  // making the tech find it in the dropdown again.
+  useEffect(() => {
+    const normalized = String(presetOrderId || "").trim();
+    if (normalized) setOrderId(normalized);
+  }, [presetOrderId]);
 
   // Load template whenever orderId changes
   useEffect(() => {

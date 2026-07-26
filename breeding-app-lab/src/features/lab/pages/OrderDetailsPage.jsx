@@ -344,12 +344,14 @@ export default function OrderDetailsPage({ orderId }) {
           </div>
         </div>
 
-        {/* Workflow progress bar */}
+        {/* Workflow progress bar — 3-column grid on narrow screens so all steps
+            are visible without horizontal scrolling; horizontal stepper with
+            connector lines from `sm:` up, where six steps comfortably fit. */}
         {order && activeStep >= 0 ? (
-          <div className="mt-4 flex items-center gap-1 overflow-x-auto pb-1">
+          <div className="mt-4 grid grid-cols-3 gap-x-2 gap-y-3 sm:flex sm:items-center sm:gap-1 sm:overflow-x-auto sm:pb-1">
             {WORKFLOW_STEPS.map((step, idx) => (
               <React.Fragment key={step.key}>
-                <div className={`flex shrink-0 flex-col items-center gap-1 ${idx <= activeStep ? "text-neutral-900" : "text-neutral-400"}`}>
+                <div className={`flex flex-col items-center gap-1 sm:shrink-0 ${idx <= activeStep ? "text-neutral-900" : "text-neutral-400"}`}>
                   <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
                     idx < activeStep ? "bg-emerald-500 text-white" :
                     idx === activeStep ? "bg-neutral-900 text-white" :
@@ -357,10 +359,10 @@ export default function OrderDetailsPage({ orderId }) {
                   }`}>
                     {idx < activeStep ? "✓" : idx + 1}
                   </div>
-                  <span className="text-xs whitespace-nowrap">{step.label}</span>
+                  <span className="text-center text-[11px] leading-tight sm:text-xs sm:whitespace-nowrap">{step.label}</span>
                 </div>
                 {idx < WORKFLOW_STEPS.length - 1 ? (
-                  <div className={`h-0.5 flex-1 rounded ${idx < activeStep ? "bg-emerald-400" : "bg-neutral-200"}`} />
+                  <div className={`hidden h-0.5 flex-1 rounded sm:block ${idx < activeStep ? "bg-emerald-400" : "bg-neutral-200"}`} />
                 ) : null}
               </React.Fragment>
             ))}

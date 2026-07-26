@@ -19,7 +19,7 @@ export const GENE_GROUPS: Record<string, string[]> = {
     "Mystic","Nanny","Nico","Nr Mandarin","Nyala","Odium","OFY","Orange Dream","Orbit","Panther","Pastel","Peach","Phantom","Phenomenon",
     "Pixel","Quake","Rain","RAR","Raven","Razor","Reaper","Red Gene","Red Stripe","Rhino","Russo","Saar","Sable","Sandblast","Sapphire",
     "Satin","Scaleless Head","Scrambler","Shadow","Sherg","Shrapnel","Shredder","Smuggler","Spark","Special","Specter","Spider","Splatter",
-    "Spotnose","Stranger","Striker","Sulfur","Surge","Taronja","The Darkling","Trick","Trident","Trojan","Twister","Vanilla","Vudoo",
+    "Spotnose","Stranger","Striker","Sugar","Sulfur","Surge","Taronja","The Darkling","Trick","Trident","Trojan","Twister","Vanilla","Vudoo",
     "Web","Woma","Wookie","Wrecking Ball","X-treme Gene","X-tremist","Yellow Belly","Zuwadi"
   ],
   Dominant: [

@@ -55,34 +55,9 @@ export function SharedBackendProvider({ children }) {
   }, [snapshot.config.warnings]);
 
   useEffect(() => {
-    if (snapshot.state === "connected") {
-      console.log("Backend connected");
-    } else if (snapshot.state === "disconnected") {
-      console.log("Backend NOT reachable");
-    }
-    console.log("Backend reachable:", snapshot.reachable);
-    console.log("Backend configured:", snapshot.configured);
-    console.log("Backend mode enabled:", snapshot.backendModeEnabled);
-    console.log("Auth status:", snapshot.authStatus);
     if (!snapshot.backendModeEnabled) {
       console.warn("[shared-backend] reason backend mode is disabled:", snapshot.reason);
     }
-  }, [snapshot]);
-
-  useEffect(() => {
-    console.info("[shared-backend]", {
-      state: snapshot.state,
-      envLoaded: snapshot.envLoaded,
-      configured: snapshot.configured,
-      reachable: snapshot.reachable,
-      backendModeEnabled: snapshot.backendModeEnabled,
-      reason: snapshot.reason,
-      authStatus: snapshot.authStatus,
-      backendReachable: snapshot.reachable,
-      storageMode: snapshot.activeStorageMode,
-      checkedAt: snapshot.checkedAt,
-      storageProviders: snapshot.storageProviders,
-    });
   }, [snapshot]);
 
   const value = useMemo(() => ({

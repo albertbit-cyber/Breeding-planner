@@ -169,7 +169,7 @@ const toLegacyOrder = (order: any): TestOrder => {
     breederUserId: String(order?.breederId || ""),
     requestedByUserId: String(order?.breederId || ""),
     submittedAt: String(order?.createdAt || ""),
-    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderId)}-sample-${index + 1}`),
+    sampleIds: animals.map((_: any, index: number) => `${sanitizeFilePart(orderNumber)}-${index + 1}`),
     resultIds: Array.isArray(order?.results)
       ? order.results
           .map((result: any) => String(result?.id || "").trim())
@@ -316,7 +316,7 @@ const getSharedOrderNumber = (order: any): string =>
   String(order?.orderNumber || order?.id || "").trim();
 
 const getSharedSampleId = (order: any, index: number): string =>
-  `${sanitizeFilePart(String(order?.id || "").trim())}-sample-${index + 1}`;
+  `${sanitizeFilePart(getSharedOrderNumber(order))}-${index + 1}`;
 
 const getSharedRequestedTestsForAnimal = (animal: any): string[] =>
   Array.isArray(animal?.tests)
@@ -942,6 +942,8 @@ const getSharedOrderLabelsArtifact = async (orderId: string): Promise<OrderLabel
         qrPayload: buildQrPayload(qrToken),
         sampleType: "shed",
         labName: LAB_PROFILE.name,
+        sampleIndex: index + 1,
+        sampleCount: animals.length,
       };
     })
   );

@@ -6,8 +6,8 @@
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .admin-sidebar {
@@ -356,8 +356,8 @@
 }
 
 .pricing-page {
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
   min-height: 100vh;
   padding: 32px;
 }
@@ -430,8 +430,8 @@
 .pricing-actions button,
 .pricing-header button {
   border: 1px solid #d0d7e2;
-  background: #101828;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text);
   border-radius: 8px;
   padding: 8px 12px;
 }
@@ -464,8 +464,8 @@
 }
 
 .marketplace-v2 {
-  background: #f4f6f5;
-  color: #13201a;
+  background: var(--color-bg);
+  color: var(--color-text);
   min-height: 100vh;
   padding: 24px;
 }
@@ -499,10 +499,10 @@
 .marketplace-category-grid button,
 .market-chip-row button,
 .market-close {
-  border: 1px solid #cfd8d3;
-  background: #12392b;
-  color: white;
-  border-radius: 8px;
+  border: 1px solid var(--status-neutral-border, #cfd8d3);
+  background: var(--color-primary);
+  color: var(--color-text);
+  border-radius: var(--border-radius, 8px);
   padding: 8px 12px;
 }
 
@@ -514,11 +514,11 @@
 
 .marketplace-hero {
   background:
-    linear-gradient(90deg, rgba(13, 38, 30, 0.92), rgba(20, 83, 65, 0.75)),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-secondary) 92%, black), color-mix(in srgb, var(--color-primary) 75%, transparent)),
     url("https://images.unsplash.com/photo-1531386151447-fd76ad50012f?auto=format&fit=crop&w=1600&q=80");
   background-position: center;
   background-size: cover;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   color: white;
   min-height: 280px;
   padding: 34px;
@@ -556,8 +556,8 @@
 .market-editor input,
 .market-editor select,
 .market-editor textarea {
-  border: 1px solid #cfd8d3;
-  border-radius: 8px;
+  border: 1px solid var(--status-neutral-border, #cfd8d3);
+  border-radius: var(--border-radius, 8px);
   padding: 10px 12px;
 }
 
@@ -570,9 +570,9 @@
 
 .marketplace-category-grid button,
 .market-stats div {
-  background: white;
-  border: 1px solid #dce4df;
-  color: #13201a;
+  background: var(--color-card, white);
+  border: 1px solid var(--status-neutral-border, #dce4df);
+  color: var(--color-text, #13201a);
   min-height: 82px;
   text-align: left;
 }
@@ -592,9 +592,9 @@
 .market-editor,
 .market-seller-dashboard,
 .market-message {
-  background: white;
-  border: 1px solid #dce4df;
-  border-radius: 8px;
+  background: var(--color-card, white);
+  border: 1px solid var(--status-neutral-border, #dce4df);
+  border-radius: var(--border-radius, 8px);
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -623,15 +623,15 @@
 
 .market-animal-card,
 .market-admin-row {
-  background: white;
-  border: 1px solid #dce4df;
-  border-radius: 8px;
+  background: var(--color-card, white);
+  border: 1px solid var(--status-neutral-border, #dce4df);
+  border-radius: var(--border-radius, 8px);
   overflow: hidden;
 }
 
 .market-animal-photo {
   aspect-ratio: 4 / 3;
-  background: #dfe7e2;
+  background: var(--status-neutral-bg, #dfe7e2);
   position: relative;
 }
 
@@ -676,10 +676,10 @@
 .market-badge-row span,
 .market-chip-row span,
 .market-chip-row button {
-  background: #e7f5ee;
-  border: 1px solid #b8dfcf;
+  background: color-mix(in srgb, var(--color-primary) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, white);
   border-radius: 999px;
-  color: #14533f;
+  color: var(--color-primary);
   font-size: 12px;
   padding: 4px 8px;
 }
@@ -695,8 +695,8 @@
 
 .market-detail-panel,
 .market-store-panel {
-  background: white;
-  border-radius: 8px;
+  background: var(--color-card, white);
+  border-radius: var(--border-radius, 8px);
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
@@ -715,8 +715,8 @@
 .market-gallery > img,
 .market-gallery > div:first-child {
   aspect-ratio: 1;
-  background: #edf2ef;
-  border-radius: 8px;
+  background: var(--status-neutral-bg, #edf2ef);
+  border-radius: var(--border-radius, 8px);
   object-fit: cover;
   width: 100%;
 }
@@ -730,7 +730,7 @@
 
 .market-gallery > div img {
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   object-fit: cover;
   width: 100%;
 }
@@ -745,8 +745,8 @@
 }
 
 .market-store-banner {
-  background: #dfe7e2;
-  border-radius: 8px;
+  background: linear-gradient(120deg, var(--color-secondary), var(--color-primary));
+  border-radius: var(--border-radius, 8px);
   height: 180px;
   overflow: hidden;
 }
@@ -767,9 +767,9 @@
 .market-store-header > div:first-child {
   align-items: center;
   aspect-ratio: 1;
-  background: #12392b;
-  border-radius: 8px;
-  color: white;
+  background: var(--color-primary);
+  border-radius: var(--border-radius, 8px);
+  color: var(--color-text);
   display: grid;
   font-size: 28px;
   font-weight: 800;
@@ -880,8 +880,8 @@
   place-content: center;
   gap: 12px;
   text-align: center;
-  background: #f6f7f9;
-  color: #18212f;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 @media (max-width: 980px) {
@@ -1542,12 +1542,12 @@
 }
 
 .launch-hero {
-  color: #172033;
+  color: var(--color-text);
 }
 
 .launch-kicker {
   margin: 0 0 0.5rem;
-  color: #235789;
+  color: var(--color-primary);
   font-size: 0.82rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -1590,7 +1590,7 @@
 }
 
 .launch-actions button:hover {
-  border-color: #235789;
+  border-color: var(--color-primary);
 }
 
 .launch-actions span {
@@ -1606,8 +1606,8 @@
 
 .marketplace-shell {
   min-height: 100vh;
-  background: #f8fafc;
-  color: #172033;
+  background: var(--color-bg);
+  color: var(--color-text);
   padding: 2rem;
 }
 
@@ -1622,7 +1622,7 @@
 .marketplace-header h1 {
   margin: 0;
   font-size: 2rem;
-  color: #172033;
+  color: var(--color-text);
 }
 
 .marketplace-header p {
@@ -1634,9 +1634,9 @@
 .marketplace-retry,
 .marketplace-editor button {
   border: 0;
-  border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;
@@ -1651,7 +1651,7 @@
 .marketplace-editor {
   background: #fff;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1.25rem;
 }
 
@@ -1679,7 +1679,7 @@
 .marketplace-editor select,
 .marketplace-editor textarea {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.65rem 0.75rem;
   font: inherit;
   font-weight: 500;
@@ -1727,7 +1727,7 @@
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 0.8rem;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1rem;
   background: #f8fafc;
 }
@@ -1740,7 +1740,7 @@
 .marketplace-message {
   max-width: 1120px;
   margin: 0 auto 1rem;
-  color: #235789;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -1752,7 +1752,7 @@
   gap: 1rem;
   background: #fff;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1rem;
 }
 
@@ -1778,7 +1778,7 @@
   gap: 0.75rem;
   align-items: center;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #f8fafc;
   padding: 0.75rem;
 }
@@ -1800,9 +1800,9 @@
 
 .marketplace-notifications__list button {
   border: 0;
-  border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.55rem 0.8rem;
   cursor: pointer;
@@ -1819,7 +1819,7 @@
   gap: 0.75rem;
   align-items: end;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.85rem;
   background: #f8fafc;
 }
@@ -1847,7 +1847,7 @@
 .marketplace-moderation-item input,
 .marketplace-moderation-item select {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-weight: 500;
@@ -1871,7 +1871,7 @@
   grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(140px, 220px));
   gap: 0.6rem;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #f8fafc;
   padding: 0.75rem;
 }
@@ -1902,7 +1902,7 @@
   align-items: end;
   background: #fff;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1rem;
 }
 
@@ -1929,7 +1929,7 @@
 .marketplace-filters input,
 .marketplace-filters select {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-weight: 500;
@@ -1938,7 +1938,7 @@
 .marketplace-filters button,
 .marketplace-detail-button {
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #475569;
   color: #fff;
   font-weight: 700;
@@ -1955,7 +1955,7 @@
   align-items: end;
   background: #fff;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1rem;
 }
 
@@ -1981,7 +1981,7 @@
 
 .marketplace-saved-searches input {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-weight: 500;
@@ -1989,9 +1989,9 @@
 
 .marketplace-saved-searches button {
   border: 0;
-  border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.6rem 0.8rem;
   cursor: pointer;
@@ -2018,7 +2018,7 @@
 .marketplace-card {
   background: #fff;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1rem;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
@@ -2043,7 +2043,7 @@
 .marketplace-card__initial {
   width: 54px;
   height: 54px;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   object-fit: cover;
   flex: 0 0 auto;
 }
@@ -2052,7 +2052,7 @@
   display: grid;
   place-items: center;
   background: #e2edf7;
-  color: #235789;
+  color: var(--color-primary);
   font-size: 1.35rem;
   font-weight: 800;
 }
@@ -2072,7 +2072,7 @@
 }
 
 .marketplace-card__links a {
-  color: #235789;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -2096,7 +2096,7 @@
   grid-template-columns: 90px 1fr;
   gap: 0.8rem;
   border: 1px solid #d9e2ec;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.8rem;
   background: #fff;
 }
@@ -2110,7 +2110,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #e2e8f0;
 }
 
@@ -2131,7 +2131,7 @@
 .marketplace-listing-card strong {
   display: inline-block;
   margin-top: 0.45rem;
-  color: #235789;
+  color: var(--color-primary);
 }
 
 .marketplace-listing-card__description {
@@ -2143,7 +2143,7 @@
   display: inline-flex;
   margin-top: 0.65rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #1f7a5b;
   color: #fff;
   font-weight: 700;
@@ -2176,7 +2176,7 @@
   gap: 1.25rem;
   position: relative;
   background: #fff;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 1.25rem;
   box-shadow: 0 24px 72px rgba(15, 23, 42, 0.32);
 }
@@ -2185,7 +2185,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #e2e8f0;
 }
 
@@ -2201,7 +2201,7 @@
 .marketplace-detail__panel strong {
   display: inline-block;
   margin-top: 0.5rem;
-  color: #235789;
+  color: var(--color-primary);
 }
 
 .marketplace-detail__panel dl {
@@ -2226,7 +2226,7 @@
   top: 0.75rem;
   right: 0.75rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #475569;
   color: #fff;
   font-weight: 700;
@@ -2250,7 +2250,7 @@
 
 .marketplace-inquiry-item {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   background: #f8fafc;
   padding: 0.85rem;
 }
@@ -2299,7 +2299,7 @@
 .marketplace-inquiry-followup select,
 .marketplace-inquiry-followup textarea {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-weight: 500;
@@ -2307,9 +2307,9 @@
 
 .marketplace-inquiry-followup button {
   border: 0;
-  border-radius: 8px;
-  background: #235789;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;
@@ -2974,8 +2974,8 @@
   font-weight: 600 !important;
 }
 .market-tab-active {
-  background: #12392b !important;
-  color: #fff !important;
+  background: var(--color-primary) !important;
+  color: var(--color-text) !important;
   border-color: transparent !important;
 }
 .market-tab-content { padding-top: 14px; }
@@ -3013,7 +3013,7 @@
 .market-seller-link {
   background: none !important;
   border: none !important;
-  color: #12392b !important;
+  color: var(--color-primary) !important;
   padding: 0 !important;
   font-size: 13px !important;
   text-decoration: underline;
@@ -3022,7 +3022,7 @@
 
 /* Misc helpers */
 .market-muted  { color: #64748b; font-size: 13px; margin: 0; }
-.market-price  { color: #12392b; font-size: 16px; font-weight: 700; }
+.market-price  { color: var(--color-primary); font-size: 16px; font-weight: 700; }
 .market-price-lg { font-size: 22px; }
 .market-genetics { font-size: 13px; color: #334155; margin: 0; }
 .market-no-photo { display: grid; place-items: center; height: 100%; color: #94a3b8; font-size: 13px; }
@@ -3043,8 +3043,8 @@
   gap: 8px;
 }
 .market-filter-count {
-  background: #12392b;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text);
   border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
@@ -3098,9 +3098,9 @@
 .market-seller-avatar {
   width: 42px;
   height: 42px;
-  border-radius: 8px;
-  background: #12392b;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   display: grid;
   place-items: center;
   font-size: 18px;
@@ -3143,7 +3143,7 @@
 .market-gallery-placeholder {
   aspect-ratio: 1;
   background: #f1f5f9;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   display: grid;
   place-items: center;
   color: #94a3b8;
@@ -3153,13 +3153,13 @@
 .market-thumbnail-row img { aspect-ratio: 1; border-radius: 6px; object-fit: cover; width: 100%; }
 
 /* Store panel header */
-.market-store-logo  { width: 86px; height: 86px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
+.market-store-logo  { width: 86px; height: 86px; border-radius: var(--border-radius, 8px); object-fit: cover; flex: 0 0 auto; }
 .market-store-initial {
   width: 86px;
   height: 86px;
-  border-radius: 8px;
-  background: #12392b;
-  color: #fff;
+  border-radius: var(--border-radius, 8px);
+  background: var(--color-primary);
+  color: var(--color-text);
   display: grid;
   place-items: center;
   font-size: 32px;
@@ -3196,7 +3196,7 @@
 .market-contact-label input,
 .market-contact-label textarea {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 10px 12px;
   font: inherit;
   font-weight: 400;
@@ -3212,18 +3212,18 @@
   align-items: center;
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 12px;
 }
 .market-dash-thumb {
   width: 56px;
   height: 56px;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   object-fit: cover;
   background: #e2e8f0;
   flex: 0 0 auto;
 }
-.market-dash-thumb-empty { background: #e2e8f0; border-radius: 8px; }
+.market-dash-thumb-empty { background: #e2e8f0; border-radius: var(--border-radius, 8px); }
 .market-dash-info { display: grid; gap: 6px; min-width: 0; }
 .market-dash-info strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .market-dash-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -3232,7 +3232,7 @@
 .market-stat-card {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 14px;
   display: grid;
   gap: 6px;
@@ -3275,7 +3275,7 @@
 /* Listing card: make whole card look clickable */
 .market-animal-card { cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
 .market-animal-card:hover { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); transform: translateY(-2px); }
-.market-animal-card:focus-visible { outline: 2px solid #12392b; outline-offset: 2px; }
+.market-animal-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 @media (max-width: 640px) {
   .market-dash-row { grid-template-columns: 1fr; }

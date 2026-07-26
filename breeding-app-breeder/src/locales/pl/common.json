@@ -167,8 +167,8 @@
   "setup.appearance": "Wygląd",
   "setup.chooseLanguage": "Wybierz język",
   "setup.languageHelp": "Twój wybór języka jest zapamiętany w tej przeglądarce.",
-  "auth.logoAlt": "Breeding Planner logo",
-  "auth.title": "Breeding Planner",
+  "auth.logoAlt": "Serpentora logo",
+  "auth.title": "Serpentora",
   "auth.subtitle": "Synchronizuj swoje gady na komputerze i telefonie dzięki jednemu bezpiecznemu kontu.",
   "auth.actions.register": "Zarejestruj się",
   "auth.actions.login": "Zaloguj się",
@@ -876,7 +876,7 @@
   "setup.aliases.import.failedMorphAliases": "Nie udalo sie zaimportowac JSON aliasow.",
   "setup.aliases.import.failedGeneAliases": "Nie udalo sie zaimportowac JSON aliasow genow.",
   "feedPrep.open": "Przygotuj karmienie",
-  "feedPrep.profileTitle": "Normalny pokarm",
+  "feedPrep.profileTitle": "Cykl karmienia",
   "feedPrep.foodType": "Typ pokarmu",
   "feedPrep.sizeClass": "Rozmiar / klasa wagi",
   "feedPrep.weightGrams": "Waga (g)",
@@ -904,5 +904,9 @@
   "feedPrep.selectionHint": "Brakujace profile sa widoczne, ale nie sa liczone w sumach.",
   "feedPrep.missingProfile": "Brak danych pokarmu",
   "feedPrep.editSnake": "Edytuj",
-  "feedPrep.noSnakes": "Brak dostepnych wezy."
+  "feedPrep.noSnakes": "Brak dostepnych wezy.",
+  "feedPrep.intervalDays": "Interwał (dni)",
+  "feedPrep.intervalHelp": "Przypomnienie zaczyna się po pierwszym zaakceptowanym wpisie karmienia.",
+  "calendar.feedDue": "Karmienie do wykonania: {{name}}",
+  "calendar.feedDueEvery": "Co {{count}} dni"
 }

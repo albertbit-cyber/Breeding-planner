@@ -106,7 +106,7 @@ export const generateOrderLabelsArtifactForOrder = async (
       createdAt: order.submittedAt || order.createdAt,
       sampleCount: samples.length,
     },
-    sampleLabels: samples.map((sample) => ({
+    sampleLabels: samples.map((sample, index) => ({
       sampleId: sample.id,
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -117,6 +117,8 @@ export const generateOrderLabelsArtifactForOrder = async (
       qrPayload: buildQrPayload(sample.qrToken),
       sampleType: sample.type,
       labName: LAB_PROFILE.name,
+      sampleIndex: index + 1,
+      sampleCount: samples.length,
     })),
   });
 

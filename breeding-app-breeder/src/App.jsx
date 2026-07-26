@@ -62,6 +62,19 @@ import {
   parseAnimalText,
 } from "./features/animals/quickAddParser";
 import {
+  COMPLETION_REASON_GROUPS,
+  OUTCOME_CONFIDENCE_OPTIONS,
+  buildCompletionPatch,
+  buildReopenPatch,
+  didLateOutcomeOccur,
+  getCompletionReasonLabel,
+  getFinalKnownBiologicalOutcome,
+  getOutcomeConfidenceLabel,
+  normalizeCompletionMetadata,
+  normalizeWorkflowStatus,
+  needsOutcomeConfidence,
+} from "./services/breedingProjectCompletion";
+import {
   getLabelBrands,
   getLabelCategories,
   getLabelPresets,
@@ -906,10 +919,19 @@ const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '
 
 function pairingLifecycleDefaults() {
   return {
+    workflowStatus: 'active',
+    completionReason: '',
+    outcomeConfidence: '',
+    completedAt: null,
+    completedBy: null,
+    completionNote: '',
+    reopenedAt: null,
+    reopenedBy: null,
+    statusHistory: [],
     ovulation: { observed: false, date: '', notes: '' },
     preLayShed: { observed: false, date: '', notes: '', intervalFromOvulation: null },
   clutch: { recorded: false, date: '', eggsTotal: '', fertileEggs: '', slugs: '', notes: '' },
-    hatch: { scheduledDate: '', recorded: false, date: '', hatchedCount: 0, notes: '' }
+    hatch: { scheduledDate: '', recorded: false, date: '', hatchedCount: 0, notes: '', hatchlingsGeneratedThrough: 0 }
   };
 }
 function resolveEggCountForClutch(eggsTotal, fertileEggs) {
@@ -987,7 +1009,71 @@ const STORAGE_KEYS = {
   backupVault: 'breedingPlannerBackupVault',
   spaces: 'breedingPlannerSpaces',
   animalLayout: 'breedingPlannerAnimalLayout',
+  animalSortBy: 'breedingPlannerAnimalSortBy',
+  animalSortDir: 'breedingPlannerAnimalSortDir',
+  demoSnakesDismissed: 'breedingPlannerDemoSnakesDismissed',
 };
+const ANIMAL_SORT_FIELDS = [
+  { key: 'name', labelKey: 'animals.sort.name', defaultLabel: 'Name' },
+  { key: 'sex', labelKey: 'animals.sort.sex', defaultLabel: 'Sex' },
+  { key: 'status', labelKey: 'animals.sort.status', defaultLabel: 'Status' },
+  { key: 'weight', labelKey: 'animals.sort.weight', defaultLabel: 'Weight' },
+  { key: 'lastFeed', labelKey: 'animals.sort.lastFeed', defaultLabel: 'Last feed' },
+  { key: 'price', labelKey: 'animals.sort.price', defaultLabel: 'Price' },
+  { key: 'dateAdded', labelKey: 'animals.sort.dateAdded', defaultLabel: 'Date added' },
+];
+const ANIMAL_SORT_FIELD_KEYS = ANIMAL_SORT_FIELDS.map(f => f.key);
+
+function getAnimalSortValue(snake, sortBy) {
+  switch (sortBy) {
+    case 'name': {
+      const name = typeof snake?.name === 'string' ? snake.name.trim() : '';
+      return name ? name.toLowerCase() : null;
+    }
+    case 'sex': {
+      const normalized = normalizeSexValue(snake?.sex);
+      return normalized === 'M' || normalized === 'F' ? normalized : null;
+    }
+    case 'status': {
+      const status = typeof snake?.status === 'string' ? snake.status.trim() : '';
+      return status ? status.toLowerCase() : null;
+    }
+    case 'weight': {
+      const manualWeight = Number(snake?.weight);
+      if (Number.isFinite(manualWeight) && manualWeight > 0) return manualWeight;
+      const weightEntry = getLatestLogEntry(snake?.logs, 'weights');
+      const loggedWeight = Number(weightEntry?.grams ?? weightEntry?.weightGrams ?? weightEntry?.weight);
+      return Number.isFinite(loggedWeight) && loggedWeight > 0 ? loggedWeight : null;
+    }
+    case 'lastFeed': {
+      const entry = getLatestLogEntry(snake?.logs, 'feeds');
+      const time = entry?.date ? new Date(entry.date).getTime() : NaN;
+      return Number.isFinite(time) ? time : null;
+    }
+    case 'price': {
+      const price = Number(snake?.price);
+      return Number.isFinite(price) && price > 0 ? price : null;
+    }
+    case 'dateAdded': {
+      const seq = Number(snake?.idSequence);
+      return Number.isFinite(seq) ? seq : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function compareAnimalsBySort(a, b, sortBy, sortDir) {
+  const va = getAnimalSortValue(a, sortBy);
+  const vb = getAnimalSortValue(b, sortBy);
+  const aMissing = va === null || va === undefined;
+  const bMissing = vb === null || vb === undefined;
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  const cmp = typeof va === 'string' ? va.localeCompare(vb) : (va < vb ? -1 : va > vb ? 1 : 0);
+  return sortDir === 'desc' ? -cmp : cmp;
+}
 const DEFAULT_FAVICON_HREF = `${process.env.PUBLIC_URL || ''}/app-icons/icon_512x512.png`;
 const BACKUP_FREQUENCIES = ['off', 'nightly', 'weekly', 'monthly'];
 const DEFAULT_BACKUP_LIMIT = 20;
@@ -1854,6 +1940,7 @@ function getPairingExportRows(pairings = [], snakes = [], options = {}) {
       notes: pairing.notes || '',
       sortIndex: numericSortIndex,
       orderWarning,
+      scheduleWarning: pairing.scheduleWarning || '',
     };
     if (row.maleId) {
       pairedMaleIds.add(row.maleId);
@@ -1921,6 +2008,9 @@ function buildPairingMatrixExportDataset(pairings = [], snakes = [], options = {
     if (row.notes) noteSegments.push(row.notes);
     if (row.orderWarning && !noteSegments.includes(row.orderWarning)) {
       noteSegments.push(row.orderWarning);
+    }
+    if (row.scheduleWarning && !noteSegments.includes(row.scheduleWarning)) {
+      noteSegments.push(row.scheduleWarning);
     }
     return {
       maleCode: row.maleCode || row.maleName || '',
@@ -2035,6 +2125,38 @@ function resolvePairingLabel(pairing, femaleSnake, maleSnake) {
 function buildClutchId(femaleName, maleName, year) {
   const names = [femaleName, maleName].filter(Boolean).join(' x ');
   return (names && year) ? `${names} ${year}` : names || null;
+}
+
+// One-time backfill ordering for legacy clutches that predate persisted eggBoxNumber/clutchNumber.
+// Mirrors the old position-derived numbering so existing numbers don't visibly jump when the
+// migration runs. Only used to seed missing numbers \u2014 never to renumber a clutch that already has one.
+function computeLegacyClutchOrder(list, snakes) {
+  const sortByClutchDate = (a, b) => {
+    const dateDiff = new Date(a.clutchDate) - new Date(b.clutchDate);
+    if (dateDiff) return dateDiff;
+    return String(a.pairingId || '').localeCompare(String(b.pairingId || ''));
+  };
+  const clutchesWithDates = (Array.isArray(list) ? list : [])
+    .filter(p => p?.clutch?.date)
+    .map(p => ({
+      pairingId: p.id,
+      clutchDate: p.clutch.date,
+      completed: isPairingCompleted(p),
+      label: resolvePairingLabel(p, snakeById(snakes, p.femaleId), snakeById(snakes, p.maleId)),
+    }))
+    .sort(sortByClutchDate);
+  const completedClutches = clutchesWithDates.filter(item => item.completed).sort(sortByClutchDate);
+  const activeClutches = clutchesWithDates.filter(item => !item.completed).sort(sortByClutchDate);
+  const starterCompletedIndex = completedClutches.findIndex(item => /salon\s+in\s+guglia/i.test(String(item.label || '')));
+  const starterCompleted = starterCompletedIndex >= 0
+    ? completedClutches[starterCompletedIndex]
+    : completedClutches[0] || null;
+  const remainingCompleted = completedClutches.filter(item => item.pairingId !== starterCompleted?.pairingId);
+  return [
+    ...(starterCompleted ? [starterCompleted] : []),
+    ...activeClutches,
+    ...remainingCompleted,
+  ].map(item => item.pairingId);
 }
 
 function summarizePairingStatus(derived) {
@@ -2456,6 +2578,21 @@ function cloneLogs(logs = {}) {
   };
 }
 
+function backfillLogIds(logs) {
+  const result = {};
+  for (const key of Object.keys(logs)) {
+    const entries = logs[key];
+    result[key] = Array.isArray(entries)
+      ? entries.map(entry =>
+          entry && typeof entry === 'object' && !entry.id
+            ? { ...entry, id: crypto.randomUUID() }
+            : entry
+        )
+      : entries;
+  }
+  return result;
+}
+
 const MAX_PHOTOS_PER_SNAKE = 60;
 
 function normalizePhotoEntry(raw) {
@@ -2537,7 +2674,7 @@ function sanitizeSnakeRecord(raw) {
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
-  snake.logs = cloneLogs(raw.logs);
+  snake.logs = backfillLogIds(cloneLogs(raw.logs));
   snake.photos = normalizeSnakePhotos(raw.photos);
   snake.labGeneticsConfirmation = normalizeLabGeneticsConfirmation(raw.labGeneticsConfirmation);
   if (snake.metadata && typeof snake.metadata === 'object') {
@@ -2549,6 +2686,72 @@ function sanitizeSnakeRecord(raw) {
 function sanitizePairingRecord(raw) {
   if (!raw || typeof raw !== 'object') return null;
   return withPairingLifecycleDefaults({ ...raw });
+}
+
+function isDemoSnakeRecord(snake) {
+  return !!snake && typeof snake === 'object' && snake.isDemo === true;
+}
+
+function normalizeSnakeListForDisplay(snakes = []) {
+  const sanitized = (Array.isArray(snakes) ? snakes : [])
+    .map(sanitizeSnakeRecord)
+    .filter(Boolean);
+  const realSnakes = sanitized.filter(snake => !isDemoSnakeRecord(snake));
+  return realSnakes.length ? realSnakes : sanitized;
+}
+
+function getDemoSnakeIds(snakes = []) {
+  return new Set(
+    (Array.isArray(snakes) ? snakes : [])
+      .filter(isDemoSnakeRecord)
+      .map(snake => String(snake.id || snake.appAnimalId || snake.animalId || '').trim())
+      .filter(Boolean)
+  );
+}
+
+function filterPairingsLinkedToDemoSnakes(pairings = [], demoSnakeIds = new Set()) {
+  return (Array.isArray(pairings) ? pairings : [])
+    .map(sanitizePairingRecord)
+    .filter(pairing => {
+      if (!pairing || pairing.isDemo === true) return false;
+      const maleId = String(pairing.maleId || pairing.maleAnimalAppId || '').trim();
+      const femaleId = String(pairing.femaleId || pairing.femaleAnimalAppId || '').trim();
+      return !demoSnakeIds.has(maleId) && !demoSnakeIds.has(femaleId);
+    });
+}
+
+function getPersistablePlannerSnapshot(snakes = [], pairings = []) {
+  const sanitizedSnakes = (Array.isArray(snakes) ? snakes : [])
+    .map(sanitizeSnakeRecord)
+    .filter(Boolean);
+  const demoSnakeIds = getDemoSnakeIds(sanitizedSnakes);
+  return {
+    snakes: sanitizedSnakes.filter(snake => !isDemoSnakeRecord(snake)),
+    pairings: filterPairingsLinkedToDemoSnakes(pairings, demoSnakeIds),
+  };
+}
+
+function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {}) {
+  const syncedSnakes = normalizeSnakeListForDisplay(syncedSnapshot.snakes);
+  if (syncedSnakes.some(snake => !isDemoSnakeRecord(snake))) {
+    return {
+      snakes: syncedSnakes,
+      pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+      plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
+    };
+  }
+
+  const localSnakes = (Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [])
+    .map(sanitizeSnakeRecord)
+    .filter(Boolean);
+  const localDemoSnakes = localSnakes.filter(isDemoSnakeRecord);
+  const localHasRealSnakes = localSnakes.some(snake => !isDemoSnakeRecord(snake));
+
+  return {
+    snakes: !localHasRealSnakes && localDemoSnakes.length ? localDemoSnakes : [],
+    pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+    plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
+  };
 }
 
 const BACKEND_MEDIA_FIELD_KEYS = new Set([
@@ -2604,12 +2807,20 @@ function prepareAnimalForBackend(snake) {
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
-function prepareSnapshotForBackend(animals, pairings) {
-  return {
-    animals: Array.isArray(animals) ? animals.map(prepareAnimalForBackend) : [],
-    pairings: Array.isArray(pairings) ? pairings : [],
+function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}) {
+  const persistable = getPersistablePlannerSnapshot(animals, pairings);
+  const snakeTombstones = Object.values(tombstones?.snakes || {});
+  const pairingTombstones = Object.values(tombstones?.pairings || {});
+  const payload = {
+    animals: [...persistable.snakes.map(prepareAnimalForBackend).filter(Boolean), ...snakeTombstones],
+    pairings: [...persistable.pairings, ...pairingTombstones],
     clutches: [],
   };
+  const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
+  if (normalizedPlannerState) {
+    payload.plannerState = sanitizeBackendMediaValue(normalizedPlannerState);
+  }
+  return payload;
 }
 
 const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
@@ -2621,8 +2832,6 @@ function getSyncRecordKey(record, fallbackPrefix, index) {
     record?.animalId,
     record?.appPairingId,
     record?.pairingId,
-    record?.name,
-    record?.label,
   ];
   const value = candidates.map(item => String(item || '').trim()).find(Boolean);
   return value || `${fallbackPrefix}-${index + 1}`;
@@ -2636,6 +2845,7 @@ function getSyncTimestamp(value) {
     value?.createdAt,
     value?.metadata?.updatedAt,
     value?.metadata?.modifiedAt,
+    value?.metadata?.backendUpdatedAt,
   ];
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -2647,19 +2857,12 @@ function getSyncTimestamp(value) {
 
 function getLogEntryKey(entry, key, index) {
   if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
-  const explicit = [entry.id, entry.logId, entry.createdAt && `${entry.createdAt}:${entry.actionType || key}`]
-    .map(item => String(item || '').trim())
-    .find(Boolean);
-  if (explicit) return explicit;
-  return [
-    key,
-    entry.date || '',
-    entry.time || '',
-    entry.result || entry.outcome || '',
-    entry.feed || entry.food || entry.prey || '',
-    entry.size || entry.weight || entry.grams || '',
-    entry.notes || entry.note || '',
-  ].map(part => String(part || '').trim()).join('|') || `${key}-${index}`;
+  return (
+    String(entry.id || '').trim() ||
+    String(entry.logId || '').trim() ||
+    (entry.createdAt ? `${entry.createdAt}:${entry.actionType || key}` : '') ||
+    `${key}-${index}`
+  );
 }
 
 function mergeLogArrays(localEntries = [], backendEntries = [], key) {
@@ -2694,6 +2897,130 @@ function mergeArrayValues(...values) {
   return merged;
 }
 
+function sanitizePlannerObjectRecord(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : null;
+}
+
+function normalizePlannerStringList(value) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.map(item => String(item || '').trim()).filter(Boolean)))
+    : [];
+}
+
+function normalizePlannerStateRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const state = { ...value };
+  const structuredSpaces = {
+    rooms: Array.isArray(state.rooms) ? state.rooms : [],
+    heatRacks: Array.isArray(state.heatRacks) ? state.heatRacks : [],
+    terrariums: Array.isArray(state.terrariums) ? state.terrariums : [],
+  };
+  if (Array.isArray(state.groups)) state.groups = normalizePlannerStringList(state.groups);
+  if (Array.isArray(state.showGroups)) state.showGroups = normalizePlannerStringList(state.showGroups);
+  if (Array.isArray(state.hiddenGroups)) state.hiddenGroups = normalizePlannerStringList(state.hiddenGroups);
+  if (Array.isArray(state.customStatusTags)) state.customStatusTags = normalizePlannerStringList(state.customStatusTags);
+  if (Array.isArray(state.removedStatusTags)) state.removedStatusTags = normalizePlannerStringList(state.removedStatusTags);
+  if (Array.isArray(state.morphAliases)) state.morphAliases = normalizeMorphAliasDatabase(state.morphAliases);
+  if (Array.isArray(state.geneAliases)) state.geneAliases = mergeGeneAliasRows(state.geneAliases);
+  if (state.breederInfo && typeof state.breederInfo === 'object') state.breederInfo = normalizeBreederInfo(state.breederInfo);
+  if (state.backupSettings && typeof state.backupSettings === 'object') state.backupSettings = normalizeBackupSettings(state.backupSettings);
+  if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
+    state.lastFeedDefaults = { ...DEFAULT_LAST_FEED_DEFAULTS, ...state.lastFeedDefaults };
+  }
+  if (state.leucisticType !== 'blackEye') state.leucisticType = 'bel';
+  const hasStructuredSpaces = structuredSpaces.rooms.length || structuredSpaces.heatRacks.length || structuredSpaces.terrariums.length;
+  if (hasStructuredSpaces || Array.isArray(state.spaces)) {
+    const normalizedSpaces = hasStructuredSpaces
+      ? normalizeSpacesDataset(structuredSpaces)
+      : normalizeSpacesDataset(state.spaces);
+    state.rooms = normalizedSpaces.rooms;
+    state.heatRacks = normalizedSpaces.heatRacks;
+    state.terrariums = normalizedSpaces.terrariums;
+    state.spaces = buildLegacySpacesSnapshot(normalizedSpaces.rooms, normalizedSpaces.heatRacks, normalizedSpaces.terrariums);
+  }
+  return state;
+}
+
+function plannerStateComparable(state) {
+  const normalized = normalizePlannerStateRecord(state);
+  if (!normalized) return null;
+  const clone = JSON.parse(JSON.stringify(normalized));
+  delete clone.updatedAt;
+  delete clone.modifiedAt;
+  delete clone.lastModifiedAt;
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    delete clone.metadata.updatedAt;
+    delete clone.metadata.modifiedAt;
+    delete clone.metadata.lastModifiedAt;
+    delete clone.metadata.backendCreatedAt;
+    delete clone.metadata.backendUpdatedAt;
+  }
+  return clone;
+}
+
+function plannerSnapshotSignature(snapshot = {}) {
+  return JSON.stringify({
+    snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
+    pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
+    plannerState: plannerStateComparable(snapshot.plannerState),
+  });
+}
+
+function markPlannerStateUpdated(state, updatedAt = nowIsoString()) {
+  if (!state || typeof state !== 'object') return state;
+  return {
+    ...state,
+    updatedAt,
+    metadata: {
+      ...(state.metadata && typeof state.metadata === 'object' ? state.metadata : {}),
+      updatedAt,
+    },
+  };
+}
+
+function stampPlannerStateForSync(localState, baselineState) {
+  const normalized = normalizePlannerStateRecord(localState);
+  if (!normalized) return null;
+  if (!baselineState) return normalized;
+  if (JSON.stringify(plannerStateComparable(normalized)) === JSON.stringify(plannerStateComparable(baselineState))) {
+    return normalized;
+  }
+  return markPlannerStateUpdated(normalized);
+}
+
+function mergePlannerObjectRecord(localRecord, backendRecord) {
+  if (!localRecord) return backendRecord;
+  if (!backendRecord) return localRecord;
+  return getSyncTimestamp(backendRecord) >= getSyncTimestamp(localRecord)
+    ? { ...localRecord, ...backendRecord }
+    : { ...backendRecord, ...localRecord };
+}
+
+function mergePlannerStates(localState, backendState) {
+  const local = normalizePlannerStateRecord(localState);
+  const backend = normalizePlannerStateRecord(backendState);
+  if (!local) return backend;
+  if (!backend) return local;
+  const localTime = getSyncTimestamp(local);
+  const backendTime = getSyncTimestamp(backend);
+  const base = backendTime > localTime ? backend : local;
+  const other = backendTime > localTime ? local : backend;
+  const merged = {
+    ...other,
+    ...base,
+    groups: mergeArrayValues(other.groups, base.groups),
+    showGroups: mergeArrayValues(other.showGroups, base.showGroups),
+    hiddenGroups: mergeArrayValues(other.hiddenGroups, base.hiddenGroups),
+    customStatusTags: mergeArrayValues(other.customStatusTags, base.customStatusTags),
+    removedStatusTags: mergeArrayValues(other.removedStatusTags, base.removedStatusTags),
+    rooms: mergeRecordsByKey(other.rooms, base.rooms, sanitizePlannerObjectRecord, 'room', mergePlannerObjectRecord),
+    heatRacks: mergeRecordsByKey(other.heatRacks, base.heatRacks, sanitizePlannerObjectRecord, 'heatRack', mergePlannerObjectRecord),
+    terrariums: mergeRecordsByKey(other.terrariums, base.terrariums, sanitizePlannerObjectRecord, 'terrarium', mergePlannerObjectRecord),
+  };
+  merged.spaces = buildLegacySpacesSnapshot(merged.rooms, merged.heatRacks, merged.terrariums);
+  return normalizePlannerStateRecord(merged);
+}
+
 function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
   if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
@@ -2723,11 +3050,37 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   });
 }
 
-function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord) {
+function mergePairingRecord(localPairing, backendPairing) {
+  if (!localPairing) return sanitizePairingRecord(backendPairing);
+  if (!backendPairing) return sanitizePairingRecord(localPairing);
+  const localTime = getSyncTimestamp(localPairing);
+  const backendTime = getSyncTimestamp(backendPairing);
+  const base = backendTime > localTime ? backendPairing : localPairing;
+  const other = backendTime > localTime ? localPairing : backendPairing;
+  // hatchlingsGeneratedThrough is a monotonic high-water mark: always keep the max seen
+  // across devices so a stale write from a tab that hasn't generated a litter yet can't
+  // regress it and let the hatch wizard duplicate an already-created batch.
+  const hatchlingsGeneratedThrough = Math.max(
+    Number(localPairing?.hatch?.hatchlingsGeneratedThrough || 0),
+    Number(backendPairing?.hatch?.hatchlingsGeneratedThrough || 0)
+  );
+  return sanitizePairingRecord({
+    ...other,
+    ...base,
+    hatch: { ...other.hatch, ...base.hatch, hatchlingsGeneratedThrough },
+  });
+}
+
+function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord, tombstoneMap = null) {
   const map = new Map();
+  const isTombstoned = (sanitized) => {
+    if (!tombstoneMap) return false;
+    const id = sanitized?.id != null ? String(sanitized.id) : '';
+    return id ? Object.prototype.hasOwnProperty.call(tombstoneMap, id) : false;
+  };
   const add = (item, source, index) => {
     const sanitized = sanitizer(item);
-    if (!sanitized) return;
+    if (!sanitized || isTombstoned(sanitized)) return;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const existing = map.get(key);
     if (!existing) {
@@ -2740,18 +3093,148 @@ function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallba
   };
   (Array.isArray(localItems) ? localItems : []).forEach((item, index) => add(item, 'local', index));
   (Array.isArray(backendItems) ? backendItems : []).forEach((item, index) => add(item, 'backend', index));
-  return Array.from(map.values());
+  return Array.from(map.values()).filter(record => !record.deletedAt);
 }
 
-function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}) {
+function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}, tombstones = {}) {
   const localSnakes = Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [];
   const backendSnakes = Array.isArray(backendSnapshot.snakes) ? backendSnapshot.snakes : [];
   const localPairings = Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [];
   const backendPairings = Array.isArray(backendSnapshot.pairings) ? backendSnapshot.pairings : [];
+  const mergedSnakes = mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord, tombstones?.snakes);
+  const demoSnakeIds = getDemoSnakeIds(mergedSnakes);
+  const displaySnakes = normalizeSnakeListForDisplay(mergedSnakes);
+  const mergedPairings = mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing', mergePairingRecord, tombstones?.pairings);
   return {
-    snakes: mergeRecordsByKey(localSnakes, backendSnakes, sanitizeSnakeRecord, 'animal', mergeAnimalRecord),
-    pairings: mergeRecordsByKey(localPairings, backendPairings, sanitizePairingRecord, 'pairing'),
+    snakes: displaySnakes,
+    pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
+      ? filterPairingsLinkedToDemoSnakes(mergedPairings, demoSnakeIds)
+      : mergedPairings,
+    plannerState: mergePlannerStates(localSnapshot.plannerState, backendSnapshot.plannerState),
   };
+}
+
+function buildSyncRecordMap(items = [], sanitizer, fallbackPrefix) {
+  const map = new Map();
+  (Array.isArray(items) ? items : []).forEach((item, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return;
+    map.set(getSyncRecordKey(sanitized, fallbackPrefix, index), sanitized);
+  });
+  return map;
+}
+
+function syncComparableRecord(record) {
+  if (!record || typeof record !== 'object') return record;
+  const clone = { ...record };
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    const metadata = { ...clone.metadata };
+    delete metadata.backendCreatedAt;
+    delete metadata.backendUpdatedAt;
+    clone.metadata = metadata;
+  }
+  return clone;
+}
+
+function stampChangedSyncRecords(items = [], baselineItems = [], sanitizer, fallbackPrefix) {
+  const baselineMap = buildSyncRecordMap(baselineItems, sanitizer, fallbackPrefix);
+  return (Array.isArray(items) ? items : []).map((item, index) => {
+    const sanitized = sanitizer(item);
+    if (!sanitized) return item;
+    const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+    const baseline = baselineMap.get(key);
+    if (!baseline) return sanitized;
+    if (JSON.stringify(syncComparableRecord(sanitized)) === JSON.stringify(syncComparableRecord(baseline))) {
+      return sanitized;
+    }
+    const updatedAt = nowIsoString();
+    return {
+      ...sanitized,
+      updatedAt,
+      metadata: {
+        ...(sanitized.metadata && typeof sanitized.metadata === 'object' ? sanitized.metadata : {}),
+        updatedAt,
+      },
+    };
+  });
+}
+
+function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) {
+  return {
+    snakes: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.snakes) ? localSnapshot.snakes : [],
+      Array.isArray(baselineSnapshot.snakes) ? baselineSnapshot.snakes : [],
+      sanitizeSnakeRecord,
+      'animal'
+    ),
+    pairings: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.pairings) ? localSnapshot.pairings : [],
+      Array.isArray(baselineSnapshot.pairings) ? baselineSnapshot.pairings : [],
+      sanitizePairingRecord,
+      'pairing'
+    ),
+    plannerState: stampPlannerStateForSync(localSnapshot.plannerState, baselineSnapshot.plannerState),
+  };
+}
+
+function normalizeBackendBreederSnapshot(snapshot = {}) {
+  const snakes = Array.isArray(snapshot?.animals) ? snapshot.animals.map(sanitizeSnakeRecord).filter(Boolean) : [];
+  const demoSnakeIds = getDemoSnakeIds(snakes);
+  return {
+    snakes: snakes.filter(snake => !isDemoSnakeRecord(snake)),
+    pairings: filterPairingsLinkedToDemoSnakes(snapshot?.pairings, demoSnakeIds),
+    plannerState: normalizePlannerStateRecord(snapshot?.plannerState),
+  };
+}
+
+function syncRecordForLocalChangeCompare(record) {
+  if (!record || typeof record !== 'object') return record;
+  const clone = syncComparableRecord(record);
+  if (!clone || typeof clone !== 'object') return clone;
+  delete clone.updatedAt;
+  delete clone.modifiedAt;
+  delete clone.lastModifiedAt;
+  if (clone.metadata && typeof clone.metadata === 'object') {
+    const metadata = { ...clone.metadata };
+    delete metadata.updatedAt;
+    delete metadata.modifiedAt;
+    delete metadata.lastModifiedAt;
+    delete metadata.backendCreatedAt;
+    delete metadata.backendUpdatedAt;
+    clone.metadata = metadata;
+  }
+  return clone;
+}
+
+function markLocalSyncRecordUpdated(record, updatedAt = nowIsoString()) {
+  if (!record || typeof record !== 'object') return record;
+  const metadata = record.metadata && typeof record.metadata === 'object' ? record.metadata : {};
+  return {
+    ...record,
+    updatedAt,
+    metadata: {
+      ...metadata,
+      updatedAt,
+    },
+  };
+}
+
+function stampLocallyChangedSyncRecords(nextItems = [], previousItems = [], sanitizer, fallbackPrefix) {
+  const previousMap = buildSyncRecordMap(previousItems, sanitizer, fallbackPrefix);
+  const updatedAt = nowIsoString();
+  return (Array.isArray(nextItems) ? nextItems : [])
+    .map((item, index) => {
+      const sanitized = sanitizer(item);
+      if (!sanitized) return null;
+      const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
+      const previous = previousMap.get(key);
+      if (!previous) return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      if (JSON.stringify(syncRecordForLocalChangeCompare(sanitized)) !== JSON.stringify(syncRecordForLocalChangeCompare(previous))) {
+        return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      }
+      return sanitized;
+    })
+    .filter(Boolean);
 }
 
 function normalizeBackupFileEntry(raw) {
@@ -3292,6 +3775,11 @@ function withPairingLifecycleDefaults(pairing = {}) {
   hatch.hatchedCount = Number(hatch.hatchedCount || 0);
   if (!Number.isFinite(hatch.hatchedCount) || hatch.hatchedCount < 0) hatch.hatchedCount = 0;
 
+  hatch.hatchlingsGeneratedThrough = Number(hatch.hatchlingsGeneratedThrough || 0);
+  if (!Number.isFinite(hatch.hatchlingsGeneratedThrough) || hatch.hatchlingsGeneratedThrough < 0) {
+    hatch.hatchlingsGeneratedThrough = 0;
+  }
+
   const hatchLimit = typeof clutch.fertileEggs === 'number' && Number.isFinite(clutch.fertileEggs)
     ? Math.max(0, clutch.fertileEggs)
     : (typeof clutch.eggsTotal === 'number' && Number.isFinite(clutch.eggsTotal) ? Math.max(0, clutch.eggsTotal) : null);
@@ -3326,6 +3814,7 @@ function withPairingLifecycleDefaults(pairing = {}) {
 
   return {
     ...pairing,
+    ...normalizeCompletionMetadata({ ...defaults, ...pairing }),
     ovulation,
     preLayShed,
     clutch,
@@ -3355,8 +3844,13 @@ function initSnakeDraft(s) {
   };
 }
 
-const FEEDER_TYPE_OPTIONS = ['Rat', 'SF', 'Mouse', 'Other'];
-const FEEDER_SIZE_OPTIONS = ['pinky', 'fuzzy', 'hopper', 'weaned', 'small', 'medium', 'large', 'jumbo'];
+const FEEDER_TYPE_OPTIONS = ['Rat', 'Multimammate', 'Mouse'];
+const FEEDER_SIZE_OPTIONS_BY_TYPE = {
+  Rat: ['5-10g','10-20g','20-30g','30-50g','50-70g','70-90g','90-110g','120-150g','150-170g','170-200g','200-250g','250-300g','301-350g','350-400g'],
+  Mouse: ['1-3g','3-4g','5-7g','7-10g','10-16g','16-24g','25-30g','30-35g','35-40g','40-50g'],
+  Multimammate: ['1-3g','3-6g','6-10g','10-19g','20-29g','30-39g','40-49g','50-60g','60-70g','70-80g','80-90g','90-100g'],
+};
+const FEEDER_SIZE_OPTIONS = [...new Set(Object.values(FEEDER_SIZE_OPTIONS_BY_TYPE).flat())];
 
 function createEmptyFeederProfile() {
   return {
@@ -3364,6 +3858,7 @@ function createEmptyFeederProfile() {
     sizeClass: '',
     weightGrams: '',
     quantity: 1,
+    intervalDays: '',
     notes: '',
   };
 }
@@ -3372,12 +3867,14 @@ function normalizeFeederProfileForDraft(profile) {
   const source = profile && typeof profile === 'object' ? profile : {};
   const quantity = Number(source.quantity ?? source.count ?? source.items ?? 1);
   const weightGrams = Number(source.weightGrams ?? source.grams ?? source.preyWeightGrams);
+  const intervalDays = Number(source.intervalDays ?? source.feedIntervalDays ?? source.feedingIntervalDays ?? source.interval ?? '');
   const rawFeedType = String(source.feedType ?? source.foodType ?? source.feed ?? '').trim();
   return {
     feedType: rawFeedType.toUpperCase() === 'ASF' ? 'SF' : rawFeedType,
     sizeClass: String(source.sizeClass ?? source.size ?? source.preySize ?? '').trim(),
     weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? String(weightGrams) : '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    intervalDays: Number.isFinite(intervalDays) && intervalDays > 0 ? String(Math.round(intervalDays)) : '',
     notes: String(source.notes ?? '').trim(),
   };
 }
@@ -3386,11 +3883,13 @@ function normalizeFeederProfileForSave(profile) {
   const draft = normalizeFeederProfileForDraft(profile);
   const weightGrams = Number(draft.weightGrams);
   const quantity = Number(draft.quantity);
+  const intervalDays = Number(draft.intervalDays);
   return {
     feedType: draft.feedType,
     sizeClass: draft.sizeClass,
     weightGrams: Number.isFinite(weightGrams) && weightGrams > 0 ? weightGrams : '',
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    intervalDays: Number.isFinite(intervalDays) && intervalDays > 0 ? Math.round(intervalDays) : '',
     notes: draft.notes,
   };
 }
@@ -3406,6 +3905,62 @@ function getLatestAcceptedFeedEntry(snake) {
 
 function getSnakeFeederProfile(snake) {
   return normalizeFeederProfileForDraft(snake?.feederProfile);
+}
+
+function getFeedEntryDateValue(entry) {
+  return entry?.date || entry?.fedAt || entry?.createdAt || entry?.updatedAt || '';
+}
+
+function parseFeedEntryDate(entry) {
+  const raw = getFeedEntryDateValue(entry);
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    const datePart = raw.slice(0, 10);
+    const parsedYmd = parseYmd(datePart);
+    if (parsedYmd) return parsedYmd;
+  }
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function getFeedEntryTime(entry) {
+  const parsed = parseFeedEntryDate(entry);
+  return parsed ? parsed.getTime() : 0;
+}
+
+function isFeedEntryRefused(entry) {
+  return entry?.refused === true || String(entry?.result || entry?.status || '').toLowerCase() === 'refused';
+}
+
+function getNextFeedCycleEvent(snake) {
+  if (!snake) return null;
+  const profile = normalizeFeederProfileForDraft(snake.feederProfile);
+  const intervalDays = Number(profile.intervalDays);
+  if (!Number.isFinite(intervalDays) || intervalDays <= 0) return null;
+
+  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
+  const latestFeed = feeds
+    .filter(entry => entry && !isFeedEntryRefused(entry) && getFeedEntryTime(entry) > 0)
+    .sort((a, b) => getFeedEntryTime(b) - getFeedEntryTime(a))[0];
+  if (!latestFeed) return null;
+
+  const lastFeedDate = parseFeedEntryDate(latestFeed);
+  if (!lastFeedDate || !Number.isFinite(lastFeedDate.getTime())) return null;
+  lastFeedDate.setHours(0, 0, 0, 0);
+
+  const dueDate = new Date(lastFeedDate);
+  dueDate.setDate(dueDate.getDate() + Math.round(intervalDays));
+  if (!Number.isFinite(dueDate.getTime())) return null;
+
+  return {
+    date: localYMD(dueDate),
+    type: 'feedDue',
+    activityKey: 'feeds',
+    snakeId: snake.id,
+    intervalDays: Math.round(intervalDays),
+    lastFeedDate: localYMD(lastFeedDate),
+    profile,
+  };
 }
 
 function hasCompleteFeederProfile(profile) {
@@ -4286,7 +4841,7 @@ function findNextAvailableDate(preferred, maleId, maleSchedule) {
     }
     candidate = cloneAndShiftDays(candidate, 1);
   }
-  return candidate;
+  return null;
 }
 
 function autoAdjustPairingAppointments(pairing, maleSchedule) {
@@ -4329,15 +4884,21 @@ function autoAdjustPairingAppointments(pairing, maleSchedule) {
     }
 
     const conflictFree = findNextAvailableDate(target, pairing.maleId, maleSchedule);
+    if (conflictFree === null) {
+      adjusted.push({ ...appt, scheduleConflict: true });
+      return;
+    }
     blockMaleSpan(maleSchedule, pairing.maleId, conflictFree);
     previousDate = new Date(conflictFree.getTime());
     adjusted.push({ ...appt, date: localYMD(conflictFree) });
   });
 
+  const hasConflict = adjusted.some(a => a.scheduleConflict);
   return {
     ...pairing,
     appointments: adjusted,
     startDate: adjusted[0]?.date || pairing.startDate || null,
+    ...(hasConflict && { scheduleWarning: 'No available slot found in the next 4 months.' }),
   };
 }
 
@@ -6011,7 +6572,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
 export default function BreedingPlannerApp() {
   const { t } = useTranslation();
-  const { resolvedAppearance, effectiveThemeMode } = useAppearance();
+  const { appearanceState, resolvedAppearance, effectiveThemeMode, hydrateAppearance } = useAppearance();
   const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
   const appRootStyle = useMemo(() => ({
@@ -6020,27 +6581,57 @@ export default function BreedingPlannerApp() {
   }), [resolvedAppearance]);
   // logs helpers are defined at module scope (updateLog, LogsEditor)
   // component state
-  const [snakes, setSnakes] = useState(() => {
+  const [snakes, setSnakesState] = useState(() => {
     // In Electron the bridge load-data effect (below) will overwrite this.
     // In browser mode there is no bridge, so seed from localStorage if available.
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
     if (bridge?.loadData) return createFreshSnakes();
     const stored = loadStoredJson(STORAGE_KEYS.snakes, null);
-    if (Array.isArray(stored) && stored.length > 0) {
-      return stored.map(sanitizeSnakeRecord).filter(Boolean);
+    const demosDismissed = loadStoredJson(STORAGE_KEYS.demoSnakesDismissed, false) === true;
+    if (Array.isArray(stored)) {
+      const normalized = normalizeSnakeListForDisplay(stored);
+      return demosDismissed && normalized.every(isDemoSnakeRecord) ? [] : normalized;
     }
-    return createFreshSnakes();
+    return demosDismissed ? [] : createFreshSnakes();
   });
-  const [pairings, setPairings] = useState(() => {
+  const [pairings, setPairingsState] = useState(() => {
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
     if (bridge?.loadData) return createFreshPairings();
     return loadStoredPairingsForBrowser();
   });
+  const setSyncedSnakes = useCallback((nextSnakes) => {
+    setSnakesState(normalizeSnakeListForDisplay(nextSnakes));
+  }, []);
+  const setSyncedPairings = useCallback((nextPairings) => {
+    setPairingsState(Array.isArray(nextPairings) ? nextPairings.map(sanitizePairingRecord).filter(Boolean) : []);
+  }, []);
+  const setSnakes = useCallback((updater) => {
+    setSnakesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return normalizeSnakeListForDisplay(stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal'));
+    });
+  }, []);
+  const setPairings = useCallback((updater) => {
+    setPairingsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
+    });
+  }, []);
+  const [syncTombstones, setSyncTombstones] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}'); }
+    catch { return { snakes: {}, pairings: {} }; }
+  });
+  const syncTombstonesRef = useRef(syncTombstones);
+  useEffect(() => {
+    syncTombstonesRef.current = syncTombstones;
+    try { localStorage.setItem('bpSyncTombstones', JSON.stringify(syncTombstones)); } catch {}
+  }, [syncTombstones]);
   const [tab, setTab] = useState('animals');
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [pairingsView, setPairingsView] = useState('dashboard');
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
+  const [completedOutcomeFilter, setCompletedOutcomeFilter] = useState('all');
   const [animalView, setAnimalView] = useState('all');
   const [animalLayout, setAnimalLayout] = useState(() => {
     if (typeof window === 'undefined') return 'cards';
@@ -6050,6 +6641,26 @@ export default function BreedingPlannerApp() {
     } catch (err) {
       console.warn('Failed to restore animal layout', err);
       return 'cards';
+    }
+  });
+  const [animalSortBy, setAnimalSortBy] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEYS.animalSortBy);
+      return ANIMAL_SORT_FIELD_KEYS.includes(stored) ? stored : '';
+    } catch (err) {
+      console.warn('Failed to restore animal sort field', err);
+      return '';
+    }
+  });
+  const [animalSortDir, setAnimalSortDir] = useState(() => {
+    if (typeof window === 'undefined') return 'asc';
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEYS.animalSortDir);
+      return stored === 'desc' ? 'desc' : 'asc';
+    } catch (err) {
+      console.warn('Failed to restore animal sort direction', err);
+      return 'asc';
     }
   });
   const [query, setQuery] = useState('');
@@ -6126,6 +6737,10 @@ export default function BreedingPlannerApp() {
   const [backupSettings, setBackupSettings] = useState(() => normalizeBackupSettings(loadStoredJson(STORAGE_KEYS.backupSettings, null)));
   const [autoBackupSnapshot, setAutoBackupSnapshot] = useState(() => normalizeBackupSnapshot(loadStoredJson(STORAGE_KEYS.backupSnapshot, null)));
   const [backupVault, setBackupVault] = useState(() => normalizeBackupVault(loadStoredJson(STORAGE_KEYS.backupVault, [])));
+  const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
+    return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
+  });
   const quickAddAvailableGenetics = useMemo(
     () => buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases),
     [snakes, morphAliases, geneAliases]
@@ -6179,6 +6794,8 @@ export default function BreedingPlannerApp() {
     lastSavedSignature: '',
   });
   const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const cloudBaselineSnapshotRef = useRef({ snakes: [], pairings: [] });
+  const cloudSaveRequestIdRef = useRef(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
     lastSyncedAt: null,
@@ -6201,6 +6818,41 @@ export default function BreedingPlannerApp() {
       console.warn('Failed to persist animal layout', err);
     }
   }, [animalLayout]);
+
+  const persistAnimalSort = useCallback((nextSortBy, nextSortDir) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.animalSortBy, nextSortBy || '');
+      window.localStorage.setItem(STORAGE_KEYS.animalSortDir, nextSortDir === 'desc' ? 'desc' : 'asc');
+    } catch (err) {
+      console.warn('Failed to persist animal sort', err);
+    }
+  }, []);
+
+  const handleAnimalSortFieldChange = useCallback((nextSortBy) => {
+    setAnimalSortBy(nextSortBy);
+    setAnimalSortDir('asc');
+    persistAnimalSort(nextSortBy, 'asc');
+  }, [persistAnimalSort]);
+
+  const handleAnimalSortDirToggle = useCallback(() => {
+    const next = animalSortDir === 'asc' ? 'desc' : 'asc';
+    setAnimalSortDir(next);
+    persistAnimalSort(animalSortBy, next);
+  }, [animalSortBy, animalSortDir, persistAnimalSort]);
+
+  const handleAnimalSortHeaderClick = useCallback((field) => {
+    if (!field) return;
+    if (animalSortBy === field) {
+      const next = animalSortDir === 'asc' ? 'desc' : 'asc';
+      setAnimalSortDir(next);
+      persistAnimalSort(field, next);
+    } else {
+      setAnimalSortBy(field);
+      setAnimalSortDir('asc');
+      persistAnimalSort(field, 'asc');
+    }
+  }, [animalSortBy, animalSortDir, persistAnimalSort]);
 
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [eggBoxModal, setEggBoxModal] = useState(null);
@@ -6502,9 +7154,79 @@ export default function BreedingPlannerApp() {
     });
   }, []);
 
+  const plannerSyncState = useMemo(() => normalizePlannerStateRecord({
+    version: 1,
+    groups,
+    showGroups,
+    hiddenGroups,
+    customStatusTags,
+    removedStatusTags,
+    morphAliases: normalizeMorphAliasDatabase(morphAliases),
+    geneAliases: mergeGeneAliasRows(geneAliases),
+    leucisticType: lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel',
+    breederInfo: normalizeBreederInfo(breederInfo),
+    backupSettings: normalizeBackupSettings(backupSettings),
+    appearance: appearanceState,
+    theme,
+    lastFeedDefaults,
+    rooms,
+    heatRacks,
+    terrariums,
+    spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
+  }), [
+    appearanceState,
+    backupSettings,
+    breederInfo,
+    customStatusTags,
+    geneAliases,
+    groups,
+    heatRacks,
+    hiddenGroups,
+    lastFeedDefaults,
+    lastLeucisticType,
+    morphAliases,
+    removedStatusTags,
+    rooms,
+    showGroups,
+    terrariums,
+    theme,
+  ]);
+
+  const applyPlannerSyncState = useCallback((incomingState) => {
+    const state = normalizePlannerStateRecord(incomingState);
+    if (!state) return;
+    if (Array.isArray(state.groups)) setGroups(state.groups.length ? state.groups : [...DEFAULT_GROUPS]);
+    if (Array.isArray(state.showGroups)) setShowGroups(state.showGroups);
+    if (Array.isArray(state.hiddenGroups)) setHiddenGroups(state.hiddenGroups);
+    if (Array.isArray(state.customStatusTags)) setCustomStatusTags(state.customStatusTags);
+    if (Array.isArray(state.removedStatusTags)) setRemovedStatusTags(state.removedStatusTags);
+    if (Array.isArray(state.morphAliases)) {
+      const normalizedAliases = normalizeMorphAliasDatabase(state.morphAliases);
+      setMorphAliases(normalizedAliases.length ? normalizedAliases : [...DEFAULT_MORPH_ALIASES]);
+    }
+    if (Array.isArray(state.geneAliases)) setGeneAliases(mergeGeneAliasRows(state.geneAliases));
+    if (state.leucisticType === 'blackEye' || state.leucisticType === 'bel') setLastLeucisticType(state.leucisticType);
+    if (state.breederInfo && typeof state.breederInfo === 'object') setBreederInfo(normalizeBreederInfo(state.breederInfo));
+    if (state.backupSettings && typeof state.backupSettings === 'object') setBackupSettings(normalizeBackupSettings(state.backupSettings));
+    if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
+      setLastFeedDefaults(prev => ({ ...prev, ...state.lastFeedDefaults }));
+    }
+    if (state.appearance && typeof state.appearance === 'object') {
+      hydrateAppearance(state.appearance);
+    }
+    const hasSpaces = Array.isArray(state.rooms) || Array.isArray(state.heatRacks) || Array.isArray(state.terrariums) || Array.isArray(state.spaces);
+    if (hasSpaces) {
+      setSpacesState(normalizeSpacesDataset({
+        rooms: Array.isArray(state.rooms) ? state.rooms : [],
+        heatRacks: Array.isArray(state.heatRacks) ? state.heatRacks : [],
+        terrariums: Array.isArray(state.terrariums) ? state.terrariums : [],
+      }));
+    }
+  }, [hydrateAppearance]);
+
   useEffect(() => {
-    latestPlannerSnapshotRef.current = { snakes, pairings };
-  }, [snakes, pairings]);
+    latestPlannerSnapshotRef.current = { snakes, pairings, plannerState: plannerSyncState };
+  }, [snakes, pairings, plannerSyncState]);
 
   const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
@@ -6522,38 +7244,41 @@ export default function BreedingPlannerApp() {
     if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
 
     try {
-      const localSnapshot = latestPlannerSnapshotRef.current;
+      const localSnapshot = stampChangedSnapshotForSync(
+        latestPlannerSnapshotRef.current,
+        cloudBaselineSnapshotRef.current
+      );
       const snapshot = await fetchBreederSnapshot();
-      const backendSnapshot = {
-        snakes: Array.isArray(snapshot?.animals) ? snapshot.animals : [],
-        pairings: Array.isArray(snapshot?.pairings) ? snapshot.pairings : [],
-      };
-      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot);
-      const signature = JSON.stringify(merged);
+      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
+      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
+      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
+      const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+      const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
+      const signature = plannerSnapshotSignature(syncedSnapshot);
 
-      setSnakes(merged.snakes);
-      setPairings(merged.pairings);
-      latestPlannerSnapshotRef.current = merged;
-
-      await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings));
+      setSyncedSnakes(syncedSnapshot.snakes);
+      setSyncedPairings(syncedSnapshot.pairings);
+      applyPlannerSyncState(syncedSnapshot.plannerState);
+      latestPlannerSnapshotRef.current = syncedSnapshot;
 
       const syncedAt = new Date().toISOString();
       backendPlannerSyncRef.current.seeded = true;
       backendPlannerSyncRef.current.status = 'ready';
       backendPlannerSyncRef.current.lastSavedSignature = signature;
+      cloudBaselineSnapshotRef.current = syncedSnapshot;
       setCloudSyncStatus({
         state: 'success',
         lastSyncedAt: syncedAt,
-        message: `Synced ${merged.snakes.length} snakes and ${merged.pairings.length} pairings with the cloud database.`,
+        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`,
       });
-      return { ...merged, syncedAt };
+      return { ...syncedSnapshot, syncedAt };
     } catch (error) {
       backendPlannerSyncRef.current.status = 'idle';
       const message = error?.message || 'Cloud sync failed.';
       setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
       throw error;
     }
-  }, [sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
@@ -6591,7 +7316,7 @@ export default function BreedingPlannerApp() {
 
         if (Array.isArray(payload.snakes)) {
           const sanitized = payload.snakes.map(sanitizeSnakeRecord).filter(Boolean);
-          setSnakes(sanitized);
+          setSyncedSnakes(sanitized);
         }
         {
           const backupPairings = [
@@ -6604,7 +7329,7 @@ export default function BreedingPlannerApp() {
             ? payload.pairings
             : backupPairings;
           const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
-          setPairings(sanitizedPairings);
+          setSyncedPairings(sanitizedPairings);
         }
         if (Array.isArray(payload.groups)) {
           setGroups(payload.groups);
@@ -6664,7 +7389,7 @@ export default function BreedingPlannerApp() {
         }
       })
       .catch((error) => {
-        console.error('Failed to load persisted Breeding Planner data', error);
+        console.error('Failed to load persisted Serpentora data', error);
       })
       .finally(() => {
         if (!cancelled) setElectronDataReady(true);
@@ -6881,10 +7606,6 @@ export default function BreedingPlannerApp() {
   }, []);
 
   // last feed defaults (persisted) - store feed/form/size/etc but not grams
-  const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
-    const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
-    return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
-  });
   useEffect(() => { saveStoredJson(STORAGE_KEYS.lastFeedDefaults, lastFeedDefaults); }, [lastFeedDefaults]);
   useEffect(() => {
     saveStoredJson(STORAGE_KEYS.spaces, { rooms, heatRacks, terrariums });
@@ -6932,7 +7653,7 @@ export default function BreedingPlannerApp() {
 
     const saveTimer = setTimeout(() => {
       bridge.saveData(payload).catch((error) => {
-        console.error('Failed to save Breeding Planner data', error);
+        console.error('Failed to save Serpentora data', error);
       });
     }, 300);
 
@@ -6968,6 +7689,9 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady) return;
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
     if (bridge?.saveData) return;
+    if (snakes.some(snake => !isDemoSnakeRecord(snake))) {
+      saveStoredJson(STORAGE_KEYS.demoSnakesDismissed, true);
+    }
     saveStoredJson(STORAGE_KEYS.snakes, snakes);
     saveStoredJson(STORAGE_KEYS.pairings, pairings);
     saveStoredJson(STORAGE_KEYS.groups, groups);
@@ -6988,23 +7712,50 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
-    if (backendPlannerSyncRef.current.status !== 'ready' || !backendPlannerSyncRef.current.seeded) return;
+    if (!backendPlannerSyncRef.current.seeded) return;
 
-    const signature = JSON.stringify({ snakes, pairings });
-    if (signature === backendPlannerSyncRef.current.lastSavedSignature) return;
+    const signature = plannerSnapshotSignature({ snakes, pairings, plannerState: plannerSyncState });
+    const saveRequestId = ++cloudSaveRequestIdRef.current;
+    if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
+      backendPlannerSyncRef.current.status = 'ready';
+      return;
+    }
 
     const saveTimer = setTimeout(() => {
-      saveBreederSnapshot(prepareSnapshotForBackend(snakes, pairings))
-        .then(() => {
-          const syncedAt = new Date().toISOString();
-          backendPlannerSyncRef.current.lastSavedSignature = signature;
+      if (saveRequestId !== cloudSaveRequestIdRef.current) return;
+      backendPlannerSyncRef.current.status = 'loading';
+      const localSnapshot = stampChangedSnapshotForSync(
+        { snakes, pairings, plannerState: plannerSyncState },
+        cloudBaselineSnapshotRef.current
+      );
+
+      fetchBreederSnapshot()
+        .then((snapshot) => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
+          const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
+          const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
+          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
+        })
+        .then((savedSnapshot) => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
+          const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+          const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
+          setSyncedSnakes(currentSnapshot.snakes);
+          setSyncedPairings(currentSnapshot.pairings);
+          applyPlannerSyncState(currentSnapshot.plannerState);
+          latestPlannerSnapshotRef.current = currentSnapshot;
+          backendPlannerSyncRef.current.status = 'ready';
+          backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(currentSnapshot);
+          cloudBaselineSnapshotRef.current = currentSnapshot;
           setCloudSyncStatus({
             state: 'success',
-            lastSyncedAt: syncedAt,
-            message: `Saved ${snakes.length} snakes and ${pairings.length} pairings to the cloud database.`,
+            lastSyncedAt: new Date().toISOString(),
+            message: `Saved ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings to the cloud database.`,
           });
         })
         .catch((error) => {
+          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
+          backendPlannerSyncRef.current.status = 'ready';
           setCloudSyncStatus(prev => ({
             ...prev,
             state: 'error',
@@ -7014,8 +7765,10 @@ export default function BreedingPlannerApp() {
         });
     }, 600);
 
-    return () => clearTimeout(saveTimer);
-  }, [electronDataReady, pairings, sharedBreederDataReady, snakes]);
+    return () => {
+      clearTimeout(saveTimer);
+    };
+  }, [applyPlannerSyncState, electronDataReady, pairings, plannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -7655,11 +8408,25 @@ export default function BreedingPlannerApp() {
 
   const filteredCompletedPairings = useMemo(() => {
     if (pairingsView !== 'completed') return completedPairings;
-    if (completedYearFilter === 'All') return completedPairingsWithYear.map(item => item.pairing);
-    return completedPairingsWithYear
-      .filter(item => item.year === completedYearFilter)
-      .map(item => item.pairing);
-  }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter]);
+    const byYear = completedYearFilter === 'All'
+      ? completedPairingsWithYear.map(item => item.pairing)
+      : completedPairingsWithYear
+        .filter(item => item.year === completedYearFilter)
+        .map(item => item.pairing);
+    if (completedOutcomeFilter === 'all') return byYear;
+    return byYear.filter(pairing => {
+      const normalized = withPairingLifecycleDefaults({ ...pairing });
+      if (completedOutcomeFilter === 'productive') {
+        const outcome = getFinalKnownBiologicalOutcome(normalized);
+        return outcome === 'eggs_laid' || outcome === 'live_birth';
+      }
+      if (completedOutcomeFilter === 'no_ovulation_observed') return normalized.completionReason === 'no_ovulation_observed';
+      if (completedOutcomeFilter === 'follicles_reabsorbed') return normalized.completionReason === 'follicles_reabsorbed';
+      if (completedOutcomeFilter === 'late_outcome') return didLateOutcomeOccur(normalized);
+      if (completedOutcomeFilter === 'reopened') return !!normalized.reopenedAt;
+      return true;
+    });
+  }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter, completedOutcomeFilter]);
 
   const displayedPairings = pairingsView === 'completed' ? filteredCompletedPairings : activePairings;
   const filteredPairingsBySearch = useMemo(() => {
@@ -7684,48 +8451,59 @@ export default function BreedingPlannerApp() {
       return tokens.every(token => fields.some(field => field.includes(token)));
     });
   }, [displayedPairings, pairingsSearchQuery, snakes]);
+  // Numbers are assigned once (see handleUpdatePairing / the backfill effect below) and persisted on
+  // pairing.clutch, so a clutch keeps its number permanently even after it's completed/removed from
+  // the incubator. This just reads what was stored — it must never re-derive numbers from list position.
   const clutchMetadataByPairingId = useMemo(() => {
     const list = Array.isArray(pairings) ? pairings : [];
-    const sortByClutchDate = (a, b) => {
-      const dateDiff = new Date(a.clutchDate) - new Date(b.clutchDate);
-      if (dateDiff) return dateDiff;
-      return String(a.pairingId || '').localeCompare(String(b.pairingId || ''));
-    };
-    const clutchesWithDates = list
-      .filter(p => p?.clutch?.date)
-      .map(p => ({
-        pairingId: p.id,
-        clutchDate: p.clutch.date,
-        eggs: resolveEggCountForClutch(p?.clutch?.eggsTotal, p?.clutch?.fertileEggs) || 0,
-        completed: isPairingCompleted(p),
-        label: resolvePairingLabel(p, snakeById(snakes, p.femaleId), snakeById(snakes, p.maleId)),
-      }))
-      .sort(sortByClutchDate);
-    const completedClutches = clutchesWithDates.filter(item => item.completed).sort(sortByClutchDate);
-    const activeClutches = clutchesWithDates.filter(item => !item.completed).sort(sortByClutchDate);
-    const starterCompletedIndex = completedClutches.findIndex(item => /salon\s+in\s+guglia/i.test(String(item.label || '')));
-    const starterCompleted = starterCompletedIndex >= 0
-      ? completedClutches[starterCompletedIndex]
-      : completedClutches[0] || null;
-    const remainingCompleted = completedClutches.filter(item => item.pairingId !== starterCompleted?.pairingId);
-    const numberedClutches = [
-      ...(starterCompleted ? [starterCompleted] : []),
-      ...activeClutches,
-      ...remainingCompleted,
-    ];
     const map = new Map();
-    let nextEggBoxNumber = 1;
-    numberedClutches.forEach((item, idx) => {
-      if (!item?.pairingId || map.has(item.pairingId)) return;
-      const eggBoxCount = splitEggBoxCounts(item.eggs).length;
-      map.set(item.pairingId, {
-        clutchNumber: idx + 1,
-        eggBoxNumber: nextEggBoxNumber,
-        eggBoxCount,
+    list.forEach(p => {
+      if (!p?.id || !p?.clutch?.date) return;
+      const storedEggBoxNumber = Number(p.clutch.eggBoxNumber) || 0;
+      const storedClutchNumber = Number(p.clutch.clutchNumber) || 0;
+      const eggBoxNumber = storedEggBoxNumber || storedClutchNumber;
+      const clutchNumber = storedClutchNumber || storedEggBoxNumber;
+      if (!eggBoxNumber && !clutchNumber) return;
+      const eggs = resolveEggCountForClutch(p?.clutch?.eggsTotal, p?.clutch?.fertileEggs) || 0;
+      map.set(p.id, {
+        clutchNumber,
+        eggBoxNumber,
+        eggBoxCount: splitEggBoxCounts(eggs).length,
       });
-      nextEggBoxNumber += 1;
     });
     return map;
+  }, [pairings]);
+  // One-time (per missing entry) backfill: assigns a permanent number to any clutch that doesn't have
+  // one yet. On the very first run after this fix ships, none of them do, so it reuses the old
+  // chronological ordering to keep today's visible numbers stable. Afterward it only ever appends new
+  // numbers above the current max — it never touches a clutch that already has a number.
+  useEffect(() => {
+    setPairings(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      const clutchesWithDates = list.filter(p => p?.clutch?.date);
+      const missing = clutchesWithDates.filter(p => !(Number(p.clutch.eggBoxNumber) > 0));
+      if (!missing.length) return prev;
+      const maxAssigned = clutchesWithDates.reduce((max, p) => Math.max(max, Number(p.clutch.eggBoxNumber) || 0), 0);
+      const missingIds = new Set(missing.map(p => p.id));
+      const orderedIds = missing.length === clutchesWithDates.length
+        ? computeLegacyClutchOrder(list, snakes)
+        : missing.slice().sort((a, b) => new Date(a.clutch.date) - new Date(b.clutch.date)).map(p => p.id);
+      let nextNumber = maxAssigned + 1;
+      const numberByPairingId = new Map();
+      orderedIds.forEach(id => {
+        if (!missingIds.has(id) || numberByPairingId.has(id)) return;
+        numberByPairingId.set(id, nextNumber);
+        nextNumber += 1;
+      });
+      let changed = false;
+      const next = list.map(p => {
+        const assigned = numberByPairingId.get(p?.id);
+        if (!assigned) return p;
+        changed = true;
+        return { ...p, clutch: { ...p.clutch, clutchNumber: assigned, eggBoxNumber: assigned } };
+      });
+      return changed ? next : prev;
+    });
   }, [pairings, snakes]);
   const clutchNumberByPairingId = useMemo(() => {
     const map = new Map();
@@ -7952,6 +8730,13 @@ export default function BreedingPlannerApp() {
     return filteredAll;
   }, [animalView, filteredAll, filteredFemales, filteredMales]);
 
+  const sortedAnimalList = useMemo(() => {
+    if (!animalSortBy) return activeAnimalList;
+    const list = activeAnimalList.slice();
+    list.sort((a, b) => compareAnimalsBySort(a, b, animalSortBy, animalSortDir));
+    return list;
+  }, [activeAnimalList, animalSortBy, animalSortDir]);
+
   const activeAnimalLabel = animalView === "groups"
     ? t("filters.groupsTitle", { defaultValue: "Groups" })
     : animalView === "females"
@@ -7961,7 +8746,7 @@ export default function BreedingPlannerApp() {
         : t("filters.allAnimals", { defaultValue: "All animals" });
 
   const handleListExportCsv = useCallback(async () => {
-    if (!activeAnimalList.length) {
+    if (!sortedAnimalList.length) {
       setListExportFeedback({
         type: 'error',
         message: t('animals.list.exportEmpty', { defaultValue: 'No animals match your filters.' }),
@@ -7994,7 +8779,7 @@ export default function BreedingPlannerApp() {
     };
     try {
       // No PDF dependencies here; Animal list export now streams through the CSV exporter exclusively.
-      await exportAnimalListToCsv(activeAnimalList, {
+      await exportAnimalListToCsv(sortedAnimalList, {
         allSnakes: snakes,
         pairings,
         labels: labelBundle,
@@ -8002,7 +8787,7 @@ export default function BreedingPlannerApp() {
       });
       setListExportFeedback({
         type: 'success',
-        message: t('animals.list.exportSuccess', { defaultValue: 'Exported list to CSV.', count: activeAnimalList.length }),
+        message: t('animals.list.exportSuccess', { defaultValue: 'Exported list to CSV.', count: sortedAnimalList.length }),
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -8013,7 +8798,7 @@ export default function BreedingPlannerApp() {
         timestamp: new Date().toISOString(),
       });
     }
-  }, [activeAnimalList, pairings, snakes, t]);
+  }, [sortedAnimalList, pairings, snakes, t]);
 
   const snakesById = useMemo(() => Object.fromEntries(snakes.map(snake => [snake.id, snake])), [snakes]);
   const malesById = useMemo(() => Object.fromEntries(snakes.filter(isMaleSnake).map(snake => [snake.id, snake])), [snakes]);
@@ -8472,12 +9257,22 @@ export default function BreedingPlannerApp() {
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
-    setSnakes(prev => {
-      const next = prev.filter(s => s.id !== id);
-      if (!next.length) return createFreshSnakes();
-      return next;
+    const deletedAt = nowIsoString();
+    setSyncTombstones(prev => ({
+      ...prev,
+      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt } },
+    }));
+    setSnakes(prev => prev.filter(s => s.id !== id));
+    setPairings(prev => {
+      const removed = prev.filter(p => p.maleId === id || p.femaleId === id);
+      removed.forEach(p => {
+        if (p.id) setSyncTombstones(t => ({
+          ...t,
+          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt } },
+        }));
+      });
+      return prev.filter(p => p.maleId !== id && p.femaleId !== id);
     });
-    setPairings(prev => prev.filter(p => p.maleId !== id && p.femaleId !== id));
     if (editSnake && editSnake.id === id) {
       closeSnakeEditor();
     }
@@ -8768,6 +9563,26 @@ export default function BreedingPlannerApp() {
     const openHatchWizardForPayload = useCallback((payload) => {
       if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
       const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
+      const existingHatchlingIndexes = new Set(
+        snakes
+          .filter(s => s && (s.pairingId === pairing.id || s.metadata?.pairingId === pairing.id))
+          .map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex))
+          .filter(Number.isFinite)
+      );
+      const requestedThrough = Number(payload.existingCount) + payload.count;
+      // hatchlingsGeneratedThrough is a persistent, synced high-water mark, so it still
+      // blocks re-generation after the hatchling records themselves were deleted or on a
+      // device/tab that hasn't locally seen them yet (unlike existingHatchlingIndexes, which
+      // only reflects snakes currently present in this session's state).
+      const alreadyGenerated = Number(pairing.hatch?.hatchlingsGeneratedThrough || 0) >= requestedThrough;
+      const alreadyRecorded = alreadyGenerated || Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
+        .some(index => existingHatchlingIndexes.has(index));
+      if (alreadyRecorded) {
+        showAppAlert(t('pairing.hatchlingsAlreadyRecorded', {
+          defaultValue: 'These hatchlings have already been recorded for this pairing.',
+        }));
+        return;
+      }
       const hatchedOn = payload.hatchedDate || localYMD(new Date());
       const parsedDate = parseYmd(hatchedOn) || new Date();
       const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
@@ -8830,7 +9645,7 @@ export default function BreedingPlannerApp() {
           existingRecordsBase: baseExistingRecords,
         },
       });
-    }, [snakes, breederInfo]);
+    }, [snakes, breederInfo, showAppAlert, t]);
 
     const regenerateWizardIdInState = useCallback((state, index, sexOverride) => {
       if (!state) return state;
@@ -9097,6 +9912,19 @@ export default function BreedingPlannerApp() {
           if (baseGroup) {
             setGroups(prevGroups => (prevGroups.includes(baseGroup) ? prevGroups : [...prevGroups, baseGroup]));
           }
+          const generatedPairingId = pairing?.id || prev.pairingId || null;
+          if (generatedPairingId) {
+            setPairings(prevPairings => prevPairings.map(p => {
+              if (p.id !== generatedPairingId) return p;
+              const withDefaults = withPairingLifecycleDefaults({ ...p });
+              const throughSoFar = Number(withDefaults.hatch?.hatchlingsGeneratedThrough || 0);
+              if (hatchlingIndex <= throughSoFar) return p;
+              return {
+                ...withDefaults,
+                hatch: { ...withDefaults.hatch, hatchlingsGeneratedThrough: hatchlingIndex },
+              };
+            }));
+          }
         }
 
         const nextEntries = entries.map((item, idx) => idx === currentIndex
@@ -9110,7 +9938,7 @@ export default function BreedingPlannerApp() {
         }
         return { ...prev, entries: nextEntries, currentIndex: currentIndex + 1 };
       });
-  }, [snakes, setSnakes, setGroups, breederInfo, showAppAlert]);
+  }, [snakes, setSnakes, setGroups, setPairings, breederInfo, showAppAlert]);
 
   const handleGenerateIdForEditSnake = useCallback(() => {
     setEditSnakeDraft(draft => {
@@ -9194,6 +10022,11 @@ export default function BreedingPlannerApp() {
         const nextRaw = typeof updater === 'function' ? updater(current) : updater;
         const merged = withPairingLifecycleDefaults({ ...current, ...(nextRaw || {}) });
         merged.id = p.id;
+
+        if (merged?.clutch?.date && !(Number(merged.clutch.eggBoxNumber) > 0)) {
+          const nextNumber = prev.reduce((max, other) => Math.max(max, Number(other?.clutch?.eggBoxNumber) || 0), 0) + 1;
+          merged.clutch = { ...merged.clutch, clutchNumber: nextNumber, eggBoxNumber: nextNumber };
+        }
 
         if (merged.femaleId) {
           const blocking = prev.find(other => (
@@ -9305,7 +10138,7 @@ export default function BreedingPlannerApp() {
             <div className="flex flex-1 flex-wrap items-center justify-end gap-3 min-w-0">
               <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-1.5">
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Planner" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Tracker" })}</TabButton>
                 <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
                 <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
                 <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
@@ -9455,6 +10288,38 @@ export default function BreedingPlannerApp() {
                       onClick={() => handleAnimalLayoutChange('list')}
                     >
                       {t('ui.listControls.list', { defaultValue: 'List' })}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 border rounded-xl bg-white px-1 py-1 text-xs shadow-sm">
+                    <select
+                      className="bg-transparent px-2 py-1 rounded-lg font-medium text-neutral-700 focus:outline-none"
+                      value={animalSortBy}
+                      onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
+                      aria-label={t('animals.sort.label', { defaultValue: 'Sort by' })}
+                    >
+                      <option value="">{t('animals.sort.default', { defaultValue: 'Default order' })}</option>
+                      {ANIMAL_SORT_FIELDS.map(field => (
+                        <option key={field.key} value={field.key}>
+                          {t(field.labelKey, { defaultValue: field.defaultLabel })}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={cx(
+                        'px-2 py-1 rounded-lg font-medium transition-colors',
+                        animalSortBy ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-300 cursor-not-allowed'
+                      )}
+                      onClick={handleAnimalSortDirToggle}
+                      disabled={!animalSortBy}
+                      aria-label={animalSortDir === 'desc'
+                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                      title={animalSortDir === 'desc'
+                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                    >
+                      {animalSortDir === 'desc' ? '↓' : '↑'}
                     </button>
                   </div>
                   {animalLayout === 'list' && (
@@ -9763,9 +10628,9 @@ export default function BreedingPlannerApp() {
                   </div>
                 )}
                 {animalLayout === 'list' ? (
-                  activeAnimalList.length ? (
+                  sortedAnimalList.length ? (
                     <SnakeListTable
-                      snakes={activeAnimalList}
+                      snakes={sortedAnimalList}
                       onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onOpenFamilyTree={openFamilyTreeForSnake}
@@ -9773,6 +10638,9 @@ export default function BreedingPlannerApp() {
                       onDelete={requestDeleteSnake}
                       pairings={pairings}
                       onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
+                      sortBy={animalSortBy}
+                      sortDir={animalSortDir}
+                      onSortHeaderClick={handleAnimalSortHeaderClick}
                     />
                   ) : (
                     <div className="text-sm text-neutral-500">{t("animals.noMatches", { defaultValue: "No animals match your filters." })}</div>
@@ -9780,7 +10648,7 @@ export default function BreedingPlannerApp() {
                 ) : (
                   <>
                     <div className="bp-cards-grid grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {activeAnimalList.map(s => (
+                      {sortedAnimalList.map(s => (
                         <SnakeCard
                           key={s.id}
                           s={s}
@@ -9799,7 +10667,7 @@ export default function BreedingPlannerApp() {
                         />
                       ))}
                     </div>
-                    {!activeAnimalList.length && (
+                    {!sortedAnimalList.length && (
                       <div className="text-sm text-neutral-500">{t("animals.noMatches", { defaultValue: "No animals match your filters." })}</div>
                     )}
                   </>
@@ -9855,6 +10723,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('dashboard');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t('pairing.dashboard', { defaultValue: 'Dashboard' })}
@@ -9866,6 +10735,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('active');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.activeProjects", { count: activePairingsCount })}
@@ -9877,6 +10747,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('completed');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.completedProjects", { count: completedPairingsCount })}
@@ -9888,6 +10759,7 @@ export default function BreedingPlannerApp() {
                     setPairingsView('incubator');
                     setFocusedPairingId(null);
                     setCompletedYearFilter('All');
+                    setCompletedOutcomeFilter('all');
                   }}
                 >
                   {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
@@ -9930,24 +10802,51 @@ export default function BreedingPlannerApp() {
               </div>
             </div>
             {pairingsView === 'completed' && completedYearOptions.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <TabButton
-                  theme={theme}
-                  active={completedYearFilter === 'All'}
-                  onClick={() => setCompletedYearFilter('All')}
-                >
-                  All years
-                </TabButton>
-                {completedYearOptions.map(year => (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <TabButton
-                    key={year}
                     theme={theme}
-                    active={completedYearFilter === year}
-                    onClick={() => setCompletedYearFilter(year)}
+                    active={completedYearFilter === 'All'}
+                    onClick={() => setCompletedYearFilter('All')}
                   >
-                    {year}
+                    All years
                   </TabButton>
-                ))}
+                  {completedYearOptions.map(year => (
+                    <TabButton
+                      key={year}
+                      theme={theme}
+                      active={completedYearFilter === year}
+                      onClick={() => setCompletedYearFilter(year)}
+                    >
+                      {year}
+                    </TabButton>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TabButton
+                    theme={theme}
+                    active={completedOutcomeFilter === 'all'}
+                    onClick={() => setCompletedOutcomeFilter('all')}
+                  >
+                    All outcomes
+                  </TabButton>
+                  {[
+                    ['productive', 'Eggs or live birth'],
+                    ['no_ovulation_observed', 'No ovulation observed'],
+                    ['follicles_reabsorbed', 'Follicles reabsorbed'],
+                    ['late_outcome', 'Late outcome'],
+                    ['reopened', 'Reopened'],
+                  ].map(([key, label]) => (
+                    <TabButton
+                      key={key}
+                      theme={theme}
+                      active={completedOutcomeFilter === key}
+                      onClick={() => setCompletedOutcomeFilter(key)}
+                    >
+                      {label}
+                    </TabButton>
+                  ))}
+                </div>
               </div>
             )}
             {pairingsView === 'dashboard' ? (
@@ -10074,6 +10973,13 @@ export default function BreedingPlannerApp() {
               breederMales={males}
               breederFemales={females}
               onDelete={(pid)=>{
+                if (pid) {
+                  const deletedAt = nowIsoString();
+                  setSyncTombstones(prev => ({
+                    ...prev,
+                    pairings: { ...prev.pairings, [pid]: { id: pid, appPairingId: pid, deletedAt } },
+                  }));
+                }
                 setPairings(ps=>ps.filter(x=>x.id!==pid));
                 setFocusedPairingId(prev=>prev===pid?null:prev);
               }}
@@ -11048,46 +11954,48 @@ export default function BreedingPlannerApp() {
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
-                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
-                  <div className="text-xs font-semibold text-neutral-700">{t("feedPrep.profileTitle", { defaultValue: "Normal feeder" })}</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2">
-                    <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
-                      <select
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm bg-white"
-                        value={editSnakeDraft.feederProfile?.feedType || ''}
-                        onChange={e => setEditSnakeDraft(d => ({
-                          ...d,
-                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
-                        }))}
-                      >
-                        <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
-                        {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.sizeClass", { defaultValue: "Size / weight class" })}</label>
-                      <input
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
-                        value={editSnakeDraft.feederProfile?.sizeClass || ''}
-                        onChange={e => setEditSnakeDraft(d => ({
-                          ...d,
-                          feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
-                        }))}
-                        list="feed-prep-size-options"
-                        placeholder={t("feedPrep.sizePlaceholder", { defaultValue: "e.g., fuzzy, small rat, 30-50g" })}
-                      />
-                      <datalist id="feed-prep-size-options">
-                        {FEEDER_SIZE_OPTIONS.map(option => <option key={option} value={option} />)}
-                      </datalist>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                <div className="border rounded-xl p-2 bg-neutral-50 mt-1">
+                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <div>
-                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                        <select
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          value={editSnakeDraft.feederProfile?.feedType || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
+                          }))}
+                        >
+                          <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                          {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
+                        <select
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          value={editSnakeDraft.feederProfile?.sizeClass || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
+                          }))}
+                        >
+                          <option value="">{t("feedPrep.notSet", { defaultValue: "Not set" })}</option>
+                          {(FEEDER_SIZE_OPTIONS_BY_TYPE[editSnakeDraft.feederProfile?.feedType] || FEEDER_SIZE_OPTIONS).map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
-                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.weightGrams || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -11097,12 +12005,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-neutral-600">{t("feedPrep.quantity", { defaultValue: "Quantity" })}</label>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.quantity || 1}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -11110,11 +12018,27 @@ export default function BreedingPlannerApp() {
                           }))}
                         />
                       </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          value={editSnakeDraft.feederProfile?.intervalDays || ''}
+                          onChange={e => setEditSnakeDraft(d => ({
+                            ...d,
+                            feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), intervalDays: e.target.value },
+                          }))}
+                          placeholder="7"
+                        />
+                      </div>
                     </div>
+                    <div className="text-[10px] text-neutral-400">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
                     <div>
-                      <label className="text-xs font-medium text-neutral-600">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
                       <input
-                        className="mt-0.5 w-full border rounded-lg px-2 py-1 text-sm"
+                        className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                         value={editSnakeDraft.feederProfile?.notes || ''}
                         onChange={e => setEditSnakeDraft(d => ({
                           ...d,
@@ -11975,7 +12899,7 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
       <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="font-semibold text-lg">Delete {snake.name || 'this snake'}?</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-          This removes the animal and detaches any pairings linked to it. Demo animals will return automatically whenever your collection is empty, so you always have something to explore.
+          This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added.
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
@@ -12026,6 +12950,32 @@ function Card({ title, children }) {
 
 function Badge({ children }) {
   return <span className="px-2 py-0.5 text-xs rounded-full border bg-neutral-50">{children}</span>;
+}
+
+function getStatusTone(status) {
+  const normalized = typeof status === 'string' ? status.trim().toLowerCase() : '';
+  if (normalized === 'active' || normalized === 'breeder') return 'success';
+  if (normalized === 'quarantine') return 'danger';
+  if (normalized === 'sold') return 'neutral';
+  if (normalized === 'holdback') return 'neutral';
+  if (normalized.includes('grow') || normalized.includes('sale') || normalized.includes('sell') || normalized === 'hold') return 'warning';
+  return 'neutral';
+}
+
+function StatusBadge({ status }) {
+  const tone = getStatusTone(status);
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold"
+      style={{
+        background: `var(--status-${tone}-bg, #f3f4f6)`,
+        borderColor: `var(--status-${tone}-border, #d1d5db)`,
+        color: `var(--status-${tone}-text, #6b7280)`,
+      }}
+    >
+      {status}
+    </span>
+  );
 }
 
 function SexBadge({ sex, label, showText = true, className }) {
@@ -12831,6 +13781,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
 }
 
 const PT_TO_MM = 0.352778;
+const PDF_TEXT_SAFE_INSET_MM = 1.2;
 
 function fitTextToWidth(doc, text, maxWidth, maxFontSize = 18, minFontSize = 8) {
   if (!text) return minFontSize;
@@ -12846,6 +13797,70 @@ function fitTextToWidth(doc, text, maxWidth, maxFontSize = 18, minFontSize = 8) 
 
 function estimateLineHeight(fontSize, multiplier = 1.2) {
   return fontSize * PT_TO_MM * multiplier;
+}
+
+function splitOversizedPdfToken(doc, token, maxWidth) {
+  const normalized = String(token || '').trim();
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
+  if (!normalized) return [];
+  if (doc.getTextWidth(normalized) <= safeMaxWidth) return [normalized];
+  const chunks = [];
+  let current = '';
+  Array.from(normalized).forEach(char => {
+    const candidate = `${current}${char}`;
+    if (!current || doc.getTextWidth(candidate) <= safeMaxWidth) {
+      current = candidate;
+      return;
+    }
+    chunks.push(current);
+    current = char;
+  });
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [normalized];
+}
+
+function wrapPdfTextToWidth(doc, source, maxWidth) {
+  const normalized = String(source ?? '').replace(/\s+/g, ' ').trim();
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
+  if (!normalized) return [];
+  const words = normalized
+    .split(' ')
+    .flatMap(word => splitOversizedPdfToken(doc, word, safeMaxWidth));
+  const lines = [];
+  let current = '';
+  words.forEach(word => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || doc.getTextWidth(candidate) <= safeMaxWidth) {
+      current = candidate;
+      return;
+    }
+    lines.push(current);
+    current = word;
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [];
+}
+
+function ellipsizePdfLine(doc, source, maxWidth) {
+  const ellipsis = '...';
+  const safeMaxWidth = Math.max(1, maxWidth - PDF_TEXT_SAFE_INSET_MM);
+  let text = String(source || '').trim();
+  if (!text || doc.getTextWidth(text) <= safeMaxWidth) return text;
+  while (text.length && doc.getTextWidth(`${text}${ellipsis}`) > safeMaxWidth) {
+    text = text.slice(0, -1).trimEnd();
+  }
+  return text ? `${text}${ellipsis}` : ellipsis;
+}
+
+function fitPdfLinesToWidth(doc, source, maxWidth, maxLines = Infinity) {
+  const rawLines = Array.isArray(source) ? source : [source];
+  const wrapped = rawLines.flatMap(line => wrapPdfTextToWidth(doc, line, maxWidth));
+  if (!Number.isFinite(maxLines) || wrapped.length <= maxLines) {
+    return wrapped;
+  }
+  const visible = wrapped.slice(0, Math.max(1, maxLines));
+  visible[visible.length - 1] = ellipsizePdfLine(doc, visible[visible.length - 1], maxWidth);
+  return visible;
 }
 
 const canUseCanvas = typeof document !== 'undefined' && typeof document.createElement === 'function';
@@ -13110,7 +14125,8 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       doc.setLineWidth(0.3);
       doc.rect(qrX - framePadding, qrY - framePadding, qrSize + framePadding * 2, qrSize + framePadding * 2);
 
-      const textWidth = Math.max(12, (labelX + labelW) - (qrX + qrSize) - margin - 2);
+      const textX = qrX + qrSize + Math.max(3, margin);
+      const textWidth = Math.max(8, (labelX + labelW) - textX - margin);
       const nameText = s.name || 'Unnamed';
       const idText = s.id ? `ID: ${s.id}` : '';
       const normalizedSex = normalizeSexValue(s.sex);
@@ -13121,7 +14137,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       let nameFont = fitTextToWidth(doc, nameText, textWidth, 18, 10);
       const nameFontMin = 8;
       let idFont = 10;
-      const idFontMin = 8;
+      const idFontMin = 6;
       if (idText) {
         idFont = fitTextToWidth(doc, idText, textWidth, idFont, idFontMin);
       }
@@ -13130,7 +14146,7 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
 
       const recomputeNameMetrics = () => {
         doc.setFontSize(nameFont);
-        const lines = doc.splitTextToSize(nameText, textWidth);
+        const lines = fitPdfLinesToWidth(doc, nameText, textWidth, 3);
         const lineHeight = estimateLineHeight(nameFont, 1);
         return { lines, lineHeight, height: lines.length * lineHeight };
       };
@@ -13141,13 +14157,9 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
 
       const maxContentHeight = labelH - margin * 2;
 
-      const calculateGeneticsLayout = (fontSize) => {
+      const calculateGeneticsLayout = (fontSize, maxLines = Infinity) => {
         doc.setFontSize(fontSize);
-        const lines = [];
-        geneticsSections.forEach(section => {
-          const sectionLines = doc.splitTextToSize(section, textWidth);
-          lines.push(...sectionLines);
-        });
+        const lines = fitPdfLinesToWidth(doc, geneticsSections, textWidth, maxLines);
         const height = lines.length ? lines.length * estimateLineHeight(fontSize, 1) : 0;
         return { lines, height };
       };
@@ -13157,14 +14169,21 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       const spacingAfterName = 3;
       let spacingAfterId = (sexText || geneticsLines.length) ? 2 : 0;
       let spacingAfterSex = geneticsLines.length ? 2 : 0;
-      let idHeight = idText ? estimateLineHeight(idFont, 1) : 0;
-      let sexHeight = sexText ? estimateLineHeight(idFont, 1) : 0;
+      let idLines = [];
+      let sexLines = [];
+      let idHeight = 0;
+      let sexHeight = 0;
       let totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
 
       const recomputeIdHeights = () => {
-        idHeight = idText ? estimateLineHeight(idFont, 1) : 0;
-        sexHeight = sexText ? estimateLineHeight(idFont, 1) : 0;
+        doc.setFontSize(idFont);
+        idLines = idText ? fitPdfLinesToWidth(doc, idText, textWidth, 3) : [];
+        sexLines = sexText ? fitPdfLinesToWidth(doc, sexText, textWidth, 1) : [];
+        idHeight = idLines.length ? idLines.length * estimateLineHeight(idFont, 1) : 0;
+        sexHeight = sexLines.length ? sexLines.length * estimateLineHeight(idFont, 1) : 0;
       };
+      recomputeIdHeights();
+      totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
 
       while (totalHeight > maxContentHeight) {
         if (geneticsFont > minGeneticsFont) {
@@ -13185,9 +14204,16 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
         totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
       }
 
+      if (totalHeight > maxContentHeight && geneticsLines.length) {
+        const geneticsLineHeight = estimateLineHeight(geneticsFont, 1);
+        const nonGeneticsHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex;
+        const maxGeneticsLines = Math.max(1, Math.floor((maxContentHeight - nonGeneticsHeight) / geneticsLineHeight));
+        ({ lines: geneticsLines, height: geneticsHeight } = calculateGeneticsLayout(geneticsFont, maxGeneticsLines));
+        totalHeight = nameHeight + spacingAfterName + idHeight + spacingAfterId + sexHeight + spacingAfterSex + geneticsHeight;
+      }
+
       let textY = labelY + ((labelH - totalHeight) / 2);
       if (textY < (labelY + margin)) textY = labelY + margin;
-      const textX = qrX + qrSize + 8;
 
     setPdfFont(doc, 'bold');
     doc.setFontSize(nameFont);
@@ -13197,13 +14223,13 @@ async function exportQrToPdf(snakesToExport, breederInfo = {}) {
       setPdfFont(doc, 'normal');
       if (idText) {
         doc.setFontSize(idFont);
-        doc.text(idText, textX, textY, { baseline: 'top' });
+        doc.text(idLines, textX, textY, { baseline: 'top' });
         textY += idHeight + spacingAfterId;
       }
 
       if (sexText) {
         doc.setFontSize(idFont);
-        doc.text(sexText, textX, textY, { baseline: 'top' });
+        doc.text(sexLines, textX, textY, { baseline: 'top' });
         textY += sexHeight + spacingAfterSex;
       }
 
@@ -13308,19 +14334,19 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
 
       setPdfFont(doc, 'bold');
       doc.setFontSize(layoutConfig.labelFont);
-      const labelLines = doc.splitTextToSize(pairingLabel, textWidth);
+      const labelLines = fitPdfLinesToWidth(doc, pairingLabel, textWidth, 3);
       const labelHeight = labelLines.length * estimateLineHeight(layoutConfig.labelFont, 1);
       positions.labelY = cursorY;
       cursorY += labelHeight + 0.8;
 
       setPdfFont(doc, 'normal');
       doc.setFontSize(layoutConfig.infoFont);
-      const maleLines = doc.splitTextToSize(`Male: ${maleName}`, textWidth);
+      const maleLines = fitPdfLinesToWidth(doc, `Male: ${maleName}`, textWidth, 2);
       const maleHeight = maleLines.length * estimateLineHeight(layoutConfig.infoFont, 1);
       positions.maleY = cursorY;
       cursorY += maleHeight + 0.5;
 
-      const femaleLines = doc.splitTextToSize(`Female: ${femaleName}`, textWidth);
+      const femaleLines = fitPdfLinesToWidth(doc, `Female: ${femaleName}`, textWidth, 2);
       const femaleHeight = femaleLines.length * estimateLineHeight(layoutConfig.infoFont, 1);
       positions.femaleY = cursorY;
       cursorY += femaleHeight + 0.7;
@@ -13416,7 +14442,9 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
       const lineTop = positions.appointmentsY + idx * lineSpacing;
       doc.rect(textX, lineTop, checkboxSize, checkboxSize);
       if (label) {
-        doc.text(label, textX + checkboxSize + 2, lineTop + textBaselineOffset);
+        const appointmentX = textX + checkboxSize + 2;
+        const appointmentWidth = Math.max(4, (labelX + labelW) - appointmentX - margin);
+        doc.text(ellipsizePdfLine(doc, label, appointmentWidth), appointmentX, lineTop + textBaselineOffset);
       }
     });
 
@@ -14428,7 +15456,14 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           </button>
         )}
         {isForSale && (
-          <span className="text-[11px] font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-0.5">
+          <span
+            className="text-[11px] font-semibold rounded-full px-2 py-0.5 border"
+            style={{
+              background: 'var(--status-warning-bg, #dcfce7)',
+              borderColor: 'var(--status-warning-border, #86efac)',
+              color: 'var(--status-warning-text, #166534)',
+            }}
+          >
             For Sale
           </span>
         )}
@@ -14651,37 +15686,20 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                 <>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.feedType", { defaultValue: "Feed type" })}</div>
-                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: (e.target.value === 'Mouse' || e.target.value === 'Rat') ? (d.size||'pinky') : ''}))}>
+                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: ''}))}>
                       <option value="Mouse">{t("animals.quickAdd.feedOptions.mouse", { defaultValue: "Mouse" })}</option>
                       <option value="Rat">{t("animals.quickAdd.feedOptions.rat", { defaultValue: "Rat" })}</option>
-                      <option value="Chick">{t("animals.quickAdd.feedOptions.chick", { defaultValue: "Chick" })}</option>
-                      <option value="Other">{t("animals.quickAdd.feedOptions.other", { defaultValue: "Other" })}</option>
+                      <option value="Multimammate">{t("animals.quickAdd.feedOptions.multimammate", { defaultValue: "Multimammate" })}</option>
                     </select>
                   </div>
                   <div>
-                    <div className="text-xs text-neutral-500">{t("animals.quickAdd.size", { defaultValue: "Size" })}</div>
-                    {(quickDraft.feed === 'Mouse' || quickDraft.feed === 'Rat') ? (
-                      <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
-                        <option value="pinky">{t("animals.quickAdd.sizeOptions.pinky", { defaultValue: "pinky" })}</option>
-                        <option value="fuzzy">{t("animals.quickAdd.sizeOptions.fuzzy", { defaultValue: "fuzzy" })}</option>
-                        <option value="medium">{t("animals.quickAdd.sizeOptions.medium", { defaultValue: "medium" })}</option>
-                        <option value="adult">{t("animals.quickAdd.sizeOptions.adult", { defaultValue: "adult" })}</option>
-                        <option value="Other">{t("animals.quickAdd.sizeOptions.other", { defaultValue: "Other" })}</option>
-                      </select>
-                    ) : (
-                      <>
-                        <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
-                          <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
-                          <option value="Other">{t("animals.quickAdd.sizeOptions.other", { defaultValue: "Other" })}</option>
-                        </select>
-                        {quickDraft.size === 'Other' && (
-                          <input className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.customSizePlaceholder", { defaultValue: "Custom size" })} value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
-                        )}
-                      </>
-                    )}
-                    {quickDraft.size === 'Other' && quickDraft.feed !== 'Mouse' && quickDraft.feed !== 'Rat' && (
-                      <input className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.customSizePlaceholder", { defaultValue: "Custom size" })} value={quickDraft.sizeDetail||''} onChange={e=>setQuickDraft(d=>({...d, sizeDetail: e.target.value}))} />
-                    )}
+                    <div className="text-xs text-neutral-500">{t("animals.quickAdd.size", { defaultValue: "Weight class" })}</div>
+                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                      <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
+                      {(FEEDER_SIZE_OPTIONS_BY_TYPE[quickDraft.feed] || FEEDER_SIZE_OPTIONS).map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.weight", { defaultValue: "Weight (g)" })}</div>
@@ -14751,8 +15769,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       )}
       
       <div className="mt-2 flex items-center gap-2">
-        <StatusDot status={displayStatus} />
-        <div className="text-xs">{displayStatus}</div>
+        <StatusBadge status={displayStatus} />
       </div>
       {isForSale && (
         <div className="mt-1 text-xs text-neutral-700">
@@ -15006,14 +16023,25 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   );
 }
 
-function StatusDot({ status }) {
-  const bg = status === "Active" ? "bg-emerald-500" : status === "Hold" ? "bg-amber-500" : "bg-rose-500";
-  return <span className={cx("inline-block w-2 h-2 rounded-full", bg)} />;
-}
-
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
+
+  const renderSortableHeader = (field, label) => {
+    const isActive = sortBy === field;
+    const arrow = isActive ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+    return (
+      <th className="text-left px-3 py-2 font-semibold">
+        <button
+          type="button"
+          className={cx('flex items-center gap-1 hover:text-neutral-900', isActive ? 'text-neutral-900' : 'text-neutral-500')}
+          onClick={() => typeof onSortHeaderClick === 'function' && onSortHeaderClick(field)}
+        >
+          {label}{arrow}
+        </button>
+      </th>
+    );
+  };
 
   const pairingsBySnake = useMemo(() => {
     const map = new Map();
@@ -15095,11 +16123,11 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
       <table className="min-w-[960px] w-full text-sm">
         <thead className="text-xs uppercase tracking-wide text-neutral-500 bg-neutral-50">
           <tr>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.animal', { defaultValue: 'Animal' })}</th>
+            {renderSortableHeader('name', t('animals.list.columns.animal', { defaultValue: 'Animal' }))}
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.status', { defaultValue: 'Status' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.weight', { defaultValue: 'Weight' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' })}</th>
+            {renderSortableHeader('status', t('animals.list.columns.status', { defaultValue: 'Status' }))}
+            {renderSortableHeader('weight', t('animals.list.columns.weight', { defaultValue: 'Weight' }))}
+            {renderSortableHeader('lastFeed', t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }))}
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
             <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
           </tr>
@@ -15108,7 +16136,6 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
           {list.map((snake, index) => {
             const sexSummary = renderSexSummary(snake);
             const geneticsTokens = combineMorphsAndHetsForDisplay(snake?.morphs, snake?.hets, snake?.possibleHets);
-            const geneticsSummary = joinTokens(geneticsTokens);
             const statusLabel = typeof snake?.status === 'string' && snake.status.trim()
               ? snake.status.trim()
               : t('snakeEdit.status', { defaultValue: 'Status' });
@@ -15127,18 +16154,15 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
                     <span>{sexSummary.label}</span>
                   </div>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  {geneticsSummary ? (
-                    <div className="text-sm text-neutral-800 max-w-xs truncate" title={geneticsSummary}>{geneticsSummary}</div>
+                <td className="px-3 py-3 align-top max-w-xs">
+                  {geneticsTokens.length ? (
+                    <GeneLine genes={geneticsTokens} size="sm" />
                   ) : (
                     <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: —</div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <div className="flex items-center gap-2 text-sm">
-                    <StatusDot status={statusLabel} />
-                    <span>{statusLabel}</span>
-                  </div>
+                  <StatusBadge status={statusLabel} />
                 </td>
                 <td className="px-3 py-3 align-top">
                   <div className="text-sm font-medium">{weightInfo.value}</div>
@@ -15958,7 +16982,7 @@ function BreederSection({
     let confirmed = true;
     if (typeof showAppConfirm === 'function') {
       confirmed = await showAppConfirm(
-        'This will permanently erase all local Breeding Planner data on this device and restore factory defaults. This cannot be undone.',
+        'This will permanently erase all local Serpentora data on this device and restore factory defaults. This cannot be undone.',
         {
           title: 'Return to Defaults',
           confirmLabel: 'Return to Defaults',
@@ -16868,7 +17892,7 @@ function BreederSection({
   }, [idConfig, previewName, previewYear, previewBirthYear, previewSex, previewSequence, previewGenes]);
 
   return (
-    <Card title={t("nav.setup", { defaultValue: "Settings" })}>
+    <Card title={`${t("nav.setup", { defaultValue: "Settings" })} · Serpentora v${__APP_VERSION__}`}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
@@ -17496,13 +18520,14 @@ function BreederSection({
                       data={{
                         orderId: 'order_preview',
                         orderNumber: 'BP-ORDER-001',
-                        labName: 'ProHerper Genetics Laboratory',
+                        labName: 'ProHerper Lab',
                         labAddress: {
-                          line1: '123 Lab Lane',
-                          city: 'Phoenix',
-                          stateOrRegion: 'AZ',
-                          postalCode: '85001',
-                          country: 'US',
+                          contactName: 'Jurgen Wuyts',
+                          line1: 'Wijngaardstraat 27',
+                          city: 'Diest',
+                          postalCode: '3290',
+                          country: 'Belgium',
+                          phone: '+32 95 32 07 98',
                         },
                         breeder: {
                           name: info.name || info.businessName || 'Breeder Name',
@@ -17537,7 +18562,7 @@ function BreederSection({
                         sampleStatus: 'pending',
                         qrPayload: 'lab-sample-preview',
                         sampleType: 'shed',
-                        labName: 'ProHerper Genetics Laboratory',
+                        labName: 'ProHerper Lab',
                       }}
                     />
                   </div>
@@ -17919,7 +18944,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Manual backup</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download a Breeding Planner backup containing all animals, pairings, groups, breeder info, and settings.
+                Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings.
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -18148,7 +19173,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">Restore from backup</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Upload a Breeding Planner backup file or import a legacy JSON export to replace the current data.
+                Upload a Serpentora backup file or import a legacy JSON export to replace the current data.
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -18229,6 +19254,16 @@ function BreederSection({
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
                   <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                  {accountState.user && (
+                    <div className={`mt-1 text-xs ${accountState.user.emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {accountState.user.emailVerified ? 'Verified' : 'Not verified'}
+                    </div>
+                  )}
+                  {accountState.user?.pendingEmail && (
+                    <div className="mt-1 text-xs text-amber-600 break-words">
+                      Pending confirmation for {accountState.user.pendingEmail} — check that inbox for a confirmation link. Your current email stays active until confirmed.
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
@@ -18362,6 +19397,9 @@ function BreederSection({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
                 <div className="text-sm font-semibold">Change email</div>
+                <div className="text-xs text-neutral-500">
+                  The new address must be confirmed via an emailed link before it becomes active.
+                </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="email"
@@ -18387,6 +19425,9 @@ function BreederSection({
               </div>
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
                 <div className="text-sm font-semibold">Change password</div>
+                <div className="text-xs text-neutral-500">
+                  We'll email a confirmation once your password is changed.
+                </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
@@ -18630,12 +19671,14 @@ function AppearanceSettingsPanel() {
                   {active && <span className="text-[11px] font-semibold text-emerald-600 uppercase">{t('appearance.presets.active', { defaultValue: 'Active' })}</span>}
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
-                  {Object.entries(preset.state.colors).map(([colorKey, colorValue]) => (
-                    <span key={colorKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border">
-                      <span className="w-3 h-3 rounded-full border" style={{ background: colorValue }} />
-                      {colorKey}
-                    </span>
-                  ))}
+                  {Object.entries(preset.state.colors)
+                    .filter(([colorKey, colorValue]) => typeof colorValue === 'string')
+                    .map(([colorKey, colorValue]) => (
+                      <span key={colorKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border">
+                        <span className="w-3 h-3 rounded-full border" style={{ background: colorValue }} />
+                        {colorKey}
+                      </span>
+                    ))}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -19084,7 +20127,7 @@ function PairingsSection({
   const openSnake = typeof onOpenSnake === 'function' ? onOpenSnake : null;
 
   const list = Array.isArray(pairings) ? pairings : [];
-  const heading = title || `Breeding Planner (${list.length})`;
+  const heading = title || `Serpentora (${list.length})`;
   const isCollapsedVariant = variant === 'collapsed';
   const listContainerClass = isCollapsedVariant
     ? 'flex flex-col gap-3'
@@ -19120,6 +20163,139 @@ function PairingsSection({
         )}
       </div>
     </Card>
+  );
+}
+
+function ProjectCompletionPanel({
+  completion,
+  isWorkflowCompleted,
+  lateOutcomeRecorded,
+  finalKnownOutcome,
+  onComplete,
+  onReopen,
+}) {
+  const [reason, setReason] = useState('season_ended');
+  const [confidence, setConfidence] = useState('likely');
+  const [note, setNote] = useState('');
+
+  const requiresConfidence = needsOutcomeConfidence(reason);
+  const completedAtLabel = completion.completedAt ? formatDateTimeForDisplay(completion.completedAt) : '';
+  const finalOutcomeLabel = getCompletionReasonLabel(finalKnownOutcome);
+
+  return (
+    <div className="mt-3 rounded-xl border bg-neutral-50 p-3 text-sm">
+      {isWorkflowCompleted ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold uppercase text-neutral-500">Completed</div>
+              <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
+            </div>
+            <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
+              Reopen project
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
+            <div><span className="font-semibold">Date:</span> {completedAtLabel || 'Unknown'}</div>
+            <div><span className="font-semibold">Confidence:</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
+            <div><span className="font-semibold">Final outcome:</span> {finalOutcomeLabel}</div>
+          </div>
+          {completion.completionNote ? (
+            <div className="text-xs text-neutral-700"><span className="font-semibold">Note:</span> {completion.completionNote}</div>
+          ) : null}
+          {lateOutcomeRecorded ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              A reproductive event was recorded after completion. The original completion record is preserved.
+            </div>
+          ) : null}
+          {completion.reopenedAt ? (
+            <div className="text-xs text-neutral-600">Previously reopened {formatDateTimeForDisplay(completion.reopenedAt) || 'after completion'}.</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {completion.completedAt ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Previously completed as {getCompletionReasonLabel(completion.completionReason)}. Reopening preserved that history.
+            </div>
+          ) : null}
+          <div className="text-xs text-neutral-600">
+            Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later.
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Completion reason</span>
+              <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
+                {COMPLETION_REASON_GROUPS.map(group => (
+                  <optgroup key={group.key} label={group.label}>
+                    {group.options.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Outcome confidence</span>
+              <select
+                className="border rounded-xl px-3 py-2 bg-white text-sm"
+                value={requiresConfidence ? confidence : 'confirmed'}
+                disabled={!requiresConfidence}
+                onChange={event => setConfidence(event.target.value)}
+              >
+                {OUTCOME_CONFIDENCE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Completion note</span>
+            <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
+            onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
+          >
+            Mark completed
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PAIRING_STAGE_LABELS = ['Paired', 'Locked', 'Ovulated', 'Pre-lay Shed', 'Clutch Laid', 'Incubating', 'Hatched'];
+
+function PairingStageTracker({ reached }) {
+  const lastReachedIdx = reached.reduce((acc, isReached, idx) => (isReached ? idx : acc), -1);
+  const activeIdx = lastReachedIdx === -1 ? 0 : lastReachedIdx;
+  return (
+    <div className="flex items-center" role="list" aria-label="Pairing stage progress">
+      {PAIRING_STAGE_LABELS.map((label, i) => {
+        const done = i < activeIdx;
+        const active = i === activeIdx;
+        const dotColor = done || active ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)';
+        const lineBeforeColor = i === 0 ? 'transparent' : (i <= activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
+        const lineAfterColor = i === PAIRING_STAGE_LABELS.length - 1 ? 'transparent' : (i < activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
+        const textColor = active ? 'var(--color-primary, #0ea5e9)' : (done ? 'var(--status-neutral-text, #6b7280)' : 'var(--status-neutral-text, #9ca3af)');
+        return (
+          <div key={label} role="listitem" className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+            <div className="w-full flex items-center">
+              <div className="flex-1 h-0.5" style={{ background: lineBeforeColor }} />
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ background: dotColor, boxShadow: active ? '0 0 0 3px var(--status-success-bg, #f0fdf4)' : 'none' }}
+                aria-current={active ? 'step' : undefined}
+              />
+              <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
+            </div>
+            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{label}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -19218,6 +20394,11 @@ function PairingInlineCard({
   const clutchCardViewDetailsLabel = t('clutchCard.viewDetails', { defaultValue: 'View details' });
   const missingValueLabel = '\u2014';
   const edit = useMemo(() => withPairingLifecycleDefaults(pairing || {}), [pairing]);
+  const completion = useMemo(() => normalizeCompletionMetadata(edit), [edit]);
+  const workflowStatus = completion.workflowStatus;
+  const isWorkflowCompleted = workflowStatus === 'completed';
+  const lateOutcomeRecorded = didLateOutcomeOccur(edit);
+  const finalKnownOutcome = getFinalKnownBiologicalOutcome(edit);
   const femaleSnake = useMemo(() => snakeById(snakes, edit.femaleId), [snakes, edit.femaleId]);
   const maleSnake = useMemo(() => snakeById(snakes, edit.maleId), [snakes, edit.maleId]);
 
@@ -19379,6 +20560,24 @@ function PairingInlineCard({
     });
   }, [setEdit]);
 
+  const handleCompleteProject = useCallback(async (input) => {
+    if (typeof onUpdatePairing !== 'function') return;
+    try {
+      const patch = buildCompletionPatch(edit, input);
+      onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
+    } catch (error) {
+      if (typeof showAppAlert === 'function') {
+        await showAppAlert(error?.message || 'Completion reason is required.');
+      }
+    }
+  }, [edit, onUpdatePairing, pairing.id, showAppAlert]);
+
+  const handleReopenProject = useCallback(() => {
+    if (typeof onUpdatePairing !== 'function') return;
+    const patch = buildReopenPatch(edit);
+    onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
+  }, [edit, onUpdatePairing, pairing.id]);
+
   const handleOpenMale = useCallback(() => {
     if (typeof onOpenSnake !== 'function' || !maleSnake) return;
     onOpenSnake(maleSnake);
@@ -19489,6 +20688,11 @@ function PairingInlineCard({
               )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
+              {isWorkflowCompleted && (
+                <span className="inline-flex items-center rounded-full border bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  Completed
+                </span>
+              )}
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
               <span aria-hidden="true">{'\u203A'}</span>
             </div>
@@ -19554,45 +20758,89 @@ function PairingInlineCard({
               Clutch lost
             </div>
           )}
-          <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
-            <div>
-              <div className="truncate text-[12px] text-neutral-800 flex items-center gap-1">
-                <SexBadge sex="M" label={maleLabel} showText={false} />
-                {typeof onOpenSnake === 'function' && maleSnake ? (
-                  <button
-                    type="button"
-                    className="truncate font-medium text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                    onClick={handleOpenMale}
-                  >
-                    {maleName}
-                  </button>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div
+              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
+              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+            >
+              <div
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
+                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+              >
+                {maleName ? maleName.slice(0, 2).toUpperCase() : '—'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                  <SexBadge sex="M" label={maleLabel} showText={false} />
+                  <span>Sire</span>
+                </div>
+                <div className="truncate text-[13px] font-semibold text-neutral-800">
+                  {typeof onOpenSnake === 'function' && maleSnake ? (
+                    <button
+                      type="button"
+                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      onClick={handleOpenMale}
+                    >
+                      {maleName}
+                    </button>
+                  ) : (
+                    <span className="truncate">{maleName}</span>
+                  )}
+                </div>
+                {maleGeneticsTokens.length ? (
+                  <GeneLine genes={maleGeneticsTokens} size="sm" className="mt-0.5" />
                 ) : (
-                  <span className="truncate font-medium">{maleName}</span>
+                  <div className="truncate text-[11px] text-neutral-500">{maleGeneticsLine}</div>
                 )}
               </div>
-              <div className="truncate">{maleGeneticsLine}</div>
             </div>
-            <div>
-              <div className="truncate text-[12px] text-neutral-800 flex items-center gap-1">
-                <SexBadge sex="F" label={femaleLabel} showText={false} />
-                {typeof onOpenSnake === 'function' && femaleSnake ? (
-                  <button
-                    type="button"
-                    className="truncate font-medium text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                    onClick={handleOpenFemale}
-                  >
-                    {femaleName}
-                  </button>
+            <div
+              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
+              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+            >
+              <div
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
+                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+              >
+                {femaleName ? femaleName.slice(0, 2).toUpperCase() : '—'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                  <SexBadge sex="F" label={femaleLabel} showText={false} />
+                  <span>Dam</span>
+                </div>
+                <div className="truncate text-[13px] font-semibold text-neutral-800">
+                  {typeof onOpenSnake === 'function' && femaleSnake ? (
+                    <button
+                      type="button"
+                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      onClick={handleOpenFemale}
+                    >
+                      {femaleName}
+                    </button>
+                  ) : (
+                    <span className="truncate">{femaleName}</span>
+                  )}
+                </div>
+                {femaleGeneticsTokens.length ? (
+                  <GeneLine genes={femaleGeneticsTokens} size="sm" className="mt-0.5" />
                 ) : (
-                  <span className="truncate font-medium">{femaleName}</span>
+                  <div className="truncate text-[11px] text-neutral-500">{femaleGeneticsLine}</div>
                 )}
               </div>
-              <div className="truncate">{femaleGeneticsLine}</div>
             </div>
           </div>
           <div className="flex gap-1 flex-wrap mt-1">
             {(pairing.goals || []).slice(0, 4).map(g => <Badge key={g}>{g}</Badge>)}
           </div>
+          {isWorkflowCompleted && (
+            <div className="mt-2 text-[11px] text-neutral-600">
+              Completed: {getCompletionReasonLabel(completion.completionReason)}
+              {lateOutcomeRecorded ? ' - late outcome recorded' : ''}
+            </div>
+          )}
         </div>
         <div className="flex gap-2 shrink-0">
           {typeof onExportPairingQr === 'function' && (
@@ -19625,6 +20873,33 @@ function PairingInlineCard({
             </button>
           )}
         </div>
+      </div>
+
+      <ProjectCompletionPanel
+        completion={completion}
+        isWorkflowCompleted={isWorkflowCompleted}
+        lateOutcomeRecorded={lateOutcomeRecorded}
+        finalKnownOutcome={finalKnownOutcome}
+        onComplete={handleCompleteProject}
+        onReopen={handleReopenProject}
+      />
+
+      <div
+        className="mt-3 border rounded-2xl p-3"
+        style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">Stage</div>
+        <PairingStageTracker
+          reached={[
+            (edit.appointments || []).some(ap => ap && ap.pairingObserved),
+            (edit.appointments || []).some(ap => ap && ap.lockObserved),
+            !!lifecycle.ovulationObserved,
+            !!lifecycle.preLayObserved,
+            !!lifecycle.clutchRecorded,
+            !!lifecycle.clutchRecorded,
+            !!lifecycle.hatchedRecorded,
+          ]}
+        />
       </div>
 
       {isEditingParticipants && (
@@ -19865,7 +21140,15 @@ function PairingInlineCard({
           <CycleTimersFrame lifecycle={lifecycle} theme={theme} />
         </div>
 
-        <PairingLifecycleEditor edit={edit} setEdit={setEdit} theme={theme} onCreateClutchCard={handleCreateClutchCard} lifecycle={lifecycle} />
+        <PairingLifecycleEditor
+          edit={edit}
+          setEdit={setEdit}
+          theme={theme}
+          onCreateClutchCard={handleCreateClutchCard}
+          lifecycle={lifecycle}
+          isWorkflowCompleted={isWorkflowCompleted}
+          onReopenProject={handleReopenProject}
+        />
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
@@ -19936,46 +21219,95 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
     <div className="mt-3">
       {perGene.length > 0 && (
         <>
-          <div className="text-xs font-medium mb-1">Genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">Genetics odds</div>
           <div className="flex flex-col gap-2">
-            {perGene.map(item => (
-              <div key={item.gene} className="rounded-lg border bg-neutral-50 px-2 py-2">
-                <div className="text-xs font-semibold text-neutral-700">{item.gene}</div>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {item.outcomes.map(out => (
-                    <span
-                      key={`${item.gene}-${out.label}`}
-                      className="inline-flex items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[11px]"
-                    >
-                      <span className="font-semibold">{formatProbabilityPercent(out.probability)}</span>
-                      <span>{out.label}</span>
-                    </span>
-                  ))}
-                </div>
-                {item.notes ? (
-                  <div className="mt-1 text-[10px] text-neutral-500">
-                    {item.notes}
+            {perGene.map(item => {
+              const visualOutcomes = item.outcomes.filter(out => !/^het\s/i.test(out.label));
+              const hetOutcomes = item.outcomes.filter(out => /^het\s/i.test(out.label));
+              return (
+                <div
+                  key={item.gene}
+                  className="rounded-lg border px-3 py-2.5"
+                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                >
+                  <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
+                  <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Visual outcomes</div>
+                      <div className="flex flex-col gap-1.5">
+                        {visualOutcomes.map(out => (
+                          <div key={`${item.gene}-v-${out.label}`}>
+                            <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-700 mb-0.5">
+                              <span className="truncate">{out.label}</span>
+                              <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-primary, #0ea5e9)' }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {hetOutcomes.length > 0 && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Het outcomes (carried, non-visual)</div>
+                        <div className="flex flex-col gap-1.5">
+                          {hetOutcomes.map(out => (
+                            <div key={`${item.gene}-h-${out.label}`}>
+                              <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-500 mb-0.5">
+                                <span className="truncate">{out.label}</span>
+                                <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
+                              </div>
+                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-secondary, #94a3b8)' }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : null}
-              </div>
-            ))}
+                  {item.notes ? (
+                    <div className="mt-2 text-[10px] text-neutral-500">
+                      {item.notes}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
       {combined.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs font-medium mb-1">Combined genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">Combined genetics odds</div>
           <div className="flex flex-col gap-1.5">
             {combined.map(item => {
               const breakdownItems = (item.breakdown || []).filter(detail => detail.label && detail.label !== 'Normal');
               return (
-                <div key={item.key} className="rounded-lg border bg-white px-2 py-1.5 text-[11px] text-neutral-700">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-semibold text-neutral-900">{formatProbabilityPercent(item.probability)}</span>
-                    <span>{item.label}</span>
+                <div
+                  key={item.key}
+                  className="rounded-lg border px-3 py-2 text-[11px] text-neutral-700"
+                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                >
+                  <div className="flex justify-between gap-2 mb-1">
+                    <span className="truncate">{item.label}</span>
+                    <span className="font-semibold text-neutral-900 shrink-0">{formatProbabilityPercent(item.probability)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.round(item.probability * 100)}%`, background: 'var(--color-accent, #f59e0b)' }}
+                    />
                   </div>
                   {breakdownItems.length ? (
-                    <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-neutral-500">
+                    <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-neutral-500">
                       {breakdownItems.map(detail => (
                         <span key={`${item.key}-${detail.gene}`} className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 bg-neutral-50">
                           <span className="font-semibold text-neutral-700">{detail.gene}</span>
@@ -20504,6 +21836,8 @@ function getBreedingCycleDerived(edit = {}) {
 
 function isPairingCompleted(pairing) {
   if (!pairing) return false;
+  if (normalizeWorkflowStatus(pairing) === 'completed') return true;
+  if (normalizeWorkflowStatus(pairing) === 'archived') return true;
   if (pairing?.clutch?.allEggsLost) return true;
   const normalized = withPairingLifecycleDefaults({ ...pairing });
   const derived = getBreedingCycleDerived(normalized);
@@ -20740,7 +22074,7 @@ function getFemaleBreedingCyclesByYear(femaleId, pairings = []) {
     });
 }
 
-function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchCard, lifecycle }) {
+function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchCard, lifecycle, isWorkflowCompleted = false, onReopenProject }) {
   const { t } = useTranslation();
   const [activeDialog, setActiveDialog] = useState(null);
   const [ovulationDraft, setOvulationDraft] = useState({ date: '', notes: '' });
@@ -21035,6 +22369,21 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
   return (
     <>
       <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
+        {isWorkflowCompleted ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="font-semibold">This project is marked completed. You can still record this event.</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
+                Keep project completed and add event
+              </span>
+              {typeof onReopenProject === 'function' ? (
+                <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
+                  Reopen project and add event
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{breedingCycleLabel}</div>
           <div className="text-[12px] text-neutral-500">{breedingCycleHelper}</div>
@@ -22132,7 +23481,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               const def = lastFeedDefaults || { feed: 'Mouse', size: '', sizeDetail: '', form: 'Frozen/thawed', formDetail: '', notes: '' };
               const method = def.form || 'Frozen/thawed';
               const methodDetail = def.formDetail || '';
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22168,25 +23517,18 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 
                 {/* feed type */}
                 <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
-                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: (e.target.value === 'Mouse' || e.target.value === 'Rat') ? (x.size||'pinky') : ''})}>
+                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
                   <option value="Mouse">Mouse</option>
                   <option value="Rat">Rat</option>
-                  <option value="Chick">Chick</option>
-                  <option value="Other">Other</option>
+                  <option value="Multimammate">Multimammate</option>
                 </select>
 
-                {/* size - only relevant for Mouse/Rat */}
-                {(x.feed === 'Mouse' || x.feed === 'Rat') ? (
-                  <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
-                    onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
-                    <option value="pinky">pinky</option>
-                    <option value="fuzzy">fuzzy</option>
-                    <option value="medium">medium</option>
-                    <option value="adult">adult</option>
-                  </select>
-                ) : (
-                  <input className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" placeholder="Size" value={x.size||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})} />
-                )}
+                {/* weight class */}
+                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
+                  onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
+                  <option value=""></option>
+                  {(FEEDER_SIZE_OPTIONS_BY_TYPE[x.feed] || FEEDER_SIZE_OPTIONS).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
 
                 {/* weight in grams */}
                 <input type="number" className="border rounded-lg px-2 py-1 text-xs w-full sm:col-span-1" placeholder="g"
@@ -22232,7 +23574,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{date:today,grams:0,notes:""}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{id:crypto.randomUUID(),date:today,grams:0,notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22258,7 +23600,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => {
               const today = localYMD(new Date());
-              setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { date: today, complete: true, notes: '' }] } }));
+              setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { id: crypto.randomUUID(), date: today, complete: true, notes: '' }] } }));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22286,7 +23628,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
         <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today = localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{date:today,deep:false,notes:''}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{id:crypto.randomUUID(),date:today,deep:false,notes:''}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22314,7 +23656,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
-              setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{date:today,drug:"",dose:"",notes:""}]}}));
+              setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{id:crypto.randomUUID(),date:today,drug:"",dose:"",notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
@@ -22563,6 +23905,14 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
         });
       };
       ['feeds', 'weights', 'sheds', 'cleanings', 'meds'].forEach(addLogs);
+
+      const feedDueEvent = getNextFeedCycleEvent(s);
+      if (feedDueEvent) {
+        const dt = new Date(`${feedDueEvent.date}T00:00:00`);
+        if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === targetYear && dt.getMonth() === targetMonth) {
+          newEvents.push(feedDueEvent);
+        }
+      }
     });
 
     return newEvents;
@@ -22575,6 +23925,9 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   useEffect(() => { loadAppointmentsIntoCalendar(); }, [loadAppointmentsIntoCalendar]);
 
   const passesFilters = useCallback((ev) => {
+    if (ev.type === 'feedDue') {
+      return filters.feeds !== false;
+    }
     if (ev.type === 'activity') {
       const key = ev.activityKey;
       if (!key) return true;
@@ -23310,6 +24663,32 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   {isToday ? <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{t('calendar.today', { defaultValue: 'Today' })}</div> : null}
                 </div>
                 {filteredEvents.filter(e => e.date === cellDate).map((e, idx) => {
+                  if (e.type === 'feedDue') {
+                    const s = snakes.find(x => x.id === e.snakeId);
+                    const profile = e.profile || getSnakeFeederProfile(s);
+                    const grams = Number(profile.weightGrams);
+                    const quantity = Math.max(1, Number(profile.quantity) || 1);
+                    const feedParts = [
+                      quantity > 1 ? `${quantity} x` : '',
+                      profile.feedType,
+                      profile.sizeClass,
+                      Number.isFinite(grams) && grams > 0 ? `${grams} g` : '',
+                    ].filter(Boolean);
+                    return (
+                      <div
+                        key={idx}
+                        className="text-[11px] px-2 py-1 rounded-full border flex items-start gap-2 border-amber-200 bg-amber-50"
+                      >
+                        <div className="truncate">
+                          <div className="font-medium truncate">{t('calendar.feedDue', { name: s?.name || e.snakeId, defaultValue: 'Feed due: {{name}}' })}</div>
+                          <div className="text-[11px] text-neutral-500 truncate">
+                            {t('calendar.feedDueEvery', { count: e.intervalDays, defaultValue: 'Every {{count}} days' })}
+                            {feedParts.length ? ` - ${feedParts.join(' ')}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                   if (e.type === 'activity') {
                     const pal = activityPalettes[e.activityKey] || { bg: '#efefef', border: '#ddd' };
                     const s = snakes.find(x => x.id === e.snakeId);
@@ -23486,9 +24865,9 @@ function buildGoogleCalendarICS({ events, pairingsById, snakesById, malesById, f
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Breeding Planner//EN',
+    'PRODID:-//Serpentora//EN',
     'CALSCALE:GREGORIAN',
-    'X-WR-CALNAME:Breeding Planner'
+    'X-WR-CALNAME:Serpentora'
   ];
 
   events.forEach(event => {
@@ -23550,6 +24929,22 @@ function prepareCalendarEventExport(event, context) {
     summary = `${cap(baseLabel)}${snakeName ? `: ${snakeName}` : ''}`;
     const detail = describeActivityEntry(event.activityKey, event.entry);
     if (detail) descriptionParts.push(detail);
+  } else if (event.type === 'feedDue') {
+    const snake = context.snakesById?.[event.snakeId];
+    const snakeName = snake?.name || event.snakeId || '';
+    summary = `Feed due${snakeName ? `: ${snakeName}` : ''}`;
+    if (event.intervalDays) descriptionParts.push(`Feed cycle: every ${event.intervalDays} days`);
+    if (event.lastFeedDate) descriptionParts.push(`Last accepted feed: ${event.lastFeedDate}`);
+    const profile = event.profile || normalizeFeederProfileForDraft(snake?.feederProfile);
+    const grams = Number(profile.weightGrams);
+    const feedParts = [
+      profile.feedType,
+      profile.sizeClass,
+      Number.isFinite(grams) && grams > 0 ? `${grams} g` : '',
+    ].filter(Boolean);
+    if (feedParts.length) descriptionParts.push(`Feeder: ${feedParts.join(' ')}`);
+    if (profile.quantity) descriptionParts.push(`Quantity: ${profile.quantity}`);
+    if (profile.notes) descriptionParts.push(`Notes: ${profile.notes}`);
   } else {
     return null;
   }
@@ -23566,7 +24961,8 @@ function prepareCalendarEventExport(event, context) {
     event.apptId || '',
     event.snakeId || '',
     event.activityKey || '',
-    event.stage || ''
+    event.stage || '',
+    event.intervalDays || ''
   ].filter(Boolean);
   const baseUid = uidParts.join('-') || `event-${formatDateToIcs(startDate)}`;
 
@@ -23615,11 +25011,11 @@ function convertCalendarEventToGooglePayload(event, context) {
   if (!startDate || !endDate) return null;
 
   const source = (() => {
-    if (typeof window === 'undefined') return { title: 'Breeding Planner' };
+    if (typeof window === 'undefined') return { title: 'Serpentora' };
     try {
-      return { title: 'Breeding Planner', url: window.location.origin };
+      return { title: 'Serpentora', url: window.location.origin };
     } catch (err) {
-      return { title: 'Breeding Planner' };
+      return { title: 'Serpentora' };
     }
   })();
 
@@ -23800,6 +25196,8 @@ function computeCalendarEventBounds({ pairings = [], snakes = [] }) {
       const entries = Array.isArray(snake.logs[key]) ? snake.logs[key] : [];
       entries.forEach(entry => consider(entry?.date));
     });
+    const feedDueEvent = getNextFeedCycleEvent(snake);
+    if (feedDueEvent) consider(feedDueEvent.date);
   });
 
   return { start: minDate, end: maxDate };
@@ -23904,7 +25302,7 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
   const styles = GENE_LINE_SIZE_STYLES[size] || GENE_LINE_SIZE_STYLES.sm;
   return (
     <div className={cx('flex flex-wrap items-center gap-1 leading-snug', styles.container, className)}>
-      <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>
+      {label && <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>}
       {list.map((gene, idx) => {
         const rawGroup = getGeneDisplayGroup(gene);
         const superInfo = getSuperGeneInfo(gene);
@@ -23916,8 +25314,8 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
           : undefined;
         return (
           <span
-            key={`${label}-${gene}-${idx}`}
-            className={cx('inline-flex items-center rounded-md border font-medium break-words', styles.chip, chipClasses)}
+            key={`${label || 'gene'}-${gene}-${idx}`}
+            className={cx('inline-flex items-center rounded-full border font-medium break-words', styles.chip, chipClasses)}
             title={chipTitle}
           >
             {gene}

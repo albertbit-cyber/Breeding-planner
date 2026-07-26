@@ -2,26 +2,41 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 
 // Mock Prisma before importing app (which imports services that import prisma).
-vi.mock("../lib/prisma", () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+vi.mock("../lib/prisma", () => {
+  const accountToken = {
+    updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    create: vi.fn().mockResolvedValue({ id: "token-1" }),
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+  };
+  return {
+    prisma: {
+      user: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      refreshSession: {
+        create: vi.fn(),
+        findFirst: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      securityEvent: {
+        create: vi.fn(),
+      },
+      accountToken,
+      $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback({ accountToken })),
     },
-    refreshSession: {
-      create: vi.fn(),
-      findFirst: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    securityEvent: {
-      create: vi.fn(),
-    },
-  },
+  };
+});
+
+vi.mock("../email/queueService", () => ({
+  enqueueEmail: vi.fn().mockResolvedValue({ id: "job-1" }),
 }));
 
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
+import { enqueueEmail } from "../email/queueService";
 import bcrypt from "bcryptjs";
 
 const mockUser = {
@@ -31,7 +46,11 @@ const mockUser = {
   fullName: "Test User",
   role: "breeder" as const,
   isActive: true,
-  emailVerified: false,
+  emailVerified: true,
+  emailVerifiedAt: new Date(),
+  pendingEmail: null,
+  pendingEmailRequestedAt: null,
+  passwordChangedAt: null,
   status: "active",
   verificationStatus: "not_applied",
   subscriptionPlan: "free",
@@ -42,6 +61,8 @@ const mockUser = {
   subscriptionPaymentStatus: "none",
   lastLoginAt: null,
   refreshToken: null,
+  passwordResetToken: null,
+  passwordResetExpiry: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -62,8 +83,8 @@ beforeEach(() => {
 });
 
 describe("POST /api/auth/register", () => {
-  it("returns 201 and user on valid input", async () => {
-    const newUser = { ...mockUser, email: "new@example.com" };
+  it("returns 201 and user on valid input, and queues a verification email", async () => {
+    const newUser = { ...mockUser, email: "new@example.com", emailVerified: false, emailVerifiedAt: null };
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
     vi.mocked(prisma.user.create).mockResolvedValue(newUser);
 
@@ -74,12 +95,17 @@ describe("POST /api/auth/register", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.user).toMatchObject({ email: "new@example.com" });
+    expect(res.body.user).toMatchObject({ email: "new@example.com", emailVerified: false });
     expect(res.body.user.passwordHash).toBeUndefined();
+    expect(enqueueEmail).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "new@example.com",
+      templateKey: "account_email_verification",
+      category: "account_and_security",
+    }));
   });
 
   it("allows public buyer registration", async () => {
-    const newUser = { ...mockUser, email: "buyer@example.com", role: "buyer" as const };
+    const newUser = { ...mockUser, email: "buyer@example.com", role: "buyer" as const, emailVerified: false, emailVerifiedAt: null };
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
     vi.mocked(prisma.user.create).mockResolvedValue(newUser);
 
@@ -189,6 +215,18 @@ describe("POST /api/auth/login", () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it("still allows an unverified account to log in (verification is a frontend gate, not a login gate) and reports emailVerified: false", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: false });
+    vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, emailVerified: false });
+
+    const res = await request(app).post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "password123",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.user.emailVerified).toBe(false);
+  });
 });
 
 describe("POST /api/auth/refresh", () => {
@@ -229,53 +267,6 @@ describe("POST /api/auth/refresh", () => {
         replacedBySessionId: "session-2",
       }),
     }));
-  });
-});
-
-describe("POST /api/auth/recover-password", () => {
-  it("returns 200 when account details match and password is updated", async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-    vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, refreshToken: null });
-
-    const res = await request(app).post("/api/auth/recover-password").send({
-      email: "test@example.com",
-      fullName: "Test User",
-      newPassword: "newpassword123",
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toContain("Password updated");
-    expect(prisma.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          refreshToken: null,
-        }),
-      })
-    );
-  });
-
-  it("returns 400 on invalid payload", async () => {
-    const res = await request(app).post("/api/auth/recover-password").send({
-      email: "test@example.com",
-      fullName: "",
-      newPassword: "short",
-    });
-
-    expect(res.status).toBe(400);
-    expect(res.body.errors?.fullName).toBeDefined();
-    expect(res.body.errors?.newPassword).toBeDefined();
-  });
-
-  it("returns 404 when the account cannot be verified", async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-
-    const res = await request(app).post("/api/auth/recover-password").send({
-      email: "test@example.com",
-      fullName: "Wrong Name",
-      newPassword: "newpassword123",
-    });
-
-    expect(res.status).toBe(404);
   });
 });
 

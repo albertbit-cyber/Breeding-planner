@@ -17,7 +17,7 @@ Create `.env` from `.env.example` and provide:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
-- `CORS_ORIGIN`
+- `CORS_ORIGIN` for browser app domains. If this is empty in production, the backend still starts for health checks, but browser requests will not receive CORS headers.
 - `PORT`
 
 ## Commands
@@ -28,6 +28,8 @@ npm run prisma:generate
 npm run prisma:migrate:deploy
 npm run dev
 npm run build
+npm run start:migrate
+npm start
 npm test
 ```
 

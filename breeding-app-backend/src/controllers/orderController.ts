@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { calculatePrice, createOrder, deleteAllOrders, deleteOrderById, getOrderByIdForUser, listOrdersForUser, updateOrderStatus, updateOrderPayment } from "../services/orderService";
+import { calculatePrice, cancelOwnOrderById, createOrder, deleteAllOrders, deleteOrderById, getOrderByIdForUser, listOrdersForUser, updateOrderStatus, updateOrderPayment } from "../services/orderService";
 import { saveOrderResult } from "../services/orderResultService";
 import { ensureAnimalsPayload } from "../utils/validators";
 import { HttpError } from "../utils/errors";
@@ -57,6 +57,12 @@ export const removeAllOrders = async (req: Request, res: Response): Promise<void
 export const removeOrder = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   const result = await deleteOrderById(req.params.id, req.user);
+  res.status(200).json(result);
+};
+
+export const cancelMyOrder = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const result = await cancelOwnOrderById(req.params.id, req.user);
   res.status(200).json(result);
 };
 

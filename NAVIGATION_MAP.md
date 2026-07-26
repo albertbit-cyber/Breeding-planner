@@ -158,28 +158,33 @@ Defined in `src/features/mobile/MobileApp.jsx`.
 
 | Main tab state | Purpose |
 | --- | --- |
-| `scan` | QR scanner, recent animals, tasks |
-| `animals` | Animal list or selected mobile animal profile |
+| `terminal` mode | QR scanner, recent animals, scanned animal card, quick care logs, photos, and pairing cycle logging |
+| `animals` | Animal list, group-filtered animal list, search, or selected mobile animal profile |
+| `breeding` | Pairing list with breeding cycle stage progress and editable pairing stage logs |
 | `tasks` | Assigned care/work tasks |
-| `messages` | Communication view |
-| `more` | Rack mode and additional tools |
+| `rack` | Mobile spaces/rack view built from synced desktop rooms, heat racks, rack slots, and terrariums |
+| `more` | Mobile settings, account actions, cloud sync, collection data summary, appearance, Breeding Advisor, and Shed Test Terminal |
 
 The mobile animal profile has its own nested tabs:
 
 | Profile tab | Purpose |
 | --- | --- |
 | `overview` | Key animal status cards |
-| `logs` | Feed, weight, shed, cleaning, water, and note logs |
-| `breeding` | Breeding data, gated by plan permissions |
-| `health` | Health data, gated by plan permissions |
-| `lab` | Lab test data, gated by plan permissions |
-| `sales` | Sales data, gated by plan permissions |
+| `feed` | Feed Cycle: feeder type, size, weight class, quantity, interval, latest accepted feed, and next feed date |
+| `details` | Full desktop animal record summary: identity, genetics, location, groups, lineage, acquisition/sale, lab/marketplace, and notes |
+| `logs` | Feed, weight, shed, cleaning, medication, water, health, note, and other synced log categories |
+| `photos` | Camera capture, icon assignment, and photo deletion |
+| `breeding` | Breeding pairings and cycle stage logging |
 
 Mobile header actions:
 
 | Action | Target |
 | --- | --- |
 | Start | `#/` |
+| Scan QR | Mobile QR scanner overlay |
+| Sync cloud database | Mobile settings cloud sync action, including queued mobile actions |
+| Refresh from cloud | Mobile settings cloud pull/refresh |
+| Switch mode | Full mode or Terminal mode selector |
 | View plans from locked notice | `#/pricing` |
 | Contact support from locked notice | `#/` |
 

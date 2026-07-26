@@ -7,8 +7,8 @@ const SCANNER_ELEMENT_ID = "lab-intake-qr-scanner-root";
  * Shows a toggle button; when active, renders a live camera view via html5-qrcode.
  * On a successful scan, calls onScan(decodedText) and stops automatically.
  */
-export default function LabQrScanner({ onScan }) {
-  const [isActive, setIsActive] = useState(false);
+export default function LabQrScanner({ onScan, autoStart = false }) {
+  const [isActive, setIsActive] = useState(autoStart);
   const [scannerError, setScannerError] = useState("");
   const qrModuleRef = useRef(null);
   const scannerRef = useRef(null);

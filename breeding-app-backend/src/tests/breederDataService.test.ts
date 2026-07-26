@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = {
-  animal: { upsert: vi.fn() },
+  animal: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   listing: {
     updateMany: vi.fn(),
     upsert: vi.fn(),
   },
-  pairing: { upsert: vi.fn() },
-  clutch: { upsert: vi.fn() },
+  pairing: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  clutch: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  breederPlannerState: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
 };
 
 vi.mock("../lib/prisma", () => ({
@@ -16,6 +17,7 @@ vi.mock("../lib/prisma", () => ({
     animal: { findMany: vi.fn() },
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
+    breederPlannerState: { findUnique: vi.fn() },
   },
 }));
 
@@ -24,14 +26,24 @@ import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederD
 
 beforeEach(() => {
   vi.clearAllMocks();
-  tx.animal.upsert.mockResolvedValue({ id: "animal-row-1" });
+  tx.animal.findUnique.mockResolvedValue(null);
+  tx.animal.create.mockResolvedValue({ id: "animal-row-1" });
+  tx.animal.update.mockResolvedValue({ id: "animal-row-1" });
   tx.listing.updateMany.mockResolvedValue({ count: 0 });
   tx.listing.upsert.mockResolvedValue({ id: "listing-row-1" });
-  tx.pairing.upsert.mockResolvedValue({ id: "pairing-row-1" });
-  tx.clutch.upsert.mockResolvedValue({ id: "clutch-row-1" });
+  tx.pairing.findUnique.mockResolvedValue(null);
+  tx.pairing.create.mockResolvedValue({ id: "pairing-row-1" });
+  tx.pairing.update.mockResolvedValue({ id: "pairing-row-1" });
+  tx.clutch.findUnique.mockResolvedValue(null);
+  tx.clutch.create.mockResolvedValue({ id: "clutch-row-1" });
+  tx.clutch.update.mockResolvedValue({ id: "clutch-row-1" });
+  tx.breederPlannerState.findUnique.mockResolvedValue(null);
+  tx.breederPlannerState.create.mockResolvedValue({ id: "planner-state-row-1" });
+  tx.breederPlannerState.update.mockResolvedValue({ id: "planner-state-row-1" });
   vi.mocked((prisma as any).animal.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
 });
 
 describe("breederDataService", () => {
@@ -49,34 +61,80 @@ describe("breederDataService", () => {
       }],
     });
 
-    expect(tx.animal.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.animal.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { ownerId_appAnimalId: { ownerId: "breeder-1", appAnimalId: "snake-1" } },
-      create: expect.objectContaining({ ownerId: "breeder-1", appAnimalId: "snake-1", name: "Saliso" }),
     }));
-    expect(tx.pairing.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.animal.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ ownerId: "breeder-1", appAnimalId: "snake-1", name: "Saliso" }),
+    });
+    expect(tx.pairing.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { ownerId_appPairingId: { ownerId: "breeder-1", appPairingId: "pairing-1" } },
-      create: expect.objectContaining({ maleAnimalAppId: "snake-1", femaleAnimalAppId: "snake-2" }),
     }));
-    expect(tx.clutch.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.pairing.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ maleAnimalAppId: "snake-1", femaleAnimalAppId: "snake-2" }),
+    });
+    expect(tx.clutch.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { ownerId_appClutchId: { ownerId: "breeder-1", appClutchId: "pairing-pairing-1-clutch" } },
-      create: expect.objectContaining({ ownerId: "breeder-1", pairingId: "pairing-row-1", laidDate: "2026-04-20" }),
     }));
+    expect(tx.clutch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ ownerId: "breeder-1", pairingId: "pairing-row-1", laidDate: "2026-04-20" }),
+    });
+  });
+
+  it("mirrors structured completion metadata when syncing a completed pairing", async () => {
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [{
+        id: "pairing-1",
+        label: "Season close",
+        workflowStatus: "completed",
+        status: "completed",
+        completionReason: "no_ovulation_observed",
+        outcomeConfidence: "likely",
+        completedAt: "2026-05-01T10:00:00.000Z",
+        completionNote: "No ovulation observed by end of season.",
+      }],
+    });
+
+    expect(tx.pairing.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workflowStatus: "completed",
+        completionReason: "no_ovulation_observed",
+        outcomeConfidence: "likely",
+        completedAt: new Date("2026-05-01T10:00:00.000Z"),
+        completionNote: "No ovulation observed by end of season.",
+      }),
+    });
+  });
+
+  it("rejects completed pairings without a completion reason", async () => {
+    await expect(upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [{
+        id: "pairing-1",
+        workflowStatus: "completed",
+        outcomeConfidence: "likely",
+      }],
+    })).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("syncs animals tagged for sale into uniform marketplace listings", async () => {
+    const animal = {
+      id: "snake-1",
+      name: "Banana Clown Female",
+      sex: "female",
+      status: "For Sale",
+      morphs: ["Banana", "Clown"],
+      hets: ["Pied"],
+      price: "450",
+      imageUrl: "https://example.com/snake.jpg",
+      marketplacePublished: true,
+      marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
+    };
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: animal }]);
+
     await upsertBreederSnapshot("breeder-1", {
-      animals: [{
-        id: "snake-1",
-        name: "Banana Clown Female",
-        sex: "female",
-        status: "For Sale",
-        morphs: ["Banana", "Clown"],
-        hets: ["Pied"],
-        price: "450",
-        imageUrl: "https://example.com/snake.jpg",
-        marketplacePublished: true,
-        marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
-      }],
+      animals: [animal],
       pairings: [],
     });
 
@@ -109,17 +167,125 @@ describe("breederDataService", () => {
   });
 
   it("does not publish sale-tagged animals until explicitly published", async () => {
+    const animal = {
+      id: "snake-1",
+      status: "For Sale",
+      morphs: ["Clown"],
+    };
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: animal }]);
+
     await upsertBreederSnapshot("breeder-1", {
-      animals: [{
-        id: "snake-1",
-        status: "For Sale",
-        morphs: ["Clown"],
-      }],
+      animals: [animal],
       pairings: [],
     });
 
     expect(tx.listing.updateMany).toHaveBeenCalled();
     expect(tx.listing.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite newer database rows with older incoming animal payloads", async () => {
+    const existingPayload = {
+      id: "snake-1",
+      name: "Newest name",
+      updatedAt: "2026-07-03T10:00:00.000Z",
+    };
+    tx.animal.findUnique.mockResolvedValueOnce({
+      id: "animal-row-1",
+      payload: existingPayload,
+      updatedAt: new Date("2026-07-03T10:00:00.000Z"),
+    });
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: existingPayload }]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        name: "Older name",
+        updatedAt: "2026-07-02T10:00:00.000Z",
+      }],
+      pairings: [],
+    });
+
+    expect(tx.animal.update).not.toHaveBeenCalled();
+  });
+
+  it("merges nested animal logs when the incoming animal is newer", async () => {
+    tx.animal.findUnique.mockResolvedValueOnce({
+      id: "animal-row-1",
+      payload: {
+        id: "snake-1",
+        name: "Original",
+        updatedAt: "2026-07-03T10:00:00.000Z",
+        logs: {
+          feeds: [{ id: "feed-old", date: "2026-07-02", result: "Fed" }],
+        },
+        photos: [{ id: "photo-old", addedAt: "2026-07-03T09:00:00.000Z", url: "old.jpg" }],
+      },
+      updatedAt: new Date("2026-07-03T10:00:00.000Z"),
+    });
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        name: "Updated",
+        updatedAt: "2026-07-04T10:00:00.000Z",
+        logs: {
+          feeds: [{ id: "feed-new", date: "2026-07-04", result: "Fed" }],
+        },
+        photos: [{ id: "photo-new", addedAt: "2026-07-04T09:00:00.000Z", url: "new.jpg" }],
+      }],
+      pairings: [],
+    });
+
+    expect(tx.animal.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        payload: expect.objectContaining({
+          name: "Updated",
+          logs: expect.objectContaining({
+            feeds: expect.arrayContaining([
+              expect.objectContaining({ id: "feed-old" }),
+              expect.objectContaining({ id: "feed-new" }),
+            ]),
+          }),
+          photos: expect.arrayContaining([
+            expect.objectContaining({ id: "photo-old" }),
+            expect.objectContaining({ id: "photo-new" }),
+          ]),
+        }),
+      }),
+    }));
+  });
+
+  it("persists and lists owner planner state", async () => {
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [],
+      pairings: [],
+      plannerState: {
+        updatedAt: "2026-07-04T12:00:00.000Z",
+        groups: ["Breeders"],
+        rooms: [{ id: "room-1", name: "Main room" }],
+      },
+    });
+
+    expect(tx.breederPlannerState.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ownerId: "breeder-1",
+        payload: expect.objectContaining({
+          groups: ["Breeders"],
+          rooms: [expect.objectContaining({ id: "room-1" })],
+        }),
+      }),
+    });
+
+    vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue({
+      payload: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+    });
+
+    await expect(listBreederSnapshot("breeder-1")).resolves.toEqual({
+      animals: [],
+      pairings: [],
+      clutches: [],
+      plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+    });
   });
 
   it("lists persisted payloads without leaking database wrapper fields", async () => {
@@ -131,6 +297,7 @@ describe("breederDataService", () => {
       animals: [{ id: "snake-1" }],
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
+      plannerState: null,
     });
   });
 });

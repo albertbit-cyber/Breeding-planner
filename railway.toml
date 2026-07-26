@@ -1,6 +1,11 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd breeding-app-breeder && npm install --omit=optional && npm run build"
+buildCommand = "cd breeding-app-breeder && npm install --no-audit --no-fund && npm run build"
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+NODE_VERSION = "22"
+NPM_CONFIG_PRODUCTION = "false"
 
 [deploy]
 startCommand = "cd breeding-app-breeder && npx serve -s build -l ${PORT:-3000}"

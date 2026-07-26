@@ -83,6 +83,13 @@ const money = (listing) => listing?.price !== null && listing?.price !== undefin
 
 const firstImage = (listing) => listing?.imageUrl || listing?.images?.[0]?.imageUrl || "";
 
+const availabilityVariant = (avail) => {
+  const map = { available: "available", reserved: "reserved", sold: "sold", featured: "featured", hidden: "hidden", draft: "draft" };
+  return map[String(avail || "available").toLowerCase()] || "available";
+};
+
+const STORE_TABS = ["Available", "Reserved", "Sold", "About", "Reviews", "Terms"];
+
 const tagsFor = (listing) => [
   listing.availability || listing.status || "available",
   listing.publishedAt ? "New" : "",
@@ -214,7 +221,7 @@ function ListingDetail({ listing, onClose, onContact, onFavorite, onStore }) {
             <p>{listing.genetics || "Visual, het, possible het, parent genetics, and probability notes can be published by the breeder."}</p>
           </section>
           <section>
-            <h3>Breeding Planner Data</h3>
+            <h3>Serpentora Data</h3>
             <p>{listing.feedingNotes || "Feeding history summary, weight chart summary, shed history, lineage, certificates, and notes appear here when the breeder makes them public."}</p>
           </section>
           <section>
@@ -240,26 +247,58 @@ function ListingDetail({ listing, onClose, onContact, onFavorite, onStore }) {
 }
 
 function StorePanel({ store, onClose }) {
+  const [activeTab, setActiveTab] = useState("Available");
   if (!store) return null;
-  const tabs = ["Available", "Reserved", "Sold", "About", "Reviews", "Terms"];
+
+  const listings = store.listings || [];
+  const byStatus = {
+    Available: listings.filter((l) => availabilityVariant(l.availability || l.status) === "available"),
+    Reserved: listings.filter((l) => availabilityVariant(l.availability || l.status) === "reserved"),
+    Sold: listings.filter((l) => availabilityVariant(l.availability || l.status) === "sold"),
+  };
+
   return (
-    <section className="market-detail-overlay">
-      <article className="market-store-panel">
+    <section className="market-detail-overlay" onClick={onClose}>
+      <article className="market-store-panel" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="market-close" onClick={onClose}>Close</button>
         <div className="market-store-banner">{store.bannerUrl ? <img src={store.bannerUrl} alt="" /> : null}</div>
         <div className="market-store-header">
           {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <div>{String(store.storeName || "S").slice(0, 1)}</div>}
           <div>
             <h2>{store.storeName}</h2>
-            <p>{[store.city, store.country].filter(Boolean).join(", ")} - {store.isVerified ? "Verified breeder" : "Unverified"} - {store.ratingAverage || 0} rating</p>
+            <p className="market-muted">{[store.city, store.country].filter(Boolean).join(", ")}</p>
+            <div className="market-seller-meta">
+              {store.isVerified && <span className="market-verified-badge">✓ Verified</span>}
+              <span>{store.ratingAverage || 0} rating</span>
+            </div>
           </div>
         </div>
-        <div className="market-chip-row">{tabs.map((tab) => <span key={tab}>{tab}</span>)}</div>
-        <p>{store.about || "This breeder has not added an about section yet."}</p>
-        <div className="market-grid">
-          {(store.listings || []).map((listing) => <ListingCard key={listing.id} listing={listing} onSelect={() => {}} onFavorite={() => {}} onStore={() => {}} />)}
+        <div className="market-store-tabs">
+          {STORE_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`market-tab-btn${activeTab === tab ? " market-tab-active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}{byStatus[tab] !== undefined && byStatus[tab].length > 0 ? ` (${byStatus[tab].length})` : ""}
+            </button>
+          ))}
         </div>
-        <section><h3>Terms</h3><p>{store.terms || store.shippingPolicy || store.paymentPolicy || "Terms and policies have not been published yet."}</p></section>
+        <div className="market-tab-content">
+          {["Available", "Reserved", "Sold"].includes(activeTab) && (
+            byStatus[activeTab].length > 0
+              ? <div className="market-grid">{byStatus[activeTab].map((listing) => <ListingCard key={listing.id} listing={listing} onSelect={() => {}} onFavorite={() => {}} onStore={() => {}} />)}</div>
+              : <p className="market-muted market-tab-empty">No {activeTab.toLowerCase()} listings.</p>
+          )}
+          {activeTab === "About" && <p>{store.about || "This breeder has not added an about section yet."}</p>}
+          {activeTab === "Reviews" && (
+            <p className="market-muted">{store.ratingAverage ? `${store.ratingAverage} rating` : "No reviews yet."}</p>
+          )}
+          {activeTab === "Terms" && (
+            <p>{store.terms || store.shippingPolicy || store.paymentPolicy || "Terms and policies have not been published yet."}</p>
+          )}
+        </div>
       </article>
     </section>
   );

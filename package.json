@@ -6,6 +6,9 @@
   "main": "electron/main.js",
   "description": "Breeding Planner app with Electron and Capacitor support.",
   "author": "albertbit-cyber <albertbit@gmail.com>",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
@@ -20,7 +23,6 @@
     "@capacitor/push-notifications": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
-    "better-sqlite3": "^9.4.0",
     "canvg": "^4.0.2",
     "dagre": "^0.8.5",
     "dompurify": "^3.1.7",
@@ -36,9 +38,12 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^16.3.5",
     "reactflow": "^11.11.4",
-    "sharp": "^0.35.1",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^9.4.0",
+    "sharp": "^0.35.1"
   },
   "scripts": {
     "start": "vite",
@@ -77,8 +82,6 @@
     "demo": "ts-node scripts/demo.ts"
   },
   "devDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "4.53.2",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.2",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^22.8.6",
@@ -95,7 +98,6 @@
     "gh-pages": "^6.3.0",
     "i18next-scanner": "^4.6.0",
     "lightningcss": "^1.32.0",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
@@ -120,11 +122,11 @@
     },
     "extraResources": [
       {
-        "from": "src/locales",
+        "from": "breeding-app-breeder/src/locales",
         "to": "locales"
       },
       {
-        "from": "src/i18n/settings.json",
+        "from": "breeding-app-breeder/src/i18n/settings.json",
         "to": "i18n-settings.json"
       }
     ],

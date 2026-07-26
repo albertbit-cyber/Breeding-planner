@@ -100,7 +100,43 @@ function searchGenes(allGenes, query) {
   }
   return results
     .sort((a, b) => a.score - b.score || a.gene.geneName.localeCompare(b.gene.geneName))
-    .slice(0, 12);
+    .slice(0, 8);
+}
+
+const HET_QUICK_VARIANTS = [
+  { label: 'Pos. Het', prefix: 'Possible' },
+  { label: '50% Het', prefix: '50%' },
+  { label: '66% Het', prefix: '66%' },
+];
+
+// Expands each matched gene into selectable rows. Recessive genes offer the
+// full set of het probabilities plus visual; other gene types (and manual
+// het-mode entry, which already carries its own qualifier) get a single row.
+function buildOptions(results, hetMode, buildToken) {
+  const options = [];
+  for (const { gene, matchedAlias } of results) {
+    if (hetMode) {
+      const token = buildToken(gene.geneName);
+      options.push({ type: 'het', gene, matchedAlias, label: token, token, showMeta: true });
+      continue;
+    }
+    if (gene.geneType === 'recessive') {
+      for (const variant of HET_QUICK_VARIANTS) {
+        options.push({
+          type: 'het',
+          gene,
+          matchedAlias: null,
+          label: `${variant.label} ${gene.geneName}`,
+          token: `${variant.prefix} ${gene.geneName}`,
+          showMeta: false,
+        });
+      }
+      options.push({ type: 'visual', gene, matchedAlias, label: `${gene.geneName} (visual)`, token: gene.geneName, showMeta: true });
+    } else {
+      options.push({ type: 'visual', gene, matchedAlias, label: gene.geneName, token: gene.geneName, showMeta: true });
+    }
+  }
+  return options;
 }
 
 /**
@@ -116,7 +152,7 @@ function searchGenes(allGenes, query) {
 export default function GeneAutocomplete({ morphs = [], hets = [], onChange, disabled = false, placeholder }) {
   const allGenes = useMemo(() => getAllGenes(), []);
   const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState([]);
+  const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [hetMode, setHetMode] = useState(false);
@@ -127,13 +163,21 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
   const dropdownRef = useRef(null);
   const containerRef = useRef(null);
 
+  const buildToken = useCallback((geneName) => {
+    if (!hetMode) return geneName;
+    const qualifier = hetQualifier.trim();
+    if (!qualifier) return `Het ${geneName}`;
+    return `${qualifier} ${geneName}`;
+  }, [hetMode, hetQualifier]);
+
   useEffect(() => {
     if (detectQualifier(inputValue) === 'het') setHetMode(true);
     const results = searchGenes(allGenes, inputValue);
-    setSuggestions(results);
+    const opts = buildOptions(results, hetMode, buildToken);
+    setOptions(opts);
     setActiveIdx(0);
-    setOpen(results.length > 0 && inputValue.trim().length > 0);
-  }, [inputValue, allGenes]);
+    setOpen(opts.length > 0 && inputValue.trim().length > 0);
+  }, [inputValue, allGenes, hetMode, buildToken]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -146,22 +190,14 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const buildToken = useCallback((geneName) => {
-    if (!hetMode) return geneName;
-    const qualifier = hetQualifier.trim();
-    if (!qualifier) return `Het ${geneName}`;
-    return `${qualifier} ${geneName}`;
-  }, [hetMode, hetQualifier]);
-
-  const selectGene = useCallback((gene) => {
-    const token = buildToken(gene.geneName);
-    const nextMorphs = hetMode ? morphs : [...morphs, gene.geneName];
-    const nextHets = hetMode ? [...hets, token] : hets;
+  const selectOption = useCallback((option) => {
+    const nextMorphs = option.type === 'het' ? morphs : [...morphs, option.token];
+    const nextHets = option.type === 'het' ? [...hets, option.token] : hets;
     onChange({ morphs: nextMorphs, hets: nextHets });
     setInputValue('');
     setOpen(false);
     inputRef.current?.focus();
-  }, [buildToken, hetMode, morphs, hets, onChange]);
+  }, [morphs, hets, onChange]);
 
   const removeMorph = useCallback((token) => {
     onChange({ morphs: morphs.filter(m => m !== token), hets });
@@ -172,7 +208,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
   }, [morphs, hets, onChange]);
 
   const handleKeyDown = useCallback((e) => {
-    if (!open || !suggestions.length) {
+    if (!open || !options.length) {
       if (e.key === 'Backspace' && !inputValue) {
         if (hets.length) {
           removeHet(hets[hets.length - 1]);
@@ -184,17 +220,17 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIdx(i => Math.min(i + 1, suggestions.length - 1));
+      setActiveIdx(i => Math.min(i + 1, options.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIdx(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (suggestions[activeIdx]) selectGene(suggestions[activeIdx].gene);
+      if (options[activeIdx]) selectOption(options[activeIdx]);
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
-  }, [open, suggestions, activeIdx, selectGene, inputValue, hets, morphs, removeHet, removeMorph]);
+  }, [open, options, activeIdx, selectOption, inputValue, hets, morphs, removeHet, removeMorph]);
 
   const toggleHetMode = useCallback(() => {
     setHetMode(m => !m);
@@ -298,7 +334,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (suggestions.length && inputValue.trim()) setOpen(true); }}
+            onFocus={() => { if (options.length && inputValue.trim()) setOpen(true); }}
             placeholder={placeholder || (hetMode ? 'Search het gene…' : 'Search gene…')}
             className="flex-1 outline-none text-sm px-1 bg-transparent min-w-24"
             disabled={disabled}
@@ -307,37 +343,37 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
         </div>
       </div>
 
-      {open && suggestions.length > 0 && (
+      {open && options.length > 0 && (
         <div
           ref={dropdownRef}
           className="absolute z-50 mt-1 w-full bg-white border border-neutral-200 rounded-xl shadow-lg max-h-72 overflow-y-auto"
           role="listbox"
         >
-          {suggestions.map(({ gene, matchedAlias }, idx) => (
+          {options.map((option, idx) => (
             <button
-              key={gene.geneName}
+              key={`${option.gene.geneName}-${option.type}-${option.token}`}
               type="button"
               role="option"
               aria-selected={idx === activeIdx}
               onMouseEnter={() => setActiveIdx(idx)}
-              onClick={() => selectGene(gene)}
+              onClick={() => selectOption(option)}
               className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors ${
                 idx === activeIdx ? 'bg-blue-50' : 'hover:bg-neutral-50'
               }`}
             >
-              <TypeBadge type={gene.geneType} />
+              <TypeBadge type={option.gene.geneType} />
               <span className="text-sm font-medium text-neutral-800 truncate">
-                {gene.geneName}
+                {option.label}
               </span>
-              {matchedAlias && (
+              {option.showMeta && option.matchedAlias && (
                 <span className="text-xs text-neutral-400 shrink-0">
-                  ({matchedAlias})
+                  ({option.matchedAlias})
                 </span>
               )}
-              <HealthIcons flags={gene.healthFlags} />
-              {gene.complex && (
-                <span className="text-[10px] text-neutral-400 ml-auto shrink-0 truncate max-w-28" title={gene.complex}>
-                  {gene.complex}
+              {option.showMeta && <HealthIcons flags={option.gene.healthFlags} />}
+              {option.showMeta && option.gene.complex && (
+                <span className="text-[10px] text-neutral-400 ml-auto shrink-0 truncate max-w-28" title={option.gene.complex}>
+                  {option.gene.complex}
                 </span>
               )}
             </button>

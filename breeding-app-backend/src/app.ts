@@ -20,6 +20,8 @@ import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
 import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { reproductiveRoutes } from "./routes/reproductiveRoutes";
+import { emailRoutes } from "./routes/emailRoutes";
+import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -27,13 +29,17 @@ const app = express();
 app.use(helmet());
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
+// Mounted before express.json() below: webhook signature verification needs the
+// exact raw request bytes, which a JSON body parser would already have consumed.
+app.use("/api/webhooks", emailWebhookRoutes);
+
 const origins = env.corsOrigin
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
 
 if (env.nodeEnv === "production" && !origins.length) {
-  throw new Error("CORS_ORIGIN must list at least one allowed origin in production.");
+  console.warn("[server] CORS_ORIGIN is empty; browser origins will not receive CORS headers.");
 }
 
 app.use(
@@ -51,6 +57,11 @@ app.use(
         return;
       }
 
+      if (!origins.length) {
+        callback(null, false);
+        return;
+      }
+
       if (origins.includes(origin)) {
         callback(null, true);
         return;
@@ -61,7 +72,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "8mb" }));
+// Embedded photos are stripped client-side before every sync request (see
+// breeding-app-breeder/src/shared/apiClient.ts), so remaining payload growth is plain
+// breeding/log data accumulated over the life of an account, not media. 32mb was tight
+// enough for long-running accounts to hit it on text alone; give more headroom.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "64mb" }));
 
 // This backend is the single source of truth for all app clients.
 // Every authenticated device calls the same hosted API and shared Postgres DB.
@@ -100,6 +115,7 @@ app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
 app.use("/api/reproductive", reproductiveRoutes);
+app.use("/api/emails", emailRoutes);
 
 app.use(errorHandler);
 

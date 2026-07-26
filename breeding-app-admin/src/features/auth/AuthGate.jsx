@@ -1,9 +1,42 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
+import {
+  clearAuthToken,
+  confirmEmailChange as confirmEmailChangeApi,
+  forgotPassword as forgotPasswordApi,
+  hasStoredAuthSession,
+  login as loginApi,
+  register as registerApi,
+  resendVerification as resendVerificationApi,
+  resetPassword as resetPasswordApi,
+  verifyEmail as verifyEmailApi,
+} from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
 const ADMIN_APP_AUTH_SCOPE = "admin";
+
+/**
+ * The account-lifecycle emails link back to plain paths (e.g. `${appUrl}/verify-email?token=...`),
+ * not hash routes — this overlay is mounted ahead of the app's HashRouter, so
+ * these are read from the real pathname/search once on load and handled
+ * inline here, ahead of the normal login/register overlay.
+ */
+const LINK_FLOW_PATHS = {
+  "/verify-email": "verify-email",
+  "/reset-password": "reset-password",
+  "/confirm-email-change": "confirm-email-change",
+};
+
+const getLinkFlowFromLocation = () => {
+  if (typeof window === "undefined") return null;
+  const path = String(window.location?.pathname || "").replace(/\/+$/, "") || "/";
+  const type = LINK_FLOW_PATHS[path];
+  if (!type) return null;
+  const params = new URLSearchParams(window.location.search || "");
+  const token = params.get("token") || "";
+  if (!token) return null;
+  return { type, token };
+};
 
 const AUTH_SESSION_STORAGE_KEYS = {
   breeder: "breedingPlannerBreederAuthSession",
@@ -258,12 +291,7 @@ const DEFAULT_REGISTRATION_TEMPLATE = {
 const createDefaultRegistrationData = () =>
   JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
 
-const createDefaultPasswordRecoveryData = (email = "") => ({
-  email,
-  fullName: "",
-  newPassword: "",
-  confirmNewPassword: "",
-});
+const createDefaultPasswordRecoveryData = (email = "") => ({ email });
 
 const buildRegistrationSteps = (t, optionSets = {}) => {
   const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
@@ -520,6 +548,20 @@ export default function AuthGate({ children }) {
     createDefaultPasswordRecoveryData()
   );
   const [passwordRecoveryError, setPasswordRecoveryError] = useState("");
+  const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
+  const [linkFlow] = useState(() => getLinkFlowFromLocation());
+  const [linkFlowResult, setLinkFlowResult] = useState({ status: "pending", message: "" });
+  const [resetPasswordValues, setResetPasswordValues] = useState({ newPassword: "", confirmPassword: "" });
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [resetPasswordDone, setResetPasswordDone] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [resendVerificationEmailValue, setResendVerificationEmailValue] = useState("");
+  const [resendVerificationSent, setResendVerificationSent] = useState(false);
+  const [resendVerificationError, setResendVerificationError] = useState("");
+  const [resendVerificationBusy, setResendVerificationBusy] = useState(false);
+  // Set right after a successful registration, before any session exists — registration isn't
+  // "done" until the user clicks the emailed link, so no login/persistAuth happens until then.
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -568,11 +610,51 @@ export default function AuthGate({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!linkFlow) return undefined;
+    // Clear the token out of the URL immediately so it can't be re-submitted
+    // (e.g. on refresh) or leak via browser history/referrer headers.
+    try {
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      // ignore
+    }
+    if (linkFlow.type === "reset-password") return undefined;
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (linkFlow.type === "verify-email") {
+          const result = await verifyEmailApi({ token: linkFlow.token });
+          if (cancelled) return;
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth.verifyEmail.success", { defaultValue: "Your email address is verified." }) });
+        } else if (linkFlow.type === "confirm-email-change") {
+          const result = await confirmEmailChangeApi({ token: linkFlow.token });
+          if (cancelled) return;
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth.confirmEmailChange.success", { defaultValue: "Your new email address is confirmed." }) });
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setLinkFlowResult({
+          status: "error",
+          message: error instanceof Error ? error.message : t("auth.linkFlow.error", { defaultValue: "This link is invalid or has expired." }),
+        });
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkFlow]);
+
+  useEffect(() => {
     setAuthState(loadStoredAuth(authScope));
     setView("chooser");
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
+    setPendingVerificationEmail("");
   }, [authScope]);
 
   const persistAuth = useCallback((next) => {
@@ -593,6 +675,8 @@ export default function AuthGate({ children }) {
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
+    setPendingVerificationEmail("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
     setRegisterStep(0);
@@ -608,6 +692,7 @@ export default function AuthGate({ children }) {
     persistAuth({ isAuthenticated: false });
     setView("chooser");
     setIsRecoveringPassword(false);
+    setIsResendingVerification(false);
     setLoginValues((prev) => ({
       username: authState.profile?.email || prev.username || "",
       password: "",
@@ -658,6 +743,7 @@ export default function AuthGate({ children }) {
           email: String((backendUser && backendUser.email) || loginEmail),
           reptileCount: "",
           role: appRole,
+          emailVerified: backendUser?.emailVerified !== false,
         },
         authenticatedAt: new Date().toISOString(),
       });
@@ -670,6 +756,7 @@ export default function AuthGate({ children }) {
     const normalizedInput = normalizeIdentifier(loginValues.username);
     const recoveryEmail = normalizedInput.includes("@") ? normalizedInput : "";
     setIsRecoveringPassword(true);
+    setIsResendingVerification(false);
     setLoginError("");
     setLoginMessage("");
     setPasswordRecoveryError("");
@@ -679,6 +766,7 @@ export default function AuthGate({ children }) {
   const closePasswordRecovery = () => {
     setIsRecoveringPassword(false);
     setPasswordRecoveryError("");
+    setRecoveryEmailSent(false);
     setPasswordRecoveryData((prev) => createDefaultPasswordRecoveryData(prev.email));
   };
 
@@ -692,66 +780,81 @@ export default function AuthGate({ children }) {
   const handlePasswordRecoverySubmit = async (event) => {
     event.preventDefault();
     setPasswordRecoveryError("");
-    setLoginMessage("");
 
     const recoveryEmail = normalizeIdentifier(passwordRecoveryData.email);
-    const recoveryFullName = String(passwordRecoveryData.fullName || "").trim();
-    const recoveryPassword = String(passwordRecoveryData.newPassword || "");
-    const recoveryConfirmPassword = String(passwordRecoveryData.confirmNewPassword || "");
-
     if (!recoveryEmail || !recoveryEmail.includes("@")) {
       setPasswordRecoveryError(t("auth.errors.emailRequired", {
-        defaultValue: "Use the account email address for password recovery.",
-      }));
-      return;
-    }
-
-    if (!recoveryFullName) {
-      setPasswordRecoveryError(t("auth.errors.requiredField", {
-        defaultValue: 'Please complete "{{field}}".',
-        field: t("auth.fields.fullName", { defaultValue: "Full name" }),
-      }));
-      return;
-    }
-
-    if (recoveryPassword.trim().length < 8) {
-      setPasswordRecoveryError(t("auth.errors.passwordLength", {
-        defaultValue: "Choose a password with at least 8 characters.",
-      }));
-      return;
-    }
-
-    if (recoveryPassword !== recoveryConfirmPassword) {
-      setPasswordRecoveryError(t("auth.errors.passwordMismatch", {
-        defaultValue: "Passwords do not match.",
+        defaultValue: "Enter the email address on your account.",
       }));
       return;
     }
 
     try {
-      const result = await recoverPasswordApi({
-        email: recoveryEmail,
-        fullName: recoveryFullName,
-        newPassword: recoveryPassword,
-      });
-
-      setIsRecoveringPassword(false);
-      setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
-      setLoginValues({
-        username: recoveryEmail,
-        password: "",
-      });
-      setLoginMessage(String(result?.message || t("auth.recovery.success", {
-        defaultValue: "Password updated. Sign in with your new password.",
-      })));
+      await forgotPasswordApi({ email: recoveryEmail });
+      setRecoveryEmailSent(true);
     } catch (error) {
       setPasswordRecoveryError(
         error instanceof Error
           ? error.message
-          : t("auth.recovery.error", {
-              defaultValue: "Password recovery failed.",
-            })
+          : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
       );
+    }
+  };
+
+  const handleResetPasswordSubmit = async (event) => {
+    event.preventDefault();
+    setResetPasswordError("");
+    const { newPassword, confirmPassword } = resetPasswordValues;
+    if (newPassword.trim().length < 8) {
+      setResetPasswordError(t("auth.errors.passwordLength", { defaultValue: "Choose a password with at least 8 characters." }));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError(t("auth.errors.passwordMismatch", { defaultValue: "Passwords do not match." }));
+      return;
+    }
+    try {
+      await resetPasswordApi({ token: linkFlow.token, newPassword });
+      setResetPasswordDone(true);
+    } catch (error) {
+      setResetPasswordError(
+        error instanceof Error ? error.message : t("auth.resetPassword.error", { defaultValue: "This link is invalid or has expired." })
+      );
+    }
+  };
+
+  const openResendVerification = (prefillEmail = "") => {
+    setIsResendingVerification(true);
+    setIsRecoveringPassword(false);
+    setResendVerificationEmailValue(prefillEmail);
+    setResendVerificationSent(false);
+    setResendVerificationError("");
+  };
+
+  const closeResendVerification = () => {
+    setIsResendingVerification(false);
+    setResendVerificationError("");
+    setResendVerificationSent(false);
+  };
+
+  const handleResendVerificationSubmit = async (event) => {
+    event.preventDefault();
+    setResendVerificationError("");
+    const email = normalizeIdentifier(resendVerificationEmailValue);
+    if (!email || !email.includes("@")) {
+      setResendVerificationError(t("auth.errors.emailRequired", { defaultValue: "Enter the email address on your account." }));
+      return;
+    }
+    setResendVerificationBusy(true);
+    try {
+      await resendVerificationApi({ email });
+      setResendVerificationSent(true);
+    } catch (error) {
+      setResendVerificationError(
+        error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
+      );
+    } finally {
+      setResendVerificationBusy(false);
     }
   };
 
@@ -792,7 +895,6 @@ export default function AuthGate({ children }) {
     }
 
     if (registerStep === totalSteps - 1) {
-      const desiredDisplayName = (registrationData.displayName || registrationData.fullName).trim();
       const desiredEmail = registrationData.email.trim();
       const desiredFullName = registrationData.fullName.trim();
 
@@ -804,34 +906,11 @@ export default function AuthGate({ children }) {
           role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
         });
 
-        const loginResponse = await loginApi({
-          email: desiredEmail,
-          password: registrationData.password,
-        }, authScope === "public" ? "breeder" : authScope);
-
-        const backendUser = loginResponse?.user || {};
-        const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-        const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
-
-        persistAuth({
-          isAuthenticated: true,
-          mode: "registered",
-          role: appRole,
-          profile: {
-            fullName: String((backendUser && backendUser.fullName) || desiredFullName),
-            displayName: desiredDisplayName,
-            email: String((backendUser && backendUser.email) || desiredEmail),
-            reptileCount: registrationData.reptileCount,
-            role: appRole,
-          },
-          registeredAt: new Date().toISOString(),
-          preferences: {
-            enableCloudSync: registrationData.enableCloudSync,
-            enableAutomaticReptileSync:
-              registrationData.enableAutomaticReptileSync,
-            devicePreference: registrationData.devicePreference,
-          },
-        });
+        // Registration isn't complete until the emailed link is clicked — no session is
+        // created here. Show the "check your inbox" card instead of logging the user in.
+        setResendVerificationSent(false);
+        setResendVerificationError("");
+        setPendingVerificationEmail(desiredEmail);
       } catch (error) {
         setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
       }
@@ -945,6 +1024,7 @@ export default function AuthGate({ children }) {
           onClick={() => {
             setView("register");
             setIsRecoveringPassword(false);
+            setIsResendingVerification(false);
             resetRegistration();
           }}
         >
@@ -956,6 +1036,7 @@ export default function AuthGate({ children }) {
           onClick={() => {
             setView("login");
             setIsRecoveringPassword(false);
+            setIsResendingVerification(false);
             setPasswordRecoveryError("");
           }}
         >
@@ -965,57 +1046,78 @@ export default function AuthGate({ children }) {
       {view === "login" && (
           isRecoveringPassword ? (
             <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
-              <p className="auth-helper-copy">
-                {t("auth.recovery.instructions", {
-                  defaultValue: "Enter the email and full name on the account, then choose a new password.",
-                })}
-              </p>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.email", { defaultValue: "Email address" })}
-                </span>
-                <input
-                  type="email"
-                  value={passwordRecoveryData.email}
-                  onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.fullName", { defaultValue: "Full name" })}
-                </span>
-                <input
-                  type="text"
-                  value={passwordRecoveryData.fullName}
-                  onChange={(e) => handlePasswordRecoveryChange("fullName", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.newPassword", { defaultValue: "New password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.newPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("newPassword", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.confirmNewPassword", { defaultValue: "Confirm new password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.confirmNewPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("confirmNewPassword", e.target.value)}
-                />
-              </label>
-              {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
-              <button type="submit" className="primary wide">
-                {t("auth.actions.resetPassword", { defaultValue: "Reset password" })}
-              </button>
+              {recoveryEmailSent ? (
+                <p className="auth-helper-copy">
+                  {t("auth.recovery.emailSent", {
+                    defaultValue: "Check your email — we sent a reset link. It expires in 1 hour.",
+                  })}
+                </p>
+              ) : (
+                <>
+                  <p className="auth-helper-copy">
+                    {t("auth.recovery.instructions", {
+                      defaultValue: "Enter your account email and we'll send you a reset link.",
+                    })}
+                  </p>
+                  <label className="auth-field">
+                    <span className="auth-field-label">
+                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                    </span>
+                    <input
+                      type="email"
+                      value={passwordRecoveryData.email}
+                      onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
+                      autoComplete="email"
+                    />
+                  </label>
+                  {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
+                  <button type="submit" className="primary wide">
+                    {t("auth.actions.sendResetLink", { defaultValue: "Send reset link" })}
+                  </button>
+                </>
+              )}
               <div className="auth-secondary-action">
                 <button type="button" className="text-button" onClick={closePasswordRecovery}>
+                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+                </button>
+              </div>
+            </form>
+          ) : isResendingVerification ? (
+            <form className="auth-login-form" onSubmit={handleResendVerificationSubmit}>
+              {resendVerificationSent ? (
+                <p className="auth-helper-copy">
+                  {t("auth.resendVerification.sent", {
+                    defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+                  })}
+                </p>
+              ) : (
+                <>
+                  <p className="auth-helper-copy">
+                    {t("auth.resendVerification.instructions", {
+                      defaultValue: "Enter your account email and we'll send a new verification link.",
+                    })}
+                  </p>
+                  <label className="auth-field">
+                    <span className="auth-field-label">
+                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                    </span>
+                    <input
+                      type="email"
+                      value={resendVerificationEmailValue}
+                      onChange={(e) => setResendVerificationEmailValue(e.target.value)}
+                      autoComplete="email"
+                    />
+                  </label>
+                  {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+                  <button type="submit" className="primary wide" disabled={resendVerificationBusy}>
+                    {resendVerificationBusy
+                      ? t("common.sending", { defaultValue: "Sending..." })
+                      : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+                  </button>
+                </>
+              )}
+              <div className="auth-secondary-action">
+                <button type="button" className="text-button" onClick={closeResendVerification}>
                   {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
                 </button>
               </div>
@@ -1049,6 +1151,13 @@ export default function AuthGate({ children }) {
               <div className="auth-inline-link-row">
                 <button type="button" className="text-button" onClick={openPasswordRecovery}>
                   {t("auth.actions.forgotPassword", { defaultValue: "Forgot password?" })}
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => openResendVerification(normalizeIdentifier(loginValues.username).includes("@") ? loginValues.username : "")}
+                >
+                  {t("auth.actions.resendVerificationLink", { defaultValue: "Resend verification email" })}
                 </button>
               </div>
               {loginMessage && <p className="auth-success">{loginMessage}</p>}
@@ -1129,8 +1238,195 @@ export default function AuthGate({ children }) {
     </div>
   ) : null;
 
-  const overlayActive = authScope !== "public" && !authState.isAuthenticated;
-  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
+  const maskEmailForDisplay = (email) => {
+    const [local, domain] = String(email || "").split("@");
+    if (!domain) return email || "";
+    const visible = local.slice(0, 2);
+    return `${visible}${"*".repeat(Math.max(local.length - visible.length, 1))}@${domain}`;
+  };
+
+  const linkFlowCard = linkFlow ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
+      </div>
+      {linkFlow.type === "reset-password" ? (
+        resetPasswordDone ? (
+          <>
+            <p className="auth-helper-copy">
+              {t("auth.resetPassword.success", { defaultValue: "Your password has been updated. You can now sign in with your new password." })}
+            </p>
+            <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
+              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+            </button>
+          </>
+        ) : (
+          <form className="auth-login-form" onSubmit={handleResetPasswordSubmit}>
+            <p className="auth-helper-copy">
+              {t("auth.resetPassword.instructions", { defaultValue: "Choose a new password for your account." })}
+            </p>
+            <label className="auth-field">
+              <span className="auth-field-label">{t("auth.fields.newPassword", { defaultValue: "New password" })}</span>
+              <input
+                type="password"
+                value={resetPasswordValues.newPassword}
+                onChange={(e) => setResetPasswordValues((prev) => ({ ...prev, newPassword: e.target.value }))}
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="auth-field">
+              <span className="auth-field-label">{t("auth.fields.confirmPassword", { defaultValue: "Confirm password" })}</span>
+              <input
+                type="password"
+                value={resetPasswordValues.confirmPassword}
+                onChange={(e) => setResetPasswordValues((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                autoComplete="new-password"
+              />
+            </label>
+            {resetPasswordError && <p className="auth-error">{resetPasswordError}</p>}
+            <button type="submit" className="primary wide">
+              {t("auth.actions.setNewPassword", { defaultValue: "Set new password" })}
+            </button>
+          </form>
+        )
+      ) : (
+        <>
+          <p className={linkFlowResult.status === "error" ? "auth-error" : "auth-helper-copy"}>
+            {linkFlowResult.status === "pending"
+              ? t("auth.linkFlow.working", { defaultValue: "Working..." })
+              : linkFlowResult.message}
+          </p>
+          {linkFlowResult.status !== "pending" && (
+            <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
+              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const unverifiedGateActive = authScope !== "public" && authState.isAuthenticated && authState.profile?.emailVerified === false;
+  const unverifiedGateCard = unverifiedGateActive ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.unverified.title", { defaultValue: "Verify your email address" })}</h1>
+      </div>
+      <p className="auth-subtitle">
+        {t("auth.unverified.description", {
+          defaultValue: "Your email address ({{email}}) has not been verified yet. Check your inbox for the verification link, or request a new one.",
+          email: maskEmailForDisplay(authState.profile?.email),
+        })}
+      </p>
+      {resendVerificationSent ? (
+        <p className="auth-helper-copy">
+          {t("auth.resendVerification.sent", {
+            defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+          })}
+        </p>
+      ) : (
+        <>
+          {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+          <button
+            type="button"
+            className="primary wide"
+            disabled={resendVerificationBusy}
+            onClick={async () => {
+              setResendVerificationError("");
+              setResendVerificationBusy(true);
+              try {
+                await resendVerificationApi({ email: authState.profile?.email });
+                setResendVerificationSent(true);
+              } catch (error) {
+                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+              } finally {
+                setResendVerificationBusy(false);
+              }
+            }}
+          >
+            {resendVerificationBusy
+              ? t("common.sending", { defaultValue: "Sending..." })
+              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+          </button>
+        </>
+      )}
+      <div className="auth-secondary-action">
+        <button type="button" className="text-button" onClick={handleLogout}>
+          {t("auth.actions.signOut", { defaultValue: "Sign out" })}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  // Shown right after registration, before any session exists. The user must click the
+  // emailed verification link (which lands on the linkFlowCard above, possibly in a
+  // different tab) before they can sign in for the first time.
+  const pendingVerificationCard = pendingVerificationEmail ? (
+    <div className="auth-card">
+      <div className="auth-card-brand">
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
+      </div>
+      <p className="auth-subtitle">
+        {t("auth.pendingVerification.description", {
+          defaultValue: "We sent a verification link to {{email}}. Click it to finish creating your account, then sign in below.",
+          email: maskEmailForDisplay(pendingVerificationEmail),
+        })}
+      </p>
+      {resendVerificationSent ? (
+        <p className="auth-helper-copy">
+          {t("auth.resendVerification.sent", {
+            defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
+          })}
+        </p>
+      ) : (
+        <>
+          {resendVerificationError && <p className="auth-error">{resendVerificationError}</p>}
+          <button
+            type="button"
+            className="primary wide"
+            disabled={resendVerificationBusy}
+            onClick={async () => {
+              setResendVerificationError("");
+              setResendVerificationBusy(true);
+              try {
+                await resendVerificationApi({ email: pendingVerificationEmail });
+                setResendVerificationSent(true);
+              } catch (error) {
+                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+              } finally {
+                setResendVerificationBusy(false);
+              }
+            }}
+          >
+            {resendVerificationBusy
+              ? t("common.sending", { defaultValue: "Sending..." })
+              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+          </button>
+        </>
+      )}
+      <div className="auth-secondary-action">
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            setLoginValues({ username: pendingVerificationEmail, password: "" });
+            setResendVerificationSent(false);
+            setResendVerificationError("");
+            setPendingVerificationEmail("");
+            setView("login");
+          }}
+        >
+          {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const overlayActive = Boolean(linkFlow) || unverifiedGateActive || Boolean(pendingVerificationEmail) || (authScope !== "public" && !authState.isAuthenticated);
+  const showBackendBlocker = !linkFlow && !unverifiedGateActive && !pendingVerificationEmail && authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
 
   return (
     <div className="auth-shell">
@@ -1180,7 +1476,7 @@ export default function AuthGate({ children }) {
                 </button>
               </div>
             </div>
-          ) : view === "register" ? registrationCard : loginCard}
+          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : pendingVerificationEmail ? pendingVerificationCard : view === "register" ? registrationCard : loginCard}
         </div>
       )}
     </div>

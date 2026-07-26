@@ -591,6 +591,7 @@ export const SuggestionsTab = ({
   const [filteredMaleCount, setFilteredMaleCount] = useState<number | null>(null);
   const [filteredFemaleCount, setFilteredFemaleCount] = useState<number | null>(null);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Record<string, boolean>>({});
+  const [planExpandedOverrides, setPlanExpandedOverrides] = useState<Record<string, boolean>>({});
   const [flowchartState, setFlowchartState] = useState({
     isOpen: false,
     loading: false,
@@ -950,10 +951,13 @@ export const SuggestionsTab = ({
     });
   };
 
-  const renderSuggestionCard = (suggestion, confidenceTier: "high" | "supporting") => {
+  const renderSuggestionCard = (suggestion, confidenceTier: "high" | "supporting", rank: number) => {
     const key = keyForSuggestion(suggestion);
     const highConfidence = confidenceTier === "high";
     const goalProb = suggestion.goalProb ?? 0;
+    const isPlanExpanded = key in planExpandedOverrides ? planExpandedOverrides[key] : rank === 1;
+    const togglePlanExpanded = () =>
+      setPlanExpandedOverrides((current) => ({ ...current, [key]: !isPlanExpanded }));
     const plan = suggestion.plan;
     const planSteps = plan?.steps ?? [];
     const outcomeTokenGroups = collectOutcomeTokenGroups(suggestion.outcomes || [], 6, goalGeneBaseSet);
@@ -1005,8 +1009,26 @@ export const SuggestionsTab = ({
         } p-4 shadow-sm`}
       >
         <div className="flex flex-col gap-2">
-          {renderPairLabel(suggestion)}
-          <div className="text-sm text-neutral-600">{topOutcomeLabel(suggestion)}</div>
+          <div className="flex items-start gap-3">
+            <div className="text-2xl font-bold text-neutral-300 leading-none w-7 shrink-0">{rank}</div>
+            <div className="flex flex-col items-center w-16 shrink-0">
+              <div className={`text-2xl font-bold leading-none ${highConfidence ? "text-emerald-600" : "text-amber-600"}`}>
+                {formatPercent(goalProb, 0)}
+              </div>
+              <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                {t("advisor.cards.successLabel", { defaultValue: "success" })}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              {renderPairLabel(suggestion)}
+              <div className="text-sm text-neutral-600">{topOutcomeLabel(suggestion)}</div>
+              {!highConfidence && (
+                <div className="text-xs text-neutral-500">
+                  {t("advisor.cards.belowTarget", { defaultValue: "(below confidence target)" })}
+                </div>
+              )}
+            </div>
+          </div>
           {geneRows.length > 0 && (
             <div className="flex flex-col gap-1">
               {geneRows.map(({ label, tokens }, index) => (
@@ -1014,17 +1036,6 @@ export const SuggestionsTab = ({
               ))}
             </div>
           )}
-          <div className="text-sm text-neutral-600">
-            {t("advisor.cards.goalSuccessLabel", { defaultValue: "Goal success chance:" })}{" "}
-            <span className={`font-semibold ${highConfidence ? "text-emerald-600" : "text-amber-600"}`}>
-              {formatPercent(goalProb, 0)}
-            </span>
-            {!highConfidence && (
-              <span className="ml-1 text-xs text-neutral-500">
-                {t("advisor.cards.belowTarget", { defaultValue: "(below confidence target)" })}
-              </span>
-            )}
-          </div>
           {!!demandSignals.length && (
             <div className="text-sm text-neutral-600">
               {t("advisor.cards.demandSignals", { defaultValue: "Demand signals:" })} {demandSignals.join(" • ")}
@@ -1082,7 +1093,12 @@ export const SuggestionsTab = ({
           </div>
           {plan && (
             <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm text-sky-900">
-              <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={togglePlanExpanded}
+                className="flex w-full items-center justify-between text-left"
+                aria-expanded={isPlanExpanded}
+              >
                 <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                   {t("advisor.plan.title", {
                     strategy:
@@ -1092,13 +1108,18 @@ export const SuggestionsTab = ({
                     defaultValue: "Multi-generation plan ({{strategy}})",
                   })}
                 </div>
-                <div className="text-xs font-semibold text-emerald-700">
-                  {t("advisor.plan.combinedProbability", {
-                    value: formatPercent(plan.cumulativeProb ?? 0, 1),
-                    defaultValue: "Combined ≈ {{value}}",
-                  })}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold text-emerald-700">
+                    {t("advisor.plan.combinedProbability", {
+                      value: formatPercent(plan.cumulativeProb ?? 0, 1),
+                      defaultValue: "Combined ≈ {{value}}",
+                    })}
+                  </div>
+                  <span className="text-sky-500">{isPlanExpanded ? "▴" : "▾"}</span>
                 </div>
-              </div>
+              </button>
+              {isPlanExpanded && (
+              <>
               <div className="mt-3 space-y-3">
                 {planSteps.map((step) => {
                   const maleName = getDisplayNameForAnimal(step.maleId);
@@ -1188,6 +1209,8 @@ export const SuggestionsTab = ({
                   </span>
                 ) : null}
               </div>
+              </>
+              )}
             </div>
           )}
         </div>
@@ -1285,14 +1308,16 @@ export const SuggestionsTab = ({
       </div>
 
       <div className="space-y-4">
-        {confidentSuggestions.map((suggestion) => renderSuggestionCard(suggestion, "high"))}
+        {confidentSuggestions.map((suggestion, idx) => renderSuggestionCard(suggestion, "high", idx + 1))}
 
         {supportingSuggestions.length > 0 && (
           <div className="space-y-3">
             <div className="text-sm font-semibold text-neutral-700">
               {t("advisor.cards.additionalHeading", { defaultValue: "Additional pairings worth reviewing" })}
             </div>
-            {supportingSuggestions.map((suggestion) => renderSuggestionCard(suggestion, "supporting"))}
+            {supportingSuggestions.map((suggestion, idx) =>
+              renderSuggestionCard(suggestion, "supporting", confidentSuggestions.length + idx + 1)
+            )}
           </div>
         )}
 

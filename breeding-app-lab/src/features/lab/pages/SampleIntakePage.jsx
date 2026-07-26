@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createLabApiClient } from "../api/client";
 import LabQrScanner from "../components/LabQrScanner.jsx";
 import {
@@ -57,7 +57,7 @@ const SampleBadge = ({ status }) => {
   );
 };
 
-export default function SampleIntakePage() {
+export default function SampleIntakePage({ presetToken }) {
   const [qrToken, setQrToken] = useState("");
   const [resolved, setResolved] = useState(null);
   const [lookupError, setLookupError] = useState("");
@@ -111,6 +111,16 @@ export default function SampleIntakePage() {
       setLookupLoading(false);
     }
   }, [resetIntakeFeedback]);
+
+  // Arrived here from the global Scan action, which already knows this
+  // sample hasn't been received yet — resolve it immediately instead of
+  // making the tech scan a second time.
+  useEffect(() => {
+    const normalized = String(presetToken || "").trim();
+    if (!normalized) return;
+    setQrToken(normalized);
+    resolveSingleValue(normalized);
+  }, [presetToken, resolveSingleValue]);
 
   const handleScanResult = useCallback((decoded) => {
     const normalized = String(decoded || "").trim();

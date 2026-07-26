@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 
 /**
@@ -49,10 +50,13 @@ function networkUrlLogger(): Plugin {
 // recognise the `?.` form, so the value is never baked in. This plugin rewrites the pattern
 // to a plain string literal before esbuild sees the file.
 function patchImportMetaEnv(): Plugin {
-  const apiUrl = process.env.VITE_API_URL ?? "";
+  let apiUrl = "";
   return {
     name: "patch-import-meta-env-optional-chain",
     enforce: "pre",
+    configResolved(config) {
+      apiUrl = (config.env as Record<string, string>).VITE_API_URL ?? "";
+    },
     transform(code) {
       if (!code.includes("VITE_API_URL")) return null;
       return code.replace(
@@ -64,6 +68,10 @@ function patchImportMetaEnv(): Plugin {
 }
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
+// Bumped automatically by .git/hooks/pre-commit on every commit that touches
+// this app, so the Settings panel always shows the exact build in use.
+const appVersion = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8")).version as string;
 
 const resolveBase = (publicUrl: string | undefined): string => {
   const ensureTrailingSlash = (value: string): string =>
@@ -84,12 +92,15 @@ const resolveBase = (publicUrl: string | undefined): string => {
   }
 };
 
-const base = resolveBase(process.env.PUBLIC_URL);
 // Set to true only if Electron packaging requires a single bundle.
 // For web builds, code splitting dramatically reduces initial load time.
 const disableCodeSplitting = process.env.ELECTRON_BUILD === "true";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isAndroidBuild = mode.startsWith("android");
+  const base = isAndroidBuild ? "/" : resolveBase(process.env.PUBLIC_URL);
+
+  return {
   base,
   plugins: [tailwindcss(), patchImportMetaEnv(), react(), networkUrlLogger()],
   test: {
@@ -128,6 +139,7 @@ export default defineConfig({
       ...process.env,
       PUBLIC_URL: process.env.PUBLIC_URL ?? "",
     },
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   build: {
     outDir: "build",
@@ -156,4 +168,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

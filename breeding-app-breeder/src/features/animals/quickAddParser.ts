@@ -1,3 +1,5 @@
+import { getGeneByName } from '../../genetics/geneDatabase';
+
 export type GeneticsType =
   | string
   | {
@@ -125,6 +127,64 @@ function consumeRegex(source: string, regex: RegExp): { working: string; matches
     return ' ';
   });
   return { working, matches };
+}
+
+function isRecessiveGene(display: string): boolean {
+  return getGeneByName(display)?.geneType === 'recessive';
+}
+
+function consumeGroupedHetGenes(
+  source: string,
+  lookup: GeneticsLookupEntry[],
+  addHet: (display: string) => void
+): string {
+  const chars = Array.from(source);
+  const markers: Array<{ end: number; percent: string }> = [];
+  const markerRegex = /(^|[^a-z0-9])((?:(\d{1,3})\s*%\s*)?(?:(?:double|triple)\s+hets?|dh|th))(?=$|[^a-z0-9])/gi;
+  let markerMatch: RegExpExecArray | null;
+
+  while ((markerMatch = markerRegex.exec(source)) !== null) {
+    const prefix = markerMatch[1] || '';
+    const markerStart = markerMatch.index + prefix.length;
+    const markerEnd = markerStart + markerMatch[2].length;
+    markers.push({
+      end: markerEnd,
+      percent: markerMatch[3] ? `${markerMatch[3]}% ` : '',
+    });
+    for (let idx = markerStart; idx < markerEnd; idx += 1) {
+      chars[idx] = ' ';
+    }
+  }
+
+  if (!markers.length) return source;
+
+  lookup
+    .filter(entry => isRecessiveGene(entry.display))
+    .forEach(entry => {
+      const variantPatterns = uniqueByLower(entry.variants)
+        .sort((a, b) => b.length - a.length)
+        .map(toPattern);
+
+      variantPatterns.forEach(pattern => {
+        const regex = new RegExp(`(^|[^a-z0-9])(${pattern})(?=$|[^a-z0-9])`, 'gi');
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(source)) !== null) {
+          const prefix = match[1] || '';
+          const geneStart = match.index + prefix.length;
+          const marker = markers
+            .filter(candidate => geneStart >= candidate.end)
+            .sort((a, b) => b.end - a.end)[0];
+          if (!marker) continue;
+          const geneEnd = geneStart + match[2].length;
+          addHet(`${marker.percent}Het ${entry.display}`);
+          for (let idx = geneStart; idx < geneEnd; idx += 1) {
+            chars[idx] = ' ';
+          }
+        }
+      });
+    });
+
+  return chars.join('');
 }
 
 function parseSex(text: string): 'F' | 'M' | undefined {
@@ -287,6 +347,10 @@ export function parseAnimalText(text: string, availableGenetics: GeneticsType[] 
 
   const lookup = buildLookup(availableGenetics);
   let geneticsWorking = working;
+
+  geneticsWorking = consumeGroupedHetGenes(geneticsWorking, lookup, token => {
+    parsed.hets.push(token);
+  });
 
   lookup.forEach(entry => {
     const variantPatterns = uniqueByLower(entry.variants)

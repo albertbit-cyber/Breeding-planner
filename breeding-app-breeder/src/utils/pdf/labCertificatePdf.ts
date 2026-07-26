@@ -97,6 +97,46 @@ const drawWrappedLines = (
   return cursorY;
 };
 
+const loadImageElement = (url: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    if (typeof Image === "undefined") {
+      reject(new Error("Image loading is unavailable."));
+      return;
+    }
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Unable to load image."));
+    image.src = url;
+  });
+
+const prepareSquareImageDataUrl = async (url: string): Promise<string | null> => {
+  const normalized = String(url || "").trim();
+  if (!normalized || typeof document === "undefined") return null;
+
+  try {
+    const image = await loadImageElement(normalized);
+    const canvas = document.createElement("canvas");
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    const naturalWidth = image.naturalWidth || image.width;
+    const naturalHeight = image.naturalHeight || image.height;
+    if (!naturalWidth || !naturalHeight) return null;
+
+    const cropSize = Math.min(naturalWidth, naturalHeight);
+    const sourceX = (naturalWidth - cropSize) / 2;
+    const sourceY = (naturalHeight - cropSize) / 2;
+    context.drawImage(image, sourceX, sourceY, cropSize, cropSize, 0, 0, size, size);
+    return canvas.toDataURL("image/jpeg", 0.9);
+  } catch {
+    return normalized.startsWith("data:image/") ? normalized : null;
+  }
+};
+
 const drawFittedCellValue = (
   doc: any,
   value: string,
@@ -112,6 +152,129 @@ const drawFittedCellValue = (
   doc.text(normalized, x, y, { baseline: "alphabetic" });
 };
 
+const splitOversizedToken = (doc: any, token: string, maxWidth: number): string[] => {
+  const normalized = String(token || "").trim();
+  if (!normalized || doc.getTextWidth(normalized) <= maxWidth) return normalized ? [normalized] : [];
+
+  const chunks: string[] = [];
+  let current = "";
+  Array.from(normalized).forEach((char) => {
+    const candidate = `${current}${char}`;
+    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+      current = candidate;
+      return;
+    }
+    chunks.push(current);
+    current = char;
+  });
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [normalized];
+};
+
+const wrapCellValue = (
+  doc: any,
+  value: string,
+  maxWidth: number,
+  fontSize: number,
+  maxLines = 6
+): string[] => {
+  const normalized = String(value || "-").replace(/\s+/g, " ").trim() || "-";
+  doc.setFontSize(fontSize);
+  const words = normalized.split(" ").flatMap((word) => splitOversizedToken(doc, word, maxWidth));
+  const lines: string[] = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || doc.getTextWidth(candidate) <= maxWidth) {
+      current = candidate;
+      return;
+    }
+    lines.push(current);
+    current = word;
+  });
+  if (current) lines.push(current);
+
+  if (lines.length <= maxLines) return lines;
+  const clipped = lines.slice(0, maxLines);
+  const ellipsis = "...";
+  let last = clipped[clipped.length - 1] || "";
+  while (last.length && doc.getTextWidth(`${last}${ellipsis}`) > maxWidth) {
+    last = last.slice(0, -1).trimEnd();
+  }
+  clipped[clipped.length - 1] = last ? `${last}${ellipsis}` : ellipsis;
+  return clipped;
+};
+
+const drawWrappedCellValue = (
+  doc: any,
+  value: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  options: { fontSize?: number; lineHeight?: number; maxLines?: number } = {}
+): number => {
+  const fontSize = options.fontSize ?? 7;
+  const lineHeight = options.lineHeight ?? 3.4;
+  const lines = wrapCellValue(doc, value, maxWidth, fontSize, options.maxLines ?? 6);
+  doc.setFontSize(fontSize);
+  doc.text(lines, x, y, { baseline: "alphabetic" });
+  return lines.length * lineHeight;
+};
+
+const drawSnakeSummaryBlock = async (doc: any, template: LabCertificateTemplateData, y: number): Promise<number> => {
+  const imageUrl = String(template.snake.imageUrl || "").trim();
+  const hasImage = !!imageUrl;
+  const blockX = 15;
+  const blockWidth = 180;
+  const photoSize = 32;
+  const photoX = blockX + blockWidth - photoSize - 8;
+  const textWidth = hasImage ? 126 : 168;
+  const detailLineHeight = 4.4;
+  const detailLines = [
+    `Name: ${template.snake.name || "-"}`,
+    `Snake ID: ${template.snake.displayId || template.snake.id || "-"}`,
+    `Morph: ${template.snake.morph || "-"}`,
+  ];
+
+  setPdfFont(doc, "normal");
+  doc.setFontSize(8.8);
+  const wrappedDetails = detailLines.flatMap((line) => doc.splitTextToSize(line, textWidth));
+  const blockHeight = Math.max(hasImage ? 42 : 32, 20 + (wrappedDetails.length * detailLineHeight));
+  const photoY = y + ((blockHeight - photoSize) / 2);
+
+  y = ensureSpace(doc, y, blockHeight + 6);
+
+  doc.setDrawColor(205, 205, 205);
+  doc.setFillColor(250, 250, 250);
+  doc.roundedRect(blockX, y, blockWidth, blockHeight, 2, 2, "FD");
+
+  setPdfFont(doc, "bold");
+  doc.setFontSize(10.5);
+  doc.text("Animal tested", blockX + 6, y + 8);
+
+  setPdfFont(doc, "normal");
+  doc.setFontSize(8.8);
+  doc.text(wrappedDetails, blockX + 6, y + 15, { baseline: "alphabetic" });
+
+  if (hasImage) {
+    doc.setDrawColor(160, 160, 160);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(photoX, photoY, photoSize, photoSize, "FD");
+    const preparedImage = await prepareSquareImageDataUrl(imageUrl);
+    if (preparedImage) {
+      try {
+        doc.addImage(preparedImage, "JPEG", photoX + 1, photoY + 1, photoSize - 2, photoSize - 2);
+      } catch {
+        doc.setFontSize(7.5);
+        doc.text("Photo unavailable", photoX + (photoSize / 2), photoY + (photoSize / 2), { align: "center" });
+      }
+    }
+  }
+
+  return y + blockHeight + 6;
+};
+
 const drawResultBlock = (doc: any, row: LabCertificateTemplateData["resultRows"][number], y: number): number => {
   const topColumns = [
     { label: "Test", x: 15, width: 39, value: row.test },
@@ -121,16 +284,31 @@ const drawResultBlock = (doc: any, row: LabCertificateTemplateData["resultRows"]
   ];
 
   const bottomColumns = [
-    { label: "Test #", x: 15, width: 31, value: row.testCode },
-    { label: "Snake ID", x: 47, width: 27, value: row.snakeId },
-    { label: "Morph", x: 75, width: 63, value: row.morph || "-" },
-    { label: "Result", x: 139, width: 27, value: row.result },
-    { label: "Genotype", x: 167, width: 28, value: row.genotype },
+    { label: "Test #", x: 15, width: 30, value: row.testCode, maxLines: 3 },
+    { label: "Snake ID", x: 47, width: 32, value: row.snakeId, maxLines: 8 },
+    { label: "Morph", x: 81, width: 54, value: row.morph || "-", maxLines: 8 },
+    { label: "Result", x: 137, width: 28, value: row.result, maxLines: 6 },
+    { label: "Genotype", x: 167, width: 28, value: row.genotype, maxLines: 6 },
   ];
+  const bottomFontSize = 7;
+  const bottomLineHeight = 3.35;
+  setPdfFont(doc, "normal");
+  doc.setFontSize(bottomFontSize);
+  const bottomRowHeight = Math.max(
+    7,
+    ...bottomColumns.map((column) =>
+      wrapCellValue(doc, column.value, column.width, bottomFontSize, column.maxLines).length * bottomLineHeight
+    )
+  );
+  const blockHeight = 24 + bottomRowHeight;
+  if (y + blockHeight > PAGE_BOTTOM_MM) {
+    doc.addPage();
+    y = 18;
+  }
 
   doc.setDrawColor(205, 205, 205);
   doc.setFillColor(248, 248, 248);
-  doc.roundedRect(15, y - 5, 180, 31, 2, 2, "FD");
+  doc.roundedRect(15, y - 5, 180, blockHeight, 2, 2, "FD");
   doc.setFillColor(242, 242, 242);
   doc.rect(15, y - 5, 180, 8, "F");
 
@@ -153,13 +331,17 @@ const drawResultBlock = (doc: any, row: LabCertificateTemplateData["resultRows"]
 
   setPdfFont(doc, "normal");
   bottomColumns.forEach((column) => {
-    drawFittedCellValue(doc, column.value, column.x, y + 22, column.width, 10.2, 5.4);
+    drawWrappedCellValue(doc, column.value, column.x, y + 22, column.width, {
+      fontSize: bottomFontSize,
+      lineHeight: bottomLineHeight,
+      maxLines: column.maxLines,
+    });
   });
 
   doc.setDrawColor(215, 215, 215);
   doc.line(15, y + 11, 195, y + 11);
 
-  return y + 35;
+  return y + blockHeight + 4;
 };
 
 export const renderLabCertificatePdf = async (
@@ -218,6 +400,7 @@ export const renderLabCertificatePdf = async (
   y += 6;
   doc.setFontSize(10);
   y = drawWrappedLines(doc, buildBreederLines(template), 25, y, 120, 5.4) + 6;
+  y = await drawSnakeSummaryBlock(doc, template, y);
 
   const rows = Array.isArray(template.resultRows) ? template.resultRows : [];
   rows.forEach((row) => {

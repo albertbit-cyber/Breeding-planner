@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm install --no-audit --no-fund && npm run build"
 
 [variables]
 NIXPACKS_NODE_VERSION = "22"

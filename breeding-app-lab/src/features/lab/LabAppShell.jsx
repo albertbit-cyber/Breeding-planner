@@ -11,6 +11,7 @@ import { createLabApiClient } from "./api/client";
 import TestCatalogPage from "./pages/TestCatalogPage.jsx";
 import PricingLogicPage from "./pages/PricingLogicPage.jsx";
 import SharedBackendGuard from "../../components/SharedBackendGuard.jsx";
+import GlobalScanOverlay from "./components/GlobalScanOverlay.jsx";
 
 const DEFAULT_ROUTE = "/lab/dashboard";
 
@@ -122,7 +123,9 @@ const normalizeHashPath = (hashValue) => {
 };
 
 const parseRoute = (path) => {
-  const normalized = normalizeHashPath(path);
+  const [pathOnly, queryString] = String(path || "").split("?");
+  const normalized = normalizeHashPath(pathOnly);
+  const params = new URLSearchParams(queryString || "");
   if (normalized === "/lab" || normalized === "/lab/") {
     return { route: "/lab/dashboard" };
   }
@@ -131,8 +134,15 @@ const parseRoute = (path) => {
   if (normalized === "/lab/incoming-orders") return { route: "/lab/incoming-orders" };
   if (normalized === "/admin/shed-tests") return { route: "/lab/incoming-orders" };
   if (normalized === "/admin" || normalized === "/admin/") return { route: "/lab/admin-oversight" };
-  if (normalized === "/lab/sample-intake") return { route: "/lab/sample-intake" };
-  if (normalized === "/lab/result-entry") return { route: "/lab/result-entry" };
+  // presetToken/presetOrderId let the global Scan action (see GlobalScanOverlay)
+  // land directly on the right step for a sample instead of making the tech
+  // re-scan or hunt for the right order in a dropdown.
+  if (normalized === "/lab/sample-intake") {
+    return { route: "/lab/sample-intake", presetToken: params.get("token") || undefined };
+  }
+  if (normalized === "/lab/result-entry") {
+    return { route: "/lab/result-entry", presetOrderId: params.get("orderId") || undefined };
+  }
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
   if (normalized === "/lab/admin-oversight") return { route: "/lab/admin-oversight" };
   if (normalized === "/lab/test-catalog") return { route: "/lab/test-catalog" };
@@ -169,9 +179,9 @@ const pageForRoute = (parsedRoute, role) => {
     case "/lab/incoming-orders":
       return <IncomingOrdersPage />;
     case "/lab/sample-intake":
-      return <SampleIntakePage />;
+      return <SampleIntakePage presetToken={parsedRoute.presetToken} />;
     case "/lab/result-entry":
-      return <ResultEntryPage />;
+      return <ResultEntryPage presetOrderId={parsedRoute.presetOrderId} />;
     case "/lab/completed-tests":
       return <CompletedTestsPage />;
     case "/lab/admin-oversight":
@@ -236,6 +246,8 @@ const getLabUserName = () => {
 
 export default function LabAppShell() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   useEffect(() => {
     const onHashChange = () => {
@@ -245,6 +257,12 @@ export default function LabAppShell() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  // Close the mobile nav drawer and scan overlay whenever the route changes.
+  useEffect(() => {
+    setMobileNavOpen(false);
+    setScanOpen(false);
+  }, [hashPath]);
 
   const role = useMemo(() => getCurrentAppRole(), [hashPath]);
   const isAllowed = canAccessLabApp(role);
@@ -291,8 +309,151 @@ export default function LabAppShell() {
     );
   }
 
+  // Shared between the desktop sidebar and the mobile drawer so every nav
+  // item (including Sample Intake's QR scanner) is reachable on any screen
+  // size — the sidebar itself is desktop-only (`lg:block`).
+  const navButtons = (onNavigate) => (
+    <>
+      {isDevEnv && (
+        <button
+          type="button"
+          onClick={() => onNavigate("/lab/dev-tools")}
+          className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+            parsedRoute.route === "/lab/dev-tools"
+              ? "border-amber-600 bg-amber-600 text-white"
+              : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300"
+          }`}
+        >
+          Developer Tools
+        </button>
+      )}
+      {visibleNavItems.map((item) => {
+        const isActive =
+          parsedRoute.route === item.path ||
+          (item.path.includes("placeholder-order-id") && parsedRoute.route === "/lab/orders/:orderId");
+
+        return (
+          <button
+            key={item.path}
+            type="button"
+            onClick={() => onNavigate(item.path)}
+            className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+              isActive
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300"
+            }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+      <div className="mt-3 border-t border-neutral-200 pt-3">
+        {getLabUserName() ? (
+          <div className="mb-2 px-1 text-xs text-neutral-500 truncate">
+            Signed in as <span className="font-medium text-neutral-700">{getLabUserName()}</span>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("lab:logout"))}
+          className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+        >
+          Sign Out
+        </button>
+      </div>
+    </>
+  );
+
+  const isBottomTabActive = (path) =>
+    parsedRoute.route === path ||
+    (path === "/lab/orders/placeholder-order-id" && parsedRoute.route === "/lab/orders/:orderId");
+
   return (
-    <div className="min-h-screen bg-neutral-100 text-neutral-900">
+    <div className="min-h-screen bg-neutral-100 pb-20 text-neutral-900 lg:pb-0">
+      {/* Compact mobile title bar — navigation itself lives in the bottom tab
+          bar below, kept off this row so it doesn't compete for space. */}
+      <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 lg:hidden">
+        <div className="text-xs uppercase tracking-wide text-neutral-500">ProHerper</div>
+        <div className="text-base font-semibold text-neutral-900">Laboratory</div>
+      </div>
+
+      {/* "More" bottom sheet — the rest of the nav list (Sample Intake without
+          scanning, Completed Tests, catalog/pricing/admin pages, sign out)
+          that doesn't fit as a primary bottom-tab icon. */}
+      {mobileNavOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-30 bg-neutral-950/40 lg:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <nav className="fixed inset-x-0 bottom-16 z-30 max-h-[65vh] overflow-y-auto rounded-t-2xl border-t border-neutral-200 bg-white p-3 shadow-lg lg:hidden">
+            {navButtons(navigateToHashPath)}
+          </nav>
+        </>
+      ) : null}
+
+      {/* Bottom tab bar — the most-needed actions, Scan always reachable from
+          any page, everything else lives above it in the page content. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <div className="mx-auto flex max-w-md items-stretch justify-between">
+          <button
+            type="button"
+            onClick={() => navigateToHashPath("/lab/dashboard")}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
+              isBottomTabActive("/lab/dashboard") ? "text-neutral-900" : "text-neutral-500"
+            }`}
+          >
+            <span className="text-lg leading-none">🏠</span>
+            Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToHashPath("/lab/incoming-orders")}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
+              isBottomTabActive("/lab/incoming-orders") ? "text-neutral-900" : "text-neutral-500"
+            }`}
+          >
+            <span className="text-lg leading-none">📋</span>
+            Orders
+          </button>
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-neutral-900"
+          >
+            <span className="-mt-4 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg text-white shadow-lg">
+              📷
+            </span>
+            Scan
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToHashPath("/lab/result-entry")}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
+              isBottomTabActive("/lab/result-entry") ? "text-neutral-900" : "text-neutral-500"
+            }`}
+          >
+            <span className="text-lg leading-none">🧪</span>
+            Results
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen((open) => !open)}
+            aria-expanded={mobileNavOpen}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
+              mobileNavOpen ? "text-neutral-900" : "text-neutral-500"
+            }`}
+          >
+            <span className="text-lg leading-none">⋯</span>
+            More
+          </button>
+        </div>
+      </nav>
+
+      {scanOpen ? <GlobalScanOverlay onClose={() => setScanOpen(false)} /> : null}
+
       <div className="mx-auto flex max-w-7xl gap-4 p-4 lg:p-6">
         <aside className="hidden w-64 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm lg:block">
           <div className="px-2 py-2">
@@ -300,69 +461,16 @@ export default function LabAppShell() {
             <div className="text-lg font-semibold text-neutral-900">Laboratory</div>
           </div>
           <nav className="mt-2 flex flex-col gap-1">
-            {isDevEnv && (
-            <button
-              type="button"
-              onClick={() => navigateToHashPath("/lab/dev-tools")}
-              className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
-                parsedRoute.route === "/lab/dev-tools"
-                  ? "border-amber-600 bg-amber-600 text-white"
-                  : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300"
-              }`}
-            >
-              Developer Tools
-            </button>
-          )}
-          {visibleNavItems.map((item) => {
-              const isActive =
-                parsedRoute.route === item.path ||
-                (item.path.includes("placeholder-order-id") && parsedRoute.route === "/lab/orders/:orderId");
-
-              return (
-                <button
-                  key={item.path}
-                  type="button"
-                  onClick={() => navigateToHashPath(item.path)}
-                  className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
-                    isActive
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-            <div className="mt-3 border-t border-neutral-200 pt-3">
-              {getLabUserName() ? (
-                <div className="mb-2 px-1 text-xs text-neutral-500 truncate">
-                  Signed in as <span className="font-medium text-neutral-700">{getLabUserName()}</span>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("lab:logout"))}
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-              >
-                Sign Out
-              </button>
-            </div>
+            {navButtons(navigateToHashPath)}
           </nav>
         </aside>
 
         <main className="min-w-0 flex-1 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:p-6">
-          <div className="mb-4 flex items-center justify-between gap-2 border-b border-neutral-100 pb-3">
+          <div className="mb-4 hidden items-center justify-between gap-2 border-b border-neutral-100 pb-3 lg:flex">
             <div>
               <div className="text-xs uppercase tracking-wide text-neutral-500">Lab Workflow</div>
               <div className="text-lg font-semibold text-neutral-900">{parsedRoute.route}</div>
             </div>
-            <button
-              type="button"
-              className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm lg:hidden"
-              onClick={() => navigateToHashPath("/lab/dashboard")}
-            >
-              Dashboard
-            </button>
           </div>
           <SharedBackendGuard featureName="Lab workflow pages">
             {parsedRoute.route === "/lab/dev-tools" ? (

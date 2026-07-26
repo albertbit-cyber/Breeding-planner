@@ -141,12 +141,11 @@ const clearStoredAuth = (scope?: AuthScope): void => {
   clearStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 };
 
+// No platform sets this anymore (see login()/refreshAuthSession() below), but
+// a browser that hit the old cookie-based flow may still have it stored, so
+// keep honoring it defensively until that flag is cleared on next login.
 const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
   getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
-
-const setCookiePreferredAuth = (scope?: AuthScope): void => {
-  setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
-};
 
 const getStoredCsrfToken = (scope?: AuthScope): string =>
   getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
@@ -336,10 +335,9 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
     }
 
     const nextToken = String(data?.token || "").trim();
-    const nextRefreshToken = String(data?.refreshToken || "").trim();
-    if (!nextToken || !nextRefreshToken) {
+    if (!nextToken) {
       const error = new SharedApiError(
-        "Shared backend refresh did not return valid auth tokens.",
+        "Shared backend refresh did not return a valid access token.",
         "unauthorized",
         401,
         data
@@ -349,15 +347,20 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
+    // Cross-origin cookies are unreliable across platforms (Electron's file://
+    // origin, and Chrome's third-party cookie blocking for the web app), so
+    // every platform stores the bearer token/refresh token directly instead.
+    // Clear any stale cookie-preferred flag a previous session may have set.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
     setStoredToken(nextToken, scope);
-    setStoredRefreshToken(nextRefreshToken, scope);
-    setCookiePreferredAuth(scope);
+    const nextRefreshToken = String(data?.refreshToken || "").trim();
+    if (nextRefreshToken) setStoredRefreshToken(nextRefreshToken, scope);
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
     return {
       token: nextToken,
-      refreshToken: nextRefreshToken,
+      refreshToken: String(data?.refreshToken || "").trim(),
     };
   })().finally(() => {
     refreshRequestPromises[scope] = undefined;
@@ -472,7 +475,8 @@ export const getRefreshToken = (scope?: AuthScope): string => getStoredRefreshTo
 
 export const setRefreshToken = (token: string, scope?: AuthScope): void => setStoredRefreshToken(String(token || "").trim(), scope);
 
-export const hasStoredAuthSession = (scope?: AuthScope): boolean => Boolean(getStoredToken(scope) || getStoredRefreshToken(scope));
+export const hasStoredAuthSession = (scope?: AuthScope): boolean =>
+  Boolean(getStoredToken(scope) || getStoredRefreshToken(scope) || isCookiePreferredAuth(scope));
 
 export const clearAuthToken = (scope?: AuthScope): void => clearStoredAuth(scope);
 
@@ -519,10 +523,14 @@ export const login = async (payload: { email: string; password: string }, authSc
     requiresAuth: false,
     authScope: scope,
   });
-  if (data?.token && data?.refreshToken) {
-    setStoredToken(data.token, scope);
-    setStoredRefreshToken(data.refreshToken, scope);
-    setCookiePreferredAuth(scope);
+  if (data?.token) {
+    // Cross-origin cookies are unreliable across platforms (Electron's file://
+    // origin, and Chrome's third-party cookie blocking for the web app), so
+    // every platform stores the bearer token/refresh token directly instead.
+    // Clear any stale cookie-preferred flag a previous session may have set.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+    setStoredToken(String(data.token), scope);
+    if (data.refreshToken) setStoredRefreshToken(String(data.refreshToken), scope);
     if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
   }
@@ -536,8 +544,36 @@ export const register = async (payload: { email: string; password: string; fullN
     requiresAuth: false,
   });
 
-export const recoverPassword = async (payload: { email: string; fullName: string; newPassword: string }) =>
-  request<{ message: string }>("/auth/recover-password", {
+export const forgotPassword = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resetPassword = async (payload: { token: string; newPassword: string }) =>
+  request<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const verifyEmail = async (payload: { token: string }) =>
+  request<{ message: string; alreadyVerified?: boolean; user?: unknown }>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const resendVerification = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const confirmEmailChange = async (payload: { token: string }) =>
+  request<{ message: string; user?: unknown }>("/auth/confirm-email-change", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
@@ -585,7 +621,11 @@ export type BreederSnapshotPayload = {
   animals: unknown[];
   pairings: unknown[];
   clutches?: unknown[];
+  plannerState?: Record<string, unknown> | null;
 };
+
+const BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS = 30_000;
+const BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS = 90_000;
 
 export type BreederProfilePayload = {
   breederName?: string;
@@ -617,12 +657,60 @@ export type MarketplaceListingPayload = {
 };
 
 export const fetchBreederSnapshot = async () =>
-  request<BreederSnapshotPayload>("/breeder/snapshot");
+  request<BreederSnapshotPayload>("/breeder/snapshot", {
+    timeoutMs: BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS,
+  });
+
+const BREEDER_SNAPSHOT_MEDIA_FIELD_KEYS = new Set([
+  "imageUrl",
+  "photoUrl",
+  "pictureUrl",
+  "thumbnailUrl",
+  "certificateUrl",
+  "labCertificateUrl",
+  "logoUrl",
+  "url",
+  "src",
+  "dataUrl",
+]);
+const BREEDER_SNAPSHOT_MEDIA_STRING_LIMIT = 200000;
+
+const isEmbeddedMediaString = (value: string): boolean => value.trim().startsWith("data:");
+
+// Camera captures and file uploads land here as base64 data: URIs. The backend body-size
+// limit exists to protect the server, not to store media, so strip embedded media before
+// it ever hits the wire — regardless of which UI (desktop or mobile) built the payload.
+const stripEmbeddedMediaForSync = (value: unknown, key = ""): unknown => {
+  if (typeof value === "string") {
+    if (isEmbeddedMediaString(value)) return undefined;
+    if (BREEDER_SNAPSHOT_MEDIA_FIELD_KEYS.has(key) && value.length > BREEDER_SNAPSHOT_MEDIA_STRING_LIMIT) return undefined;
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripEmbeddedMediaForSync(item, key))
+      .filter((item) => {
+        if (item == null) return false;
+        if (typeof item === "object") return Object.keys(item as object).length > 0;
+        return true;
+      });
+  }
+  if (value && typeof value === "object") {
+    const cleaned: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([entryKey, entryValue]) => {
+      const nextValue = stripEmbeddedMediaForSync(entryValue, entryKey);
+      if (typeof nextValue !== "undefined") cleaned[entryKey] = nextValue;
+    });
+    return cleaned;
+  }
+  return value;
+};
 
 export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
   request<BreederSnapshotPayload>("/breeder/snapshot", {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(stripEmbeddedMediaForSync(payload)),
+    timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
   });
 
 export const fetchMyBreederProfile = async () =>

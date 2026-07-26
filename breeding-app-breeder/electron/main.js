@@ -28,16 +28,16 @@ const localeReady = electronLocale.initPromise.catch((error) => {
   console.error('Failed to initialize electron translations', error);
 });
 
-const getWindowTitle = () => electronLocale.t('window.title', { defaultValue: 'Breeding Planner' });
+const getWindowTitle = () => electronLocale.t('window.title', { defaultValue: 'Serpentora' });
 
 const DIALOG_DEFAULTS = {
   storageReadFailed: {
     title: 'Unable to open data',
-    message: 'Breeding Planner could not read your local data file. A new workspace will be created.',
+    message: 'Serpentora could not read your local data file. A new workspace will be created.',
   },
   storageWriteFailed: {
     title: 'Unable to save data',
-    message: 'Breeding Planner could not save your latest changes. Try again or export a manual backup.',
+    message: 'Serpentora could not save your latest changes. Try again or export a manual backup.',
   },
 };
 
