@@ -58,11 +58,37 @@ function PatternTag({ tag }) {
 
 function PredictionCard({ title, window: win, source }) {
   if (!win) return null;
+  const earliestDays = daysFromToday(win.earliest);
   const avgDays = daysFromToday(win.average);
+  const latestDays = daysFromToday(win.latest);
   const urgency = avgDays !== null && avgDays <= 7 ? 'border-rose-200 bg-rose-50' : 'border-violet-100 bg-violet-50/60';
+
+  let barLeftPct = null;
+  let barWidthPct = null;
+  let avgPct = null;
+  if (earliestDays !== null && latestDays !== null && latestDays > earliestDays) {
+    const axisStart = Math.min(0, earliestDays);
+    const axisEnd = Math.max(latestDays, axisStart + 1);
+    const span = axisEnd - axisStart;
+    barLeftPct = ((earliestDays - axisStart) / span) * 100;
+    barWidthPct = ((latestDays - earliestDays) / span) * 100;
+    avgPct = avgDays !== null ? ((avgDays - axisStart) / span) * 100 : null;
+  }
+
   return (
     <div className={`rounded-xl border p-3 ${urgency}`}>
       <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1">{title}</div>
+      {barLeftPct !== null && (
+        <div className="relative h-2.5 rounded-full bg-violet-100 overflow-hidden mb-2">
+          <div
+            className="absolute inset-y-0 rounded-full bg-violet-400"
+            style={{ left: `${barLeftPct}%`, width: `${barWidthPct}%` }}
+          />
+          {avgPct !== null && (
+            <div className="absolute inset-y-0 w-0.5 bg-violet-700" style={{ left: `${avgPct}%` }} />
+          )}
+        </div>
+      )}
       <div className="space-y-0.5">
         <div className="flex justify-between text-[11px]">
           <span className="text-neutral-400">Earliest</span>
@@ -191,6 +217,17 @@ function CycleRow({ cycle }) {
   );
 }
 
+// ── Stat tile ─────────────────────────────────────────────────────────────────
+
+function StatTile({ label, value, accent }) {
+  return (
+    <div className="rounded-xl bg-violet-50/60 border border-violet-100 px-3 py-2.5 flex flex-col gap-0.5 min-w-0">
+      <div className={`text-lg font-bold truncate ${accent ? 'text-emerald-600' : 'text-neutral-800'}`}>{value ?? '—'}</div>
+      <div className="text-[10px] text-neutral-500">{label}</div>
+    </div>
+  );
+}
+
 // ── Analytics overview ────────────────────────────────────────────────────────
 
 function AnalyticsOverview({ analytics }) {
@@ -269,6 +306,13 @@ export function ReproductiveIntelligencePanel({ snake }) {
 
   // Active cycle for prediction context
   const activeCycle = cycles.find(c => !c.eggLayingDate);
+
+  // Most recent lock date across all recorded cycles, for the headline stat tile
+  const lastLockDate = cycles
+    .flatMap(c => (c.locks || []).map(l => l.lockDate))
+    .filter(Boolean)
+    .sort()
+    .slice(-1)[0] || null;
 
   return (
     <div className="border border-violet-100 rounded-2xl overflow-hidden bg-white">
@@ -371,6 +415,19 @@ export function ReproductiveIntelligencePanel({ snake }) {
                 {analytics.totalCycles > 0 && (
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">Lifetime Averages</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                      <StatTile label="Total cycles" value={analytics.totalCycles} />
+                      <StatTile
+                        label="Avg days between locks"
+                        value={analytics.avgDaysBetweenLocks != null ? `${analytics.avgDaysBetweenLocks}d` : null}
+                      />
+                      <StatTile label="Last lock date" value={lastLockDate ? formatDate(lastLockDate) : null} />
+                      <StatTile
+                        label="Avg fertility"
+                        value={analytics.avgFertilityRate != null ? `${Math.round(analytics.avgFertilityRate * 100)}%` : null}
+                        accent
+                      />
+                    </div>
                     <AnalyticsOverview analytics={analytics} />
                   </div>
                 )}

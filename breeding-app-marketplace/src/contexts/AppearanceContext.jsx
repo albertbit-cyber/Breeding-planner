@@ -2,6 +2,25 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 const APPEARANCE_STORAGE_KEY = "breedingPlannerAppearance.v1";
 const CUSTOM_PRESET_STORAGE_KEY = "breedingPlannerCustomPresets.v1";
+
+// Fixed semantic status colors — not themeable per-preset except where a preset
+// (e.g. "editorial") deliberately re-tunes them for a dark card/light-card contrast pairing.
+const DEFAULT_STATUS_COLORS = {
+  success: { bg: "#f0fdf4", border: "#bbf7d0", text: "#166534" },
+  error: { bg: "#fff1f2", border: "#fecaca", text: "#9f1239" },
+  warning: { bg: "#dcfce7", border: "#86efac", text: "#166534" },
+  danger: { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" },
+  neutral: { bg: "#f3f4f6", border: "#d1d5db", text: "#6b7280" },
+};
+
+const EDITORIAL_STATUS_COLORS = {
+  success: { bg: "#16352c", border: "#235143", text: "#8fd6bd" },
+  error: { bg: "#3a1c1c", border: "#5c2b2b", text: "#e39b9b" },
+  warning: { bg: "#362a14", border: "#574019", text: "#e0bc78" },
+  danger: { bg: "#3a1c1c", border: "#5c2b2b", text: "#d98888" },
+  neutral: { bg: "#2a2620", border: "#443c30", text: "#a89e8e" },
+};
+
 const DEFAULT_APPEARANCE = {
   version: 1,
   preset: "default",
@@ -13,9 +32,13 @@ const DEFAULT_APPEARANCE = {
     background: "#f6f7f9",
     card: "#ffffff",
     text: "#0f172a",
+    status: DEFAULT_STATUS_COLORS,
   },
   typography: {
     fontFamily: "default",
+    // "inherit" reuses fontFamily for headings; a FONT_FAMILIES key (e.g. "serif")
+    // gives headings a distinct display face while body text stays on fontFamily.
+    headingFontFamily: "inherit",
     fontSize: "medium",
     lineSpacing: "normal",
   },
@@ -87,6 +110,7 @@ const HIGH_CONTRAST_COLORS = {
   background: "#000000",
   card: "#111111",
   text: "#ffffff",
+  status: DEFAULT_STATUS_COLORS,
 };
 
 const APPEARANCE_PRESETS = {
@@ -110,9 +134,11 @@ const APPEARANCE_PRESETS = {
         background: "#fbfbfb",
         card: "#ffffff",
         text: "#0f172a",
+        status: DEFAULT_STATUS_COLORS,
       },
       typography: {
         fontFamily: "default",
+        headingFontFamily: "inherit",
         fontSize: "medium",
         lineSpacing: "normal",
       },
@@ -130,6 +156,7 @@ const APPEARANCE_PRESETS = {
       colors: HIGH_CONTRAST_COLORS,
       typography: {
         fontFamily: "inter",
+        headingFontFamily: "inherit",
         fontSize: "large",
         lineSpacing: "relaxed",
       },
@@ -156,9 +183,11 @@ const APPEARANCE_PRESETS = {
         background: "#ffffff",
         card: "#ffffff",
         text: "#000000",
+        status: DEFAULT_STATUS_COLORS,
       },
       typography: {
         fontFamily: "opensans",
+        headingFontFamily: "inherit",
         fontSize: "xlarge",
         lineSpacing: "relaxed",
       },
@@ -185,9 +214,38 @@ const APPEARANCE_PRESETS = {
         background: "#05070d",
         card: "#111827",
         text: "#e2e8f0",
+        status: DEFAULT_STATUS_COLORS,
       },
       typography: {
         fontFamily: "inter",
+        headingFontFamily: "inherit",
+        fontSize: "medium",
+        lineSpacing: "normal",
+      },
+      layoutDensity: "comfortable",
+      borderStyle: "soft",
+    },
+  },
+  editorial: {
+    key: "editorial",
+    label: "Editorial",
+    description: "Deep charcoal, ivory, emerald and brass, with serif headings — a quieter, considered palette.",
+    state: {
+      ...DEFAULT_APPEARANCE,
+      preset: "editorial",
+      themeMode: "dark",
+      colors: {
+        primary: "#1f5e4e",
+        secondary: "#2b3a52",
+        accent: "#c8975a",
+        background: "#14110f",
+        card: "#faf6ef",
+        text: "#201b16",
+        status: EDITORIAL_STATUS_COLORS,
+      },
+      typography: {
+        fontFamily: "default",
+        headingFontFamily: "serif",
         fontSize: "medium",
         lineSpacing: "normal",
       },
@@ -209,9 +267,11 @@ const APPEARANCE_PRESETS = {
         background: "#fef6fb",
         card: "#ffffff",
         text: "#2e1065",
+        status: DEFAULT_STATUS_COLORS,
       },
       typography: {
         fontFamily: "opensans",
+        headingFontFamily: "inherit",
         fontSize: "medium",
         lineSpacing: "relaxed",
       },
@@ -382,11 +442,17 @@ export function AppearanceProvider({ children }) {
     return merged;
   }, [appearanceState.colors, appearanceState.preset, effectiveThemeMode]);
 
-  const resolvedTypography = useMemo(() => ({
-    fontFamily: FONT_FAMILIES[appearanceState.typography.fontFamily] || FONT_FAMILIES.default,
-    fontSize: FONT_SIZE_SCALE[appearanceState.typography.fontSize] || FONT_SIZE_SCALE.medium,
-    lineSpacing: LINE_HEIGHT_SCALE[appearanceState.typography.lineSpacing] || LINE_HEIGHT_SCALE.normal,
-  }), [appearanceState.typography.fontFamily, appearanceState.typography.fontSize, appearanceState.typography.lineSpacing]);
+  const resolvedTypography = useMemo(() => {
+    const fontFamily = FONT_FAMILIES[appearanceState.typography.fontFamily] || FONT_FAMILIES.default;
+    const headingKey = appearanceState.typography.headingFontFamily || "inherit";
+    const headingFontFamily = headingKey === "inherit" ? fontFamily : (FONT_FAMILIES[headingKey] || fontFamily);
+    return {
+      fontFamily,
+      headingFontFamily,
+      fontSize: FONT_SIZE_SCALE[appearanceState.typography.fontSize] || FONT_SIZE_SCALE.medium,
+      lineSpacing: LINE_HEIGHT_SCALE[appearanceState.typography.lineSpacing] || LINE_HEIGHT_SCALE.normal,
+    };
+  }, [appearanceState.typography.fontFamily, appearanceState.typography.headingFontFamily, appearanceState.typography.fontSize, appearanceState.typography.lineSpacing]);
 
   const resolvedDensity = useMemo(() => DENSITY_MAP[appearanceState.layoutDensity] || DENSITY_MAP.comfortable, [appearanceState.layoutDensity]);
   const resolvedRadius = useMemo(() => RADIUS_MAP[appearanceState.borderStyle] || RADIUS_MAP.soft, [appearanceState.borderStyle]);
@@ -396,6 +462,8 @@ export function AppearanceProvider({ children }) {
     reduced: appearanceState.motion.reducedMotion || systemMotion,
   }), [appearanceState.motion.animations, appearanceState.motion.reducedMotion, systemMotion]);
 
+  const resolvedStatus = resolvedColors.status || DEFAULT_STATUS_COLORS;
+
   const cssVariables = useMemo(() => ({
     "--color-primary": resolvedColors.primary,
     "--color-secondary": resolvedColors.secondary,
@@ -403,7 +471,23 @@ export function AppearanceProvider({ children }) {
     "--color-bg": resolvedColors.background,
     "--color-card": resolvedColors.card,
     "--color-text": resolvedColors.text,
+    "--status-success-bg": resolvedStatus.success.bg,
+    "--status-success-border": resolvedStatus.success.border,
+    "--status-success-text": resolvedStatus.success.text,
+    "--status-error-bg": resolvedStatus.error.bg,
+    "--status-error-border": resolvedStatus.error.border,
+    "--status-error-text": resolvedStatus.error.text,
+    "--status-warning-bg": resolvedStatus.warning.bg,
+    "--status-warning-border": resolvedStatus.warning.border,
+    "--status-warning-text": resolvedStatus.warning.text,
+    "--status-danger-bg": resolvedStatus.danger.bg,
+    "--status-danger-border": resolvedStatus.danger.border,
+    "--status-danger-text": resolvedStatus.danger.text,
+    "--status-neutral-bg": resolvedStatus.neutral.bg,
+    "--status-neutral-border": resolvedStatus.neutral.border,
+    "--status-neutral-text": resolvedStatus.neutral.text,
     "--font-family": resolvedTypography.fontFamily,
+    "--font-family-heading": resolvedTypography.headingFontFamily,
     "--font-size-base": resolvedTypography.fontSize,
     "--line-height": resolvedTypography.lineSpacing,
     "--border-radius": resolvedRadius,
@@ -417,7 +501,7 @@ export function AppearanceProvider({ children }) {
     "--primary-border": resolvedColors.secondary,
     "--primary-contrast": resolvedColors.text,
     "--motion-duration": resolvedMotion.animationsEnabled ? "250ms" : "0ms",
-  }), [resolvedColors, resolvedTypography, resolvedRadius, resolvedDensity, effectiveThemeMode, resolvedMotion.animationsEnabled]);
+  }), [resolvedColors, resolvedStatus, resolvedTypography, resolvedRadius, resolvedDensity, effectiveThemeMode, resolvedMotion.animationsEnabled]);
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;

@@ -12952,6 +12952,32 @@ function Badge({ children }) {
   return <span className="px-2 py-0.5 text-xs rounded-full border bg-neutral-50">{children}</span>;
 }
 
+function getStatusTone(status) {
+  const normalized = typeof status === 'string' ? status.trim().toLowerCase() : '';
+  if (normalized === 'active' || normalized === 'breeder') return 'success';
+  if (normalized === 'quarantine') return 'danger';
+  if (normalized === 'sold') return 'neutral';
+  if (normalized === 'holdback') return 'neutral';
+  if (normalized.includes('grow') || normalized.includes('sale') || normalized.includes('sell') || normalized === 'hold') return 'warning';
+  return 'neutral';
+}
+
+function StatusBadge({ status }) {
+  const tone = getStatusTone(status);
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold"
+      style={{
+        background: `var(--status-${tone}-bg, #f3f4f6)`,
+        borderColor: `var(--status-${tone}-border, #d1d5db)`,
+        color: `var(--status-${tone}-text, #6b7280)`,
+      }}
+    >
+      {status}
+    </span>
+  );
+}
+
 function SexBadge({ sex, label, showText = true, className }) {
   const normalized = normalizeSexValue(sex);
   const symbol = normalized === 'M' ? '\u2642' : normalized === 'F' ? '\u2640' : '?';
@@ -15430,7 +15456,14 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           </button>
         )}
         {isForSale && (
-          <span className="text-[11px] font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-0.5">
+          <span
+            className="text-[11px] font-semibold rounded-full px-2 py-0.5 border"
+            style={{
+              background: 'var(--status-warning-bg, #dcfce7)',
+              borderColor: 'var(--status-warning-border, #86efac)',
+              color: 'var(--status-warning-text, #166534)',
+            }}
+          >
             For Sale
           </span>
         )}
@@ -15736,8 +15769,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       )}
       
       <div className="mt-2 flex items-center gap-2">
-        <StatusDot status={displayStatus} />
-        <div className="text-xs">{displayStatus}</div>
+        <StatusBadge status={displayStatus} />
       </div>
       {isForSale && (
         <div className="mt-1 text-xs text-neutral-700">
@@ -15991,11 +16023,6 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   );
 }
 
-function StatusDot({ status }) {
-  const bg = status === "Active" ? "bg-emerald-500" : status === "Hold" ? "bg-amber-500" : "bg-rose-500";
-  return <span className={cx("inline-block w-2 h-2 rounded-full", bg)} />;
-}
-
 function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
@@ -16109,7 +16136,6 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
           {list.map((snake, index) => {
             const sexSummary = renderSexSummary(snake);
             const geneticsTokens = combineMorphsAndHetsForDisplay(snake?.morphs, snake?.hets, snake?.possibleHets);
-            const geneticsSummary = joinTokens(geneticsTokens);
             const statusLabel = typeof snake?.status === 'string' && snake.status.trim()
               ? snake.status.trim()
               : t('snakeEdit.status', { defaultValue: 'Status' });
@@ -16128,18 +16154,15 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
                     <span>{sexSummary.label}</span>
                   </div>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  {geneticsSummary ? (
-                    <div className="text-sm text-neutral-800 max-w-xs truncate" title={geneticsSummary}>{geneticsSummary}</div>
+                <td className="px-3 py-3 align-top max-w-xs">
+                  {geneticsTokens.length ? (
+                    <GeneLine genes={geneticsTokens} size="sm" />
                   ) : (
                     <div className="text-xs text-neutral-500">{t('snakeEdit.geneticsShort', { defaultValue: 'Genetics' })}: —</div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <div className="flex items-center gap-2 text-sm">
-                    <StatusDot status={statusLabel} />
-                    <span>{statusLabel}</span>
-                  </div>
+                  <StatusBadge status={statusLabel} />
                 </td>
                 <td className="px-3 py-3 align-top">
                   <div className="text-sm font-medium">{weightInfo.value}</div>
@@ -19648,12 +19671,14 @@ function AppearanceSettingsPanel() {
                   {active && <span className="text-[11px] font-semibold text-emerald-600 uppercase">{t('appearance.presets.active', { defaultValue: 'Active' })}</span>}
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
-                  {Object.entries(preset.state.colors).map(([colorKey, colorValue]) => (
-                    <span key={colorKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border">
-                      <span className="w-3 h-3 rounded-full border" style={{ background: colorValue }} />
-                      {colorKey}
-                    </span>
-                  ))}
+                  {Object.entries(preset.state.colors)
+                    .filter(([colorKey, colorValue]) => typeof colorValue === 'string')
+                    .map(([colorKey, colorValue]) => (
+                      <span key={colorKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border">
+                        <span className="w-3 h-3 rounded-full border" style={{ background: colorValue }} />
+                        {colorKey}
+                      </span>
+                    ))}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -20241,6 +20266,39 @@ function ProjectCompletionPanel({
   );
 }
 
+const PAIRING_STAGE_LABELS = ['Paired', 'Locked', 'Ovulated', 'Pre-lay Shed', 'Clutch Laid', 'Incubating', 'Hatched'];
+
+function PairingStageTracker({ reached }) {
+  const lastReachedIdx = reached.reduce((acc, isReached, idx) => (isReached ? idx : acc), -1);
+  const activeIdx = lastReachedIdx === -1 ? 0 : lastReachedIdx;
+  return (
+    <div className="flex items-center" role="list" aria-label="Pairing stage progress">
+      {PAIRING_STAGE_LABELS.map((label, i) => {
+        const done = i < activeIdx;
+        const active = i === activeIdx;
+        const dotColor = done || active ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)';
+        const lineBeforeColor = i === 0 ? 'transparent' : (i <= activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
+        const lineAfterColor = i === PAIRING_STAGE_LABELS.length - 1 ? 'transparent' : (i < activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
+        const textColor = active ? 'var(--color-primary, #0ea5e9)' : (done ? 'var(--status-neutral-text, #6b7280)' : 'var(--status-neutral-text, #9ca3af)');
+        return (
+          <div key={label} role="listitem" className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+            <div className="w-full flex items-center">
+              <div className="flex-1 h-0.5" style={{ background: lineBeforeColor }} />
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ background: dotColor, boxShadow: active ? '0 0 0 3px var(--status-success-bg, #f0fdf4)' : 'none' }}
+                aria-current={active ? 'step' : undefined}
+              />
+              <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
+            </div>
+            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PairingInlineCard({
   pairing,
   pairingNumber,
@@ -20700,40 +20758,78 @@ function PairingInlineCard({
               Clutch lost
             </div>
           )}
-          <div className="mt-1 text-[11px] text-neutral-600 space-y-1">
-            <div>
-              <div className="truncate text-[12px] text-neutral-800 flex items-center gap-1">
-                <SexBadge sex="M" label={maleLabel} showText={false} />
-                {typeof onOpenSnake === 'function' && maleSnake ? (
-                  <button
-                    type="button"
-                    className="truncate font-medium text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                    onClick={handleOpenMale}
-                  >
-                    {maleName}
-                  </button>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div
+              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
+              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+            >
+              <div
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
+                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+              >
+                {maleName ? maleName.slice(0, 2).toUpperCase() : '—'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                  <SexBadge sex="M" label={maleLabel} showText={false} />
+                  <span>Sire</span>
+                </div>
+                <div className="truncate text-[13px] font-semibold text-neutral-800">
+                  {typeof onOpenSnake === 'function' && maleSnake ? (
+                    <button
+                      type="button"
+                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      onClick={handleOpenMale}
+                    >
+                      {maleName}
+                    </button>
+                  ) : (
+                    <span className="truncate">{maleName}</span>
+                  )}
+                </div>
+                {maleGeneticsTokens.length ? (
+                  <GeneLine genes={maleGeneticsTokens} size="sm" className="mt-0.5" />
                 ) : (
-                  <span className="truncate font-medium">{maleName}</span>
+                  <div className="truncate text-[11px] text-neutral-500">{maleGeneticsLine}</div>
                 )}
               </div>
-              <div className="truncate">{maleGeneticsLine}</div>
             </div>
-            <div>
-              <div className="truncate text-[12px] text-neutral-800 flex items-center gap-1">
-                <SexBadge sex="F" label={femaleLabel} showText={false} />
-                {typeof onOpenSnake === 'function' && femaleSnake ? (
-                  <button
-                    type="button"
-                    className="truncate font-medium text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                    onClick={handleOpenFemale}
-                  >
-                    {femaleName}
-                  </button>
+            <div
+              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
+              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+            >
+              <div
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
+                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+              >
+                {femaleName ? femaleName.slice(0, 2).toUpperCase() : '—'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                  <SexBadge sex="F" label={femaleLabel} showText={false} />
+                  <span>Dam</span>
+                </div>
+                <div className="truncate text-[13px] font-semibold text-neutral-800">
+                  {typeof onOpenSnake === 'function' && femaleSnake ? (
+                    <button
+                      type="button"
+                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      onClick={handleOpenFemale}
+                    >
+                      {femaleName}
+                    </button>
+                  ) : (
+                    <span className="truncate">{femaleName}</span>
+                  )}
+                </div>
+                {femaleGeneticsTokens.length ? (
+                  <GeneLine genes={femaleGeneticsTokens} size="sm" className="mt-0.5" />
                 ) : (
-                  <span className="truncate font-medium">{femaleName}</span>
+                  <div className="truncate text-[11px] text-neutral-500">{femaleGeneticsLine}</div>
                 )}
               </div>
-              <div className="truncate">{femaleGeneticsLine}</div>
             </div>
           </div>
           <div className="flex gap-1 flex-wrap mt-1">
@@ -20787,6 +20883,24 @@ function PairingInlineCard({
         onComplete={handleCompleteProject}
         onReopen={handleReopenProject}
       />
+
+      <div
+        className="mt-3 border rounded-2xl p-3"
+        style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">Stage</div>
+        <PairingStageTracker
+          reached={[
+            (edit.appointments || []).some(ap => ap && ap.pairingObserved),
+            (edit.appointments || []).some(ap => ap && ap.lockObserved),
+            !!lifecycle.ovulationObserved,
+            !!lifecycle.preLayObserved,
+            !!lifecycle.clutchRecorded,
+            !!lifecycle.clutchRecorded,
+            !!lifecycle.hatchedRecorded,
+          ]}
+        />
+      </div>
 
       {isEditingParticipants && (
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -21105,46 +21219,95 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
     <div className="mt-3">
       {perGene.length > 0 && (
         <>
-          <div className="text-xs font-medium mb-1">Genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">Genetics odds</div>
           <div className="flex flex-col gap-2">
-            {perGene.map(item => (
-              <div key={item.gene} className="rounded-lg border bg-neutral-50 px-2 py-2">
-                <div className="text-xs font-semibold text-neutral-700">{item.gene}</div>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {item.outcomes.map(out => (
-                    <span
-                      key={`${item.gene}-${out.label}`}
-                      className="inline-flex items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[11px]"
-                    >
-                      <span className="font-semibold">{formatProbabilityPercent(out.probability)}</span>
-                      <span>{out.label}</span>
-                    </span>
-                  ))}
-                </div>
-                {item.notes ? (
-                  <div className="mt-1 text-[10px] text-neutral-500">
-                    {item.notes}
+            {perGene.map(item => {
+              const visualOutcomes = item.outcomes.filter(out => !/^het\s/i.test(out.label));
+              const hetOutcomes = item.outcomes.filter(out => /^het\s/i.test(out.label));
+              return (
+                <div
+                  key={item.gene}
+                  className="rounded-lg border px-3 py-2.5"
+                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                >
+                  <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
+                  <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Visual outcomes</div>
+                      <div className="flex flex-col gap-1.5">
+                        {visualOutcomes.map(out => (
+                          <div key={`${item.gene}-v-${out.label}`}>
+                            <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-700 mb-0.5">
+                              <span className="truncate">{out.label}</span>
+                              <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-primary, #0ea5e9)' }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {hetOutcomes.length > 0 && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Het outcomes (carried, non-visual)</div>
+                        <div className="flex flex-col gap-1.5">
+                          {hetOutcomes.map(out => (
+                            <div key={`${item.gene}-h-${out.label}`}>
+                              <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-500 mb-0.5">
+                                <span className="truncate">{out.label}</span>
+                                <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
+                              </div>
+                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-secondary, #94a3b8)' }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : null}
-              </div>
-            ))}
+                  {item.notes ? (
+                    <div className="mt-2 text-[10px] text-neutral-500">
+                      {item.notes}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
       {combined.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs font-medium mb-1">Combined genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">Combined genetics odds</div>
           <div className="flex flex-col gap-1.5">
             {combined.map(item => {
               const breakdownItems = (item.breakdown || []).filter(detail => detail.label && detail.label !== 'Normal');
               return (
-                <div key={item.key} className="rounded-lg border bg-white px-2 py-1.5 text-[11px] text-neutral-700">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-semibold text-neutral-900">{formatProbabilityPercent(item.probability)}</span>
-                    <span>{item.label}</span>
+                <div
+                  key={item.key}
+                  className="rounded-lg border px-3 py-2 text-[11px] text-neutral-700"
+                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                >
+                  <div className="flex justify-between gap-2 mb-1">
+                    <span className="truncate">{item.label}</span>
+                    <span className="font-semibold text-neutral-900 shrink-0">{formatProbabilityPercent(item.probability)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.round(item.probability * 100)}%`, background: 'var(--color-accent, #f59e0b)' }}
+                    />
                   </div>
                   {breakdownItems.length ? (
-                    <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-neutral-500">
+                    <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-neutral-500">
                       {breakdownItems.map(detail => (
                         <span key={`${item.key}-${detail.gene}`} className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 bg-neutral-50">
                           <span className="font-semibold text-neutral-700">{detail.gene}</span>
@@ -25139,7 +25302,7 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
   const styles = GENE_LINE_SIZE_STYLES[size] || GENE_LINE_SIZE_STYLES.sm;
   return (
     <div className={cx('flex flex-wrap items-center gap-1 leading-snug', styles.container, className)}>
-      <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>
+      {label && <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>}
       {list.map((gene, idx) => {
         const rawGroup = getGeneDisplayGroup(gene);
         const superInfo = getSuperGeneInfo(gene);
@@ -25151,8 +25314,8 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
           : undefined;
         return (
           <span
-            key={`${label}-${gene}-${idx}`}
-            className={cx('inline-flex items-center rounded-md border font-medium break-words', styles.chip, chipClasses)}
+            key={`${label || 'gene'}-${gene}-${idx}`}
+            className={cx('inline-flex items-center rounded-full border font-medium break-words', styles.chip, chipClasses)}
             title={chipTitle}
           >
             {gene}
