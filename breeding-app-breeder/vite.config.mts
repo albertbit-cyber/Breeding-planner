@@ -142,7 +142,9 @@ export default defineConfig(({ mode }) => {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
   build: {
-    outDir: "build",
+    // Web/Netlify builds publish from "dist" (matches the Netlify publish dir).
+    // Electron production loads from "../build/index.html", so keep "build" there.
+    outDir: disableCodeSplitting ? "build" : "dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
