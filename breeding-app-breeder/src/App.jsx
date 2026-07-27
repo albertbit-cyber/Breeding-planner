@@ -22158,23 +22158,21 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
   const canGenerateClutchCard = typeof onCreateClutchCard === 'function' && clutchRecorded && !!clutchDate;
 
-  useEffect(() => {
-    if (activeDialog === 'ovulation') {
-      setOvulationDraft({
-        date: edit?.ovulation?.date || localYMD(new Date()),
-        notes: edit?.ovulation?.notes || '',
-      });
-    }
-  }, [activeDialog, edit?.ovulation?.date, edit?.ovulation?.notes]);
+  const openOvulationDialog = useCallback(() => {
+    setOvulationDraft({
+      date: edit?.ovulation?.date || localYMD(new Date()),
+      notes: edit?.ovulation?.notes || '',
+    });
+    setActiveDialog('ovulation');
+  }, [edit?.ovulation?.date, edit?.ovulation?.notes]);
 
-  useEffect(() => {
-    if (activeDialog === 'preLay') {
-      setPreLayDraft({
-        date: edit?.preLayShed?.date || localYMD(new Date()),
-        notes: edit?.preLayShed?.notes || '',
-      });
-    }
-  }, [activeDialog, edit?.preLayShed?.date, edit?.preLayShed?.notes]);
+  const openPreLayDialog = useCallback(() => {
+    setPreLayDraft({
+      date: edit?.preLayShed?.date || localYMD(new Date()),
+      notes: edit?.preLayShed?.notes || '',
+    });
+    setActiveDialog('preLay');
+  }, [edit?.preLayShed?.date, edit?.preLayShed?.notes]);
 
   useEffect(() => {
     if (activeDialog === 'clutch') {
@@ -22184,17 +22182,6 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       });
     }
   }, [activeDialog, clutchFertileValue, clutchSlugsValue]);
-
-  useEffect(() => {
-    if (activeDialog === 'hatched') {
-      setHatchedDraft({
-        date: edit?.hatch?.date || localYMD(new Date()),
-        hatchedCount: edit?.hatch?.hatchedCount ? String(edit.hatch.hatchedCount) : '',
-        notes: edit?.hatch?.notes || '',
-      });
-    }
-  }, [activeDialog, edit?.hatch]);
-
 
   const toggleClutch = useCallback((checked) => {
     setEdit(prev => {
@@ -22260,8 +22247,13 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
   }, [setEdit]);
 
   const openHatchedDialog = useCallback(() => {
+    setHatchedDraft({
+      date: edit?.hatch?.date || localYMD(new Date()),
+      hatchedCount: edit?.hatch?.hatchedCount ? String(edit.hatch.hatchedCount) : '',
+      notes: edit?.hatch?.notes || '',
+    });
     setActiveDialog('hatched');
-  }, [setActiveDialog]);
+  }, [edit?.hatch]);
 
   const saveClutchDraft = useCallback(() => {
     setEdit(prev => {
@@ -22406,7 +22398,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>setActiveDialog('ovulation')}>
+                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog}>
                   {ovulationObserved ? 'Edit details' : logOvulationLabel}
                 </button>
                 {ovulationObserved && (
@@ -22442,7 +22434,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>setActiveDialog('preLay')} disabled={!ovulationObserved}>
+                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog}>
                   {preLayObserved ? 'Edit details' : logPreLayLabel}
                 </button>
                 {preLayObserved && (
