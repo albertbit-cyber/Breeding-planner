@@ -1,6 +1,29 @@
 import "./config/env";
-import { app } from "./app";
+import { initSentry, captureException } from "./config/sentry";
 import { env } from "./config/env";
+
+// TypeScript compiles this file's `import`s to CommonJS `require`s hoisted
+// above this line regardless of source order, so `./app` has already loaded
+// by the time initSentry() runs here — fine for this project's manual
+// Sentry.captureException() calls (no auto-instrumentation that needs to
+// patch modules before they're required), but do not rely on this ordering
+// for anything that does.
+initSentry();
+
+// Catches crashes outside Express's request lifecycle (e.g. the email worker's
+// background polling) that errorHandler.ts never sees. Logs and reports to
+// Sentry (no-op if unconfigured) but does not exit — matches this process's
+// existing behavior of staying up through unexpected errors elsewhere.
+process.on("uncaughtException", (error) => {
+  console.error("[server] uncaughtException:", error);
+  captureException(error);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] unhandledRejection:", reason);
+  captureException(reason);
+});
+
+import { app } from "./app";
 import { startEmailWorker, stopEmailWorker } from "./email/worker";
 
 /*

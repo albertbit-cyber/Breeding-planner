@@ -349,9 +349,14 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
+    // Cross-origin cookies are unreliable in modern browsers (Chrome's
+    // third-party cookie restrictions in particular), so this app stores the
+    // bearer token/refresh token directly instead of preferring cookies —
+    // matching breeder/lab's auth behavior. Clear any stale cookie-preferred
+    // flag a previous build may have set.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
     setStoredToken(nextToken, scope);
     setStoredRefreshToken(nextRefreshToken, scope);
-    setCookiePreferredAuth(scope);
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
@@ -520,9 +525,12 @@ export const login = async (payload: { email: string; password: string }, authSc
     authScope: scope,
   });
   if (data?.token && data?.refreshToken) {
+    // Cross-origin cookies are unreliable in modern browsers, so this app
+    // stores the bearer token/refresh token directly instead of preferring
+    // cookies — matching breeder/lab's auth behavior.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
     setStoredToken(data.token, scope);
     setStoredRefreshToken(data.refreshToken, scope);
-    setCookiePreferredAuth(scope);
     if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
   }

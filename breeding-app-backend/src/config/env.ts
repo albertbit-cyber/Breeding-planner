@@ -47,4 +47,17 @@ export const env = {
     workerStuckJobMinutes: Number(process.env.EMAIL_WORKER_STUCK_JOB_MINUTES || 10),
   },
   publicAppUrl: (process.env.PUBLIC_APP_URL || process.env.CORS_ORIGIN || "").split(",")[0].trim(),
+  // "lax" is correct once every frontend reaches the backend through a same-origin
+  // proxy (see docs/architecture/saas-implementation-plan.md Phase 0.5). Only set
+  // this to "none" for an environment that still talks to the backend cross-origin
+  // and needs cookie auth to keep working during the proxy rollout — bearer-token
+  // auth (the current default everywhere) is unaffected either way.
+  authCookieSameSite: (process.env.AUTH_COOKIE_SAMESITE || "lax").trim().toLowerCase() as "lax" | "none" | "strict",
+  sentry: {
+    // Unset by default — error tracking stays off until a real DSN is provided.
+    // No SENTRY_DSN means initSentry() (src/config/sentry.ts) is a no-op.
+    dsn: process.env.SENTRY_DSN || "",
+    environment: process.env.SENTRY_ENVIRONMENT || nodeEnv,
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.1),
+  },
 };

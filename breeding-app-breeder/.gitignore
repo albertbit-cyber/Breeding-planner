@@ -5,6 +5,9 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.android-development
+!.env.android-staging
+!.env.android-production
 .DS_Store
 *.log
 android/key.properties

@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { HttpError } from "../utils/errors";
 import { verifyAuthToken } from "../utils/jwt";
 import { AUTH_ACCESS_COOKIE, getCookieValue } from "../utils/authCookies";
+import { captureException } from "../config/sentry";
 
 const getErrorDetail = (error: unknown): { status?: number; type?: string; length?: number } => {
   if (!error || typeof error !== "object") return {};
@@ -70,7 +71,11 @@ export const errorHandler = (error: unknown, req: Request, res: Response, _next:
     return;
   }
 
-  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  console.error("Unhandled error:", detail, error);
+  const errorSummary = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.error("Unhandled error:", errorSummary, error);
+  // Only truly unhandled/unexpected errors reach this point — HttpError,
+  // known Prisma codes, JWT errors, and validation failures above are all
+  // expected application states, not incidents worth alerting on.
+  captureException(error, { path: req.path, method: req.method });
   res.status(500).json({ message: "Internal server error" });
 };

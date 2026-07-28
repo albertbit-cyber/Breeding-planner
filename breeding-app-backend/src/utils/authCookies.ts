@@ -7,15 +7,18 @@ export const AUTH_REFRESH_COOKIE = "bp_refresh_token";
 export const CSRF_COOKIE = "bp_csrf_token";
 export const CSRF_HEADER = "x-csrf-token";
 
-// Every deployed environment (production, staging, ...) is accessed cross-origin
-// over HTTPS, so cookies need Secure+SameSite=None there. Only plain local
-// development runs the frontend and backend same-site over HTTP.
+// Deployed environments run over HTTPS and need Secure cookies; local dev runs
+// plain HTTP. SameSite defaults to "lax", which is correct once the frontend
+// reaches the backend through a same-origin proxy — see env.authCookieSameSite
+// for the escape hatch during the proxy rollout. Bearer-token auth (the current
+// default on every platform) never reads these cookies, so this only affects
+// the httpOnly-cookie auth path once a frontend is switched onto it.
 const isDeployed = () => env.nodeEnv !== "development";
 
 const cookieOptions = (maxAgeMs?: number, httpOnly = true) => ({
   httpOnly,
   secure: isDeployed(),
-  sameSite: isDeployed() ? "none" as const : "lax" as const,
+  sameSite: isDeployed() ? env.authCookieSameSite : ("lax" as const),
   path: "/",
   ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
 });

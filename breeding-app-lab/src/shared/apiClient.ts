@@ -38,6 +38,23 @@ export const REFRESH_TOKEN_STORAGE_KEY = REFRESH_TOKEN_STORAGE_KEYS.breeder;
 const LEGACY_AUTH_TOKEN_STORAGE_KEY = "breedingPlannerAuthToken";
 const LEGACY_REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
 const COOKIE_PREFERRED_AUTH_MODE = "cookie-preferred";
+
+// True only once VITE_API_URL points at this page's own origin — i.e. this
+// deployment reaches the backend through a same-origin proxy (see
+// docs/architecture/saas-implementation-plan.md Phase 0.5), not the backend's
+// own cross-origin domain directly. Cross-origin cookies are unreliable across
+// platforms (Capacitor's native WebView origin, and Chrome's third-party
+// cookie restrictions for the web app), so only same-origin deployments can
+// safely prefer httpOnly cookies over bearer tokens in localStorage. This is
+// opt-in per deployment via VITE_API_URL, not a global behavior change.
+const isSameOriginApiBaseUrl = (baseUrl: string): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(baseUrl).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+};
 const CSRF_HEADER_NAME = "x-csrf-token";
 
 export const getAuthScopeForHash = (hashValue?: string): AuthScope => {
@@ -348,14 +365,21 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
-    // Cross-origin cookies are unreliable across platforms (Capacitor's native
-    // WebView origin, and Chrome's third-party cookie blocking for the web
-    // app), so every platform stores the bearer token/refresh token directly
-    // instead. Clear any stale cookie-preferred flag a previous session may
-    // have set.
-    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
-    setStoredToken(nextToken, scope);
-    setStoredRefreshToken(nextRefreshToken, scope);
+    if (isSameOriginApiBaseUrl(config.baseUrl)) {
+      // Same-origin deployment: the httpOnly cookies the backend just re-set on
+      // this response are reliable here, so keep preferring them over storing
+      // the bearer/refresh token in localStorage.
+      setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
+      clearStoredToken(scope);
+      clearStoredRefreshToken(scope);
+    } else {
+      // Cross-origin deployment (native WebView, or web not yet behind the
+      // same-origin proxy): store the bearer/refresh token directly instead,
+      // and clear any stale cookie-preferred flag a previous session may have set.
+      clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+      setStoredToken(nextToken, scope);
+      setStoredRefreshToken(nextRefreshToken, scope);
+    }
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
@@ -476,9 +500,24 @@ export const getRefreshToken = (scope?: AuthScope): string => getStoredRefreshTo
 
 export const setRefreshToken = (token: string, scope?: AuthScope): void => setStoredRefreshToken(String(token || "").trim(), scope);
 
-export const hasStoredAuthSession = (scope?: AuthScope): boolean => Boolean(getStoredToken(scope) || getStoredRefreshToken(scope));
+export const hasStoredAuthSession = (scope?: AuthScope): boolean =>
+  Boolean(getStoredToken(scope) || getStoredRefreshToken(scope) || isCookiePreferredAuth(scope));
 
-export const clearAuthToken = (scope?: AuthScope): void => clearStoredAuth(scope);
+export const clearAuthToken = (scope?: AuthScope): void => {
+  const normalizedScope = normalizeAuthScope(scope);
+  const wasCookiePreferred = isCookiePreferredAuth(normalizedScope);
+  clearStoredAuth(normalizedScope);
+  if (wasCookiePreferred) {
+    // Local state is cleared synchronously above; this is a best-effort,
+    // fire-and-forget call to also clear the httpOnly cookies server-side —
+    // without it, a same-origin session would look logged-out locally while
+    // the cookie itself stays valid until it expires.
+    const config = getSharedApiConfig();
+    if (config.ok) {
+      fetch(`${config.baseUrl}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
+  }
+};
 
 export const resetSharedBackendState = (): void => {
   resetSharedBackendSnapshot();
@@ -560,9 +599,20 @@ export const login = async (payload: { email: string; password: string }, authSc
       authScope: scope,
     });
     if (data?.token && data?.refreshToken) {
-      clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
-      setStoredToken(data.token, scope);
-      setStoredRefreshToken(data.refreshToken, scope);
+      const config = getSharedApiConfig();
+      if (config.ok && isSameOriginApiBaseUrl(config.baseUrl)) {
+        // Same-origin deployment: prefer the httpOnly cookies the backend just
+        // set on this response over storing the bearer/refresh token.
+        setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
+        clearStoredToken(scope);
+        clearStoredRefreshToken(scope);
+      } else {
+        // Cross-origin deployment (native WebView, or web not yet behind the
+        // same-origin proxy): store the bearer/refresh token directly instead.
+        clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+        setStoredToken(data.token, scope);
+        setStoredRefreshToken(data.refreshToken, scope);
+      }
       if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
       markAuthorized();
     }

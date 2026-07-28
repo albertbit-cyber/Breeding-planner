@@ -6,6 +6,9 @@ import './i18n/index.js';
 import App from './AppEntry.jsx';
 import reportWebVitals from './reportWebVitals';
 import { seedDemoUsersIfNeeded } from './features/lab/utils/seedDemoUser';
+import { initSentry } from './shared/sentry';
+
+initSentry();
 
 // Seed demo users into localStorage for dev-mode login (no-op in production)
 seedDemoUsersIfNeeded();

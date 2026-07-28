@@ -40,6 +40,25 @@ const LEGACY_REFRESH_TOKEN_STORAGE_KEY = "breedingPlannerRefreshToken";
 const COOKIE_PREFERRED_AUTH_MODE = "cookie-preferred";
 const CSRF_HEADER_NAME = "x-csrf-token";
 
+// True only once VITE_API_URL points at this page's own origin — i.e. this
+// deployment reaches the backend through a same-origin proxy (see
+// docs/architecture/saas-implementation-plan.md Phase 0.5), not the backend's
+// own cross-origin domain directly. Cross-origin cookies are unreliable across
+// platforms (Electron's file:// origin, the native WebView, and Chrome's
+// third-party cookie restrictions), so only same-origin deployments can safely
+// prefer httpOnly cookies over bearer tokens in localStorage. Every other
+// deployment (Electron, Capacitor Android/iOS, or a web build not yet behind
+// the proxy) keeps using bearer tokens exactly as before — this is opt-in per
+// deployment via VITE_API_URL, not a global behavior change.
+const isSameOriginApiBaseUrl = (baseUrl: string): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(baseUrl).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
 export const getAuthScopeForHash = (hashValue?: string): AuthScope => {
   const fallbackHash = typeof window !== "undefined" ? window.location.hash : "";
   const raw = String((hashValue ?? fallbackHash) || "")
@@ -141,9 +160,9 @@ const clearStoredAuth = (scope?: AuthScope): void => {
   clearStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 };
 
-// No platform sets this anymore (see login()/refreshAuthSession() below), but
-// a browser that hit the old cookie-based flow may still have it stored, so
-// keep honoring it defensively until that flag is cleared on next login.
+// Set by login()/refreshAuthSession() only for same-origin deployments (see
+// isSameOriginApiBaseUrl above) — everywhere else this stays unset and the
+// client uses bearer tokens instead.
 const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
   getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
 
@@ -347,14 +366,22 @@ const refreshAuthSession = async (scope: AuthScope): Promise<{ token: string; re
       throw error;
     }
 
-    // Cross-origin cookies are unreliable across platforms (Electron's file://
-    // origin, and Chrome's third-party cookie blocking for the web app), so
-    // every platform stores the bearer token/refresh token directly instead.
-    // Clear any stale cookie-preferred flag a previous session may have set.
-    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
-    setStoredToken(nextToken, scope);
-    const nextRefreshToken = String(data?.refreshToken || "").trim();
-    if (nextRefreshToken) setStoredRefreshToken(nextRefreshToken, scope);
+    if (isSameOriginApiBaseUrl(config.baseUrl)) {
+      // Same-origin deployment: the httpOnly cookies the backend just re-set on
+      // this response are reliable here, so keep preferring them over storing
+      // the bearer/refresh token in localStorage.
+      setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
+      clearStoredToken(scope);
+      clearStoredRefreshToken(scope);
+    } else {
+      // Cross-origin deployment (Electron, native, or web not yet behind the
+      // same-origin proxy): store the bearer/refresh token directly instead,
+      // and clear any stale cookie-preferred flag a previous session may have set.
+      clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+      setStoredToken(nextToken, scope);
+      const nextRefreshToken = String(data?.refreshToken || "").trim();
+      if (nextRefreshToken) setStoredRefreshToken(nextRefreshToken, scope);
+    }
     if (data?.csrfToken) setStoredCsrfToken(String(data.csrfToken), scope);
     markAuthorized("Refreshed shared backend session.");
 
@@ -478,7 +505,21 @@ export const setRefreshToken = (token: string, scope?: AuthScope): void => setSt
 export const hasStoredAuthSession = (scope?: AuthScope): boolean =>
   Boolean(getStoredToken(scope) || getStoredRefreshToken(scope) || isCookiePreferredAuth(scope));
 
-export const clearAuthToken = (scope?: AuthScope): void => clearStoredAuth(scope);
+export const clearAuthToken = (scope?: AuthScope): void => {
+  const normalizedScope = normalizeAuthScope(scope);
+  const wasCookiePreferred = isCookiePreferredAuth(normalizedScope);
+  clearStoredAuth(normalizedScope);
+  if (wasCookiePreferred) {
+    // Local state is cleared synchronously above; this is a best-effort,
+    // fire-and-forget call to also clear the httpOnly cookies server-side —
+    // without it, a same-origin session would look logged-out locally while
+    // the cookie itself stays valid until it expires.
+    const config = getSharedApiConfig();
+    if (config.ok) {
+      fetch(`${config.baseUrl}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
+  }
+};
 
 export const resetSharedBackendState = (): void => {
   resetSharedBackendSnapshot();
@@ -524,13 +565,21 @@ export const login = async (payload: { email: string; password: string }, authSc
     authScope: scope,
   });
   if (data?.token) {
-    // Cross-origin cookies are unreliable across platforms (Electron's file://
-    // origin, and Chrome's third-party cookie blocking for the web app), so
-    // every platform stores the bearer token/refresh token directly instead.
-    // Clear any stale cookie-preferred flag a previous session may have set.
-    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
-    setStoredToken(String(data.token), scope);
-    if (data.refreshToken) setStoredRefreshToken(String(data.refreshToken), scope);
+    const config = getSharedApiConfig();
+    if (config.ok && isSameOriginApiBaseUrl(config.baseUrl)) {
+      // Same-origin deployment: prefer the httpOnly cookies the backend just
+      // set on this response over storing the bearer/refresh token in localStorage.
+      setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
+      clearStoredToken(scope);
+      clearStoredRefreshToken(scope);
+    } else {
+      // Cross-origin deployment (Electron, native, or web not yet behind the
+      // same-origin proxy): store the bearer/refresh token directly instead,
+      // and clear any stale cookie-preferred flag a previous session may have set.
+      clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+      setStoredToken(String(data.token), scope);
+      if (data.refreshToken) setStoredRefreshToken(String(data.refreshToken), scope);
+    }
     if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
     markAuthorized();
   }

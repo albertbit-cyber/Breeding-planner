@@ -1,6 +1,6 @@
 {
   "name": "breeding-app-breeder",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "engines": {
@@ -28,6 +28,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/react": "^8.55.0",
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^8.2.0",
