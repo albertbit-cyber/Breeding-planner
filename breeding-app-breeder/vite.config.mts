@@ -135,8 +135,19 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
   },
   define: {
+    // Deliberately NOT `...process.env` - that spread was inlining this entire
+    // build machine's environment (every var, from every provider: Netlify,
+    // Railway, CI, or a local dev machine) as a literal object into the shipped
+    // browser bundle, readable by anyone via view-source. Confirmed live on
+    // serpentora.com's production bundle: it contained Netlify's real build
+    // container env, including at least one token-shaped variable
+    // (NETLIFY_SKEW_PROTECTION_TOKEN). The handful of Node-only env reads this
+    // exposed (LAB_DB_PATH, CACHE_DB_PATH, SUGGESTION_CONCURRENCY, the
+    // SEARCH_* vars in src/signals/) are for an Electron/Node context anyway -
+    // require()/process.cwd() don't functionally work in a browser bundle -
+    // so they only ever needed to safely resolve to undefined here, which an
+    // empty object already does via their existing fallback logic.
     "process.env": {
-      ...process.env,
       PUBLIC_URL: process.env.PUBLIC_URL ?? "",
     },
     __APP_VERSION__: JSON.stringify(appVersion),
