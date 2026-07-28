@@ -67,7 +67,12 @@ app.use(
         return;
       }
 
-      callback(new Error("CORS origin not allowed"));
+      // `callback(null, false)`, not an Error — cors declines to set CORS headers
+      // and the browser blocks the response client-side, same as the empty-allowlist
+      // case above. Passing an Error instead makes Express treat a disallowed origin
+      // as an unhandled server error (500 via errorHandler.ts), which is what was
+      // actually happening in production before this fix.
+      callback(null, false);
     },
     credentials: true,
   })
