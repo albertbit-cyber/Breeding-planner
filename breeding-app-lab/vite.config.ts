@@ -46,7 +46,14 @@ export default defineConfig({
         manualChunks: (id) => {
           if (!id.includes("node_modules")) return;
 
-          // React runtime — must be isolated to avoid circular deps
+          // React runtime — must be isolated to avoid circular deps.
+          // @sentry/* is included here too: @sentry/react matches "/react/" on its
+          // own, but sibling packages (@sentry/core, @sentry/browser, @sentry/utils,
+          // ...) don't and would otherwise land in the generic "vendor" chunk below -
+          // creating a vendor -> vendor-react -> vendor circular chunk dependency
+          // that crashes at runtime ("Cannot read properties of undefined (reading
+          // 'createContext')") because vendor-react's React export isn't populated
+          // yet when vendor needs it.
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
@@ -54,7 +61,8 @@ export default defineConfig({
             id.includes("\\react\\") ||
             id.includes("\\react-dom\\") ||
             id.includes("\\scheduler\\") ||
-            id.includes("use-sync-external-store")
+            id.includes("use-sync-external-store") ||
+            id.includes("@sentry")
           ) {
             return "vendor-react";
           }

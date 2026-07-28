@@ -160,7 +160,8 @@ export default defineConfig(({ mode }) => {
                 id.includes("react") ||
                 id.includes("/scheduler/") ||
                 id.includes("\\scheduler\\") ||
-                id.includes("use-sync-external-store")
+                id.includes("use-sync-external-store") ||
+                id.includes("@sentry")
               ) {
                 return "vendor-react";
               }

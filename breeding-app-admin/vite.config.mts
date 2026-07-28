@@ -128,7 +128,8 @@ export default defineConfig({
                 id.includes("\\react\\") ||
                 id.includes("\\react-dom\\") ||
                 id.includes("\\scheduler\\") ||
-                id.includes("use-sync-external-store")
+                id.includes("use-sync-external-store") ||
+                id.includes("@sentry")
               ) return "vendor-react";
               return "vendor";
             },

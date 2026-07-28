@@ -124,7 +124,14 @@ export default defineConfig({
               if (id.includes("html2canvas")) return "html2canvas";
               if (id.includes("jspdf")) return "jspdf";
               if (id.includes("xlsx")) return "xlsx";
-              if (id.includes("react")) return "vendor-react";
+              // @sentry/react itself matches "react" above, but its sibling packages
+              // (@sentry/core, @sentry/browser, @sentry/utils, ...) don't and would
+              // otherwise land in "vendor" - creating a vendor -> vendor-react ->
+              // vendor circular chunk dependency that crashes at runtime
+              // (`Cannot read properties of undefined (reading 'createContext')`)
+              // because vendor-react's React export isn't populated yet when vendor
+              // needs it. Keep every @sentry package together with react/react-dom.
+              if (id.includes("react") || id.includes("@sentry")) return "vendor-react";
               return "vendor";
             },
       },
