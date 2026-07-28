@@ -1,5 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+const appVersion = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8")).version as string;
 
 // Pre-transform plugin: the shared config file uses `(import.meta as any)?.env?.VITE_API_URL`
 // (TypeScript optional-chaining cast). Vite's static import.meta.env replacement does NOT
@@ -28,6 +34,9 @@ function patchImportMetaEnv(): import("vite").Plugin {
 
 export default defineConfig({
   plugins: [patchImportMetaEnv(), react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   server: {
     host: "0.0.0.0",
     port: 5174,

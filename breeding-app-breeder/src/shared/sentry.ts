@@ -17,6 +17,13 @@ export const initSentry = (): void => {
   Sentry.init({
     dsn,
     environment: String(import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE || "production"),
+    // Without a release, @sentry/core's captureSession() silently discards every
+    // automatic session on every page load (`Discarded session because of missing
+    // or non-string release` - only logged in debug builds) - the SDK initializes
+    // fine and manual captureException() calls work, but zero automatic network
+    // traffic is ever produced, which is exactly what looked like Sentry "not
+    // working" even after the init-path bug was fixed.
+    release: __APP_VERSION__,
     tracesSampleRate: 0.1,
   });
   initialized = true;

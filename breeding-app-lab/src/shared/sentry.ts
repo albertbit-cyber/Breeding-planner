@@ -20,6 +20,11 @@ export const initSentry = (): void => {
   Sentry.init({
     dsn,
     environment: String((import.meta as any).env.VITE_SENTRY_ENVIRONMENT || (import.meta as any).env.MODE || "production"),
+    // Without a release, @sentry/core's captureSession() silently discards every
+    // automatic session on every page load - the SDK initializes fine and manual
+    // captureException() calls work, but zero automatic network traffic is ever
+    // produced.
+    release: __APP_VERSION__,
     tracesSampleRate: 0.1,
   });
   initialized = true;

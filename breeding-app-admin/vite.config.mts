@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 
 function getLanIp(): string {
@@ -54,6 +55,8 @@ function patchImportMetaEnv(): Plugin {
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
+const appVersion = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8")).version as string;
+
 const resolveBase = (publicUrl: string | undefined): string => {
   const ensureTrailingSlash = (value: string): string =>
     value.endsWith("/") ? value : `${value}/`;
@@ -98,10 +101,16 @@ export default defineConfig({
     strictPort: true,
   },
   define: {
+    // Deliberately NOT `...process.env` - see breeding-app-breeder's identical fix
+    // (commit 2e66dd0): that spread embeds the entire build machine's environment
+    // as a literal object into the shipped bundle wherever code reads process.env
+    // as a whole object. Nothing here currently does that, so this wasn't actively
+    // leaking, but it's the same dormant footgun - closing it before anything ever
+    // triggers it, same as breeder.
     "process.env": {
-      ...process.env,
       PUBLIC_URL: process.env.PUBLIC_URL ?? "",
     },
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   build: {
     outDir: "build",
