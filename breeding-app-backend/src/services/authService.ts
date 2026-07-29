@@ -14,6 +14,7 @@ import {
   rotateRefreshSession,
 } from "./refreshTokenSessionService";
 import { recordSecurityEvent } from "./securityEventService";
+import { createOrganizationWithOwner, defaultOrganizationName } from "./organizationService";
 import { issueToken, consumeToken, revokeAllForPurpose } from "./accountTokenService";
 import { enqueueEmail } from "../email/queueService";
 import { maskEmail } from "../utils/maskEmail";
@@ -125,14 +126,35 @@ export const registerUser = async (input: {
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
-  const user = await prisma.user.create({
-    data: {
-      email,
-      fullName: input.fullName,
-      passwordHash,
-      role: input.role || "breeder",
-      isActive: true,
-    },
+  const role = input.role || "breeder";
+  // Breeders are tenants and get an organization they own, created in the same
+  // transaction as the account so a signup can never leave a user without one
+  // (see organizationService and implementation plan §3.1). Buyers are
+  // marketplace-only and are deliberately not tenants, so they get no org.
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        email,
+        fullName: input.fullName,
+        passwordHash,
+        role,
+        isActive: true,
+      },
+    });
+
+    if (role === "breeder") {
+      await createOrganizationWithOwner(
+        {
+          userId: created.id,
+          name: defaultOrganizationName(created.fullName, created.email),
+          kind: "breeder",
+          billingEmail: created.email,
+        },
+        tx
+      );
+    }
+
+    return created;
   });
 
   await recordSecurityEvent({ type: "auth.registered", actorUserId: user.id, outcome: "success", metadata: { email } });

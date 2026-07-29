@@ -16,6 +16,26 @@ enum UserRole {
   support
 }
 
+// Distinguishes the two kinds of tenant, which come into existence through
+// entirely different doors: `breeder` orgs are created automatically at public
+// signup, `lab_vendor` orgs only ever via an admin invitation (there is
+// deliberately no public signup path for the Lab Portal). See
+// docs/architecture/saas-implementation-plan.md §3.1/§3.3.
+enum OrganizationKind {
+  breeder
+  lab_vendor
+}
+
+// Org-scoped role, distinct from the global `UserRole` above. `UserRole` says
+// what kind of user someone is platform-wide (breeder/lab/admin/...);
+// `OrgRole` says what they may do inside their own organization.
+enum OrgRole {
+  owner
+  admin
+  billing_manager
+  member
+}
+
 enum TestPricingType {
   morph
   sex
@@ -125,6 +145,107 @@ model User {
   emailJobs          EmailJob[]
   notificationPreferences NotificationPreference[]
   accountTokens      AccountToken[]
+  // Singular, not a list: one organization per user is a hard rule enforced by
+  // Membership.userId @unique (see the Membership model).
+  membership         Membership?
+  organizationInvitesSent     OrganizationInvite[] @relation("OrganizationInviteInviter")
+  organizationInvitesAccepted OrganizationInvite[] @relation("OrganizationInviteAcceptedBy")
+}
+
+// The tenant: a breeding business or an admin-vetted vendor lab. Sits *above*
+// User — existing per-user `ownerId`/`userId` ownership on scoped models stays
+// as "who created this", while the org is what access is granted against.
+//
+// Billing note: only `breeder` orgs are ever billed. `lab_vendor` orgs are free
+// for admin-vetted service partners and skip the checkout/paywall path
+// entirely (decided 2026-07-30, see implementation plan §4).
+model Organization {
+  id              String           @id @default(cuid())
+  name            String
+  kind            OrganizationKind
+  // active | suspended. Suspension is how an admin revokes a vendor lab's
+  // access without deleting its data.
+  status          String           @default("active")
+  billingEmail    String?          @map("billing_email")
+  suspendedAt     DateTime?        @map("suspended_at")
+  suspendedReason String?          @map("suspended_reason") @db.Text
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  memberships Membership[]
+  invites     OrganizationInvite[]
+  labAccount  LabAccount?
+
+  @@index([kind])
+  @@index([status])
+  @@map("organizations")
+}
+
+// User <-> Organization join, carrying the org-scoped role.
+//
+// `userId` is deliberately @unique: one organization per user is a hard product
+// rule, not an incidental constraint (decided 2026-07-30, see implementation
+// plan §3.1). Encoding it at the DB level makes the rule structurally
+// impossible to violate, and means there is no "active org" / org-switcher
+// concept anywhere in the system. A technician working for two vendor labs
+// needs two accounts. Relaxing this later is a migration project in its own
+// right, not an incremental change — every permission check assumes it.
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String       @unique @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           OrgRole      @default(member)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([role])
+  @@map("memberships")
+}
+
+// One entity, two distinct triggers (see implementation plan §3.1):
+//
+//  1. Teammate invite — `organizationId` is set: an existing org's owner/admin
+//     invites someone into that org. Accepting creates a Membership only.
+//  2. New-vendor invite — `organizationId` is null and `createsOrgKind` is set:
+//     the platform admin invites a brand-new vendor lab. Accepting *creates the
+//     organization* plus an `owner` Membership. This is the only way a
+//     lab_vendor org ever comes into existence.
+//
+// Distinct from AccountToken (account lifecycle: verify email, reset password)
+// and from the existing internal-staff invite flow, which stays scoped to
+// internal ops accounts and does not create tenant orgs.
+model OrganizationInvite {
+  id             String            @id @default(cuid())
+  email          String
+  // sha256 of the raw token, never the token itself — same scheme as
+  // AccountToken/RefreshSession (see accountTokenService.hashToken).
+  tokenHash      String            @unique @map("token_hash")
+  organizationId String?           @map("organization_id")
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Set only for trigger 2 above; the org to create on acceptance.
+  createsOrgKind OrganizationKind? @map("creates_org_kind")
+  createsOrgName String?           @map("creates_org_name")
+  // Role the invitee receives. Trigger 2 always grants `owner`.
+  role           OrgRole           @default(member)
+  invitedBy      String?           @map("invited_by")
+  inviter        User?             @relation("OrganizationInviteInviter", fields: [invitedBy], references: [id], onDelete: SetNull)
+  // pending | accepted | revoked
+  status         String            @default("pending")
+  expiresAt      DateTime          @map("expires_at")
+  acceptedAt     DateTime?         @map("accepted_at")
+  acceptedByUserId String?         @map("accepted_by_user_id")
+  acceptedBy     User?             @relation("OrganizationInviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("organization_invites")
 }
 
 // purpose: verify_email | reset_password | verify_new_email
@@ -472,10 +593,23 @@ model MarketplacePermission {
   @@index([featuredBreeder])
 }
 
+// Owned by an Organization as of the Phase 1 tenancy migration. This is what
+// fixes the concretely-broken case the audit called out: a vendor lab with more
+// than one employee. Access to lab features is granted by *org membership*, so
+// any number of staff can work under one LabAccount.
+//
+// `userId` is retained (and still unique) as the designated owning user — the
+// person the admin originally invited. It is not the access-control mechanism
+// any more; org membership is. Keeping it preserves the existing admin-panel
+// search (which filters through the `user` relation) and response shape.
+// Given one-org-per-user plus one-LabAccount-per-org, userId being unique is
+// implied anyway, so the constraint costs nothing and avoids needless churn.
 model LabAccount {
   id                String   @id @default(cuid())
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId    String   @unique @map("organization_id")
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   labName           String
   contactPerson     String?
   location          String?

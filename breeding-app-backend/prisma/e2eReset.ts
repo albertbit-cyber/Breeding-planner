@@ -166,7 +166,35 @@ const ensureCatalogAndPricing = async () => {
   }
 };
 
-const ensureLabAccount = async (labUserId: string) => {
+// Mirrors the 20260730120000_add_organization_tenancy migration and seed.ts:
+// every tenant user owns exactly one Organization, with ids derived from the
+// user id so repeated resets are idempotent.
+const ensureOrganizationFor = async (
+  user: { id: string; email: string; fullName: string },
+  kind: "breeder" | "lab_vendor",
+  name: string
+): Promise<string> => {
+  const organizationId = `org_${user.id}`;
+  await prisma.organization.upsert({
+    where: { id: organizationId },
+    update: { name, kind, status: "active" },
+    create: {
+      id: organizationId,
+      name,
+      kind,
+      status: "active",
+      billingEmail: kind === "breeder" ? user.email : null,
+    },
+  });
+  await prisma.membership.upsert({
+    where: { userId: user.id },
+    update: { organizationId, role: "owner" },
+    create: { id: `mbr_${user.id}`, userId: user.id, organizationId, role: "owner" },
+  });
+  return organizationId;
+};
+
+const ensureLabAccount = async (labUserId: string, organizationId: string) => {
   await prisma.labAccount.upsert({
     where: { userId: labUserId },
     update: {
@@ -180,6 +208,7 @@ const ensureLabAccount = async (labUserId: string) => {
     },
     create: {
       userId: labUserId,
+      organizationId,
       labName: "Seed Genetics Lab",
       contactPerson: E2E_USERS.lab.fullName,
       location: "Germany",
@@ -283,8 +312,12 @@ const main = async () => {
     },
   });
 
+  // Tenant users only — the admin account is internal staff and gets no org.
+  const labOrganizationId = await ensureOrganizationFor(labUser, "lab_vendor", "Seed Genetics Lab");
+  await ensureOrganizationFor(breederUser, "breeder", breederUser.fullName);
+
   await ensureCatalogAndPricing();
-  await ensureLabAccount(labUser.id);
+  await ensureLabAccount(labUser.id, labOrganizationId);
   await resetBreederLabOrders(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id);
 

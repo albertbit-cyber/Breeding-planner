@@ -44,11 +44,47 @@ async function upsertUser(email: string, fullName: string, role: UserRoleValue, 
   });
 }
 
+// Mirrors what the 20260730120000_add_organization_tenancy migration does for
+// pre-existing accounts, and what registerUser() does for new ones: every tenant
+// user owns exactly one Organization. Ids are derived from the user id (same
+// 'org_'/'mbr_' scheme the migration uses) so re-running the seed is idempotent
+// and seeded orgs are recognisable.
+async function ensureOrganizationFor(
+  user: { id: string; email: string; fullName: string },
+  kind: "breeder" | "lab_vendor",
+  name: string
+) {
+  const organizationId = `org_${user.id}`;
+  await prisma.organization.upsert({
+    where: { id: organizationId },
+    update: { name, kind, status: "active" },
+    create: {
+      id: organizationId,
+      name,
+      kind,
+      status: "active",
+      // Vendor-lab orgs are never billed, so they carry no billing contact.
+      billingEmail: kind === "breeder" ? user.email : null,
+    },
+  });
+  await prisma.membership.upsert({
+    where: { userId: user.id },
+    update: { organizationId, role: "owner" },
+    create: { id: `mbr_${user.id}`, userId: user.id, organizationId, role: "owner" },
+  });
+  return organizationId;
+}
+
 async function main() {
   const adminUser = await upsertUser("admin@breedingplanner.dev", "BreedingPlanner Admin", "admin", "admin1234");
   const labUser = await upsertUser("lab@proherper.dev", "Seed Lab User", "lab", "demo1234");
   const breederUser = await upsertUser("breeder@proherper.dev", "Seed Breeder", "breeder", "breeder1234");
   const buyerUser = await upsertUser("buyer@breedingplanner.dev", "Seed Buyer", "buyer", "buyer1234");
+
+  // Tenant users only: admin (internal staff) and buyer (marketplace-only) get
+  // no organization, matching the migration's scoping.
+  const labOrganizationId = await ensureOrganizationFor(labUser, "lab_vendor", "Seed Genetics Lab");
+  await ensureOrganizationFor(breederUser, "breeder", breederUser.fullName);
 
   for (const [index, item] of FEATURE_CATALOG.entries()) {
     await prisma.featureCatalog.upsert({
@@ -421,6 +457,7 @@ async function main() {
     },
     create: {
       userId: labUser.id,
+      organizationId: labOrganizationId,
       labName: "Seed Genetics Lab",
       contactPerson: "Seed Lab User",
       location: "Germany",

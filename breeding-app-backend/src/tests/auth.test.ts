@@ -9,13 +9,24 @@ vi.mock("../lib/prisma", () => {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
   };
+  const user = {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  };
+  // Registration provisions a breeder's organization in the same transaction as
+  // the account (see authService.registerUser / organizationService), so the
+  // transaction client has to expose these too, not just accountToken.
+  const membership = {
+    findUnique: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({ id: "mbr_user-1", role: "owner" }),
+  };
+  const organization = {
+    create: vi.fn().mockResolvedValue({ id: "org_user-1", kind: "breeder" }),
+  };
   return {
     prisma: {
-      user: {
-        findUnique: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-      },
+      user,
       refreshSession: {
         create: vi.fn(),
         findFirst: vi.fn(),
@@ -25,7 +36,11 @@ vi.mock("../lib/prisma", () => {
         create: vi.fn(),
       },
       accountToken,
-      $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback({ accountToken })),
+      membership,
+      organization,
+      $transaction: vi.fn((callback: (tx: unknown) => unknown) =>
+        callback({ accountToken, user, membership, organization })
+      ),
     },
   };
 });
