@@ -48,7 +48,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Must stay >= the highest `engines.node` declared in any workspace
+          # installed below. breeding-app-backend pins ">=24.0.0" deliberately
+          # (commit 9fa075a, "Pin backend Node engine to >=24 to match Railway
+          # lockfile") and production runs Node 24 via nixpacks, so 24 is what
+          # this pipeline has to test against. Node 20 satisfied none of the
+          # declared engines and shipped an older npm, whose different peer
+          # resolution made `npm ci` reject the committed lockfiles.
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             breeding-app-backend/package-lock.json
