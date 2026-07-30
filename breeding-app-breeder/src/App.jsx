@@ -7414,6 +7414,8 @@ export default function BreedingPlannerApp() {
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
   const [familyTreeFocusSnakeId, setFamilyTreeFocusSnakeId] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
+  const pendingHatchWizardPayloadRef = useRef(null);
+  const [pendingHatchWizardTick, setPendingHatchWizardTick] = useState(0);
   const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
   const editCameraInputRef = useRef(null);
   const editUploadInputRef = useRef(null);
@@ -9647,6 +9649,13 @@ export default function BreedingPlannerApp() {
       });
     }, [snakes, breederInfo, showAppAlert, t]);
 
+    useEffect(() => {
+      const payload = pendingHatchWizardPayloadRef.current;
+      if (!payload) return;
+      pendingHatchWizardPayloadRef.current = null;
+      openHatchWizardForPayload(payload);
+    }, [pendingHatchWizardTick, openHatchWizardForPayload]);
+
     const regenerateWizardIdInState = useCallback((state, index, sexOverride) => {
       if (!state) return state;
       const entries = Array.isArray(state.entries) ? state.entries : [];
@@ -10013,8 +10022,8 @@ export default function BreedingPlannerApp() {
   }, [snakes, editSnake, breederInfo]);
 
   const handleUpdatePairing = useCallback(async (pairingId, updater) => {
-    let hatchPayload = null;
     let conflictInfo = null;
+    pendingHatchWizardPayloadRef.current = null;
     setPairings(prev => {
       const updated = prev.map(p => {
         if (p.id !== pairingId) return p;
@@ -10045,7 +10054,7 @@ export default function BreedingPlannerApp() {
         const newCount = merged?.hatch?.recorded ? Number(merged.hatch.hatchedCount || 0) : 0;
         const delta = merged?.hatch?.recorded ? Math.max(0, newCount - previousCount) : 0;
         if (delta > 0) {
-          hatchPayload = {
+          pendingHatchWizardPayloadRef.current = {
             pairing: { ...current, ...merged },
             count: delta,
             hatchedDate: merged.hatch.date,
@@ -10073,10 +10082,8 @@ export default function BreedingPlannerApp() {
       setFocusedPairingId(conflictInfo.blockingPairing?.id || null);
       return;
     }
-    if (hatchPayload) {
-      openHatchWizardForPayload(hatchPayload);
-    }
-  }, [setPairings, openHatchWizardForPayload, snakes, t, setTab, setFocusedPairingId, showAppAlert]);
+    setPendingHatchWizardTick(tick => tick + 1);
+  }, [setPairings, snakes, t, setTab, setFocusedPairingId, showAppAlert]);
 
   const handleGeneratePairingQrLabels = useCallback(async (targetPairings) => {
     if (!Array.isArray(targetPairings) || !targetPairings.length) {
