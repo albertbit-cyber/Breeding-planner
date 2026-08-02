@@ -92,7 +92,9 @@ export default function RegisterPage() {
           <Link to="/login" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Sign in</Link>
         </p>
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--hint)', marginTop: 8 }}>
-          By signing up you agree to our Terms of Service and Privacy Policy.
+          By signing up you agree to our{' '}
+          <Link to="/terms" style={{ color: 'var(--gold-dk)' }}>Terms of Service</Link> and{' '}
+          <Link to="/privacy" style={{ color: 'var(--gold-dk)' }}>Privacy Policy</Link>.
         </p>
       </div>
     </section>

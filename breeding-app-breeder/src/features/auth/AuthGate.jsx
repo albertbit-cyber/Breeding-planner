@@ -20,6 +20,14 @@ import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
  * pathname/search once on load and handled inline by AuthGate, ahead of the
  * normal login/register overlay.
  */
+// The legal documents live on the public marketing site, which is a separate
+// deploy from this app. Defaults to the production domain so the links work even
+// where the env var hasn't been set; override per environment to point a staging
+// build at its own copy.
+const LEGAL_SITE_URL = (
+  import.meta.env.VITE_PUBLIC_SITE_URL || "https://serpentora.com"
+).replace(/\/+$/, "");
+
 const LINK_FLOW_PATHS = {
   "/verify-email": "verify-email",
   "/reset-password": "reset-password",
@@ -469,9 +477,23 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
         },
         {
           name: "acceptTerms",
-          label: t("auth.fields.acceptTerms", {
-            defaultValue: "I agree to the Terms of Service and keeper guidelines.",
-          }),
+          // Rendered as a node rather than a plain string so the two documents are
+          // actually reachable from the consent checkbox. Asking someone to agree
+          // to terms they have no way to open is the gap the readiness audit
+          // flagged; the translated strings stay translatable around the links.
+          label: (
+            <>
+              {t("auth.fields.acceptTermsPrefix", { defaultValue: "I agree to the" })}{" "}
+              <a href={`${LEGAL_SITE_URL}/terms`} target="_blank" rel="noopener noreferrer">
+                {t("auth.fields.termsOfService", { defaultValue: "Terms of Service" })}
+              </a>{" "}
+              {t("auth.common.and", { defaultValue: "and" })}{" "}
+              <a href={`${LEGAL_SITE_URL}/privacy`} target="_blank" rel="noopener noreferrer">
+                {t("auth.fields.privacyPolicy", { defaultValue: "Privacy Policy" })}
+              </a>
+              .
+            </>
+          ),
           type: "checkbox",
           required: true,
         },
