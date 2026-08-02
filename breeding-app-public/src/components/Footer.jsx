@@ -30,8 +30,8 @@ export default function Footer() {
             <a key={l} href={h} style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>{l}</a>
           ))}
           <Link to="/pricing" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Pricing</Link>
-          <a href="#" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Privacy</a>
-          <a href="#" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Terms</a>
+          <Link to="/privacy" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Privacy</Link>
+          <Link to="/terms" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Terms</Link>
         </div>
       </div>
     </footer>
