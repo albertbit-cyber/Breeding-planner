@@ -47,6 +47,18 @@ import {
   renderAccountEmailChangedTemplate,
   type AccountEmailChangedTemplateProps,
 } from "./accountEmailChangedTemplate";
+import {
+  ACCOUNT_DELETION_SCHEDULED_TEMPLATE_KEY,
+  ACCOUNT_DELETION_SCHEDULED_TEMPLATE_VERSION,
+  renderAccountDeletionScheduledTemplate,
+  type AccountDeletionScheduledTemplateProps,
+} from "./accountDeletionScheduledTemplate";
+import {
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY,
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
+  renderAccountDeletionCancelledTemplate,
+  type AccountDeletionCancelledTemplateProps,
+} from "./accountDeletionCancelledTemplate";
 
 export type RenderedEmail = { subject: string; html: string; text: string };
 
@@ -87,6 +99,14 @@ const TEMPLATES: Record<string, TemplateEntry> = {
   [ACCOUNT_EMAIL_CHANGED_TEMPLATE_KEY]: {
     version: ACCOUNT_EMAIL_CHANGED_TEMPLATE_VERSION,
     render: (payload) => renderAccountEmailChangedTemplate(payload as unknown as AccountEmailChangedTemplateProps),
+  },
+  [ACCOUNT_DELETION_SCHEDULED_TEMPLATE_KEY]: {
+    version: ACCOUNT_DELETION_SCHEDULED_TEMPLATE_VERSION,
+    render: (payload) => renderAccountDeletionScheduledTemplate(payload as unknown as AccountDeletionScheduledTemplateProps),
+  },
+  [ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY]: {
+    version: ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
+    render: (payload) => renderAccountDeletionCancelledTemplate(payload as unknown as AccountDeletionCancelledTemplateProps),
   },
 };
 
@@ -130,6 +150,10 @@ export {
   ACCOUNT_VERIFY_NEW_EMAIL_TEMPLATE_VERSION,
   ACCOUNT_EMAIL_CHANGED_TEMPLATE_KEY,
   ACCOUNT_EMAIL_CHANGED_TEMPLATE_VERSION,
+  ACCOUNT_DELETION_SCHEDULED_TEMPLATE_KEY,
+  ACCOUNT_DELETION_SCHEDULED_TEMPLATE_VERSION,
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY,
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
 };
 export type {
   InvitationTemplateProps,
@@ -140,5 +164,7 @@ export type {
   AccountPasswordChangedTemplateProps,
   AccountVerifyNewEmailTemplateProps,
   AccountEmailChangedTemplateProps,
+  AccountDeletionScheduledTemplateProps,
+  AccountDeletionCancelledTemplateProps,
 };
 export type { BreedingReminderType } from "./breedingReminderTemplate";

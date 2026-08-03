@@ -88,6 +88,12 @@ model User {
   subscriptionTrialEndsAt DateTime?
   subscriptionPaymentStatus String @default("none")
   lastLoginAt           DateTime?
+  // Right-to-erasure grace period. `status` becomes "pending_deletion" and the
+  // account is locked immediately; the purge job hard-deletes once
+  // deletionScheduledAt passes. Signing in during the window cancels it and
+  // clears both columns.
+  deletionRequestedAt   DateTime?      @map("deletion_requested_at")
+  deletionScheduledAt   DateTime?      @map("deletion_scheduled_at")
   refreshToken          String?        @db.Text
   // Deprecated: superseded by AccountToken (purpose "reset_password"). Columns kept, no longer written.
   passwordResetToken    String?        @unique
@@ -150,6 +156,8 @@ model User {
   membership         Membership?
   organizationInvitesSent     OrganizationInvite[] @relation("OrganizationInviteInviter")
   organizationInvitesAccepted OrganizationInvite[] @relation("OrganizationInviteAcceptedBy")
+
+  @@index([deletionScheduledAt])
 }
 
 // The tenant: a breeding business or an admin-vetted vendor lab. Sits *above*
@@ -1110,7 +1118,10 @@ model ShedTestOrder {
   id                String                @id @default(cuid())
   orderNumber       String?               @unique
   breederId         String
-  breeder           User                  @relation(fields: [breederId], references: [id])
+  // Cascade, not the Prisma default of Restrict: without this, deleting a user
+  // who ever placed a lab order fails outright, which silently broke the
+  // right-to-erasure flow. The order's own rows cascade from here.
+  breeder           User                  @relation(fields: [breederId], references: [id], onDelete: Cascade)
   totalAnimals      Int
   pricingTier       PricingTier
   totalPrice        Decimal               @db.Decimal(12, 2)

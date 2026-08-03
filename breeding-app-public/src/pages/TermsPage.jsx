@@ -7,7 +7,7 @@ export default function TermsPage() {
   return (
     <LegalLayout
       title="Terms of Service"
-      updated="2 August 2026"
+      updated="3 August 2026"
       summary="In short: your records belong to you, genetics predictions are probabilities rather than guarantees, lab results come from independent laboratories, and you are responsible for the animals in your care and for how you describe them to buyers."
     >
       <h2>1. Who these terms are with</h2>
@@ -29,10 +29,23 @@ export default function TermsPage() {
           secure. Tell us promptly if you think someone else has access to it.
         </li>
         <li>
-          Accounts are for you or your organisation. Do not share one login among people who should
-          each have their own.
+          Accounts are personal. Do not share one login among people who should each have their own.
         </li>
       </ul>
+
+      <h3>Organisations and shared access</h3>
+      <p>
+        An account belongs to one organisation — for most users, a breeding business they created by
+        signing up. Where an organisation has more than one member, such as a laboratory with staff,
+        every member gets their own login and access is granted through membership rather than by
+        sharing a password.
+      </p>
+      <p>
+        Records created within an organisation belong to that organisation, not to the individual
+        member who happened to enter them. If you leave an organisation, the records you created stay
+        with it. If you delete your own account, that removes <em>you</em> and the records you
+        personally own; it does not dissolve an organisation that still has other members.
+      </p>
 
       <h2>3. Your content stays yours</h2>
       <p>
@@ -142,7 +155,9 @@ export default function TermsPage() {
 
       <h2>8. Plans, billing, and trials</h2>
       <p>
-        Serpentora offers a free tier and paid subscription plans. Where a plan is paid:
+        Serpentora is currently free to use. We intend to introduce paid subscription plans, and we
+        will not begin charging any existing account without telling you first. The terms below
+        govern paid plans once they launch:
       </p>
       <ul>
         <li>Fees and inclusions are those shown on our pricing page when you subscribe.</li>
@@ -178,9 +193,27 @@ export default function TermsPage() {
 
       <h2>10. Your data, export, and deletion</h2>
       <p>
-        You can export your records and close your account. On closure we delete your data as
-        described in our <a href="/privacy">Privacy Policy</a>. Export your records before closing —
-        deletion cannot be reversed.
+        Both of these are in <strong>Settings → My Account</strong>, and neither requires you to ask
+        us:
+      </p>
+      <ul>
+        <li>
+          <strong>Download my data</strong> gives you a machine-readable file of everything we hold
+          about you.
+        </li>
+        <li>
+          <strong>Delete my account</strong> locks your account immediately and permanently erases it
+          30 days later. Signing in during those 30 days cancels the deletion. After that it cannot
+          be reversed, and we cannot recover anything for you — so download your records first if you
+          want to keep them.
+        </li>
+      </ul>
+      <p>
+        Deletion means deletion. We do not retain an anonymised shadow of your account. One
+        consequence is worth stating plainly: if you have sold animals through the marketplace,
+        deleting your account also removes those sale records and the reviews attached to them,
+        including from the other party&rsquo;s history. See our{' '}
+        <a href="/privacy">Privacy Policy</a> for the full detail.
       </p>
 
       <h2>11. Third-party services</h2>

@@ -25,6 +25,7 @@ process.on("unhandledRejection", (reason) => {
 
 import { app } from "./app";
 import { startEmailWorker, stopEmailWorker } from "./email/worker";
+import { startAccountPurgeWorker, stopAccountPurgeWorker } from "./services/accountPurgeWorker";
 
 /*
 Setup steps for true multi-computer shared data:
@@ -43,11 +44,12 @@ Setup steps for true multi-computer shared data:
 const server = app.listen(env.port, "0.0.0.0", () => {
   console.log(`[server] API running on port ${env.port}`);
   startEmailWorker();
+  startAccountPurgeWorker();
 });
 
 const shutdown = async (signal: string): Promise<void> => {
   console.log(`[server] received ${signal}, shutting down gracefully`);
-  await stopEmailWorker();
+  await Promise.all([stopEmailWorker(), stopAccountPurgeWorker()]);
   server.close(() => process.exit(0));
 };
 

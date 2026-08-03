@@ -29,13 +29,17 @@ import {
   ACCOUNT_VERIFY_NEW_EMAIL_TEMPLATE_VERSION,
   ACCOUNT_EMAIL_CHANGED_TEMPLATE_KEY,
   ACCOUNT_EMAIL_CHANGED_TEMPLATE_VERSION,
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY,
+  ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
 } from "../email/templates";
+import { PENDING_DELETION_STATUS } from "./accountDeletionService";
 import {
   emailVerificationIdempotencyKey,
   passwordResetIdempotencyKey,
   passwordChangedIdempotencyKey,
   verifyNewEmailIdempotencyKey,
   emailChangedNoticeIdempotencyKey,
+  accountDeletionCancelledIdempotencyKey,
 } from "../email/idempotency";
 
 const VERIFY_EMAIL_TTL_MS = 48 * 60 * 60 * 1000;
@@ -180,6 +184,10 @@ export const loginUser = async (email: string, password: string) => {
     throw new HttpError(401, "Invalid credentials.");
   }
 
+  // Signing in is what cancels a pending deletion, so this has to be read
+  // before the update below resets `status` to active.
+  const hadPendingDeletion = user.status === PENDING_DELETION_STATUS;
+
   const tokenPayload = {
     sub: user.id,
     email: user.email,
@@ -191,7 +199,16 @@ export const loginUser = async (email: string, password: string) => {
 
   await (prisma as any).user.update({
     where: { id: user.id },
-    data: { refreshToken: hashRefreshToken(refreshToken), lastLoginAt: new Date(), status: "active" },
+    data: {
+      refreshToken: hashRefreshToken(refreshToken),
+      lastLoginAt: new Date(),
+      status: "active",
+      // Cleared unconditionally. `status` was already being reset here, so
+      // leaving these set would strand the account in a state where the UI
+      // reports a pending deletion the purge job will never act on.
+      deletionRequestedAt: null,
+      deletionScheduledAt: null,
+    },
   });
   await createRefreshSession(user.id, refreshToken);
   await recordSecurityEvent({
@@ -200,6 +217,30 @@ export const loginUser = async (email: string, password: string) => {
     outcome: "success",
     metadata: { email: user.email, role: user.role },
   });
+
+  if (hadPendingDeletion) {
+    await recordSecurityEvent({
+      type: "account.deletion.cancelled",
+      actorUserId: user.id,
+      outcome: "success",
+      metadata: { via: "login" },
+    });
+
+    // If the deletion was requested by someone who should not have had access,
+    // this mail is how the real owner finds out.
+    await enqueueEmail({
+      ownerId: user.id,
+      recipientEmail: user.email,
+      category: "account_and_security",
+      templateKey: ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY,
+      templateVersion: ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
+      templatePayload: { fullName: user.fullName },
+      subject: "Your Breeding Planner account deletion was cancelled",
+      idempotencyKey: accountDeletionCancelledIdempotencyKey(user.id),
+      relatedEntityType: "user",
+      relatedEntityId: user.id,
+    });
+  }
 
   return {
     token,

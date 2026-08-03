@@ -646,6 +646,57 @@ export const changeAccountPassword = async (payload: { currentPassword: string; 
     body: JSON.stringify(payload),
   });
 
+export type AccountDeletionStatus = {
+  pending: boolean;
+  requestedAt: string | null;
+  scheduledAt: string | null;
+  gracePeriodDays: number;
+};
+
+export const fetchAccountDeletionStatus = async () =>
+  request<AccountDeletionStatus>("/auth/me/deletion");
+
+export const requestAccountDeletion = async (payload: { password: string; confirmation: string }) =>
+  request<AccountDeletionStatus & { message: string }>("/auth/me/deletion", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const cancelAccountDeletion = async () =>
+  request<{ pending: boolean; cancelled: boolean; message: string }>("/auth/me/deletion", {
+    method: "DELETE",
+  });
+
+/**
+ * Routed through `request` like everything else rather than a bare fetch: the
+ * endpoint responds with JSON, and `request` already carries the bearer/cookie
+ * auth split, CSRF, and the 401-refresh retry. Re-implementing that here to
+ * stream a blob would duplicate the tricky part of this client to save one
+ * parse of a file that is a few megabytes at most.
+ *
+ * The server's Content-Disposition filename is therefore not visible to us, so
+ * the same name is rebuilt client-side.
+ */
+export const downloadAccountDataExport = async (): Promise<{ filename: string }> => {
+  const payload = await request<Record<string, unknown>>("/auth/me/export");
+
+  const filename = `serpentora-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  return { filename };
+};
+
 export const fetchTestCatalog = async () => request<{ tests: unknown[] }>("/lab/tests/catalog?breederView=true");
 
 export const fetchPricingConfig = async () => request<{ pricing: unknown }>("/lab/tests/pricing");

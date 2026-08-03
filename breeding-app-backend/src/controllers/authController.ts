@@ -13,6 +13,12 @@ import {
   resendVerificationEmail,
   confirmEmailChange as confirmEmailChangeForUser,
 } from "../services/authService";
+import { buildAccountExport, accountExportFilename } from "../services/accountDataExportService";
+import {
+  requestAccountDeletion,
+  cancelAccountDeletion,
+  getDeletionStatus,
+} from "../services/accountDeletionService";
 import {
   changeEmailSchema,
   changePasswordSchema,
@@ -22,6 +28,7 @@ import {
   resetPasswordSchema,
   resendVerificationSchema,
   confirmEmailChangeSchema,
+  requestAccountDeletionSchema,
 } from "../validators/authValidators";
 import {
   AUTH_REFRESH_COOKIE,
@@ -160,4 +167,38 @@ export const confirmEmailChange = async (req: Request, res: Response): Promise<v
     return;
   }
   res.status(200).json(await confirmEmailChangeForUser(parsed.data.token));
+};
+
+export const exportMyData = async (req: Request, res: Response): Promise<void> => {
+  const userId = String(req.user?.id || "");
+  const payload = await buildAccountExport(userId);
+
+  // Served as a download rather than a JSON body: the whole point is that the
+  // user ends up with a file they keep.
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${accountExportFilename(userId)}"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).send(JSON.stringify(payload, null, 2));
+};
+
+export const deletionStatus = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getDeletionStatus(String(req.user?.id || "")));
+};
+
+export const requestDeletion = async (req: Request, res: Response): Promise<void> => {
+  const parsed = requestAccountDeletionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const result = await requestAccountDeletion(String(req.user?.id || ""), parsed.data.password);
+  // Every session was just revoked server-side; drop the cookies too so the
+  // browser reflects it instead of holding a token that no longer resolves.
+  clearAuthCookies(res);
+  res.status(200).json(result);
+};
+
+export const cancelDeletion = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await cancelAccountDeletion(String(req.user?.id || "")));
 };

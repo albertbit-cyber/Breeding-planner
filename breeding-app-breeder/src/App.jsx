@@ -33,6 +33,10 @@ import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
 import {
   changeAccountEmail,
   changeAccountPassword,
+  fetchAccountDeletionStatus,
+  requestAccountDeletion,
+  cancelAccountDeletion,
+  downloadAccountDataExport,
   changeMySubscription,
   checkFeatureAccess,
   clearAuthToken,
@@ -16440,6 +16444,14 @@ function BreederSection({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    deletePassword: '',
+    deleteConfirmation: '',
+  });
+  const [deletionState, setDeletionState] = useState({
+    loaded: false,
+    pending: false,
+    scheduledAt: null,
+    gracePeriodDays: 30,
   });
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
@@ -17491,6 +17503,11 @@ function BreederSection({
     loadAccountData();
   }, [accountState.loaded, accountState.loading, loadAccountData, setupTab]);
 
+  useEffect(() => {
+    if (setupTab !== 'account' || deletionState.loaded) return;
+    loadDeletionStatus();
+  }, [deletionState.loaded, loadDeletionStatus, setupTab]);
+
   const handleAccountSignOut = useCallback(() => {
     clearAuthToken('breeder');
     setAccountState(prev => ({
@@ -17550,6 +17567,112 @@ function BreederSection({
       setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to update password.', message: '' }));
     }
   }, [accountForms.confirmPassword, accountForms.currentPassword, accountForms.newPassword]);
+
+  const loadDeletionStatus = useCallback(async () => {
+    try {
+      const status = await fetchAccountDeletionStatus();
+      setDeletionState({
+        loaded: true,
+        pending: Boolean(status?.pending),
+        scheduledAt: status?.scheduledAt || null,
+        gracePeriodDays: Number(status?.gracePeriodDays) || 30,
+      });
+    } catch {
+      // A failed status check must not blank out the rest of the account tab.
+      setDeletionState(prev => ({ ...prev, loaded: true }));
+    }
+  }, []);
+
+  const handleDownloadMyData = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, actionLoading: 'export', error: '', message: '' }));
+    try {
+      const { filename } = await downloadAccountDataExport();
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: '',
+        message: `Your data export has been downloaded as ${filename}.`,
+      }));
+    } catch (error) {
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: error?.message || 'Unable to prepare your data export.',
+        message: '',
+      }));
+    }
+  }, []);
+
+  const handleRequestAccountDeletion = useCallback(async () => {
+    if (!accountForms.deletePassword) {
+      setAccountState(prev => ({ ...prev, error: 'Enter your password to confirm deletion.', message: '' }));
+      return;
+    }
+    if (accountForms.deleteConfirmation.trim().toUpperCase() !== 'DELETE') {
+      setAccountState(prev => ({ ...prev, error: 'Type DELETE to confirm.', message: '' }));
+      return;
+    }
+
+    // Second gate on top of the password and the typed word: this is the only
+    // irreversible action in the app.
+    let confirmed = true;
+    if (typeof showAppConfirm === 'function') {
+      confirmed = await showAppConfirm(
+        'This permanently deletes your account and every record in it. You have 30 days to change your mind by signing back in. Continue?',
+        { confirmLabel: 'Delete my account', cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }) }
+      );
+    }
+    if (!confirmed) return;
+
+    setAccountState(prev => ({ ...prev, actionLoading: 'delete', error: '', message: '' }));
+    try {
+      const result = await requestAccountDeletion({
+        password: accountForms.deletePassword,
+        confirmation: 'DELETE',
+      });
+      setDeletionState({
+        loaded: true,
+        pending: true,
+        scheduledAt: result?.scheduledAt || null,
+        gracePeriodDays: Number(result?.gracePeriodDays) || 30,
+      });
+      setAccountForms(prev => ({ ...prev, deletePassword: '', deleteConfirmation: '' }));
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: '',
+        message: result?.message || 'Your account is scheduled for deletion.',
+      }));
+    } catch (error) {
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: error?.message || 'Unable to schedule account deletion.',
+        message: '',
+      }));
+    }
+  }, [accountForms.deleteConfirmation, accountForms.deletePassword, showAppConfirm, t]);
+
+  const handleCancelAccountDeletion = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, actionLoading: 'cancelDelete', error: '', message: '' }));
+    try {
+      const result = await cancelAccountDeletion();
+      setDeletionState({ loaded: true, pending: false, scheduledAt: null, gracePeriodDays: 30 });
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: '',
+        message: result?.message || 'Account deletion cancelled.',
+      }));
+    } catch (error) {
+      setAccountState(prev => ({
+        ...prev,
+        actionLoading: '',
+        error: error?.message || 'Unable to cancel the deletion.',
+        message: '',
+      }));
+    }
+  }, []);
 
   const handleChangeAccountPlan = useCallback(async (tier) => {
     const tierId = tier?.id;
@@ -19466,6 +19589,85 @@ function BreederSection({
                 </button>
               </div>
             </div>
+          </section>
+
+          <section className="space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-neutral-800">Your data</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Download everything we hold about you, or close your account for good.
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
+              <div className="text-sm font-semibold">Download my data</div>
+              <div className="text-xs text-neutral-500">
+                A single JSON file containing your profile, animals, pairings, clutches, lab orders,
+                listings and messages. Records shared with another person identify them only by an
+                internal id.
+              </div>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-lg border bg-white text-sm"
+                disabled={Boolean(accountState.actionLoading)}
+                onClick={handleDownloadMyData}
+              >
+                {accountState.actionLoading === 'export' ? 'Preparing...' : 'Download my data'}
+              </button>
+            </div>
+
+            {deletionState.pending ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2">
+                <div className="text-sm font-semibold text-amber-900">This account is scheduled for deletion</div>
+                <div className="text-xs text-amber-800">
+                  {deletionState.scheduledAt
+                    ? `Everything will be permanently erased on ${formatDateTimeForDisplay(deletionState.scheduledAt)}.`
+                    : 'Everything will be permanently erased when the grace period ends.'}
+                  {' '}Download your data before then if you want to keep a copy.
+                </div>
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleCancelAccountDeletion}
+                >
+                  {accountState.actionLoading === 'cancelDelete' ? 'Cancelling...' : 'Keep my account'}
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                <div className="text-sm font-semibold text-red-900">Delete my account</div>
+                <div className="text-xs text-red-800">
+                  This erases your account and every record in it — animals, pairings, clutches,
+                  photos, notes, lab orders and messages. Nothing is kept. You have{' '}
+                  {deletionState.gracePeriodDays} days to change your mind by signing back in; after
+                  that it cannot be undone.
+                </div>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="password"
+                  autoComplete="current-password"
+                  value={accountForms.deletePassword}
+                  onChange={event => handleAccountFormChange('deletePassword', event.target.value)}
+                  placeholder="Current password"
+                />
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  type="text"
+                  value={accountForms.deleteConfirmation}
+                  onChange={event => handleAccountFormChange('deleteConfirmation', event.target.value)}
+                  placeholder="Type DELETE to confirm"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 disabled:opacity-60"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleRequestAccountDeletion}
+                >
+                  {accountState.actionLoading === 'delete' ? 'Scheduling...' : 'Delete my account'}
+                </button>
+              </div>
+            )}
           </section>
 
           {accountState.message ? (

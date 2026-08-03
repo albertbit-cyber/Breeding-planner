@@ -28,3 +28,14 @@ export const passwordChangedIdempotencyKey = (userId: string): string =>
 
 export const emailChangedNoticeIdempotencyKey = (userId: string): string =>
   `email_changed_notice:${userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Keyed on the scheduled purge timestamp rather than the clock: re-requesting
+ * deletion while one is already pending resolves to the same key, so a
+ * double-submit cannot produce two conflicting deadline emails.
+ */
+export const accountDeletionScheduledIdempotencyKey = (userId: string, scheduledAt: Date): string =>
+  `account_deletion_scheduled:${userId}:${scheduledAt.getTime()}`;
+
+export const accountDeletionCancelledIdempotencyKey = (userId: string): string =>
+  `account_deletion_cancelled:${userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
