@@ -310,8 +310,7 @@ export default function PrivacyPage() {
 
       <h2>9. Children</h2>
       <p>
-        Serpentora is not intended for children. You must be at least{' '}
-        <Fill>[16 / the age of digital consent in your country]</Fill> to create an account. If we
+        Serpentora is not intended for children. You must be at least 16 to create an account. If we
         learn that we hold data about a child below that age, we will delete it.
       </p>
 

@@ -21,7 +21,7 @@ export default function TermsPage() {
       <h2>2. Your account</h2>
       <ul>
         <li>
-          You must be at least <Fill>[minimum age]</Fill> and able to enter a binding contract.
+          You must be at least 16 and able to enter a binding contract.
         </li>
         <li>The details you register with must be accurate, and you must keep them up to date.</li>
         <li>
@@ -171,7 +171,7 @@ export default function TermsPage() {
         </li>
         <li>
           We may change prices, but not during a period you have already paid for. We will give you at
-          least <Fill>[notice period, e.g. 30 days]</Fill> notice before a change takes effect.
+          least 30 days&rsquo; notice before a change takes effect.
         </li>
         <li>
           If a payment fails, we may suspend access to paid features. Your data is not deleted for
@@ -237,8 +237,7 @@ export default function TermsPage() {
       </ul>
       <p>
         Where liability cannot lawfully be excluded, our total liability for any claim is limited to
-        the greater of the amount you paid us in the twelve months before the claim, or{' '}
-        <Fill>[minimum liability floor, e.g. EUR 100]</Fill>.
+        the greater of the amount you paid us in the twelve months before the claim, or EUR 100.
       </p>
       <p>
         Nothing here limits liability for death or personal injury caused by negligence, for fraud, or
