@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import PrivacyPage from './pages/PrivacyPage.jsx';
 import TermsPage from './pages/TermsPage.jsx';
+import ImpressumPage from './pages/ImpressumPage.jsx';
 
 export default function App() {
   return (
@@ -21,6 +22,10 @@ export default function App() {
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/privacy"  element={<PrivacyPage />} />
           <Route path="/terms"    element={<TermsPage />} />
+          {/* Both spellings: German visitors look for "Impressum", and the
+              English path is there so the link is guessable either way. */}
+          <Route path="/impressum" element={<ImpressumPage />} />
+          <Route path="/legal-notice" element={<ImpressumPage />} />
           {/* Fallback */}
           <Route path="*" element={<HomePage />} />
         </Routes>

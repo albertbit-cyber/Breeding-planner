@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       </p>
       <p>
         For any privacy question, or to exercise the rights described in section 7, contact{' '}
-        <Fill>[privacy contact email]</Fill>.
+        <a href="mailto:info@serpentora.com">info@serpentora.com</a>.
       </p>
 
       <h2>2. What we collect</h2>
@@ -294,7 +294,7 @@ export default function PrivacyPage() {
       </ul>
       <p>
         For anything else — correction, restriction, objection, or a question about a request —
-        contact <Fill>[privacy contact email]</Fill>. We respond within one month. We may ask you to
+        contact <a href="mailto:info@serpentora.com">info@serpentora.com</a>. We respond within one month. We may ask you to
         confirm your identity first, so that nobody else can make a request about your data.
       </p>
 

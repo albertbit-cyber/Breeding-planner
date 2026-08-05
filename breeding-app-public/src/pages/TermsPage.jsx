@@ -262,15 +262,15 @@ export default function TermsPage() {
 
       <h2>15. Governing law</h2>
       <p>
-        These terms are governed by the law of <Fill>[governing jurisdiction]</Fill>, and the courts
-        of <Fill>[jurisdiction]</Fill> have non-exclusive jurisdiction. If you are a consumer, you keep
-        the protection of the mandatory law of the country you live in, and may bring proceedings
-        there.
+        These terms are governed by the law of the Federal Republic of Germany, excluding the UN
+        Convention on Contracts for the International Sale of Goods, and the courts of Germany have
+        non-exclusive jurisdiction. If you are a consumer, you keep the protection of the mandatory
+        law of the country you live in, and may bring proceedings there.
       </p>
 
       <h2>16. Contact</h2>
       <p>
-        Questions about these terms: <Fill>[contact email]</Fill>.
+        Questions about these terms: <a href="mailto:info@serpentora.com">info@serpentora.com</a>.
       </p>
     </LegalLayout>
   );

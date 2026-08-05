@@ -32,6 +32,9 @@ export default function Footer() {
           <Link to="/pricing" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Pricing</Link>
           <Link to="/privacy" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Privacy</Link>
           <Link to="/terms" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Terms</Link>
+          {/* Left untranslated on purpose: German law requires the legal notice
+              be findable, and "Impressum" is the label a German visitor scans for. */}
+          <Link to="/impressum" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Impressum</Link>
         </div>
       </div>
     </footer>
