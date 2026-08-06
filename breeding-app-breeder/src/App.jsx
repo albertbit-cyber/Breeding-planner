@@ -17562,11 +17562,6 @@ function BreederSection({
     loadAccountData();
   }, [accountState.loaded, accountState.loading, loadAccountData, setupTab]);
 
-  useEffect(() => {
-    if (setupTab !== 'account' || deletionState.loaded) return;
-    loadDeletionStatus();
-  }, [deletionState.loaded, loadDeletionStatus, setupTab]);
-
   const handleAccountSignOut = useCallback(() => {
     clearAuthToken('breeder');
     setAccountState(prev => ({
@@ -17641,6 +17636,14 @@ function BreederSection({
       setDeletionState(prev => ({ ...prev, loaded: true }));
     }
   }, []);
+
+  // Must stay below loadDeletionStatus: the dependency array is evaluated during
+  // render, so an effect placed above the `const` reads it inside its temporal
+  // dead zone and throws before the account tab can paint.
+  useEffect(() => {
+    if (setupTab !== 'account' || deletionState.loaded) return;
+    loadDeletionStatus();
+  }, [deletionState.loaded, loadDeletionStatus, setupTab]);
 
   const handleDownloadMyData = useCallback(async () => {
     setAccountState(prev => ({ ...prev, actionLoading: 'export', error: '', message: '' }));
