@@ -199,7 +199,7 @@ export default function TermsPage() {
       <ul>
         <li>
           <strong>Download my data</strong> gives you a machine-readable file of everything we hold
-          about you.
+          about you, or of just the categories you select.
         </li>
         <li>
           <strong>Delete my account</strong> locks your account immediately and permanently erases it

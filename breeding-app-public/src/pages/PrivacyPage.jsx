@@ -283,9 +283,11 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong>Download my data</strong> — a single machine-readable file containing everything
-          described in section 2. Where a record involves another person, such as a marketplace
-          conversation, they are identified only by an internal reference, because their details are
-          not yours to receive.
+          described in section 2. You may narrow it to particular categories if you only want part
+          of it; the full file is what you get unless you choose otherwise, and a narrowed file
+          states on its face that it is partial. Where a record involves another person, such as a
+          marketplace conversation, they are identified only by an internal reference, because their
+          details are not yours to receive.
         </li>
         <li>
           <strong>Delete my account</strong> — locks the account at once and erases everything 30

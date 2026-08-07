@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACCOUNT_EXPORT_GROUP_IDS } from "../services/accountDataExportService";
 
 export const registerSchema = z.object({
   email: z
@@ -85,6 +86,34 @@ export const requestAccountDeletionSchema = z.object({
     .string()
     .trim()
     .refine((value) => value.toUpperCase() === "DELETE", "Type DELETE to confirm."),
+});
+
+/**
+ * Optional narrowing of the data export, as a comma-separated list of group
+ * ids. Absent means the whole export, which is what the right to portability
+ * actually grants — the query string can only ever be a convenience on top.
+ *
+ * An unrecognised id is rejected rather than ignored: silently dropping it
+ * would hand back a file missing a category the user believed they had asked
+ * for, and they have no way to tell from the file that they were misheard.
+ */
+export const accountExportQuerySchema = z.object({
+  groups: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(",")
+            .map((id) => id.trim())
+            .filter((id) => id.length > 0)
+        : []
+    )
+    .refine(
+      (ids) => ids.every((id) => (ACCOUNT_EXPORT_GROUP_IDS as string[]).includes(id)),
+      `groups must be a comma-separated list of: ${ACCOUNT_EXPORT_GROUP_IDS.join(", ")}.`
+    ),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

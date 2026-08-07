@@ -132,4 +132,112 @@ describe("GET /api/auth/me/export", () => {
     const res = await request(app).get("/api/auth/me/export");
     expect(res.status).toBe(401);
   });
+
+  it("exports every group and marks the file complete when none are named", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    const res = await request(app).get("/api/auth/me/export").set("Authorization", `Bearer ${token}`);
+
+    const body = JSON.parse(res.text);
+    expect(body.selection.complete).toBe(true);
+    expect(body.selection.omitted).toEqual([]);
+    expect(body.records.animals).toBeDefined();
+    expect(body.records.labOrders).toBeDefined();
+    expect(body.shared.conversations).toBeDefined();
+    expect(body.security.securityEvents).toBeDefined();
+    expect(res.headers["content-disposition"]).not.toContain("partial");
+  });
+});
+
+describe("GET /api/auth/me/export?groups=", () => {
+  it("returns only the named groups", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    const res = await request(app)
+      .get("/api/auth/me/export?groups=animals")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.text);
+
+    expect(body.records.animals).toHaveLength(1);
+    expect(body.records.pairings).toBeDefined();
+    // Marketplace, messages, reviews and security were not asked for.
+    expect(body.records.marketplaceListings).toBeUndefined();
+    expect(body.shared.conversations).toBeUndefined();
+    expect(body.shared.reviewsWritten).toBeUndefined();
+    expect(body.security.securityEvents).toBeUndefined();
+  });
+
+  it("does not query the tables behind a group that was not selected", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    await request(app).get("/api/auth/me/export?groups=animals").set("Authorization", `Bearer ${token}`);
+
+    // The whole point of narrowing server-side: the work is skipped, not done
+    // and then discarded.
+    expect(db.animal.findMany).toHaveBeenCalled();
+    expect(db.marketplaceListing.findMany).not.toHaveBeenCalled();
+    expect(db.marketplaceConversation.findMany).not.toHaveBeenCalled();
+    expect(db.marketplaceReview.findMany).not.toHaveBeenCalled();
+    expect(db.shedTestOrder.findMany).not.toHaveBeenCalled();
+    expect(db.userDeviceSession.findMany).not.toHaveBeenCalled();
+  });
+
+  it("always includes the account group, even when it is not named", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    const res = await request(app)
+      .get("/api/auth/me/export?groups=lab")
+      .set("Authorization", `Bearer ${token}`);
+
+    const body = JSON.parse(res.text);
+    expect(body.account.email).toBe("test@example.com");
+    expect(body.records.profile.breederName).toBe("Test Reptiles");
+    expect(body.selection.included).toContain("account");
+    expect(body.records.animals).toBeUndefined();
+  });
+
+  it("flags a narrowed export as partial in the file and the filename", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    const res = await request(app)
+      .get("/api/auth/me/export?groups=animals")
+      .set("Authorization", `Bearer ${token}`);
+
+    const body = JSON.parse(res.text);
+    // A partial file must never be mistakable for a complete Art. 20 response.
+    expect(body.selection.complete).toBe(false);
+    expect(body.selection.omitted).toContain("marketplace");
+    expect(body.notice).toContain("partial export");
+    expect(res.headers["content-disposition"]).toContain("-partial.json");
+  });
+
+  it("rejects an unknown group instead of silently ignoring it", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    const res = await request(app)
+      .get("/api/auth/me/export?groups=animals,passwords")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+    expect(db.animal.findMany).not.toHaveBeenCalled();
+  });
+
+  it("still never asks the database for credentials when narrowed", async () => {
+    const token = await getToken();
+    db.user.findUnique.mockResolvedValue(mockUser);
+
+    await request(app).get("/api/auth/me/export?groups=animals").set("Authorization", `Bearer ${token}`);
+
+    const select = db.user.findUnique.mock.calls.at(-1)[0].select;
+    expect(select.passwordHash).toBeUndefined();
+    expect(select.email).toBe(true);
+  });
 });

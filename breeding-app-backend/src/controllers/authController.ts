@@ -29,6 +29,7 @@ import {
   resendVerificationSchema,
   confirmEmailChangeSchema,
   requestAccountDeletionSchema,
+  accountExportQuerySchema,
 } from "../validators/authValidators";
 import {
   AUTH_REFRESH_COOKIE,
@@ -171,12 +172,22 @@ export const confirmEmailChange = async (req: Request, res: Response): Promise<v
 
 export const exportMyData = async (req: Request, res: Response): Promise<void> => {
   const userId = String(req.user?.id || "");
-  const payload = await buildAccountExport(userId);
+
+  const parsed = accountExportQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const payload = await buildAccountExport(userId, parsed.data.groups);
 
   // Served as a download rather than a JSON body: the whole point is that the
   // user ends up with a file they keep.
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${accountExportFilename(userId)}"`);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${accountExportFilename(userId, new Date(), payload.selection.complete)}"`
+  );
   res.setHeader("Cache-Control", "no-store");
   res.status(200).send(JSON.stringify(payload, null, 2));
 };

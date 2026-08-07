@@ -677,10 +677,30 @@ export const cancelAccountDeletion = async () =>
  * The server's Content-Disposition filename is therefore not visible to us, so
  * the same name is rebuilt client-side.
  */
-export const downloadAccountDataExport = async (): Promise<{ filename: string }> => {
-  const payload = await request<Record<string, unknown>>("/auth/me/export");
+/**
+ * Selectable categories for the data export, mirroring ACCOUNT_EXPORT_GROUPS in
+ * the backend's accountDataExportService. `always` groups cannot be deselected:
+ * a file with no identity in it cannot be checked against the person it belongs
+ * to, which is what a portability export is for.
+ */
+export const ACCOUNT_EXPORT_GROUPS: Array<{ id: string; label: string; hint: string; always?: boolean }> = [
+  { id: "account", label: "Account & profile", hint: "Your login details, breeder profile and notification settings", always: true },
+  { id: "animals", label: "Animals & breeding", hint: "Animals, pairings, clutches, reproductive cycles and planner state" },
+  { id: "lab", label: "Lab orders", hint: "Shed test orders, the animals on them and their results" },
+  { id: "marketplace", label: "Marketplace", hint: "Listings, stores, favourites, saved searches, sales and purchases" },
+  { id: "messages", label: "Messages & inquiries", hint: "Marketplace conversations and listing inquiries" },
+  { id: "reviews", label: "Reviews", hint: "Reviews you wrote and reviews you received" },
+  { id: "security", label: "Security & activity", hint: "Sign-in history, emails we sent you, devices, usage and subscriptions" },
+];
 
-  const filename = `serpentora-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+export const downloadAccountDataExport = async (groups?: readonly string[]): Promise<{ filename: string }> => {
+  // An empty or absent selection means the whole export, which is what the
+  // right to portability actually grants — narrowing is a convenience on top.
+  const query = groups && groups.length > 0 ? `?groups=${encodeURIComponent(groups.join(","))}` : "";
+  const payload = await request<Record<string, any>>(`/auth/me/export${query}`);
+
+  const suffix = payload?.selection && payload.selection.complete === false ? "-partial" : "";
+  const filename = `serpentora-data-export-${new Date().toISOString().slice(0, 10)}${suffix}.json`;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const objectUrl = URL.createObjectURL(blob);
   try {

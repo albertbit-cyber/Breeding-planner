@@ -4,6 +4,7 @@ import {
   createListingInquiry,
   createSavedSearch,
   deleteSavedSearch,
+  downloadAccountDataExport,
   fetchOrders,
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
@@ -563,5 +564,78 @@ describe("shared api client", () => {
       .rejects.toBeInstanceOf(SharedApiError);
 
     expect(getSharedBackendSnapshot().state).toBe("connected");
+  });
+
+  describe("account data export", () => {
+    const stubDownload = () => {
+      // This suite runs on the node environment, which has neither `document`
+      // nor object-URL plumbing. Only the request and the resulting filename are
+      // under test, so the anchor-click delivery mechanism is stubbed out.
+      // URL is subclassed rather than replaced so `new URL()` keeps working for
+      // everything else in the client.
+      class StubURL extends URL {}
+      StubURL.createObjectURL = vi.fn(() => "blob:export");
+      StubURL.revokeObjectURL = vi.fn();
+      vi.stubGlobal("URL", StubURL);
+
+      const anchor = { href: "", download: "", click: vi.fn(), remove: vi.fn() };
+      vi.stubGlobal("document", {
+        createElement: vi.fn(() => anchor),
+        body: { appendChild: vi.fn() },
+      });
+      return anchor;
+    };
+
+    const stubExportResponse = (payload) => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => payload });
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    };
+
+    it("asks for the whole export when no groups are given", async () => {
+      import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+      setAuthToken("token-1");
+      stubDownload();
+      const fetchMock = stubExportResponse({ selection: { complete: true } });
+
+      const { filename } = await downloadAccountDataExport();
+
+      expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/auth\/me\/export$/);
+      expect(filename).not.toContain("partial");
+    });
+
+    it("passes the selected groups as a comma-separated query", async () => {
+      import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+      setAuthToken("token-1");
+      stubDownload();
+      const fetchMock = stubExportResponse({ selection: { complete: false } });
+
+      await downloadAccountDataExport(["account", "animals", "lab"]);
+
+      expect(String(fetchMock.mock.calls[0][0]))
+        .toMatch(/\/auth\/me\/export\?groups=account%2Canimals%2Clab$/);
+    });
+
+    it("names a partial export partial, so it cannot be mistaken for the full record", async () => {
+      import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+      setAuthToken("token-1");
+      stubDownload();
+      stubExportResponse({ selection: { complete: false } });
+
+      const { filename } = await downloadAccountDataExport(["account", "animals"]);
+
+      expect(filename).toContain("-partial.json");
+    });
+
+    it("treats an empty selection as the whole export rather than an empty file", async () => {
+      import.meta.env.VITE_API_URL = "https://lab.example.com/api";
+      setAuthToken("token-1");
+      stubDownload();
+      const fetchMock = stubExportResponse({ selection: { complete: true } });
+
+      await downloadAccountDataExport([]);
+
+      expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/auth\/me\/export$/);
+    });
   });
 });

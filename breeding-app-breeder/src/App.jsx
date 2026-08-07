@@ -33,6 +33,7 @@ import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
 import {
   changeAccountEmail,
   changeAccountPassword,
+  ACCOUNT_EXPORT_GROUPS,
   fetchAccountDeletionStatus,
   requestAccountDeletion,
   cancelAccountDeletion,
@@ -1580,15 +1581,22 @@ function normalizeExportFieldSelection(selection, fallback, definitions) {
   return cleaned.length ? cleaned : [...fallback];
 }
 
-function buildAnimalExportDataset(snakes = [], pairings = [], selected = DEFAULT_ANIMAL_EXPORT_FIELDS) {
+/**
+ * `options.subset` narrows which animals become rows without narrowing the
+ * lookup context: parent and pairing getters still resolve against the full
+ * collection, so exporting one group does not turn a sire kept in another group
+ * into a missing reference.
+ */
+function buildAnimalExportDataset(snakes = [], pairings = [], selected = DEFAULT_ANIMAL_EXPORT_FIELDS, options = {}) {
   const normalizedFields = normalizeExportFieldSelection(selected, DEFAULT_ANIMAL_EXPORT_FIELDS, ANIMAL_EXPORT_FIELD_DEFS);
   const defByKey = new Map(ANIMAL_EXPORT_FIELD_DEFS.map(def => [def.key, def]));
   const selectedDefs = normalizedFields.map(key => defByKey.get(key)).filter(Boolean);
   const snakeMap = makeSnakeMap(snakes);
   const pairingsBySnakeId = groupPairingsBySnake(pairings, snakeMap);
   const context = { snakes, pairings, snakeMap, pairingsBySnakeId };
+  const rowSource = Array.isArray(options.subset) ? options.subset : snakes;
   const rows = [];
-  (Array.isArray(snakes) ? snakes : []).forEach(snake => {
+  (Array.isArray(rowSource) ? rowSource : []).forEach(snake => {
     if (!snake) return;
     const row = {};
     selectedDefs.forEach(def => {
@@ -16350,6 +16358,10 @@ function AddGroupInline({ onAdd }) {
   );
 }
 
+// The export categories a user can actually turn off. `always` groups are shown
+// ticked and disabled, so they are never part of the mutable selection.
+const OPTIONAL_EXPORT_GROUP_IDS = ACCOUNT_EXPORT_GROUPS.filter(group => !group.always).map(group => group.id);
+
 // Breeder section for contact and logo
 function BreederSection({
   breederInfo,
@@ -16512,6 +16524,13 @@ function BreederSection({
     scheduledAt: null,
     gracePeriodDays: 30,
   });
+  // Which optional categories the data export will include. Starts as all of
+  // them, so the default action stays "give me everything" — narrowing is a
+  // convenience, not the norm.
+  const [exportGroups, setExportGroups] = useState(() => OPTIONAL_EXPORT_GROUP_IDS);
+  // Which animals the Animals export covers: everything, a set of groups, a set
+  // of tags, or a hand-picked list.
+  const [animalExportScope, setAnimalExportScope] = useState({ mode: 'all', groups: [], tags: [], ids: [] });
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
@@ -16524,6 +16543,77 @@ function BreederSection({
     () => normalizeExportFieldSelection(pairingExportFields, DEFAULT_PAIRING_EXPORT_FIELDS, PAIRING_EXPORT_FIELD_DEFS),
     [pairingExportFields]
   );
+
+  // Group and tag pickers are built from the animals themselves rather than the
+  // saved group list, so a group nothing is filed under never offers itself as a
+  // filter that would export zero rows.
+  const animalScopeOptions = useMemo(() => {
+    const groupSet = new Set();
+    const tagSet = new Set();
+    (Array.isArray(snakes) ? snakes : []).forEach(snake => {
+      (Array.isArray(snake?.groups) ? snake.groups : []).forEach(value => {
+        const token = String(value || '').trim();
+        if (token) groupSet.add(token);
+      });
+      (Array.isArray(snake?.tags) ? snake.tags : []).forEach(value => {
+        const token = String(value || '').trim();
+        if (token) tagSet.add(token);
+      });
+    });
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    return {
+      groups: [...groupSet].sort((a, b) => collator.compare(a, b)),
+      tags: [...tagSet].sort((a, b) => collator.compare(a, b)),
+    };
+  }, [snakes]);
+
+  const animalsToExport = useMemo(() => {
+    const all = Array.isArray(snakes) ? snakes.filter(Boolean) : [];
+    const { mode, groups: pickedGroups, tags: pickedTags, ids } = animalExportScope;
+
+    // An empty picker means "nothing chosen yet" rather than "match nothing":
+    // falling through to every animal here would silently export the lot under a
+    // heading that says otherwise.
+    if (mode === 'groups') {
+      if (!pickedGroups.length) return [];
+      const wanted = new Set(pickedGroups);
+      return all.filter(snake => (Array.isArray(snake.groups) ? snake.groups : [])
+        .some(value => wanted.has(String(value || '').trim())));
+    }
+    if (mode === 'tags') {
+      if (!pickedTags.length) return [];
+      const wanted = new Set(pickedTags);
+      return all.filter(snake => (Array.isArray(snake.tags) ? snake.tags : [])
+        .some(value => wanted.has(String(value || '').trim())));
+    }
+    if (mode === 'pick') {
+      if (!ids.length) return [];
+      const wanted = new Set(ids);
+      return all.filter(snake => wanted.has(snake.id));
+    }
+    return all;
+  }, [snakes, animalExportScope]);
+
+  const animalScopeIsNarrowed = animalExportScope.mode !== 'all';
+  const hasAnimalsInScope = animalsToExport.length > 0;
+
+  const setAnimalScopeMode = useCallback((mode) => {
+    setAnimalExportScope(prev => ({ ...prev, mode }));
+  }, []);
+
+  const toggleAnimalScopeValue = useCallback((key, value) => {
+    setAnimalExportScope(prev => {
+      const current = Array.isArray(prev[key]) ? prev[key] : [];
+      return {
+        ...prev,
+        [key]: current.includes(value) ? current.filter(item => item !== value) : [...current, value],
+      };
+    });
+  }, []);
+
+  const clearAnimalScope = useCallback(() => {
+    setAnimalExportScope({ mode: 'all', groups: [], tags: [], ids: [] });
+  }, []);
   const animalFieldSections = useMemo(() => groupFieldDefsBySection(ANIMAL_EXPORT_FIELD_DEFS), []);
   const pairingFieldSections = useMemo(() => groupFieldDefsBySection(PAIRING_EXPORT_FIELD_DEFS), []);
   const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
@@ -17293,7 +17383,7 @@ function BreederSection({
   const handleAnimalsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields));
+      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields, { subset: animalsToExport }));
       if (!dataset.columns.length) {
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
@@ -17321,12 +17411,12 @@ function BreederSection({
         timestamp: new Date().toISOString(),
       });
     }
-  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
+  }, [snakes, pairings, animalsToExport, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
 
   const handleAnimalsExportSheet = useCallback(async () => {
     const timestamp = new Date().toISOString();
     try {
-      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields));
+      const dataset = translateExportDataset(buildAnimalExportDataset(snakes, pairings, normalizedAnimalExportFields, { subset: animalsToExport }));
       if (!dataset.columns.length) {
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
@@ -17353,14 +17443,16 @@ function BreederSection({
         timestamp: new Date().toISOString(),
       });
     }
-  }, [snakes, pairings, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
+  }, [snakes, pairings, animalsToExport, normalizedAnimalExportFields, setExportFeedback, t, translateExportDataset]);
 
   const handleGenerateSnakeCatalog = useCallback(async () => {
     const timestamp = new Date().toISOString();
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     try {
+      // Pairing lookups still use the full collection; only the catalog's own
+      // rows are narrowed, and the for-sale rule still applies on top.
       const pairingsBySnakeId = groupPairingsBySnake(pairings, makeSnakeMap(snakes));
-      const forSaleAnimals = (Array.isArray(snakes) ? snakes : [])
+      const forSaleAnimals = (Array.isArray(animalsToExport) ? animalsToExport : [])
         .filter((snake) => isSnakeTaggedForSell(snake))
         .sort((a, b) => collator.compare(String(a?.id || ''), String(b?.id || '')))
         .map((snake) => {
@@ -17394,7 +17486,7 @@ function BreederSection({
         timestamp,
       });
     }
-  }, [pairings, setExportFeedback, snakes, t]);
+  }, [animalsToExport, pairings, setExportFeedback, snakes, t]);
 
   const handlePairingsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
@@ -17645,10 +17737,38 @@ function BreederSection({
     loadDeletionStatus();
   }, [deletionState.loaded, loadDeletionStatus, setupTab]);
 
+  const exportSelectionComplete = exportGroups.length === OPTIONAL_EXPORT_GROUP_IDS.length;
+
+  const exportButtonLabel = exportSelectionComplete
+    ? 'Download my data'
+    : `Download selected (${exportGroups.length + 1})`;
+
+  const toggleExportGroup = useCallback((groupId) => {
+    setExportGroups(prev => (
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        // Rebuilt from the canonical order rather than appended, so the query
+        // string and the file read the same regardless of clicking order.
+        : OPTIONAL_EXPORT_GROUP_IDS.filter(id => id === groupId || prev.includes(id))
+    ));
+  }, []);
+
+  const selectAllExportGroups = useCallback(() => setExportGroups(OPTIONAL_EXPORT_GROUP_IDS), []);
+
+  // Clearing leaves the always-included account group, which is a legitimate
+  // "just my profile" export rather than an empty file.
+  const clearExportGroups = useCallback(() => setExportGroups([]), []);
+
   const handleDownloadMyData = useCallback(async () => {
     setAccountState(prev => ({ ...prev, actionLoading: 'export', error: '', message: '' }));
     try {
-      const { filename } = await downloadAccountDataExport();
+      // A complete selection sends no groups at all, so the request means
+      // "everything" even if the group list grows on the server before this
+      // client is rebuilt. A narrowed one names every group explicitly,
+      // including the always-included account group — an empty list would be
+      // read as "everything" and hand back the opposite of what was asked.
+      const requestedGroups = exportSelectionComplete ? undefined : ['account', ...exportGroups];
+      const { filename } = await downloadAccountDataExport(requestedGroups);
       setAccountState(prev => ({
         ...prev,
         actionLoading: '',
@@ -17663,7 +17783,7 @@ function BreederSection({
         message: '',
       }));
     }
-  }, []);
+  }, [exportGroups, exportSelectionComplete]);
 
   const handleRequestAccountDeletion = useCallback(async () => {
     if (!accountForms.deletePassword) {
@@ -18893,35 +19013,141 @@ function BreederSection({
                     <div className="font-semibold text-sm">{t('setup.animals', { defaultValue: 'Animals' })}</div>
                     <div className="text-xs text-neutral-500">
                       {t('export.selectedFields', { defaultValue: 'Selected {{selected}} of {{total}} fields.', selected: normalizedAnimalExportFields.length, total: ANIMAL_EXPORT_FIELD_DEFS.length })}
+                      {animalScopeIsNarrowed
+                        ? ` ${t('export.scope.subtitle', { defaultValue: '{{count}} animals selected.', count: animalsToExport.length })}`
+                        : ''}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), (!hasAnimalData ? 'opacity-60 cursor-not-allowed' : ''))}
+                      className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), (!hasAnimalData || !hasAnimalsInScope ? 'opacity-60 cursor-not-allowed' : ''))}
                       onClick={handleAnimalsExportPdf}
-                      disabled={!hasAnimalData}
+                      disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
                       {t('actions.exportPdf', { defaultValue: 'Export PDF' })}
                     </button>
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData ? '' : 'opacity-60 cursor-not-allowed')}
+                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
                       onClick={handleAnimalsExportSheet}
-                      disabled={!hasAnimalData}
+                      disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
                       {t('export.exportSheetXlsx', { defaultValue: 'Export sheet (.xlsx)' })}
                     </button>
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData ? '' : 'opacity-60 cursor-not-allowed')}
+                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
                       onClick={handleGenerateSnakeCatalog}
-                      disabled={!hasAnimalData}
+                      disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
                       {t('export.generateCatalog', { defaultValue: 'Generate Catalog' })}
                     </button>
                   </div>
                 </div>
+                <div className="rounded-lg border bg-neutral-50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                    {t('export.whichAnimals', { defaultValue: 'Which animals' })}
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-sm text-neutral-700">
+                    {[
+                      { mode: 'all', label: t('export.scope.all', { defaultValue: 'All animals' }) },
+                      { mode: 'groups', label: t('export.scope.byGroup', { defaultValue: 'By group' }) },
+                      { mode: 'tags', label: t('export.scope.byTag', { defaultValue: 'By tag' }) },
+                      { mode: 'pick', label: t('export.scope.pick', { defaultValue: 'Choose animals' }) },
+                    ].map(option => (
+                      <label key={option.mode} className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="animal-export-scope"
+                          checked={animalExportScope.mode === option.mode}
+                          onChange={() => setAnimalScopeMode(option.mode)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {animalExportScope.mode === 'groups' && (
+                    animalScopeOptions.groups.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {animalScopeOptions.groups.map(group => (
+                          <label key={group} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={animalExportScope.groups.includes(group)}
+                              onChange={() => toggleAnimalScopeValue('groups', group)}
+                            />
+                            {group}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-neutral-500">
+                        {t('export.scope.noGroups', { defaultValue: 'None of your animals are filed under a group yet.' })}
+                      </div>
+                    )
+                  )}
+
+                  {animalExportScope.mode === 'tags' && (
+                    animalScopeOptions.tags.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {animalScopeOptions.tags.map(tag => (
+                          <label key={tag} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={animalExportScope.tags.includes(tag)}
+                              onChange={() => toggleAnimalScopeValue('tags', tag)}
+                            />
+                            {tag}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-neutral-500">
+                        {t('export.scope.noTags', { defaultValue: 'None of your animals carry a tag yet.' })}
+                      </div>
+                    )
+                  )}
+
+                  {animalExportScope.mode === 'pick' && (
+                    <div className="max-h-56 overflow-y-auto rounded-lg border bg-white divide-y">
+                      {(Array.isArray(snakes) ? snakes : []).filter(Boolean).map(snake => (
+                        <label key={snake.id} className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-neutral-50">
+                          <input
+                            type="checkbox"
+                            checked={animalExportScope.ids.includes(snake.id)}
+                            onChange={() => toggleAnimalScopeValue('ids', snake.id)}
+                          />
+                          <span className="font-medium">{snake.name || snake.id}</span>
+                          <span className="text-neutral-500">{snake.id}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className={cx('text-[11px]', hasAnimalsInScope ? 'text-neutral-600' : 'text-amber-700')}>
+                      {hasAnimalsInScope
+                        ? t('export.scope.count', {
+                            defaultValue: 'Exporting {{selected}} of {{total}} animals.',
+                            selected: animalsToExport.length,
+                            total: (Array.isArray(snakes) ? snakes : []).length,
+                          })
+                        : t('export.scope.empty', { defaultValue: 'Nothing selected — pick at least one animal to export.' })}
+                    </span>
+                    {animalScopeIsNarrowed && (
+                      <button
+                        type="button"
+                        className="status-tag-neutral-button px-2 py-1 rounded-lg border text-[11px]"
+                        onClick={clearAnimalScope}
+                      >
+                        {t('export.scope.reset', { defaultValue: 'Back to all animals' })}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
                   <button type="button" className="underline" onClick={handleSelectAllAnimalFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
                   <button type="button" className="underline" onClick={handleResetAnimalFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
@@ -19657,25 +19883,81 @@ function BreederSection({
             <div>
               <div className="text-sm font-semibold text-neutral-800">Your data</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download everything we hold about you, or close your account for good.
+                Download what we hold about you — all of it, or just the parts you pick — or close
+                your account for good.
               </div>
             </div>
 
             <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
               <div className="text-sm font-semibold">Download my data</div>
               <div className="text-xs text-neutral-500">
-                A single JSON file containing your profile, animals, pairings, clutches, lab orders,
-                listings and messages. Records shared with another person identify them only by an
-                internal id.
+                A JSON file containing the categories you pick below. Everything is included by
+                default. Records shared with another person identify them only by an internal id.
               </div>
-              <button
-                type="button"
-                className="px-3 py-2 rounded-lg border bg-white text-sm"
-                disabled={Boolean(accountState.actionLoading)}
-                onClick={handleDownloadMyData}
-              >
-                {accountState.actionLoading === 'export' ? 'Preparing...' : 'Download my data'}
-              </button>
+
+              <div className="space-y-1 pt-1">
+                {ACCOUNT_EXPORT_GROUPS.map(group => {
+                  const checked = group.always || exportGroups.includes(group.id);
+                  return (
+                    <label
+                      key={group.id}
+                      className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${group.always ? 'opacity-70' : 'cursor-pointer hover:bg-white'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        disabled={group.always || Boolean(accountState.actionLoading)}
+                        onChange={() => toggleExportGroup(group.id)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium text-neutral-800">
+                          {group.label}
+                          {group.always ? ' (always included)' : ''}
+                        </span>
+                        <span className="block text-[11px] text-neutral-500">{group.hint}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-2 items-center pt-1">
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={handleDownloadMyData}
+                >
+                  {accountState.actionLoading === 'export' ? 'Preparing...' : exportButtonLabel}
+                </button>
+                {/* status-tag-neutral-button opts out of `.app-root button`, which
+                    themes every button as the primary colour with !important.
+                    Without it these two read as loudly as the download itself. */}
+                <button
+                  type="button"
+                  className="status-tag-neutral-button px-2 py-1 rounded-lg border text-xs"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={selectAllExportGroups}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="status-tag-neutral-button px-2 py-1 rounded-lg border text-xs"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={clearExportGroups}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {!exportSelectionComplete ? (
+                <div className="text-[11px] text-amber-700">
+                  This will be a partial export. The file is marked as partial so it is not mistaken
+                  for the complete record we hold about you.
+                </div>
+              ) : null}
             </div>
 
             {deletionState.pending ? (
