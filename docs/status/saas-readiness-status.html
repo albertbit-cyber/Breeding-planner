@@ -1,0 +1,774 @@
+<title>Serpentora — SaaS Readiness Status</title>
+
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground: #f5f6f8;
+    --panel: #ffffff;
+    --panel-sunk: #eef1f4;
+    --ink: #0f1418;
+    --ink-soft: #3b4650;
+    --muted: #6a7480;
+    --rule: #dde2e8;
+    --rule-strong: #c3ccd6;
+
+    --accent: #2b4c6f;
+    --accent-soft: #e6ecf3;
+
+    --shipped: #2f7a54;
+    --shipped-soft: #e4f0e9;
+    --partial: #b07b1e;
+    --partial-soft: #f7eeda;
+    --blocked: #a93b25;
+    --blocked-soft: #f7e5e1;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0f1418;
+      --panel: #161d23;
+      --panel-sunk: #1b232a;
+      --ink: #e8edf2;
+      --ink-soft: #c0cad4;
+      --muted: #8c98a5;
+      --rule: #28323b;
+      --rule-strong: #3a4650;
+
+      --accent: #7ea8d4;
+      --accent-soft: #1a2732;
+
+      --shipped: #6cc094;
+      --shipped-soft: #16261f;
+      --partial: #e0ac52;
+      --partial-soft: #2a2117;
+      --blocked: #e08670;
+      --blocked-soft: #2b1a16;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1418;
+    --panel: #161d23;
+    --panel-sunk: #1b232a;
+    --ink: #e8edf2;
+    --ink-soft: #c0cad4;
+    --muted: #8c98a5;
+    --rule: #28323b;
+    --rule-strong: #3a4650;
+    --accent: #7ea8d4;
+    --accent-soft: #1a2732;
+    --shipped: #6cc094;
+    --shipped-soft: #16261f;
+    --partial: #e0ac52;
+    --partial-soft: #2a2117;
+    --blocked: #e08670;
+    --blocked-soft: #2b1a16;
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f5f6f8;
+    --panel: #ffffff;
+    --panel-sunk: #eef1f4;
+    --ink: #0f1418;
+    --ink-soft: #3b4650;
+    --muted: #6a7480;
+    --rule: #dde2e8;
+    --rule-strong: #c3ccd6;
+    --accent: #2b4c6f;
+    --accent-soft: #e6ecf3;
+    --shipped: #2f7a54;
+    --shipped-soft: #e4f0e9;
+    --partial: #b07b1e;
+    --partial-soft: #f7eeda;
+    --blocked: #a93b25;
+    --blocked-soft: #f7e5e1;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-bottom: 2px solid var(--rule-strong);
+    padding-bottom: 1.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+
+  .stamp {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stamp b {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  /* ---------- verdict ---------- */
+
+  .verdict {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--blocked);
+    border-radius: 3px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .verdict h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .verdict p {
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--ink-soft);
+  }
+
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .tally div {
+    background: var(--panel-sunk);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .tally .n {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tally .k {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .n-blocked { color: var(--blocked); }
+  .n-partial { color: var(--partial); }
+  .n-shipped { color: var(--shipped); }
+
+  /* ---------- sections ---------- */
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  h2.head {
+    font-family: var(--serif);
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  .lede {
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--ink-soft);
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .row {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .row.is-blocked { border-left-color: var(--blocked); }
+  .row.is-partial { border-left-color: var(--partial); }
+  .row.is-shipped { border-left-color: var(--shipped); }
+
+  .row-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.85rem;
+  }
+
+  .row h3 {
+    font-size: 1.02rem;
+    font-weight: 650;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .chip-blocked { background: var(--blocked-soft); color: var(--blocked); }
+  .chip-partial { background: var(--partial-soft); color: var(--partial); }
+  .chip-shipped { background: var(--shipped-soft); color: var(--shipped); }
+  .chip-you { background: var(--accent-soft); color: var(--accent); }
+
+  .row p {
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+
+  .evidence {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    line-height: 1.55;
+    color: var(--muted);
+    background: var(--panel-sunk);
+    border-radius: 2px;
+    padding: 0.55rem 0.7rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .evidence b {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  /* ---------- table ---------- */
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    min-width: 34rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.9rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom-color: var(--rule-strong);
+  }
+
+  td.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    max-width: var(--measure);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--panel-sunk);
+    padding: 0.1em 0.32em;
+    border-radius: 2px;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 40rem) {
+    .wrap { padding: 2rem 1rem 3rem; gap: 2.25rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Serpentora · Status report</div>
+    <h1>Where the software actually stands</h1>
+    <p class="standfirst">
+      A plain reading of what is shipped, what is half-built, and what is stopping you charging
+      money. Every claim below carries the check that produced it, so nothing here has to be taken
+      on trust.
+    </p>
+    <div class="stamp">
+      <span><b>As of</b> 2026-08-07</span>
+      <span><b>Commit</b> 11cc797</span>
+      <span><b>Live build</b> 0.1.22</span>
+      <span><b>Branch</b> phase-3/account-data-rights = main</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <h2>You cannot sell this yet, and only one of the reasons is code.</h2>
+    <p>
+      The product runs, is deployed, and is legally documented. What stops a paying customer is a
+      payment system that was never built, and an operator identity that only you can decide. The
+      deeper structural item — making the data model belong to organisations rather than individual
+      users — is started but far from finished, and it is the one that gets more expensive every
+      week it waits.
+    </p>
+    <div class="tally">
+      <div><span class="n n-blocked">3</span><span class="k">gates before charging</span></div>
+      <div><span class="n n-partial">4</span><span class="k">started, not finished</span></div>
+      <div><span class="n n-shipped">8</span><span class="k">closed since the audit</span></div>
+      <div><span class="n n-partial">5</span><span class="k">known problems</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2 class="head">The three gates before you can charge money</h2>
+    <p class="lede">
+      These are hard gates, not polish. Each one independently prevents taking a payment; none of
+      them is partially satisfiable.
+    </p>
+
+    <div class="rows">
+
+      <article class="row is-blocked">
+        <div class="row-top">
+          <h3>No payment processing exists</h3>
+          <span class="chip chip-blocked">Not started</span>
+        </div>
+        <p>
+          The billing <em>schema</em> is well ahead of most pre-revenue codebases — priced tiers, a
+          feature catalogue, per-user usage metering and an admin tier editor all work. What has
+          never been built is the part where money moves. Today any signed-in user can switch to any
+          plan for free, so there is no paywall to speak of.
+        </p>
+        <div class="evidence"><b>checked</b> no stripe / @stripe dependency in any app package.json
+<b>checked</b> schema.prisma has paymentProvider, paymentCustomerId, paymentSubscriptionId — all unused columns
+<b>checked</b> subscriptionController.changeMySubscription switches tier with no payment gate</div>
+      </article>
+
+      <article class="row is-blocked">
+        <div class="row-top">
+          <h3>The legal pages still have blanks only you can fill</h3>
+          <span class="chip chip-blocked">Blocked</span>
+          <span class="chip chip-you">Needs your decision</span>
+        </div>
+        <p>
+          The privacy policy, terms and Impressum are written, live and accurate to what the code
+          does. Twelve values remain unfilled, and they all trace back to one unmade decision: who,
+          legally, is behind Serpentora — sole trader, UG, or GmbH. That is a tax and liability
+          question for a Steuerberater, not a drafting question. It matters more in Germany than
+          elsewhere, because the Impressum is enforced by competitors sending cease-and-desist
+          letters that carry their legal costs, rather than by a regulator.
+        </p>
+        <div class="evidence"><b>counted</b> unfilled &lt;Fill&gt; placeholders — Impressum 8, Privacy 3, Terms 1
+<b>source</b> docs/legal/INFORMATION-NEEDED.md §1, still open as of 2026-08-05</div>
+      </article>
+
+      <article class="row is-blocked">
+        <div class="row-top">
+          <h3>No lawyer has read any of it</h3>
+          <span class="chip chip-blocked">Not started</span>
+          <span class="chip chip-you">Needs your decision</span>
+        </div>
+        <p>
+          The documents describe your software truthfully, which is the part templates get wrong and
+          the part that makes a review cheap. Four clauses genuinely need a German opinion before you
+          take money: the €100 liability floor under AGB review, the 14-day withdrawal right, the
+          Impressum itself, and whether the genetics-prediction disclaimer survives §307 BGB.
+        </p>
+        <div class="evidence"><b>source</b> docs/legal/README.md — "drafted, wired, verified against the code, not yet reviewed by a lawyer"</div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">Started, not finished</h2>
+    <p class="lede">
+      Work that exists in the repository but does not yet do the job it was started for. The first
+      item is the one worth acting on.
+    </p>
+
+    <div class="rows">
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Multi-tenancy: the frame is up, the building isn't</h3>
+          <span class="chip chip-partial">Partly done</span>
+        </div>
+        <p>
+          <code>Organization</code>, <code>Membership</code> and <code>OrganizationInvite</code> now
+          exist, the migration is applied, and there are real tenant-isolation tests — the hardest
+          conceptual work is done. But only <code>LabAccount</code> has actually been re-pointed to
+          an organisation. The entire breeder side — animals, pairings, clutches, listings — is still
+          owned directly by individual users. Until that moves, there is nothing to attach a
+          multi-seat plan or a subscription to, which is why this sits underneath the payments gate
+          rather than beside it.
+        </p>
+        <div class="evidence"><b>counted</b> 58 models in schema.prisma; organizationId appears on 3 (LabAccount, Membership, OrganizationInvite)
+<b>counted</b> ~33 models still keyed directly to a user via ownerId / userId
+<b>checked</b> tenantIsolation.test.ts and organizationService.test.ts both present and passing</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Auth tokens: the safer path exists but is opt-in</h3>
+          <span class="chip chip-partial">Partly done</span>
+        </div>
+        <p>
+          The backend issues httpOnly cookies with CSRF protection, and the client will prefer them —
+          but only when the API is same-origin. Every other deployment, including the desktop and
+          Android wrappers, still keeps bearer tokens in <code>localStorage</code>. This is the item
+          a security-minded customer asks about first.
+        </p>
+        <div class="evidence"><b>checked</b> apiClient.ts — cookie-preferred mode set only when isSameOriginApiBaseUrl(baseUrl)</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Shared code package is still imported by nobody</h3>
+          <span class="chip chip-partial">Partly done</span>
+        </div>
+        <p>
+          <code>breeding-app-shared</code> exists and exports the auth and API-client logic it was
+          built for, but no app depends on it. Each app carries its own hand-copied client, and they
+          have already drifted apart. Every auth change now has to be made correctly in three places.
+        </p>
+        <div class="evidence"><b>checked</b> "breeding-app-shared" appears in no app's package.json dependencies</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>A stale third Android project still sits at the repo root</h3>
+          <span class="chip chip-partial">Partly done</span>
+        </div>
+        <p>
+          The root <code>railway.toml</code> and <code>capacitor.config.ts</code> duplicates were
+          removed, but the root <code>android/</code> project was not. It shares an application ID
+          with the breeder app, so installing one can overwrite the other on a device.
+        </p>
+        <div class="evidence"><b>checked</b> root android/ present; railway.toml and capacitor.config.ts both gone</div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">Known problems</h2>
+    <p class="lede">
+      Live or latent defects. None currently stops a user completing a task, but the first is visible
+      in production right now.
+    </p>
+
+    <div class="rows">
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>A render loop on Settings → My Account</h3>
+          <span class="chip chip-partial">Open</span>
+        </div>
+        <p>
+          React reports "Maximum update depth exceeded" every time the account tab opens. The page
+          still works, so it is a warning rather than a crash, but it means something is setting
+          state in a loop and it is burning cycles on every visit. It predates this week's work.
+        </p>
+        <div class="evidence"><b>observed</b> live in the running app, 2026-08-06
+<b>isolated</b> reproduced with this week's changes stashed — 8 occurrences without them vs 6 with, so not introduced by them</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Rate limiting never runs outside production</h3>
+          <span class="chip chip-partial">Open</span>
+        </div>
+        <p>
+          All four limiters skip themselves unless <code>NODE_ENV</code> is production. They are
+          therefore never exercised by a test or in staging, so a bug in the limiter itself would
+          first appear under real traffic — which is the one situation where you need it working.
+        </p>
+        <div class="evidence"><b>checked</b> middleware/rateLimiters.ts — skip: productionOnly on 4 limiters</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Cloud-sync 413s: instrumented, not confirmed fixed</h3>
+          <span class="chip chip-partial">Unconfirmed</span>
+        </div>
+        <p>
+          The request body limit is now 64&nbsp;MB and there is a dedicated handler that logs the
+          path and caller whenever a payload is rejected as too large. That is the diagnostic work,
+          not the fix — whether real users still hit it is unanswered until those logs are read.
+        </p>
+        <div class="evidence"><b>checked</b> app.ts — express.json limit 64mb (JSON_BODY_LIMIT)
+<b>checked</b> errorHandler.ts — dedicated [cloud-sync] 413 logger with path and caller</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>No two-factor authentication</h3>
+          <span class="chip chip-partial">Not started</span>
+        </div>
+        <p>
+          Nothing blocking today, and not worth building speculatively — but it is a standard
+          question on any business customer's procurement checklist, so expect to be asked once you
+          are selling to labs rather than hobbyists.
+        </p>
+        <div class="evidence"><b>checked</b> no totp / mfa / two-factor implementation anywhere in the backend</div>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Deploys are not driven by CI, and are not described in the repo</h3>
+          <span class="chip chip-partial">Open</span>
+        </div>
+        <p>
+          Pushing to <code>main</code> deploys serpentora.com because a Netlify project is configured
+          to watch that branch — a setting that exists only in Netlify's dashboard. Nothing in the
+          repository records it, so the deployment story cannot be read from the code. The only
+          automated pipeline in the repo publishes the marketplace to GitHub Pages.
+        </p>
+        <div class="evidence"><b>checked</b> .github/workflows/deploy.yml builds and publishes breeding-app-marketplace only
+<b>checked</b> breeding-app-breeder/netlify.toml sets build command and publish dir, but no branch
+<b>note</b> origin/HEAD still points at gh-pages, which is ~99 commits behind main and is not production</div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">Closed since the July audit</h2>
+    <p class="lede">
+      The 2026-07-27 readiness audit named three hard blockers. One of them — the legal foundation —
+      is now gone entirely, along with a run of infrastructure debt.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">What</th>
+            <th scope="col">Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Privacy policy, terms and Impressum written, routed and live</td>
+            <td class="num">serpentora.com/privacy → HTTP 200</td>
+          </tr>
+          <tr>
+            <td>Self-service data export and account deletion, with a 30-day grace period</td>
+            <td class="num">7 backend tests</td>
+          </tr>
+          <tr>
+            <td>Export can now be narrowed — by data category, and animals by group, tag or hand-picked</td>
+            <td class="num">commit 11cc797</td>
+          </tr>
+          <tr>
+            <td>Organisation, membership and invite models, with tenant-isolation tests</td>
+            <td class="num">migration 20260730120000</td>
+          </tr>
+          <tr>
+            <td>Error tracking wired into backend and breeder app</td>
+            <td class="num">@sentry/node, @sentry/react</td>
+          </tr>
+          <tr>
+            <td>Legacy untracked <code>server/</code> backend and its dormant vulnerability removed</td>
+            <td class="num">git ls-files server/ → 0</td>
+          </tr>
+          <tr>
+            <td>Stale root Railway and Capacitor config duplicates deleted</td>
+            <td class="num">both absent</td>
+          </tr>
+          <tr>
+            <td>Backend test suite green</td>
+            <td class="num">276 tests / 42 files</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">Uncommitted work</h2>
+    <p class="lede">
+      Everything else in the working tree is committed and pushed; local <code>HEAD</code>,
+      <code>origin/main</code> and the feature branch all sit on the same commit.
+    </p>
+
+    <div class="rows">
+      <article class="row is-shipped">
+        <div class="row-top">
+          <h3>Nothing is left uncommitted</h3>
+          <span class="chip chip-shipped">Clean</span>
+        </div>
+        <p>
+          The marketing strategy document that had been sitting untracked is now committed alongside
+          this page. Working tree clean, nothing unpushed.
+        </p>
+        <div class="evidence"><b>checked</b> git status — clean
+<b>checked</b> HEAD = origin/main = origin/phase-3/account-data-rights</div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">If you do three things next</h2>
+    <p class="lede">
+      In this order, because each one is cheaper once the previous is settled.
+    </p>
+
+    <div class="rows">
+      <article class="row is-blocked">
+        <div class="row-top">
+          <h3>Decide the legal entity</h3>
+          <span class="chip chip-you">Yours alone</span>
+        </div>
+        <p>
+          A short conversation with a Steuerberater unblocks twelve placeholders across three
+          documents and closes an entire launch gate. Nothing technical depends on it, and nobody
+          else can do it for you. It is the cheapest gate to close and it is fully blocked on you.
+        </p>
+      </article>
+
+      <article class="row is-partial">
+        <div class="row-top">
+          <h3>Finish moving ownership to organisations</h3>
+          <span class="chip chip-partial">Engineering</span>
+        </div>
+        <p>
+          The frame is built and proven on <code>LabAccount</code>. Every feature shipped before the
+          breeder side follows adds another model to migrate later — this is the only item on the
+          page whose cost rises with delay.
+        </p>
+      </article>
+
+      <article class="row is-blocked">
+        <div class="row-top">
+          <h3>Then wire payments</h3>
+          <span class="chip chip-blocked">Engineering</span>
+        </div>
+        <p>
+          Deliberately third. The schema columns are already shaped for Stripe, but building checkout
+          against per-user billing before organisations own the data means building it twice.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Generated from the repository at commit <code>11cc797</code> on 2026-08-07. Every status was
+      re-checked against the code rather than carried over from the July audit, which is now stale in
+      several places — most importantly, it lists the legal foundation as missing.
+    </p>
+    <p>
+      Companion documents: <code>docs/architecture/saas-readiness-audit.md</code> (the fuller
+      analysis and phased plan), <code>docs/legal/INFORMATION-NEEDED.md</code> (the open decision),
+      <code>docs/legal/README.md</code> (what still needs a lawyer).
+    </p>
+  </footer>
+
+</div>
