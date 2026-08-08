@@ -776,10 +776,15 @@ export type MarketplaceListingPayload = {
   genetics?: string;
 };
 
-export const fetchBreederSnapshot = async () =>
-  request<BreederSnapshotPayload>("/breeder/snapshot", {
-    timeoutMs: BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS,
-  });
+// `since` asks the backend for only what changed after that instant, plus an explicit list of
+// records tombstoned in the window (a delta cannot express a deletion by omission). Always use a
+// cursor the *server* issued: a device with a fast clock would otherwise skip records forever.
+// Omitting it returns the whole account, which is what a first load or a new device needs.
+export const fetchBreederSnapshot = async (since?: string | null) =>
+  request<BreederSnapshotPayload>(
+    since ? `/breeder/snapshot?since=${encodeURIComponent(since)}` : "/breeder/snapshot",
+    { timeoutMs: BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS },
+  );
 
 const BREEDER_SNAPSHOT_MEDIA_FIELD_KEYS = new Set([
   "imageUrl",
@@ -826,12 +831,21 @@ const stripEmbeddedMediaForSync = (value: unknown, key = ""): unknown => {
   return value;
 };
 
-export const saveBreederSnapshot = async (payload: BreederSnapshotPayload) =>
-  request<BreederSnapshotPayload>("/breeder/snapshot", {
-    method: "PUT",
-    body: JSON.stringify(stripEmbeddedMediaForSync(payload)),
-    timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
-  });
+// With changedOnly the response carries just the records this request wrote, instead of the whole
+// account echoed back. The caller must then patch those into the snapshot it already holds rather
+// than replacing state wholesale — see applyChangedRecords in App.jsx.
+export const saveBreederSnapshot = async (
+  payload: BreederSnapshotPayload,
+  options: { changedOnly?: boolean } = {},
+) =>
+  request<BreederSnapshotPayload>(
+    options.changedOnly ? "/breeder/snapshot?ack=changed" : "/breeder/snapshot",
+    {
+      method: "PUT",
+      body: JSON.stringify(stripEmbeddedMediaForSync(payload)),
+      timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
+    },
+  );
 
 export const fetchMyBreederProfile = async () =>
   request<{ profile: unknown | null }>("/profiles/me");

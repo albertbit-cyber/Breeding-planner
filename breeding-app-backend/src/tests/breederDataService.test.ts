@@ -295,6 +295,98 @@ describe("breederDataService", () => {
     expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
+  // The bug this guards produced 222,517 weight entries for 116 real readings: the client minted a
+  // random id for every id-less log entry on every merge, and the server kept the id-less original
+  // (keyed by content), so each sync added one more "distinct" copy of the same reading.
+  it("collapses an id-less log entry into the identical entry that carries an id", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", {
+        id: "snake-1",
+        updatedAt: "2026-07-03T10:00:00.000Z",
+        logs: { weights: [{ date: "2025-11-29", grams: 1550, notes: "" }] },
+      }, "2026-07-03T10:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        updatedAt: "2026-07-04T10:00:00.000Z",
+        logs: { weights: [{ id: "log-abc123", date: "2025-11-29", grams: 1550, notes: "" }] },
+      }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload.logs.weights;
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ id: "log-abc123", grams: 1550 });
+  });
+
+  it("keeps genuinely different readings on the same day apart", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", {
+        id: "snake-1",
+        updatedAt: "2026-07-03T10:00:00.000Z",
+        logs: { weights: [{ id: "log-1", date: "2025-11-29", grams: 1550 }] },
+      }, "2026-07-03T10:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        updatedAt: "2026-07-04T10:00:00.000Z",
+        logs: {
+          weights: [
+            { id: "log-1", date: "2025-11-29", grams: 1550 },
+            { id: "log-2", date: "2025-11-29", grams: 1602 },
+          ],
+        },
+      }],
+      pairings: [],
+    });
+
+    expect(tx.animal.update.mock.calls[0][0].data.payload.logs.weights).toHaveLength(2);
+  });
+
+  it("returns only the records it wrote when the caller asks for a changed-only ack", async () => {
+    const saved = { id: "snake-1", name: "Saliso" };
+    vi.mocked((prisma as any).animal.findMany)
+      .mockResolvedValueOnce([])                      // bulk pre-load: nothing stored yet
+      .mockResolvedValueOnce([{ payload: saved }]);   // snapshot read after the write
+    vi.mocked((prisma as any).pairing.findMany)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ payload: { id: "pairing-untouched" } }]);
+
+    const result: any = await upsertBreederSnapshot("breeder-1", {
+      animals: [saved],
+      pairings: [],
+    });
+
+    expect(result.snapshot.animals).toHaveLength(1);
+    expect(result.changed.animals).toEqual([expect.objectContaining({ id: "snake-1" })]);
+    // The pairing exists on the account but this request did not touch it, so it stays out.
+    expect(result.changed.pairings).toEqual([]);
+    expect(result.changed.partial).toBe(true);
+  });
+
+  it("returns a delta plus explicit tombstones when given a since cursor", async () => {
+    const since = new Date("2026-07-01T00:00:00.000Z");
+    vi.mocked((prisma as any).animal.findMany)
+      .mockResolvedValueOnce([{ payload: { id: "snake-changed" } }])   // changed since
+      .mockResolvedValueOnce([{ appAnimalId: "snake-deleted" }]);      // tombstoned since
+    vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
+    vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
+
+    const result: any = await listBreederSnapshot("breeder-1", { since });
+
+    expect((prisma as any).animal.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ ownerId: "breeder-1", updatedAt: { gt: since } }),
+    }));
+    expect(result.partial).toBe(true);
+    expect(result.animals).toEqual([{ id: "snake-changed" }]);
+    // A deletion cannot be conveyed by omission in a delta, so it is named.
+    expect(result.deleted.animals).toEqual(["snake-deleted"]);
+  });
+
   it("persists and lists owner planner state", async () => {
     await upsertBreederSnapshot("breeder-1", {
       animals: [],
@@ -325,6 +417,7 @@ describe("breederDataService", () => {
       pairings: [],
       clutches: [],
       plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+      serverTime: expect.any(String),
     });
   });
 
@@ -338,6 +431,7 @@ describe("breederDataService", () => {
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
       plannerState: null,
+      serverTime: expect.any(String),
     });
   });
 });

@@ -358,6 +358,7 @@ model Animal {
 
   @@unique([ownerId, appAnimalId])
   @@index([ownerId])
+  @@index([ownerId, updatedAt])
   @@index([globalId])
 }
 
@@ -387,6 +388,7 @@ model Pairing {
 
   @@unique([ownerId, appPairingId])
   @@index([ownerId])
+  @@index([ownerId, updatedAt])
   @@index([ownerId, status])
   @@index([ownerId, workflowStatus])
   @@index([ownerId, completionReason])
@@ -410,6 +412,7 @@ model Clutch {
 
   @@unique([ownerId, appClutchId])
   @@index([ownerId])
+  @@index([ownerId, updatedAt])
   @@index([pairingId])
 }
 

@@ -50,6 +50,13 @@ import {
   saveMyListings,
 } from "./shared/apiClient";
 import {
+  getSyncTimestamp,
+  backfillLogIds,
+  selectRecordsToUpload,
+  applyRemoteDeletions,
+  applyChangedRecords,
+} from "./services/cloudSyncPayload";
+import {
   GENE_GROUPS,
   GENE_ALIASES,
   getGeneDisplayGroup,
@@ -2590,21 +2597,6 @@ function cloneLogs(logs = {}) {
   };
 }
 
-function backfillLogIds(logs) {
-  const result = {};
-  for (const key of Object.keys(logs)) {
-    const entries = logs[key];
-    result[key] = Array.isArray(entries)
-      ? entries.map(entry =>
-          entry && typeof entry === 'object' && !entry.id
-            ? { ...entry, id: crypto.randomUUID() }
-            : entry
-        )
-      : entries;
-  }
-  return result;
-}
-
 const MAX_PHOTOS_PER_SNAKE = 60;
 
 function normalizePhotoEntry(raw) {
@@ -2847,24 +2839,6 @@ function getSyncRecordKey(record, fallbackPrefix, index) {
   ];
   const value = candidates.map(item => String(item || '').trim()).find(Boolean);
   return value || `${fallbackPrefix}-${index + 1}`;
-}
-
-function getSyncTimestamp(value) {
-  const candidates = [
-    value?.updatedAt,
-    value?.modifiedAt,
-    value?.lastModifiedAt,
-    value?.createdAt,
-    value?.metadata?.updatedAt,
-    value?.metadata?.modifiedAt,
-    value?.metadata?.backendUpdatedAt,
-  ];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const time = new Date(candidate).getTime();
-    if (Number.isFinite(time)) return time;
-  }
-  return 0;
 }
 
 function getLogEntryKey(entry, key, index) {
@@ -6823,6 +6797,12 @@ export default function BreedingPlannerApp() {
   });
   const latestPlannerSnapshotRef = useRef({ snakes: [], pairings: [] });
   const cloudBaselineSnapshotRef = useRef({ snakes: [], pairings: [] });
+  // The client's model of what the server currently holds, and the server-issued timestamp that
+  // model is current as of. Both are session-scoped on purpose: a fresh load starts with no
+  // cursor and therefore does one full fetch, which is the safe default. Everything downstream
+  // falls back to a whole-account sync whenever either is missing.
+  const remoteSnapshotRef = useRef({ snakes: [], pairings: [], plannerState: null });
+  const remoteCursorRef = useRef(null);
   const cloudSaveRequestIdRef = useRef(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
@@ -7276,11 +7256,35 @@ export default function BreedingPlannerApp() {
         latestPlannerSnapshotRef.current,
         cloudBaselineSnapshotRef.current
       );
-      const snapshot = await fetchBreederSnapshot();
+      // First sync of a session has no cursor and fetches everything; later ones ask only for
+      // what changed since the server's own timestamp.
+      const snapshot = await fetchBreederSnapshot(remoteCursorRef.current);
+      const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
       const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-      const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
-      const savedSnapshot = await saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
-      const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+      const remoteState = isDelta
+        ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
+        : backendSnapshot;
+      const merged = applyRemoteDeletions(
+        mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
+        isDelta ? snapshot?.deleted : null
+      );
+      // Upload only what the server does not already have. Tombstones are added by
+      // prepareSnapshotForBackend and are never filtered out.
+      const savedSnapshot = await saveBreederSnapshot(
+        prepareSnapshotForBackend(
+          selectRecordsToUpload(merged.snakes, remoteState.snakes),
+          selectRecordsToUpload(merged.pairings, remoteState.pairings),
+          merged.plannerState,
+          syncTombstonesRef.current
+        ),
+        { changedOnly: true }
+      );
+      const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
+      // ?ack=changed returns only the rows the server wrote, so they are patched over the merge
+      // we already hold rather than replacing it.
+      const persistedSnapshot = applyChangedRecords(merged, changedRecords);
+      remoteSnapshotRef.current = applyChangedRecords(remoteState, changedRecords);
+      if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
       const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
       const signature = plannerSnapshotSignature(syncedSnapshot);
 
@@ -7759,16 +7763,37 @@ export default function BreedingPlannerApp() {
         cloudBaselineSnapshotRef.current
       );
 
-      fetchBreederSnapshot()
+      let mergedForSave = null;
+      let remoteStateForSave = null;
+
+      fetchBreederSnapshot(remoteCursorRef.current)
         .then((snapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
+          const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
           const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-          const merged = mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current);
-          return saveBreederSnapshot(prepareSnapshotForBackend(merged.snakes, merged.pairings, merged.plannerState, syncTombstonesRef.current));
+          remoteStateForSave = isDelta
+            ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
+            : backendSnapshot;
+          mergedForSave = applyRemoteDeletions(
+            mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
+            isDelta ? snapshot?.deleted : null
+          );
+          return saveBreederSnapshot(
+            prepareSnapshotForBackend(
+              selectRecordsToUpload(mergedForSave.snakes, remoteStateForSave.snakes),
+              selectRecordsToUpload(mergedForSave.pairings, remoteStateForSave.pairings),
+              mergedForSave.plannerState,
+              syncTombstonesRef.current
+            ),
+            { changedOnly: true }
+          );
         })
         .then((savedSnapshot) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          const persistedSnapshot = normalizeBackendBreederSnapshot(savedSnapshot);
+          const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
+          const persistedSnapshot = applyChangedRecords(mergedForSave, changedRecords);
+          remoteSnapshotRef.current = applyChangedRecords(remoteStateForSave, changedRecords);
+          if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
           const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
           setSyncedSnakes(currentSnapshot.snakes);
           setSyncedPairings(currentSnapshot.pairings);

@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -27,6 +28,9 @@ import { errorHandler } from "./middleware/errorHandler";
 const app = express();
 
 app.use(helmet());
+// The breeder snapshot endpoints return an account's whole dataset, which is repetitive JSON and
+// compresses roughly an order of magnitude. Mounted ahead of the routes so every response benefits.
+app.use(compression());
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
 // Mounted before express.json() below: webhook signature verification needs the

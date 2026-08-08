@@ -210,25 +210,34 @@ const mergeStringArrays = (...values: unknown[]): string[] => {
   return merged;
 };
 
-const mergeRecordKey = (record: JsonRecord, label: string, index: number): string => {
-  const explicit = [
+const explicitRecordId = (record: JsonRecord, label: string): string | null => (
+  [
     record.id,
     record.logId,
     record.uuid,
     record.appId,
     record.createdAt && `${record.createdAt}:${record.actionType || label}`,
     record.addedAt && `${record.addedAt}:${record.source || label}`,
-  ].map(textValue).find(Boolean);
+  ].map(textValue).find(Boolean) || null
+);
+
+// Identity of an entry that carries no id of its own, derived from the fields a breeder actually
+// fills in. The client derives its backfilled ids from the same fields, so both sides agree on
+// what counts as "the same reading".
+const recordContentSignature = (record: JsonRecord, label: string): string => [
+  label,
+  record.date,
+  record.time,
+  record.result || record.outcome,
+  record.feed || record.food || record.prey,
+  record.size || record.weight || record.grams,
+  record.notes || record.note,
+].map((part) => textValue(part) || "").join("|");
+
+const mergeRecordKey = (record: JsonRecord, label: string, index: number): string => {
+  const explicit = explicitRecordId(record, label);
   if (explicit) return explicit;
-  return [
-    label,
-    record.date,
-    record.time,
-    record.result || record.outcome,
-    record.feed || record.food || record.prey,
-    record.size || record.weight || record.grams,
-    record.notes || record.note,
-  ].map((part) => textValue(part) || "").join("|") || `${label}-${index + 1}`;
+  return recordContentSignature(record, label) || `${label}-${index + 1}`;
 };
 
 const mergeRecordArrays = (olderValue: unknown, newerValue: unknown, label: string): JsonRecord[] => {
@@ -236,8 +245,19 @@ const mergeRecordArrays = (olderValue: unknown, newerValue: unknown, label: stri
     ...(Array.isArray(olderValue) ? olderValue : []),
     ...(Array.isArray(newerValue) ? newerValue : []),
   ].map(asRecord).filter((item): item is JsonRecord => !!item);
+
+  // An id-less entry and an identical entry that has since been given an id are the same reading,
+  // and keying them separately is what let one account accumulate 222k weight entries for 116 real
+  // readings: the id-less original survived every merge, and each sync minted a fresh id for it.
+  // Whenever both forms are present, the one carrying an id wins and the bare copy is dropped.
+  const identified = new Set<string>();
+  for (const row of rows) {
+    if (explicitRecordId(row, label)) identified.add(recordContentSignature(row, label));
+  }
+
   const merged = new Map<string, JsonRecord>();
   rows.forEach((row, index) => {
+    if (!explicitRecordId(row, label) && identified.has(recordContentSignature(row, label))) return;
     const key = mergeRecordKey(row, label, index);
     const existing = merged.get(key);
     if (!existing || payloadUpdatedAtMs(row) >= payloadUpdatedAtMs(existing)) {
@@ -475,24 +495,55 @@ const syncMarketplaceAutoListings = async (ownerId: string, animals: JsonRecord[
   }, SNAPSHOT_TRANSACTION_OPTIONS);
 };
 
-export const listBreederSnapshot = async (ownerId: string) => {
+export const listBreederSnapshot = async (ownerId: string, options: { since?: Date | null } = {}) => {
+  const since = options.since && Number.isFinite(options.since.getTime()) ? options.since : null;
+
+  // Captured before the reads, not after: anything written while these queries run then falls
+  // inside the next window rather than slipping between the two. Re-sending a record costs
+  // nothing (the merge is idempotent); missing one loses data.
+  const serverTime = new Date().toISOString();
+
+  const liveWhere = since
+    ? { ownerId, deletedAt: null, updatedAt: { gt: since } }
+    : { ownerId, deletedAt: null };
+
   const [animals, pairings, clutches, plannerState] = await Promise.all([
-    db.animal.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
-    db.pairing.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
-    db.clutch.findMany({ where: { ownerId, deletedAt: null }, orderBy: { updatedAt: "desc" } }),
+    db.animal.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
+    db.pairing.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
+    db.clutch.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.breederPlannerState.findUnique({ where: { ownerId } }),
   ]);
 
-  return {
+  const snapshot: JsonRecord = {
     animals: animals.map(withBackendSyncMetadata),
     pairings: pairings.map(withBackendSyncMetadata),
     clutches: clutches.map(withBackendSyncMetadata),
     plannerState: plannerState ? withBackendSyncMetadata(plannerState) : null,
+    serverTime,
   };
+
+  if (!since) return snapshot;
+
+  // A full snapshot conveys a deletion by omission; an incremental one cannot, so tombstones
+  // raised inside the window have to be named explicitly.
+  const [deletedAnimals, deletedPairings, deletedClutches] = await Promise.all([
+    db.animal.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appAnimalId: true } }),
+    db.pairing.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appPairingId: true } }),
+    db.clutch.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appClutchId: true } }),
+  ]);
+
+  snapshot.since = since.toISOString();
+  snapshot.partial = true;
+  snapshot.deleted = {
+    animals: deletedAnimals.map((row: any) => row.appAnimalId).filter(Boolean),
+    pairings: deletedPairings.map((row: any) => row.appPairingId).filter(Boolean),
+    clutches: deletedClutches.map((row: any) => row.appClutchId).filter(Boolean),
+  };
+  return snapshot;
 };
 
 type ExistingRow = { id: string; payload: unknown; updatedAt: unknown };
-type PlannedUpdate = { id: string; data: JsonRecord };
+type PlannedUpdate = { id: string; appId: string; data: JsonRecord };
 
 // One query per table, keyed by the app-side id, replacing a findUnique per incoming record.
 const loadExistingByAppId = async (
@@ -567,7 +618,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     const tombstoneAt = isoDateValue(animal.deletedAt);
     if (tombstoneAt) {
       if (existing) {
-        animalUpdates.push({ id: existing.id, data: { deletedAt: new Date(tombstoneAt) } });
+        animalUpdates.push({ id: existing.id, appId: appAnimalId, data: { deletedAt: new Date(tombstoneAt) } });
       } else {
         animalCreates.push({ ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) });
       }
@@ -582,7 +633,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     if (!existing) {
       animalCreates.push({ ownerId, appAnimalId, ...data });
     } else if (shouldApplyIncomingPayload(animal, existing)) {
-      animalUpdates.push({ id: existing.id, data });
+      animalUpdates.push({ id: existing.id, appId: appAnimalId, data });
     }
   }
 
@@ -598,7 +649,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     const tombstoneAt = isoDateValue(pairing.deletedAt);
     if (tombstoneAt) {
       if (existing) {
-        pairingUpdates.push({ id: existing.id, data: { deletedAt: new Date(tombstoneAt) } });
+        pairingUpdates.push({ id: existing.id, appId: appPairingId, data: { deletedAt: new Date(tombstoneAt) } });
       } else {
         pairingCreates.push({ ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) });
       }
@@ -628,11 +679,16 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       pairingRowsByAppId.set(appPairingId, "");
     } else {
       if (shouldApplyIncomingPayload(pairing, existing)) {
-        pairingUpdates.push({ id: existing.id, data });
+        pairingUpdates.push({ id: existing.id, appId: appPairingId, data });
       }
       pairingRowsByAppId.set(appPairingId, existing.id);
     }
   }
+
+  // Clutches and planner state are planned inside the transaction (they depend on row ids created
+  // there), so what they wrote is recorded out here for the response below.
+  const clutchAppIdsWritten: string[] = [];
+  let plannerStateWritten = false;
 
   await db.$transaction(async (tx: any) => {
     await createManyChunked(tx.animal, animalCreates);
@@ -672,8 +728,10 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       };
       if (!existing) {
         clutchCreates.push({ ownerId, appClutchId, ...data });
+        clutchAppIdsWritten.push(appClutchId);
       } else if (shouldApplyIncomingPayload(clutch, existing)) {
-        clutchUpdates.push({ id: existing.id, data: { ...data, pairingId: data.pairingId || undefined } });
+        clutchUpdates.push({ id: existing.id, appId: appClutchId, data: { ...data, pairingId: data.pairingId || undefined } });
+        clutchAppIdsWritten.push(appClutchId);
       }
     }
 
@@ -692,8 +750,10 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       };
       if (!existingPlannerState) {
         await tx.breederPlannerState.create({ data: { ownerId, ...data } });
+        plannerStateWritten = true;
       } else if (shouldApplyIncomingPayload(plannerState, existingPlannerState)) {
         await tx.breederPlannerState.update({ where: { id: existingPlannerState.id }, data });
+        plannerStateWritten = true;
       }
     }
   }, SNAPSHOT_TRANSACTION_OPTIONS);
@@ -718,5 +778,34 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     console.error("[reproductive] ingestion error:", err);
   });
 
-  return savedSnapshot;
+  // The rows this request actually wrote, in the same shape as a snapshot so a caller can treat
+  // either response the same way. On a routine sync this is a handful of records instead of the
+  // account's entire dataset; callers opt in with ?ack=changed so older installed builds, which
+  // expect the full snapshot back, keep getting exactly what they got before.
+  const touchedAnimals = new Set<string>([
+    ...animalCreates.map((row) => String(row.appAnimalId)),
+    ...animalUpdates.map((row) => row.appId),
+  ]);
+  const touchedPairings = new Set<string>([
+    ...pairingCreates.map((row) => String(row.appPairingId)),
+    ...pairingUpdates.map((row) => row.appId),
+  ]);
+  const touchedClutches = new Set<string>(clutchAppIdsWritten);
+
+  const pickTouched = (records: unknown, touched: Set<string>): JsonRecord[] => (
+    (Array.isArray(records) ? records : [])
+      .map(asRecord)
+      .filter((record): record is JsonRecord => !!record && touched.has(String(record.id)))
+  );
+
+  const changed = {
+    animals: pickTouched(savedSnapshot.animals, touchedAnimals),
+    pairings: pickTouched(savedSnapshot.pairings, touchedPairings),
+    clutches: pickTouched(savedSnapshot.clutches, touchedClutches),
+    plannerState: plannerStateWritten ? savedSnapshot.plannerState : null,
+    serverTime: savedSnapshot.serverTime,
+    partial: true,
+  };
+
+  return { snapshot: savedSnapshot, changed };
 };
