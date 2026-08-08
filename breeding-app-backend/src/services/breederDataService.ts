@@ -491,6 +491,36 @@ export const listBreederSnapshot = async (ownerId: string) => {
   };
 };
 
+type ExistingRow = { id: string; payload: unknown; updatedAt: unknown };
+type PlannedUpdate = { id: string; data: JsonRecord };
+
+// One query per table, keyed by the app-side id, replacing a findUnique per incoming record.
+const loadExistingByAppId = async (
+  model: any,
+  ownerId: string,
+  appIdField: string,
+): Promise<Map<string, ExistingRow>> => {
+  const rows = await model.findMany({
+    where: { ownerId },
+    select: { id: true, payload: true, updatedAt: true, [appIdField]: true },
+  });
+  const byAppId = new Map<string, ExistingRow>();
+  for (const row of rows) {
+    const appId = textValue(row[appIdField]);
+    if (appId) byAppId.set(appId, { id: row.id, payload: row.payload, updatedAt: row.updatedAt });
+  }
+  return byAppId;
+};
+
+// Inserts in batches to stay well under Postgres' bind-parameter ceiling. skipDuplicates keeps a
+// concurrent sync from turning a racing insert into a failed request; the loser's data arrives on
+// the next sync, which is how every other conflict in this file already resolves.
+const createManyChunked = async (model: any, rows: JsonRecord[], chunkSize = 200): Promise<void> => {
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    await model.createMany({ data: rows.slice(index, index + chunkSize), skipDuplicates: true });
+  }
+};
+
 export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnapshotInput) => {
   const animals = normalizeArray(input.animals, "animals");
   const pairings = normalizeArray(input.pairings, "pairings");
@@ -513,84 +543,126 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     throw new HttpError(403, `Animal limit reached: ${animals.length} / ${animalAccess.limit} animals.`);
   }
 
+  // Read the owner's current rows in bulk, outside the write transaction. The previous
+  // implementation issued a findUnique per incoming record *inside* the transaction, so a sync
+  // cost two sequential round-trips per record. Past a few thousand records that exceeded the
+  // transaction budget: Prisma closed the transaction mid-flight and the next query failed with
+  // P2028, surfacing to the app as a bare 500. Almost all of those reads were wasted anyway --
+  // on a routine sync nothing has changed, and the row was read only to decide not to write it.
+  const [existingAnimals, existingPairings, existingClutches, existingPlannerState] = await Promise.all([
+    loadExistingByAppId(db.animal, ownerId, "appAnimalId"),
+    loadExistingByAppId(db.pairing, ownerId, "appPairingId"),
+    loadExistingByAppId(db.clutch, ownerId, "appClutchId"),
+    db.breederPlannerState.findUnique({
+      where: { ownerId },
+      select: { id: true, payload: true, updatedAt: true },
+    }),
+  ]);
+
+  const animalCreates: JsonRecord[] = [];
+  const animalUpdates: PlannedUpdate[] = [];
+  for (const [index, animal] of animals.entries()) {
+    const appAnimalId = requireRecordId(animal, "animal", index);
+    const existing = existingAnimals.get(appAnimalId) || null;
+    const tombstoneAt = isoDateValue(animal.deletedAt);
+    if (tombstoneAt) {
+      if (existing) {
+        animalUpdates.push({ id: existing.id, data: { deletedAt: new Date(tombstoneAt) } });
+      } else {
+        animalCreates.push({ ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) });
+      }
+      continue;
+    }
+    const data = {
+      name: textValue(animal.name),
+      sex: textValue(animal.sex),
+      status: textValue(animal.status),
+      payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
+    };
+    if (!existing) {
+      animalCreates.push({ ownerId, appAnimalId, ...data });
+    } else if (shouldApplyIncomingPayload(animal, existing)) {
+      animalUpdates.push({ id: existing.id, data });
+    }
+  }
+
+  // Row ids for every pairing the clutch loop may reference. Pairings created by this request
+  // have no id until after the insert, so those are resolved in a single lookup below.
+  const pairingRowsByAppId = new Map<string, string>();
+  const pairingCreates: JsonRecord[] = [];
+  const pairingUpdates: PlannedUpdate[] = [];
+  const createdPairingAppIds: string[] = [];
+  for (const [index, pairing] of pairings.entries()) {
+    const appPairingId = requireRecordId(pairing, "pairing", index);
+    const existing = existingPairings.get(appPairingId) || null;
+    const tombstoneAt = isoDateValue(pairing.deletedAt);
+    if (tombstoneAt) {
+      if (existing) {
+        pairingUpdates.push({ id: existing.id, data: { deletedAt: new Date(tombstoneAt) } });
+      } else {
+        pairingCreates.push({ ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) });
+      }
+      pairingRowsByAppId.set(appPairingId, existing?.id || "");
+      continue;
+    }
+    const mergedPairingPayload = existing ? mergePairingPayload(existing.payload, pairing) : pairing;
+    const data = {
+      label: textValue(pairing.label),
+      maleAnimalAppId: textValue(pairing.maleId),
+      femaleAnimalAppId: textValue(pairing.femaleId),
+      status: textValue(mergedPairingPayload.status),
+      workflowStatus: enumTextValue(mergedPairingPayload.workflowStatus ?? mergedPairingPayload.status, workflowStatuses),
+      completionReason: enumTextValue(mergedPairingPayload.completionReason, completionReasons),
+      outcomeConfidence: enumTextValue(mergedPairingPayload.outcomeConfidence, outcomeConfidences),
+      completedAt: isoDateValue(mergedPairingPayload.completedAt) ? new Date(isoDateValue(mergedPairingPayload.completedAt) as string) : null,
+      completedByUserId: textValue(mergedPairingPayload.completedBy),
+      completionNote: textValue(mergedPairingPayload.completionNote),
+      reopenedAt: isoDateValue(mergedPairingPayload.reopenedAt) ? new Date(isoDateValue(mergedPairingPayload.reopenedAt) as string) : null,
+      reopenedByUserId: textValue(mergedPairingPayload.reopenedBy),
+      startDate: textValue(pairing.startDate),
+      payload: mergedPairingPayload,
+    };
+    if (!existing) {
+      pairingCreates.push({ ownerId, appPairingId, ...data });
+      createdPairingAppIds.push(appPairingId);
+      pairingRowsByAppId.set(appPairingId, "");
+    } else {
+      if (shouldApplyIncomingPayload(pairing, existing)) {
+        pairingUpdates.push({ id: existing.id, data });
+      }
+      pairingRowsByAppId.set(appPairingId, existing.id);
+    }
+  }
+
   await db.$transaction(async (tx: any) => {
-    for (const [index, animal] of animals.entries()) {
-      const appAnimalId = requireRecordId(animal, "animal", index);
-      const existing = await tx.animal.findUnique({
-        where: { ownerId_appAnimalId: { ownerId, appAnimalId } },
-        select: { id: true, payload: true, updatedAt: true },
+    await createManyChunked(tx.animal, animalCreates);
+    for (const update of animalUpdates) {
+      await tx.animal.update({ where: { id: update.id }, data: update.data });
+    }
+
+    await createManyChunked(tx.pairing, pairingCreates);
+    for (const update of pairingUpdates) {
+      await tx.pairing.update({ where: { id: update.id }, data: update.data });
+    }
+
+    if (createdPairingAppIds.length) {
+      const insertedPairings = await tx.pairing.findMany({
+        where: { ownerId, appPairingId: { in: createdPairingAppIds } },
+        select: { id: true, appPairingId: true },
       });
-      const tombstoneAt = isoDateValue(animal.deletedAt);
-      if (tombstoneAt) {
-        if (existing) {
-          await tx.animal.update({ where: { id: existing.id }, data: { deletedAt: new Date(tombstoneAt) } });
-        } else {
-          await tx.animal.create({ data: { ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) } });
-        }
-        continue;
-      }
-      const data = {
-        name: textValue(animal.name),
-        sex: textValue(animal.sex),
-        status: textValue(animal.status),
-        payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
-      };
-      if (!existing) {
-        await tx.animal.create({ data: { ownerId, appAnimalId, ...data } });
-      } else if (shouldApplyIncomingPayload(animal, existing)) {
-        await tx.animal.update({ where: { id: existing.id }, data });
+      for (const row of insertedPairings) {
+        pairingRowsByAppId.set(String(row.appPairingId), row.id);
       }
     }
 
-    const pairingRowsByAppId = new Map<string, string>();
-    for (const [index, pairing] of pairings.entries()) {
-      const appPairingId = requireRecordId(pairing, "pairing", index);
-      const existing = await tx.pairing.findUnique({
-        where: { ownerId_appPairingId: { ownerId, appPairingId } },
-        select: { id: true, payload: true, updatedAt: true },
-      });
-      const tombstoneAt = isoDateValue(pairing.deletedAt);
-      if (tombstoneAt) {
-        if (existing) {
-          await tx.pairing.update({ where: { id: existing.id }, data: { deletedAt: new Date(tombstoneAt) } });
-        } else {
-          await tx.pairing.create({ data: { ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) } });
-        }
-        pairingRowsByAppId.set(appPairingId, existing?.id || "");
-        continue;
-      }
-      const mergedPairingPayload = existing ? mergePairingPayload(existing.payload, pairing) : pairing;
-      const data = {
-        label: textValue(pairing.label),
-        maleAnimalAppId: textValue(pairing.maleId),
-        femaleAnimalAppId: textValue(pairing.femaleId),
-        status: textValue(mergedPairingPayload.status),
-        workflowStatus: enumTextValue(mergedPairingPayload.workflowStatus ?? mergedPairingPayload.status, workflowStatuses),
-        completionReason: enumTextValue(mergedPairingPayload.completionReason, completionReasons),
-        outcomeConfidence: enumTextValue(mergedPairingPayload.outcomeConfidence, outcomeConfidences),
-        completedAt: isoDateValue(mergedPairingPayload.completedAt) ? new Date(isoDateValue(mergedPairingPayload.completedAt) as string) : null,
-        completedByUserId: textValue(mergedPairingPayload.completedBy),
-        completionNote: textValue(mergedPairingPayload.completionNote),
-        reopenedAt: isoDateValue(mergedPairingPayload.reopenedAt) ? new Date(isoDateValue(mergedPairingPayload.reopenedAt) as string) : null,
-        reopenedByUserId: textValue(mergedPairingPayload.reopenedBy),
-        startDate: textValue(pairing.startDate),
-        payload: mergedPairingPayload,
-      };
-      const row = !existing
-        ? await tx.pairing.create({ data: { ownerId, appPairingId, ...data } })
-        : shouldApplyIncomingPayload(pairing, existing)
-          ? await tx.pairing.update({ where: { id: existing.id }, data })
-          : existing;
-      pairingRowsByAppId.set(appPairingId, row.id);
-    }
-
+    // Planned here rather than alongside the others because a clutch's pairingId can point at a
+    // pairing that only just received its row id. No queries run in this loop.
+    const clutchCreates: JsonRecord[] = [];
+    const clutchUpdates: PlannedUpdate[] = [];
     for (const [index, clutch] of clutches.entries()) {
       const appClutchId = requireRecordId(clutch, "clutch", index);
       const pairingAppId = textValue(clutch.pairingAppId) || textValue(clutch.pairingId);
-      const existing = await tx.clutch.findUnique({
-        where: { ownerId_appClutchId: { ownerId, appClutchId } },
-        select: { id: true, payload: true, updatedAt: true },
-      });
+      const existing = existingClutches.get(appClutchId) || null;
       const data = {
         pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
         clutchNumber: intValue(clutch.clutchNumber),
@@ -599,48 +671,29 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         payload: existing ? mergeSnapshotPayload(existing.payload, clutch, { recordArrayKeys: ["photos"], mergeLogs: true }) : clutch,
       };
       if (!existing) {
-        await tx.clutch.create({
-          data: {
-            ownerId,
-            appClutchId,
-            ...data,
-          },
-        });
+        clutchCreates.push({ ownerId, appClutchId, ...data });
       } else if (shouldApplyIncomingPayload(clutch, existing)) {
-        await tx.clutch.update({
-          where: { id: existing.id },
-          data: {
-            ...data,
-            pairingId: data.pairingId || undefined,
-          },
-        });
+        clutchUpdates.push({ id: existing.id, data: { ...data, pairingId: data.pairingId || undefined } });
       }
     }
 
+    await createManyChunked(tx.clutch, clutchCreates);
+    for (const update of clutchUpdates) {
+      await tx.clutch.update({ where: { id: update.id }, data: update.data });
+    }
+
     if (plannerState) {
-      const existing = await tx.breederPlannerState.findUnique({
-        where: { ownerId },
-        select: { id: true, payload: true, updatedAt: true },
-      });
       const data = {
-        payload: existing
-          ? mergeSnapshotPayload(existing.payload, plannerState, {
+        payload: existingPlannerState
+          ? mergeSnapshotPayload(existingPlannerState.payload, plannerState, {
             stringArrayKeys: ["groups", "showGroups", "hiddenGroups", "customStatusTags", "removedStatusTags"],
           })
           : plannerState,
       };
-      if (!existing) {
-        await tx.breederPlannerState.create({
-          data: {
-            ownerId,
-            ...data,
-          },
-        });
-      } else if (shouldApplyIncomingPayload(plannerState, existing)) {
-        await tx.breederPlannerState.update({
-          where: { id: existing.id },
-          data,
-        });
+      if (!existingPlannerState) {
+        await tx.breederPlannerState.create({ data: { ownerId, ...data } });
+      } else if (shouldApplyIncomingPayload(plannerState, existingPlannerState)) {
+        await tx.breederPlannerState.update({ where: { id: existingPlannerState.id }, data });
       }
     }
   }, SNAPSHOT_TRANSACTION_OPTIONS);

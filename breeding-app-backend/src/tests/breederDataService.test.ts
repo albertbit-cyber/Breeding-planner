@@ -1,15 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Existing rows are read in bulk off `prisma` before the transaction opens; the transaction
+// itself only carries writes, inserting through createMany.
 const tx = {
-  animal: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  animal: { createMany: vi.fn(), update: vi.fn() },
   listing: {
     updateMany: vi.fn(),
     upsert: vi.fn(),
   },
-  pairing: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-  clutch: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-  breederPlannerState: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  pairing: { createMany: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+  clutch: { createMany: vi.fn(), update: vi.fn() },
+  breederPlannerState: { create: vi.fn(), update: vi.fn() },
 };
+
+// A row as the bulk pre-load sees it: the app-side id is what keys the lookup, so a row without
+// one reads as "not stored yet".
+const existingRow = (appIdField: string, appId: string, payload: unknown, updatedAt?: string) => ({
+  id: `${appIdField}-row-1`,
+  [appIdField]: appId,
+  payload,
+  updatedAt: updatedAt ? new Date(updatedAt) : undefined,
+});
 
 vi.mock("../lib/prisma", () => ({
   prisma: {
@@ -26,18 +37,16 @@ import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederD
 
 beforeEach(() => {
   vi.clearAllMocks();
-  tx.animal.findUnique.mockResolvedValue(null);
-  tx.animal.create.mockResolvedValue({ id: "animal-row-1" });
+  tx.animal.createMany.mockResolvedValue({ count: 1 });
   tx.animal.update.mockResolvedValue({ id: "animal-row-1" });
   tx.listing.updateMany.mockResolvedValue({ count: 0 });
   tx.listing.upsert.mockResolvedValue({ id: "listing-row-1" });
-  tx.pairing.findUnique.mockResolvedValue(null);
-  tx.pairing.create.mockResolvedValue({ id: "pairing-row-1" });
+  tx.pairing.createMany.mockResolvedValue({ count: 1 });
   tx.pairing.update.mockResolvedValue({ id: "pairing-row-1" });
-  tx.clutch.findUnique.mockResolvedValue(null);
-  tx.clutch.create.mockResolvedValue({ id: "clutch-row-1" });
+  // Resolves the row ids of pairings inserted by this request, which clutches reference.
+  tx.pairing.findMany.mockResolvedValue([{ id: "pairing-row-1", appPairingId: "pairing-1" }]);
+  tx.clutch.createMany.mockResolvedValue({ count: 1 });
   tx.clutch.update.mockResolvedValue({ id: "clutch-row-1" });
-  tx.breederPlannerState.findUnique.mockResolvedValue(null);
   tx.breederPlannerState.create.mockResolvedValue({ id: "planner-state-row-1" });
   tx.breederPlannerState.update.mockResolvedValue({ id: "planner-state-row-1" });
   vi.mocked((prisma as any).animal.findMany).mockResolvedValue([]);
@@ -61,24 +70,31 @@ describe("breederDataService", () => {
       }],
     });
 
-    expect(tx.animal.findUnique).toHaveBeenCalledWith(expect.objectContaining({
-      where: { ownerId_appAnimalId: { ownerId: "breeder-1", appAnimalId: "snake-1" } },
+    // Existing rows are read once per table for the whole owner, not once per incoming record.
+    expect((prisma as any).animal.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { ownerId: "breeder-1" },
     }));
-    expect(tx.animal.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ ownerId: "breeder-1", appAnimalId: "snake-1", name: "Saliso" }),
-    });
-    expect(tx.pairing.findUnique).toHaveBeenCalledWith(expect.objectContaining({
-      where: { ownerId_appPairingId: { ownerId: "breeder-1", appPairingId: "pairing-1" } },
+    expect((prisma as any).pairing.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { ownerId: "breeder-1" },
     }));
-    expect(tx.pairing.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ maleAnimalAppId: "snake-1", femaleAnimalAppId: "snake-2" }),
-    });
-    expect(tx.clutch.findUnique).toHaveBeenCalledWith(expect.objectContaining({
-      where: { ownerId_appClutchId: { ownerId: "breeder-1", appClutchId: "pairing-pairing-1-clutch" } },
+
+    expect(tx.animal.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([
+        expect.objectContaining({ ownerId: "breeder-1", appAnimalId: "snake-1", name: "Saliso" }),
+      ]),
     }));
-    expect(tx.clutch.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ ownerId: "breeder-1", pairingId: "pairing-row-1", laidDate: "2026-04-20" }),
-    });
+    expect(tx.pairing.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([
+        expect.objectContaining({ maleAnimalAppId: "snake-1", femaleAnimalAppId: "snake-2" }),
+      ]),
+    }));
+    // The clutch still lands on the row id of the pairing created moments earlier in the same
+    // request, which is the one ordering constraint the batching has to preserve.
+    expect(tx.clutch.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([
+        expect.objectContaining({ ownerId: "breeder-1", pairingId: "pairing-row-1", laidDate: "2026-04-20" }),
+      ]),
+    }));
   });
 
   it("mirrors structured completion metadata when syncing a completed pairing", async () => {
@@ -96,15 +112,17 @@ describe("breederDataService", () => {
       }],
     });
 
-    expect(tx.pairing.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        workflowStatus: "completed",
-        completionReason: "no_ovulation_observed",
-        outcomeConfidence: "likely",
-        completedAt: new Date("2026-05-01T10:00:00.000Z"),
-        completionNote: "No ovulation observed by end of season.",
-      }),
-    });
+    expect(tx.pairing.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          workflowStatus: "completed",
+          completionReason: "no_ovulation_observed",
+          outcomeConfidence: "likely",
+          completedAt: new Date("2026-05-01T10:00:00.000Z"),
+          completionNote: "No ovulation observed by end of season.",
+        }),
+      ]),
+    }));
   });
 
   it("rejects completed pairings without a completion reason", async () => {
@@ -189,12 +207,9 @@ describe("breederDataService", () => {
       name: "Newest name",
       updatedAt: "2026-07-03T10:00:00.000Z",
     };
-    tx.animal.findUnique.mockResolvedValueOnce({
-      id: "animal-row-1",
-      payload: existingPayload,
-      updatedAt: new Date("2026-07-03T10:00:00.000Z"),
-    });
-    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: existingPayload }]);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", existingPayload, "2026-07-03T10:00:00.000Z"),
+    ]);
 
     await upsertBreederSnapshot("breeder-1", {
       animals: [{
@@ -206,12 +221,13 @@ describe("breederDataService", () => {
     });
 
     expect(tx.animal.update).not.toHaveBeenCalled();
+    // Nor may the stale record sneak in as an insert: the row was recognised as already stored.
+    expect(tx.animal.createMany).not.toHaveBeenCalled();
   });
 
   it("merges nested animal logs when the incoming animal is newer", async () => {
-    tx.animal.findUnique.mockResolvedValueOnce({
-      id: "animal-row-1",
-      payload: {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", {
         id: "snake-1",
         name: "Original",
         updatedAt: "2026-07-03T10:00:00.000Z",
@@ -219,9 +235,8 @@ describe("breederDataService", () => {
           feeds: [{ id: "feed-old", date: "2026-07-02", result: "Fed" }],
         },
         photos: [{ id: "photo-old", addedAt: "2026-07-03T09:00:00.000Z", url: "old.jpg" }],
-      },
-      updatedAt: new Date("2026-07-03T10:00:00.000Z"),
-    });
+      }, "2026-07-03T10:00:00.000Z"),
+    ]);
 
     await upsertBreederSnapshot("breeder-1", {
       animals: [{
@@ -253,6 +268,31 @@ describe("breederDataService", () => {
         }),
       }),
     }));
+  });
+
+  // The regression this guards: reads used to be issued one findUnique per incoming record from
+  // inside the write transaction. At a few thousand records the sequential round-trips ran past
+  // the transaction budget, Prisma closed the transaction, and the sync died on P2028 -> 500.
+  it("reads once per table regardless of record count, and writes nothing when nothing changed", async () => {
+    const stored = Array.from({ length: 500 }, (_, index) => ({
+      id: `snake-${index}`,
+      name: `Animal ${index}`,
+      updatedAt: "2026-07-03T10:00:00.000Z",
+    }));
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue(
+      stored.map(payload => existingRow("appAnimalId", payload.id, payload, "2026-07-03T10:00:00.000Z")),
+    );
+
+    await upsertBreederSnapshot("breeder-1", {
+      // Same records the server already has, none of them touched since.
+      animals: stored.map(payload => ({ ...payload, updatedAt: "2026-07-02T10:00:00.000Z" })),
+      pairings: [],
+    });
+
+    // Once for the pre-load, once for the snapshot returned to the caller — not 500 times.
+    expect((prisma as any).animal.findMany).toHaveBeenCalledTimes(2);
+    expect(tx.animal.createMany).not.toHaveBeenCalled();
+    expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
   it("persists and lists owner planner state", async () => {

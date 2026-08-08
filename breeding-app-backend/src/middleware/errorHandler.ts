@@ -71,6 +71,18 @@ export const errorHandler = (error: unknown, req: Request, res: Response, _next:
     return;
   }
 
+  // The write transaction ran past its budget and was closed underneath us, so nothing was
+  // committed. Worth alerting on (it means an account outgrew the sync path again), but the
+  // caller deserves better than "Internal server error" for a retryable, nothing-was-lost state.
+  if (prismaCode === "P2028") {
+    console.error("[cloud-sync] transaction timed out and was rolled back:", error);
+    captureException(error, { path: req.path, method: req.method });
+    res.status(503).json({
+      message: "Cloud sync took too long and was rolled back — nothing was saved. Please try again.",
+    });
+    return;
+  }
+
   const errorSummary = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   console.error("Unhandled error:", errorSummary, error);
   // Only truly unhandled/unexpected errors reach this point — HttpError,
