@@ -2704,6 +2704,17 @@ function normalizeSnakeListForDisplay(snakes = []) {
   return realSnakes.length ? realSnakes : sanitized;
 }
 
+// Hatchlings used to be named "Hatchling 4 (Runa × Confusion Lesser Pastel het Clown)".
+// They are now named "Runa × Confusion Lesser Pastel het Clown - 4". The parenthetical must
+// contain "×" so this only ever matches the generated dam × sire label, never a hand-typed name.
+const LEGACY_HATCHLING_NAME_RE = /^\s*Hatchling\s+(\d+)\s*\(\s*([^()]*×[^()]*?)\s*\)\s*$/;
+
+function legacyHatchlingNameToCurrentFormat(name) {
+  const match = LEGACY_HATCHLING_NAME_RE.exec(String(name || ''));
+  if (!match) return null;
+  return `${match[2]} - ${match[1]}`;
+}
+
 function getDemoSnakeIds(snakes = []) {
   return new Set(
     (Array.isArray(snakes) ? snakes : [])
@@ -6619,6 +6630,23 @@ export default function BreedingPlannerApp() {
       return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
     });
   }, []);
+  // Rewrite hatchlings still carrying the legacy "Hatchling 4 (Dam × Sire)" name. This runs on
+  // every snakes change rather than once behind a flag so records that arrive later from cloud
+  // sync (or from another device) get converted too; once renamed nothing matches, so it settles.
+  useEffect(() => {
+    const pending = snakes.filter(snake => legacyHatchlingNameToCurrentFormat(snake?.name));
+    if (!pending.length) return;
+    console.info(`Renaming ${pending.length} hatchling(s) to the "Dam × Sire - N" format`, pending.map(snake => ({
+      id: snake.id,
+      from: snake.name,
+      to: legacyHatchlingNameToCurrentFormat(snake.name),
+    })));
+    setSnakes(prev => prev.map(snake => {
+      const renamed = legacyHatchlingNameToCurrentFormat(snake?.name);
+      return renamed ? { ...snake, name: renamed } : snake;
+    }));
+  }, [snakes, setSnakes]);
+
   const [syncTombstones, setSyncTombstones] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}'); }
     catch { return { snakes: {}, pairings: {} }; }
@@ -9651,7 +9679,7 @@ export default function BreedingPlannerApp() {
 
       const entries = Array.from({ length: payload.count }, (_, idx) => {
         const sequenceLabel = payload.existingCount + idx + 1;
-        const defaultName = `Hatchling ${sequenceLabel} (${pairingName})`;
+        const defaultName = `${pairingName} - ${sequenceLabel}`;
         const generatedId = generateSnakeId(
           defaultName,
           year,
@@ -9746,7 +9774,8 @@ export default function BreedingPlannerApp() {
           recordsInUse.push({ id: trimmed, idSequence: derivedSeq });
         }
       });
-      const baseName = entries[index].name || context.pairingName || `Hatchling ${index + 1}`;
+      const baseName = entries[index].name
+        || (context.pairingName ? `${context.pairingName} - ${index + 1}` : `Hatchling ${index + 1}`);
       const sex = ensureSex(sexOverride ?? entries[index].sex, 'F');
       const entryBirthYear = extractYearFromDateString(entries[index].birthDate);
       const derivedYear = entryBirthYear ?? context.year ?? new Date().getFullYear();
@@ -9873,7 +9902,8 @@ export default function BreedingPlannerApp() {
           ...snakes.map(s => ({ id: s.id, idSequence: s.idSequence })),
           ...savedIds.map(id => ({ id, idSequence: extractSequenceFromId(id, breederInfo?.idGenerator) })),
         ];
-        const fallbackName = entry.name || context.pairingName || `Hatchling ${currentIndex + 1}`;
+        const fallbackName = entry.name
+          || (context.pairingName ? `${context.pairingName} - ${Number(prev.existingCount) + currentIndex + 1}` : `Hatchling ${currentIndex + 1}`);
         const sex = ensureSex(entry.sex, 'F');
         let resolvedId = String(entry.id || '').trim();
         const rawBirthValue = entry.birthDate || hatchedOn;
