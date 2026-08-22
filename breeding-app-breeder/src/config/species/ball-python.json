@@ -1,0 +1,3493 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "ball-python",
+  "speciesName": "Ball Pythons",
+  "scientificName": "Python regius",
+  "genes": [
+    {
+      "geneName": "210 Hypo",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Hollywood"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Distinct line of Hypo; does not complement other Hypo/Ghost lines.",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Acid",
+      "geneType": "incomplete_dominant",
+      "complex": "Acid Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "ACD"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Adder",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Black Adder"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2006",
+      "rarity": "average"
+    },
+    {
+      "geneName": "AHI",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Ajax",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Amelanistic"
+      ],
+      "shorthand": [
+        "Alb"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1992",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Alloy",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Removes clutter from yellows and adds orange tones.",
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Ambush",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Arcane",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Arid",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Arroyo",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "het Rio"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Ashen",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Breeder notes ~32% visual offspring ratio from het-like pairings (previously suspected polygenic).",
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Asphalt",
+      "geneType": "incomplete_dominant",
+      "complex": "Super Stripe Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Super Asphalt",
+      "aliases": [
+        "401 Ball"
+      ],
+      "shorthand": [
+        "Asp"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Astro",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Astro",
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Atomic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Eclipse"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Breeder reports inconsistent production.",
+      "yearDiscovered": "2011",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Axanthic (GCR)",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Gateway City Reptiles Axanthic"
+      ],
+      "shorthand": [
+        "GCR"
+      ],
+      "healthFlags": [],
+      "notes": "Non-complementary with Jolliff/MJ/TSK/VPI lines.",
+      "yearDiscovered": "2010",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Axanthic (Jolliff)",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Jolliff"
+      ],
+      "healthFlags": [],
+      "notes": "Non-complementary with GCR/MJ/TSK/VPI lines.",
+      "yearDiscovered": "1997",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Axanthic (MJ)",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Markus Jayne Axanthic"
+      ],
+      "shorthand": [
+        "MJ"
+      ],
+      "healthFlags": [],
+      "notes": "Non-complementary with GCR/Jolliff/TSK/VPI lines.",
+      "yearDiscovered": "2008",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Axanthic (TSK)",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Ax TSK",
+        "Black Axanthic (same allele)"
+      ],
+      "shorthand": [
+        "TSK"
+      ],
+      "healthFlags": [],
+      "notes": "Same allele as Black Axanthic (confirmed by RGI genetic testing, 2024). Non-complementary with GCR/Jolliff/MJ/VPI.",
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Axanthic (VPI)",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "VPI Axanthic"
+      ],
+      "shorthand": [
+        "VPI"
+      ],
+      "healthFlags": [],
+      "notes": "Non-complementary with GCR/Jolliff/MJ/TSK lines.",
+      "yearDiscovered": "1997",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Bald",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Bambino",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2019",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Bamboo",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Banana",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Coral Glow",
+        "Whitesmoke"
+      ],
+      "shorthand": [
+        "Ban"
+      ],
+      "healthFlags": [],
+      "notes": "Sex-linked (X-chromosome). Females produce Female Makers; males produce Male Makers.",
+      "yearDiscovered": "2003",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Bang",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Tangerine Nightmare",
+        "Orange Bang"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Bengal",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Black Axanthic",
+      "geneType": "recessive",
+      "complex": "Axanthic Lines",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Same allele as Axanthic (TSK) — confirmed by RGI genetic testing 2024.",
+      "yearDiscovered": "2008",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Black Belly",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Considered a problematic morph: poor growth, poor breeding performance, facial/cranial malformations.",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Black Head",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "BH"
+      ],
+      "healthFlags": [],
+      "notes": "Masks genetic wobble found in other Spider Complex members.",
+      "yearDiscovered": "2002",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Black Lace",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Black Pastel",
+      "geneType": "incomplete_dominant",
+      "complex": "8 Ball Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Super Black Pastel",
+      "aliases": [
+        "Blk Pastel"
+      ],
+      "shorthand": [
+        "BP"
+      ],
+      "healthFlags": [
+        "kinking"
+      ],
+      "notes": "Super Black Pastel has duckbill deformity and rare kinking.",
+      "yearDiscovered": "2002",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Blade",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2002",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Bongo",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Brown Back",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "More of a descriptive look than a fixed single-gene trait; heritable/provable in some lines.",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Butter",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Blue-Eyed Leucistic",
+      "aliases": [],
+      "shorthand": [
+        "But"
+      ],
+      "healthFlags": [],
+      "notes": "2025 RGI confirmed Butter and Lesser are genetically DISTINCT despite historical grouping.",
+      "yearDiscovered": "2001",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Cafe",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Calico",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Biancaball"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2002",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Candy",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Toffee"
+      ],
+      "shorthand": [
+        "Can"
+      ],
+      "healthFlags": [],
+      "notes": "Candy and Toffee are the same allele (independently discovered/named).",
+      "yearDiscovered": "2008",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Caramel Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Caramel",
+        "T+ Albino",
+        "Tyrosinase-Positive Albino",
+        "Axanthic Albino"
+      ],
+      "shorthand": [
+        "Car Alb"
+      ],
+      "healthFlags": [
+        "kinking",
+        "infertility"
+      ],
+      "notes": "Female sub-fertility/high infertility rate; kinking; photophobia.",
+      "yearDiscovered": "1996",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Carbon",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Carnivore",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Champagne",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Champ"
+      ],
+      "shorthand": [],
+      "healthFlags": [
+        "wobble",
+        "lethal_super"
+      ],
+      "notes": "Light-to-severe wobble in all animals. Super Champagne is LETHAL. Avoid pairing with Sable, HGW, Spotnose.",
+      "yearDiscovered": "2005",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Chino",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Chocolate",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Cinder",
+      "geneType": "incomplete_dominant",
+      "complex": "Mahogany Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Cinnamon",
+      "geneType": "incomplete_dominant",
+      "complex": "8 Ball Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Super Cinnamon",
+      "aliases": [
+        "Cinny",
+        "Cinnamon Pastel"
+      ],
+      "shorthand": [
+        "Cin",
+        "Cinn"
+      ],
+      "healthFlags": [
+        "kinking"
+      ],
+      "notes": "Super Cinnamon commonly has duckbill deformity and rare kinking.",
+      "yearDiscovered": "2002",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Circle",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Citron",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Clown",
+      "geneType": "recessive",
+      "complex": "Clown Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Cln",
+        "Cl"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Coffee",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Confusion",
+      "geneType": "dominant",
+      "complex": "Acid Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Congo",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Copper",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Creed",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Cryptic",
+      "geneType": "recessive",
+      "complex": "Clown Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Amur",
+        "Gizmo"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Allelic to Clown; reclassified from Incomplete Dominant to Recessive (Oct 2020).",
+      "yearDiscovered": null,
+      "rarity": "common"
+    },
+    {
+      "geneName": "Cypress",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Cyp"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Dark Angel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2017",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Dark Viking",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Dark Togo",
+        "DV"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Desert",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [
+        "infertility"
+      ],
+      "notes": "Female fertility/reproduction issues documented.",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Desert Ghost",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "DG",
+        "Bell Line DG"
+      ],
+      "shorthand": [
+        "DG"
+      ],
+      "healthFlags": [],
+      "notes": "2023 RGI testing revealed DG is actually 3 combined genes (DGa/DGb/DGc); some lines incompatible with others.",
+      "yearDiscovered": "2003",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Diesel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Diesel",
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2000s",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Dinker",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Unproven"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Denotes any phenotype not yet proven genetic through breeding trials. High risk/gamble category.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Disco",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Super Disco",
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2004",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Dot",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "EMG",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Evil Morph God"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Enchi",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Enchi",
+      "aliases": [],
+      "shorthand": [
+        "En"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2002",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Enhancer",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Visually similar to but distinguishable from Desert Ghost.",
+      "yearDiscovered": "2004",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Epic",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Eramosa",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Mutation X"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Breeder describes as 'Dominant with no Super'. Fast-growing, aggressive, good feeders.",
+      "yearDiscovered": "2008",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Exo-lbb",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2006",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Fader",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Not reliably heritable in a predictable single-gene manner.",
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Fire",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Black-Eyed Leucistic",
+      "aliases": [],
+      "shorthand": [
+        "Fir"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2003-2005",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Flame",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "FNR Vanilla",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Proven distinct from Gulf Coast Vanilla in 2015.",
+      "yearDiscovered": "2008",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Frost",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2011",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Furrow",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Fusion",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Gaia",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Gallium",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Mercury"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Genetic Black Back",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Genetic Reduced",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Genetic Stripe",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "G-Stripe"
+      ],
+      "shorthand": [
+        "GS"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "GeneX",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2015",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "GHI",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Gotta Have It"
+      ],
+      "shorthand": [
+        "GHI"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2007",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Ghost (Vesper)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Vesper Ghost",
+        "Hypo (Vesper)"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Distinct project-specific Ghost line, not identical to Vesper dominant gene.",
+      "yearDiscovered": "2000s",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Glossy",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Gobi",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Gold Blush",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Granite",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2003",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Gravel",
+      "geneType": "incomplete_dominant",
+      "complex": "Super Stripe Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Gra"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2006",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Grim",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Harlequin",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Controversy: multiple incompatible lines exist; many originally-labeled animals proved to be Normals.",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Het Daddy",
+      "geneType": "dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Het Red Axanthic",
+      "geneType": "incomplete_dominant",
+      "complex": "8 Ball Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Red Axanthic",
+      "aliases": [
+        "HRA",
+        "Green Pastel",
+        "Lace Black Back",
+        "Lori"
+      ],
+      "shorthand": [
+        "HRA"
+      ],
+      "healthFlags": [],
+      "notes": "'Het' here denotes the incomplete-dominant heterozygous form, not a recessive het.",
+      "yearDiscovered": "2001",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Hidden Gene Woma",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "HGW"
+      ],
+      "shorthand": [
+        "HGW"
+      ],
+      "healthFlags": [
+        "wobble",
+        "lethal_super"
+      ],
+      "notes": "Light-to-severe wobble in single-gene animals. Super HGW is LETHAL. Genetically separate from Woma despite name.",
+      "yearDiscovered": "1999",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Hieroglyphic",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "High Intensity OD",
+      "geneType": "incomplete_dominant",
+      "complex": "Orange Dream Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "HIOD",
+        "High Intensity Orange Dream"
+      ],
+      "shorthand": [
+        "HIOD"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "High Orange Gene",
+      "geneType": "incomplete_dominant",
+      "complex": "Orange Dream Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Possibly synonym for High Intensity OD (unconfirmed).",
+      "yearDiscovered": "2021",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Honey",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Huffman",
+      "geneType": "incomplete_dominant",
+      "complex": "8 Ball Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Genetic test available for this trait.",
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Hybrid",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Not a single gene; a category tag applied to cross-species animals.",
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Hydra",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Hypo",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Hypomelanistic"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1994",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Jaguar",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Status disputed — no line conclusively proven genetic/heritable in ball pythons.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Java",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2011",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Jedi",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2006",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Jolliff Tiger",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Jolt",
+      "geneType": "incomplete_dominant",
+      "complex": "Black Pastel Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "'Acts Like Super' form is called Whiplash. Breeding Whiplash produces only Jolt and Black Pastel offspring.",
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Joppa",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Josie",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Jungle Woma",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Genetically unrelated to Woma despite the name.",
+      "yearDiscovered": "2005",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Kosmos",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "average"
+    },
+    {
+      "geneName": "KRG",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Lace",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2002",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Lavender Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Lav"
+      ],
+      "healthFlags": [],
+      "notes": "Genetically distinct/unrelated to standard TYR-gene Albino. OCA2 gene deletion.",
+      "yearDiscovered": "2001",
+      "rarity": "common"
+    },
+    {
+      "geneName": "LC Black Magic",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Lemonback",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Brite",
+        "Lucifer",
+        "Mota",
+        "Sauce"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Commonly combined with Fire and other BlkEL-complex genes.",
+      "yearDiscovered": "2008",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Leopard",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Leo"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2005",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Lesser",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Blue-Eyed Leucistic",
+      "aliases": [
+        "Bug Eyes"
+      ],
+      "shorthand": [
+        "Les"
+      ],
+      "healthFlags": [],
+      "notes": "Super Lesser individuals sometimes show enlarged protruding eyes. 2025 RGI confirmed Lesser and Butter are genetically DISTINCT.",
+      "yearDiscovered": "2001",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Mahogany",
+      "geneType": "incomplete_dominant",
+      "complex": "Mahogany Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Mah"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2005",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Maple",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "New"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2019",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Mario",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Marvel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Mckenzie",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Melt",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Metal Flake",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Gold Flake",
+        "MF"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Status unconfirmed/controversial as standalone trait; linked to Piebald.",
+      "yearDiscovered": "2004",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Microscale",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Scaleless",
+      "aliases": [
+        "Micro"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Related to but distinct from Scaleless Head (confirmed separate mutations).",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Migraine",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Possibly linked to Splatter (unconfirmed).",
+      "yearDiscovered": "2016",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Mocha",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Latte"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Mojave",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Blue-Eyed Leucistic",
+      "aliases": [],
+      "shorthand": [
+        "Moj"
+      ],
+      "healthFlags": [],
+      "notes": "Only one wild Mojave has ever been found; all captive Mojaves descend from that single animal.",
+      "yearDiscovered": "2000",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Monarch",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Suspected allelic to Ultramel (per breeder Rance Meier).",
+      "yearDiscovered": "2009",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Monsoon",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Fractal"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Possibly same gene as Moray (disputed).",
+      "yearDiscovered": "2013",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Moray",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Possibly same gene as Monsoon (disputed).",
+      "yearDiscovered": "2017",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Mordor",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Mosaic",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2015",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Motley",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Mystic",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Suspected Phantom"
+      ],
+      "shorthand": [
+        "Mys"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2005",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Nanny",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Carnage"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "In 2023 some sellers attempted rebranding as 'Carnage', largely rejected by the community.",
+      "yearDiscovered": "2011",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Nico",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Wild Type",
+        "Classic",
+        "Royal Python"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "~70 million years ago",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Nova",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Nr Mandarin",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Nuyten Reptiles Mandarin"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Nyala",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Odium",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "OFY",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Orange Fire Yellow"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Orange Crush",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Orange Dream",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Orange Dream",
+      "aliases": [],
+      "shorthand": [
+        "OD"
+      ],
+      "healthFlags": [],
+      "notes": "Single-gene animals can look brighter/more orange than supers, historically causing misidentification.",
+      "yearDiscovered": "2004",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Orange Ghost",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Related to Graziani Hypo, Ghost, Blue Ghost, Green Ghost, Bell, Butterscotch, Citrus Hypo.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Orbit",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Oriole",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Paint",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Reclassified to Recessive (Dec 2019).",
+      "yearDiscovered": "2008",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Panther",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2004",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Paradox",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Mosaic",
+        "Chimera"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Not heritable in the traditional sense. Arises from somatic mutation or embryo fusion.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Pastel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Pastel",
+      "aliases": [
+        "Type 2 Jungle"
+      ],
+      "shorthand": [
+        "PS",
+        "P"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1994",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Patternless",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2002",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Peach",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2007",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Phantom",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Blue-Eyed Leucistic",
+      "aliases": [
+        "Suspected Mystic"
+      ],
+      "shorthand": [
+        "Phan"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2005",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Phenomenon",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Piebald",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Pied"
+      ],
+      "shorthand": [
+        "Pied",
+        "Pb"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1997",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Pinstripe",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Pin"
+      ],
+      "shorthand": [
+        "Pin"
+      ],
+      "healthFlags": [],
+      "notes": "Only one wild Pinstripe ever found; all hobby animals descend from that single specimen.",
+      "yearDiscovered": "2001",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Pixel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "J2"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Super Pixel proven in 2020 (14 years after project start). Do not confuse with Granite gene.",
+      "yearDiscovered": "2016",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Puzzle",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Puz"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "2011",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Quake",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Rain",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Amber"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Rainbow",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Unrelated to the combo 'Rainbow Banana' — shared name only.",
+      "yearDiscovered": "2015",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "RAR",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2017",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Raven",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Super Raven pairing produced runt twins that died; not successfully established.",
+      "yearDiscovered": "2011",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Razor",
+      "geneType": "incomplete_dominant",
+      "complex": "8 Ball Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Allelic to Black Pastel; combining the two produces 'Black Razor' (black snake with silver dorsal stripe).",
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Reaper",
+      "geneType": "incomplete_dominant",
+      "complex": "Granite Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Buchman line Granite"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "RECO",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "RECO Anerythristic"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Unusual sex-linked-style inheritance pattern, still being studied.",
+      "yearDiscovered": "2011",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Red Gene",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Red Stripe",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "RS"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common"
+    },
+    {
+      "geneName": "Redhead",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Envy"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Rhino",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2017",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Ringer",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Frequently confused with the separate Ringer Mark trait.",
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Ringer Mark",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Never proven to be a reliably inherited trait on its own; distinct from the Ringer gene.",
+      "yearDiscovered": null,
+      "rarity": null
+    },
+    {
+      "geneName": "Russo",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": "White Diamond",
+      "aliases": [
+        "Lemon Het Leucistic",
+        "Het White Diamond",
+        "Lemon Ball"
+      ],
+      "shorthand": [
+        "Rus"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1998",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Saar",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Suspected allelic to Chocolate (8 Ball Complex).",
+      "yearDiscovered": "2016",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Sable",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Super Sable",
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [
+        "wobble"
+      ],
+      "notes": "Super Sable displays a wobble. Sable x Spider combinations difficult to hatch and show severe wobble.",
+      "yearDiscovered": "2002",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Sahara",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Sandblast",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Sandstorm",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2019",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Sapphire",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Satin",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Scaleless Head",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Related to but distinct from Microscale (confirmed separate mutation).",
+      "yearDiscovered": "2010",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Scrambler",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Sentinel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Not listed in Morphpedia. Inheritance carried over from the legacy lab gene list and is UNVERIFIED. Recordable in the breeder app; not offered as a lab test.",
+      "yearDiscovered": null,
+      "rarity": null
+    },
+    {
+      "geneName": "Shadow",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Shatter",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Sherg",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Shrapnel",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Shredder",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Smuggler",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Spark",
+      "geneType": "incomplete_dominant",
+      "complex": "Super Stripe Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Part of the Yellow Belly allelic series.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Special",
+      "geneType": "incomplete_dominant",
+      "complex": "BEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Spec"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common"
+    },
+    {
+      "geneName": "Specter",
+      "geneType": "incomplete_dominant",
+      "complex": "Super Stripe Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Whirlwind"
+      ],
+      "shorthand": [
+        "Spc"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Spider",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Bee"
+      ],
+      "shorthand": [
+        "Spi"
+      ],
+      "healthFlags": [
+        "wobble",
+        "lethal_super"
+      ],
+      "notes": "Documented light-to-severe neurological wobble. Super Spider is LETHAL. Some expos have banned sale.",
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Splash",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2007",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Splatter",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Complex genetics still being studied. Possibly linked to Migraine (unconfirmed).",
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Spotnose",
+      "geneType": "incomplete_dominant",
+      "complex": "Spider Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Powerball",
+      "aliases": [],
+      "shorthand": [
+        "SN"
+      ],
+      "healthFlags": [
+        "wobble"
+      ],
+      "notes": "Super Spotnose (Powerball) tends to show a wobble. Spotnose combined with Champagne or Spider shows severe wobble.",
+      "yearDiscovered": "2001",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Static",
+      "geneType": "dominant",
+      "complex": "Acid Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Stranger",
+      "geneType": "incomplete_dominant",
+      "complex": "Mahogany Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Corrected: Incomplete Dominant (NOT recessive — error from early databases).",
+      "yearDiscovered": "2012",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Striker",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Sugar",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": null
+    },
+    {
+      "geneName": "Sulfur",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [
+        "Ember"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Sunrise",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Not to be confused with the recessive 'Sunset' morph.",
+      "yearDiscovered": "2010",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Sunset",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Reclassified from Incomplete Dominant to Recessive (Dec 2019).",
+      "yearDiscovered": "2012",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Surge",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Taronja",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "The Darkling",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Tornado",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2019",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Tri-stripe",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Reclassified Recessive Dec 2020.",
+      "yearDiscovered": null,
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Trick",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [
+        "Hurricane",
+        "Blitz"
+      ],
+      "shorthand": [],
+      "healthFlags": [],
+      "equivalentNames": [
+        "Hurricane",
+        "Blitz"
+      ],
+      "notes": "Trick, Hurricane and Blitz are genetically identical; the lab test cannot tell them apart. Any of the three may be used as the label.",
+      "yearDiscovered": "2006",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Trident",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2012",
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Trojan",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Twister",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average"
+    },
+    {
+      "geneName": "Typhoon",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Ultramel",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "UM"
+      ],
+      "healthFlags": [],
+      "notes": "Caused by TYRP1 gene variants.",
+      "yearDiscovered": "~1995",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Vanilla",
+      "geneType": "incomplete_dominant",
+      "complex": "BlkEL Complex",
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [
+        "Van"
+      ],
+      "healthFlags": [],
+      "notes": "Subtle trait, easily confused with Normal or Fire.",
+      "yearDiscovered": null,
+      "rarity": "common"
+    },
+    {
+      "geneName": "Vesper",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1995",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Volta",
+      "geneType": "locality",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Geographic locality population (Volta region, Ghana/Togo), not a mutation. Notable for large clutch sizes and large adult size.",
+      "yearDiscovered": null,
+      "rarity": "lower"
+    },
+    {
+      "geneName": "Vudoo",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2018",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Web",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Whitewash",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Legitimacy as true genetic recessive is debated/unconfirmed.",
+      "yearDiscovered": "2008",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Woma",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": "Pearl",
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [
+        "wobble"
+      ],
+      "notes": "Documented genetic wobble varying from almost unnoticeable to apparent. Super Woma (Pearl) produced by NERD in 2000.",
+      "yearDiscovered": "2000",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Wookie",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": true,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Proved incomplete-dominant by Josh Jensen, 2022.",
+      "yearDiscovered": "2013",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Wrecking Ball",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2010",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "X-treme Gene",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2009",
+      "rarity": "average"
+    },
+    {
+      "geneName": "X-tremist",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Originated from X-treme Gene stock but proven a distinct gene.",
+      "yearDiscovered": "2013",
+      "rarity": "average"
+    },
+    {
+      "geneName": "Yellow Belly",
+      "geneType": "incomplete_dominant",
+      "complex": "Super Stripe Complex",
+      "hasSuperForm": true,
+      "superGeneName": "Ivory",
+      "aliases": [
+        "YB"
+      ],
+      "shorthand": [
+        "YB"
+      ],
+      "healthFlags": [],
+      "yearDiscovered": "1999",
+      "rarity": "common"
+    },
+    {
+      "geneName": "Zebra",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Originally misidentified as Incomplete Dominant before being proven recessive.",
+      "yearDiscovered": "2015",
+      "rarity": "higher"
+    },
+    {
+      "geneName": "Zip Belly",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "notes": "Connected to Microscale mutation (only observed on Microscale animals so far).",
+      "yearDiscovered": "2017",
+      "rarity": "rarest"
+    },
+    {
+      "geneName": "Zuwadi",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "rarest"
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "210 Hypo",
+      "Albino",
+      "Atomic",
+      "Axanthic (GCR)",
+      "Axanthic (Jolliff)",
+      "Axanthic (MJ)",
+      "Axanthic (TSK)",
+      "Axanthic (VPI)",
+      "Bengal",
+      "Black Axanthic",
+      "Black Lace",
+      "Candy",
+      "Caramel Albino",
+      "Clown",
+      "Cryptic",
+      "Desert Ghost",
+      "Enhancer",
+      "Genetic Stripe",
+      "Ghost (Vesper)",
+      "Hypo",
+      "Lavender Albino",
+      "Maple",
+      "Metal Flake",
+      "Migraine",
+      "Monarch",
+      "Monsoon",
+      "Moray",
+      "Orange Crush",
+      "Orange Ghost",
+      "Paint",
+      "Patternless",
+      "Piebald",
+      "Puzzle",
+      "Rainbow",
+      "Sahara",
+      "Sandstorm",
+      "Sunset",
+      "Tornado",
+      "Tri-stripe",
+      "Ultramel",
+      "Whitewash",
+      "Zebra"
+    ],
+    "incompleteDominantGenes": [
+      "Acid",
+      "Ajax",
+      "Alloy",
+      "Ambush",
+      "Arcane",
+      "Arid",
+      "Arroyo",
+      "Asphalt",
+      "Astro",
+      "Bald",
+      "Bambino",
+      "Bamboo",
+      "Banana",
+      "Bang",
+      "Black Head",
+      "Black Pastel",
+      "Blade",
+      "Bongo",
+      "Butter",
+      "Cafe",
+      "Calico",
+      "Carbon",
+      "Carnivore",
+      "Champagne",
+      "Chino",
+      "Chocolate",
+      "Cinder",
+      "Cinnamon",
+      "Circle",
+      "Citron",
+      "Coffee",
+      "Copper",
+      "Creed",
+      "Cypress",
+      "Dark Angel",
+      "Dark Viking",
+      "Diesel",
+      "Disco",
+      "Dot",
+      "EMG",
+      "Enchi",
+      "Epic",
+      "Exo-lbb",
+      "Fire",
+      "Flame",
+      "FNR Vanilla",
+      "Furrow",
+      "Fusion",
+      "Gaia",
+      "Gallium",
+      "GeneX",
+      "GHI",
+      "Glossy",
+      "Gobi",
+      "Granite",
+      "Gravel",
+      "Grim",
+      "Het Red Axanthic",
+      "Hidden Gene Woma",
+      "Hieroglyphic",
+      "High Intensity OD",
+      "High Orange Gene",
+      "Honey",
+      "Huffman",
+      "Hydra",
+      "Jaguar",
+      "Java",
+      "Jedi",
+      "Jolliff Tiger",
+      "Jolt",
+      "Joppa",
+      "Jungle Woma",
+      "Kosmos",
+      "KRG",
+      "Lace",
+      "LC Black Magic",
+      "Lemonback",
+      "Lesser",
+      "Mahogany",
+      "Mario",
+      "Marvel",
+      "Mckenzie",
+      "Melt",
+      "Microscale",
+      "Mocha",
+      "Mojave",
+      "Mosaic",
+      "Motley",
+      "Mystic",
+      "Nanny",
+      "Nico",
+      "Nr Mandarin",
+      "Nyala",
+      "Odium",
+      "OFY",
+      "Orange Dream",
+      "Orbit",
+      "Panther",
+      "Pastel",
+      "Peach",
+      "Phantom",
+      "Phenomenon",
+      "Pixel",
+      "Quake",
+      "Rain",
+      "RAR",
+      "Raven",
+      "Razor",
+      "Reaper",
+      "Red Gene",
+      "Red Stripe",
+      "Rhino",
+      "Russo",
+      "Saar",
+      "Sable",
+      "Sandblast",
+      "Sapphire",
+      "Satin",
+      "Scaleless Head",
+      "Scrambler",
+      "Sentinel",
+      "Shadow",
+      "Sherg",
+      "Shrapnel",
+      "Shredder",
+      "Smuggler",
+      "Spark",
+      "Special",
+      "Specter",
+      "Spider",
+      "Splatter",
+      "Spotnose",
+      "Stranger",
+      "Striker",
+      "Sugar",
+      "Sulfur",
+      "Surge",
+      "Taronja",
+      "The Darkling",
+      "Trick",
+      "Trident",
+      "Trojan",
+      "Twister",
+      "Vanilla",
+      "Vudoo",
+      "Web",
+      "Woma",
+      "Wookie",
+      "Wrecking Ball",
+      "X-treme Gene",
+      "X-tremist",
+      "Yellow Belly",
+      "Zuwadi"
+    ],
+    "dominantGenes": [
+      "Adder",
+      "AHI",
+      "Ashen",
+      "Black Belly",
+      "Confusion",
+      "Congo",
+      "Desert",
+      "Eramosa",
+      "Frost",
+      "Gold Blush",
+      "Harlequin",
+      "Het Daddy",
+      "Josie",
+      "Leopard",
+      "Mordor",
+      "Nova",
+      "Oriole",
+      "Pinstripe",
+      "Redhead",
+      "Shatter",
+      "Splash",
+      "Static",
+      "Sunrise",
+      "Typhoon",
+      "Vesper",
+      "Zip Belly"
+    ],
+    "polygenicGenes": [
+      "Brown Back",
+      "Fader",
+      "Genetic Black Back",
+      "Genetic Reduced"
+    ],
+    "belComplexGenes": [
+      "Bamboo",
+      "Butter",
+      "Honey",
+      "Lesser",
+      "Mocha",
+      "Mojave",
+      "Mystic",
+      "Phantom",
+      "Russo",
+      "Shredder",
+      "Special",
+      "Het Daddy"
+    ],
+    "blkELComplexGenes": [
+      "Creed",
+      "Disco",
+      "Fire",
+      "Flame",
+      "Lemonback",
+      "Sulfur",
+      "Vanilla"
+    ],
+    "spiderComplexGenes": [
+      "Black Head",
+      "Bongo",
+      "Champagne",
+      "Chocolate",
+      "Cypress",
+      "Hidden Gene Woma",
+      "Sable",
+      "Shadow",
+      "Spider",
+      "Spotnose",
+      "Woma"
+    ],
+    "eightBallComplexGenes": [
+      "Black Pastel",
+      "Cinnamon",
+      "Het Red Axanthic",
+      "Huffman",
+      "Razor"
+    ],
+    "mahoganyComplexGenes": [
+      "Cinder",
+      "Mahogany",
+      "Stranger"
+    ],
+    "superStripeComplexGenes": [
+      "Asphalt",
+      "Gravel",
+      "Spark",
+      "Specter",
+      "Yellow Belly"
+    ],
+    "axanthicLines": [
+      "Axanthic (GCR)",
+      "Axanthic (Jolliff)",
+      "Axanthic (MJ)",
+      "Axanthic (TSK)",
+      "Axanthic (VPI)",
+      "Black Axanthic"
+    ],
+    "acidComplexGenes": [
+      "Acid",
+      "Confusion",
+      "Static"
+    ],
+    "clownComplexGenes": [
+      "Clown",
+      "Cryptic"
+    ],
+    "wobbleGenes": [
+      "Champagne",
+      "Hidden Gene Woma",
+      "Sable",
+      "Spider",
+      "Spotnose",
+      "Woma"
+    ],
+    "lethalSuperGenes": [
+      "Champagne",
+      "Hidden Gene Woma",
+      "Spider"
+    ],
+    "localityGenes": [
+      "Volta"
+    ],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Dinker",
+      "Hybrid",
+      "Normal",
+      "Paradox",
+      "RECO",
+      "Ringer",
+      "Ringer Mark"
+    ]
+  }
+}

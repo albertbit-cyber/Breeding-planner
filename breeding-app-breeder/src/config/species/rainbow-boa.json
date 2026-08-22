@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "rainbow-boa",
+  "speciesName": "Rainbow Boas",
+  "scientificName": "Epicrates cenchria",
+  "genes": [
+    {
+      "geneName": "Albino (Caramel)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Albino (Outback)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2014",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Anery (Seib)",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Anery (Sharp)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Bulls Eye",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Calico",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Candy Stripe",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2011",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Hypo (Lockwood)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1994",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Pied",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2013",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Pinstripe",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Wipeout",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino (Caramel)",
+      "Albino (Outback)",
+      "Anery (Sharp)",
+      "Calico",
+      "Hypo (Lockwood)",
+      "Pied",
+      "Pinstripe"
+    ],
+    "incompleteDominantGenes": [
+      "Candy Stripe"
+    ],
+    "dominantGenes": [],
+    "polygenicGenes": [],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Anery (Seib)",
+      "Bulls Eye",
+      "Wipeout"
+    ]
+  }
+}

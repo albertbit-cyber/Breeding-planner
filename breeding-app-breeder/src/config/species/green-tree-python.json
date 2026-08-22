@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "green-tree-python",
+  "speciesName": "Green Tree Pythons",
+  "scientificName": "Morelia viridis",
+  "genes": [
+    {
+      "geneName": "Aru",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Biak",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Calico",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "High Blue",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1988",
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Jayapura",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Kofiau",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1996",
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "Lereh",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "Manokwari",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Sorong",
+      "geneType": "locality",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Wamena",
+      "geneType": "locality",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [],
+    "incompleteDominantGenes": [],
+    "dominantGenes": [],
+    "polygenicGenes": [
+      "Calico",
+      "High Blue"
+    ],
+    "localityGenes": [
+      "Sorong",
+      "Wamena"
+    ],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Aru",
+      "Biak",
+      "Jayapura",
+      "Kofiau",
+      "Lereh",
+      "Manokwari"
+    ]
+  }
+}

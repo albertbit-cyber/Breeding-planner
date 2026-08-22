@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "chahoua-gecko",
+  "speciesName": "Chahoua Geckos",
+  "scientificName": "Mniarogekko chahoua",
+  "genes": [
+    {
+      "geneName": "High White",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1980s",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Pine Island",
+      "geneType": "locality",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "White Collar",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "White Shoulder",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [],
+    "incompleteDominantGenes": [],
+    "dominantGenes": [],
+    "polygenicGenes": [
+      "High White",
+      "White Collar",
+      "White Shoulder"
+    ],
+    "localityGenes": [
+      "Pine Island"
+    ],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Normal"
+    ]
+  }
+}
