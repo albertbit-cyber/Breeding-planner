@@ -190,6 +190,27 @@ img { max-width: 100%; }
   width: 100%; max-width: 420px; margin: 0 auto;
 }
 
+/* ── Prose (rich-text blocks) ──────────────────────── */
+/* Shared by the legal pages and by any richText block elsewhere on the site.
+   LegalLayout scopes the same rules to .legal-body; these live here because a
+   rich-text block can appear on any page, not only inside that shell. */
+.prose { font-size: 14.5px; line-height: 1.75; color: #3a3630; }
+.prose h2 { font-size: 16px; font-weight: 600; color: var(--dark); margin: 2.25rem 0 .6rem; }
+.prose h3 { font-size: 14px; font-weight: 600; color: var(--dark); margin: 1.5rem 0 .4rem; }
+.prose > :first-child { margin-top: 0; }
+.prose p { margin: 0 0 .9rem; }
+.prose ul, .prose ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+.prose li { margin-bottom: .45rem; }
+.prose a { color: var(--gold-dk); }
+.prose strong { font-weight: 600; color: var(--dark); }
+.prose table { width: 100%; border-collapse: collapse; margin: 0 0 1.25rem; font-size: 13.5px; }
+.prose th, .prose td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.prose th { font-weight: 600; color: var(--dark); background: var(--bg); }
+
+/* Unfinished placeholder text — highlighted so it cannot ship unnoticed. */
+.legal-fill { background: #fdf4d8; border-bottom: 1px dashed #c8a840; padding: 0 3px; font-style: italic; }
+.legal-scroll { overflow-x: auto; }
+
 /* ── Spin animation ────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { display: inline-block; animation: spin .8s linear infinite; }
