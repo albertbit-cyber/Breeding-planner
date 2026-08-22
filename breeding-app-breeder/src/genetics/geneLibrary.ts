@@ -1,35 +1,114 @@
 import { MorphType } from "../types/pairing";
-import { getDefaultGeneAliasRows } from "./geneDatabase";
+import {
+  getActiveSpeciesId,
+  getAllGenes,
+  getDefaultGeneAliasRows,
+  getGeneDatabaseGeneration,
+} from "./geneDatabase";
+import { DEFAULT_SPECIES_ID } from "./speciesRegistry";
 
-export const GENE_GROUPS: Record<string, string[]> = {
-  Recessive: [
-    "210 Hypo","Albino","Atomic","Axanthic","Axanthic (GCR)","Axanthic (Jolliff)","Axanthic (MJ)","Axanthic (TSK)","Axanthic (VPI)",
-    "Bengal","Black Axanthic","Black Lace","Candy","Caramel Albino","Clown","Cryptic","Desert Ghost","Enhancer","Genetic Stripe",
-    "Ghost (Vesper)","Hypo","Lavender Albino","Maple","Metal Flake","Migraine","Monarch","Monsoon","Moray","Orange Crush",
-    "Orange Ghost","Paint","Patternless","Piebald","Puzzle","Rainbow","Sahara","Sandstorm","Sunset","Tornado","Tri-stripe",
-    "Ultramel","Whitewash","Zebra"
-  ],
-  "Incomplete Dominant": [
-    "Acid","Ajax","Alloy","Ambush","Arcane","Arroyo","Asphalt","Astro","Bald","Bambino","Bamboo","Banana","Bang","Black Head","Black Pastel",
-    "Blade","Bongo","Butter","Cafe","Calico","Carbon","Carnivore","Champagne","Chino","Chocolate","Cinder","Cinnamon","Circle","Citron",
-    "Coffee","Copper","Creed","Cypress","Dark Viking","Diesel","Disco","Dot","EMG","Enchi","Epic","Exo-lbb","Fire","Flame","FNR Vanilla",
-    "Furrow","Fusion","Gaia","Gallium","GeneX","GHI","Glossy","Gobi","Granite","Gravel","Grim","Het Red Axanthic","Hidden Gene Woma",
-    "Hieroglyphic","High Intensity OD","Honey","Huffman","Hydra","Jaguar","Java","Jedi","Jolliff Tiger","Jolt","Joppa","Jungle Woma","KRG",
-    "Lace","LC Black Magic","Lemonback","Lesser","Mahogany","Mario","Marvel","Mckenzie","Melt","Microscale","Mocha","Mojave","Mosaic","Motley",
-    "Mystic","Nanny","Nico","Nr Mandarin","Nyala","Odium","OFY","Orange Dream","Orbit","Panther","Pastel","Peach","Phantom","Phenomenon",
-    "Pixel","Quake","Rain","RAR","Raven","Razor","Reaper","Red Gene","Red Stripe","Rhino","Russo","Saar","Sable","Sandblast","Sapphire",
-    "Satin","Scaleless Head","Scrambler","Shadow","Sherg","Shrapnel","Shredder","Smuggler","Spark","Special","Specter","Spider","Splatter",
-    "Spotnose","Stranger","Striker","Sugar","Sulfur","Surge","Taronja","The Darkling","Trick","Trident","Trojan","Twister","Vanilla","Vudoo",
-    "Web","Woma","Wookie","Wrecking Ball","X-treme Gene","X-tremist","Yellow Belly","Zuwadi"
-  ],
-  Dominant: [
-    "Adder","AHI","Ashen","Black Belly","Confusion","Congo","Desert","Eramosa","Frost","Gold Blush","Harlequin","Het Daddy","Josie","Leopard",
-    "Mordor","Nova","Oriole","Pinstripe","Redhead","Shatter","Splash","Static","Sunrise","Vesper","Zip Belly"
-  ],
-  Polygenic: ["Brown Back","Fader","Genetic Black Back","Genetic Reduced"],
-  Other: ["Dinker","Hybrid","Normal","Paradox","RECO","Ringer","Ringer Mark"],
-  Locality: ["Volta"],
+/**
+ * Display-group label for each inheritance type in the gene database. Keys match the
+ * labels the UI already renders, so widening the database's GeneType union does not
+ * require touching call sites.
+ */
+const GENE_TYPE_GROUP_LABELS: Record<string, string> = {
+  recessive: 'Recessive',
+  incomplete_dominant: 'Incomplete Dominant',
+  dominant: 'Dominant',
+  polygenic: 'Polygenic',
+  locality: 'Locality',
+  physical: 'Physical',
+  other: 'Other',
 };
+
+/**
+ * Names kept in the picker that are not database entries, per species. Ball python's
+ * 'Axanthic' is a deliberate catch-all: no gene claims it, but keepers routinely record an
+ * axanthic animal without knowing which of the five lines it carries. Dropping it would
+ * stop that token resolving, so it stays until the line is identified.
+ *
+ * Scoped per species on purpose -- a catch-all only makes sense where the species actually
+ * has lines to be uncertain between, and inventing one elsewhere would offer keepers a gene
+ * their animals cannot carry.
+ */
+const UNRESOLVED_CATCH_ALL_GENES: Record<string, Record<string, string>> = {
+  [DEFAULT_SPECIES_ID]: { Axanthic: 'Recessive' },
+};
+
+/**
+ * Derived from the gene database rather than hand-maintained. The previous hardcoded
+ * list had drifted five genes behind it -- Arid, Dark Angel, High Orange Gene, Kosmos
+ * and Typhoon existed in the database but were unreachable from autocomplete and gene
+ * name matching, because both read this list rather than the database.
+ */
+function buildGeneGroups(): Record<string, string[]> {
+  const groups: Record<string, string[]> = {};
+  const catchAlls = UNRESOLVED_CATCH_ALL_GENES[getActiveSpeciesId()] || {};
+  Object.values(GENE_TYPE_GROUP_LABELS).forEach((label) => {
+    groups[label] = [];
+  });
+
+  getAllGenes().forEach((gene) => {
+    const label = GENE_TYPE_GROUP_LABELS[gene.geneType];
+    if (!label) return;
+    groups[label].push(gene.geneName);
+  });
+
+  Object.entries(catchAlls).forEach(([name, label]) => {
+    if (!groups[label] || groups[label].includes(name)) return;
+    groups[label].push(name);
+  });
+
+  Object.keys(groups).forEach((label) => {
+    if (groups[label].length) groups[label].sort((a, b) => a.localeCompare(b));
+    else delete groups[label];
+  });
+
+  return groups;
+}
+
+/**
+ * Everything derived from the gene database, rebuilt when the active species changes.
+ * These used to be module-level consts evaluated once at import; with more than one species
+ * that would pin the whole app to whichever species happened to be active at load time.
+ */
+type DerivedGeneTables = {
+  groups: Record<string, string[]>;
+  aliases: Record<string, string>;
+  groupLookup: Map<string, string>;
+};
+
+let derivedCache: DerivedGeneTables | null = null;
+let derivedGeneration = -1;
+
+function derived(): DerivedGeneTables {
+  const generation = getGeneDatabaseGeneration();
+  if (derivedCache && derivedGeneration === generation) return derivedCache;
+
+  const groups = buildGeneGroups();
+  const groupLookup = new Map<string, string>();
+  Object.entries(groups).forEach(([group, genes]) => {
+    genes.forEach((gene) => {
+      if (!gene) return;
+      groupLookup.set(String(gene).trim().toLowerCase(), group);
+    });
+  });
+
+  derivedCache = { groups, aliases: buildLegacyGeneAliases(), groupLookup };
+  derivedGeneration = generation;
+  return derivedCache;
+}
+
+/** Gene names by display group for the active species. */
+export function getGeneGroups(): Record<string, string[]> {
+  return derived().groups;
+}
+
+/** Alias/shorthand -> canonical gene name for the active species. */
+export function getGeneAliases(): Record<string, string> {
+  return derived().aliases;
+}
 
 export const PRIMARY_GENE_GROUPS = ["Recessive", "Incomplete Dominant", "Dominant", "Other"] as const;
 
@@ -56,19 +135,6 @@ function buildLegacyGeneAliases(): Record<string, string> {
   });
   return out;
 }
-
-export const GENE_ALIASES: Record<string, string> = buildLegacyGeneAliases();
-
-const RAW_GENE_GROUP_LOOKUP: Map<string, string> = (() => {
-  const map = new Map<string, string>();
-  Object.entries(GENE_GROUPS).forEach(([group, genes]) => {
-    genes.forEach((gene) => {
-      if (!gene) return;
-      map.set(String(gene).trim().toLowerCase(), group);
-    });
-  });
-  return map;
-})();
 
 export function normalizeGeneCandidate(raw: unknown): string {
   if (!raw) return "";
@@ -101,7 +167,9 @@ export function getGeneGroupFromDatabase(rawGene: unknown): string | null {
   const camelSuper = noParens.match(/^super([A-Z].*)$/);
   if (camelSuper && camelSuper[1]) enqueue(camelSuper[1]);
 
-  const aliasExpanded = GENE_ALIASES[noParens.toLowerCase()];
+  const { aliases: geneAliases, groupLookup } = derived();
+
+  const aliasExpanded = geneAliases[noParens.toLowerCase()];
   if (aliasExpanded) enqueue(aliasExpanded);
 
   const axanthicVariant = original.match(/^\s*axanthic\s*\(([^)]+)\)/i);
@@ -140,14 +208,14 @@ export function getGeneGroupFromDatabase(rawGene: unknown): string | null {
   if (stripPercent && stripPercent !== stripLeadingHet) enqueue(stripPercent);
 
   for (const candidate of seen) {
-    const alias = GENE_ALIASES[candidate];
+    const alias = geneAliases[candidate];
     if (alias) enqueue(alias);
   }
 
   for (const candidate of seen) {
     const key = normalizeGeneCandidate(candidate);
-    if (RAW_GENE_GROUP_LOOKUP.has(key)) {
-      return RAW_GENE_GROUP_LOOKUP.get(key) || null;
+    if (groupLookup.has(key)) {
+      return groupLookup.get(key) || null;
     }
   }
   return null;
