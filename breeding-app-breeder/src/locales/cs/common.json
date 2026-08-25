@@ -758,7 +758,6 @@
   "export.pairingsSheetName": "Pareni",
   "export.errors.selectField": "P?ed exportem vyberte alespo? jedno pole.",
   "export.errors.noAnimals": "Nejsou k dispozici zadna zvirata k exportu.",
-  "export.errors.noSaleAnimals": "Nebyla nalezena zadna zvirata oznacena k prodeji.",
   "export.errors.noPairings": "Nejsou k dispozici zadne chovne projekty k exportu.",
   "export.feedback.animalsPdf": "{{count}} Tiere als PDF exportiert.",
   "export.feedback.animalsPdfFailed": "Tierexport als PDF fehlgeschlagen.",

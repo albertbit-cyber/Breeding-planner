@@ -15013,13 +15013,143 @@ function drawCatalogImagePlaceholder(doc, x, y, width, height) {
   doc.text('No Image', x + (width / 2), y + (height / 2), { align: 'center', baseline: 'middle' });
 }
 
-async function generateSnakeCatalogPDF(animals = []) {
+// Every catalog page shares one format. The animal pages used to be added as A4
+// while the first page was A5, so everything after the first page was drawn into
+// the top-left corner of a larger sheet.
+const CATALOG_PAGE_FORMAT = 'a5';
+const CATALOG_PAGE_ORIENTATION = 'landscape';
+const CATALOG_FILENAME_MAX_TOKENS = 3;
+
+function catalogFileToken(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Names the file after the groups or tags it was built from, so a breeder
+// catalog and a for-sale catalog exported on the same day don't overwrite each
+// other in the download folder. Long selections keep the first few names and
+// count the rest rather than growing an unusable filename.
+function buildCatalogFileName(labels = [], dateLike = new Date()) {
+  const stamp = new Date(dateLike).toISOString().slice(0, 10);
+  const tokens = (Array.isArray(labels) ? labels : []).map(catalogFileToken).filter(Boolean);
+  if (!tokens.length) return `snake-catalog-${stamp}.pdf`;
+  const shown = tokens.slice(0, CATALOG_FILENAME_MAX_TOKENS);
+  const overflow = tokens.length - shown.length;
+  const suffix = overflow > 0 ? `-plus-${overflow}` : '';
+  return `snake-catalog-${shown.join('-')}${suffix}-${stamp}.pdf`;
+}
+
+async function drawCatalogCoverPage(doc, { breederInfo = {}, title = '', subtitle = '' } = {}) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+
+  doc.setFillColor(244, 244, 244);
+  doc.rect(0, 0, pageW, pageH, 'F');
+
+  const centerX = pageW / 2;
+  let cursorY = margin + 6;
+
+  const logoSrc = typeof breederInfo?.logoUrl === 'string' ? breederInfo.logoUrl.trim() : '';
+  if (logoSrc) {
+    try {
+      const image = await loadImageElement(logoSrc);
+      const naturalW = Number(image.naturalWidth || image.width || 0);
+      const naturalH = Number(image.naturalHeight || image.height || 0);
+      if (naturalW > 0 && naturalH > 0) {
+        const scale = Math.min(70 / naturalW, 26 / naturalH);
+        const drawW = naturalW * scale;
+        const drawH = naturalH * scale;
+        doc.addImage(logoSrc, 'PNG', centerX - (drawW / 2), cursorY, drawW, drawH);
+        cursorY += drawH + 8;
+      }
+    } catch (err) {
+      // A broken or cross-origin logo shouldn't cost the breeder the catalog.
+      console.warn('Catalog cover logo could not be drawn', err);
+    }
+  }
+
+  const businessName = String(breederInfo?.businessName || '').trim();
+  const personName = String(breederInfo?.name || '').trim();
+  const headline = businessName || personName;
+  if (headline) {
+    setPdfFont(doc, 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(24, 24, 24);
+    const headlineLines = doc.splitTextToSize(headline, pageW - (margin * 2));
+    doc.text(headlineLines, centerX, cursorY, { align: 'center' });
+    cursorY += (headlineLines.length * 8);
+  }
+  if (businessName && personName && personName !== businessName) {
+    setPdfFont(doc, 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(90, 90, 90);
+    doc.text(personName, centerX, cursorY + 1, { align: 'center' });
+    cursorY += 8;
+  }
+
+  cursorY += 4;
+  doc.setDrawColor(190, 195, 201);
+  doc.setLineWidth(0.5);
+  doc.line(margin + 10, cursorY, pageW - margin - 10, cursorY);
+  cursorY += 12;
+
+  if (title) {
+    setPdfFont(doc, 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(28, 28, 28);
+    const titleLines = doc.splitTextToSize(title, pageW - (margin * 2));
+    doc.text(titleLines, centerX, cursorY, { align: 'center' });
+    cursorY += (titleLines.length * 7.5);
+  }
+  if (subtitle) {
+    setPdfFont(doc, 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(90, 90, 90);
+    const subtitleLines = doc.splitTextToSize(subtitle, pageW - (margin * 2));
+    doc.text(subtitleLines, centerX, cursorY + 2, { align: 'center' });
+  }
+
+  // Contact details sit on the bottom margin so the block stays put whatever the
+  // logo and title above it took up.
+  const cityLine = [breederInfo?.postalCode, breederInfo?.city]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  const contactLine = [breederInfo?.email, breederInfo?.phone]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join('  •  ');
+  const addressLine = [breederInfo?.street, cityLine, breederInfo?.country]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(', ');
+  const footerLines = [contactLine, addressLine].filter(Boolean);
+  if (footerLines.length) {
+    setPdfFont(doc, 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(110, 110, 110);
+    let footerY = pageH - margin - ((footerLines.length - 1) * 5);
+    footerLines.forEach((line) => {
+      doc.text(line, centerX, footerY, { align: 'center' });
+      footerY += 5;
+    });
+  }
+}
+
+async function generateSnakeCatalogPDF(animals = [], options = {}) {
   if (!Array.isArray(animals) || !animals.length) {
     throw new Error('No animals available for catalog generation.');
   }
 
+  const { breederInfo = null, coverTitle = '', coverSubtitle = '', fileName = '' } = options;
+
   const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
+  const doc = new jsPDF({ orientation: CATALOG_PAGE_ORIENTATION, unit: 'mm', format: CATALOG_PAGE_FORMAT });
   await applyPdfUnicodeFont(doc);
 
   const pageW = doc.internal.pageSize.getWidth();
@@ -15038,9 +15168,14 @@ async function generateSnakeCatalogPDF(animals = []) {
   const imageW = imageColumnW;
   const imageH = contentH;
 
+  const hasCover = Boolean(breederInfo || coverTitle || coverSubtitle);
+  if (hasCover) {
+    await drawCatalogCoverPage(doc, { breederInfo: breederInfo || {}, title: coverTitle, subtitle: coverSubtitle });
+  }
+
   for (let index = 0; index < animals.length; index += 1) {
-    if (index > 0) {
-      doc.addPage('a4', 'landscape');
+    if (index > 0 || hasCover) {
+      doc.addPage(CATALOG_PAGE_FORMAT, CATALOG_PAGE_ORIENTATION);
     }
 
     const animal = animals[index] || {};
@@ -15103,7 +15238,7 @@ async function generateSnakeCatalogPDF(animals = []) {
     if (hasPairing) drawField('PAIRING', String(pairingRaw).trim());
   }
 
-  doc.save(`snake-catalog-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(fileName || buildCatalogFileName([]));
 }
 
 async function exportQrToPdf(snakesToExport, breederInfo = {}) {
@@ -17516,6 +17651,9 @@ function BreederSection({
   // Which animals the Animals export covers: everything, a set of groups, a set
   // of tags, or a hand-picked list.
   const [animalExportScope, setAnimalExportScope] = useState({ mode: 'all', groups: [], tags: [], ids: [] });
+  // The catalog used to force the for-sale rule on top of that scope, so a
+  // catalog of, say, every breeder was impossible to ask for. It is a choice now.
+  const [catalogOnlyForSale, setCatalogOnlyForSale] = useState(true);
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
@@ -17581,6 +17719,19 @@ function BreederSection({
 
   const animalScopeIsNarrowed = animalExportScope.mode !== 'all';
   const hasAnimalsInScope = animalsToExport.length > 0;
+
+  // Groups and tags give the catalog its name; a hand-picked or whole-collection
+  // scope has no name of its own to borrow.
+  const catalogScopeLabels = useMemo(() => {
+    if (animalExportScope.mode === 'groups') return animalExportScope.groups.filter(Boolean);
+    if (animalExportScope.mode === 'tags') return animalExportScope.tags.filter(Boolean);
+    return [];
+  }, [animalExportScope]);
+
+  const catalogAnimals = useMemo(
+    () => (catalogOnlyForSale ? animalsToExport.filter(snake => isSnakeTaggedForSell(snake)) : animalsToExport),
+    [animalsToExport, catalogOnlyForSale]
+  );
 
   const setAnimalScopeMode = useCallback((mode) => {
     setAnimalExportScope(prev => ({ ...prev, mode }));
@@ -18487,10 +18638,24 @@ function BreederSection({
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     try {
       // Pairing lookups still use the full collection; only the catalog's own
-      // rows are narrowed, and the for-sale rule still applies on top.
+      // rows follow the export scope.
       const pairingsBySnakeId = groupPairingsBySnake(pairings, makeSnakeMap(snakes));
-      const forSaleAnimals = (Array.isArray(animalsToExport) ? animalsToExport : [])
-        .filter((snake) => isSnakeTaggedForSell(snake))
+      const scopedAnimals = Array.isArray(animalsToExport) ? animalsToExport.filter(Boolean) : [];
+      if (!scopedAnimals.length) {
+        throw new Error(t('export.errors.noAnimalsInScope', { defaultValue: 'Nothing selected — pick at least one animal to put in the catalog.' }));
+      }
+
+      const selectedAnimals = catalogOnlyForSale
+        ? scopedAnimals.filter((snake) => isSnakeTaggedForSell(snake))
+        : scopedAnimals;
+      if (!selectedAnimals.length) {
+        throw new Error(t('export.errors.noSaleAnimalsInScope', {
+          defaultValue: 'None of the {{count}} selected animals are marked for sale. Untick "Only animals marked for sale" to include them.',
+          count: scopedAnimals.length,
+        }));
+      }
+
+      const catalogRows = selectedAnimals
         .sort((a, b) => collator.compare(String(a?.id || ''), String(b?.id || '')))
         .map((snake) => {
           const linkedPairings = pairingsBySnakeId.get(snake.id) || [];
@@ -18503,14 +18668,29 @@ function BreederSection({
           };
         });
 
-      if (!forSaleAnimals.length) {
-        throw new Error(t('export.errors.noSaleAnimals', { defaultValue: 'No animals marked for sale were found.' }));
-      }
+      const scopeLabels = Array.isArray(catalogScopeLabels) ? catalogScopeLabels : [];
+      const coverTitle = scopeLabels.length
+        ? scopeLabels.join(' • ')
+        : (catalogOnlyForSale
+          ? t('export.catalog.titleForSale', { defaultValue: 'Available animals' })
+          : t('export.catalog.titleCollection', { defaultValue: 'Collection' }));
+      const coverSubtitle = [
+        t('export.catalog.animalCount', { defaultValue: '{{count}} animals', count: catalogRows.length }),
+        catalogOnlyForSale && scopeLabels.length
+          ? t('export.catalog.forSaleOnly', { defaultValue: 'For sale' })
+          : '',
+        formatDateForDisplay(timestamp.slice(0, 10)),
+      ].filter(Boolean).join('  •  ');
 
-      await generateSnakeCatalogPDF(forSaleAnimals);
+      await generateSnakeCatalogPDF(catalogRows, {
+        breederInfo: info,
+        coverTitle,
+        coverSubtitle,
+        fileName: buildCatalogFileName(scopeLabels),
+      });
       setExportFeedback({
         type: 'success',
-        message: t('export.feedback.catalogGenerated', { defaultValue: 'Generated snake catalog ({{count}} pages).', count: forSaleAnimals.length }),
+        message: t('export.feedback.catalogGenerated', { defaultValue: 'Generated snake catalog ({{count}} pages).', count: catalogRows.length }),
         context: 'animals',
         timestamp,
       });
@@ -18523,7 +18703,7 @@ function BreederSection({
         timestamp,
       });
     }
-  }, [animalsToExport, pairings, setExportFeedback, snakes, t]);
+  }, [animalsToExport, catalogOnlyForSale, catalogScopeLabels, info, pairings, setExportFeedback, snakes, t]);
 
   const handlePairingsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
@@ -20190,6 +20370,24 @@ function BreederSection({
                         {t('export.scope.reset', { defaultValue: 'Back to all animals' })}
                       </button>
                     )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 border-t pt-2">
+                    <label className="inline-flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={catalogOnlyForSale}
+                        onChange={() => setCatalogOnlyForSale(value => !value)}
+                      />
+                      <span>{t('export.catalog.onlyForSale', { defaultValue: 'Catalog: only animals marked for sale' })}</span>
+                    </label>
+                    <span className="text-[11px] text-neutral-500">
+                      {t('export.catalog.willContain', {
+                        defaultValue: 'Catalog will contain {{count}} of {{total}} selected animals.',
+                        count: catalogAnimals.length,
+                        total: animalsToExport.length,
+                      })}
+                    </span>
                   </div>
                 </div>
 
