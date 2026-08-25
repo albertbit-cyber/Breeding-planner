@@ -794,7 +794,6 @@
   "export.pairingsSheetName": "זיווגים",
   "export.errors.selectField": "בחר לפחות שדה אחד לפני הייצוא.",
   "export.errors.noAnimals": "אין חיות זמינות לייצוא.",
-  "export.errors.noSaleAnimals": "לא נמצאו חיות שסומנו למכירה.",
   "export.errors.noPairings": "אין פרויקטי רבייה זמינים לייצוא.",
   "export.feedback.animalsPdf": "יוצאו {{count}} חיות ל-PDF.",
   "export.feedback.animalsPdfFailed": "ייצוא החיות ל-PDF נכשל.",

@@ -722,7 +722,6 @@
   "export.pairingsSheetName": "Emparelhamentos",
   "export.errors.selectField": "Selecione pelo menos um campo antes de exportar.",
   "export.errors.noAnimals": "N?o h? animais dispon?veis para exportar.",
-  "export.errors.noSaleAnimals": "Nenhum animal marcado para venda foi encontrado.",
   "export.errors.noPairings": "Nao ha projetos de reproducao disponiveis para exportar.",
   "export.feedback.animalsPdf": "{{count}} animales exportados a PDF.",
   "export.feedback.animalsPdfFailed": "No se pudieron exportar los animales a PDF.",
