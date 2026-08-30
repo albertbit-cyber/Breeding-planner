@@ -7,6 +7,7 @@ import ViewTabs from './components/ViewTabs';
 import StatsBar from './components/StatsBar';
 import { buildTreeGraph } from './utils/buildTreeGraph';
 import './familyTree.css';
+import { splitPairLabel } from '../animals/parentage';
 
 const ComingSoonCanvas = ({ label }) => (
   <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-violet-50/40">
@@ -86,10 +87,30 @@ const parseParentNamesFromAnimalName = (name) => {
     working = working.slice(0, trailingIndex.index).trim();
   }
 
+  // Dam first, sire second. That is how the hatch wizard names a hatchling
+  // (`${dam.name} x ${sire.name}`) and how buildClutchId orders a clutch id, and it is the rule
+  // the animal editor's parentage pickers use. This read the FIRST half as the sire, which
+  // swapped sire and dam on every name-inferred animal in the tree -- and then handed the
+  // swapped pair to buildClutchId, so the reconstructed clutch id came back reversed too.
+  //
+  // The canonical split lives in features/animals/parentage so the tree and the editor cannot
+  // drift apart again. The looser matching below is kept as a fallback: it catches shapes the
+  // strict split deliberately refuses, and dropping it would narrow what the tree can infer.
+  const canonical = splitPairLabel(working);
+  if (canonical) {
+    return {
+      sireName: canonical.sireName,
+      damName: canonical.damName,
+      hatchYear,
+      hatchlingIndex,
+      clutchId: buildClutchId(canonical.damName, canonical.sireName, hatchYear),
+    };
+  }
+
   const delimiterMatch = working.match(/\s+[xX]\s+|\s*X\s*/);
   if (delimiterMatch) {
-    const sireName = working.slice(0, delimiterMatch.index).trim();
-    const damName = working.slice(delimiterMatch.index + delimiterMatch[0].length).trim();
+    const damName = working.slice(0, delimiterMatch.index).trim();
+    const sireName = working.slice(delimiterMatch.index + delimiterMatch[0].length).trim();
     if (sireName && damName) {
       return {
         sireName,
@@ -103,8 +124,8 @@ const parseParentNamesFromAnimalName = (name) => {
   const parts = text.split(/\s+[xX]\s+|\s*[×✕]\s*/).map((part) => part.trim()).filter(Boolean);
   if (parts.length < 2) return null;
   return {
-    sireName: parts[0],
-    damName: parts[1],
+    damName: parts[0],
+    sireName: parts[1],
   };
 };
 
