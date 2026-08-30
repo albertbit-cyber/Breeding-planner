@@ -99,15 +99,43 @@ This is the mechanism, not polish — since there's no public Lab signup, this i
 - The admin console needs a view of existing vendor orgs (list, suspend/revoke access) — this is the "one vendor, or several" management surface the product owner described; it doesn't exist today since no vendor-org concept exists yet.
 - Explicitly confirm (as a build-time assertion, not just a missing route) that no public `/register`-style path exists anywhere for the Lab Portal — the absence of a signup route is intentional, not an oversight, and should stay that way.
 
+**Status: built 2026-08-30** on `feature/lab-vendor-onboarding`. `organizationInviteService` covers issue / preview / revoke / accept; the acceptance path creates the `Organization`, the owner `Membership`, the `LabAccount` and the lab's own `PricingConfig` in one transaction, gated by a conditional `UPDATE` that makes a token single-use. The invitee sets their own password, so an admin never handles vendor credentials. Admin routes live under `/api/admin/vendor-labs`; the unauthenticated redemption pair is `/api/invites/:token` and `/api/invites/:token/accept`. `assertNoLabSignupRoute` in the Lab Portal's `AuthGate` is the build-time assertion this section asks for — and it was needed: that AuthGate was a copy of the breeder app's and shipped a full public multi-step registration form.
+
+### 3.3a Six decisions taken 2026-08-30
+
+These supersede the open questions left in 3.1–3.4 and 10.5. They were settled with the product owner before implementation:
+
+1. **Breeders choose their laboratory at order time.** Not single-lab, not admin-routed. This makes the Lab side a marketplace: `GET /api/lab/directory` lists laboratories, and everything a breeder sees after choosing one — tests, prices, turnaround — comes from that laboratory.
+2. **Tests are lab-owned, fully.** `LabTestOffering` is what a laboratory sells and the only test data a breeder ever sees. `ShedTestCatalog` is demoted to an optional *seed library* a lab may copy from; it never gates what a lab is allowed to offer, and a lab may define tests that exist in no library. This reverses an earlier proposal for a global-definition/per-lab-offering split, which would have let the platform's catalogue constrain each vendor's product line. **This is the expensive-to-reverse decision of this phase** — it determines the foreign key on every order line.
+3. **Tier pricing is lab-owned.** `PricingConfig` gains an `organizationId`. The row with a null organization is the platform *template* used to seed a new vendor; it is never used to price an order. A laboratory with no pricing of its own fails loudly rather than falling back, because a silent fallback would quote one lab's prices for another lab's work.
+4. **No public Lab Portal signup, ever** (as 3.3 already assumed, now enforced).
+5. **Platform admins read everything and write nothing but the on/off switch.** The only admin write against a vendor tenant is `PATCH /api/admin/vendor-labs/:id/status`, with a mandatory reason. There is deliberately no admin endpoint for a vendor's tests, prices, staff or results — the absence of the route is the control, not a role check inside one.
+6. **The Lab Portal reads server-side, org-scoped data**, not a browser-local store.
+
 ### 3.4 Extend permissions
 
 - Replace flat `actor.id === ownerId` ownership checks with "actor is a member of the resource's organization, with sufficient org role."
 - Extend `requireRole` (currently a global role check) to also accept an org-role check where relevant.
 - Decide the specific permission matrix per org role (`owner`/`admin`/`billing_manager`/`member`) against each existing action (create/edit/delete animal, manage lab orders, manage listings, manage billing, invite members) — this is a product decision to make explicitly before implementation, not something to improvise mid-build.
 
+**Status: built 2026-08-30.** `withOrgContext` loads the actor's membership once per request; `requireOrgRole` / `requireOrgAdmin` gate on it. The matrix settled on: **owner** everything including ownership transfer; **admin** tests, prices, lab profile and staff, but not ownership transfer; **billing_manager** reserved for Phase 2 (lab vendor orgs are not billed, so it currently behaves as a member); **member** read plus the day-to-day order workflow. Personal account settings are available to every member — a technician must be able to change their own password.
+
 ### 3.5 Testing
 
 Add a dedicated **tenant-isolation test suite** — currently the single highest-severity untested bug class this migration can introduce (one org seeing or modifying another org's data). At minimum: for every migrated model, a test asserting a member of Org A cannot read, list, or write a resource owned by Org B, via every route that touches it.
+
+**Status: built 2026-08-30**, four suites, 62 tests:
+
+| Suite | Covers |
+|---|---|
+| `organizationInviteService.test.ts` | issue/preview/revoke/accept, token hashing, single-use, expiry, supersession |
+| `labVendorTenancy.test.ts` | offerings and pricing scoped by organization at the service layer |
+| `orgRoleMatrix.test.ts` | org-role gates, suspension, and the team-management guard rails |
+| `vendorRouteIsolation.test.ts` | two vendors against the live Express stack, every lab-facing route |
+
+The route-level suite is the one that matters most: the original defect was not a missing rule but a rule the routes never asked for. `listOrdersForUser` returned an unfiltered `findMany` to any lab actor, so a second vendor would have read the first's entire order book on day one.
+
+**What this phase did not do.** `LabAccount` is migrated; the ~60 breeder-side owner-scoped models (3.2 step 2) are not. `assertSameOrganization` is now used on the lab surface but the breeder surface still checks `ownerId` directly.
 
 **New entities introduced this phase:** `Organization`, `Membership`, `OrganizationInvite`.
 **Definition of done:** every scoped model has an `organizationId` path; permission checks are org-aware; tenant-isolation tests exist and pass; existing single-user accounts are unaffected (each got an auto-created personal org, zero user-visible change).

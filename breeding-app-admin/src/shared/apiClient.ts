@@ -1157,6 +1157,52 @@ export const updateAdminLabAccount = async (id: string, payload: { status: strin
     body: JSON.stringify(payload),
   });
 
+// ── Vendor laboratories ──────────────────────────────────────────────────────
+//
+// Read everything, change only whether the tenant is switched on. There is
+// deliberately no client method here for a vendor's tests, prices, staff or
+// results: the corresponding endpoints do not exist, so the admin console
+// cannot reach them even by mistake.
+
+export const fetchAdminVendorLab = async (organizationId: string) =>
+  request<Record<string, unknown>>(`/admin/vendor-labs/${encodeURIComponent(organizationId)}`);
+
+export const setAdminVendorLabStatus = async (
+  organizationId: string,
+  payload: { status: "active" | "suspended"; reason: string }
+) =>
+  request<{ organization: Record<string, unknown> }>(
+    `/admin/vendor-labs/${encodeURIComponent(organizationId)}/status`,
+    { method: "PATCH", body: JSON.stringify(payload) }
+  );
+
+export const fetchAdminVendorInvites = async (params: Record<string, string | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ invites: Array<Record<string, unknown>> }>(`/admin/vendor-labs/invites${suffix}`);
+};
+
+export const inviteAdminVendorLab = async (payload: {
+  email: string;
+  labName: string;
+  contactPerson?: string;
+  location?: string;
+  reason: string;
+}) =>
+  request<{ invite: Record<string, unknown> }>("/admin/vendor-labs/invites", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const revokeAdminVendorInvite = async (id: string, reason: string) =>
+  request<{ invite: Record<string, unknown> }>(
+    `/admin/vendor-labs/invites/${encodeURIComponent(id)}/revoke`,
+    { method: "POST", body: JSON.stringify({ reason }) }
+  );
+
 export const sendAdminNotification = async (payload: {
   recipientId?: string;
   audience: string;
