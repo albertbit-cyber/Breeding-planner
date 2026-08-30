@@ -1,7 +1,7 @@
 # Deploying lab vendor tenancy
 
-Runbook for the `feature/lab-vendor-onboarding` branch. Two migrations ship with
-it, one of which rewrites existing order data.
+Runbook for the `feature/lab-vendor-onboarding` branch. Three migrations ship
+with it, one of which rewrites existing order data.
 
 The one thing this branch is waiting on is **step 2** — it needs database access
 that only you have.
@@ -14,6 +14,7 @@ that only you have.
 |---|---|
 | `20260830120000_add_lab_vendor_tenancy` | Lab-owned tests and pricing, orders carrying their laboratory, per-lab identity. **Back-fills existing rows.** |
 | `20260830140000_add_partner_applications` | A new empty table. No backfill, no risk. |
+| `20260830160000_add_lab_payment_details` | Three nullable columns on `LabAccount` (`iban`, `bic`, `vat_number`), so each laboratory carries its own certificate payment details instead of the hardcoded ones. No backfill, no risk. |
 
 Only the first needs care.
 
