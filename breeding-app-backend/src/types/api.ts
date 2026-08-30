@@ -16,6 +16,8 @@ export interface PriceBreakdownPerAnimal {
   morphBaseCost: number;
   additionalMorphCost: number;
   sexCost: number;
+  /** Flat-priced items (panels), which no quantity tier applies to. */
+  panelCost: number;
   total: number;
 }
 

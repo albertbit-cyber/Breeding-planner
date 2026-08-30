@@ -237,6 +237,8 @@ export default function TestCatalogPage() {
             <thead className="border-b border-neutral-100 bg-neutral-50 text-left text-xs text-neutral-500">
               <tr>
                 <th className="px-3 py-2">{t("lab.catalog.colName", { defaultValue: "Name" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colKind", { defaultValue: "Kind" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colSpecies", { defaultValue: "Species" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colGeneticType", { defaultValue: "Type" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colGroup", { defaultValue: "Group" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colCode", { defaultValue: "Code" })}</th>
@@ -251,9 +253,47 @@ export default function TestCatalogPage() {
               {tests.map((test) => (
                 <tr key={test.id} className="hover:bg-neutral-50">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-neutral-900">{test.name}</div>
-                    {test.description ? <div className="text-xs text-neutral-400 max-w-xs truncate">{test.description}</div> : null}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-neutral-900">{test.name}</span>
+                      {test.availability === "coming_soon" ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                          {t("lab.catalog.comingSoon", { defaultValue: "coming soon" })}
+                        </span>
+                      ) : null}
+                    </div>
+                    {test.panelScope ? (
+                      <div className="max-w-xs text-xs text-neutral-500">{test.panelScope}</div>
+                    ) : test.description ? (
+                      <div className="max-w-xs truncate text-xs text-neutral-400">{test.description}</div>
+                    ) : null}
+                    {test.testKind === "panel" && !(test.panelMemberIds || []).length ? (
+                      <div className="mt-1 text-[11px] text-amber-700">
+                        {t("lab.catalog.panelUnresolved", {
+                          defaultValue:
+                            "Included tests not yet listed — confirm with the lab, then set them here.",
+                        })}
+                      </div>
+                    ) : null}
+                    {(test.aliases || []).length ? (
+                      <div className="text-[11px] text-neutral-400">
+                        {t("lab.catalog.alsoKnownAs", { defaultValue: "also" })}: {test.aliases.join(", ")}
+                      </div>
+                    ) : null}
                   </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        test.testKind === "panel"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : test.testKind === "sex"
+                          ? "bg-indigo-100 text-indigo-800"
+                          : "bg-neutral-100 text-neutral-700"
+                      }`}
+                    >
+                      {test.testKind || "morph"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-neutral-600">{test.speciesLabel || "-"}</td>
                   <td className="px-3 py-2">
                     {test.geneticType ? (
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -271,7 +311,16 @@ export default function TestCatalogPage() {
                   <td className="px-3 py-2 font-mono text-xs text-neutral-600">{test.internalCode}</td>
                   <td className="px-3 py-2 text-xs text-neutral-600">{test.pricingType || "morph"}</td>
                   <td className="px-3 py-2 text-xs">
-                    {formatEuroFromCents(test.priceCents)}
+                    {test.priceModel === "flat" || test.testKind === "panel" ? (
+                      <span className="font-medium">{formatEuroFromCents(test.priceCents)}</span>
+                    ) : (
+                      <span className="text-neutral-500">
+                        {t("lab.catalog.byTier", { defaultValue: "by tier" })}
+                        {test.addonPriceCents
+                          ? ` · +${formatEuroFromCents(test.addonPriceCents)} ${t("lab.catalog.asAddon", { defaultValue: "as add-on" })}`
+                          : ""}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <button

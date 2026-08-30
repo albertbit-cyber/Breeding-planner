@@ -246,6 +246,17 @@ const toLabAvailableTestRecord = (test: any, index = 0): LabAvailableTest => ({
   isActive: test?.active !== false,
   isVisibleToBreeder: test?.visibleInBreederApp !== false,
   sortOrder: Number(test?.sortOrder || index || 0),
+  // Carried through so the portal can show what kind of product each row is,
+  // which animal it is for, and whether it can actually be ordered yet.
+  testKind: String(test?.testKind || "morph"),
+  priceModel: String(test?.priceModel || "tier"),
+  addonPriceCents: Number.isFinite(Number(test?.addonPriceCents)) ? Number(test.addonPriceCents) : undefined,
+  speciesId: test?.speciesId ? String(test.speciesId) : undefined,
+  speciesLabel: test?.speciesLabel ? String(test.speciesLabel) : undefined,
+  aliases: Array.isArray(test?.aliases) ? test.aliases.map((a: unknown) => String(a)) : [],
+  availability: String(test?.availability || "available"),
+  panelScope: test?.panelScope ? String(test.panelScope) : undefined,
+  panelMemberIds: Array.isArray(test?.panelMemberIds) ? test.panelMemberIds.map((m: unknown) => String(m)) : [],
   createdAt: String(test?.createdAt || new Date().toISOString()),
   updatedAt: String(test?.updatedAt || new Date().toISOString()),
 });

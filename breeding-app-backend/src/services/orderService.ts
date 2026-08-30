@@ -102,6 +102,8 @@ const resolveLabPricingContext = async (labOrganizationId: string) => {
       },
       select: { labName: true },
     }),
+    // Every field the pricing engine reads must come back here: a missing
+    // `priceCents` would silently price a panel at zero.
     (prisma as any).labTestOffering.findMany({
       where: { organizationId: labOrganizationId, active: true, visibleInBreederApp: true },
     }),
@@ -180,19 +182,33 @@ export const createOrder = async (
           morphBaseCost: toPrice(row.morphBaseCost),
           additionalMorphCost: toPrice(row.additionalMorphCost),
           sexCost: toPrice(row.sexCost),
+          panelCost: toPrice(row.panelCost),
           total: toPrice(row.total),
         },
       });
 
+      // Splitting the animal's total back across its lines, so each line records
+      // what it actually cost rather than an even share.
+      const isFlat = (entry: { priceModel?: string | null; testKind?: string | null }) =>
+        String(entry.priceModel || "tier") === "flat" || String(entry.testKind || "") === "panel";
+      const tieredMorphs = row.selectedCatalogTests.filter(
+        (entry) => !isFlat(entry) && entry.pricingType === "morph"
+      );
+      const tieredSexTests = row.selectedCatalogTests.filter(
+        (entry) => !isFlat(entry) && entry.pricingType === "sex"
+      );
+
       for (const test of row.selectedCatalogTests) {
-        const isMorph = test.pricingType === "morph";
-        const morphTests = row.selectedCatalogTests.filter((entry) => entry.pricingType === "morph");
-        const morphIndex = isMorph ? morphTests.findIndex((entry) => entry.id === test.id) : -1;
+        const morphIndex = tieredMorphs.findIndex((entry) => entry.id === test.id);
 
         const priceApplied = (() => {
-          if (test.pricingType === "sex") return row.sexCost > 0 ? row.sexCost : 0;
+          // A flat-priced item carries its own price, whatever the order size.
+          if (isFlat(test)) return (test.priceCents ?? 0) / 100;
+          if (test.pricingType === "sex") {
+            return tieredSexTests.length ? row.sexCost / tieredSexTests.length : 0;
+          }
           if (morphIndex === 0) return row.morphBaseCost;
-          if (morphIndex > 0 && morphTests.length > 1) return row.additionalMorphCost / (morphTests.length - 1);
+          if (morphIndex > 0) return row.additionalMorphCost / (tieredMorphs.length - 1);
           return 0;
         })();
 

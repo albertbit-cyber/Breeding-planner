@@ -155,7 +155,17 @@ export const normalizeOffering = (row: any) => ({
   shortLabel: row.shortLabel || null,
   category: row.category,
   pricingType: row.pricingType,
+  testKind: row.testKind || "morph",
+  priceModel: row.priceModel || "tier",
   priceCents: row.priceCents ?? null,
+  tierPrices: row.tierPricesJson ?? null,
+  addonPriceCents: row.addonPriceCents ?? null,
+  speciesId: row.speciesId || null,
+  speciesLabel: row.speciesLabel || null,
+  aliases: row.aliases || [],
+  availability: row.availability || "available",
+  panelScope: row.panelScope || null,
+  panelMemberIds: row.panelMemberIds || [],
   currency: row.currency,
   geneTarget: row.geneTarget || null,
   catalogRefId: row.catalogRefId || null,
@@ -209,6 +219,34 @@ const offeringWriteData = (payload: Record<string, unknown>, isCreate: boolean):
   if (payload.geneTarget !== undefined) data.geneTarget = text(payload.geneTarget, 120);
   if (payload.description !== undefined) data.description = text(payload.description, 2000);
   if (payload.priceCents !== undefined) data.priceCents = optionalInt(payload.priceCents, "Price", 0, 10_000_000);
+  if (payload.addonPriceCents !== undefined) {
+    data.addonPriceCents = optionalInt(payload.addonPriceCents, "Add-on price", 0, 10_000_000);
+  }
+  if (payload.speciesId !== undefined) data.speciesId = text(payload.speciesId, 80);
+  if (payload.speciesLabel !== undefined) data.speciesLabel = text(payload.speciesLabel, 120);
+  if (payload.panelScope !== undefined) data.panelScope = text(payload.panelScope, 2000);
+  if (payload.aliases !== undefined) {
+    data.aliases = Array.isArray(payload.aliases)
+      ? payload.aliases.map((a: unknown) => String(a || "").trim()).filter(Boolean).slice(0, 20)
+      : [];
+  }
+  if (payload.testKind !== undefined) {
+    const kind = String(payload.testKind || "morph").trim().toLowerCase();
+    if (!["morph", "sex", "panel"].includes(kind)) throw new HttpError(400, "Unsupported test kind.");
+    data.testKind = kind;
+  }
+  if (payload.priceModel !== undefined) {
+    const model = String(payload.priceModel || "tier").trim().toLowerCase();
+    if (!["tier", "flat"].includes(model)) throw new HttpError(400, "Price model must be tier or flat.");
+    data.priceModel = model;
+  }
+  if (payload.availability !== undefined) {
+    const availability = String(payload.availability || "available").trim().toLowerCase();
+    if (!["available", "coming_soon"].includes(availability)) {
+      throw new HttpError(400, "Availability must be available or coming soon.");
+    }
+    data.availability = availability;
+  }
   if (payload.turnaroundDays !== undefined) data.turnaroundDays = optionalInt(payload.turnaroundDays, "Turnaround", 0, 365);
   if (payload.sortOrder !== undefined) data.sortOrder = optionalInt(payload.sortOrder, "Sort order", 0, 10_000) ?? 0;
   if (payload.currency !== undefined) data.currency = (text(payload.currency, 3) || "EUR").toUpperCase();

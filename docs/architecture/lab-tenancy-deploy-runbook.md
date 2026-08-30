@@ -15,6 +15,7 @@ that only you have.
 | `20260830120000_add_lab_vendor_tenancy` | Lab-owned tests and pricing, orders carrying their laboratory, per-lab identity. **Back-fills existing rows.** |
 | `20260830140000_add_partner_applications` | A new empty table. No backfill, no risk. |
 | `20260830160000_add_lab_payment_details` | Three nullable columns on `LabAccount` (`iban`, `bic`, `vat_number`), so each laboratory carries its own certificate payment details instead of the hardcoded ones. No backfill, no risk. |
+| `20260830180000_extend_lab_offerings` | Widens a test offering: kind (morph/sex/panel), flat vs tier pricing, per-test tier overrides, add-on price, species, aliases, availability, panel scope and membership. Additive and defaulted, so existing offerings keep behaving identically. |
 
 Only the first needs care.
 
@@ -102,8 +103,30 @@ Set it on the backend service before the first invitation goes out.
 
 ## 4. Deploy
 
-Migrations run on boot via `start:migrate`. Order does not matter between the
-two; Prisma applies them in timestamp order.
+Migrations run on boot via `start:migrate`. Prisma applies them in timestamp
+order.
+
+### Then provision ProHerper
+
+Two scripts, both idempotent and both with a dry run. Run them in this order:
+
+```powershell
+cd breeding-app-backend
+npx tsx prisma/provisioning/provisionProHerper.ts            # identity - dry run
+npx tsx prisma/provisioning/provisionProHerper.ts --apply
+
+npx tsx prisma/provisioning/provisionProHerperCatalog.ts     # catalogue - dry run
+npx tsx prisma/provisioning/provisionProHerperCatalog.ts --apply
+```
+
+The first restores their name, contact, address, phone, email, bank details and
+logo — everything that used to be hardcoded. It only fills blanks, so anything
+the laboratory has since set for itself wins.
+
+The second replaces the platform's generic ball-python seed with ProHerper's own
+published catalogue: 60 morph tests across four species, three sex determination
+tests and five panels, at their real prices. It reports anything already on
+their list that the catalogue does not mention, and never deletes.
 
 ---
 
@@ -117,12 +140,16 @@ two; Prisma applies them in timestamp order.
 3. **It has its own prices.** Pricing & Logic should load rather than 404.
 4. **The directory works.** From a breeder account, start an order — the
    laboratory should appear and be selectable.
-5. **Fill in its identity.** Laboratory Settings starts blank for address and
-   logo, because there was nowhere to migrate them from. Until they are filled
-   in, shipping labels and certificates render with the name only. This is
-   deliberate — the alternative was carrying over the hardcoded details of the
-   one laboratory the feature was first built for, which every other vendor
-   would then have inherited.
+5. **Check the catalogue.** Test Catalog should show 68 rows: 60 morph tests
+   tagged by species, 3 sex determination tests, and 5 panels. Two ball python
+   tests (Black pastel, Cinnamon) show as *coming soon* and cannot be ordered.
+6. **Confirm the three unresolved panels with ProHerper.** Recessive, Spider
+   complex and BEL complex price correctly but do not yet list which tests they
+   include, because ProHerper does not publish that. They are marked as
+   unresolved in the portal; ask, then set the members in Test Catalog.
+7. **Have Jurgen check the prices** before breeders can order. The tier table is
+   set from their published list (35/30/25 morph, 20 additional, 30/25/20 sex),
+   but confirming it is theirs to do, not ours to assume.
 
 ---
 

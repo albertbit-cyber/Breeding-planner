@@ -1201,8 +1201,40 @@ model LabTestOffering {
   shortLabel          String?         @map("short_label")
   category            String
   pricingType         TestPricingType @map("pricing_type")
-  /** This lab's own price. Null means "priced by the tier table", not "free". */
+
+  /**
+   * What kind of product this is: `morph`, `sex`, or `panel`.
+   *
+   * Distinct from `pricingType`, which is only the morph/sex bucket the tier
+   * table understands. A panel is a bundle sold at one flat price and belongs in
+   * neither bucket, which is why it needed its own dimension.
+   */
+  testKind            String          @default("morph") @map("test_kind")
+
+  /**
+   * `tier` prices from the laboratory's tier table; `flat` uses `priceCents`
+   * regardless of order size. Panels are flat. Real catalogues turned out to
+   * contain both, so this cannot be inferred from the kind alone.
+   */
+  priceModel          String          @default("tier") @map("price_model")
+
+  /** The flat price, in cents, when `priceModel` is `flat`. */
   priceCents          Int?            @map("price_cents")
+
+  /**
+   * Per-offering tier prices in cents, `{ "t1": 6500, "t2": 6000, "t3": 5500 }`,
+   * overriding the laboratory's tier table for this one test. Needed because a
+   * laboratory may price one test on a different scale from the rest — a green
+   * tree python sex test costs roughly double a colubrid one.
+   */
+  tierPricesJson      Json?           @map("tier_prices_json")
+
+  /**
+   * Price when this test is added to a morph test on the same animal, rather
+   * than ordered on its own. Sex determination is commonly sold this way.
+   */
+  addonPriceCents     Int?            @map("addon_price_cents")
+
   currency            String          @default("EUR")
   /**
    * Gene this test reads, when the lab has mapped it. Drives the automatic
@@ -1213,6 +1245,34 @@ model LabTestOffering {
   /** Optional provenance link to the shared seed library. Never a constraint. */
   catalogRefId        String?         @map("catalog_ref_id")
   catalogRef          ShedTestCatalog? @relation(fields: [catalogRefId], references: [id], onDelete: SetNull)
+
+  /** Which animal this test is for. Null means the laboratory did not say. */
+  speciesId           String?         @map("species_id")
+  speciesLabel        String?         @map("species_label")
+
+  /**
+   * Other names the same test is sold or asked for under ("Yb", "HGW",
+   * "Migraine"). Used to match what a breeder has recorded on an animal against
+   * what a laboratory offers, which rarely agree on spelling.
+   */
+  aliases             String[]        @default([])
+
+  /**
+   * `available` or `coming_soon`. Separate from `active`: a coming-soon test is
+   * published so breeders can see it is on the way, but cannot be ordered, while
+   * an inactive one has been withdrawn.
+   */
+  availability        String          @default("available")
+
+  /** For panels: what the bundle covers, in the laboratory's own words. */
+  panelScope          String?         @map("panel_scope") @db.Text
+
+  /**
+   * For panels: the offerings this bundle includes. Empty means the laboratory
+   * has not told us, which is deliberately distinguishable from "includes
+   * nothing" — an unresolved panel must not be silently priced as empty.
+   */
+  panelMemberIds      String[]        @default([]) @map("panel_member_ids")
 
   allowedPriorities   String[]        @default(["routine", "priority", "urgent"]) @map("allowed_priorities")
   turnaroundDays      Int?            @map("turnaround_days")
@@ -1229,6 +1289,7 @@ model LabTestOffering {
   // and correct — two labs both offering "Albino" are two distinct products.
   @@unique([organizationId, name])
   @@index([organizationId, active])
+  @@index([organizationId, speciesId])
   @@index([catalogRefId])
   @@map("lab_test_offerings")
 }
@@ -1305,6 +1366,8 @@ model ShedTestOrderAnimal {
   morphBaseCost      Decimal                 @db.Decimal(10, 2)
   additionalMorphCost Decimal                @db.Decimal(10, 2)
   sexCost            Decimal                 @db.Decimal(10, 2)
+  /** Flat-priced items on this animal (panels), which no tier applies to. */
+  panelCost          Decimal                 @default(0) @db.Decimal(10, 2) @map("panel_cost")
   total              Decimal                 @db.Decimal(10, 2)
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt

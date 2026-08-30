@@ -15,11 +15,46 @@ type PricingConfigShape = {
   sexTier50Plus: { toString(): string } | number;
 };
 
+type TierKey = "t1" | "t2" | "t3";
+
 type CatalogShape = {
   id: string;
   name: string;
   pricingType: "morph" | "sex";
   active: boolean;
+  /** morph | sex | panel. Absent on legacy rows, which are all morph or sex. */
+  testKind?: string | null;
+  /** tier | flat. Absent means tier. */
+  priceModel?: string | null;
+  priceCents?: number | null;
+  /** Per-offering tier override, in cents: { t1, t2, t3 }. */
+  tierPricesJson?: Partial<Record<TierKey, number>> | null;
+  /** Charged instead of the full price when bundled with a morph test. */
+  addonPriceCents?: number | null;
+  availability?: string | null;
+};
+
+const TIER_KEYS: Record<PricingTierValue, TierKey> = {
+  tier_1_9: "t1",
+  tier_10_49: "t2",
+  tier_50_plus: "t3",
+};
+
+const centsToUnits = (cents: number): number => Math.round(cents) / 100;
+
+const isFlatPriced = (test: CatalogShape): boolean =>
+  String(test.priceModel || "tier") === "flat" || String(test.testKind || "") === "panel";
+
+/**
+ * A test's own tier price, when the laboratory has priced it on a different
+ * scale from the rest of its catalogue. Returns null to mean "use the
+ * laboratory's tier table", which is the common case.
+ */
+const ownTierPrice = (test: CatalogShape, tier: PricingTierValue): number | null => {
+  const overrides = test.tierPricesJson;
+  if (!overrides) return null;
+  const value = overrides[TIER_KEYS[tier]];
+  return typeof value === "number" && Number.isFinite(value) ? centsToUnits(value) : null;
 };
 
 const decimalToNumber = (value: { toString(): string } | number): number => Number(value.toString());
@@ -53,7 +88,7 @@ const getTierPricing = (tier: PricingTierValue, config: PricingConfigShape) => {
 };
 
 export interface EnrichedAnimalBreakdown extends PriceBreakdownPerAnimal {
-  selectedCatalogTests: Array<Pick<CatalogShape, "id" | "name" | "pricingType">>;
+  selectedCatalogTests: CatalogShape[];
 }
 
 export interface InternalBreakdown {
@@ -85,16 +120,44 @@ export const calculateOrderBreakdown = (
       if (!test || !test.active) {
         throw new HttpError(400, `Selected test is invalid or inactive: ${testId}`);
       }
-      return { id: test.id, name: test.name, pricingType: test.pricingType };
+      if (String(test.availability || "available") === "coming_soon") {
+        throw new HttpError(400, `${test.name} is not available to order yet.`);
+      }
+      return test;
     });
 
-    const morphTests = selected.filter((test) => test.pricingType === "morph");
-    const sexTests = selected.filter((test) => test.pricingType === "sex");
+    // Flat-priced items (panels, and anything a laboratory has chosen to price
+    // outright) sit outside the tier table entirely: a bundle's whole appeal is
+    // that its price does not move with order size.
+    const flatTests = selected.filter(isFlatPriced);
+    const tieredTests = selected.filter((test) => !isFlatPriced(test));
 
-    const morphBaseCost = morphTests.length > 0 ? tierPricing.morphFirst : 0;
-    const additionalMorphCost = morphTests.length > 1 ? (morphTests.length - 1) * tierPricing.morphAdditional : 0;
-    const sexCost = sexTests.length > 0 ? tierPricing.sex : 0;
-    const total = morphBaseCost + additionalMorphCost + sexCost;
+    const panelCost = flatTests.reduce((sum, test) => sum + centsToUnits(test.priceCents ?? 0), 0);
+
+    const morphTests = tieredTests.filter((test) => test.pricingType === "morph");
+    const sexTests = tieredTests.filter((test) => test.pricingType === "sex");
+
+    const morphBaseCost = morphTests.length > 0
+      ? ownTierPrice(morphTests[0], tier) ?? tierPricing.morphFirst
+      : 0;
+    const additionalMorphCost = morphTests.length > 1
+      ? morphTests
+          .slice(1)
+          .reduce((sum, test) => sum + (ownTierPrice(test, tier) ?? tierPricing.morphAdditional), 0)
+      : 0;
+
+    // A morph test already on this animal makes a sex test an add-on, which is
+    // how laboratories usually sell it — the sample and the extraction are
+    // shared, so only the extra assay is charged.
+    const hasMorphWork = morphTests.length > 0 || flatTests.length > 0;
+    const sexCost = sexTests.reduce((sum, test) => {
+      if (hasMorphWork && typeof test.addonPriceCents === "number") {
+        return sum + centsToUnits(test.addonPriceCents);
+      }
+      return sum + (ownTierPrice(test, tier) ?? tierPricing.sex);
+    }, 0);
+
+    const total = morphBaseCost + additionalMorphCost + sexCost + panelCost;
 
     return {
       animalId: animal.animalId,
@@ -102,6 +165,7 @@ export const calculateOrderBreakdown = (
       morphBaseCost,
       additionalMorphCost,
       sexCost,
+      panelCost,
       total,
       selectedCatalogTests: selected,
     };
@@ -137,6 +201,7 @@ export const toPublicBreakdown = (breakdown: InternalBreakdown): PriceBreakdownR
     morphBaseCost: row.morphBaseCost,
     additionalMorphCost: row.additionalMorphCost,
     sexCost: row.sexCost,
+    panelCost: row.panelCost,
     total: row.total,
   })),
   total: breakdown.total,
