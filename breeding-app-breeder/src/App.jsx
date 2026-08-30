@@ -96,6 +96,7 @@ import {
   sexOrUnknown,
 } from "./features/animals/animalSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
+import { resolveCatalogParentLabel } from "./features/animals/catalogParentLabel";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
 import QuarantinePanel from "./features/quarantine/QuarantinePanel.jsx";
 import QuarantineNotice from "./features/quarantine/QuarantineNotice.jsx";
@@ -15162,7 +15163,8 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
   const textX = pagePadding + 4;
   const textLabelW = 24;
   const lineHeight = 7;
-  const morphMaxWidth = Math.max(40, textColumnW - textLabelW - 8);
+  const textRight = pagePadding + textColumnW;
+  const bottomLimit = pageH - pagePadding;
   const imageX = pagePadding + textColumnW;
   const imageY = pagePadding;
   const imageW = imageColumnW;
@@ -15180,6 +15182,9 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
 
     const animal = animals[index] || {};
     const idValue = String(animal.id || '—');
+    const nameValue = String(animal.name || '').trim();
+    const sireLabel = String(animal.sireLabel || '').trim();
+    const damLabel = String(animal.damLabel || '').trim();
     const sexValue = formatCatalogSex(animal.sex);
     const morphValue = resolveCatalogMorph(animal) || '—';
     const priceRaw = animal.price;
@@ -15214,28 +15219,59 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
       drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
     }
 
-    let cursorY = pagePadding + 22;
-    const drawField = (label, value, { multiline = false } = {}) => {
+    let cursorY = pagePadding + 16;
+    const drawField = (label, value, {
+      multiline = false,
+      maxLines = 0,
+      fontSize = 12.5,
+      lineGap = 5.4,
+      labelW = textLabelW,
+    } = {}) => {
+      // A page carrying parents on top of its own genetics can run long;
+      // stop at the margin rather than printing into it.
+      if (cursorY > bottomLimit) return;
       setPdfFont(doc, 'bold');
-      doc.setFontSize(12.5);
+      doc.setFontSize(fontSize);
       doc.setTextColor(28, 28, 28);
       doc.text(`${label}:`, textX, cursorY);
       setPdfFont(doc, 'normal');
+      const valueX = textX + labelW;
       if (multiline) {
-        const lines = doc.splitTextToSize(String(value || ''), morphMaxWidth);
-        doc.text(lines, textX + textLabelW, cursorY);
-        cursorY += (Math.max(1, lines.length) * 5.4) + 4;
+        const valueMaxW = Math.max(30, textRight - valueX - 2);
+        let lines = doc.splitTextToSize(String(value || ''), valueMaxW);
+        if (maxLines > 0 && lines.length > maxLines) {
+          lines = lines.slice(0, maxLines);
+          let last = String(lines[maxLines - 1]).replace(/[\s,]+$/, '');
+          // The ellipsis is appended after wrapping, so the last line has to
+          // pay for it -- otherwise the cut line is the one that hangs over
+          // the photo column.
+          while (last && doc.getTextWidth(`${last}…`) > valueMaxW) {
+            last = last.slice(0, -1).replace(/[\s,]+$/, '');
+          }
+          lines[maxLines - 1] = `${last}…`;
+        }
+        doc.text(lines, valueX, cursorY);
+        cursorY += (Math.max(1, lines.length) * lineGap) + 4;
       } else {
-        doc.text(String(value || '—'), textX + textLabelW, cursorY);
+        doc.text(String(value || '—'), valueX, cursorY);
         cursorY += lineHeight;
       }
     };
 
+    // The name is what a buyer asks after; the ID stays because it is what
+    // the breeder files the animal under. No line is spent when the animal
+    // was never named beyond its ID.
+    if (nameValue && nameValue !== idValue) drawField('NAME', nameValue, { multiline: true, maxLines: 2 });
     drawField('ID', idValue);
     drawField('SEX', sexValue);
-    drawField('MORPH', morphValue, { multiline: true });
+    drawField('MORPH', morphValue, { multiline: true, maxLines: 4 });
+    if (sireLabel || damLabel) {
+      const parentOpts = { multiline: true, maxLines: 2, fontSize: 9.5, lineGap: 4.4, labelW: 16 };
+      if (sireLabel) drawField('SIRE', sireLabel, parentOpts);
+      if (damLabel) drawField('DAM', damLabel, parentOpts);
+    }
     if (taggedForSell || hasPrice) drawField('PRICE', hasPrice ? String(priceRaw).trim() : '');
-    if (hasPairing) drawField('PAIRING', String(pairingRaw).trim());
+    if (hasPairing) drawField('PAIRING', String(pairingRaw).trim(), { multiline: true, maxLines: 2 });
   }
 
   doc.save(fileName || buildCatalogFileName([]));
@@ -18639,7 +18675,8 @@ function BreederSection({
     try {
       // Pairing lookups still use the full collection; only the catalog's own
       // rows follow the export scope.
-      const pairingsBySnakeId = groupPairingsBySnake(pairings, makeSnakeMap(snakes));
+      const snakeById = makeSnakeMap(snakes);
+      const pairingsBySnakeId = groupPairingsBySnake(pairings, snakeById);
       const scopedAnimals = Array.isArray(animalsToExport) ? animalsToExport.filter(Boolean) : [];
       if (!scopedAnimals.length) {
         throw new Error(t('export.errors.noAnimalsInScope', { defaultValue: 'Nothing selected — pick at least one animal to put in the catalog.' }));
@@ -18663,6 +18700,8 @@ function BreederSection({
           return {
             ...snake,
             genetics: resolveCatalogMorph(snake),
+            sireLabel: resolveCatalogParentLabel(snake, 'sire', snakeById, resolveCatalogMorph),
+            damLabel: resolveCatalogParentLabel(snake, 'dam', snakeById, resolveCatalogMorph),
             pairing: snake?.pairing || pairingLabel || '',
             primaryImage: resolvePrimaryAnimalImage(snake),
           };
