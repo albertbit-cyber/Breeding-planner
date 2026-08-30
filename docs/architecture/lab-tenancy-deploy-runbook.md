@@ -15,9 +15,11 @@ that only you have.
 | `20260830120000_add_lab_vendor_tenancy` | Lab-owned tests and pricing, orders carrying their laboratory, per-lab identity. **Back-fills existing rows.** |
 | `20260830140000_add_partner_applications` | A new empty table. No backfill, no risk. |
 | `20260830160000_add_lab_payment_details` | Three nullable columns on `LabAccount` (`iban`, `bic`, `vat_number`), so each laboratory carries its own certificate payment details instead of the hardcoded ones. No backfill, no risk. |
+| `20260831090000_species_vocabulary` | Remaps species onto the platform taxonomy and makes an offering multi-species. **Rewrites existing rows.** |
+| `20260831100000_add_lab_gene_submissions` | New empty table for lab-contributed genes. No backfill, no risk. |
 | `20260830180000_extend_lab_offerings` | Widens a test offering: kind (morph/sex/panel), flat vs tier pricing, per-test tier overrides, add-on price, species, aliases, availability, panel scope and membership. Additive and defaulted, so existing offerings keep behaving identically. |
 
-Only the first needs care.
+The first and the species remap both rewrite existing rows; the rest are additive.
 
 ---
 
@@ -143,11 +145,15 @@ their list that the catalogue does not mention, and never deletes.
 5. **Check the catalogue.** Test Catalog should show 68 rows: 60 morph tests
    tagged by species, 3 sex determination tests, and 5 panels. Two ball python
    tests (Black pastel, Cinnamon) show as *coming soon* and cannot be ordered.
-6. **Confirm the three unresolved panels with ProHerper.** Recessive, Spider
+6. **Check the species.** Test Catalog shows each test tagged by species, and
+   Laboratory Settings lists the ten ProHerper serves. A breeder ordering for a
+   corn snake should now see ProHerper; one ordering for a leopard gecko should
+   not.
+7. **Confirm the three unresolved panels with ProHerper.** Recessive, Spider
    complex and BEL complex price correctly but do not yet list which tests they
    include, because ProHerper does not publish that. They are marked as
    unresolved in the portal; ask, then set the members in Test Catalog.
-7. **Have Jurgen check the prices** before breeders can order. The tier table is
+8. **Have Jurgen check the prices** before breeders can order. The tier table is
    set from their published list (35/30/25 morph, 20 additional, 30/25/20 sex),
    but confirming it is theirs to do, not ours to assume.
 
@@ -165,6 +171,15 @@ database**, which is the safer direction. If you do need to reverse the schema,
 restore from the pre-deploy backup rather than writing a down-migration; the
 backfill is not losslessly reversible, since it cannot know which order lines
 had a `testId` before.
+
+---
+
+## Handing the laboratory over
+
+Provisioning gives ProHerper a working laboratory; it does not make it theirs.
+`docs/handoff/PROHERPER_HANDOVER.md` covers the rest — who the owner should be,
+what to walk them through, the three things they must decide, and what each of
+you can and cannot do afterwards.
 
 ---
 
