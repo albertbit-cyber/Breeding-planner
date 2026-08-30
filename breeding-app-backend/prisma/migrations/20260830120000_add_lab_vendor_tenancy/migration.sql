@@ -176,14 +176,18 @@ ALTER TABLE "ShedTestOrderAnimalTest" ADD CONSTRAINT "ShedTestOrderAnimalTest_of
 -- Route each historical line to the offering its own lab now holds for that
 -- catalog test. Lines whose order has no lab stay null; they remain readable
 -- through their snapshot columns.
+-- Every condition lives in WHERE rather than in JOIN ... ON: Postgres does not
+-- allow the UPDATE target (`oat`) to be referenced from a join condition inside
+-- the FROM clause, only from WHERE.
 UPDATE "ShedTestOrderAnimalTest" oat
 SET "offering_id" = o."id"
-FROM "ShedTestOrderAnimal" oa
-JOIN "ShedTestOrder" ord ON ord."id" = oa."orderId"
-JOIN "lab_test_offerings" o
-  ON o."organization_id" = ord."lab_organization_id"
- AND o."catalog_ref_id" = oat."testId"
+FROM "ShedTestOrderAnimal" oa,
+     "ShedTestOrder" ord,
+     "lab_test_offerings" o
 WHERE oa."id" = oat."orderAnimalId"
+  AND ord."id" = oa."orderId"
+  AND o."organization_id" = ord."lab_organization_id"
+  AND o."catalog_ref_id" = oat."testId"
   AND oat."offering_id" IS NULL
   AND ord."lab_organization_id" IS NOT NULL;
 
