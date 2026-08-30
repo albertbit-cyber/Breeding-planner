@@ -1,0 +1,943 @@
+<title>Lab Platform Handover</title>
+
+<style>
+  /* Design tokens, type stack and component vocabulary are inherited from
+     docs/status/saas-readiness-status.html so the two status reports read as one
+     set. Additions specific to this subject are marked below. */
+  :root {
+    color-scheme: light dark;
+
+    --ground: #f5f6f8;
+    --panel: #ffffff;
+    --panel-sunk: #eef1f4;
+    --ink: #0f1418;
+    --ink-soft: #3b4650;
+    --muted: #6a7480;
+    --rule: #dde2e8;
+    --rule-strong: #c3ccd6;
+
+    --accent: #2b4c6f;
+    --accent-soft: #e6ecf3;
+
+    --shipped: #2f7a54;
+    --shipped-soft: #e4f0e9;
+    --partial: #b07b1e;
+    --partial-soft: #f7eeda;
+    --blocked: #a93b25;
+    --blocked-soft: #f7e5e1;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1418;
+      --panel: #161d23;
+      --panel-sunk: #1b232a;
+      --ink: #e8edf2;
+      --ink-soft: #c0cad4;
+      --muted: #8c98a5;
+      --rule: #28323b;
+      --rule-strong: #3a4650;
+      --accent: #7ea8d4;
+      --accent-soft: #1a2732;
+      --shipped: #6cc094;
+      --shipped-soft: #16261f;
+      --partial: #e0ac52;
+      --partial-soft: #2a2117;
+      --blocked: #e08670;
+      --blocked-soft: #2b1a16;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1418;
+    --panel: #161d23;
+    --panel-sunk: #1b232a;
+    --ink: #e8edf2;
+    --ink-soft: #c0cad4;
+    --muted: #8c98a5;
+    --rule: #28323b;
+    --rule-strong: #3a4650;
+    --accent: #7ea8d4;
+    --accent-soft: #1a2732;
+    --shipped: #6cc094;
+    --shipped-soft: #16261f;
+    --partial: #e0ac52;
+    --partial-soft: #2a2117;
+    --blocked: #e08670;
+    --blocked-soft: #2b1a16;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-bottom: 2px solid var(--rule-strong);
+    padding-bottom: 1.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+
+  .stamp {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stamp b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- verdict ---------- */
+
+  .verdict {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--partial);
+    border-radius: 3px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .verdict h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .verdict p { margin: 0; max-width: var(--measure); color: var(--ink-soft); }
+
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .tally div {
+    background: var(--panel-sunk);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .tally .n {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tally .k { font-size: 0.78rem; color: var(--muted); }
+
+  .n-blocked { color: var(--blocked); }
+  .n-partial { color: var(--partial); }
+  .n-shipped { color: var(--shipped); }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  h2.head {
+    font-family: var(--serif);
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  h3.sub {
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0.5rem 0 0;
+  }
+
+  .lede { margin: 0; max-width: var(--measure); color: var(--ink-soft); }
+  p.body { margin: 0; max-width: var(--measure); color: var(--ink-soft); }
+
+  .rows { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .row {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .row.is-blocked { border-left-color: var(--blocked); }
+  .row.is-partial { border-left-color: var(--partial); }
+  .row.is-shipped { border-left-color: var(--shipped); }
+
+  .row-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.85rem;
+  }
+
+  .row h3 { font-size: 1.02rem; font-weight: 650; margin: 0; letter-spacing: -0.005em; }
+  .row p { margin: 0; max-width: var(--measure); color: var(--ink-soft); font-size: 0.95rem; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .chip-blocked { background: var(--blocked-soft); color: var(--blocked); }
+  .chip-partial { background: var(--partial-soft); color: var(--partial); }
+  .chip-shipped { background: var(--shipped-soft); color: var(--shipped); }
+  .chip-you { background: var(--accent-soft); color: var(--accent); }
+
+  .evidence {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: var(--panel-sunk);
+    border-radius: 2px;
+    padding: 0.5rem 0.7rem;
+    overflow-x: auto;
+  }
+
+  .evidence b { color: var(--ink-soft); font-weight: 600; }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    background: var(--panel-sunk);
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { font-family: var(--mono); font-size: 0.88em; }
+
+  /* ---------- ADDED: the boundary diagram ----------
+     The whole subject is who-can-see-what, so the three actors get three
+     literal lanes with a hard division between them. */
+
+  .lanes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(15rem, 1fr));
+    gap: 1px;
+    background: var(--rule-strong);
+    border: 1px solid var(--rule-strong);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 46rem;
+  }
+
+  .lane { background: var(--panel); display: flex; flex-direction: column; }
+
+  .lane-head {
+    background: var(--panel-sunk);
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .lane-head .who {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .lane-head .what { font-weight: 650; font-size: 0.98rem; }
+
+  .lane-body {
+    padding: 0.9rem 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+  }
+
+  /* The tenant lane is the thing being protected, so it is the one that is
+     visually held apart. */
+  .lane.tenant { background: var(--accent-soft); }
+  .lane.tenant .lane-head { background: var(--accent); border-bottom-color: var(--accent); }
+  .lane.tenant .lane-head .who { color: var(--panel); opacity: 0.75; }
+  .lane.tenant .lane-head .what { color: var(--panel); }
+  .lane.tenant .lane-body { color: var(--ink); }
+
+  .lane-body ul { margin: 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .arrow {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+
+  .arrow b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- ADDED: can / cannot ----------
+     "Reads everything, changes one thing" is the most important fact about the
+     admin, and the asymmetry does not survive being written as a list. */
+
+  .split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .split > div { background: var(--panel); padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .split .split-head { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
+  .split .can .split-head { color: var(--shipped); }
+  .split .cannot .split-head { color: var(--blocked); }
+  .split ul { margin: 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.93rem; color: var(--ink-soft); }
+
+  /* ---------- ADDED: numbered sequence ----------
+     Numbered because the onboarding flow genuinely is a sequence; the order
+     carries information the reader needs. */
+
+  ol.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.75rem; counter-reset: step; }
+
+  ol.steps > li {
+    counter-increment: step;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1rem 1.25rem 1rem 3.4rem;
+    position: relative;
+  }
+
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 2px;
+    display: grid;
+    place-items: center;
+  }
+
+  ol.steps h3 { font-size: 1rem; font-weight: 650; margin: 0 0 0.3rem; }
+  ol.steps p { margin: 0; font-size: 0.93rem; color: var(--ink-soft); max-width: var(--measure); }
+  ol.steps .evidence { margin-top: 0.55rem; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    padding-left: 0.9rem;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    max-width: var(--measure);
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, li:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 40rem) {
+    .wrap { padding: 2rem 1rem 3rem; gap: 2.25rem; }
+    ol.steps > li { padding-left: 1.25rem; padding-top: 2.6rem; }
+    ol.steps > li::before { top: 0.85rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Serpentora · Status &amp; handover</div>
+    <h1>The Laboratory Platform</h1>
+    <p class="standfirst">
+      How a testing laboratory joins the platform, what it runs for itself, what the
+      administrator can and cannot touch, and what a breeder sees when they order a
+      test. Plus an honest account of what is finished, what is verified, and what
+      is still open.
+    </p>
+    <div class="stamp">
+      <span><b>Branch</b> feature/lab-vendor-onboarding</span>
+      <span><b>Commits</b> 6</span>
+      <span><b>Backend tests</b> 350 passing</span>
+      <span><b>Apps building</b> 3 of 3</span>
+      <span><b>Reviewed</b> 30 Aug 2026</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <h2>Ready for a second laboratory, not yet ready to deploy</h2>
+    <p>
+      The platform now treats each laboratory as its own tenant. A vendor arrives only
+      by invitation, sets its own password, publishes its own tests at its own prices,
+      manages its own staff, and issues documents under its own name. A breeder chooses
+      a laboratory first, and everything they see from that point belongs to it.
+    </p>
+    <p>
+      One item stands between this and production: the database migration has been
+      rehearsed against seeded data but not against a copy of live data. Everything
+      else outstanding is either scheduled work or a pre-existing issue this project
+      did not create.
+    </p>
+    <div class="tally">
+      <div><span class="n n-shipped">9</span><span class="k">Stages delivered</span></div>
+      <div><span class="n n-shipped">62</span><span class="k">New tests</span></div>
+      <div><span class="n n-blocked">1</span><span class="k">Blocks deploy</span></div>
+      <div><span class="n n-partial">4</span><span class="k">Open, scheduled</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2 class="head">The boundary</h2>
+    <p class="lede">
+      Three parties touch laboratory work, and the product rule is that the middle one
+      owns its own section. Nothing crosses between two laboratories, and the
+      administrator sees everything without being able to change it.
+    </p>
+
+    <div class="table-scroll">
+      <div class="lanes">
+        <div class="lane">
+          <div class="lane-head">
+            <span class="who">Platform</span>
+            <span class="what">Administrator</span>
+          </div>
+          <div class="lane-body">
+            <div class="arrow"><b>→</b> sends the invitation</div>
+            <div class="arrow"><b>→</b> reads everything</div>
+            <div class="arrow"><b>→</b> suspends or reactivates</div>
+            <p style="margin:0.3rem 0 0;font-size:0.85rem;color:var(--muted);">
+              The only door into the platform, and the only switch that turns a
+              laboratory off.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane tenant">
+          <div class="lane-head">
+            <span class="who">Tenant</span>
+            <span class="what">Vendor Laboratory</span>
+          </div>
+          <div class="lane-body">
+            <ul>
+              <li>Its own tests and prices</li>
+              <li>Its own staff and roles</li>
+              <li>Its own name, address and logo</li>
+              <li>Its own orders, results and certificates</li>
+            </ul>
+            <p style="margin:0.3rem 0 0;font-size:0.85rem;">
+              A second laboratory is a second lane. Neither can read the other.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-head">
+            <span class="who">Customer</span>
+            <span class="what">Breeder</span>
+          </div>
+          <div class="lane-body">
+            <div class="arrow"><b>→</b> picks a laboratory</div>
+            <div class="arrow"><b>→</b> sees only its tests</div>
+            <div class="arrow"><b>→</b> is quoted only its prices</div>
+            <p style="margin:0.3rem 0 0;font-size:0.85rem;color:var(--muted);">
+              The choice comes first. Everything afterwards follows from it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note">
+      When a laboratory asks for an order that is not theirs, the answer is
+      <b>“not found”</b>, not “not allowed”. Confirming that a record exists somewhere
+      else is itself a small leak, so the system declines to confirm it.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="head">How a laboratory joins</h2>
+    <p class="lede">
+      There is exactly one route in. There is no sign-up page for the Lab Portal and
+      there must never be one — the build fails if a registration route reappears.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h3>The administrator sends an invitation</h3>
+        <p>
+          Laboratory name and email, plus an optional contact and location that
+          pre-fill the vendor's profile later. A reason is required and goes to the
+          audit log. Nothing is created yet — an unaccepted invitation leaves no
+          half-built laboratory behind.
+        </p>
+        <div class="evidence"><b>POST</b> /api/admin/vendor-labs/invites</div>
+      </li>
+      <li>
+        <h3>The laboratory receives an emailed link</h3>
+        <p>
+          The link carries a single-use token that expires in fourteen days. Only a
+          hash of it is stored, so the invitation cannot be recovered from the
+          database. Re-inviting the same address withdraws the earlier invitation, so
+          an old link can never quietly still work.
+        </p>
+      </li>
+      <li>
+        <h3>They set their own password</h3>
+        <p>
+          The acceptance page shows who was invited, to what, and until when — and
+          nothing else. The administrator never sees, sets, or handles the
+          laboratory's credentials.
+        </p>
+        <div class="evidence"><b>GET</b> /api/invites/:token  ·  <b>POST</b> /api/invites/:token/accept</div>
+      </li>
+      <li>
+        <h3>The laboratory comes into existence, all at once</h3>
+        <p>
+          One transaction creates the organization, the owner's membership, the
+          laboratory record and its own pricing. Because the invitation was delivered
+          to that address and redeemed from it, the email is already verified. If two
+          people click the same link, exactly one succeeds.
+        </p>
+      </li>
+      <li>
+        <h3>They publish what they sell</h3>
+        <p>
+          The laboratory adds its tests — either written from scratch or copied from
+          the platform's shared library as a starting point — sets its prices, fills in
+          its address and logo, and invites its colleagues. Once it lists itself in the
+          directory, breeders can order.
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2 class="head">The administrator's console</h2>
+    <p class="lede">
+      Full sight, one switch. This is deliberate: the administrator supports vendors
+      and can shut off a bad actor, but a laboratory's work is its own.
+    </p>
+
+    <div class="split">
+      <div class="can">
+        <div class="split-head">Can</div>
+        <ul>
+          <li>List every laboratory with its member, test and order counts</li>
+          <li>Open one and read its members, orders, results, tests and prices</li>
+          <li>Read its invitation history and full audit trail</li>
+          <li>Invite a new laboratory, and withdraw an invitation</li>
+          <li>Suspend a laboratory, and reactivate it</li>
+        </ul>
+      </div>
+      <div class="cannot">
+        <div class="split-head">Cannot</div>
+        <ul>
+          <li>Change a laboratory's name, address or logo</li>
+          <li>Add, remove or re-role its staff</li>
+          <li>Edit its tests or its prices</li>
+          <li>Touch a result, a certificate or an order's contents</li>
+          <li>Sign in as the laboratory</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="body">
+      The restriction is structural rather than a rule someone has to remember: the
+      endpoints an administrator would need in order to do those things do not exist.
+      Suspension is the single write, it always requires a written reason, and it is
+      fully reversible — it stops sign-in and hides the laboratory from breeders
+      without altering any of its data.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Route</th><th>Purpose</th><th>Writes?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">GET /admin/vendor-labs/invites</td><td>Pending and historical invitations</td><td>No</td></tr>
+          <tr><td class="num">POST /admin/vendor-labs/invites</td><td>Invite a laboratory</td><td>Creates an invitation</td></tr>
+          <tr><td class="num">POST /admin/vendor-labs/invites/:id/revoke</td><td>Withdraw an invitation</td><td>Marks it withdrawn</td></tr>
+          <tr><td class="num">GET /admin/vendor-labs/:id</td><td>Everything about one laboratory</td><td>No</td></tr>
+          <tr><td class="num">PATCH /admin/vendor-labs/:id/status</td><td>Suspend or reactivate</td><td>Status only, reason required</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">The laboratory portal</h2>
+    <p class="lede">
+      What a vendor runs for itself. Every screen below acts on the signed-in
+      laboratory, resolved from who they are — no screen takes a laboratory
+      identifier, so none can be pointed at somebody else's.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Screen</th><th>What it does</th><th>Who can reach it</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Dashboard</td><td>Queue overview and recent activity</td><td>Any member</td></tr>
+          <tr><td>All Shed Orders</td><td>Orders addressed to this laboratory, and only those</td><td>Any member</td></tr>
+          <tr><td>Sample Intake</td><td>Receive samples, scan specimen QR codes</td><td>Any member</td></tr>
+          <tr><td>Result Entry</td><td>Draft and submit results</td><td>Any member</td></tr>
+          <tr><td>Completed Tests</td><td>Finished work and issued certificates</td><td>Any member</td></tr>
+          <tr><td>Test Catalog</td><td>The tests this laboratory sells, and their prices</td><td>Owner, administrator</td></tr>
+          <tr><td>Pricing &amp; Logic</td><td>This laboratory's own tier pricing</td><td>Owner, administrator</td></tr>
+          <tr><td>Laboratory Settings</td><td>Name, contact, address, logo, turnaround, directory listing</td><td>Owner, administrator</td></tr>
+          <tr><td>Team</td><td>Invite colleagues, set roles, transfer ownership</td><td>Owner, administrator</td></tr>
+          <tr><td>My Account</td><td>Personal name, email and password</td><td>Any member</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub">Roles inside a laboratory</h3>
+    <p class="body">
+      A person's role in their laboratory is separate from what kind of account they
+      hold on the platform. This is what makes a laboratory with more than one
+      employee possible at all — access follows membership, not the single person the
+      administrator originally invited.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Day-to-day work</th><th>Tests, prices, profile</th><th>Staff</th><th>Ownership</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>Owner</b></td><td>Yes</td><td>Yes</td><td>Yes</td><td>Can hand over</td></tr>
+          <tr><td><b>Administrator</b></td><td>Yes</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+          <tr><td><b>Billing manager</b></td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td><b>Member</b></td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note">
+      Billing manager currently behaves as a member, because vendor laboratories are
+      not billed. The role exists for the subscription phase and is inert until then.
+    </p>
+
+    <p class="body">
+      Removing someone ends their access and nothing else. Their account survives, and
+      so do the results they signed off — a person leaving a laboratory is not a reason
+      to rewrite the record of work they did there.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="head">The breeder's side</h2>
+    <p class="lede">
+      Ordering now begins with a choice of laboratory, because there is no longer such
+      a thing as “the catalogue” or “the price list” — only a given laboratory's.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h3>Choose a laboratory</h3>
+        <p>
+          The directory lists laboratories that are approved, active, and have listed
+          themselves. Each shows its location, how many tests it offers and its typical
+          turnaround.
+        </p>
+        <div class="evidence"><b>GET</b> /api/lab/directory</div>
+      </li>
+      <li>
+        <h3>Pick tests for each animal</h3>
+        <p>
+          The test list belongs to the chosen laboratory. Suggested tests for
+          possible-het genetics are matched against that laboratory's own offerings.
+        </p>
+      </li>
+      <li>
+        <h3>See a live price</h3>
+        <p>
+          Quoted from the chosen laboratory's tier pricing. If that laboratory has not
+          finished setting up its prices, the quote fails plainly rather than falling
+          back to somebody else's numbers.
+        </p>
+        <div class="evidence"><b>POST</b> /api/lab/orders/calculate-price</div>
+      </li>
+      <li>
+        <h3>Submit, and print labels</h3>
+        <p>
+          The order names its laboratory, and is numbered in that laboratory's own
+          sequence. Shipping labels are addressed to that laboratory, using its address
+          — not a fixed one.
+        </p>
+      </li>
+      <li>
+        <h3>Receive results and a certificate</h3>
+        <p>
+          Issued under the name and logo of the laboratory that actually ran the test.
+          Confirmed results feed back into the animal's recorded genetics.
+        </p>
+      </li>
+    </ol>
+
+    <p class="note">
+      Changing laboratory mid-order clears the staged animals. Those test selections
+      belong to the previous laboratory's catalogue and would mean nothing in the new
+      one — so the app says so, rather than silently carrying across identifiers that
+      no longer resolve.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="head">What is verified</h2>
+    <p class="lede">
+      Isolation that holds inside a service but is not wired into the routes protects
+      nothing. That was precisely the original defect — the rules existed, the order
+      routes never asked — so the tests run at both levels.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Suite</th><th>What it proves</th><th class="num">Tests</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Invitation lifecycle</td><td>Token hashing, single use, expiry, supersession, what a preview may reveal</td><td class="num">19</td></tr>
+          <tr><td>Vendor tenancy</td><td>Tests and prices scoped by laboratory at the service layer</td><td class="num">14</td></tr>
+          <tr><td>Role matrix</td><td>Role gates, suspension, team-management guard rails</td><td class="num">15</td></tr>
+          <tr><td>Route isolation</td><td>Two laboratories against the live API, every lab-facing route</td><td class="num">14</td></tr>
+          <tr><td><b>Whole backend</b></td><td>Including every pre-existing suite</td><td class="num"><b>350</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub">The migration</h3>
+    <p class="body">
+      Applying a migration to an empty database only proves the SQL parses. A
+      repeatable harness now builds a throwaway database, applies every earlier
+      migration, seeds the state a real deployment is actually in — one laboratory, the
+      shared catalogue and pricing it sold against, an order placed through it — applies
+      the change on top, and asserts what happened to the data.
+    </p>
+    <p class="body">
+      Writing it found a defect that would have failed on deploy: the order-line
+      backfill referenced the update target from inside a join condition, which
+      PostgreSQL rejects outright. That is now fixed and verified.
+    </p>
+    <div class="evidence">./scripts/verify-lab-tenancy-migration.ps1</div>
+  </section>
+
+  <section>
+    <h2 class="head">What is missing</h2>
+    <p class="lede">
+      In order of what should worry you. One item gates deployment; the rest are
+      scheduled, or predate this work.
+    </p>
+
+    <div class="rows">
+      <div class="row is-blocked">
+        <div class="row-top">
+          <h3>The migration has not been rehearsed against live data</h3>
+          <span class="chip chip-blocked">Blocks deploy</span>
+          <span class="chip chip-you">Needs your access</span>
+        </div>
+        <p>
+          The harness covers the single-laboratory case with seeded rows. A copy of
+          production exercises real row volume and the branch that deliberately leaves
+          orders unattributed when there is no single laboratory to attribute them to.
+          Dump from the live database, restore to a scratch one, run the migration, read
+          what it reports.
+        </p>
+        <div class="evidence">Roughly half a day · requires database credentials I do not have</div>
+      </div>
+
+      <div class="row is-partial">
+        <div class="row-top">
+          <h3>Browser end-to-end tests are out of date</h3>
+          <span class="chip chip-partial">Scheduled</span>
+        </div>
+        <p>
+          The seed script creates a laboratory but no sellable tests or per-laboratory
+          pricing, so nothing is orderable. Two specs reference a pricing endpoint that
+          has moved and an order flow that now needs a laboratory. Worth adding
+          alongside: a two-laboratory spec proving separation through a real browser.
+          Separately, a pre-existing configuration slip means these specs are picked up
+          by the unit-test runner that is supposed to ignore them — a one-line fix.
+        </p>
+        <div class="evidence">Roughly one day · 2 of 11 specs affected</div>
+      </div>
+
+      <div class="row is-partial">
+        <div class="row-top">
+          <h3>The breeder side is not yet organization-scoped</h3>
+          <span class="chip chip-partial">Next phase</span>
+        </div>
+        <p>
+          Laboratories are tenants; breeders still are not. Around twelve models —
+          animals, pairings, clutches, reproductive records, sync state — still check
+          individual ownership. The pattern is proven now, so the work is mechanical but
+          wide. It unlocks breeder teams, which is a product feature rather than
+          plumbing. Worth waiting until the open cloud-sync defects are settled, since
+          two of those models drive sync.
+        </p>
+        <div class="evidence">One to two weeks · the plan overstates this as “~60 tables”; it is about 12</div>
+      </div>
+
+      <div class="row is-partial">
+        <div class="row-top">
+          <h3>A legacy oversight screen still reads local data</h3>
+          <span class="chip chip-partial">Cleanup</span>
+        </div>
+        <p>
+          The Lab Portal has its own “Admin Oversight” page from before the
+          administrator console existed. It reads from browser storage rather than the
+          server, and the real console now does this job properly. It should be removed
+          rather than left to show stale figures to whoever finds it.
+        </p>
+        <div class="evidence">An hour</div>
+      </div>
+
+      <div class="row is-partial">
+        <div class="row-top">
+          <h3>No self-service route for a laboratory to ask to join</h3>
+          <span class="chip chip-partial">Product decision</span>
+        </div>
+        <p>
+          Invitation-only was the deliberate choice, and it is correctly enforced. But a
+          laboratory that hears about the platform has no way to raise its hand — it has
+          to reach you some other way. A simple “apply to become a partner” form that
+          creates a lead for review, creating no account, would close that gap without
+          weakening the rule.
+        </p>
+        <div class="evidence">Not a defect — flagged as a gap in the journey</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="head">What I would do next</h2>
+    <div class="rows">
+      <div class="row is-shipped">
+        <div class="row-top"><h3>This week</h3><span class="chip chip-shipped">Cheap</span></div>
+        <p>
+          Fix the test-runner configuration line, update the seed script, and repair the
+          two affected browser specs. This makes everything else testable and costs
+          about a day.
+        </p>
+      </div>
+      <div class="row is-blocked">
+        <div class="row-top"><h3>Before any laboratory goes live</h3><span class="chip chip-blocked">Gating</span></div>
+        <p>
+          Rehearse the migration against a copy of production. This is the only item
+          that stands between the work and a deployment, and it needs your database
+          access rather than mine.
+        </p>
+      </div>
+      <div class="row">
+        <div class="row-top"><h3>Then, separately</h3></div>
+        <p>
+          Bring the breeder side into the same tenancy model — after the cloud-sync
+          defects are resolved, so the two investigations do not tangle.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</div>
