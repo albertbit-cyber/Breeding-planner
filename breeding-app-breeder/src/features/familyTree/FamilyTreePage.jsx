@@ -175,7 +175,7 @@ const findLocalParentByName = (snakes, name, preferredSex, selectedSnakeId) => {
   return exactMatch || preferred || matches[0];
 };
 
-const inferParentsForLocalSnake = (child, snakes) => {
+export const inferParentsForLocalSnake = (child, snakes) => {
   if (!child) return { sire: null, dam: null };
 
   const byId = new Map(snakes.map((snake) => [snake?.id, snake]).filter(([id]) => !!id));

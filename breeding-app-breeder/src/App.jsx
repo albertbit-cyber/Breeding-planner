@@ -96,8 +96,18 @@ import {
   sexOrUnknown,
 } from "./features/animals/animalSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
-import { resolveCatalogParentLabel } from "./features/animals/catalogParentLabel";
+import { resolveCatalogParent } from "./features/animals/catalogParentLabel";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
+import {
+  CATALOG_COLORS,
+  CATALOG_METRICS,
+  catalogBirthValue,
+  drawCatalogPanel,
+  catalogSexWord,
+  fitTextToBox,
+  pt2mm,
+} from "./features/animals/catalogLayout";
+import { inferParentsForLocalSnake } from "./features/familyTree/FamilyTreePage.jsx";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
 import QuarantinePanel from "./features/quarantine/QuarantinePanel.jsx";
 import QuarantineNotice from "./features/quarantine/QuarantineNotice.jsx";
@@ -14986,12 +14996,6 @@ function loadImageElement(src) {
   });
 }
 
-function formatCatalogSex(rawSex) {
-  const normalized = normalizeSexValue(rawSex);
-  if (normalized === 'M') return '1.0';
-  if (normalized === 'F') return '0.1';
-  return String(rawSex || 'Unknown').trim() || 'Unknown';
-}
 
 function resolveCatalogMorph(animal) {
   if (!animal || typeof animal !== 'object') return '';
@@ -15190,20 +15194,16 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
 
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const pagePadding = 12;
-  const contentW = pageW - (pagePadding * 2);
-  const contentH = pageH - (pagePadding * 2);
-  const textColumnW = contentW * 0.37;
-  const imageColumnW = contentW * 0.63;
-  const textX = pagePadding + 4;
-  const textLabelW = 24;
-  const lineHeight = 7;
-  const textRight = pagePadding + textColumnW;
-  const bottomLimit = pageH - pagePadding;
-  const imageX = pagePadding + textColumnW;
-  const imageY = pagePadding;
-  const imageW = imageColumnW;
-  const imageH = contentH;
+  const M = CATALOG_METRICS;
+  const C = CATALOG_COLORS;
+
+  // Paper panel down the left, photograph full bleed to the right of it.
+  const panelW = pageW * M.panelRatio;
+  const textX = M.padLeft;
+  const textW = panelW - M.padLeft - M.padRight;
+  const panelBottom = pageH - M.padBottom;
+  const photoX = panelW;
+  const photoW = pageW - panelW;
 
   const hasCover = Boolean(breederInfo || coverTitle || coverSubtitle);
   if (hasCover) {
@@ -15216,97 +15216,63 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
     }
 
     const animal = animals[index] || {};
-    const idValue = String(animal.id || '—');
+    const idValue = String(animal.id || '').trim();
     const nameValue = String(animal.name || '').trim();
-    const sireLabel = String(animal.sireLabel || '').trim();
-    const damLabel = String(animal.damLabel || '').trim();
-    const sexValue = formatCatalogSex(animal.sex);
-    const morphValue = resolveCatalogMorph(animal) || '—';
+    const sexWord = String(animal.sexWord || '').trim();
+    const bornWord = String(animal.bornWord || '').trim();
+    const sire = animal.sire || { name: '', genetics: '' };
+    const dam = animal.dam || { name: '', genetics: '' };
+    const morphValue = resolveCatalogMorph(animal);
     const priceRaw = animal.price;
     const pairingRaw = animal.pairing;
-    const taggedForSell = isSnakeTaggedForSell(animal);
     const hasPrice = !(priceRaw === null || typeof priceRaw === 'undefined' || String(priceRaw).trim() === '');
     const hasPairing = !(pairingRaw === null || typeof pairingRaw === 'undefined' || String(pairingRaw).trim() === '');
 
-    doc.setFillColor(244, 244, 244);
+    doc.setFillColor(C.paper[0], C.paper[1], C.paper[2]);
     doc.rect(0, 0, pageW, pageH, 'F');
 
     const primaryImage = resolvePrimaryAnimalImage(animal);
+    let imageDrawn = false;
     if (primaryImage) {
       try {
         const image = await loadImageElement(primaryImage);
         const naturalW = Number(image.naturalWidth || image.width || 0);
         const naturalH = Number(image.naturalHeight || image.height || 0);
         if (naturalW > 0 && naturalH > 0) {
-          const scale = Math.min(imageW / naturalW, imageH / naturalH);
+          // Cover, not contain: the column is filled edge to edge and the
+          // overflow is cropped, so no page carries a band of dead grey.
+          const scale = Math.max(photoW / naturalW, pageH / naturalH);
           const drawW = naturalW * scale;
           const drawH = naturalH * scale;
-          const drawX = imageX + ((imageW - drawW) / 2);
-          const drawY = imageY + ((imageH - drawH) / 2);
+          const drawX = photoX + ((photoW - drawW) / 2);
+          const drawY = (pageH - drawH) / 2;
           doc.addImage(primaryImage, 'JPEG', drawX, drawY, drawW, drawH);
-        } else {
-          drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+          imageDrawn = true;
         }
       } catch (err) {
-        drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+        // A photo that will not load costs the page its picture, not the catalog.
+        imageDrawn = false;
       }
-    } else {
-      drawCatalogImagePlaceholder(doc, imageX, imageY, imageW, imageH);
+    }
+    if (!imageDrawn) {
+      drawCatalogImagePlaceholder(doc, photoX, 0, photoW, pageH);
     }
 
-    let cursorY = pagePadding + 16;
-    const drawField = (label, value, {
-      multiline = false,
-      maxLines = 0,
-      fontSize = 12.5,
-      lineGap = 5.4,
-      labelW = textLabelW,
-    } = {}) => {
-      // A page carrying parents on top of its own genetics can run long;
-      // stop at the margin rather than printing into it.
-      if (cursorY > bottomLimit) return;
-      setPdfFont(doc, 'bold');
-      doc.setFontSize(fontSize);
-      doc.setTextColor(28, 28, 28);
-      doc.text(`${label}:`, textX, cursorY);
-      setPdfFont(doc, 'normal');
-      const valueX = textX + labelW;
-      if (multiline) {
-        const valueMaxW = Math.max(30, textRight - valueX - 2);
-        let lines = doc.splitTextToSize(String(value || ''), valueMaxW);
-        if (maxLines > 0 && lines.length > maxLines) {
-          lines = lines.slice(0, maxLines);
-          let last = String(lines[maxLines - 1]).replace(/[\s,]+$/, '');
-          // The ellipsis is appended after wrapping, so the last line has to
-          // pay for it -- otherwise the cut line is the one that hangs over
-          // the photo column.
-          while (last && doc.getTextWidth(`${last}…`) > valueMaxW) {
-            last = last.slice(0, -1).replace(/[\s,]+$/, '');
-          }
-          lines[maxLines - 1] = `${last}…`;
-        }
-        doc.text(lines, valueX, cursorY);
-        cursorY += (Math.max(1, lines.length) * lineGap) + 4;
-      } else {
-        doc.text(String(value || '—'), valueX, cursorY);
-        cursorY += lineHeight;
-      }
-    };
+    // Overflow from the cover crop spills left over the panel; repaint it.
+    doc.setFillColor(C.paper[0], C.paper[1], C.paper[2]);
+    doc.rect(0, 0, panelW, pageH, 'F');
 
-    // The name is what a buyer asks after; the ID stays because it is what
-    // the breeder files the animal under. No line is spent when the animal
-    // was never named beyond its ID.
-    if (nameValue && nameValue !== idValue) drawField('NAME', nameValue, { multiline: true, maxLines: 2 });
-    drawField('ID', idValue);
-    drawField('SEX', sexValue);
-    drawField('MORPH', morphValue, { multiline: true, maxLines: 4 });
-    if (sireLabel || damLabel) {
-      const parentOpts = { multiline: true, maxLines: 2, fontSize: 9.5, lineGap: 4.4, labelW: 16 };
-      if (sireLabel) drawField('SIRE', sireLabel, parentOpts);
-      if (damLabel) drawField('DAM', damLabel, parentOpts);
-    }
-    if (taggedForSell || hasPrice) drawField('PRICE', hasPrice ? String(priceRaw).trim() : '');
-    if (hasPairing) drawField('PAIRING', String(pairingRaw).trim(), { multiline: true, maxLines: 2 });
+    drawCatalogPanel(doc, {
+      name: nameValue,
+      id: idValue,
+      sexWord,
+      bornWord,
+      morph: morphValue,
+      sire,
+      dam,
+      pairing: hasPairing ? String(pairingRaw).trim() : '',
+      price: hasPrice ? String(priceRaw).trim() : '',
+    }, { pageW, pageH, breederInfo, setFont: setPdfFont });
   }
 
   doc.save(fileName || buildCatalogFileName([]));
@@ -18731,16 +18697,50 @@ function BreederSection({
         }));
       }
 
+      const sexLabels = {
+        male: t('animals.sexMale', { defaultValue: 'Male' }),
+        female: t('animals.sexFemale', { defaultValue: 'Female' }),
+        unsexed: t('animals.sexUnsexed', { defaultValue: 'Unsexed' }),
+      };
+      const allSnakes = Array.isArray(snakes) ? snakes.filter(Boolean) : [];
+
       const catalogRows = selectedAnimals
         .sort((a, b) => collator.compare(String(a?.id || ''), String(b?.id || '')))
         .map((snake) => {
           const linkedPairings = pairingsBySnakeId.get(snake.id) || [];
           const pairingLabel = linkedPairings.length ? String(linkedPairings[0]?.label || '').trim() : '';
+
+          const sire = resolveCatalogParent(snake, 'sire', snakeById, resolveCatalogMorph);
+          const dam = resolveCatalogParent(snake, 'dam', snakeById, resolveCatalogMorph);
+          // Most animals never had sireId/damId written. The family tree
+          // already reads parentage out of a hatchling name such as
+          // "Lulu x Arun - 8" and matches breeders by token, so fall back to
+          // it rather than leaving the page blank.
+          if (!sire.name || !dam.name) {
+            const inferred = inferParentsForLocalSnake(snake, allSnakes) || {};
+            if (!sire.name && inferred.sire) {
+              sire.name = String(inferred.sire.name || inferred.sire.id || '').trim();
+              sire.genetics = sire.genetics || resolveCatalogMorph(inferred.sire);
+            }
+            if (!dam.name && inferred.dam) {
+              dam.name = String(inferred.dam.name || inferred.dam.id || '').trim();
+              dam.genetics = dam.genetics || resolveCatalogMorph(inferred.dam);
+            }
+          }
+
+          const birthValue = catalogBirthValue(snake);
           return {
             ...snake,
             genetics: resolveCatalogMorph(snake),
-            sireLabel: resolveCatalogParentLabel(snake, 'sire', snakeById, resolveCatalogMorph),
-            damLabel: resolveCatalogParentLabel(snake, 'dam', snakeById, resolveCatalogMorph),
+            sire,
+            dam,
+            sexWord: catalogSexWord(normalizeSexValue(snake?.sex), sexLabels),
+            bornWord: birthValue
+              ? t('export.catalog.hatchedOn', {
+                defaultValue: 'Hatched {{date}}',
+                date: formatDateForDisplay(birthValue),
+              })
+              : '',
             pairing: snake?.pairing || pairingLabel || '',
             primaryImage: resolvePrimaryAnimalImage(snake),
           };

@@ -31,9 +31,10 @@ export function catalogGeneticsText(value) {
  * @param resolveGenetics reads a displayable genetics string off a full animal
  * @returns the label, or '' when nothing is recorded about that parent
  */
-export function resolveCatalogParentLabel(animal, role, snakeById = null, resolveGenetics = null) {
-  if (!animal || typeof animal !== 'object') return '';
-  if (role !== 'sire' && role !== 'dam') return '';
+export function resolveCatalogParent(animal, role, snakeById = null, resolveGenetics = null) {
+  const none = { name: '', genetics: '' };
+  if (!animal || typeof animal !== 'object') return none;
+  if (role !== 'sire' && role !== 'dam') return none;
 
   const idKey = role === 'sire' ? 'sireId' : 'damId';
   const nameKey = role === 'sire' ? 'sireName' : 'damName';
@@ -59,6 +60,12 @@ export function resolveCatalogParentLabel(animal, role, snakeById = null, resolv
       || catalogGeneticsText(animal[geneticsKey])
       || (snapshot ? catalogGeneticsText(readGenetics(snapshot)) : ''));
 
+  return { name, genetics };
+}
+
+/** The same parent as one line, for callers that want a single string. */
+export function resolveCatalogParentLabel(animal, role, snakeById = null, resolveGenetics = null) {
+  const { name, genetics } = resolveCatalogParent(animal, role, snakeById, resolveGenetics);
   if (name && genetics) return `${name} — ${genetics}`;
   return name || genetics || '';
 }
