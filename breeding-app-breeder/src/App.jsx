@@ -6601,6 +6601,9 @@ export default function BreedingPlannerApp() {
   const { appearanceState, resolvedAppearance, effectiveThemeMode, hydrateAppearance } = useAppearance();
   const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
+  // Every control on the animals toolbar — filters, layout toggle, sort, actions — shares this,
+  // so the row reads as one strip instead of three competing button styles.
+  const toolbarControlClass = cx(primaryBtnClass(theme, true), 'bp-toolbar-control');
   const appRootStyle = useMemo(() => ({
     backgroundColor: resolvedAppearance?.colors?.background || '#f6f7f9',
     color: resolvedAppearance?.colors?.text || '#0f172a',
@@ -10338,28 +10341,6 @@ export default function BreedingPlannerApp() {
               </div>
             </div>
           </div>
-          {/* Search sits on its own row rather than sharing one with eight nav tabs. In the tab
-              row it was the first thing to wrap once the viewport narrowed, landing under the
-              buttons at an unpredictable width; given the full row it keeps one position. */}
-          <div className="mt-3 header-search-shell">
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={t("header.search")}
-              className="header-search-input w-full pr-11"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="header-search-clear"
-                onClick={() => setQuery("")}
-                aria-label={t("filters.clear", { defaultValue: "Clear" })}
-                title={t("filters.clear", { defaultValue: "Clear" })}
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
         </div>
       </div>
 
@@ -10446,44 +10427,49 @@ export default function BreedingPlannerApp() {
           <div className="flex flex-col gap-4">
             <div className="bp-toolbar flex flex-wrap items-center gap-2">
               <div className="bp-filter-tabs flex flex-wrap items-center gap-2">
-                <TabButton theme={theme} active={animalView === "all"} onClick={()=>handleAnimalViewTabChange("all")}>{t("filters.all")}</TabButton>
-                <TabButton theme={theme} active={animalView === "males"} onClick={()=>handleAnimalViewTabChange("males")}>{t("filters.males")}</TabButton>
-                <TabButton theme={theme} active={animalView === "females"} onClick={()=>handleAnimalViewTabChange("females")}>{t("filters.females")}</TabButton>
-                <TabButton theme={theme} active={animalView === "groups"} onClick={()=>handleAnimalViewTabChange("groups")}>{t("filters.groups")}</TabButton>
+                {[
+                  { key: 'all', label: t("filters.all") },
+                  { key: 'males', label: t("filters.males") },
+                  { key: 'females', label: t("filters.females") },
+                  { key: 'groups', label: t("filters.groups") },
+                ].map(filter => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    className={cx(
+                      toolbarControlClass,
+                      animalView === filter.key && 'bp-toolbar-control--selected'
+                    )}
+                    aria-pressed={animalView === filter.key}
+                    onClick={() => handleAnimalViewTabChange(filter.key)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
               </div>
               {animalView !== "groups" && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1 border rounded-xl bg-white px-1 py-1 text-xs shadow-sm">
-                    <button
-                      type="button"
-                      className={cx(
-                        'px-2 py-1 rounded-lg font-medium transition-colors',
-                        animalLayout === 'cards'
-                          ? 'bg-sky-500 text-white shadow'
-                          : 'text-neutral-600 hover:text-neutral-900'
-                      )}
-                      aria-pressed={animalLayout === 'cards'}
-                      onClick={() => handleAnimalLayoutChange('cards')}
-                    >
-                      {t('ui.listControls.cards', { defaultValue: 'Cards' })}
-                    </button>
-                    <button
-                      type="button"
-                      className={cx(
-                        'px-2 py-1 rounded-lg font-medium transition-colors',
-                        animalLayout === 'list'
-                          ? 'bg-sky-500 text-white shadow'
-                          : 'text-neutral-600 hover:text-neutral-900'
-                      )}
-                      aria-pressed={animalLayout === 'list'}
-                      onClick={() => handleAnimalLayoutChange('list')}
-                    >
-                      {t('ui.listControls.list', { defaultValue: 'List' })}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1 border rounded-xl bg-white px-1 py-1 text-xs shadow-sm">
+                  <button
+                    type="button"
+                    className={cx(toolbarControlClass, animalLayout === 'cards' && 'bp-toolbar-control--selected')}
+                    aria-pressed={animalLayout === 'cards'}
+                    onClick={() => handleAnimalLayoutChange('cards')}
+                  >
+                    {t('ui.listControls.cards', { defaultValue: 'Cards' })}
+                  </button>
+                  <button
+                    type="button"
+                    className={cx(toolbarControlClass, animalLayout === 'list' && 'bp-toolbar-control--selected')}
+                    aria-pressed={animalLayout === 'list'}
+                    onClick={() => handleAnimalLayoutChange('list')}
+                  >
+                    {t('ui.listControls.list', { defaultValue: 'List' })}
+                  </button>
+                  {/* Select and direction toggle share one pill so they read as a single sort
+                      control rather than two unrelated buttons. */}
+                  <div className={cx(toolbarControlClass, animalSortBy && 'bp-toolbar-control--selected')}>
                     <select
-                      className="bg-transparent px-2 py-1 rounded-lg font-medium text-neutral-700 focus:outline-none"
+                      className="bp-toolbar-select"
                       value={animalSortBy}
                       onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
                       aria-label={t('animals.sort.label', { defaultValue: 'Sort by' })}
@@ -10497,10 +10483,7 @@ export default function BreedingPlannerApp() {
                     </select>
                     <button
                       type="button"
-                      className={cx(
-                        'px-2 py-1 rounded-lg font-medium transition-colors',
-                        animalSortBy ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-300 cursor-not-allowed'
-                      )}
+                      className={cx('bp-toolbar-sort-dir font-semibold', animalSortBy ? 'opacity-100' : 'opacity-40 cursor-not-allowed')}
                       onClick={handleAnimalSortDirToggle}
                       disabled={!animalSortBy}
                       aria-label={animalSortDir === 'desc'
@@ -10516,10 +10499,7 @@ export default function BreedingPlannerApp() {
                   {animalLayout === 'list' && (
                     <button
                       type="button"
-                      className={cx(
-                        'px-3 py-2 rounded-xl text-xs sm:text-sm border bg-white font-medium transition-colors',
-                        activeAnimalList.length ? 'hover:border-sky-500 hover:text-sky-700' : 'opacity-60 cursor-not-allowed'
-                      )}
+                      className={toolbarControlClass}
                       onClick={() => {
                         // Animal list export entry point
                         handleListExportCsv();
@@ -10542,10 +10522,25 @@ export default function BreedingPlannerApp() {
                 +
               </button>
               <div className="ml-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
+                <button onClick={()=>setShowExportModal(true)} className={toolbarControlClass}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowFeedPrepModal(true)} className={toolbarControlClass}>{t("feedPrep.open", { defaultValue: "Feed prep" })}</button>
+                <button onClick={()=>setShowScanner(true)} className={toolbarControlClass}>{t("actions.scanQr")}</button>
+                <button
+                  onClick={() => {
+                    setNewAnimal(createEmptyNewAnimalDraft());
+                    setShowAddModal(true);
+                  }}
+                  className={toolbarControlClass}
+                >
+                  + {t("actions.addAnimal")}
+                </button>
+                <button onClick={() => setShowImportModal(true)} className={toolbarControlClass}>{t("actions.importAnimals")}</button>
+                {/* Last on the row, and smaller than the buttons: this reports scanner state,
+                    it is not something to press. Its colour still tracks that state. */}
                 {isAnimalScannerView && (
                   <div
                     className={cx(
-                      'px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border transition-colors',
+                      'bp-toolbar-status flex items-center gap-1.5 border transition-colors',
                       passiveScannerStatus === 'success'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : passiveScannerStatus === 'error'
@@ -10555,7 +10550,7 @@ export default function BreedingPlannerApp() {
                   >
                     <span
                       className={cx(
-                        'w-2 h-2 rounded-full',
+                        'w-1.5 h-1.5 rounded-full',
                         passiveScannerStatus === 'success'
                           ? 'bg-emerald-500 animate-pulse'
                           : passiveScannerStatus === 'error'
@@ -10566,21 +10561,33 @@ export default function BreedingPlannerApp() {
                     <span>{passiveScannerLabel}</span>
                   </div>
                 )}
-                <button onClick={()=>setShowExportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.exportQr")}</button>
-                <button onClick={()=>setShowFeedPrepModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("feedPrep.open", { defaultValue: "Feed prep" })}</button>
-                <button onClick={()=>setShowScanner(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.scanQr")}</button>
-                <button
-                  onClick={() => {
-                    setNewAnimal(createEmptyNewAnimalDraft());
-                    setShowAddModal(true);
-                  }}
-                  className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}
-                >
-                  + {t("actions.addAnimal")}
-                </button>
-                <button onClick={() => setShowImportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.importAnimals")}</button>
               </div>
             </div>
+            {/* Search belongs to the animal list, not the app: `query` only ever feeds
+                filterSnakes. Sitting directly under the toolbar it lines up with the controls
+                that filter alongside it, and it is absent from Groups view, which the query
+                does not filter. */}
+            {animalView !== "groups" && (
+              <div className="header-search-shell w-full">
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder={t("header.search")}
+                  className="header-search-input w-full pr-11"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    className="header-search-clear"
+                    onClick={() => setQuery("")}
+                    aria-label={t("filters.clear", { defaultValue: "Clear" })}
+                    title={t("filters.clear", { defaultValue: "Clear" })}
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+            )}
             {animalLayout === 'list' && listExportFeedback && (
               <div className={cx(
                 'text-xs',

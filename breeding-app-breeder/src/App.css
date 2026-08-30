@@ -1511,6 +1511,91 @@
   backdrop-filter: blur(12px);
 }
 
+/* Animals toolbar — one shape and one colour for every control on the row.
+   The row used to mix three treatments: pill-shaped filter tabs, white outlined
+   boxes around the layout toggle and the sort select, and filled action buttons.
+   These classes put them all on the filled pill so the row reads as one strip.
+   Sizing uses !important for the same reason .header-nav-button does: the base
+   .appearance-btn / .appearance-tab rules and the Tailwind utilities on the
+   elements have equal specificity, so ordering alone decides the winner. */
+.bp-toolbar-control {
+  border-radius: 999px !important;
+  padding: 0.42rem 0.85rem !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Everything on the row shares a fill, so the selected filter cannot be marked with a different
+   colour. An inset ring keeps shape and colour identical and still shows which filter is active.
+   Scoped under .app-root to outrank .appearance-btn--filled's own box-shadow, which is declared
+   later in this file at the same specificity and would otherwise erase the ring. */
+.app-root .bp-toolbar-control--selected {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9), 0 15px 30px rgba(14, 165, 233, 0.25);
+}
+
+.bp-toolbar-control:disabled {
+  cursor: not-allowed;
+}
+
+/* `.app-root button` forces `background: var(--primary) !important` on every button in the app,
+   so the buttons on this row already share one colour. The sort control is a div wrapping a
+   select, so it never matches that rule and would fall back to `--color-primary`, a different
+   variable that can resolve to a different shade. Mirror the button rule so the whole row stays
+   one colour under every skin. */
+.app-root .bp-toolbar-control:not(button) {
+  background: var(--primary, var(--color-primary, #0ea5e9)) !important;
+  color: var(--primary-contrast, #fff) !important;
+  border-color: var(--primary-border, transparent) !important;
+}
+
+/* The direction toggle sits inside the sort pill. Without this it matches `.app-root button`
+   and paints its own fill on top of the pill it lives in. */
+.app-root .bp-toolbar-control .bp-toolbar-sort-dir {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+
+/* The sort control is a native select; it has to inherit the pill's colours
+   rather than the browser default, and the dropdown list needs readable
+   colours of its own because it renders outside the pill. */
+.bp-toolbar-select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding-right: 0.2rem;
+  cursor: pointer;
+}
+
+.bp-toolbar-select:focus {
+  outline: none;
+}
+
+.bp-toolbar-select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+/* Scanner status sits at the end of the row and is deliberately quieter than
+   the buttons: it reports state, it is not something to press. */
+.bp-toolbar-status {
+  border-radius: 999px;
+  padding: 0.24rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 /* Appearance designer */
 .appearance-btn {
   font-weight: 600;
