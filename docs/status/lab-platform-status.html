@@ -457,8 +457,9 @@
     </p>
     <div class="stamp">
       <span><b>Branch</b> feature/lab-vendor-onboarding</span>
-      <span><b>Commits</b> 6</span>
-      <span><b>Backend tests</b> 350 passing</span>
+      <span><b>Commits</b> 10</span>
+      <span><b>Backend tests</b> 362 passing</span>
+      <span><b>Lab app tests</b> 68 passing</span>
       <span><b>Apps building</b> 3 of 3</span>
       <span><b>Reviewed</b> 30 Aug 2026</span>
     </div>
@@ -474,15 +475,17 @@
     </p>
     <p>
       One item stands between this and production: the database migration has been
-      rehearsed against seeded data but not against a copy of live data. Everything
-      else outstanding is either scheduled work or a pre-existing issue this project
-      did not create.
+      rehearsed against seeded data but not against a copy of live data. That
+      rehearsal is now a single command with a runbook — it needs database access
+      rather than more work. Everything else raised in the first review has been
+      closed, except one item deliberately deferred because it would touch a sync
+      path that currently has an unexplained data-loss defect.
     </p>
     <div class="tally">
       <div><span class="n n-shipped">9</span><span class="k">Stages delivered</span></div>
-      <div><span class="n n-shipped">62</span><span class="k">New tests</span></div>
+      <div><span class="n n-shipped">86</span><span class="k">New tests</span></div>
       <div><span class="n n-blocked">1</span><span class="k">Blocks deploy</span></div>
-      <div><span class="n n-partial">4</span><span class="k">Open, scheduled</span></div>
+      <div><span class="n n-partial">1</span><span class="k">Deferred, with cause</span></div>
     </div>
   </div>
 
@@ -803,7 +806,11 @@
           <tr><td>Vendor tenancy</td><td>Tests and prices scoped by laboratory at the service layer</td><td class="num">14</td></tr>
           <tr><td>Role matrix</td><td>Role gates, suspension, team-management guard rails</td><td class="num">15</td></tr>
           <tr><td>Route isolation</td><td>Two laboratories against the live API, every lab-facing route</td><td class="num">14</td></tr>
-          <tr><td><b>Whole backend</b></td><td>Including every pre-existing suite</td><td class="num"><b>350</b></td></tr>
+          <tr><td>Partner applications</td><td>Applying creates a lead and never access; reviewing never invites</td><td class="num">12</td></tr>
+          <tr><td>Genetics (Punnett)</td><td>Inheritance ratios, independent assortment, possible-het uncertainty</td><td class="num">12</td></tr>
+          <tr><td>Browser, two laboratories</td><td>Separation through a real session and the real stack</td><td class="num">6</td></tr>
+          <tr><td><b>Whole backend</b></td><td>Including every pre-existing suite</td><td class="num"><b>362</b></td></tr>
+          <tr><td><b>Lab app</b></td><td>Was 55 passing with 1 failure and 12 miscollected files</td><td class="num"><b>68</b></td></tr>
         </tbody>
       </table>
     </div>
@@ -827,8 +834,8 @@
   <section>
     <h2 class="head">What is missing</h2>
     <p class="lede">
-      In order of what should worry you. One item gates deployment; the rest are
-      scheduled, or predate this work.
+      Four of the five items raised in the first review are closed. What remains is
+      one deployment gate and one deliberate deferral.
     </p>
 
     <div class="rows">
@@ -839,74 +846,104 @@
           <span class="chip chip-you">Needs your access</span>
         </div>
         <p>
-          The harness covers the single-laboratory case with seeded rows. A copy of
-          production exercises real row volume and the branch that deliberately leaves
-          orders unattributed when there is no single laboratory to attribute them to.
-          Dump from the live database, restore to a scratch one, run the migration, read
-          what it reports.
+          Seeded data only exercises the single-laboratory case. A copy of production
+          exercises real row volume and the branch that deliberately leaves orders
+          unattributed when there is no single laboratory to attribute them to. This is
+          now one command with a runbook that says exactly what to look for &mdash; it
+          needs database credentials rather than more engineering.
         </p>
-        <div class="evidence">Roughly half a day · requires database credentials I do not have</div>
+        <div class="evidence">./scripts/rehearse-migration-on-production-copy.ps1 -SourceUrl "&hellip;"</div>
       </div>
 
       <div class="row is-partial">
         <div class="row-top">
-          <h3>Browser end-to-end tests are out of date</h3>
-          <span class="chip chip-partial">Scheduled</span>
+          <h3>The breeder side is deliberately not organization-scoped yet</h3>
+          <span class="chip chip-partial">Deferred, with cause</span>
         </div>
         <p>
-          The seed script creates a laboratory but no sellable tests or per-laboratory
-          pricing, so nothing is orderable. Two specs reference a pricing endpoint that
-          has moved and an order flow that now needs a laboratory. Worth adding
-          alongside: a two-laboratory spec proving separation through a real browser.
-          Separately, a pre-existing configuration slip means these specs are picked up
-          by the unit-test runner that is supposed to ignore them — a one-line fix.
+          Laboratories are tenants; breeder collections still belong to individuals.
+          The reason for holding is specific rather than general: the change touches
+          125 ownership checks, most of them on the cloud-sync path &mdash; which
+          currently carries an unexplained data-loss defect that has already cost one
+          animal record and whose cause is still unknown.
         </p>
-        <div class="evidence">Roughly one day · 2 of 11 specs affected</div>
+        <p>
+          It is also worth being clear that the change delivers nothing visible today.
+          Every breeder already has a personal organization with exactly one member, so
+          organization-scoping is behaviourally identical to the ownership check it
+          replaces. Its value is unlocking breeder teams later. Weighing an invisible
+          change against an active data-loss investigation in the same subsystem, the
+          sequencing is worth keeping.
+        </p>
+        <div class="evidence">
+          Plan &sect;3.2 step 2 &middot; ~12 models &middot; <b>do the sync investigation first</b>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub">Closed since the first review</h3>
+    <div class="rows">
+      <div class="row is-shipped">
+        <div class="row-top">
+          <h3>Browser end-to-end tests</h3>
+          <span class="chip chip-shipped">Done</span>
+        </div>
+        <p>
+          The seed now creates lab-owned tests, per-laboratory pricing and a second
+          laboratory &mdash; without which isolation is untestable, since with one lab
+          &ldquo;sees only its own&rdquo; and &ldquo;sees everything&rdquo; give the
+          same answer. Both stale specs are repaired and a two-laboratory spec proves
+          separation through a real session. The configuration slip is fixed at its
+          cause: the exclusion lived in a second Vite config that was never resolved,
+          and that file is gone.
+        </p>
       </div>
 
-      <div class="row is-partial">
+      <div class="row is-shipped">
         <div class="row-top">
-          <h3>The breeder side is not yet organization-scoped</h3>
-          <span class="chip chip-partial">Next phase</span>
+          <h3>The legacy oversight screen</h3>
+          <span class="chip chip-shipped">Removed</span>
         </div>
         <p>
-          Laboratories are tenants; breeders still are not. Around twelve models —
-          animals, pairings, clutches, reproductive records, sync state — still check
-          individual ownership. The pattern is proven now, so the work is mechanical but
-          wide. It unlocks breeder teams, which is a product feature rather than
-          plumbing. Worth waiting until the open cloud-sync defects are settled, since
-          two of those models drive sync.
+          Page, route, client methods and the local service behind it. It returned
+          empty arrays for results, certificates and genetics changes while sitting in
+          the navigation looking authoritative.
         </p>
-        <div class="evidence">One to two weeks · the plan overstates this as “~60 tables”; it is about 12</div>
       </div>
 
-      <div class="row is-partial">
+      <div class="row is-shipped">
         <div class="row-top">
-          <h3>A legacy oversight screen still reads local data</h3>
-          <span class="chip chip-partial">Cleanup</span>
+          <h3>A way for a laboratory to ask to join</h3>
+          <span class="chip chip-shipped">Built</span>
         </div>
         <p>
-          The Lab Portal has its own “Admin Oversight” page from before the
-          administrator console existed. It reads from browser storage rather than the
-          server, and the real console now does this job properly. It should be removed
-          rather than left to show stale figures to whoever finds it.
+          An application form that creates a lead and nothing else &mdash; no account,
+          no organization, no token, no access. The response says only that it arrived,
+          so it cannot be used to probe who has applied. Reviewing records a decision
+          and never issues an invitation as a side effect, so access cannot be granted
+          by tidying a queue.
         </p>
-        <div class="evidence">An hour</div>
       </div>
 
-      <div class="row is-partial">
+      <div class="row is-shipped">
         <div class="row-top">
-          <h3>No self-service route for a laboratory to ask to join</h3>
-          <span class="chip chip-partial">Product decision</span>
+          <h3>Two things found along the way</h3>
+          <span class="chip chip-shipped">Fixed</span>
         </div>
         <p>
-          Invitation-only was the deliberate choice, and it is correctly enforced. But a
-          laboratory that hears about the platform has no way to raise its hand — it has
-          to reach you some other way. A simple “apply to become a partner” form that
-          creates a lead for review, creating no account, would close that gap without
-          weakening the rule.
+          The migration contained a defect that would have failed on deploy &mdash; the
+          order-line backfill referenced the update target from inside a join
+          condition, which PostgreSQL rejects. It was found by writing the verification
+          the migration never had.
         </p>
-        <div class="evidence">Not a defect — flagged as a gap in the journey</div>
+        <p>
+          And the genetics engine had no tests at all. All three copies of
+          <code>punnett.test.ts</code> contained a single empty export &mdash; a stub
+          named as if it were coverage, for the module this entire product computes. It
+          now has twelve, covering inheritance ratios, independent assortment and
+          possible-het uncertainty. All passed first run; the engine was right, nothing
+          was checking.
+        </p>
       </div>
     </div>
   </section>
@@ -914,27 +951,29 @@
   <section>
     <h2 class="head">What I would do next</h2>
     <div class="rows">
-      <div class="row is-shipped">
-        <div class="row-top"><h3>This week</h3><span class="chip chip-shipped">Cheap</span></div>
-        <p>
-          Fix the test-runner configuration line, update the seed script, and repair the
-          two affected browser specs. This makes everything else testable and costs
-          about a day.
-        </p>
-      </div>
       <div class="row is-blocked">
-        <div class="row-top"><h3>Before any laboratory goes live</h3><span class="chip chip-blocked">Gating</span></div>
+        <div class="row-top"><h3>Next, and it is yours</h3><span class="chip chip-blocked">Gating</span></div>
         <p>
-          Rehearse the migration against a copy of production. This is the only item
-          that stands between the work and a deployment, and it needs your database
-          access rather than mine.
+          Rehearse the migration against a copy of production, then set
+          <code>LAB_PORTAL_URL</code> and deploy. The runbook walks both. This is the
+          only thing standing between the work and a live laboratory.
+        </p>
+        <div class="evidence">docs/architecture/lab-tenancy-deploy-runbook.md</div>
+      </div>
+      <div class="row is-partial">
+        <div class="row-top"><h3>Then the sync investigation</h3></div>
+        <p>
+          Resolve the outstanding cloud-sync defects &mdash; the 413 on large payloads
+          and the unexplained lost record. They are the reason breeder-side tenancy is
+          waiting, so closing them unblocks it.
         </p>
       </div>
       <div class="row">
-        <div class="row-top"><h3>Then, separately</h3></div>
+        <div class="row-top"><h3>Then breeder teams</h3></div>
         <p>
-          Bring the breeder side into the same tenancy model — after the cloud-sync
-          defects are resolved, so the two investigations do not tangle.
+          Bring the breeder side into the same tenancy model. The pattern is proven on
+          the laboratory side now, so it is mechanical work &mdash; just wide, and in a
+          subsystem worth having settled first.
         </p>
       </div>
     </div>
