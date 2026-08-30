@@ -25,6 +25,15 @@ const E2E_USERS = {
     password: "demo1234",
     role: "lab" as const,
   },
+  // A second laboratory exists purely so isolation can be proven rather than
+  // asserted. With one laboratory, "a lab sees only its own orders" is
+  // indistinguishable from "a lab sees every order".
+  labB: {
+    email: "lab-b@proherper.dev",
+    fullName: "Second Lab User",
+    password: "demo1234",
+    role: "lab" as const,
+  },
 };
 
 const E2E_ANIMAL = {
@@ -39,6 +48,10 @@ const E2E_BASELINE_ORDER = {
   animalName: E2E_ANIMAL.name,
   testId: "clown",
   testName: "Clown",
+  // Tests are lab-owned now. The catalogue entry above is the platform's shared
+  // seed library; this is the laboratory's own offering, and it is what an order
+  // line actually references.
+  offeringId: "e2e-offering-clown",
 };
 
 const forbiddenUrlParts = [
@@ -146,8 +159,10 @@ const ensureCatalogAndPricing = async () => {
     },
   });
 
-  const activePricing = await prisma.pricingConfig.findFirst({ where: { isActive: true } });
-  if (!activePricing) {
+  const template = await prisma.pricingConfig.findFirst({
+    where: { organizationId: null, isActive: true },
+  });
+  if (!template) {
     await prisma.pricingConfig.create({
       data: {
         currency: "EUR",
@@ -164,6 +179,62 @@ const ensureCatalogAndPricing = async () => {
       },
     });
   }
+};
+
+/**
+ * Everything the seeded laboratory needs in order to be orderable at all: the
+ * tests it sells, and its own tier pricing. Without these the directory shows a
+ * laboratory that rejects every quote, and no browser test can place an order.
+ */
+const ensureLabOfferingsAndPricing = async (organizationId: string, suffix = "") => {
+  const offeringId = suffix
+    ? `${E2E_BASELINE_ORDER.offeringId}-${suffix}`
+    : E2E_BASELINE_ORDER.offeringId;
+  const offering = {
+    organizationId,
+    name: E2E_BASELINE_ORDER.testName,
+    shortLabel: "Clown",
+    category: "morph",
+    pricingType: "morph" as const,
+    priceCents: 3500,
+    currency: "EUR",
+    geneTarget: "Clown",
+    catalogRefId: E2E_BASELINE_ORDER.testId,
+    allowedPriorities: ["routine", "priority", "urgent"],
+    active: true,
+    visibleInBreederApp: true,
+    description: "Deterministic E2E Clown genetic test",
+    sortOrder: 1,
+  };
+
+  await prisma.labTestOffering.upsert({
+    where: { id: offeringId },
+    update: offering,
+    create: { id: offeringId, ...offering },
+  });
+
+  const template = await prisma.pricingConfig.findFirst({
+    where: { organizationId: null, isActive: true },
+  });
+  const tiers = {
+    currency: "EUR",
+    morphTier1to9FirstTest: template?.morphTier1to9FirstTest ?? 35,
+    morphTier1to9AdditionalTest: template?.morphTier1to9AdditionalTest ?? 20,
+    morphTier10to49FirstTest: template?.morphTier10to49FirstTest ?? 30,
+    morphTier10to49AdditionalTest: template?.morphTier10to49AdditionalTest ?? 20,
+    morphTier50PlusFirstTest: template?.morphTier50PlusFirstTest ?? 25,
+    morphTier50PlusAdditionalTest: template?.morphTier50PlusAdditionalTest ?? 20,
+    sexTier1to9: template?.sexTier1to9 ?? 30,
+    sexTier10to49: template?.sexTier10to49 ?? 25,
+    sexTier50Plus: template?.sexTier50Plus ?? 20,
+    isActive: true,
+  };
+
+  await prisma.pricingConfig.upsert({
+    where: { organizationId },
+    update: tiers,
+    create: { id: `pricing_${organizationId}`, organizationId, ...tiers },
+  });
 };
 
 // Mirrors the 20260730120000_add_organization_tenancy migration and seed.ts:
@@ -228,10 +299,11 @@ const resetBreederLabOrders = async (breederId: string) => {
   });
 };
 
-const createBaselineOrder = async (breederId: string) => {
+const createBaselineOrder = async (breederId: string, labOrganizationId: string) => {
   const orderData = {
     orderNumber: E2E_BASELINE_ORDER.orderNumber,
     breederId,
+    labOrganizationId,
     totalAnimals: 1,
     pricingTier: "tier_1_9" as const,
     totalPrice: 35,
@@ -260,7 +332,7 @@ const createBaselineOrder = async (breederId: string) => {
           tests: {
             create: [
               {
-                testId: E2E_BASELINE_ORDER.testId,
+                offeringId: E2E_BASELINE_ORDER.offeringId,
                 testNameSnapshot: E2E_BASELINE_ORDER.testName,
                 pricingTypeSnapshot: "morph",
                 priceApplied: 35,
@@ -296,10 +368,11 @@ const createBaselineOrder = async (breederId: string) => {
 const main = async () => {
   const database = assertLocalDatabaseUrl();
 
-  const [adminUser, breederUser, labUser] = await Promise.all([
+  const [adminUser, breederUser, labUser, labBUser] = await Promise.all([
     upsertUser(E2E_USERS.admin),
     upsertUser(E2E_USERS.breeder),
     upsertUser(E2E_USERS.lab),
+    upsertUser(E2E_USERS.labB),
   ]);
 
   await prisma.user.update({
@@ -314,17 +387,22 @@ const main = async () => {
 
   // Tenant users only — the admin account is internal staff and gets no org.
   const labOrganizationId = await ensureOrganizationFor(labUser, "lab_vendor", "Seed Genetics Lab");
+  const labBOrganizationId = await ensureOrganizationFor(labBUser, "lab_vendor", "Second Genetics Lab");
   await ensureOrganizationFor(breederUser, "breeder", breederUser.fullName);
 
   await ensureCatalogAndPricing();
   await ensureLabAccount(labUser.id, labOrganizationId);
+  await ensureLabAccount(labBUser.id, labBOrganizationId);
+  await ensureLabOfferingsAndPricing(labOrganizationId);
+  await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
-  const baselineOrder = await createBaselineOrder(breederUser.id);
+  const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
 
   console.log("E2E reset complete", {
     databaseHost: database.hostname,
     databaseName: database.databaseName,
-    users: [adminUser.email, breederUser.email, labUser.email],
+    users: [adminUser.email, breederUser.email, labUser.email, labBUser.email],
+    laboratories: [labOrganizationId, labBOrganizationId],
     baselineOrderNumber: baselineOrder.orderNumber,
   });
 };

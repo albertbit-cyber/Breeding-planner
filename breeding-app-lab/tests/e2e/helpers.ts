@@ -6,6 +6,27 @@ export const labEmail = process.env.E2E_LAB_EMAIL || "lab@proherper.dev";
 export const breederEmail = process.env.E2E_BREEDER_EMAIL || "breeder@proherper.dev";
 export const expectedOrderNumber = process.env.E2E_EXPECTED_ORDER_NUMBER || "05AA00001";
 
+/** The second seeded laboratory. Exists so isolation can be proven, not assumed. */
+export const labBEmail = process.env.E2E_LAB_B_EMAIL || "lab-b@proherper.dev";
+export const requireLabBPassword = (): string =>
+  String(process.env.E2E_LAB_B_PASSWORD || "demo1234").trim();
+
+/** Signs in via the API as a given laboratory and returns its bearer token. */
+export const loginLabViaApi = async (
+  request: APIRequestContext,
+  email: string,
+  password: string
+): Promise<string> => {
+  const response = await request.post(`${backendUrl}/api/auth/login`, {
+    data: { email, password },
+  });
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  const token = String(body?.token || "");
+  expect(token.length).toBeGreaterThan(0);
+  return token;
+};
+
 export const requireLabPassword = (): string => {
   const password = String(process.env.E2E_LAB_PASSWORD || "demo1234").trim();
   if (!password || password === "replace-with-local-seeded-password") {
@@ -22,14 +43,24 @@ export const requireBreederPassword = (): string => {
   return password;
 };
 
-export const loginAsLabUser = async (page: Page): Promise<void> => {
+/**
+ * Signs in through the Lab Portal's own gate.
+ *
+ * The gate was rewritten when laboratory onboarding became invitation-only: it
+ * no longer has the breeder app's multi-step chooser, so there is no "Log in"
+ * mode button to press first and no "Continue" — the sign-in form is simply the
+ * page.
+ */
+export const loginAsLabUser = async (
+  page: Page,
+  email: string = labEmail,
+  password: string = requireLabPassword()
+): Promise<void> => {
   await page.goto("/#/lab/dashboard");
-  await expect(page.getByRole("heading", { name: /breeding planner/i })).toBeVisible();
-  await page.getByRole("button", { name: /^log in$/i }).click();
-  await page.getByRole("textbox").first().fill(labEmail);
-  await page.locator('input[type="password"]').fill(requireLabPassword());
-  await page.getByRole("button", { name: /continue/i }).click();
-  await expect(page.getByText(/signed in as/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /laboratory portal/i })).toBeVisible();
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole("button", { name: /^sign in$/i }).click();
   await page.evaluate(() => {
     window.location.hash = "/lab/incoming-orders";
   });

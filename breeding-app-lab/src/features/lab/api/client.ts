@@ -484,7 +484,7 @@ const parseSharedResultFindings = (result: any) => {
       confidence: typeof entry?.confidence === "number" ? entry.confidence : undefined,
       notes: String(entry?.notes || "").trim() || undefined,
     }))
-    .filter((entry) => entry.marker && entry.outcome);
+    .filter((entry: { marker: string; outcome: string }) => entry.marker && entry.outcome);
 };
 
 const toStoredSnakeGeneticsSnapshot = (snake: any) => {

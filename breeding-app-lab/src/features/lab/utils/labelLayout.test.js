@@ -93,8 +93,11 @@ describe("lab label layout engine", () => {
     });
     expect(layout.destinationBox.heightMm).toBeGreaterThan(0);
     expect(layout.senderBox.heightMm).toBeGreaterThan(0);
-    expect(content.destinationLines[0]).toBe("TO");
-    expect(content.senderLines[0]).toBe("FROM");
+    // "TO"/"FROM" deliberately share their line with the name rather than
+    // standing alone: fitTextToBox() drops trailing lines first on a small
+    // label, and a standalone header word costs the line the country needs.
+    expect(content.destinationLines[0]).toBe("TO: Lab");
+    expect(content.senderLines[0]).toBe("FROM: Breeder");
   });
 
   it("generates one multi-page PDF for a 4-sample order", async () => {

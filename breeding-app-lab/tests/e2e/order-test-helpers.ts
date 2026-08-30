@@ -64,7 +64,9 @@ export const patchOrderPayment = async (
 export const resetSeededOrderForResultEntry = async (
   request: APIRequestContext,
   token: string,
-  status: "received" | "in_progress" = "received"
+  // "submitted" included deliberately: sample intake is the step that moves an
+  // order out of it, so an intake test has to be able to reset back to it.
+  status: "submitted" | "received" | "in_progress" = "received"
 ): Promise<BackendOrder> => {
   const order = await findSeededOrder(request, token);
   await patchOrderStatus(request, token, order.id, status);

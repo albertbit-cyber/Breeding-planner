@@ -34,6 +34,19 @@ function patchImportMetaEnv(): import("vite").Plugin {
 
 export default defineConfig({
   plugins: [patchImportMetaEnv(), react()],
+  test: {
+    // Playwright drives everything under tests/e2e against a running backend and
+    // a built frontend. Vitest must not try to execute those files as unit
+    // tests: it cannot, and the resulting collection errors were being read as
+    // real failures. This exclusion previously lived in a stale vite.config.mts
+    // that Vite never resolved (it tries .ts before .mts), so it never applied.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "tests/e2e/**",
+    ],
+  },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
