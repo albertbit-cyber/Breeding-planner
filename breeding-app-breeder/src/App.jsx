@@ -96,6 +96,7 @@ import {
   sexOrUnknown,
 } from "./features/animals/animalSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
+import { buildAnimalTextList } from "./features/animals/animalTextList";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
 import QuarantinePanel from "./features/quarantine/QuarantinePanel.jsx";
 import QuarantineNotice from "./features/quarantine/QuarantineNotice.jsx";
@@ -1825,6 +1826,40 @@ async function exportAnimalListToCsv(snakesSubset = [], options = {}) {
     throw new Error('CSV export requires a browser environment.');
   }
   const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+/**
+ * Saves plain text, through the desktop save dialog when the app is running under Electron and
+ * through a browser download otherwise. Same two-step as the CSV export above.
+ */
+async function saveTextFile(text, fileName) {
+  const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+  if (bridge?.saveFile) {
+    try {
+      await bridge.saveFile({
+        data: text,
+        fileName,
+        encoding: 'utf8',
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+      });
+      return;
+    } catch (error) {
+      console.warn('Electron saveFile bridge failed; falling back to browser download.', error);
+    }
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('Text export requires a browser environment.');
+  }
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -17516,6 +17551,10 @@ function BreederSection({
   // Which animals the Animals export covers: everything, a set of groups, a set
   // of tags, or a hand-picked list.
   const [animalExportScope, setAnimalExportScope] = useState({ mode: 'all', groups: [], tags: [], ids: [] });
+  // The plain-text list, held while the keeper looks it over before copying. Null means closed;
+  // the text is generated once on open rather than re-derived on every render.
+  const [animalTextListPreview, setAnimalTextListPreview] = useState(null);
+  const [animalTextListCopied, setAnimalTextListCopied] = useState(false);
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
@@ -18524,6 +18563,77 @@ function BreederSection({
       });
     }
   }, [animalsToExport, pairings, setExportFeedback, snakes, t]);
+
+  // The text list runs off the same scope picker as the catalog, but without the catalog's
+  // for-sale rule: what the keeper selected is what gets written.
+  const handleOpenAnimalTextList = useCallback(() => {
+    const timestamp = new Date().toISOString();
+    try {
+      const rows = (Array.isArray(animalsToExport) ? animalsToExport : [])
+        .filter(Boolean)
+        .map(snake => ({ ...snake, genetics: resolveCatalogMorph(snake) }));
+      const text = buildAnimalTextList(rows, {
+        unknownYearLabel: t('export.textList.unknownYear', { defaultValue: 'Year not recorded' }),
+      });
+      if (!text) {
+        throw new Error(t('export.errors.noAnimalsInScope', { defaultValue: 'No animals are selected to export.' }));
+      }
+      setAnimalTextListCopied(false);
+      setAnimalTextListPreview({ text, count: rows.length });
+    } catch (err) {
+      console.error('Animal text list generation failed', err);
+      setExportFeedback({
+        type: 'error',
+        message: err?.message || t('export.feedback.textListFailed', { defaultValue: 'Failed to build the text list.' }),
+        context: 'animals',
+        timestamp,
+      });
+    }
+  }, [animalsToExport, setExportFeedback, t]);
+
+  const handleCopyAnimalTextList = useCallback(async () => {
+    const text = animalTextListPreview?.text || '';
+    if (!text || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setAnimalTextListCopied(true);
+      window.setTimeout(() => setAnimalTextListCopied(false), 1500);
+    } catch (error) {
+      console.warn('Failed to copy the animal text list', error);
+      setExportFeedback({
+        type: 'error',
+        message: t('export.feedback.textListCopyFailed', { defaultValue: 'Could not copy to the clipboard. Select the text and copy it by hand.' }),
+        context: 'animals',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [animalTextListPreview, setExportFeedback, t]);
+
+  const handleDownloadAnimalTextList = useCallback(async () => {
+    const timestamp = new Date().toISOString();
+    const text = animalTextListPreview?.text || '';
+    if (!text) return;
+    try {
+      await saveTextFile(text, `animal-list-${timestamp.slice(0, 10)}.txt`);
+      setExportFeedback({
+        type: 'success',
+        message: t('export.feedback.textListSaved', {
+          defaultValue: 'Saved the text list ({{count}} animals).',
+          count: animalTextListPreview?.count || 0,
+        }),
+        context: 'animals',
+        timestamp,
+      });
+    } catch (err) {
+      console.error('Animal text list download failed', err);
+      setExportFeedback({
+        type: 'error',
+        message: err?.message || t('export.feedback.textListFailed', { defaultValue: 'Failed to build the text list.' }),
+        context: 'animals',
+        timestamp,
+      });
+    }
+  }, [animalTextListPreview, setExportFeedback, t]);
 
   const handlePairingsExportPdf = useCallback(async () => {
     const timestamp = new Date().toISOString();
@@ -20091,6 +20201,14 @@ function BreederSection({
                     >
                       {t('export.generateCatalog', { defaultValue: 'Generate Catalog' })}
                     </button>
+                    <button
+                      type="button"
+                      className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
+                      onClick={handleOpenAnimalTextList}
+                      disabled={!hasAnimalData || !hasAnimalsInScope}
+                    >
+                      {t('export.exportText', { defaultValue: 'Export as text' })}
+                    </button>
                   </div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3 space-y-2">
@@ -20195,6 +20313,63 @@ function BreederSection({
                     )}
                   </div>
                 </div>
+
+                {animalTextListPreview && typeof document !== 'undefined' && createPortal((
+                  <div
+                    className={cx('fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]', overlayClass(theme))}
+                    onClick={() => setAnimalTextListPreview(null)}
+                  >
+                    <div
+                      className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border"
+                      onClick={event => event.stopPropagation()}
+                    >
+                      <div className="p-5 border-b">
+                        <div className="text-lg font-semibold text-neutral-900">
+                          {t('export.textList.title', { defaultValue: 'Animal list as text' })}
+                        </div>
+                        <div className="text-sm text-neutral-500">
+                          {t('export.textList.subtitle', {
+                            defaultValue: '{{count}} animals, grouped by birth year. Copy it straight into a message.',
+                            count: animalTextListPreview.count,
+                          })}
+                        </div>
+                      </div>
+                      <div className="p-5">
+                        <textarea
+                          readOnly
+                          value={animalTextListPreview.text}
+                          onFocus={event => event.target.select()}
+                          className="w-full h-72 rounded-lg border p-3 font-mono text-xs leading-relaxed bg-neutral-50 text-neutral-800"
+                        />
+                      </div>
+                      <div className="px-5 pb-5 flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-lg text-sm border"
+                          onClick={() => setAnimalTextListPreview(null)}
+                        >
+                          {t('actions.close', { defaultValue: 'Close' })}
+                        </button>
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-lg text-sm border"
+                          onClick={handleDownloadAnimalTextList}
+                        >
+                          {t('export.textList.download', { defaultValue: 'Download .txt' })}
+                        </button>
+                        <button
+                          type="button"
+                          className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                          onClick={handleCopyAnimalTextList}
+                        >
+                          {animalTextListCopied
+                            ? t('export.textList.copied', { defaultValue: 'Copied' })
+                            : t('export.textList.copy', { defaultValue: 'Copy' })}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ), document.body)}
 
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
                   <button type="button" className="underline" onClick={handleSelectAllAnimalFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
