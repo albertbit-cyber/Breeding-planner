@@ -3097,26 +3097,7 @@
   text-overflow: ellipsis;
 }
 
-.bp-header-mobile__search {
-  padding: 0 14px 10px;
-}
-
-.bp-header-mobile__search input {
-  width: 100%;
-  padding: 9px 14px;
-  border: 1.5px solid rgba(82, 47, 124, 0.25);
-  border-radius: 12px;
-  font-size: 0.875rem;
-  background: #fafafa;
-  outline: none;
-  box-sizing: border-box;
-  color: #0f172a;
-}
-
-.bp-header-mobile__search input:focus {
-  border-color: rgba(82, 47, 124, 0.5);
-  background: #fff;
-}
+/* The mobile header search moved into the Animals section and now reuses .header-search-*. */
 
 /* ── Mobile bottom navigation bar ────────────────────────────── */
 .bp-mobile-bottom-nav {

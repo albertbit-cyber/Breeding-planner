@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "burmese-python",
+  "speciesName": "Burmese Pythons",
+  "scientificName": "Python bivittatus",
+  "genes": [
+    {
+      "geneName": "Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1986",
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Dwarf",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Enigma",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2016",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Granite",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1996",
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Hybrid",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "At least 2007",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Hypo",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2006",
+      "rarity": "average",
+      "notes": null
+    },
+    {
+      "geneName": "Labyrinth",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average",
+      "notes": null
+    },
+    {
+      "geneName": "Paradox",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Patternless",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1987",
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Piebald",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2018",
+      "rarity": "higher",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino",
+      "Granite",
+      "Labyrinth",
+      "Patternless",
+      "Piebald"
+    ],
+    "incompleteDominantGenes": [
+      "Hypo"
+    ],
+    "dominantGenes": [],
+    "polygenicGenes": [],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Dwarf",
+      "Enigma",
+      "Hybrid",
+      "Paradox"
+    ]
+  }
+}

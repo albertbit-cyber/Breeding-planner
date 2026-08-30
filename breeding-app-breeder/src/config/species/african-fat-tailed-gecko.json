@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "african-fat-tailed-gecko",
+  "speciesName": "African Fat-Tailed Geckos",
+  "scientificName": "Hemitheconyx caudicinctus",
+  "genes": [
+    {
+      "geneName": "Amelanistic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Caramel",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average",
+      "notes": null
+    },
+    {
+      "geneName": "Ghost",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2008",
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "Jungle",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "Oreo",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Patternless",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Stinger",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Stripe",
+      "geneType": "dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Whiteout",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Zero",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Zulu",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Amelanistic",
+      "Caramel",
+      "Ghost",
+      "Oreo",
+      "Patternless",
+      "Stinger",
+      "Zero",
+      "Zulu"
+    ],
+    "incompleteDominantGenes": [
+      "Whiteout"
+    ],
+    "dominantGenes": [
+      "Stripe"
+    ],
+    "polygenicGenes": [
+      "Jungle"
+    ],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Normal"
+    ]
+  }
+}

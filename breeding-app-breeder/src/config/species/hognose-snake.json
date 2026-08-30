@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "hognose-snake",
+  "speciesName": "Hognose Snakes",
+  "scientificName": "Heterodon nasicus",
+  "genes": [
+    {
+      "geneName": "Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1992",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Arctic",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2000s",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Axanthic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1990",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Caramel",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2001",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Conda",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2004",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Evans Hypo",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Lavender",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2005",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Lemon Hypo",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "10.3 million years ago",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "RBE Pastel",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Shadow",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino",
+      "Axanthic",
+      "Caramel",
+      "Evans Hypo",
+      "Lavender"
+    ],
+    "incompleteDominantGenes": [
+      "Arctic",
+      "Conda"
+    ],
+    "dominantGenes": [],
+    "polygenicGenes": [
+      "Lemon Hypo",
+      "RBE Pastel",
+      "Shadow"
+    ],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Normal"
+    ]
+  }
+}
