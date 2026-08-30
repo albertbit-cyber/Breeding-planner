@@ -48,6 +48,17 @@ if (env.nodeEnv === "production" && !origins.length) {
   console.warn("[server] CORS_ORIGIN is empty; browser origins will not receive CORS headers.");
 }
 
+// An unset LAB_PORTAL_URL is not a startup failure — env.ts falls back to the
+// breeder origin so single-origin dev setups keep working. In production that
+// fallback is silently wrong: invitation links still generate and still carry a
+// valid token, but they land an invited laboratory on the breeder sign-in page,
+// where it has no account. The only symptom is a confused vendor, so say it here.
+if (env.nodeEnv === "production" && !process.env.LAB_PORTAL_URL) {
+  console.warn(
+    "[server] LAB_PORTAL_URL is not set; lab invitation links will point at the breeder app."
+  );
+}
+
 app.use(
   cors({
     origin(origin, callback) {

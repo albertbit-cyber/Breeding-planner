@@ -87,19 +87,38 @@ psql -h localhost -U postgres -c 'DROP DATABASE "prod_rehearsal";'
 
 ---
 
-## 3. Set the new environment variable
+## 3. Set the two environment variables
+
+The Lab Portal is served from **labpoints.serpentora.com**. The backend needs to
+know that twice, for two unrelated reasons.
+
+```
+LAB_PORTAL_URL=https://labpoints.serpentora.com
+CORS_ORIGIN=<existing origins>,https://labpoints.serpentora.com
+```
 
 `LAB_PORTAL_URL` — where invited laboratories land.
 
 Without it, invitation links are built from `PUBLIC_APP_URL` and drop an invited
 laboratory on the **breeder** sign-in page, where they cannot sign in. The
-invitation is still valid; the link just goes to the wrong app.
+invitation is still valid; the link just goes to the wrong app. The backend now
+logs `[server] LAB_PORTAL_URL is not set` at startup when that fallback is in
+play, so check the boot log rather than trusting silence to mean it is set.
 
-```
-LAB_PORTAL_URL=https://lab.serpentora.com
-```
+`CORS_ORIGIN` — whether the portal may call the API at all.
 
-Set it on the backend service before the first invitation goes out.
+`CORS_ORIGIN` is a comma-separated allowlist (`src/app.ts`), and an origin absent
+from it gets no CORS headers back. The portal talks to the same backend as the
+breeder app, so a missing entry does not degrade gracefully: every request from
+labpoints.serpentora.com fails in the browser, starting with the sign-in an
+invited laboratory lands on. Append the new origin rather than replacing the
+value — the breeder and admin origins live in the same variable.
+
+Set both on the backend service before the first invitation goes out.
+
+Netlify also needs a site for `breeding-app-lab`, with DNS for the subdomain to
+match. `breeding-app-lab/netlify.toml` carries only the build command and publish
+dir, so the site, its branch and its `VITE_API_URL` are all set in the Netlify UI.
 
 ---
 
