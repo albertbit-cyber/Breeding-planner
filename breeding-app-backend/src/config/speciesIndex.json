@@ -1,0 +1,705 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "groups": [
+    {
+      "id": "pythons",
+      "name": "Pythons",
+      "sourceNote": null,
+      "speciesIds": [
+        "ball-python",
+        "reticulated-python",
+        "burmese-python",
+        "short-tailed-python",
+        "green-tree-python",
+        "carpet-python",
+        "other-pythons"
+      ]
+    },
+    {
+      "id": "boas",
+      "name": "Boas",
+      "sourceNote": null,
+      "speciesIds": [
+        "boa-constrictor",
+        "rainbow-boa",
+        "sand-boa",
+        "tree-boa",
+        "dumerils-boa",
+        "rosy-boa",
+        "other-boas"
+      ]
+    },
+    {
+      "id": "colubrids",
+      "name": "Colubrids",
+      "sourceNote": null,
+      "speciesIds": [
+        "hognose-snake",
+        "kingsnake",
+        "milk-snake",
+        "corn-snake",
+        "rat-snake",
+        "bullsnake",
+        "garter-snake",
+        "gopher-snake",
+        "house-snake",
+        "pine-snake",
+        "other-colubrids"
+      ]
+    },
+    {
+      "id": "geckos",
+      "name": "Geckos",
+      "sourceNote": null,
+      "speciesIds": [
+        "crested-gecko",
+        "leopard-gecko",
+        "gargoyle-gecko",
+        "leachianus-gecko",
+        "african-fat-tailed-gecko",
+        "chahoua-gecko",
+        "day-gecko",
+        "knob-tailed-gecko",
+        "tokay-gecko",
+        "other-geckos"
+      ]
+    },
+    {
+      "id": "lizards",
+      "name": "Lizards",
+      "sourceNote": null,
+      "speciesIds": [
+        "bearded-dragon",
+        "skink",
+        "tegu",
+        "monitor",
+        "iguana",
+        "chameleon",
+        "anole",
+        "uromastyx",
+        "other-lizards"
+      ]
+    },
+    {
+      "id": "tortoises",
+      "name": "Tortoises",
+      "sourceNote": null,
+      "speciesIds": [
+        "aldabra-tortoise",
+        "galapagos-tortoise",
+        "greek-tortoise",
+        "hermanns-tortoise",
+        "star-tortoise",
+        "leopard-tortoise",
+        "red-footed-tortoise",
+        "russian-tortoise",
+        "sulcata-tortoise",
+        "other-tortoises"
+      ]
+    },
+    {
+      "id": "turtles",
+      "name": "Turtles",
+      "sourceNote": null,
+      "speciesIds": [
+        "slider-turtle",
+        "box-turtle",
+        "terrapin",
+        "snake-necked-turtle",
+        "side-necked-turtle",
+        "mud-musk-turtle",
+        "pond-turtle",
+        "softshell-turtle",
+        "other-turtles"
+      ]
+    },
+    {
+      "id": "amphibians",
+      "name": "Amphibians",
+      "sourceNote": "Not present in the MorphMarket category tree; added to host Axolotls.",
+      "speciesIds": [
+        "axolotl"
+      ]
+    }
+  ],
+  "species": [
+    {
+      "id": "ball-python",
+      "name": "Ball Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Python regius",
+      "reproduction": "egg_laying",
+      "traitCount": 233
+    },
+    {
+      "id": "reticulated-python",
+      "name": "Reticulated Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Malayopython reticulatus",
+      "reproduction": "egg_laying",
+      "traitCount": 30
+    },
+    {
+      "id": "burmese-python",
+      "name": "Burmese Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Python bivittatus",
+      "reproduction": "egg_laying",
+      "traitCount": 10
+    },
+    {
+      "id": "short-tailed-python",
+      "name": "Short-Tailed Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Python brongersmai",
+      "reproduction": "egg_laying",
+      "traitCount": 7
+    },
+    {
+      "id": "green-tree-python",
+      "name": "Green Tree Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Morelia viridis",
+      "reproduction": "egg_laying",
+      "traitCount": 10
+    },
+    {
+      "id": "carpet-python",
+      "name": "Carpet Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": "Morelia spilota",
+      "reproduction": "egg_laying",
+      "traitCount": 11
+    },
+    {
+      "id": "other-pythons",
+      "name": "Other Pythons",
+      "group": "pythons",
+      "groupName": "Pythons",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "boa-constrictor",
+      "name": "Boa Constrictors",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": "Boa constrictor",
+      "reproduction": "live_bearing",
+      "traitCount": 36
+    },
+    {
+      "id": "rainbow-boa",
+      "name": "Rainbow Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": "Epicrates cenchria",
+      "reproduction": "live_bearing",
+      "traitCount": 11
+    },
+    {
+      "id": "sand-boa",
+      "name": "Sand Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": "Eryx colubrinus",
+      "reproduction": "live_bearing",
+      "traitCount": 6
+    },
+    {
+      "id": "tree-boa",
+      "name": "Tree Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": null,
+      "reproduction": "live_bearing",
+      "traitCount": 0
+    },
+    {
+      "id": "dumerils-boa",
+      "name": "Dumeril's Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": null,
+      "reproduction": "live_bearing",
+      "traitCount": 0
+    },
+    {
+      "id": "rosy-boa",
+      "name": "Rosy Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": null,
+      "reproduction": "live_bearing",
+      "traitCount": 0
+    },
+    {
+      "id": "other-boas",
+      "name": "Other Boas",
+      "group": "boas",
+      "groupName": "Boas",
+      "scientificName": null,
+      "reproduction": "live_bearing",
+      "traitCount": 0
+    },
+    {
+      "id": "hognose-snake",
+      "name": "Hognose Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": "Heterodon nasicus",
+      "reproduction": "egg_laying",
+      "traitCount": 11
+    },
+    {
+      "id": "kingsnake",
+      "name": "Kingsnakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": "Lampropeltis getula",
+      "reproduction": "egg_laying",
+      "traitCount": 16
+    },
+    {
+      "id": "milk-snake",
+      "name": "Milk Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": "Lampropeltis triangulum",
+      "reproduction": "egg_laying",
+      "traitCount": 7
+    },
+    {
+      "id": "corn-snake",
+      "name": "Corn Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": "Pantherophis guttatus",
+      "reproduction": "egg_laying",
+      "traitCount": 35
+    },
+    {
+      "id": "rat-snake",
+      "name": "Rat Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "bullsnake",
+      "name": "Bullsnakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "garter-snake",
+      "name": "Garter Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "live_bearing",
+      "traitCount": 0
+    },
+    {
+      "id": "gopher-snake",
+      "name": "Gopher Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "house-snake",
+      "name": "House Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "pine-snake",
+      "name": "Pine Snakes",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "other-colubrids",
+      "name": "Other Colubrids",
+      "group": "colubrids",
+      "groupName": "Colubrids",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "crested-gecko",
+      "name": "Crested Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Correlophus ciliatus",
+      "reproduction": "egg_laying",
+      "traitCount": 55
+    },
+    {
+      "id": "leopard-gecko",
+      "name": "Leopard Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Eublepharis macularius",
+      "reproduction": "egg_laying",
+      "traitCount": 63
+    },
+    {
+      "id": "gargoyle-gecko",
+      "name": "Gargoyle Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Rhacodactylus auriculatus",
+      "reproduction": "egg_laying",
+      "traitCount": 33
+    },
+    {
+      "id": "leachianus-gecko",
+      "name": "Leachianus Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Rhacodactylus leachianus",
+      "reproduction": "egg_laying",
+      "traitCount": 17
+    },
+    {
+      "id": "african-fat-tailed-gecko",
+      "name": "African Fat-Tailed Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Hemitheconyx caudicinctus",
+      "reproduction": "egg_laying",
+      "traitCount": 12
+    },
+    {
+      "id": "chahoua-gecko",
+      "name": "Chahoua Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": "Mniarogekko chahoua",
+      "reproduction": "egg_laying",
+      "traitCount": 5
+    },
+    {
+      "id": "day-gecko",
+      "name": "Day Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "knob-tailed-gecko",
+      "name": "Knob-Tailed Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "tokay-gecko",
+      "name": "Tokay Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "other-geckos",
+      "name": "Other Geckos",
+      "group": "geckos",
+      "groupName": "Geckos",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "bearded-dragon",
+      "name": "Bearded Dragons",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": "Pogona vitticeps",
+      "reproduction": "egg_laying",
+      "traitCount": 16
+    },
+    {
+      "id": "skink",
+      "name": "Skinks",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "tegu",
+      "name": "Tegus",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "monitor",
+      "name": "Monitors",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "iguana",
+      "name": "Iguanas",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "chameleon",
+      "name": "Chameleons",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "anole",
+      "name": "Anoles",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "uromastyx",
+      "name": "Uromastyx",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "other-lizards",
+      "name": "Other Lizards",
+      "group": "lizards",
+      "groupName": "Lizards",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "aldabra-tortoise",
+      "name": "Aldabra Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "galapagos-tortoise",
+      "name": "Galapagos Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "greek-tortoise",
+      "name": "Greek Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "hermanns-tortoise",
+      "name": "Hermann's Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "star-tortoise",
+      "name": "Star Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "leopard-tortoise",
+      "name": "Leopard Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "red-footed-tortoise",
+      "name": "Red-Footed Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "russian-tortoise",
+      "name": "Russian Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "sulcata-tortoise",
+      "name": "Sulcata Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "other-tortoises",
+      "name": "Other Tortoises",
+      "group": "tortoises",
+      "groupName": "Tortoises",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "slider-turtle",
+      "name": "Slider Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "box-turtle",
+      "name": "Box Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "terrapin",
+      "name": "Terrapins",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "snake-necked-turtle",
+      "name": "Snake-Necked Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "side-necked-turtle",
+      "name": "Side-Necked Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "mud-musk-turtle",
+      "name": "Mud & Musk Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "pond-turtle",
+      "name": "Pond Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "softshell-turtle",
+      "name": "Softshell Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "other-turtles",
+      "name": "Other Turtles",
+      "group": "turtles",
+      "groupName": "Turtles",
+      "scientificName": null,
+      "reproduction": "egg_laying",
+      "traitCount": 0
+    },
+    {
+      "id": "axolotl",
+      "name": "Axolotls",
+      "group": "amphibians",
+      "groupName": "Amphibians",
+      "scientificName": "Ambystoma mexicanum",
+      "reproduction": "egg_laying",
+      "traitCount": 11
+    }
+  ]
+}

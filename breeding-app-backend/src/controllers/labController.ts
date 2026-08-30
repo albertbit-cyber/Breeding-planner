@@ -22,6 +22,12 @@ import {
   listInvitesForOrganization,
   revokeInvite,
 } from "../services/organizationInviteService";
+import { listSpecies } from "../services/speciesCatalogService";
+import {
+  getSpeciesGeneOverlay,
+  listSubmissionsForOrganization,
+  submitGene,
+} from "../services/geneSubmissionService";
 import { HttpError } from "../utils/errors";
 
 /**
@@ -142,10 +148,40 @@ export const postOwnershipTransfer = async (req: Request, res: Response): Promis
 
 // ── Public lab directory (breeder-facing) ────────────────────────────────────
 
-export const getLabDirectory = async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await listPublicLabs());
+export const getLabDirectory = async (req: Request, res: Response): Promise<void> => {
+  // `?species=` narrows the directory to laboratories serving the animal the
+  // breeder is ordering for.
+  const speciesId = String(req.query.species || "").trim() || undefined;
+  res.status(200).json(await listPublicLabs(speciesId));
 };
 
 export const getLabDirectoryEntry = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await getPublicLab(req.params.id));
+  const speciesId = String(req.query.species || "").trim() || undefined;
+  res.status(200).json(await getPublicLab(req.params.id, speciesId));
+};
+
+// ── Gene contributions ───────────────────────────────────────────────────────
+
+export const postGeneSubmission = async (req: Request, res: Response): Promise<void> => {
+  res.status(201).json(await submitGene(ownOrganizationId(req), req.body || {}));
+};
+
+export const getMyGeneSubmissions = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listSubmissionsForOrganization(ownOrganizationId(req)));
+};
+
+/**
+ * Approved lab-contributed genes for a species, merged over the generated table
+ * by the client. A laboratory also sees its own pending submissions here, so it
+ * can work with a gene it proposed before review.
+ */
+export const getGeneOverlay = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(
+    await getSpeciesGeneOverlay(req.params.speciesId, req.membership?.organizationId)
+  );
+};
+
+/** The platform taxonomy a laboratory picks its served species from. */
+export const getSpeciesCatalog = async (_req: Request, res: Response): Promise<void> => {
+  res.status(200).json(listSpecies());
 };

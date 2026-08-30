@@ -2,6 +2,7 @@ import type { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
+import { normalizeSpeciesIds, speciesName } from "./speciesCatalogService";
 
 const db = prisma as any;
 
@@ -73,6 +74,8 @@ export const normalizeLabProfile = (row: any) => ({
   logoUrl: row.logoUrl || null,
   publicDescription: row.publicDescription || null,
   turnaroundDays: row.turnaroundDays ?? null,
+  servedSpeciesIds: row.servedSpeciesIds || [],
+  servedSpecies: (row.servedSpeciesIds || []).map((id: string) => ({ id, name: speciesName(id) })),
   iban: row.iban || null,
   bic: row.bic || null,
   vatNumber: row.vatNumber || null,
@@ -116,6 +119,9 @@ export const updateLabProfile = async (organizationId: string, payload: Record<s
   if (payload.iban !== undefined) data.iban = text(payload.iban, 40);
   if (payload.bic !== undefined) data.bic = text(payload.bic, 20);
   if (payload.vatNumber !== undefined) data.vatNumber = text(payload.vatNumber, 40);
+  if (payload.servedSpeciesIds !== undefined) {
+    data.servedSpeciesIds = normalizeSpeciesIds(payload.servedSpeciesIds, "Served species");
+  }
   if (payload.listedInDirectory !== undefined) data.listedInDirectory = Boolean(payload.listedInDirectory);
   if (payload.logoUrl !== undefined) {
     const logo = String(payload.logoUrl ?? "").trim();
@@ -160,8 +166,8 @@ export const normalizeOffering = (row: any) => ({
   priceCents: row.priceCents ?? null,
   tierPrices: row.tierPricesJson ?? null,
   addonPriceCents: row.addonPriceCents ?? null,
-  speciesId: row.speciesId || null,
-  speciesLabel: row.speciesLabel || null,
+  speciesIds: row.speciesIds || [],
+  species: (row.speciesIds || []).map((id: string) => ({ id, name: speciesName(id) })),
   aliases: row.aliases || [],
   availability: row.availability || "available",
   panelScope: row.panelScope || null,
@@ -222,8 +228,9 @@ const offeringWriteData = (payload: Record<string, unknown>, isCreate: boolean):
   if (payload.addonPriceCents !== undefined) {
     data.addonPriceCents = optionalInt(payload.addonPriceCents, "Add-on price", 0, 10_000_000);
   }
-  if (payload.speciesId !== undefined) data.speciesId = text(payload.speciesId, 80);
-  if (payload.speciesLabel !== undefined) data.speciesLabel = text(payload.speciesLabel, 120);
+  if (payload.speciesIds !== undefined) {
+    data.speciesIds = normalizeSpeciesIds(payload.speciesIds, "Species");
+  }
   if (payload.panelScope !== undefined) data.panelScope = text(payload.panelScope, 2000);
   if (payload.aliases !== undefined) {
     data.aliases = Array.isArray(payload.aliases)
@@ -258,8 +265,32 @@ const offeringWriteData = (payload: Record<string, unknown>, isCreate: boolean):
   return data;
 };
 
+/**
+ * A test cannot claim a species the laboratory has not said it serves.
+ *
+ * Without this a lab could tag a test with any of the 64 species and have it
+ * surface to breeders it has no business serving — its directory entry would
+ * say one thing and its catalogue another.
+ */
+const assertServedSpecies = async (organizationId: string, speciesIds: unknown) => {
+  if (!Array.isArray(speciesIds) || !speciesIds.length) return;
+  const lab = await db.labAccount.findUnique({
+    where: { organizationId },
+    select: { servedSpeciesIds: true },
+  });
+  const served = new Set<string>(lab?.servedSpeciesIds || []);
+  const notServed = (speciesIds as string[]).filter((id) => !served.has(id));
+  if (notServed.length) {
+    throw new HttpError(
+      400,
+      `Add ${notServed.map(speciesName).join(", ")} to the species your laboratory serves before tagging a test with it.`
+    );
+  }
+};
+
 export const createOffering = async (organizationId: string, payload: Record<string, unknown>) => {
   const data = offeringWriteData(payload, true);
+  await assertServedSpecies(organizationId, data.speciesIds);
 
   // A lab may start from the shared library, which prefills the gene mapping so
   // results still drive the genetics engine. It is a copy, not a link that
@@ -304,6 +335,7 @@ export const updateOffering = async (
   await requireOwnOffering(organizationId, offeringId);
   const data = offeringWriteData(payload, false);
   if (!Object.keys(data).length) throw new HttpError(400, "Nothing to update.");
+  await assertServedSpecies(organizationId, data.speciesIds);
 
   try {
     const updated = await db.labTestOffering.update({ where: { id: offeringId }, data });
@@ -551,12 +583,18 @@ export const transferOwnership = async (
  * independent switches: the vendor's own listing toggle, the admin's org
  * suspension, and the lab account's approval status.
  */
-export const listPublicLabs = async () => {
+/**
+ * @param speciesId when given, only laboratories serving that species. This is
+ *   what makes the breeder's first choice meaningful: ordering for a corn snake
+ *   should not offer a laboratory that only handles ball pythons.
+ */
+export const listPublicLabs = async (speciesId?: string) => {
   const rows = await db.labAccount.findMany({
     where: {
       listedInDirectory: true,
       status: "approved",
       organization: { status: "active", kind: "lab_vendor" },
+      ...(speciesId ? { servedSpeciesIds: { has: speciesId } } : {}),
     },
     include: {
       organization: {
@@ -580,6 +618,11 @@ export const listPublicLabs = async () => {
       logoUrl: row.logoUrl || null,
       turnaroundDays: row.turnaroundDays ?? null,
       testCount: row.organization?._count?.testOfferings ?? 0,
+      servedSpeciesIds: row.servedSpeciesIds || [],
+      servedSpecies: (row.servedSpeciesIds || []).map((id: string) => ({
+        id,
+        name: speciesName(id),
+      })),
     })),
   };
 };
@@ -588,7 +631,7 @@ export const listPublicLabs = async () => {
  * One lab's public profile plus the tests a breeder may actually order from it.
  * This is the read behind "everything comes from the chosen lab's section".
  */
-export const getPublicLab = async (organizationId: string) => {
+export const getPublicLab = async (organizationId: string, speciesId?: string) => {
   const lab = await db.labAccount.findFirst({
     where: {
       organizationId,
@@ -600,10 +643,16 @@ export const getPublicLab = async (organizationId: string) => {
   });
   if (!lab) throw new HttpError(404, "Laboratory not found.");
 
-  const [{ offerings }, pricing] = await Promise.all([
+  const [{ offerings: allOfferings }, pricing] = await Promise.all([
     listOfferings(organizationId, true),
     db.pricingConfig.findUnique({ where: { organizationId } }),
   ]);
+
+  // A breeder ordering for one animal should see that animal's tests and no
+  // others — a ball python keeper has no use for the boa constrictor list.
+  const offerings = speciesId
+    ? allOfferings.filter((offering: any) => (offering.speciesIds || []).includes(speciesId))
+    : allOfferings;
 
   return {
     lab: {
@@ -614,6 +663,11 @@ export const getPublicLab = async (organizationId: string) => {
       publicDescription: lab.publicDescription || null,
       logoUrl: lab.logoUrl || null,
       turnaroundDays: lab.turnaroundDays ?? null,
+      servedSpeciesIds: lab.servedSpeciesIds || [],
+      servedSpecies: (lab.servedSpeciesIds || []).map((id: string) => ({
+        id,
+        name: speciesName(id),
+      })),
     },
     offerings,
     pricing: pricing ? normalizePricingConfig(pricing) : null,

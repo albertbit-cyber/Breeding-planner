@@ -36,6 +36,10 @@ import {
   listVendorInvites,
   revokeInvite,
 } from "../services/organizationInviteService";
+import {
+  listSubmissionsForAdmin,
+  reviewSubmission,
+} from "../services/geneSubmissionService";
 
 export const dashboard = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json(await getAdminDashboard());
@@ -143,6 +147,14 @@ export const vendorLabDetail = async (req: Request, res: Response): Promise<void
 
 export const changeVendorLabStatus = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await setVendorLabStatus(req.user!, req.params.id, req.body || {}));
+};
+
+export const geneSubmissions = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listSubmissionsForAdmin(req.query));
+};
+
+export const reviewGeneSubmission = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await reviewSubmission(req.user!, req.params.id, req.body || {}));
 };
 
 export const vendorInvites = async (req: Request, res: Response): Promise<void> => {

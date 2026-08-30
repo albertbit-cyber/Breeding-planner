@@ -123,6 +123,7 @@ model User {
   marketplacePermission MarketplacePermission?
   labAccount       LabAccount?
   reviewedPartnerApplications PartnerApplication[] @relation("PartnerApplicationReviewer")
+  reviewedGeneSubmissions     LabGeneSubmission[]  @relation("LabGeneSubmissionReviewer")
   gdprRequests     GdprRequest[] @relation("GdprRequestUser")
   gdprReviews      GdprRequest[] @relation("GdprRequestReviewer")
   subscriptions     UserSubscription[] @relation("UserSubscriptionUser")
@@ -185,6 +186,7 @@ model Organization {
   invites       OrganizationInvite[]
   labAccount    LabAccount?
   testOfferings LabTestOffering[]
+  geneSubmissions LabGeneSubmission[]
   pricingConfig PricingConfig?
   labOrders     ShedTestOrder[]
 
@@ -226,6 +228,54 @@ model Membership {
 //     organization* plus an `owner` Membership. This is the only way a
 //     lab_vendor org ever comes into existence.
 //
+// A gene a laboratory needs that the platform's genetics database does not yet
+// know about.
+//
+// The gene tables under breeding-app-breeder/src/config/species/ are generated
+// from Morphpedia and never hand-edited, so contributions cannot go into them.
+// They live here instead and are merged over the generated tables at read time,
+// which means regenerating from Morphpedia can never wipe a laboratory's work.
+//
+// Shared, after review (decision 2026-08-31). A submission is usable by the
+// laboratory that made it straight away, so they are never blocked waiting; it
+// reaches every breeder only once an administrator approves it. The asymmetry is
+// deliberate: a wrong inheritance type would silently corrupt breeding advice for
+// everyone keeping that species, including people who never deal with that lab.
+model LabGeneSubmission {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /** Species id from the platform taxonomy. */
+  speciesId      String   @map("species_id")
+  geneName       String   @map("gene_name")
+  /** recessive | incomplete_dominant | dominant — the generated tables' vocabulary. */
+  geneType       String   @map("gene_type")
+  aliases        String[] @default([])
+  /** Allelic complex this gene belongs to, when the laboratory knows it. */
+  complex        String?
+  hasSuperForm   Boolean  @default(false) @map("has_super_form")
+  superGeneName  String?  @map("super_gene_name")
+  notes          String?  @db.Text
+
+  // pending | approved | rejected
+  status         String   @default("pending")
+  reviewedBy     String?  @map("reviewed_by")
+  reviewer       User?    @relation("LabGeneSubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime? @map("reviewed_at")
+  reviewNote     String?  @map("review_note") @db.Text
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // One live submission per gene per species: two laboratories naming the same
+  // gene is one fact to review, not two.
+  @@unique([speciesId, geneName])
+  @@index([status])
+  @@index([organizationId])
+  @@map("lab_gene_submissions")
+}
+
 // A laboratory asking to be considered as a partner.
 //
 // Onboarding stays invitation-only: this creates no account, no organization
@@ -703,6 +753,13 @@ model LabAccount {
   iban              String?
   bic               String?
   vatNumber         String?  @map("vat_number")
+  /**
+   * The species this laboratory works with, curated by its own staff from the
+   * platform taxonomy. Drives which laboratories a breeder sees when ordering
+   * for a given animal, and bounds which species its tests may be tagged with.
+   */
+  servedSpeciesIds  String[] @default([]) @map("served_species_ids")
+
   /**
    * Whether breeders may discover and order from this lab. Vendor-controlled —
    * a lab closing for holidays hides itself without an admin round-trip. An
@@ -1246,9 +1303,17 @@ model LabTestOffering {
   catalogRefId        String?         @map("catalog_ref_id")
   catalogRef          ShedTestCatalog? @relation(fields: [catalogRefId], references: [id], onDelete: SetNull)
 
-  /** Which animal this test is for. Null means the laboratory did not say. */
-  speciesId           String?         @map("species_id")
-  speciesLabel        String?         @map("species_label")
+  /**
+   * Which animals this test is for, as ids from the platform species taxonomy
+   * (breeding-app-backend/src/config/speciesIndex.json, generated alongside the
+   * breeder app's gene tables so the two can never disagree).
+   *
+   * A list rather than a single value because one test genuinely can cover
+   * several species — a colubrid sex determination test covers corn snake,
+   * hognose, kingsnake, rat snake, bullsnake and garter snake at once. Empty
+   * means the laboratory has not said, and the test matches no animal.
+   */
+  speciesIds          String[]        @default([]) @map("species_ids")
 
   /**
    * Other names the same test is sold or asked for under ("Yb", "HGW",
@@ -1289,7 +1354,6 @@ model LabTestOffering {
   // and correct — two labs both offering "Albino" are two distinct products.
   @@unique([organizationId, name])
   @@index([organizationId, active])
-  @@index([organizationId, speciesId])
   @@index([catalogRefId])
   @@map("lab_test_offerings")
 }

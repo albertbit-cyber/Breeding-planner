@@ -24,6 +24,10 @@ const REPO = join(HERE, '..', '..');
 // into any app's build (nothing imports it), so emitting there would produce a database no
 // app could load. The single source of truth is this scripts/ directory, not the output.
 const OUT_DIR = join(REPO, 'breeding-app-breeder', 'src', 'config', 'species');
+// The backend validates the species a laboratory claims to serve, so it needs
+// the same taxonomy. Written from here rather than hand-copied, so the two can
+// never drift: one generator, two outputs.
+const BACKEND_INDEX = join(REPO, 'breeding-app-backend', 'src', 'config', 'speciesIndex.json');
 // Curated ball python data lives here as build INPUT, not as app config -- the app must
 // import only the generated table, otherwise there are two runtime databases again.
 const CURATED_BALL_PYTHON = join(HERE, 'sources', 'ballPythonCurated.json');
@@ -235,23 +239,49 @@ for (const group of TAXONOMY) {
   }
 }
 
+const indexDocument = {
+  version: 1,
+  generatedAt: GENERATED_AT,
+  source: SOURCE,
+  groups: TAXONOMY.map((g) => ({
+    id: g.id,
+    name: g.name,
+    sourceNote: g.sourceNote || null,
+    speciesIds: g.species.map((s) => s.id),
+  })),
+  species: speciesIndex,
+};
+
+writeFileSync(join(OUT_DIR, 'index.json'), JSON.stringify(indexDocument, null, 2) + '\n');
+
+// The backend validates the species a laboratory claims to serve, so it needs
+// the same taxonomy - written from here rather than hand-copied, so the two can
+// never drift. Taxonomy only: it has no reason to carry the gene tables.
 writeFileSync(
-  join(OUT_DIR, 'index.json'),
-  JSON.stringify({
-    version: 1,
-    generatedAt: GENERATED_AT,
-    source: SOURCE,
-    groups: TAXONOMY.map((g) => ({
-      id: g.id,
-      name: g.name,
-      sourceNote: g.sourceNote || null,
-      speciesIds: g.species.map((s) => s.id),
-    })),
-    species: speciesIndex,
-  }, null, 2) + '\n',
+  BACKEND_INDEX,
+  JSON.stringify(
+    {
+      version: indexDocument.version,
+      generatedAt: indexDocument.generatedAt,
+      source: indexDocument.source,
+      groups: indexDocument.groups,
+      species: speciesIndex.map((s) => ({
+        id: s.id,
+        name: s.name,
+        group: s.group,
+        groupName: s.groupName,
+        scientificName: s.scientificName,
+        reproduction: s.reproduction,
+        traitCount: s.traitCount,
+      })),
+    },
+    null,
+    2
+  ) + '\n'
 );
 
 const withTraits = speciesIndex.filter((s) => s.traitsFile);
 console.log(`Wrote ${readdirSync(OUT_DIR).length} files to ${OUT_DIR}`);
+console.log(`  + backend taxonomy at ${BACKEND_INDEX}`);
 console.log(`  ${speciesIndex.length} species in taxonomy, ${withTraits.length} with trait tables`);
 console.log(`  ${withTraits.reduce((n, s) => n + s.traitCount, 0)} traits total`);

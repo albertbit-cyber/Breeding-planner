@@ -15,6 +15,8 @@ import {
   revokeVendorInvite,
   vendorInvites,
   vendorLabDetail,
+  geneSubmissions,
+  reviewGeneSubmission,
   changeMarketplacePermission,
   changeReportStatus,
   changeVerificationRequest,
@@ -86,6 +88,12 @@ adminRoutes.post("/vendor-labs/invites/:id/revoke", asyncHandler(revokeVendorInv
 // Laboratories that have asked to be considered. Reviewing one records a
 // decision; it never sends an invitation as a side effect — that stays a
 // separate, deliberate action.
+// Genes laboratories have proposed. Approving one publishes it to every breeder
+// keeping that species, so it is a deliberate action with a mandatory reason on
+// rejection and an audit entry either way.
+adminRoutes.get("/gene-submissions", asyncHandler(geneSubmissions));
+adminRoutes.patch("/gene-submissions/:id", asyncHandler(reviewGeneSubmission));
+
 adminRoutes.get("/partner-applications", asyncHandler(adminPartnerApplications));
 adminRoutes.patch("/partner-applications/:id", asyncHandler(adminReviewPartnerApplication));
 adminRoutes.get("/vendor-labs/:id", asyncHandler(vendorLabDetail));

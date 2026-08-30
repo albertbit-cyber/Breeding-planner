@@ -11,6 +11,10 @@ import {
   getMyPricing,
   getMyTeam,
   getSeedLibrary,
+  getSpeciesCatalog,
+  getGeneOverlay,
+  getMyGeneSubmissions,
+  postGeneSubmission,
   getTeamInvites,
   patchCatalogItem,
   patchMyLab,
@@ -32,6 +36,21 @@ export const labRoutes = Router();
 // ── Lab directory ────────────────────────────────────────────────────────────
 // Breeders choose a laboratory before they can be quoted, so these are readable
 // by any signed-in account. They expose only what a lab has chosen to publish.
+// The species taxonomy both sides pick from. Readable by any signed-in account:
+// a laboratory needs it to declare what it serves, a breeder to say what they
+// keep, and it is generated reference data rather than anyone's private list.
+labRoutes.get("/species", requireAuth, asyncHandler(getSpeciesCatalog));
+
+// Lab-contributed genes for a species, merged over the generated tables by the
+// client. Org context is loaded so a laboratory also sees its own pending
+// submissions; everyone else sees only what has been approved.
+labRoutes.get(
+  "/genetics/:speciesId/overlay",
+  requireAuth,
+  asyncHandler(withOrgContext),
+  asyncHandler(getGeneOverlay)
+);
+
 labRoutes.get("/directory", requireAuth, asyncHandler(getLabDirectory));
 labRoutes.get("/directory/:id", requireAuth, asyncHandler(getLabDirectoryEntry));
 
@@ -56,6 +75,11 @@ vendor.get("/tests", requireOrgMember, asyncHandler(getMyOfferings));
 vendor.post("/tests", requireOrgAdmin, asyncHandler(postMyOffering));
 vendor.patch("/tests/:id", requireOrgAdmin, asyncHandler(patchMyOffering));
 vendor.delete("/tests/:id", requireOrgAdmin, asyncHandler(deleteMyOffering));
+
+// Proposing a gene is part of publishing a test, so it sits with the roles that
+// may edit the catalogue.
+vendor.post("/genes", requireOrgAdmin, asyncHandler(postGeneSubmission));
+vendor.get("/genes", requireOrgMember, asyncHandler(getMyGeneSubmissions));
 
 vendor.get("/pricing", requireOrgMember, asyncHandler(getMyPricing));
 vendor.patch("/pricing", requireOrgAdmin, asyncHandler(patchMyPricing));
