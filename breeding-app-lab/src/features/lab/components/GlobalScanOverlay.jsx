@@ -44,7 +44,7 @@ export default function GlobalScanOverlay({ onClose }) {
     <div className="fixed inset-0 z-40 flex flex-col bg-neutral-950/90 p-4">
       <div className="flex items-center justify-between text-white">
         <div>
-          <div className="text-xs uppercase tracking-wide text-neutral-400">ProHerper Lab</div>
+          <div className="text-xs uppercase tracking-wide text-neutral-400">Laboratory</div>
           <div className="text-base font-semibold">Scan Sample QR Code</div>
         </div>
         <button

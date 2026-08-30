@@ -1,1171 +1,440 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { clearAuthToken, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
+import {
+  acceptInvite as acceptInviteApi,
+  clearAuthToken,
+  fetchInvite as fetchInviteApi,
+  login as loginApi,
+  requestPasswordReset as requestPasswordResetApi,
+} from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
-const AUTH_SESSION_STORAGE_KEYS = {
-  breeder: "breedingPlannerBreederAuthSession",
-  lab: "breedingPlannerLabAuthSession",
-  admin: "breedingPlannerAdminAuthSession",
-};
-const LEGACY_AUTH_STORAGE_KEY = "breedingPlannerAuthSession";
+/**
+ * The Lab Portal's authentication gate.
+ *
+ * This is deliberately NOT the breeder app's AuthGate. It was a copy of it,
+ * which meant the Lab Portal shipped a full public multi-step registration form
+ * that created breeder accounts — directly contradicting the confirmed product
+ * model, in which a laboratory only ever enters the platform through an
+ * administrator's invitation.
+ *
+ * There is therefore no registration path in this file, and there must not be
+ * one. `assertNoLabSignupRoute` below is a build-time guard against it coming
+ * back. The three ways in are: sign in, reset a forgotten password, and redeem
+ * an invitation.
+ */
 
-const getAuthSurfaceForHash = (hashValue) => {
-  const raw = String(hashValue || "").replace(/^#/, "").trim();
-  const path = raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "/";
-  // Only pricing is public; root "/" requires auth so the welcome screen
-  // always shows on first visit.
-  if (path.startsWith("/pricing")) return "public";
-  return getAuthScopeForHash(hashValue);
-};
-const COUNTRY_OPTIONS_FALLBACK = [
-  "Afghanistan",
-  "Albania",
-  "Algeria",
-  "Andorra",
-  "Angola",
-  "Antigua and Barbuda",
-  "Argentina",
-  "Armenia",
-  "Australia",
-  "Austria",
-  "Azerbaijan",
-  "Bahamas",
-  "Bahrain",
-  "Bangladesh",
-  "Barbados",
-  "Belarus",
-  "Belgium",
-  "Belize",
-  "Benin",
-  "Bhutan",
-  "Bolivia",
-  "Bosnia and Herzegovina",
-  "Botswana",
-  "Brazil",
-  "Brunei",
-  "Bulgaria",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cambodia",
-  "Cameroon",
-  "Canada",
-  "Central African Republic",
-  "Chad",
-  "Chile",
-  "China",
-  "Colombia",
-  "Comoros",
-  "Congo (Congo-Brazzaville)",
-  "Costa Rica",
-  "Cote d'Ivoire",
-  "Croatia",
-  "Cuba",
-  "Cyprus",
-  "Czechia",
-  "Democratic Republic of the Congo",
-  "Denmark",
-  "Djibouti",
-  "Dominica",
-  "Dominican Republic",
-  "Ecuador",
-  "Egypt",
-  "El Salvador",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Estonia",
-  "Eswatini",
-  "Ethiopia",
-  "Fiji",
-  "Finland",
-  "France",
-  "Gabon",
-  "Gambia",
-  "Georgia",
-  "Germany",
-  "Ghana",
-  "Greece",
-  "Grenada",
-  "Guatemala",
-  "Guinea",
-  "Guinea-Bissau",
-  "Guyana",
-  "Haiti",
-  "Holy See",
-  "Honduras",
-  "Hungary",
-  "Iceland",
-  "India",
-  "Indonesia",
-  "Iran",
-  "Iraq",
-  "Ireland",
-  "Israel",
-  "Italy",
-  "Jamaica",
-  "Japan",
-  "Jordan",
-  "Kazakhstan",
-  "Kenya",
-  "Kiribati",
-  "Kuwait",
-  "Kyrgyzstan",
-  "Laos",
-  "Latvia",
-  "Lebanon",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Liechtenstein",
-  "Lithuania",
-  "Luxembourg",
-  "Madagascar",
-  "Malawi",
-  "Malaysia",
-  "Maldives",
-  "Mali",
-  "Malta",
-  "Marshall Islands",
-  "Mauritania",
-  "Mauritius",
-  "Mexico",
-  "Micronesia",
-  "Moldova",
-  "Monaco",
-  "Mongolia",
-  "Montenegro",
-  "Morocco",
-  "Mozambique",
-  "Myanmar",
-  "Namibia",
-  "Nauru",
-  "Nepal",
-  "Netherlands",
-  "New Zealand",
-  "Nicaragua",
-  "Niger",
-  "Nigeria",
-  "North Korea",
-  "North Macedonia",
-  "Norway",
-  "Oman",
-  "Pakistan",
-  "Palau",
-  "Panama",
-  "Papua New Guinea",
-  "Paraguay",
-  "Peru",
-  "Philippines",
-  "Poland",
-  "Portugal",
-  "Qatar",
-  "Romania",
-  "Russia",
-  "Rwanda",
-  "Saint Kitts and Nevis",
-  "Saint Lucia",
-  "Saint Vincent and the Grenadines",
-  "Samoa",
-  "San Marino",
-  "Sao Tome and Principe",
-  "Saudi Arabia",
-  "Senegal",
-  "Serbia",
-  "Seychelles",
-  "Sierra Leone",
-  "Singapore",
-  "Slovakia",
-  "Slovenia",
-  "Solomon Islands",
-  "Somalia",
-  "South Africa",
-  "South Korea",
-  "South Sudan",
-  "Spain",
-  "Sri Lanka",
-  "Sudan",
-  "Suriname",
-  "Sweden",
-  "Switzerland",
-  "Syria",
-  "Tajikistan",
-  "Tanzania",
-  "Thailand",
-  "Timor-Leste",
-  "Togo",
-  "Tonga",
-  "Trinidad and Tobago",
-  "Tunisia",
-  "Turkey",
-  "Turkmenistan",
-  "Tuvalu",
-  "Uganda",
-  "Ukraine",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Uruguay",
-  "Uzbekistan",
-  "Vanuatu",
-  "Venezuela",
-  "Vietnam",
-  "Yemen",
-  "Zambia",
-  "Zimbabwe",
-];
-const DEVICE_OPTIONS_FALLBACK = [
-  { value: "desktop", label: "Desktop only" },
-  { value: "mobile", label: "Mobile only" },
-  { value: "both", label: "Both desktop and mobile" },
-];
-const DATA_BACKUP_OPTIONS_FALLBACK = [
-  { value: "automatic", label: "Automatic" },
-  { value: "manual", label: "Manual" },
-];
-const EXPERIENCE_OPTIONS_FALLBACK = [
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced breeder" },
-  { value: "professional", label: "Professional" },
-];
-const ROLE_OPTIONS_FALLBACK = [
-  { value: "breeder", label: "Breeder" },
-  { value: "buyer", label: "Buyer" },
-];
+const LAB_AUTH_SESSION_STORAGE_KEY = "breedingPlannerLabAuthSession";
+const AUTH_SCOPE = "lab";
 
-const DEFAULT_REGISTRATION_TEMPLATE = {
-  fullName: "",
-  displayName: "",
-  email: "",
-  phone: "",
-  password: "",
-  confirmPassword: "",
-  country: "",
-  enableCloudSync: true,
-  devicePreference: "both",
-  dataBackupPreference: "automatic",
-  reptileCount: "",
-  experienceLevel: "intermediate",
-  enableAutomaticReptileSync: true,
-  consentDataProcessing: false,
-  acceptTerms: false,
-  role: "breeder",
-};
+const INVITE_HASH_PATTERN = /^#?\/accept-invite/;
 
-const createDefaultRegistrationData = () =>
-  JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
-
-const createDefaultPasswordRecoveryData = (email = "") => ({
-  email,
-  fullName: "",
-  newPassword: "",
-  confirmNewPassword: "",
-});
-
-const buildRegistrationSteps = (t, optionSets = {}) => {
-  const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
-    ? optionSets.countries
-    : COUNTRY_OPTIONS_FALLBACK;
-  const devicePreferences = Array.isArray(optionSets.devicePreferences) && optionSets.devicePreferences.length
-    ? optionSets.devicePreferences
-    : DEVICE_OPTIONS_FALLBACK;
-  const dataBackup = Array.isArray(optionSets.dataBackup) && optionSets.dataBackup.length
-    ? optionSets.dataBackup
-    : DATA_BACKUP_OPTIONS_FALLBACK;
-  const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
-    ? optionSets.experienceLevels
-    : EXPERIENCE_OPTIONS_FALLBACK;
-  const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
-    ? optionSets.roleOptions
-    : ROLE_OPTIONS_FALLBACK
-  ).filter((option) => ["breeder", "buyer"].includes(String(option?.value || option || "").trim().toLowerCase()));
-  const roleOptionValues = new Set(roleOptions.map((option) => String(option?.value || option || "").trim().toLowerCase()));
-  if (!roleOptionValues.has("buyer")) {
-    roleOptions.push({ value: "buyer", label: "Buyer" });
-  }
-  if (!roleOptionValues.has("breeder")) {
-    roleOptions.unshift({ value: "breeder", label: "Breeder" });
-  }
-
-  return [
-    {
-      key: "account",
-      title: t("auth.steps.account.title", { defaultValue: "Account basics" }),
-      description: t("auth.steps.account.description", {
-        defaultValue: "Create your keeper profile and secure your login.",
-      }),
-      fields: [
-        {
-          name: "fullName",
-          label: t("auth.fields.fullName", { defaultValue: "Full name" }),
-          type: "text",
-          required: true,
-        },
-        {
-          name: "displayName",
-          label: t("auth.fields.displayName", {
-            defaultValue: "Preferred username / display name",
-          }),
-          type: "text",
-          required: true,
-        },
-        {
-          name: "email",
-          label: t("auth.fields.email", { defaultValue: "Email address" }),
-          type: "email",
-          required: true,
-        },
-        {
-          name: "phone",
-          label: t("auth.fields.phone", { defaultValue: "Phone number (optional)" }),
-          type: "tel",
-        },
-        {
-          name: "password",
-          label: t("auth.fields.password", { defaultValue: "Password" }),
-          type: "password",
-          required: true,
-        },
-        {
-          name: "confirmPassword",
-          label: t("auth.fields.confirmPassword", { defaultValue: "Confirm password" }),
-          type: "password",
-          required: true,
-        },
-      ],
-      validate: (data) => {
-        if (data.password.trim().length < 8) {
-          return t("auth.errors.passwordLength", {
-            defaultValue: "Choose a password with at least 8 characters.",
-          });
-        }
-        if (data.password !== data.confirmPassword) {
-          return t("auth.errors.passwordMismatch", {
-            defaultValue: "Passwords do not match.",
-          });
-        }
-        return null;
-      },
-    },
-    {
-      key: "preferences",
-      title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
-      description: t("auth.steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Breeding Planner.",
-      }),
-      fields: [
-        {
-          name: "country",
-          label: t("auth.fields.country", { defaultValue: "Country" }),
-          type: "select",
-          options: countries,
-          required: true,
-        },
-        {
-          name: "enableCloudSync",
-          label: t("auth.fields.enableCloudSync", { defaultValue: "Enable cloud sync" }),
-          type: "checkbox",
-        },
-        {
-          name: "devicePreference",
-          label: t("auth.fields.devicePreference", { defaultValue: "Device preference" }),
-          type: "select",
-          options: devicePreferences,
-          required: true,
-        },
-        {
-          name: "dataBackupPreference",
-          label: t("auth.fields.dataBackupPreference", {
-            defaultValue: "Data backup preference",
-          }),
-          type: "select",
-          options: dataBackup,
-          required: true,
-        },
-      ],
-    },
-    {
-      key: "keeper",
-      title: t("auth.steps.keeper.title", { defaultValue: "Reptile keeper profile" }),
-      description: t("auth.steps.keeper.description", {
-        defaultValue: "Share a bit about your collection and processes.",
-      }),
-      fields: [
-        {
-          name: "role",
-          label: t("auth.fields.userRole", { defaultValue: "User role" }),
-          type: "select",
-          options: roleOptions,
-          required: true,
-        },
-        {
-          name: "reptileCount",
-          label: t("auth.fields.reptileCount", {
-            defaultValue: "How many reptiles do you currently keep?",
-          }),
-          type: "number",
-          required: true,
-        },
-        {
-          name: "experienceLevel",
-          label: t("auth.fields.experienceLevel", { defaultValue: "Experience level" }),
-          type: "select",
-          options: experienceLevels,
-          required: true,
-        },
-        {
-          name: "enableAutomaticReptileSync",
-          label: t("auth.fields.enableAutomaticReptileSync", {
-            defaultValue: "Enable automatic reptile-data syncing",
-          }),
-          type: "checkbox",
-        },
-      ],
-    },
-    {
-      key: "consent",
-      title: t("auth.steps.consent.title", { defaultValue: "Consent & finish" }),
-      description: t("auth.steps.consent.description", {
-        defaultValue: "Review the legal bits so we can activate your account.",
-      }),
-      fields: [
-        {
-          name: "consentDataProcessing",
-          label: t("auth.fields.consentDataProcessing", {
-            defaultValue: "I consent to data processing for sync & backup services.",
-          }),
-          type: "checkbox",
-          required: true,
-        },
-        {
-          name: "acceptTerms",
-          label: t("auth.fields.acceptTerms", {
-            defaultValue: "I agree to the Terms of Service and keeper guidelines.",
-          }),
-          type: "checkbox",
-          required: true,
-        },
-      ],
-    },
-  ];
-};
-
-const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
-
-const loadStoredAuth = (scope = "breeder") => {
-  if (scope === "public") return { isAuthenticated: false };
-  const storageKey = AUTH_SESSION_STORAGE_KEYS[scope] || AUTH_SESSION_STORAGE_KEYS.breeder;
+const readStoredAuth = () => {
   try {
-    const raw = localStorage.getItem(storageKey) || (scope === "breeder" ? localStorage.getItem(LEGACY_AUTH_STORAGE_KEY) : "");
-    if (!raw) return { isAuthenticated: false };
-    const parsed = JSON.parse(raw);
-    if (parsed?.isAuthenticated) {
-      // Keep the session only if either the access token or refresh token is still
-      // available. This lets the app silently restore auth after a reload.
-      if (!hasStoredAuthSession(scope)) {
-        try {
-          localStorage.removeItem(storageKey);
-          if (scope === "breeder") localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
-        } catch {}
-        return { isAuthenticated: false };
-      }
-      return parsed;
-    }
-    return { isAuthenticated: false };
+    const raw = localStorage.getItem(LAB_AUTH_SESSION_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === "object") return parsed;
   } catch {
-    return { isAuthenticated: false };
+    // unreadable session; fall through to signed-out
   }
+  return { isAuthenticated: false };
 };
 
-const hasValue = (value) => {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (value === 0) return true;
-  return Boolean(String(value ?? "").trim());
+/** Reads `?token=` out of the hash route, which is where invite links land. */
+const inviteTokenFromHash = (hashValue) => {
+  const raw = String(hashValue || "").replace(/^#/, "");
+  const [path, query] = raw.split("?");
+  if (!INVITE_HASH_PATTERN.test(`#${path}`)) return "";
+  return new URLSearchParams(query || "").get("token") || "";
 };
 
-const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
+/**
+ * Build-time assertion that no public signup route exists in the Lab Portal.
+ *
+ * The plan asks for this explicitly: the absence of a signup path is a product
+ * decision, not an oversight, and a future copy-paste from the breeder app
+ * should fail loudly rather than quietly reopen the door.
+ */
+export const assertNoLabSignupRoute = (routes) => {
+  const offending = (Array.isArray(routes) ? routes : []).filter((route) =>
+    /register|signup|sign-up/i.test(String(route || ""))
+  );
+  if (offending.length) {
+    throw new Error(
+      `The Lab Portal must not expose a signup route (found: ${offending.join(", ")}). ` +
+        "Laboratories are onboarded by admin invitation only."
+    );
+  }
+  return true;
+};
 
 export default function AuthGate({ children }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { snapshot, retry } = useSharedBackend();
-  const [authScope, setAuthScope] = useState(() => getAuthSurfaceForHash(window?.location?.hash));
-  const [authState, setAuthState] = useState(() => loadStoredAuth(authScope));
-  const [view, setView] = useState("chooser");
-  const [loginValues, setLoginValues] = useState({ username: "", password: "" });
+
+  const [authState, setAuthState] = useState(readStoredAuth);
+  const [inviteToken, setInviteToken] = useState(() => inviteTokenFromHash(window?.location?.hash));
+  const [loginValues, setLoginValues] = useState({ email: "", password: "" });
   const [loginError, setLoginError] = useState("");
-  const [loginMessage, setLoginMessage] = useState("");
-  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
-  const [passwordRecoveryData, setPasswordRecoveryData] = useState(() =>
-    createDefaultPasswordRecoveryData()
-  );
-  const [passwordRecoveryError, setPasswordRecoveryError] = useState("");
-  const [registrationData, setRegistrationData] = useState(
-    createDefaultRegistrationData(),
-  );
-  const [registerStep, setRegisterStep] = useState(0);
-  const [registrationError, setRegistrationError] = useState("");
-  const registrationSteps = useMemo(() => {
-    const countries = t("auth.options.countries", {
-      returnObjects: true,
-      defaultValue: COUNTRY_OPTIONS_FALLBACK,
-    });
-    const devicePreferences = t("auth.options.devicePreferences", {
-      returnObjects: true,
-      defaultValue: DEVICE_OPTIONS_FALLBACK,
-    });
-    const dataBackup = t("auth.options.dataBackup", {
-      returnObjects: true,
-      defaultValue: DATA_BACKUP_OPTIONS_FALLBACK,
-    });
-    const experienceLevels = t("auth.options.experienceLevels", {
-      returnObjects: true,
-      defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
-    });
-    const roleOptions = t("auth.options.roles", {
-      returnObjects: true,
-      defaultValue: ROLE_OPTIONS_FALLBACK,
-    });
+  const [notice, setNotice] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [busy, setBusy] = useState(false);
 
-    return buildRegistrationSteps(t, {
-      countries,
-      devicePreferences,
-      dataBackup,
-      experienceLevels,
-      roleOptions,
-    });
-  }, [t, i18n.language]);
-
-  const currentStep = registrationSteps[registerStep] || registrationSteps[0];
-  const totalSteps = registrationSteps.length || 1;
-
-  useEffect(() => {
-    const onHashChange = () => {
-      setAuthScope(getAuthSurfaceForHash(window.location.hash));
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  useEffect(() => {
-    setAuthState(loadStoredAuth(authScope));
-    setView("chooser");
-    setLoginError("");
-    setLoginMessage("");
-    setIsRecoveringPassword(false);
-  }, [authScope]);
+  // Invite acceptance
+  const [invite, setInvite] = useState(null);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteForm, setInviteForm] = useState({ fullName: "", password: "", confirmPassword: "" });
 
   const persistAuth = useCallback((next) => {
     setAuthState(next);
-    if (authScope === "public") return;
-    const storageKey = AUTH_SESSION_STORAGE_KEYS[authScope] || AUTH_SESSION_STORAGE_KEYS.breeder;
     try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
+      localStorage.setItem(LAB_AUTH_SESSION_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // ignore write errors
     }
-  }, [authScope]);
+  }, []);
 
-  const handleLogout = useCallback(() => {
-    if (authScope !== "public") clearAuthToken(authScope);
-    persistAuth({ isAuthenticated: false });
-    setView("chooser");
-    setLoginError("");
-    setLoginMessage("");
-    setIsRecoveringPassword(false);
-    setPasswordRecoveryError("");
-    setPasswordRecoveryData(createDefaultPasswordRecoveryData());
-    setRegisterStep(0);
-    setRegistrationData(createDefaultRegistrationData());
-  }, [authScope, persistAuth]);
-
-  // Allow the lab shell to trigger logout via a custom event (avoids prop-drilling).
-  useEffect(() => {
-    if (authScope !== "lab") return;
-    const handler = () => handleLogout();
-    window.addEventListener("lab:logout", handler);
-    return () => window.removeEventListener("lab:logout", handler);
-  }, [authScope, handleLogout]);
-
-  useEffect(() => {
-    if (!authState.isAuthenticated || snapshot.state !== "unauthorized") {
-      return;
-    }
-
-    if (authScope !== "public") clearAuthToken(authScope);
-    persistAuth({ isAuthenticated: false });
-    setView("login");
-    setIsRecoveringPassword(false);
-    setLoginValues((prev) => ({
-      username: authState.profile?.email || prev.username || "",
-      password: "",
-    }));
-    setLoginError(
-      t("auth.sharedBackend.sessionExpiredMessage", {
-        defaultValue: "Your shared backend session expired. Sign in again.",
-      })
-    );
-    setLoginMessage("");
-    setPasswordRecoveryError("");
-    setPasswordRecoveryData(createDefaultPasswordRecoveryData(authState.profile?.email || ""));
-    setRegisterStep(0);
-    setRegistrationData(createDefaultRegistrationData());
-    setRegistrationError("");
-  }, [authScope, authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
-
-  const handleLoginSubmit = async (event) => {
-    event.preventDefault();
-    setLoginError("");
-    setLoginMessage("");
-    const { username, password } = loginValues;
-    if (!username.trim() || !password.trim()) {
-      setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter both username and password." }));
-      return;
-    }
-    try {
-      const normalizedInput = normalizeIdentifier(username);
-      const loginEmail = String(normalizedInput.includes("@") ? normalizedInput : "").trim();
-
-      if (!loginEmail) {
-        setLoginError(t("auth.errors.emailRequired", { defaultValue: "Use your account email address to sign in." }));
-        return;
-      }
-
-      const response = await loginApi({ email: loginEmail, password: String(password || "") }, authScope === "public" ? "breeder" : authScope);
-      const backendUser = response?.user || {};
-      const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
-
+  const signedInAs = useCallback(
+    (backendUser, fallbackEmail) => {
+      const backendRole = String(backendUser?.role || "").trim().toLowerCase();
+      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "lab_staff";
       persistAuth({
         isAuthenticated: true,
         mode: "login",
         role: appRole,
         profile: {
-          fullName: String((backendUser && backendUser.fullName) || loginEmail),
-          displayName: String((backendUser && backendUser.fullName) || loginEmail),
-          email: String((backendUser && backendUser.email) || loginEmail),
-          reptileCount: "",
+          fullName: String(backendUser?.fullName || fallbackEmail),
+          displayName: String(backendUser?.fullName || fallbackEmail),
+          email: String(backendUser?.email || fallbackEmail),
           role: appRole,
         },
         authenticatedAt: new Date().toISOString(),
       });
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : t("auth.errors.badPassword", { defaultValue: "Login failed." }));
-    }
-  };
+    },
+    [persistAuth]
+  );
 
-  const openPasswordRecovery = () => {
-    const normalizedInput = normalizeIdentifier(loginValues.username);
-    const recoveryEmail = normalizedInput.includes("@") ? normalizedInput : "";
-    setIsRecoveringPassword(true);
+  useEffect(() => {
+    const onHashChange = () => setInviteToken(inviteTokenFromHash(window.location.hash));
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    clearAuthToken(AUTH_SCOPE);
+    persistAuth({ isAuthenticated: false });
+    setLoginValues({ email: "", password: "" });
     setLoginError("");
-    setLoginMessage("");
-    setPasswordRecoveryError("");
-    setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
-  };
+    setNotice("");
+  }, [persistAuth]);
 
-  const closePasswordRecovery = () => {
-    setIsRecoveringPassword(false);
-    setPasswordRecoveryError("");
-    setPasswordRecoveryData((prev) => createDefaultPasswordRecoveryData(prev.email));
-  };
+  // The lab shell triggers logout through an event rather than prop-drilling.
+  useEffect(() => {
+    const handler = () => handleLogout();
+    window.addEventListener("lab:logout", handler);
+    return () => window.removeEventListener("lab:logout", handler);
+  }, [handleLogout]);
 
-  const handlePasswordRecoveryChange = (name, value) => {
-    setPasswordRecoveryData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // A rejected session upstream means the stored one is stale.
+  useEffect(() => {
+    if (!authState.isAuthenticated || snapshot.state !== "unauthorized") return;
+    clearAuthToken(AUTH_SCOPE);
+    persistAuth({ isAuthenticated: false });
+    setLoginValues((prev) => ({ email: authState.profile?.email || prev.email, password: "" }));
+    setLoginError(
+      t("auth.sharedBackend.sessionExpiredMessage", {
+        defaultValue: "Your session expired. Sign in again.",
+      })
+    );
+  }, [authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
 
-  const handlePasswordRecoverySubmit = async (event) => {
+  // Load the invitation named in the URL, if any.
+  useEffect(() => {
+    if (!inviteToken) {
+      setInvite(null);
+      setInviteError("");
+      return;
+    }
+    setBusy(true);
+    setInviteError("");
+    fetchInviteApi(inviteToken)
+      .then((data) => {
+        setInvite(data?.invite || null);
+        setInviteForm((prev) => ({ ...prev, fullName: prev.fullName || "" }));
+      })
+      .catch((error) => {
+        setInvite(null);
+        setInviteError(error instanceof Error ? error.message : "This invitation link is not valid.");
+      })
+      .finally(() => setBusy(false));
+  }, [inviteToken]);
+
+  const handleLogin = async (event) => {
     event.preventDefault();
-    setPasswordRecoveryError("");
-    setLoginMessage("");
-
-    const recoveryEmail = normalizeIdentifier(passwordRecoveryData.email);
-    const recoveryFullName = String(passwordRecoveryData.fullName || "").trim();
-    const recoveryPassword = String(passwordRecoveryData.newPassword || "");
-    const recoveryConfirmPassword = String(passwordRecoveryData.confirmNewPassword || "");
-
-    if (!recoveryEmail || !recoveryEmail.includes("@")) {
-      setPasswordRecoveryError(t("auth.errors.emailRequired", {
-        defaultValue: "Use the account email address for password recovery.",
-      }));
+    setLoginError("");
+    setNotice("");
+    const email = String(loginValues.email || "").trim().toLowerCase();
+    const password = String(loginValues.password || "");
+    if (!email || !password) {
+      setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter your email and password." }));
       return;
     }
-
-    if (!recoveryFullName) {
-      setPasswordRecoveryError(t("auth.errors.requiredField", {
-        defaultValue: 'Please complete "{{field}}".',
-        field: t("auth.fields.fullName", { defaultValue: "Full name" }),
-      }));
-      return;
-    }
-
-    if (recoveryPassword.trim().length < 8) {
-      setPasswordRecoveryError(t("auth.errors.passwordLength", {
-        defaultValue: "Choose a password with at least 8 characters.",
-      }));
-      return;
-    }
-
-    if (recoveryPassword !== recoveryConfirmPassword) {
-      setPasswordRecoveryError(t("auth.errors.passwordMismatch", {
-        defaultValue: "Passwords do not match.",
-      }));
-      return;
-    }
-
+    setBusy(true);
     try {
-      const result = await recoverPasswordApi({
-        email: recoveryEmail,
-        fullName: recoveryFullName,
-        newPassword: recoveryPassword,
-      });
-
-      setIsRecoveringPassword(false);
-      setPasswordRecoveryData(createDefaultPasswordRecoveryData(recoveryEmail));
-      setLoginValues({
-        username: recoveryEmail,
-        password: "",
-      });
-      setLoginMessage(String(result?.message || t("auth.recovery.success", {
-        defaultValue: "Password updated. Sign in with your new password.",
-      })));
+      const response = await loginApi({ email, password }, AUTH_SCOPE);
+      signedInAs(response?.user, email);
     } catch (error) {
-      setPasswordRecoveryError(
-        error instanceof Error
-          ? error.message
-          : t("auth.recovery.error", {
-              defaultValue: "Password recovery failed.",
-            })
+      setLoginError(error instanceof Error ? error.message : "Sign in failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasswordReset = async (event) => {
+    event.preventDefault();
+    setLoginError("");
+    const email = String(resetEmail || "").trim().toLowerCase();
+    if (!email.includes("@")) {
+      setLoginError(t("auth.errors.emailRequired", { defaultValue: "Enter your account email address." }));
+      return;
+    }
+    setBusy(true);
+    try {
+      await requestPasswordResetApi({ email });
+    } catch {
+      // Deliberately swallowed: whether the address exists is not something an
+      // unauthenticated caller should be able to learn from the response.
+    } finally {
+      setBusy(false);
+      setIsResetting(false);
+      setNotice(
+        t("auth.reset.sent", {
+          defaultValue: "If that address has an account, a reset link is on its way.",
+        })
       );
     }
   };
 
-  const handleRegistrationChange = (name, value) => {
-    setRegistrationData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleRegistrationStepSubmit = async (event) => {
+  const handleAcceptInvite = async (event) => {
     event.preventDefault();
-    setRegistrationError("");
-    const missingField = currentStep.fields.find((field) => {
-      if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
-        return false;
-      }
-      const required =
-        typeof field.required === "function"
-          ? field.required(registrationData)
-          : field.required;
-      if (!required) return false;
-      const value = registrationData[field.name];
-      return !hasValue(value);
-    });
-
-    if (missingField) {
-      setRegistrationError(t("auth.errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
+    setInviteError("");
+    const fullName = String(inviteForm.fullName || "").trim();
+    if (!fullName) {
+      setInviteError("Enter your name.");
       return;
     }
-
-    if (currentStep.validate) {
-      const error = currentStep.validate(registrationData);
-      if (error) {
-        setRegistrationError(error);
+    const needsPassword = invite?.requiresPassword;
+    if (needsPassword) {
+      if (String(inviteForm.password || "").length < 8) {
+        setInviteError("Choose a password of at least 8 characters.");
+        return;
+      }
+      if (inviteForm.password !== inviteForm.confirmPassword) {
+        setInviteError("Those passwords do not match.");
         return;
       }
     }
 
-    if (registerStep === totalSteps - 1) {
-      const desiredDisplayName = (registrationData.displayName || registrationData.fullName).trim();
-      const desiredEmail = registrationData.email.trim();
-      const desiredFullName = registrationData.fullName.trim();
-
-      try {
-        await registerApi({
-          fullName: desiredFullName || registrationData.fullName,
-          email: desiredEmail,
-          password: registrationData.password,
-          role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
-        });
-
-        const loginResponse = await loginApi({
-          email: desiredEmail,
-          password: registrationData.password,
-        }, authScope === "public" ? "breeder" : authScope);
-
-        const backendUser = loginResponse?.user || {};
-        const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-        const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
-
-        persistAuth({
-          isAuthenticated: true,
-          mode: "registered",
-          role: appRole,
-          profile: {
-            fullName: String((backendUser && backendUser.fullName) || desiredFullName),
-            displayName: desiredDisplayName,
-            email: String((backendUser && backendUser.email) || desiredEmail),
-            reptileCount: registrationData.reptileCount,
-            role: appRole,
-          },
-          registeredAt: new Date().toISOString(),
-          preferences: {
-            enableCloudSync: registrationData.enableCloudSync,
-            enableAutomaticReptileSync:
-              registrationData.enableAutomaticReptileSync,
-            devicePreference: registrationData.devicePreference,
-          },
-        });
-      } catch (error) {
-        setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
+    setBusy(true);
+    try {
+      const result = await acceptInviteApi(inviteToken, {
+        fullName,
+        ...(needsPassword ? { password: inviteForm.password } : {}),
+      });
+      window.location.hash = "#/lab/dashboard";
+      setInviteToken("");
+      if (result?.requiresSignIn) {
+        setNotice("Invitation accepted. Sign in to continue.");
+        setLoginValues({ email: String(result.email || ""), password: "" });
+        return;
       }
-      return;
-    }
-
-    setRegisterStep((prev) => Math.min(prev + 1, totalSteps - 1));
-  };
-
-  const resetRegistration = () => {
-    setRegisterStep(0);
-    setRegistrationError("");
-    setRegistrationData(createDefaultRegistrationData());
-  };
-
-  const renderField = (field) => {
-    if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
-      return null;
-    }
-    const value = registrationData[field.name];
-    const label = (
-      <span className="auth-field-label">
-        {field.label}
-        {typeof field.required === "function"
-          ? field.required(registrationData) && <span className="required">*</span>
-          : field.required && <span className="required">*</span>}
-      </span>
-    );
-
-    switch (field.type) {
-      case "checkbox":
-        return (
-          <label key={field.name} className="auth-field auth-field-checkbox">
-            <input
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.checked)
-              }
-            />
-            <span>{field.label}</span>
-          </label>
-        );
-      case "textarea":
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <textarea
-              value={value}
-              rows={3}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            />
-          </label>
-        );
-      case "select":
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <select
-              value={value}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            >
-              <option value="">{t("common.selectOption", { defaultValue: "Select an option" })}</option>
-              {field.options.map((option) => (
-                <option
-                  key={option.value || option}
-                  value={option.value || option}
-                >
-                  {option.label || option}
-                </option>
-              ))}
-            </select>
-          </label>
-        );
-      default:
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <input
-              type={field.type || "text"}
-              value={value}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            />
-          </label>
-        );
+      signedInAs(result?.user, String(invite?.email || ""));
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "Could not accept this invitation.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const loginCard = (
-    <div className="auth-card">
-      <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
-      </div>
-      <p className="auth-subtitle">
-        {t("auth.subtitle", {
-          defaultValue:
-            "Keep your reptiles synced across desktop and mobile with one secure account.",
-        })}
-      </p>
-      <div className="auth-primary-actions">
-        <button
-          type="button"
-          className={`primary ${view === "register" ? "is-active" : ""}`}
-          onClick={() => {
-            setView("register");
-            setIsRecoveringPassword(false);
-            resetRegistration();
-          }}
-        >
-          {t("auth.actions.register", { defaultValue: "Register" })}
-        </button>
-        <button
-          type="button"
-          className={`ghost ${view === "login" ? "is-active" : ""}`}
-          onClick={() => {
-            setView("login");
-            setIsRecoveringPassword(false);
-            setPasswordRecoveryError("");
-          }}
-        >
-          {t("auth.actions.login", { defaultValue: "Log in" })}
-        </button>
-      </div>
-      {view === "login" && (
-          isRecoveringPassword ? (
-            <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
-              <p className="auth-helper-copy">
-                {t("auth.recovery.instructions", {
-                  defaultValue: "Enter the email and full name on the account, then choose a new password.",
-                })}
+  if (authState.isAuthenticated) {
+    return <>{children}</>;
+  }
+
+  // ── Invitation acceptance ─────────────────────────────────────────────────
+  if (inviteToken) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <h1 className="auth-card-title">
+            {invite?.kind === "vendor_lab" ? "Set up your laboratory" : "Join the team"}
+          </h1>
+
+          {inviteError ? <div className="auth-error">{inviteError}</div> : null}
+
+          {invite ? (
+            <>
+              <p className="auth-subtitle">
+                {invite.kind === "vendor_lab" ? (
+                  <>
+                    You have been invited to run <strong>{invite.organizationName}</strong> on
+                    Breeding Planner. Accepting creates your laboratory's own workspace.
+                  </>
+                ) : (
+                  <>
+                    You have been invited to join <strong>{invite.organizationName}</strong> as{" "}
+                    {String(invite.role || "member").replace(/_/g, " ")}.
+                  </>
+                )}
               </p>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.email", { defaultValue: "Email address" })}
-                </span>
-                <input
-                  type="email"
-                  value={passwordRecoveryData.email}
-                  onChange={(e) => handlePasswordRecoveryChange("email", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.fullName", { defaultValue: "Full name" })}
-                </span>
-                <input
-                  type="text"
-                  value={passwordRecoveryData.fullName}
-                  onChange={(e) => handlePasswordRecoveryChange("fullName", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.newPassword", { defaultValue: "New password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.newPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("newPassword", e.target.value)}
-                />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.recovery.confirmNewPassword", { defaultValue: "Confirm new password" })}
-                </span>
-                <input
-                  type="password"
-                  value={passwordRecoveryData.confirmNewPassword}
-                  onChange={(e) => handlePasswordRecoveryChange("confirmNewPassword", e.target.value)}
-                />
-              </label>
-              {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
-              <button type="submit" className="primary wide">
-                {t("auth.actions.resetPassword", { defaultValue: "Reset password" })}
-              </button>
-              <div className="auth-secondary-action">
-                <button type="button" className="text-button" onClick={closePasswordRecovery}>
-                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form className="auth-login-form" onSubmit={handleLoginSubmit}>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.email", { defaultValue: "Email address" })}
-                </span>
-                <input
-                  type="email"
-                  value={loginValues.username}
-                  onChange={(e) =>
-                    setLoginValues((prev) => ({ ...prev, username: e.target.value }))
-                }
-              />
-              </label>
-              <label className="auth-field">
-                <span className="auth-field-label">
-                  {t("auth.fields.password", { defaultValue: "Password" })}
-                </span>
-                <input
-                  type="password"
-                  value={loginValues.password}
-                  onChange={(e) =>
-                    setLoginValues((prev) => ({ ...prev, password: e.target.value }))
-                }
-              />
-              </label>
-              <div className="auth-inline-link-row">
-                <button type="button" className="text-button" onClick={openPasswordRecovery}>
-                  {t("auth.actions.forgotPassword", { defaultValue: "Forgot password?" })}
-                </button>
-              </div>
-              {loginMessage && <p className="auth-success">{loginMessage}</p>}
-              {loginError && <p className="auth-error">{loginError}</p>}
-              <button type="submit" className="primary wide">
-                {t("common.continue", { defaultValue: "Continue" })}
-              </button>
-              {import.meta.env.DEV ? (
-                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                  Dev login:
-                  {" "}
-                  <code>lab@proherper.dev</code>
-                  {" / "}
-                  <code>demo1234</code>
-                  {" "}
-                  or
-                  {" "}
-                  <code>admin@BreedingPlanner.dev</code>
-                  {" / "}
-                  <code>admin1234</code>.
-                  {" "}
-                  Public registration creates breeder accounts only.
-                </div>
-              ) : null}
-            </form>
-          )
-        )}
-    </div>
-  );
+              <p className="auth-subtitle">
+                Invitation for <strong>{invite.email}</strong>
+              </p>
 
-  const registrationCard = (
-    <div className="auth-card registration-card">
-      <div className="auth-card-header">
-        <button type="button" className="text-button" onClick={() => setView("chooser")}>
-          {t("common.back", { defaultValue: "Back" })}
-        </button>
-        <div>
-          {t("auth.steps.progress", { defaultValue: "Step {{current}} of {{total}}", current: registerStep + 1, total: totalSteps, })}
+              <form onSubmit={handleAcceptInvite}>
+                <label>
+                  Your name
+                  <input
+                    value={inviteForm.fullName}
+                    onChange={(e) => setInviteForm((p) => ({ ...p, fullName: e.target.value }))}
+                    required
+                  />
+                </label>
+
+                {invite.requiresPassword ? (
+                  <>
+                    <label>
+                      Choose a password
+                      <input
+                        type="password"
+                        value={inviteForm.password}
+                        onChange={(e) => setInviteForm((p) => ({ ...p, password: e.target.value }))}
+                        minLength={8}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Confirm password
+                      <input
+                        type="password"
+                        value={inviteForm.confirmPassword}
+                        onChange={(e) =>
+                          setInviteForm((p) => ({ ...p, confirmPassword: e.target.value }))
+                        }
+                        required
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <p className="auth-subtitle">
+                    This address already has an account — accept, then sign in with your existing
+                    password.
+                  </p>
+                )}
+
+                <button type="submit" className="primary" disabled={busy}>
+                  {busy ? "Working…" : "Accept invitation"}
+                </button>
+              </form>
+            </>
+          ) : (
+            !inviteError && <p className="auth-subtitle">Checking your invitation…</p>
+          )}
         </div>
       </div>
-      <h2>{currentStep.title}</h2>
-      <p className="auth-subtitle">{currentStep.description}</p>
-      <form className="auth-registration-form" onSubmit={handleRegistrationStepSubmit}>
-        {currentStep.fields.map((field) => renderField(field))}
-        {registrationError && <p className="auth-error">{registrationError}</p>}
-        <div className="auth-registration-actions">
-          <button
-            type="button"
-            className="ghost"
-            disabled={registerStep === 0}
-            onClick={() =>
-              setRegisterStep((prev) => Math.max(0, prev - 1))
-            }
-          >
-            {t("common.previous", { defaultValue: "Previous" })}
-          </button>
-          <button type="submit" className="primary">
-            {registerStep === totalSteps - 1
-              ? t("auth.actions.createAccount", { defaultValue: "Create account" })
-              : t("common.next", { defaultValue: "Next" })}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+    );
+  }
 
-  const signedInChip = authState.isAuthenticated ? (
-    <div className="auth-floating-chip">
-      <span>
-        {t("auth.status.signedInAs", { defaultValue: "Signed in as" })}{" "}
-        {authState.profile?.displayName ||
-          authState.profile?.fullName ||
-          t("auth.status.defaultName", { defaultValue: "Keeper" })}
-      </span>
-      <button type="button" onClick={handleLogout}>
-        {t("auth.actions.signOut", { defaultValue: "Sign out" })}
-      </button>
-    </div>
-  ) : null;
-
-  const overlayActive = authScope !== "public" && !authState.isAuthenticated;
-  const showBackendBlocker = authScope !== "public" && !authState.isAuthenticated && snapshot.state !== "connected" && snapshot.state !== "unauthorized";
-
+  // ── Sign in ───────────────────────────────────────────────────────────────
   return (
     <div className="auth-shell">
-      <div className={`auth-shell__app ${overlayActive ? "is-blurred" : ""}`}>
-        {authState.isAuthenticated && signedInChip}
-        {!overlayActive ? children : null}
+      <div className="auth-card">
+        <h1 className="auth-card-title">
+          {t("auth.lab.title", { defaultValue: "Laboratory Portal" })}
+        </h1>
+        <p className="auth-subtitle">
+          {t("auth.lab.subtitle", {
+            defaultValue: "Sign in to manage your laboratory's tests, orders and results.",
+          })}
+        </p>
+
+        {notice ? <div className="auth-notice">{notice}</div> : null}
+        {loginError ? <div className="auth-error">{loginError}</div> : null}
+
+        {snapshot.state === "unreachable" ? (
+          <div className="auth-error">
+            {snapshot?.message ||
+              t("auth.sharedBackend.unreachable", { defaultValue: "The backend is unreachable." })}
+            <button type="button" className="ghost" onClick={retry}>
+              {t("common.retry", { defaultValue: "Retry" })}
+            </button>
+          </div>
+        ) : null}
+
+        {isResetting ? (
+          <form onSubmit={handlePasswordReset}>
+            <label>
+              {t("auth.fields.email", { defaultValue: "Email" })}
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+            </label>
+            <button type="submit" className="primary" disabled={busy}>
+              {busy ? "Sending…" : t("auth.reset.send", { defaultValue: "Send reset link" })}
+            </button>
+            <button type="button" className="ghost" onClick={() => setIsResetting(false)}>
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin}>
+            <label>
+              {t("auth.fields.email", { defaultValue: "Email" })}
+              <input
+                type="email"
+                value={loginValues.email}
+                onChange={(e) => setLoginValues((p) => ({ ...p, email: e.target.value }))}
+                autoComplete="username"
+                required
+              />
+            </label>
+            <label>
+              {t("auth.fields.password", { defaultValue: "Password" })}
+              <input
+                type="password"
+                value={loginValues.password}
+                onChange={(e) => setLoginValues((p) => ({ ...p, password: e.target.value }))}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <button type="submit" className="primary" disabled={busy}>
+              {busy ? "Signing in…" : t("auth.actions.login", { defaultValue: "Sign in" })}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setResetEmail(loginValues.email);
+                setIsResetting(true);
+              }}
+            >
+              {t("auth.actions.forgotPassword", { defaultValue: "Forgot your password?" })}
+            </button>
+          </form>
+        )}
+
+        {/* No registration link, by design. */}
+        <p className="auth-footnote">
+          {t("auth.lab.inviteOnly", {
+            defaultValue:
+              "Laboratory accounts are created by invitation. If your laboratory would like to join, contact us and we will send an invitation.",
+          })}
+        </p>
       </div>
-      {overlayActive && (
-        <div className="auth-overlay">
-          {showBackendBlocker ? (
-            <div className="auth-card">
-              <div className="auth-card-brand">
-                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-                <h1 className="auth-card-title">
-                  {snapshot.state === "config-error"
-                    ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
-                    : snapshot.state === "unauthorized"
-                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
-                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
-                </h1>
-              </div>
-              <p className="auth-subtitle">{snapshot.message}</p>
-              <div className="text-xs text-neutral-500">
-                {t("auth.sharedBackend.requirements", {
-                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
-                })}
-              </div>
-              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  {snapshot.config.warnings.join(" ")}
-                </div>
-              ) : null}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" className="primary" onClick={retry}>
-                  {t("common.retry", { defaultValue: "Retry" })}
-                </button>
-              </div>
-            </div>
-          ) : view === "register" ? registrationCard : loginCard}
-        </div>
-      )}
     </div>
   );
 }
-

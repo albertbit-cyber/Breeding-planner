@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const CART_STORAGE_KEY = "breedingPlannerBatchOrderCart";
+const CART_LAB_STORAGE_KEY = "breedingPlannerBatchOrderLab";
 
 const BatchOrderContext = createContext(null);
 
@@ -15,6 +16,24 @@ export function BatchOrderProvider({ children }) {
     }
   });
 
+  /**
+   * The laboratory this cart is addressed to.
+   *
+   * One cart goes to one lab, and it has to be chosen before tests can be
+   * picked: each lab publishes its own tests at its own prices, so a selection
+   * made against one lab's list means nothing at another. Changing the lab
+   * therefore empties the cart rather than carrying over test ids that the new
+   * lab may not offer at all.
+   */
+  const [selectedLab, setSelectedLab] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CART_LAB_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
@@ -22,6 +41,15 @@ export function BatchOrderProvider({ children }) {
       // storage not available
     }
   }, [cartItems]);
+
+  useEffect(() => {
+    try {
+      if (selectedLab) localStorage.setItem(CART_LAB_STORAGE_KEY, JSON.stringify(selectedLab));
+      else localStorage.removeItem(CART_LAB_STORAGE_KEY);
+    } catch {
+      // storage not available
+    }
+  }, [selectedLab]);
 
   const addToCart = useCallback((snake, selectedTestIds) => {
     const snakeId = String(snake?.id || "").trim();
@@ -54,6 +82,17 @@ export function BatchOrderProvider({ children }) {
 
   const clearCart = useCallback(() => setCartItems([]), []);
 
+  const chooseLab = useCallback((lab) => {
+    const nextId = String(lab?.organizationId || "").trim();
+    setSelectedLab((previous) => {
+      const previousId = String(previous?.organizationId || "").trim();
+      // Switching labs discards the staged selection: those test ids belong to
+      // the previous lab's catalogue and would silently fail against the new one.
+      if (previousId && nextId && previousId !== nextId) setCartItems([]);
+      return nextId ? { organizationId: nextId, labName: String(lab?.labName || "").trim() } : null;
+    });
+  }, []);
+
   const isInCart = useCallback(
     (snakeId) => cartItems.some((item) => item.snakeId === String(snakeId || "")),
     [cartItems]
@@ -65,8 +104,19 @@ export function BatchOrderProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ cartItems, addToCart, removeFromCart, updateTests, clearCart, isInCart, getCartItem }),
-    [cartItems, addToCart, removeFromCart, updateTests, clearCart, isInCart, getCartItem]
+    () => ({
+      cartItems,
+      addToCart,
+      removeFromCart,
+      updateTests,
+      clearCart,
+      isInCart,
+      getCartItem,
+      selectedLab,
+      selectedLabId: selectedLab?.organizationId || "",
+      chooseLab,
+    }),
+    [cartItems, addToCart, removeFromCart, updateTests, clearCart, isInCart, getCartItem, selectedLab, chooseLab]
   );
 
   return <BatchOrderContext.Provider value={value}>{children}</BatchOrderContext.Provider>;

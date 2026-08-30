@@ -635,8 +635,15 @@ export const register = async (payload: { email: string; password: string; fullN
     requiresAuth: false,
   });
 
-export const recoverPassword = async (payload: { email: string; fullName: string; newPassword: string }) =>
-  request<{ message: string }>("/auth/recover-password", {
+/**
+ * Starts a password reset by emailing a single-use link.
+ *
+ * Replaces the older `recoverPassword`, which POSTed a new password straight to
+ * `/auth/recover-password` — an endpoint the backend no longer exposes, so that
+ * path had been silently failing.
+ */
+export const requestPasswordReset = async (payload: { email: string }) =>
+  request<{ message: string }>("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
@@ -650,15 +657,114 @@ export const getCurrentUser = async () => {
 
 export const fetchTestCatalog = async () => request<{ tests: unknown[] }>("/lab/tests/catalog?breederView=true");
 
-export const fetchPricingConfig = async () => request<{ pricing: unknown }>("/lab/tests/pricing");
+/**
+ * The tests a breeder may actually order, which belong to the chosen lab.
+ * `fetchTestCatalog` above reads the platform's shared seed library, which is a
+ * different thing and is not orderable.
+ */
+export const fetchLabOfferings = async (labOrganizationId: string) => {
+  const data = await fetchLabDirectoryEntry(labOrganizationId);
+  return { tests: Array.isArray(data?.offerings) ? data.offerings : [] };
+};
 
-export const calculateOrderPrice = async (payload: { animals: Array<{ animalId: string; animalName?: string; selectedTestIds: string[] }> }) =>
+// ── Lab directory (breeder-facing) ──────────────────────────────────────────
+
+export const fetchLabDirectory = async () =>
+  request<{ labs: Array<Record<string, unknown>> }>("/lab/directory");
+
+/** One lab's public profile, the tests it sells and the prices it charges. */
+export const fetchLabDirectoryEntry = async (labOrganizationId: string) =>
+  request<{ lab: Record<string, unknown>; offerings: unknown[]; pricing: unknown }>(
+    `/lab/directory/${encodeURIComponent(labOrganizationId)}`
+  );
+
+// ── The signed-in laboratory's own workspace ────────────────────────────────
+//
+// None of these take an organization id: the backend resolves the caller's own
+// organization from their membership, which is what makes it impossible to aim
+// them at another laboratory.
+
+export const fetchMyLabProfile = async () => request<{ lab: Record<string, unknown> }>("/lab/my/profile");
+
+export const updateMyLabProfile = async (payload: Record<string, unknown>) =>
+  request<{ lab: Record<string, unknown> }>("/lab/my/profile", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMyLabTests = async () => request<{ offerings: unknown[] }>("/lab/my/tests");
+
+export const createMyLabTest = async (payload: Record<string, unknown>) =>
+  request<{ offering: unknown }>("/lab/my/tests", { method: "POST", body: JSON.stringify(payload) });
+
+export const updateMyLabTest = async (id: string, payload: Record<string, unknown>) =>
+  request<{ offering: unknown }>(`/lab/my/tests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const retireMyLabTest = async (id: string) =>
+  request<{ offering: unknown }>(`/lab/my/tests/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** The shared library a lab may copy standard tests from. Never a constraint. */
+export const fetchLabSeedLibrary = async () => request<{ library: unknown[] }>("/lab/my/library");
+
+export const fetchMyLabPricing = async () => request<{ pricing: Record<string, unknown> }>("/lab/my/pricing");
+
+export const updateMyLabPricing = async (payload: Record<string, unknown>) =>
+  request<{ pricing: Record<string, unknown> }>("/lab/my/pricing", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMyLabTeam = async () => request<{ members: unknown[] }>("/lab/my/team");
+
+export const inviteLabTeammate = async (payload: { email: string; role?: string }) =>
+  request<{ invite: unknown }>("/lab/my/team/invites", { method: "POST", body: JSON.stringify(payload) });
+
+export const fetchMyLabTeamInvites = async () => request<{ invites: unknown[] }>("/lab/my/team/invites");
+
+export const revokeLabTeamInvite = async (id: string) =>
+  request<{ invite: unknown }>(`/lab/my/team/invites/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const changeLabTeamMemberRole = async (id: string, role: string) =>
+  request<{ member: unknown }>(`/lab/my/team/${encodeURIComponent(id)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+
+export const removeLabTeamMember = async (id: string) =>
+  request<{ removed: boolean }>(`/lab/my/team/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const transferLabOwnership = async (id: string) =>
+  request<{ members: unknown[] }>(`/lab/my/team/${encodeURIComponent(id)}/transfer-ownership`, {
+    method: "POST",
+  });
+
+// ── Invitations (unauthenticated: the token is the credential) ───────────────
+
+export const fetchInvite = async (token: string) =>
+  request<{ invite: Record<string, unknown> }>(`/invites/${encodeURIComponent(token)}`, {
+    requiresAuth: false,
+  });
+
+export const acceptInvite = async (
+  token: string,
+  payload: { fullName: string; password?: string }
+) =>
+  request<Record<string, unknown>>(`/invites/${encodeURIComponent(token)}/accept`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
+export const calculateOrderPrice = async (payload: { labOrganizationId: string; animals: Array<{ animalId: string; animalName?: string; selectedTestIds: string[] }> }) =>
   request("/lab/orders/calculate-price", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
-export const createOrder = async (payload: { animals: Array<{ animalId: string; animalName?: string; selectedTestIds: string[] }> }) =>
+export const createOrder = async (payload: { labOrganizationId: string; animals: Array<{ animalId: string; animalName?: string; selectedTestIds: string[] }> }) =>
   request("/lab/orders", {
     method: "POST",
     body: JSON.stringify(payload),

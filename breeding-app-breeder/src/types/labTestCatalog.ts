@@ -37,7 +37,18 @@ export interface LabAvailableTestBreederView {
 }
 
 export type CreateLabAvailableTestInput = {
-  labId: string;
+  /**
+   * Which laboratory the test belongs to. Optional now that the backend
+   * resolves it from the caller's own membership — a client cannot name a
+   * laboratory it does not belong to.
+   */
+  labId?: string;
+  /**
+   * Optional provenance link to the shared seed library, set when a lab copies
+   * a standard test in as a starting point. Never required: a lab may define a
+   * test that exists in no library at all.
+   */
+  catalogRefId?: string;
   internalCode: string;
   name: string;
   shortLabel?: string;

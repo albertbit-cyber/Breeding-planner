@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
+import LabPicker from "./LabPicker.jsx";
 import {
   getSuggestedHetTestIds,
   matchSuggestedHetTests,
@@ -22,7 +23,7 @@ export default function BreederOrderGeneticTestModal({
   overlayClass,
 }) {
   const { t } = useTranslation();
-  const { addToCart, isInCart, getCartItem } = useBatchOrder();
+  const { addToCart, isInCart, getCartItem, selectedLab, selectedLabId } = useBatchOrder();
 
   const [selectedTests, setSelectedTests] = useState([]);
   const [catalogTests, setCatalogTests] = useState([]);
@@ -30,6 +31,7 @@ export default function BreederOrderGeneticTestModal({
   const [catalogError, setCatalogError] = useState("");
   const [added, setAdded] = useState(false);
   const [hasAppliedSuggestions, setHasAppliedSuggestions] = useState(false);
+  const [changingLab, setChangingLab] = useState(false);
 
   const snakeId = String(snake?.id || "").trim();
   const alreadyInCart = isInCart(snakeId);
@@ -43,22 +45,32 @@ export default function BreederOrderGeneticTestModal({
     setHasAppliedSuggestions(false);
   }, [open, snakeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load catalog when modal opens
+  // Load the chosen laboratory's tests. Re-runs when the lab changes, because
+  // the list of what can be ordered is a property of the lab, not of the app.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !selectedLabId) {
+      setCatalogTests([]);
+      return;
+    }
     setIsLoadingCatalog(true);
     setCatalogError("");
     const api = createLabApiClient();
     api
-      .getLabTestsCatalog({ breederView: true })
+      .getLabTestsCatalog({ breederView: true, labOrganizationId: selectedLabId })
       .then((tests) => setCatalogTests(tests || []))
       .catch((err) => {
-        const message = err instanceof Error ? err.message : "Unable to load lab test catalog.";
+        const message = err instanceof Error ? err.message : "Unable to load this laboratory's tests.";
         setCatalogTests([]);
         setCatalogError(message);
       })
       .finally(() => setIsLoadingCatalog(false));
-  }, [open]);
+  }, [open, selectedLabId]);
+
+  // Switching labs invalidates any staged selection for the same reason.
+  useEffect(() => {
+    setSelectedTests([]);
+    setHasAppliedSuggestions(false);
+  }, [selectedLabId]);
 
   const testOptions = useMemo(
     () => catalogTests.map((entry) => ({ id: entry.id, name: entry.name })),
@@ -167,10 +179,46 @@ export default function BreederOrderGeneticTestModal({
             ) : null}
           </div>
 
+          {/* Laboratory selection. Everything below depends on it, so it comes
+              first and the test list stays hidden until a lab is chosen. */}
+          <div className="rounded-2xl border border-neutral-200 bg-white p-3">
+            {selectedLabId ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-neutral-500">
+                    {t("lab.orders.sendingTo", { defaultValue: "Sending to" })}
+                  </div>
+                  <div className="truncate text-sm font-medium text-neutral-900">
+                    {selectedLab?.labName}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-xl border px-3 py-1.5 text-xs"
+                  onClick={() => setChangingLab((prev) => !prev)}
+                >
+                  {changingLab
+                    ? t("common.cancel", { defaultValue: "Cancel" })
+                    : t("lab.orders.changeLab", { defaultValue: "Change" })}
+                </button>
+              </div>
+            ) : null}
+            {!selectedLabId || changingLab ? (
+              <div className={selectedLabId ? "mt-3" : ""}>
+                <LabPicker onChosen={() => setChangingLab(false)} />
+              </div>
+            ) : null}
+          </div>
+
           {/* Test selection */}
-          <div>
+          <div className={selectedLabId ? "" : "pointer-events-none opacity-40"}>
             <div className="mb-2 text-xs text-neutral-600">
               {t("lab.orders.requestedTests", { defaultValue: "Requested Gene Tests" })}
+              {selectedLab?.labName ? (
+                <span className="ml-1 text-neutral-400">
+                  — {selectedLab.labName}
+                </span>
+              ) : null}
             </div>
             {suggestedHetTests.length ? (
               <div className="mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
@@ -268,7 +316,7 @@ export default function BreederOrderGeneticTestModal({
             <button
               type="button"
               className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!selectedTests.length || isLoadingCatalog || !!catalogError || added}
+              disabled={!selectedLabId || !selectedTests.length || isLoadingCatalog || !!catalogError || added}
               onClick={handleAddToBatch}
             >
               {alreadyInCart && !added

@@ -4,7 +4,9 @@ import {
   createOrder,
   fetchMyOrders,
   fetchOrderById,
-  fetchPricingConfig,
+  fetchLabDirectoryEntry,
+  fetchLabOfferings,
+  fetchMyLabPricing,
   fetchTestCatalog,
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
@@ -992,7 +994,9 @@ export const createLabApiClient = () => {
     const selectedTestIds = Array.isArray(input.requestedTests)
       ? input.requestedTests.map((id) => String(id || "").trim()).filter(Boolean)
       : [];
+    const labOrganizationId = String((input as any)?.labOrganizationId || "").trim();
     const payload = {
+      labOrganizationId,
       animals: [
         {
           animalId: normalizedAnimalId,
@@ -1004,16 +1008,24 @@ export const createLabApiClient = () => {
     if (!payload.animals[0].animalId || payload.animals[0].selectedTestIds.length === 0) {
       throw new Error("snakeId and requested tests are required.");
     }
+    if (!labOrganizationId) {
+      throw new Error("Choose a laboratory before placing the order.");
+    }
     const created = await createOrder(payload as any);
     return { order: toLegacyOrder((created as any)?.order || null) } as any;
   };
 
   const createBatchOrder = async (
-    items: { snakeId: string; snakeName?: string; selectedTestIds: string[] }[]
+    items: { snakeId: string; snakeName?: string; selectedTestIds: string[] }[],
+    labOrganizationId?: string
   ): Promise<{ order: TestOrder }> => {
     requireSessionRole("breeder");
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error("No animals in batch.");
+    }
+    const resolvedLabId = String(labOrganizationId || "").trim();
+    if (!resolvedLabId) {
+      throw new Error("Choose a laboratory before submitting the batch.");
     }
     const animals = items.map((item) => ({
       animalId: String(item.snakeId || "").trim(),
@@ -1026,7 +1038,7 @@ export const createLabApiClient = () => {
     if (invalid) {
       throw new Error("Each animal must have an ID and at least one selected test.");
     }
-    const created = await createOrder({ animals } as any);
+    const created = await createOrder({ labOrganizationId: resolvedLabId, animals } as any);
     return { order: toLegacyOrder((created as any)?.order || null) };
   };
 
@@ -1268,23 +1280,44 @@ export const createLabApiClient = () => {
     return buildSharedOrderLabelsPrintPayload(orderId);
   };
 
-  const getLabTestsCatalog = async (options: { breederView?: boolean } = {}): Promise<ShedTestCatalogItem[]> => {
+  /**
+   * The tests on offer.
+   *
+   * `labOrganizationId` names the laboratory whose tests to read — a breeder
+   * passes the lab they picked, so what they see is that lab's list and nobody
+   * else's. Without one, a lab user reads its own offerings.
+   */
+  const getLabTestsCatalog = async (
+    options: { breederView?: boolean; labOrganizationId?: string } = {}
+  ): Promise<ShedTestCatalogItem[]> => {
     requireSessionRole("admin", "lab_staff", "breeder");
-    const breederView = options.breederView ? "true" : "false";
-    const data = options.breederView
-      ? await fetchTestCatalog()
-      : await apiRequest<{ tests: any[] }>(`/lab/tests/catalog?breederView=${breederView}`);
-    const tests = Array.isArray((data as any)?.tests) ? (data as any).tests : [];
+    const labOrganizationId = String(options.labOrganizationId || "").trim();
+    const data = labOrganizationId
+      ? await fetchLabOfferings(labOrganizationId)
+      : await apiRequest<{ offerings: any[] }>("/lab/my/tests");
+    const tests = Array.isArray((data as any)?.tests)
+      ? (data as any).tests
+      : Array.isArray((data as any)?.offerings)
+        ? (data as any).offerings
+        : [];
     return tests.map(toLegacyCatalogItem);
   };
 
-  const getLabTestsPricing = async (): Promise<PricingConfig> => {
+  const getLabTestsPricing = async (
+    options: { labOrganizationId?: string } = {}
+  ): Promise<PricingConfig> => {
     requireSessionRole("admin", "lab_staff", "breeder");
-    const data = await fetchPricingConfig();
+    const labOrganizationId = String(options.labOrganizationId || "").trim();
+    const data = labOrganizationId
+      ? await fetchLabDirectoryEntry(labOrganizationId)
+      : await fetchMyLabPricing();
     return toLegacyPricingConfig((data as any)?.pricing || null);
   };
 
-  const calculateLabOrderPrice = async (payload: { animals: AnimalTestSelection[] }): Promise<OrderPriceBreakdown> => {
+  const calculateLabOrderPrice = async (payload: {
+    labOrganizationId: string;
+    animals: AnimalTestSelection[];
+  }): Promise<OrderPriceBreakdown> => {
     requireSessionRole("admin", "lab_staff", "breeder");
     const data = await calculateOrderPrice(payload as any);
     const tierMap: Record<string, "1-9" | "10-49" | "50+"> = {
@@ -1367,8 +1400,9 @@ export const createLabApiClient = () => {
 
   const listLabAvailableTests = async (): Promise<LabAvailableTest[]> => {
     requireSessionRole("admin", "lab_staff");
-    const response = await apiRequest<{ tests: any[] }>("/lab/tests/catalog?breederView=false");
-    const tests = Array.isArray(response?.tests) ? response.tests : [];
+    // The acting laboratory's own tests, not the platform's shared library.
+    const response = await apiRequest<{ offerings: any[] }>("/lab/my/tests");
+    const tests = Array.isArray(response?.offerings) ? response.offerings : [];
     return tests.map((test, index) => toLabAvailableTestRecord(test, index));
   };
 
@@ -1398,21 +1432,21 @@ export const createLabApiClient = () => {
     if (input.isActive !== undefined) payload.active = Boolean(input.isActive);
     if (input.isVisibleToBreeder !== undefined) payload.visibleInBreederApp = Boolean(input.isVisibleToBreeder);
 
-    const response = await apiRequest<{ test: any }>(`/lab/tests/catalog/${encodeURIComponent(String(input.id || "").trim())}`, {
+    const response = await apiRequest<{ offering: any }>(`/lab/my/tests/${encodeURIComponent(String(input.id || "").trim())}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
-    return toLabAvailableTestRecord(response?.test || null);
+    return toLabAvailableTestRecord(response?.offering || null);
   };
 
   const setLabAvailableTestActive = async (id: string, isActive: boolean): Promise<LabAvailableTest> => {
     requireSessionRole("admin", "lab_staff");
-    return updateLabAvailableTest({ id, labId: DEFAULT_LAB_ID, isActive } as any);
+    return updateLabAvailableTest({ id, isActive } as any);
   };
 
   const setLabAvailableTestVisibility = async (id: string, isVisibleToBreeder: boolean): Promise<LabAvailableTest> => {
     requireSessionRole("admin", "lab_staff");
-    return updateLabAvailableTest({ id, labId: DEFAULT_LAB_ID, isVisibleToBreeder } as any);
+    return updateLabAvailableTest({ id, isVisibleToBreeder } as any);
   };
 
   const listAdminAllOrders = async (): Promise<TestOrder[]> => {

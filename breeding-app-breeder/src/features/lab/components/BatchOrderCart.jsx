@@ -22,7 +22,7 @@ const base64ToBlob = (base64, mimeType) => {
 
 export default function BatchOrderCart() {
   const { t } = useTranslation();
-  const { cartItems, removeFromCart, clearCart } = useBatchOrder();
+  const { cartItems, removeFromCart, clearCart, selectedLab, selectedLabId } = useBatchOrder();
   const { sharedFeaturesEnabled, snapshot, retry } = useSharedBackend();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -41,9 +41,10 @@ export default function BatchOrderCart() {
     if (!cartItems.length && !createdOrder) setIsExpanded(false);
   }, [cartItems.length, createdOrder]);
 
-  // Live price preview, debounced
+  // Live price preview, debounced. Quoted by the chosen laboratory: prices are
+  // per-lab, so there is nothing to quote until one is selected.
   useEffect(() => {
-    if (!cartItems.length || !sharedFeaturesEnabled) {
+    if (!cartItems.length || !sharedFeaturesEnabled || !selectedLabId) {
       setPriceBreakdown(null);
       return;
     }
@@ -53,6 +54,7 @@ export default function BatchOrderCart() {
       const api = createLabApiClient();
       api
         .calculateLabOrderPrice({
+          labOrganizationId: selectedLabId,
           animals: cartItems.map((item) => ({
             animalId: item.snakeId,
             selectedTestIds: item.selectedTestIds,
@@ -65,7 +67,7 @@ export default function BatchOrderCart() {
     return () => {
       if (priceDebounceRef.current) clearTimeout(priceDebounceRef.current);
     };
-  }, [cartItems, sharedFeaturesEnabled]);
+  }, [cartItems, sharedFeaturesEnabled, selectedLabId]);
 
   const handleSubmit = useCallback(async () => {
     setSubmitError("");
@@ -74,7 +76,7 @@ export default function BatchOrderCart() {
     setIsSubmitting(true);
     try {
       const api = createLabApiClient();
-      const result = await api.createBatchOrder(cartItems);
+      const result = await api.createBatchOrder(cartItems, selectedLabId);
       setCreatedOrder(result.order);
 
       if (typeof window !== "undefined") {
@@ -258,6 +260,21 @@ export default function BatchOrderCart() {
           </div>
         ) : null}
 
+        {/* Which laboratory this batch is going to. Shown at the point of
+            submission so it is never ambiguous whose prices were quoted. */}
+        {selectedLab?.labName ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+            {t("lab.batch.sendingTo", { defaultValue: "Sending to" })}:{" "}
+            <span className="font-medium text-neutral-900">{selectedLab.labName}</span>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {t("lab.batch.noLabChosen", {
+              defaultValue: "Choose a laboratory before submitting this order.",
+            })}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2">
           <button
@@ -272,7 +289,7 @@ export default function BatchOrderCart() {
             type="button"
             className="flex-1 rounded-xl border border-neutral-900 bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleSubmit}
-            disabled={isSubmitting || !cartItems.length || !sharedFeaturesEnabled}
+            disabled={isSubmitting || !cartItems.length || !sharedFeaturesEnabled || !selectedLabId}
           >
             {isSubmitting
               ? t("lab.batch.submitting", { defaultValue: "Submitting…" })

@@ -10,6 +10,9 @@ import AdminOversightPage from "./pages/AdminOversightPage.jsx";
 import { createLabApiClient } from "./api/client";
 import TestCatalogPage from "./pages/TestCatalogPage.jsx";
 import PricingLogicPage from "./pages/PricingLogicPage.jsx";
+import LabSettingsPage from "./pages/LabSettingsPage.jsx";
+import LabTeamPage from "./pages/LabTeamPage.jsx";
+import MyAccountPage from "./pages/MyAccountPage.jsx";
 import SharedBackendGuard from "../../components/SharedBackendGuard.jsx";
 import GlobalScanOverlay from "./components/GlobalScanOverlay.jsx";
 
@@ -147,6 +150,9 @@ const parseRoute = (path) => {
   if (normalized === "/lab/admin-oversight") return { route: "/lab/admin-oversight" };
   if (normalized === "/lab/test-catalog") return { route: "/lab/test-catalog" };
   if (normalized === "/lab/pricing-logic") return { route: "/lab/pricing-logic" };
+  if (normalized === "/lab/settings") return { route: "/lab/settings" };
+  if (normalized === "/lab/team") return { route: "/lab/team" };
+  if (normalized === "/lab/account") return { route: "/lab/account" };
   if (normalized === "/lab/dev-tools") return { route: "/lab/dev-tools" };
   if (normalized.startsWith("/lab/orders/")) {
     const orderId = decodeURIComponent(normalized.replace("/lab/orders/", "")).trim();
@@ -164,6 +170,9 @@ const navItems = [
   { path: "/lab/admin-oversight", label: "Admin Oversight", roles: ["admin"] },
   { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
   { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
+  { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
+  { path: "/lab/team", label: "Team", roles: ["lab_staff", "admin"] },
+  { path: "/lab/account", label: "My Account" },
   { path: "/lab/orders/placeholder-order-id", label: "Order Details" },
 ];
 
@@ -214,6 +223,14 @@ const pageForRoute = (parsedRoute, role) => {
         );
       }
       return <PricingLogicPage />;
+    case "/lab/settings":
+      return <LabSettingsPage />;
+    case "/lab/team":
+      return <LabTeamPage />;
+    // Personal account details are available to anyone signed in — a member
+    // still needs to be able to change their own password.
+    case "/lab/account":
+      return <MyAccountPage />;
     case "/lab/orders/:orderId":
       return <OrderDetailsPage orderId={parsedRoute.orderId} />;
     default:
@@ -292,7 +309,7 @@ export default function LabAppShell() {
         <div className="mx-auto max-w-3xl rounded-2xl border border-rose-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-semibold text-rose-700">Lab Access Restricted</h1>
           <p className="mt-2 text-sm text-neutral-700">
-            Only <code>lab_staff</code> or <code>admin</code> roles can access the ProHerper lab section.
+            Only <code>lab_staff</code> or <code>admin</code> roles can access the laboratory portal.
           </p>
           <p className="mt-2 text-sm text-neutral-600">
             Current role: <span className="font-mono">{role}</span>
@@ -373,7 +390,7 @@ export default function LabAppShell() {
       {/* Compact mobile title bar — navigation itself lives in the bottom tab
           bar below, kept off this row so it doesn't compete for space. */}
       <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 lg:hidden">
-        <div className="text-xs uppercase tracking-wide text-neutral-500">ProHerper</div>
+        <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
         <div className="text-base font-semibold text-neutral-900">Laboratory</div>
       </div>
 
@@ -457,7 +474,7 @@ export default function LabAppShell() {
       <div className="mx-auto flex max-w-7xl gap-4 p-4 lg:p-6">
         <aside className="hidden w-64 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm lg:block">
           <div className="px-2 py-2">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">ProHerper</div>
+            <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
             <div className="text-lg font-semibold text-neutral-900">Laboratory</div>
           </div>
           <nav className="mt-2 flex flex-col gap-1">

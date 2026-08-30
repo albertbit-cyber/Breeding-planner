@@ -137,10 +137,10 @@ export default function TestCatalogPage() {
       };
 
       if (editingId) {
-        await api.updateLabAvailableTest({ id: editingId, labId: "proherper-main-lab", ...payload });
+        await api.updateLabAvailableTest({ id: editingId, ...payload });
         setSuccessMessage(t("lab.catalog.updated", { defaultValue: "Test updated successfully." }));
       } else {
-        await api.createLabAvailableTest({ labId: "proherper-main-lab", ...payload });
+        await api.createLabAvailableTest(payload);
         setSuccessMessage(t("lab.catalog.created", { defaultValue: "Test created successfully." }));
       }
       closeForm();
