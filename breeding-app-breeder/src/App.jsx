@@ -74,12 +74,28 @@ import {
 import { DEFAULT_SPECIES_ID, getSpeciesById, resolveSpeciesId, speciesHasGeneDatabase } from "./genetics/speciesRegistry";
 import SpeciesSelect from "./components/SpeciesSelect";
 import SpeciesDashboard from "./features/species/SpeciesDashboard";
+import {
+  flattenGroupsBySpecies,
+  mergeGroupsBySpecies,
+  migrateFlatGroups,
+  normalizeGroupNames,
+  normalizeGroupsBySpecies,
+} from "./features/species/speciesGroups";
 import { DEMO_ANIMALS } from "./config/demoAnimals";
 import { listSpecies } from "./genetics/speciesRegistry";
 import {
-  collectLiveGenetics,
+  detectSpeciesFromText,
   parseAnimalText,
 } from "./features/animals/quickAddParser";
+import {
+  UNKNOWN_SEX,
+  ensureSex,
+  isFemaleSnake,
+  isMaleSnake,
+  normalizeSexValue,
+  sexOrUnknown,
+} from "./features/animals/animalSex";
+import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
 import QuarantinePanel from "./features/quarantine/QuarantinePanel.jsx";
 import QuarantineNotice from "./features/quarantine/QuarantineNotice.jsx";
@@ -1034,6 +1050,7 @@ const STORAGE_KEYS = {
   snakes: 'breedingPlannerSnakes',
   pairings: 'breedingPlannerPairings',
   groups: 'breedingPlannerGroups',
+  groupsBySpecies: 'breedingPlannerGroupsBySpecies',
   showGroups: 'breedingPlannerShowGroups',
   hiddenGroups: 'breedingPlannerHiddenGroups',
   customStatusTags: 'breedingPlannerCustomStatusTags',
@@ -2959,6 +2976,7 @@ function normalizePlannerStateRecord(value) {
     heatRacks: Array.isArray(state.heatRacks) ? state.heatRacks : [],
     terrariums: Array.isArray(state.terrariums) ? state.terrariums : [],
   };
+  if (state.groupsBySpecies) state.groupsBySpecies = normalizeGroupsBySpecies(state.groupsBySpecies);
   if (Array.isArray(state.groups)) state.groups = normalizePlannerStringList(state.groups);
   if (Array.isArray(state.showGroups)) state.showGroups = normalizePlannerStringList(state.showGroups);
   if (Array.isArray(state.hiddenGroups)) state.hiddenGroups = normalizePlannerStringList(state.hiddenGroups);
@@ -3040,6 +3058,7 @@ function mergePlannerObjectRecord(localRecord, backendRecord) {
     : { ...backendRecord, ...localRecord };
 }
 
+
 function mergePlannerStates(localState, backendState) {
   const local = normalizePlannerStateRecord(localState);
   const backend = normalizePlannerStateRecord(backendState);
@@ -3052,6 +3071,9 @@ function mergePlannerStates(localState, backendState) {
   const merged = {
     ...other,
     ...base,
+    // Per species, so two devices editing different species both keep their lists. The flat
+    // `groups` union is still merged for older clients that only understand that field.
+    groupsBySpecies: mergeGroupsBySpecies(other.groupsBySpecies, base.groupsBySpecies),
     groups: mergeArrayValues(other.groups, base.groups),
     showGroups: mergeArrayValues(other.showGroups, base.showGroups),
     hiddenGroups: mergeArrayValues(other.hiddenGroups, base.hiddenGroups),
@@ -3609,6 +3631,10 @@ const BORIS_PREVIEW_DEFAULTS = {
 
 const seedPairings = [];
 const DEFAULT_GROUPS = ["Breeders", "Holdbacks", "Hatchlings 2024", "Hatchlings 2025"];
+
+
+
+
 // QUARANTINE_TAG rather than a literal: this tag drives the whole quarantine section, so the two
 // must never drift apart.
 const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, 'For sell', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
@@ -3826,7 +3852,7 @@ function initSnakeDraft(s) {
     ...s,
     status: (typeof s?.status === 'string' && s.status.trim()) ? s.status.trim() : 'Active',
     idSequence: resolvedSequence,
-    sex: ensureSex(s.sex, 'F'),
+    sex: sexOrUnknown(s.sex),
     morphs: s.morphs || [],
     hets: s.hets || [],
     tags: s.tags || [],
@@ -3988,8 +4014,33 @@ function formatFeederClass(profile) {
   return '';
 }
 
+/**
+ * Example gene text for the Quick Add placeholder, per species. Only a hint for the handful
+ * of species a keeper is most likely to start with -- anything absent falls back to a
+ * genetics-free example rather than borrowing another species' morphs.
+ */
+const QUICK_ADD_EXAMPLE_GENES = {
+  'ball-python': 'pastel clown het pied',
+  'crested-gecko': 'harlequin cappuccino',
+  'corn-snake': 'amel motley het anery',
+  'leopard-gecko': 'tremper albino tangerine',
+  'boa-constrictor': 'hypo motley',
+  'hognose-snake': 'anaconda albino',
+};
+
+/** Status tags worth a chip on a species card, in the order they appear. */
+const DASHBOARD_STATUS_TAGS = ['Breeder', 'Holdback', 'Grow-out', QUARANTINE_TAG, 'For sell'];
+
+/** Lower rank wins when choosing the one event a species card shows. */
+const DASHBOARD_URGENCY_RANK = { overdue: 0, due: 1, soon: 2, upcoming: 3, none: 4 };
+
 /** Tabs that are meaningless outside one species. See the scope table in the design notes. */
 const SPECIES_SCOPED_TABS = new Set(['animals', 'pairings', 'advisor', 'familyTree']);
+
+// The dashboard search is a way in, not a list view. A two-letter query over a large
+// collection would otherwise push the species grid off the screen, so only the first hits
+// are drawn and the count says how many were left out.
+const DASHBOARD_SEARCH_LIMIT = 25;
 
 function createEmptyNewAnimalDraft() {
   return {
@@ -3997,7 +4048,9 @@ function createEmptyNewAnimalDraft() {
     autoId: true,
     idSequence: null,
     name: "",
-    sex: "",
+    // Unknown until stated. Defaulting to female guessed on the keeper's behalf and the guess
+    // was invisible once saved.
+    sex: "U",
     // Empty, not defaulted: the keeper states the species. Nothing downstream may guess it.
     species: "",
   status: "Active",
@@ -4044,34 +4097,10 @@ function snakeById(list, id) {
   if (!Array.isArray(list)) return null; return list.find(x => x && x.id === id) || null;
 }
 
-function normalizeSexValue(raw) {
-  const value = String(raw ?? '').trim().toLowerCase();
-  if (!value) return 'UNKNOWN';
-  if (value === 'm' || value === 'male') return 'M';
-  if (value === 'f' || value === 'female') return 'F';
-  if (/^male\b/.test(value)) return 'M';
-  if (/^female\b/.test(value)) return 'F';
-  if (/^supermale\b/.test(value)) return 'M';
-  if (/^superfemale\b/.test(value)) return 'F';
-  if (/^1[\s.:/]*0$/.test(value)) return 'M';
-  if (/^0[\s.:/]*1$/.test(value)) return 'F';
-  if (/^m/.test(value)) return 'M';
-  if (/^f/.test(value)) return 'F';
-  return 'UNKNOWN';
-}
 
-function ensureSex(raw, fallback = 'F') {
-  const normalized = normalizeSexValue(raw);
-  return normalized === 'UNKNOWN' ? fallback : normalized;
-}
 
-function isFemaleSnake(snake) {
-  return normalizeSexValue(snake?.sex) === 'F';
-}
 
-function isMaleSnake(snake) {
-  return normalizeSexValue(snake?.sex) === 'M';
-}
+
 
 function formatHetForDisplay(rawHet) {
   if (rawHet === null || rawHet === undefined) return null;
@@ -4670,94 +4699,6 @@ function formatMorphHetForInput(morphs = [], hets = []) {
   return [...morphTokens, ...hetTokens].join(', ');
 }
 
-function buildQuickAddGeneticsSource(snakes = [], morphAliases = [], geneAliases = []) {
-  const live = collectLiveGenetics(Array.isArray(snakes) ? snakes : []);
-  const sourceMap = new Map();
-  Object.values(getGeneGroups()).forEach(groupList => {
-    (groupList || []).forEach(name => {
-      const display = String(name || '').trim();
-      if (!display) return;
-      const key = normalizeGeneCandidate(display);
-      if (!key || sourceMap.has(key)) return;
-      sourceMap.set(key, { name: display, aliases: [] });
-    });
-  });
-
-  live.forEach(item => {
-    const display = String(item?.name || '').trim();
-    if (!display) return;
-    const key = normalizeGeneCandidate(display);
-    if (!key) return;
-    if (!sourceMap.has(key)) {
-      sourceMap.set(key, { name: display, aliases: [] });
-    }
-    const entry = sourceMap.get(key);
-    const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
-    aliases.forEach(alias => {
-      const cleanedAlias = String(alias || '').trim();
-      if (!cleanedAlias) return;
-      if (!entry.aliases.some(existing => existing.toLowerCase() === cleanedAlias.toLowerCase())) {
-        entry.aliases.push(cleanedAlias);
-      }
-    });
-  });
-
-  Object.entries(getGeneAliases()).forEach(([alias, canonical]) => {
-    const canonicalKey = normalizeGeneCandidate(canonical || '');
-    if (!canonicalKey || !sourceMap.has(canonicalKey)) return;
-    const entry = sourceMap.get(canonicalKey);
-    const cleanedAlias = String(alias || '').trim();
-    if (!cleanedAlias) return;
-    if (!entry.aliases.some(existing => existing.toLowerCase() === cleanedAlias.toLowerCase())) {
-      entry.aliases.push(cleanedAlias);
-    }
-  });
-
-  // Morph aliases (e.g. "Batman", "Blackhead DG Clown") are registered by their exact
-  // alias name only. We intentionally do NOT auto-generate prefix shorthands here because
-  // short prefixes (e.g. "Black" from "BlackheadDGClown") would match unrelated genes
-  // and corrupt free-text parsing.
-  (Array.isArray(morphAliases) ? morphAliases : []).forEach((entry) => {
-    const alias = String(entry?.alias || '').trim();
-    const key = normalizeGeneCandidate(alias);
-    if (!alias || !key) return;
-    if (!sourceMap.has(key)) {
-      sourceMap.set(key, { name: alias, aliases: [], shorthand: [] });
-    }
-  });
-
-  (Array.isArray(geneAliases) ? geneAliases : []).forEach((row) => {
-    const geneName = String(row?.geneName || '').trim();
-    const key = normalizeGeneCandidate(geneName);
-    if (!geneName || !key) return;
-    if (!sourceMap.has(key)) {
-      sourceMap.set(key, { name: geneName, aliases: [], shorthand: [] });
-    }
-    const target = sourceMap.get(key);
-    if (!Array.isArray(target.aliases)) target.aliases = [];
-    if (!Array.isArray(target.shorthand)) target.shorthand = [];
-
-    const aliasValues = Array.isArray(row?.aliases) ? row.aliases : [];
-    aliasValues.forEach((alias) => {
-      const cleaned = String(alias || '').trim();
-      if (!cleaned) return;
-      if (!target.aliases.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
-        target.aliases.push(cleaned);
-      }
-    });
-
-    const shorthandValues = Array.isArray(row?.shorthand) ? row.shorthand : [];
-    shorthandValues.forEach((value) => {
-      const cleaned = String(value || '').trim();
-      if (!cleaned) return;
-      if (!target.shorthand.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
-        target.shorthand.push(cleaned);
-      }
-    });
-  });
-
-  return [...sourceMap.values()];
-}
 
 function genMonthlyAppointments(startDate, months=3) {
   const out = [];
@@ -5296,7 +5237,7 @@ function parseFourLineBlocks(raw) {
 
 function convertParsedToSnake(p, idConfig = null) {
   // p: { name, id?, sex, morphs, hets, year? }
-  const sex = ensureSex(p.sex, 'F');
+  const sex = sexOrUnknown(p.sex);
   // normalize tokens possibly present in morphs/hets/genetics
   const combined = [
     ...(Array.isArray(p.morphs) ? p.morphs : (p.morphs ? [String(p.morphs)] : [])),
@@ -5748,7 +5689,7 @@ function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber =
   const effectiveYear = Number(year) || new Date().getFullYear();
   const baseName = (name && String(name).trim())
     || (originalRawName && String(originalRawName).trim())
-    || (sex === 'M' ? 'New Male' : 'New Female');
+    || (sex === 'M' ? 'New Male' : sex === 'F' ? 'New Female' : 'New Animal');
 
   const context = buildIdTemplateContext({
     name: baseName,
@@ -6145,7 +6086,7 @@ function deriveQuickAddName(text, parsed = {}) {
   return candidate;
 }
 
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, theme='blue' }) {
   const { t } = useTranslation();
   const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
   const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
@@ -6174,11 +6115,34 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef(null);
 
+  const [quickAddSpeciesNotice, setQuickAddSpeciesNotice] = useState(null);
+
+
   const handleQuickAddUpdateFields = useCallback(async () => {
-    const textForParse = typeof onResolveLeucisticText === 'function'
+    const rawText = typeof onResolveLeucisticText === 'function'
       ? await onResolveLeucisticText(quickAddText, 'Quick Add free text')
       : quickAddText;
-    const parsed = parseAnimalText(textForParse, availableGenetics);
+
+    // A species named in the text fills the picker. The phrase is then removed so it cannot
+    // be read as genetics, and the gene vocabulary is fetched for the species that actually
+    // won -- reading it from props here would use whatever species the last render saw.
+    const detected = detectSpeciesFromText(rawText);
+    const activeDraftSpecies = (newAnimal && newAnimal.species) || '';
+    const targetSpecies = detected?.speciesId || activeDraftSpecies;
+    const textForParse = detected ? detected.rest : rawText;
+
+    if (detected && detected.speciesId !== activeDraftSpecies) {
+      setNewAnimal(previous => ({ ...(previous || {}), species: detected.speciesId, morphs: [], hets: [], morphHetInput: '' }));
+      setQuickAddSpeciesNotice({ matched: detected.matched, speciesId: detected.speciesId });
+    } else {
+      setQuickAddSpeciesNotice(null);
+    }
+
+    const genetics = typeof onGeneticsForSpecies === 'function'
+      ? await onGeneticsForSpecies(targetSpecies)
+      : availableGenetics;
+
+    const parsed = parseAnimalText(textForParse, genetics);
     const parsedName = deriveQuickAddName(textForParse, parsed);
     const hasAnyParsedValue = Boolean(
       parsedName
@@ -6272,7 +6236,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
       return next;
     });
-  }, [availableGenetics, onGenerateIdFromWizard, onResolveLeucisticLists, onResolveLeucisticText, quickAddText, setNewAnimal]);
+  }, [availableGenetics, newAnimal, onGenerateIdFromWizard, onGeneticsForSpecies, onResolveLeucisticLists, onResolveLeucisticText, quickAddText, setNewAnimal]);
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -6398,6 +6362,15 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
   const draftSpecies = draftSpeciesId ? getSpeciesById(draftSpeciesId) : null;
   const draftSpeciesHasGenes = draftSpeciesId ? speciesHasGeneDatabase(draftSpeciesId) : false;
+
+  // Below draftSpeciesId, which it reads. Declared above it, this threw during render before
+  // the Add modal could paint -- the third time this ordering trap bit in this file.
+  const detectedSpeciesInText = useMemo(
+    () => (quickAddText.trim() ? detectSpeciesFromText(quickAddText) : null),
+    [quickAddText]
+  );
+  // Parsing needs a species from somewhere: the picker above, or the text itself.
+  const canParseQuickAdd = Boolean(quickAddText.trim()) && Boolean(draftSpeciesId || detectedSpeciesInText);
   const newAnimalSpeciesReady = Boolean(draftSpeciesId)
     && loadedDraftSpecies === draftSpeciesId
     && draftSpeciesHasGenes;
@@ -6422,6 +6395,30 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             species: draftSpecies?.name || '',
           });
 
+  /**
+   * Example line for the free-text box, using genes the chosen species actually has. A ball
+   * python example under crested geckos would invite a keeper to type genes that cannot
+   * resolve, then leave them wondering why nothing matched.
+   */
+  const quickAddPlaceholder = useMemo(() => {
+    if (!draftSpeciesId) {
+      return t('ui.animals.addAnimal.quickAddPickSpecies', {
+        defaultValue: 'Pick a species above, or start the line with one: crested gecko 0.1 harlequin cappuccino 52g',
+      });
+    }
+    const sample = QUICK_ADD_EXAMPLE_GENES[draftSpeciesId];
+    if (!sample) {
+      // Species with no gene table still parse ID, sex, weight and dates.
+      return t('ui.animals.addAnimal.quickAddPlaceholderNoGenes', {
+        defaultValue: 'Paste a full line like: MS-24-033 0.1 620g born 2024 breeder John Doe',
+      });
+    }
+    return t('ui.animals.addAnimal.quickAddPlaceholderFor', {
+      defaultValue: 'Paste a full line like: MS-24-033 0.1 {{genes}} 620g born 2024 breeder John Doe',
+      genes: sample,
+    });
+  }, [draftSpeciesId, t]);
+
   const noTagText = t("snakeEdit.noTag", { defaultValue: "No tag" });
   const quarantineLabel = useMemo(() => makeQuarantineLabeller(t), [t]);
   const resolveStatusLabel = useCallback((value) => {
@@ -6434,23 +6431,62 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
     <div className="p-4">
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm max-h-[68vh] overflow-auto">
         <div className="sm:col-span-2">
+          <label className="text-xs font-medium">{t("ui.animals.addAnimal.species", { defaultValue: "Species" })}</label>
+          <SpeciesSelect
+            value={(newAnimal && newAnimal.species) || ''}
+            onChange={handleNewAnimalSpeciesChange}
+            placeholder={t("ui.animals.addAnimal.selectSpecies", { defaultValue: "Select species" })}
+          />
+          <div className="mt-1 text-[11px] text-neutral-500">{newAnimalSpeciesNote}</div>
+        </div>
+
+        <div className="sm:col-span-2">
           <label className="text-xs font-medium">{t('ui.animals.addAnimal.quickAdd', { defaultValue: 'Quick Add / Free Text' })}</label>
           <textarea
             rows={4}
             className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
             value={quickAddText}
             onChange={e => setQuickAddText(e.target.value)}
-            placeholder={t('ui.animals.addAnimal.quickAddPlaceholder', { defaultValue: 'Paste a full line like: MS-24-033 0.1 pastel clown het pied 620g born 2024 breeder John Doe eating rats weekly' })}
+            placeholder={quickAddPlaceholder}
           />
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className={cx('px-3 py-2 rounded-xl text-sm border', quickAddText.trim() ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+              className={cx('px-3 py-2 rounded-xl text-sm border', canParseQuickAdd ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
               onClick={handleQuickAddUpdateFields}
-              disabled={!quickAddText.trim()}
+              disabled={!canParseQuickAdd}
             >
               {t('ui.animals.addAnimal.updateFields', { defaultValue: 'Update Fields' })}
             </button>
+            {quickAddSpeciesNotice ? (
+              <span className="text-[11px] text-[#3c1b73]">
+                {t('ui.animals.addAnimal.quickAddSpeciesDetected', {
+                  defaultValue: 'Read "{{matched}}" as {{species}} — change it above if that is wrong.',
+                  matched: quickAddSpeciesNotice.matched,
+                  species: getSpeciesById(quickAddSpeciesNotice.speciesId)?.name || quickAddSpeciesNotice.speciesId,
+                })}
+              </span>
+            ) : (quickAddText.trim() && !draftSpeciesId && !detectedSpeciesInText) ? (
+              <span className="text-[11px] text-amber-700">
+                {t('ui.animals.addAnimal.quickAddNeedsSpecies', {
+                  defaultValue: "Pick a species above, or name one in the text — genetics are read from that species' gene table.",
+                })}
+              </span>
+            ) : detectedSpeciesInText && !draftSpeciesId ? (
+              <span className="text-[11px] text-neutral-500">
+                {t('ui.animals.addAnimal.quickAddWillUse', {
+                  defaultValue: 'Will read this as {{species}}.',
+                  species: getSpeciesById(detectedSpeciesInText.speciesId)?.name || detectedSpeciesInText.speciesId,
+                })}
+              </span>
+            ) : draftSpeciesId && draftSpeciesHasGenes ? (
+              <span className="text-[11px] text-neutral-500">
+                {t('ui.animals.addAnimal.quickAddScope', {
+                  defaultValue: 'Genetics are read as {{species}} genes.',
+                  species: draftSpecies?.name || '',
+                })}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -6483,24 +6519,15 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
           <label className="text-xs font-medium">{t("ui.animals.addAnimal.sex", { defaultValue: "Sex" })}</label>
           <select
             className="mt-1 w-full border rounded-xl px-2 py-1 bg-white text-sm"
-            value={(newAnimal && newAnimal.sex) || 'F'}
+            value={(newAnimal && newAnimal.sex) || 'U'}
             onChange={handleNewAnimalSexChange}
           >
+            <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
             <option value="F">{t("ui.animals.addAnimal.female", { defaultValue: "Female" })}</option>
             <option value="M">{t("ui.animals.addAnimal.male", { defaultValue: "Male" })}</option>
-            <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
           </select>
         </div>
 
-        <div>
-          <label className="text-xs font-medium">{t("ui.animals.addAnimal.species", { defaultValue: "Species" })}</label>
-          <SpeciesSelect
-            value={(newAnimal && newAnimal.species) || ''}
-            onChange={handleNewAnimalSpeciesChange}
-            placeholder={t("ui.animals.addAnimal.selectSpecies", { defaultValue: "Select species" })}
-          />
-          <div className="mt-1 text-[11px] text-neutral-500">{newAnimalSpeciesNote}</div>
-        </div>
 
         <div ref={statusMenuRef} className="relative">
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Tag" })}</label>
@@ -6783,6 +6810,21 @@ export default function BreedingPlannerApp() {
   );
   const [speciesBackfillChoice, setSpeciesBackfillChoice] = useState(DEFAULT_SPECIES_ID);
 
+  const speciesOfAnimalId = useMemo(() => new Map(
+    (Array.isArray(snakes) ? snakes : [])
+      .filter(Boolean)
+      .map(snake => [snake.id, resolveSpeciesId(snake.species)])
+  ), [snakes]);
+
+  /**
+   * Pairings store no species of their own: they inherit it from their parents. Cross-species
+   * pairing is impossible, so either side answers the question and disagreement cannot arise.
+   */
+  const speciesOfPairing = useCallback((pairing) => {
+    if (!pairing) return '';
+    return speciesOfAnimalId.get(pairing.femaleId) || speciesOfAnimalId.get(pairing.maleId) || '';
+  }, [speciesOfAnimalId]);
+
   /**
    * One entry per species the keeper actually owns, ordered by collection size. Species with
    * no animals are absent by design -- the catalogue lives in the add-animal picker.
@@ -6804,7 +6846,13 @@ export default function BreedingPlannerApp() {
           geneCount: meta?.traitCount || 0,
           hasGenes: Boolean(meta?.traitsFile),
           total: 0, females: 0, males: 0, unsexed: 0,
+          // Only the tags a keeper acts on day to day. The other seven stay reachable inside
+          // the species rather than crowding a card that has to be readable at a glance.
+          statusCounts: {},
           activePairings: 0,
+          eggs: 0,
+          stages: {},
+          nextEvent: null,
           isDemo: true,
         };
         buckets.set(speciesId, bucket);
@@ -6814,34 +6862,92 @@ export default function BreedingPlannerApp() {
       if (sex === 'F') bucket.females += 1;
       else if (sex === 'M') bucket.males += 1;
       else bucket.unsexed += 1;
+      const status = String(snake.status || '').trim();
+      if (DASHBOARD_STATUS_TAGS.includes(status)) {
+        bucket.statusCounts[status] = (bucket.statusCounts[status] || 0) + 1;
+      }
       // A species is only badged as demo when every animal in it is one.
       if (!isDemoSnakeRecord(snake)) bucket.isDemo = false;
     });
 
-    const speciesOfAnimal = new Map(
-      (Array.isArray(snakes) ? snakes : [])
-        .filter(Boolean)
-        .map(snake => [snake.id, resolveSpeciesId(snake.species)])
-    );
-
+    const today = localYMD(new Date());
     (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
       if (!pairing || isPairingCompleted(pairing)) return;
-      // Pairings cannot cross species, so either side identifies the pairing's species.
-      const speciesId = speciesOfAnimal.get(pairing.femaleId) || speciesOfAnimal.get(pairing.maleId);
-      const bucket = speciesId ? buckets.get(speciesId) : null;
-      if (bucket) bucket.activePairings += 1;
+      const bucket = buckets.get(speciesOfPairing(pairing));
+      if (!bucket) return;
+      bucket.activePairings += 1;
+
+      // Stage, countdown and urgency all come from the breeding tracker's own builder, so a
+      // card can never disagree with the tracker it links to.
+      const item = buildPairingDashboardItem(pairing, snakes, today);
+      if (!item) return;
+      if (item.stageKey) bucket.stages[item.stageKey] = (bucket.stages[item.stageKey] || 0) + 1;
+
+      const derived = getBreedingCycleDerived(withPairingLifecycleDefaults({ ...pairing }));
+      const fertile = Number(derived?.clutchFertileValue);
+      if (Number.isFinite(fertile) && fertile > 0) bucket.eggs += fertile;
+
+      // The single most pressing thing: soonest target date wins, overdue ahead of everything.
+      if (item.targetDate) {
+        const rank = DASHBOARD_URGENCY_RANK[item.urgency] ?? 99;
+        const currentRank = bucket.nextEvent ? (DASHBOARD_URGENCY_RANK[bucket.nextEvent.urgency] ?? 99) : 100;
+        const sooner = !bucket.nextEvent
+          || rank < currentRank
+          || (rank === currentRank && (item.daysUntil ?? 9999) < (bucket.nextEvent.daysUntil ?? 9999));
+        if (sooner) {
+          bucket.nextEvent = {
+            urgency: item.urgency,
+            daysUntil: item.daysUntil,
+            countdownLabel: item.countdownLabel,
+            stage: item.nextStage || item.stage,
+            label: item.label,
+          };
+        }
+      }
     });
 
     return Array.from(buckets.values()).sort((a, b) => (
       b.total - a.total || a.name.localeCompare(b.name)
     ));
-  }, [snakes, pairings]);
+  }, [snakes, pairings, speciesOfPairing]);
 
   const dashboardTotals = useMemo(() => ({
     animals: speciesSummaries.reduce((n, s) => n + s.total, 0),
     species: speciesSummaries.length,
     activePairings: speciesSummaries.reduce((n, s) => n + s.activePairings, 0),
   }), [speciesSummaries]);
+
+  /**
+   * The whole-collection search, and the only one that ignores `speciesScope`: from the
+   * dashboard you have not chosen a species yet, so being made to guess which workspace an
+   * animal lives in before you can look for it defeats the point of searching.
+   *
+   * It is kept separate from the Animals search on purpose. One shared box would mean a query
+   * typed here silently filtered the list of whatever species you opened next.
+   */
+  const [dashboardQuery, setDashboardQuery] = useState('');
+
+  const dashboardSearch = useMemo(() => {
+    if (!dashboardQuery.trim()) return { matches: [], total: 0 };
+    const catalogue = new Map(listSpecies().map(species => [species.id, species]));
+    const hits = filterSnakes(Array.isArray(snakes) ? snakes : [], dashboardQuery, 'all');
+    return {
+      total: hits.length,
+      matches: hits.slice(0, DASHBOARD_SEARCH_LIMIT).map(snake => {
+        const speciesId = resolveSpeciesId(snake.species);
+        return {
+          key: snake.id,
+          snake,
+          name: snake.name || snake.id || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' }),
+          // Only worth a second line when it is not already the name.
+          animalId: snake.name ? snake.id : '',
+          speciesName: catalogue.get(speciesId)?.name || speciesId,
+          sex: isFemaleSnake(snake) ? '♀' : isMaleSnake(snake) ? '♂' : '',
+          genes: combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets).join(', '),
+        };
+      }),
+    };
+  }, [dashboardQuery, snakes, t]);
 
   const isDemoCollection = useMemo(
     () => snakes.length > 0 && snakes.every(isDemoSnakeRecord),
@@ -6854,11 +6960,13 @@ export default function BreedingPlannerApp() {
     setShowAddModal(true);
   }, [speciesScope]);
 
-  const openSpeciesWorkspace = useCallback((speciesId) => {
+  // `destinationTab` exists for the dashboard's breeding table, which sends a keeper straight
+  // to a species' Breeding Tracker. Everything else lands on Animals, as it always did.
+  const openSpeciesWorkspace = useCallback((speciesId, destinationTab = 'animals') => {
     const resolved = resolveSpeciesId(speciesId);
     setSpeciesScope(resolved);
     setActiveSpecies(resolved);
-    setTab('animals');
+    setTab(destinationTab);
   }, []);
 
   const leaveSpeciesWorkspace = useCallback(() => {
@@ -6959,15 +7067,62 @@ export default function BreedingPlannerApp() {
     const stored = loadStoredJson(STORAGE_KEYS.removedStatusTags, []);
     return Array.isArray(stored) ? stored : [];
   });
-  const [groups, setGroups] = useState(() => {
+  // Per-species group lists. This is the source of truth; the flat STORAGE_KEYS.groups array is
+  // still written for older clients but never read back into state.
+  const [groupsBySpecies, setGroupsBySpecies] = useState(() => {
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
-    if (bridge?.loadData) return [...DEFAULT_GROUPS];
-    const stored = loadStoredJson(STORAGE_KEYS.groups, null);
-    if (Array.isArray(stored) && stored.length > 0) {
-      return Array.from(new Set(stored.map(group => String(group || '').trim()).filter(Boolean)));
-    }
-    return [...DEFAULT_GROUPS];
+    if (bridge?.loadData) return { [DEFAULT_SPECIES_ID]: [...DEFAULT_GROUPS] };
+    const storedBySpecies = loadStoredJson(STORAGE_KEYS.groupsBySpecies, null);
+    const migrated = migrateFlatGroups(loadStoredJson(STORAGE_KEYS.groups, null), storedBySpecies);
+    if (Object.keys(migrated).length) return migrated;
+    // First run of all: only ball python gets the starter groups. Every other species begins
+    // empty so the keeper names their own.
+    return { [DEFAULT_SPECIES_ID]: [...DEFAULT_GROUPS] };
   });
+
+  /** The group list for one species. Absent species have none yet, not someone else's. */
+  const groupsForSpecies = useCallback((speciesId) => {
+    const id = resolveSpeciesId(speciesId);
+    const stored = normalizeGroupNames(groupsBySpecies[id] || []);
+    if (!isDemoCollection) return stored;
+    // While the demo collection is showing, surface the groups its animals actually sit in --
+    // otherwise a demo crested gecko appears in a group that species does not list. Derived,
+    // never stored: the moment a real animal arrives these vanish with the demos, so a keeper
+    // never inherits a group they did not create.
+    const demoGroups = DEMO_ANIMALS
+      .filter(animal => resolveSpeciesId(animal.species) === id)
+      .flatMap(animal => animal.groups || []);
+    return normalizeGroupNames([...stored, ...demoGroups]);
+  }, [groupsBySpecies, isDemoCollection]);
+
+  /** Replaces one species' list, leaving every other species untouched. */
+  const setGroupsForSpeciesImpl = useCallback((speciesId, updater) => {
+    const id = resolveSpeciesId(speciesId);
+    setGroupsBySpecies((previous) => {
+      const current = normalizeGroupNames(previous[id] || []);
+      const nextList = normalizeGroupNames(typeof updater === 'function' ? updater(current) : updater);
+      const unchanged = nextList.length === current.length
+        && nextList.every((name, index) => name === current[index]);
+      if (unchanged) return previous;
+      return { ...previous, [id]: nextList };
+    });
+  }, []);
+
+  const setGroupsForSpecies = setGroupsForSpeciesImpl;
+
+  // `groups` and `setGroups` keep their old names and shapes deliberately: every consumer in
+  // this file -- the picker, filters, exports, the Groups tab -- goes on working unchanged,
+  // while the data underneath is now the open species' own list rather than a shared one.
+  const groups = useMemo(
+    () => groupsForSpecies(speciesScope || DEFAULT_SPECIES_ID),
+    [groupsForSpecies, speciesScope]
+  );
+
+  const setGroups = useCallback(
+    (updater) => setGroupsForSpeciesImpl(speciesScope || DEFAULT_SPECIES_ID, updater),
+    [setGroupsForSpeciesImpl, speciesScope]
+  );
+
   const initialSpacesData = useMemo(() => normalizeSpacesDataset(loadStoredJson(STORAGE_KEYS.spaces, null)), []);
   const [spacesState, setSpacesState] = useState(initialSpacesData);
   const rooms = Array.isArray(spacesState?.rooms) ? spacesState.rooms : [];
@@ -7009,10 +7164,6 @@ export default function BreedingPlannerApp() {
     const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
     return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
   });
-  const quickAddAvailableGenetics = useMemo(
-    () => buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases),
-    [snakes, morphAliases, geneAliases, getGeneDatabaseGeneration()]
-  );
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -7047,6 +7198,45 @@ export default function BreedingPlannerApp() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFeedPrepModal, setShowFeedPrepModal] = useState(false);
   const [newAnimal, setNewAnimal] = useState(createEmptyNewAnimalDraft);
+
+  // The Add draft picks its own species, which need not be the open workspace, so its group
+  // picker offers that species' list.
+  const newAnimalSpeciesId = newAnimal?.species ? resolveSpeciesId(newAnimal.species) : '';
+
+  const draftGroups = useMemo(
+    () => (newAnimalSpeciesId ? groupsForSpecies(newAnimalSpeciesId) : []),
+    [groupsForSpecies, newAnimalSpeciesId]
+  );
+
+  const setDraftGroups = useCallback(
+    (updater) => {
+      if (!newAnimalSpeciesId) return;
+      setGroupsForSpeciesImpl(newAnimalSpeciesId, updater);
+    },
+    [setGroupsForSpeciesImpl, newAnimalSpeciesId]
+  );
+
+  // Both of these must sit BELOW snakes, morphAliases, geneAliases and newAnimal. A hook's
+  // dependency array is evaluated the moment the line runs, not when the hook later fires, so
+  // placing either above a value it depends on puts that value in the temporal dead zone and
+  // throws during the first render -- before any of it is used.
+  const quickAddAvailableGenetics = useMemo(
+    () => buildQuickAddGeneticsSource(
+      snakes,
+      morphAliases,
+      geneAliases,
+      newAnimal?.species ? resolveSpeciesId(newAnimal.species) : ''
+    ),
+    // getGeneGroups() reads the ACTIVE species, which the draft sets asynchronously; the
+    // generation counter is what makes this correct rather than merely usually-correct.
+    [snakes, morphAliases, geneAliases, newAnimal?.species, getGeneDatabaseGeneration()]
+  );
+
+  const geneticsForSpecies = useCallback(async (speciesId) => {
+    if (!speciesId) return [];
+    const settled = await setActiveSpecies(speciesId);
+    return buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases, settled);
+  }, [snakes, morphAliases, geneAliases]);
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -7150,7 +7340,7 @@ export default function BreedingPlannerApp() {
   const [pairingsSearchQuery, setPairingsSearchQuery] = useState('');
 
   const generateIdFromWizardRules = useCallback((draft = {}) => {
-    const sex = ensureSex(draft?.sex, 'F');
+    const sex = sexOrUnknown(draft?.sex);
     const parsedMorphHet = splitMorphHetInput(draft?.morphHetInput || '');
     const morphList = Array.isArray(draft?.morphs)
       ? draft.morphs.map(entry => String(entry).trim()).filter(Boolean)
@@ -7434,7 +7624,8 @@ export default function BreedingPlannerApp() {
 
   const plannerSyncState = useMemo(() => normalizePlannerStateRecord({
     version: 1,
-    groups,
+    groupsBySpecies,
+    groups: flattenGroupsBySpecies(groupsBySpecies),
     showGroups,
     hiddenGroups,
     customStatusTags,
@@ -7457,7 +7648,7 @@ export default function BreedingPlannerApp() {
     breederInfo,
     customStatusTags,
     geneAliases,
-    groups,
+    groupsBySpecies,
     heatRacks,
     hiddenGroups,
     lastFeedDefaults,
@@ -7473,7 +7664,9 @@ export default function BreedingPlannerApp() {
   const applyPlannerSyncState = useCallback((incomingState) => {
     const state = normalizePlannerStateRecord(incomingState);
     if (!state) return;
-    if (Array.isArray(state.groups)) setGroups(state.groups.length ? state.groups : [...DEFAULT_GROUPS]);
+    if (state.groupsBySpecies || Array.isArray(state.groups)) {
+      setGroupsBySpecies(migrateFlatGroups(state.groups, state.groupsBySpecies));
+    }
     if (Array.isArray(state.showGroups)) setShowGroups(state.showGroups);
     if (Array.isArray(state.hiddenGroups)) setHiddenGroups(state.hiddenGroups);
     if (Array.isArray(state.customStatusTags)) setCustomStatusTags(state.customStatusTags);
@@ -7633,8 +7826,8 @@ export default function BreedingPlannerApp() {
           const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
           setSyncedPairings(sanitizedPairings);
         }
-        if (Array.isArray(payload.groups)) {
-          setGroups(payload.groups);
+        if (payload.groupsBySpecies || Array.isArray(payload.groups)) {
+          setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
         }
         const hasStructuredSpaces = Array.isArray(payload.rooms) || Array.isArray(payload.heatRacks) || Array.isArray(payload.terrariums);
         if (hasStructuredSpaces || Array.isArray(payload.spaces)) {
@@ -7759,7 +7952,10 @@ export default function BreedingPlannerApp() {
       const base = prev.filter(entry => !entry.isDemo);
       return [...base, snakeToAdd];
     });
-    setGroups(prev => Array.from(new Set([...(prev || []), ...(snakeToAdd.groups || [])])));
+    setGroupsForSpecies(
+      snakeToAdd.species,
+      prev => Array.from(new Set([...(prev || []), ...(snakeToAdd.groups || [])]))
+    );
     setShowAddModal(false);
     setNewAnimal(createEmptyNewAnimalDraft());
     // Follow the animal into its own species' workspace. This lives here rather than at the call
@@ -7956,7 +8152,9 @@ export default function BreedingPlannerApp() {
     const payload = {
       snakes,
       pairings,
-      groups,
+      groupsBySpecies,
+      // Flat union for older clients; this app reads groupsBySpecies.
+      groups: flattenGroupsBySpecies(groupsBySpecies),
       rooms,
       heatRacks,
       terrariums,
@@ -7992,7 +8190,7 @@ export default function BreedingPlannerApp() {
     breederInfo,
     customStatusTags,
     electronDataReady,
-    groups,
+    groupsBySpecies,
     hiddenGroups,
     lastFeedDefaults,
     pairings,
@@ -8016,7 +8214,8 @@ export default function BreedingPlannerApp() {
     if (bridge?.saveData) return;
     saveStoredJson(STORAGE_KEYS.snakes, snakes);
     saveStoredJson(STORAGE_KEYS.pairings, pairings);
-    saveStoredJson(STORAGE_KEYS.groups, groups);
+    saveStoredJson(STORAGE_KEYS.groupsBySpecies, groupsBySpecies);
+    saveStoredJson(STORAGE_KEYS.groups, flattenGroupsBySpecies(groupsBySpecies));
     saveStoredJson(STORAGE_KEYS.showGroups, showGroups);
     saveStoredJson(STORAGE_KEYS.hiddenGroups, hiddenGroups);
     saveStoredJson(STORAGE_KEYS.customStatusTags, customStatusTags);
@@ -8213,7 +8412,7 @@ export default function BreedingPlannerApp() {
 
     setSnakes(incomingSnakes);
     setPairings(incomingPairings);
-    setGroups(Array.isArray(payload.groups) ? payload.groups : [...DEFAULT_GROUPS]);
+    setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
 
     if (Array.isArray(payload.morphAliases)) {
       const normalizedAliases = normalizeMorphAliasDatabase(payload.morphAliases);
@@ -8415,7 +8614,7 @@ export default function BreedingPlannerApp() {
     setSelectedStatusTags([]);
     setCustomStatusTags([]);
     setRemovedStatusTags([]);
-    setGroups([...DEFAULT_GROUPS]);
+    setGroupsBySpecies({ [DEFAULT_SPECIES_ID]: [...DEFAULT_GROUPS] });
     setSpacesState(normalizeSpacesDataset([]));
     setBreederInfo(normalizeBreederInfo(null));
     setMorphAliases([...DEFAULT_MORPH_ALIASES]);
@@ -8645,7 +8844,7 @@ export default function BreedingPlannerApp() {
       let changed = false;
       const next = prev.map(s => {
         const normalized = normalizeSexValue(s?.sex);
-        if (!s || normalized === 'UNKNOWN' || s.sex === normalized) return s;
+        if (!s || normalized === UNKNOWN_SEX || s.sex === normalized) return s;
         changed = true;
         return { ...s, sex: normalized };
       });
@@ -8766,6 +8965,63 @@ export default function BreedingPlannerApp() {
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
   }, [activePairings, snakes]);
+
+  /**
+   * The same urgency counts the Breeding Tracker dashboard shows, but for every species at
+   * once. Built from all pairings rather than the scoped ones on purpose -- this is the view
+   * that cannot be had from inside a single species workspace, which is why it earns the
+   * dashboard's lower half.
+   *
+   * Alphabetical: this is a list you scan for a name you already have in mind. The species
+   * grid above it ranks by collection size, which is the other question.
+   */
+  const breedingBySpecies = useMemo(() => {
+    const today = new Date();
+    const buckets = new Map(speciesSummaries.map(summary => [summary.id, {
+      id: summary.id,
+      name: summary.name,
+      overdue: 0,
+      due: 0,
+      soon: 0,
+      tracking: 0,
+    }]));
+
+    (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
+      if (!pairing || isPairingCompleted(pairing)) return;
+      const bucket = buckets.get(speciesOfPairing(pairing));
+      if (!bucket) return;
+      const item = buildPairingDashboardItem(pairing, snakes, today);
+      if (!item) return;
+      bucket.tracking += 1;
+      if (item.urgency === 'overdue') bucket.overdue += 1;
+      else if (item.urgency === 'due') bucket.due += 1;
+      else if (item.urgency === 'soon') bucket.soon += 1;
+    });
+
+    return Array.from(buckets.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [speciesSummaries, pairings, snakes, speciesOfPairing]);
+
+  /**
+   * Set only when a keeper presses an urgency count on the dashboard, and read only as the
+   * Breeding Tracker dashboard's opening filter. That view unmounts whenever the tab or the
+   * sub-view changes, so it picks this up on mount and owns the filter from then on -- the
+   * keeper can clear it in place without the dashboard reimposing it.
+   */
+  const [breedingUrgencyFocus, setBreedingUrgencyFocus] = useState(null);
+
+  const openSpeciesBreeding = useCallback((speciesId, urgency = null) => {
+    setBreedingUrgencyFocus(urgency || null);
+    // A stale focused pairing would drag the view to Active or Completed on arrival, and the
+    // tracker remembers whichever sub-view was last open. Both have to be reset here.
+    setFocusedPairingId(null);
+    setPairingsView('dashboard');
+    openSpeciesWorkspace(speciesId, 'pairings');
+  }, [openSpeciesWorkspace]);
+
+  // Leaving the tracker dashboard drops the focus, so opening it again by hand is unfiltered.
+  useEffect(() => {
+    if (tab !== 'pairings' || pairingsView !== 'dashboard') setBreedingUrgencyFocus(null);
+  }, [tab, pairingsView]);
   const completedPairingsWithYear = useMemo(() => {
     return completedPairings.map(pairing => {
       const normalized = withPairingLifecycleDefaults({ ...pairing });
@@ -9261,7 +9517,10 @@ export default function BreedingPlannerApp() {
       if (!s || s.id !== snakeId) return s;
       return { ...s, groups: ['Breeders'] };
     }));
-    setGroups(prev => prev.includes("Breeders") ? prev : [...prev, "Breeders"]);
+    setGroupsForSpecies(
+      pairingGuard.snake.species,
+      prev => (prev.includes("Breeders") ? prev : [...prev, "Breeders"])
+    );
     const updatedSnake = {
       ...pairingGuard.snake,
       groups: ['Breeders']
@@ -9514,6 +9773,9 @@ export default function BreedingPlannerApp() {
   }, [animalView, tab, speciesScope]);
 
   const editDraftSpeciesId = editSnakeDraft ? resolveSpeciesId(editSnakeDraft.species) : '';
+
+  // An animal opened from a scan or search can belong to another species than the open one.
+  const editGroups = groupsForSpecies(editDraftSpeciesId);
   const [loadedEditSpecies, setLoadedEditSpecies] = useState('');
 
   useEffect(() => {
@@ -9803,7 +10065,7 @@ export default function BreedingPlannerApp() {
   }
 
   async function addAnimalFromForm() {
-    const sex = ensureSex(newAnimal.sex, 'F');
+    const sex = sexOrUnknown(newAnimal.sex);
     const resolvedMorphHetInput = await resolveLeucisticInText(newAnimal.morphHetInput || '', 'Add Animal save');
     const parsedMorphHet = splitMorphHetInput(resolvedMorphHetInput || '');
     const morphList = uniqueGeneTokens(
@@ -9864,7 +10126,7 @@ export default function BreedingPlannerApp() {
 
     const snake = {
       id: resolvedId,
-      name: newAnimal.name.trim() || resolvedId || (sex === 'F' ? 'New Female' : 'New Male'),
+      name: newAnimal.name.trim() || resolvedId || (sex === 'F' ? 'New Female' : sex === 'M' ? 'New Male' : 'New Animal'),
       sex,
       species: resolveSpeciesId(newAnimal.species),
       morphs: morphList,
@@ -9927,7 +10189,7 @@ export default function BreedingPlannerApp() {
         return {
           name: item.name,
           id: item.id || '',
-          sex: ensureSex(item.gender && item.gender[0], 'F'),
+          sex: sexOrUnknown(item.gender && item.gender[0]),
           morphs,
           hets,
         };
@@ -9943,7 +10205,7 @@ export default function BreedingPlannerApp() {
         ...(item.hets || []),
         ...(item.genetics || []),
       ]);
-      const sex = ensureSex(item.sex || item.gender, 'F');
+      const sex = sexOrUnknown(item.sex || item.gender);
       return {
         ...item,
         sex,
@@ -9968,7 +10230,7 @@ export default function BreedingPlannerApp() {
 
   function applyImport() {
     const existingKeySet = new Set(
-      snakes.map(snake => `${(snake.name || '').trim().toLowerCase()}|${ensureSex(snake.sex, 'F')}`)
+      snakes.map(snake => `${(snake.name || '').trim().toLowerCase()}|${sexOrUnknown(snake.sex)}`)
     );
     const existingIds = snakes.map(snake => snake.id).filter(Boolean);
     const existingRecords = snakes.map(snake => ({ id: snake.id, idSequence: snake.idSequence }));
@@ -9989,7 +10251,7 @@ export default function BreedingPlannerApp() {
         { ...preview, __existingIds: existingIds, __existingRecords: existingRecords },
         breederInfo?.idGenerator
       );
-      const sex = ensureSex(converted.sex, 'F');
+      const sex = sexOrUnknown(converted.sex);
       const nameKey = (converted.name || '').trim().toLowerCase();
       const compositeKey = `${nameKey}|${sex}`;
       if (existingKeySet.has(compositeKey)) continue;
@@ -10014,7 +10276,8 @@ export default function BreedingPlannerApp() {
       });
       const newGroups = Array.from(new Set(normalizedToAdd.flatMap(snake => snake.groups || [])));
       if (newGroups.length) {
-        setGroups(prev => Array.from(new Set([...(prev || []), ...newGroups])));
+        // The whole batch is one species; see the import modal's species picker.
+        setGroupsForSpecies(importSpecies, prev => Array.from(new Set([...(prev || []), ...newGroups])));
       }
     }
 
@@ -10071,7 +10334,7 @@ export default function BreedingPlannerApp() {
           null,
           {
             idConfig: configClone,
-            sex: 'F',
+            sex: 'U',
             morphs: [],
             hets: [],
             birthYear: year,
@@ -10084,7 +10347,7 @@ export default function BreedingPlannerApp() {
           id: generatedId,
           autoId: true,
           name: defaultName,
-          sex: 'F',
+          sex: 'U',
           morph: '',
           weight: '',
           birthDate: hatchedOn,
@@ -10160,7 +10423,7 @@ export default function BreedingPlannerApp() {
       });
       const baseName = entries[index].name
         || (context.pairingName ? `${context.pairingName} - ${index + 1}` : `Hatchling ${index + 1}`);
-      const sex = ensureSex(sexOverride ?? entries[index].sex, 'F');
+      const sex = sexOrUnknown(sexOverride ?? entries[index].sex);
       const entryBirthYear = extractYearFromDateString(entries[index].birthDate);
       const derivedYear = entryBirthYear ?? context.year ?? new Date().getFullYear();
       const candidate = generateSnakeId(
@@ -10229,7 +10492,7 @@ export default function BreedingPlannerApp() {
     }, [regenerateWizardIdInState]);
 
     const handleWizardSexChange = useCallback((index, value) => {
-      const normalized = ensureSex(value, 'F');
+      const normalized = sexOrUnknown(value);
       setHatchWizard(prev => {
         if (!prev) return prev;
         const entries = Array.isArray(prev.entries) ? prev.entries : [];
@@ -10288,7 +10551,7 @@ export default function BreedingPlannerApp() {
         ];
         const fallbackName = entry.name
           || (context.pairingName ? `${context.pairingName} - ${Number(prev.existingCount) + currentIndex + 1}` : `Hatchling ${currentIndex + 1}`);
-        const sex = ensureSex(entry.sex, 'F');
+        const sex = sexOrUnknown(entry.sex);
         let resolvedId = String(entry.id || '').trim();
         const rawBirthValue = entry.birthDate || hatchedOn;
         const normalizedBirthDate = rawBirthValue ? normalizeDateInput(rawBirthValue) || rawBirthValue : '';
@@ -10392,7 +10655,11 @@ export default function BreedingPlannerApp() {
             return [...base, created];
           });
           if (baseGroup) {
-            setGroups(prevGroups => (prevGroups.includes(baseGroup) ? prevGroups : [...prevGroups, baseGroup]));
+            // A hatchling's clutch group belongs to the parents' species.
+            setGroupsForSpecies(
+              created.species,
+              prevGroups => (prevGroups.includes(baseGroup) ? prevGroups : [...prevGroups, baseGroup])
+            );
           }
           const generatedPairingId = pairing?.id || prev.pairingId || null;
           if (generatedPairingId) {
@@ -10794,6 +11061,15 @@ export default function BreedingPlannerApp() {
             isDemoCollection={isDemoCollection}
             onOpenSpecies={openSpeciesWorkspace}
             onAddAnimal={startNewAnimalDraft}
+            searchQuery={dashboardQuery}
+            onSearchQueryChange={setDashboardQuery}
+            searchResults={dashboardSearch.matches}
+            searchResultTotal={dashboardSearch.total}
+            breeding={breedingBySpecies}
+            onOpenBreeding={openSpeciesBreeding}
+            /* openSnakeCard follows the animal into its own species, so a hit from another
+               species opens where it belongs rather than inside the wrong workspace. */
+            onOpenAnimal={openSnakeCard}
             t={t}
           />
         )}
@@ -10929,7 +11205,7 @@ export default function BreedingPlannerApp() {
                   onClick={startNewAnimalDraft}
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}
                 >
-                  + {t("actions.addAnimal")}
+                  + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
                 <button onClick={() => setShowImportModal(true)} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}>{t("actions.importAnimals")}</button>
               </div>
@@ -11417,6 +11693,7 @@ export default function BreedingPlannerApp() {
             {pairingsView === 'dashboard' ? (
               <BreedingDashboardSection
                 items={breedingDashboardItems}
+                initialUrgencyFilter={breedingUrgencyFocus}
                 theme={theme}
                 clutchNumberByPairingId={clutchNumberByPairingId}
                 clutchMetadataByPairingId={clutchMetadataByPairingId}
@@ -11767,9 +12044,10 @@ export default function BreedingPlannerApp() {
             <AddAnimalWizard
               newAnimal={newAnimal}
               setNewAnimal={setNewAnimal}
-              groups={groups}
-              setGroups={setGroups}
+              groups={draftGroups}
+              setGroups={setDraftGroups}
               availableGenetics={quickAddAvailableGenetics}
+              onGeneticsForSpecies={geneticsForSpecies}
               statusOptions={statusTagOptions}
               customStatusTags={customStatusTags}
               onCreateStatusTag={handleCreateStatusTag}
@@ -12089,12 +12367,12 @@ export default function BreedingPlannerApp() {
                         <label className="text-xs font-medium">Sex</label>
                         <select
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm bg-white"
-                          value={entry.sex || 'F'}
+                          value={entry.sex || 'U'}
                           onChange={e => handleWizardSexChange(safeIndex, e.target.value)}
                         >
+                          <option value="U">Unknown</option>
                           <option value="F">Female</option>
                           <option value="M">Male</option>
-                          <option value="U">Unknown</option>
                         </select>
                       </div>
                       <div>
@@ -12423,7 +12701,7 @@ export default function BreedingPlannerApp() {
                             onClick={()=>{
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
-                              const normalizedSex = ensureSex(editSnakeDraft.sex, ensureSex(editSnake.sex, 'F'));
+                              const normalizedSex = sexOrUnknown(editSnakeDraft.sex);
                               const normalizedStatus = (editSnakeDraft.status || '').trim() || 'Active';
                               const normalizedGroups = normalizeSingleGroupValue(editSnakeDraft.groups);
                               const normalizedFeederProfile = normalizeFeederProfileForSave(editSnakeDraft.feederProfile);
@@ -12562,8 +12840,9 @@ export default function BreedingPlannerApp() {
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.sex")}</label>
                   <select className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
-                    value={editSnakeDraft.sex}
+                    value={normalizeSexValue(editSnakeDraft.sex)}
                     onChange={e=>setEditSnakeDraft(d=>({...d,sex:e.target.value}))}>
+                    <option value="U">{t("snakeEdit.sexUnknown", { defaultValue: "Unknown" })}</option>
                     <option value="F">{t("snakeEdit.sexFemale")}</option>
                     <option value="M">{t("snakeEdit.sexMale")}</option>
                   </select>
@@ -12831,18 +13110,18 @@ export default function BreedingPlannerApp() {
                     }}
                   >
                     <option value="">{t("snakeEdit.noGroup", { defaultValue: "No group" })}</option>
-                    {groups.map(g => (
+                    {editGroups.map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
                   <div className="mt-2 border border-dashed border-neutral-200 rounded-xl p-3 bg-white">
                     <AddGroupInline onAdd={(g)=>{
                       if (!g) return;
-                      setGroups(prev => prev.includes(g) ? prev : [...prev, g]);
+                      setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
                       setEditSnakeDraft(d=>({...d, groups: [g]}));
                     }} />
                   </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.existingGroups", { defaultValue: "Existing" })}: {groups.join(", ")||"-"}</div>
+                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.existingGroups", { defaultValue: "Existing" })}: {editGroups.join(", ")||"-"}</div>
                 </div>
               </div>
 
@@ -21074,7 +21353,7 @@ function AppearancePreview({ resolvedAppearance, density, mode }) {
 }
 
 // pairings list
-function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, clutchNumberByPairingId, clutchMetadataByPairingId }) {
+function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, clutchNumberByPairingId, clutchMetadataByPairingId, initialUrgencyFilter = null }) {
   const { t } = useTranslation();
   const list = Array.isArray(items) ? items : [];
   const counts = list.reduce((acc, item) => {
@@ -21087,7 +21366,9 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const [urgencyFilter, setUrgencyFilter] = useState(null);
+  // Initial only, never synced. Arriving from the dashboard's "Overdue 3" opens filtered; from
+  // there the filter is the keeper's, and a re-render must not snap it back.
+  const [urgencyFilter, setUrgencyFilter] = useState(initialUrgencyFilter);
   const openPairing = useCallback((id) => {
     if (id && typeof onOpenPairing === 'function') onOpenPairing(id);
   }, [onOpenPairing]);
@@ -24374,7 +24655,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     if (items && items.length) {
                       const converted = items.map(p => {
                         const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
-                        const sex = ensureSex(p.sex, 'F');
+                        const sex = sexOrUnknown(p.sex);
                         return { name: p.name, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ ...p, sex, morphs: normalized.morphs, hets: normalized.hets }) };
                       });
                       const resolvedRows = [];
@@ -24399,7 +24680,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                           else morphs.push(g);
                         });
                         const normalized = normalizeMorphHetLists([...morphs, ...hets]);
-                        const sex = ensureSex(p.gender && p.gender[0], 'F');
+                        const sex = sexOrUnknown(p.gender && p.gender[0]);
                         return {
                           name: p.name,
                           sex,
@@ -24422,7 +24703,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     if (pipeParsed && pipeParsed.length) {
                       const convertedPipe = pipeParsed.map(p => {
                         const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
-                        const sex = ensureSex(p.sex, 'F');
+                        const sex = sexOrUnknown(p.sex);
                         return { name: p.name, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ name: p.name, id: '', sex, morphs: normalized.morphs, hets: normalized.hets }) };
                       });
                       const resolvedRows = [];
@@ -24438,7 +24719,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     const fallback = parseReptileBuddyText(txt);
                     const normalizedFallback = fallback.map(p => {
                       const normalized = normalizeMorphHetLists([...(p.morphs || []), ...(p.hets || [])]);
-                      const sex = ensureSex(p.sex, 'F');
+                      const sex = sexOrUnknown(p.sex);
                       return { ...p, sex, morphs: normalized.morphs, hets: normalized.hets, previewText: formatParsedPreview({ ...p, sex, morphs: normalized.morphs, hets: normalized.hets }) };
                     });
                     const resolvedRows = [];
@@ -24537,7 +24818,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     const groups = Array.from(new Set(allTokens('groups')));
                     const tags = Array.from(new Set(allTokens('tags')));
 
-                    const sex = ensureSex(sexRaw, 'F');
+                    const sex = sexOrUnknown(sexRaw);
                     const year = Number(yearRaw);
                     const weight = weightRaw && weightRaw.trim() ? weightRaw : '';
                     const birthDate = normalizeDateInput(birthRaw) || birthRaw || null;
@@ -24596,7 +24877,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                   if (!parsed.length) { setImportPreview([]); return; }
 
                   const converted = parsed.map(p => {
-                    const sex = ensureSex(p.sex, 'F');
+                    const sex = sexOrUnknown(p.sex);
                     const previewPayload = { name: p.name, id: p.id || '', sex, morphs: p.morphs || [], hets: p.hets || [] };
                     return {
                       ...p,
