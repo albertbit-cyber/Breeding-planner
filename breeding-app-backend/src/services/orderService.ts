@@ -7,6 +7,33 @@ import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
+
+/**
+ * The issuing laboratory's identity, carried on every order the clients read.
+ *
+ * Certificates and shipping labels are rendered from this. They used to be
+ * rendered from a constant naming a single laboratory, which meant every
+ * vendor's documents went out under one lab's name, address and logo.
+ */
+export const LAB_IDENTITY_SELECT = {
+  id: true,
+  name: true,
+  labAccount: {
+    select: {
+      labName: true,
+      contactPerson: true,
+      contactEmail: true,
+      phone: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      postalCode: true,
+      country: true,
+      logoUrl: true,
+      turnaroundDays: true,
+    },
+  },
+} as const;
 type OrderActor = { id?: string; role: AppRole };
 
 /**
@@ -201,7 +228,7 @@ export const listOrdersForUser = async (user: { id: string; role: AppRole }, org
     return prisma.shedTestOrder.findMany({
       include: {
         breeder: { select: { id: true, email: true, fullName: true, role: true } },
-        labOrganization: { select: { id: true, name: true } },
+        labOrganization: { select: LAB_IDENTITY_SELECT },
         animals: { include: { tests: true } },
         results: { orderBy: { updatedAt: "desc" } },
       },
@@ -229,7 +256,7 @@ export const listOrdersForUser = async (user: { id: string; role: AppRole }, org
   return prisma.shedTestOrder.findMany({
     where: { breederId: user.id },
     include: {
-      labOrganization: { select: { id: true, name: true } },
+      labOrganization: { select: LAB_IDENTITY_SELECT },
       animals: { include: { tests: true } },
       results: { orderBy: { updatedAt: "desc" } },
     },
@@ -249,7 +276,7 @@ export const getOrderByIdForUser = async (
     where: { id: orderId },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
-      labOrganization: { select: { id: true, name: true } },
+      labOrganization: { select: LAB_IDENTITY_SELECT },
       animals: { include: { tests: true } },
       results: { orderBy: { updatedAt: "desc" } },
     },

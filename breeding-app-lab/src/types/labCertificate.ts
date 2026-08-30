@@ -20,6 +20,8 @@ export interface CertificateLabIssuerInfo {
   cityLine?: string;
   phone?: string;
   email?: string;
+  /** The issuing laboratory's own logo, rendered in the certificate header. */
+  logoUrl?: string | null;
   iban?: string;
   bic?: string;
 }

@@ -30,18 +30,53 @@ type CertificateTemplateInput = {
 
 const CERTIFICATE_DATE_LOCALE = "en-US";
 
-export const PROHERPER_CERTIFICATE_ISSUER = {
-  brandName: "PRO HERPER",
-  ownerName: "Jurgen Wuyts",
-  addressLine1: "Wijngaardstraat 27",
-  cityLine: "2390 Diest, Belgium",
-  phone: "+32 95 32 07 98",
-  email: "Info@proherper.com",
-  iban: "BE62 0636 4963 1061",
-  bic: "GKCCBEBB",
-} as const;
+const CERTIFICATE_VERIFICATION_BASE_URL = String(
+  (import.meta as any)?.env?.VITE_CERTIFICATE_VERIFICATION_URL || "https://serpentora.com"
+).replace(/\/$/, "");
 
-export const PROHERPER_CERTIFICATE_DISCLAIMERS = [
+export type CertificateIssuer = {
+  brandName: string;
+  ownerName?: string;
+  addressLine1?: string;
+  cityLine?: string;
+  phone?: string;
+  email?: string;
+  logoUrl?: string | null;
+  /** Bank details are per-laboratory and only rendered when the lab supplies them. */
+  iban?: string;
+  bic?: string;
+};
+
+/**
+ * A certificate must be issued under the laboratory that actually ran the test.
+ *
+ * This replaces a hardcoded issuer — one specific lab's brand, owner, address,
+ * phone, email and bank account — that was stamped onto every certificate the
+ * system produced, whichever laboratory did the work.
+ */
+export const issuerFromOrder = (order: unknown): CertificateIssuer => {
+  const organization = (order as any)?.labOrganization;
+  const account = organization?.labAccount;
+
+  if (!account) {
+    // No laboratory on the order (historical data): issue under no name rather
+    // than under someone else's.
+    return { brandName: "" };
+  }
+
+  const cityLine = [account.postalCode, account.city].filter(Boolean).join(" ");
+  return {
+    brandName: account.labName || organization?.name || "",
+    ownerName: account.contactPerson || undefined,
+    addressLine1: account.addressLine1 || undefined,
+    cityLine: [cityLine, account.country].filter(Boolean).join(", ") || undefined,
+    phone: account.phone || undefined,
+    email: account.contactEmail || undefined,
+    logoUrl: account.logoUrl || null,
+  };
+};
+
+export const CERTIFICATE_DISCLAIMERS = [
   "Every line represents a separate test for a given snake.",
   "A heterozygous result confirms the snake carries one copy of the tested mutation and is shown as Het <gene>.",
   "A visual result confirms the tested mutation is present in visual form and is shown as the gene name itself.",
@@ -272,10 +307,12 @@ export const buildLabCertificateTemplateData = ({
     certificateNumber,
     verificationCode,
     issueDateIso: resolvedIssueDateIso,
-    verificationUrl: `https://proherper.example/verify/${encodeURIComponent(verificationCode)}`,
+    // Verification is a platform service, not a per-lab one: the point is that a
+    // buyer can check a certificate without trusting the issuing lab's own site.
+    verificationUrl: `${CERTIFICATE_VERIFICATION_BASE_URL}/verify/${encodeURIComponent(verificationCode)}`,
     orderId: order.id,
     labId: order.labId,
-    issuer: PROHERPER_CERTIFICATE_ISSUER,
+    issuer: issuerFromOrder(order),
     snake: {
       id: order.animalId,
       displayId: snakeDisplayId,
@@ -285,6 +322,6 @@ export const buildLabCertificateTemplateData = ({
     },
     breeder: normalizedBreeder,
     resultRows: toCertificateRows(order, result, resolvedIssueDateIso, snake),
-    disclaimers: [...PROHERPER_CERTIFICATE_DISCLAIMERS],
+    disclaimers: [...CERTIFICATE_DISCLAIMERS],
   };
 };

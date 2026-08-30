@@ -39,16 +39,84 @@ export type BreederInfo = {
   labLabelSettings?: unknown;
 };
 
-export const LAB_PROFILE = {
-  name: "ProHerper Lab",
-  address: {
-    contactName: "Jurgen Wuyts",
-    line1: "Wijngaardstraat 27",
-    city: "Diest",
-    postalCode: "3290",
-    country: "Belgium",
-    phone: "+32 95 32 07 98",
-  } satisfies LabAddress,
+export type LabProfile = {
+  name: string;
+  address: LabAddress;
+  logoUrl?: string | null;
+};
+
+/**
+ * Used only when an order carries no laboratory — historical orders placed
+ * before breeders chose a lab, essentially. Deliberately blank rather than a
+ * real laboratory's details: a document that cannot say who ran the test must
+ * say nothing, not name the wrong lab.
+ *
+ * This replaces a hardcoded constant naming one specific laboratory, which was
+ * rendered onto every vendor's shipping labels and certificates.
+ */
+export const UNKNOWN_LAB_PROFILE: LabProfile = {
+  name: "",
+  address: { line1: "", city: "", postalCode: "", country: "" },
+  logoUrl: null,
+};
+
+/**
+ * The signed-in laboratory's own profile, as fetched from `/lab/my/profile`.
+ * Cached here so label and certificate rendering stays synchronous.
+ */
+let activeLabProfile: LabProfile | null = null;
+
+export const setActiveLabProfile = (profile: LabProfile | null): void => {
+  activeLabProfile = profile;
+};
+
+export const getActiveLabProfile = (): LabProfile | null => activeLabProfile;
+
+type OrderLabOrganization = {
+  name?: string;
+  labAccount?: {
+    labName?: string | null;
+    contactPerson?: string | null;
+    contactEmail?: string | null;
+    phone?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    logoUrl?: string | null;
+  } | null;
+};
+
+/**
+ * The identity a document should be issued under: the laboratory that actually
+ * received the order, taken from the order itself.
+ *
+ * Falls back to the signed-in lab's own profile (the common case inside the Lab
+ * Portal, where the order's lab *is* the acting lab) and finally to the blank
+ * profile above — never to another laboratory's details.
+ */
+export const resolveLabProfileForOrder = (order: unknown): LabProfile => {
+  const organization = (order as { labOrganization?: OrderLabOrganization } | null)?.labOrganization;
+  const account = organization?.labAccount;
+
+  if (account) {
+    return {
+      name: account.labName || organization?.name || "",
+      address: {
+        contactName: account.contactPerson || undefined,
+        line1: account.addressLine1 || "",
+        line2: account.addressLine2 || undefined,
+        city: account.city || "",
+        postalCode: account.postalCode || "",
+        country: account.country || "",
+        phone: account.phone || undefined,
+      },
+      logoUrl: account.logoUrl || null,
+    };
+  }
+
+  return activeLabProfile || UNKNOWN_LAB_PROFILE;
 };
 
 const readBridge = (): ElectronBridge | null => {

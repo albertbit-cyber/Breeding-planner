@@ -1,6 +1,5 @@
 import { applyPdfUnicodeFont, setPdfFont } from "../pdfFonts";
 import type { LabCertificateTemplateData, RenderedCertificateArtifact } from "../../types/labCertificate";
-import proHerperCertificateLogoDataUrl from "../../assets/lab/proherper-certificate-logo.png?inline";
 
 export interface CertificatePdfRenderOptions {
   includeQr?: boolean;
@@ -354,22 +353,30 @@ export const renderLabCertificatePdf = async (
 
   let y = 18;
 
-  if (proHerperCertificateLogoDataUrl) {
+  // The issuing laboratory's own logo, carried on the certificate data. This
+  // used to be a single lab's logo compiled into the bundle, so every vendor's
+  // certificates went out under that lab's brand.
+  const logoDataUrl = template.issuer.logoUrl || "";
+  const drawWordmark = () => {
+    setPdfFont(doc, "bold");
+    doc.setFontSize(28);
+    doc.text(String(template.issuer.brandName || "").toUpperCase(), HEADER_CENTER_X, y + 8, {
+      align: "center",
+      maxWidth: PAGE_WIDTH_MM - 30,
+    });
+  };
+
+  if (logoDataUrl) {
     try {
-      doc.addImage(proHerperCertificateLogoDataUrl, "PNG", LOGO_X_MM, LOGO_Y_MM, LOGO_WIDTH_MM, LOGO_HEIGHT_MM);
+      const format = /^data:image\/jpe?g/i.test(logoDataUrl) ? "JPEG" : "PNG";
+      doc.addImage(logoDataUrl, format, LOGO_X_MM, LOGO_Y_MM, LOGO_WIDTH_MM, LOGO_HEIGHT_MM);
     } catch {
-      setPdfFont(doc, "bold");
-      doc.setFontSize(34);
-      doc.text("PRO", HEADER_CENTER_X, y + 4, { align: "center" });
-      doc.setFontSize(26);
-      doc.text("HERPER", HEADER_CENTER_X, y + 15, { align: "center" });
+      // A lab may upload something jsPDF cannot decode; its name still has to
+      // appear, so fall back to a wordmark rather than an empty header.
+      drawWordmark();
     }
   } else {
-    setPdfFont(doc, "bold");
-    doc.setFontSize(34);
-    doc.text("PRO", HEADER_CENTER_X, y + 4, { align: "center" });
-    doc.setFontSize(26);
-    doc.text("HERPER", HEADER_CENTER_X, y + 15, { align: "center" });
+    drawWordmark();
   }
 
   setPdfFont(doc, "normal");

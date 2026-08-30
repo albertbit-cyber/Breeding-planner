@@ -6,7 +6,7 @@ import { buildQrPayload } from "../../utils/labToken";
 import { generateOrderLabelsPdf } from "../../utils/pdf/labOrderLabelsPdf";
 import type { ServiceActor } from "./testOrderService";
 import {
-  LAB_PROFILE,
+  resolveLabProfileForOrder,
   isLabLabelDebugEnabled,
   loadBreederInfo,
   resolveBreederDisplayName,
@@ -90,6 +90,8 @@ export const generateOrderLabelsArtifactForOrder = async (
   const breederName = resolveBreederDisplayName(order, breeder);
   const labelSize = getActiveLabelSize(breeder);
   const debug = await isLabLabelDebugEnabled();
+  // The receiving laboratory, taken from the order rather than a constant.
+  const labProfile = resolveLabProfileForOrder(order);
 
   const rendered = await generateOrderLabelsPdf({
     size: labelSize,
@@ -97,8 +99,8 @@ export const generateOrderLabelsArtifactForOrder = async (
     shippingLabel: {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      labName: LAB_PROFILE.name,
-      labAddress: LAB_PROFILE.address,
+      labName: labProfile.name,
+      labAddress: labProfile.address,
       breeder: {
         name: breederName,
         address: toBreederAddress(breeder),
@@ -116,7 +118,7 @@ export const generateOrderLabelsArtifactForOrder = async (
       sampleStatus: sample.status,
       qrPayload: buildQrPayload(sample.qrToken),
       sampleType: sample.type,
-      labName: LAB_PROFILE.name,
+      labName: labProfile.name,
       sampleIndex: index + 1,
       sampleCount: samples.length,
     })),

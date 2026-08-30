@@ -9,7 +9,7 @@ import {
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
-  LAB_PROFILE,
+  resolveLabProfileForOrder,
   loadBreederInfo,
   loadSnakeById,
   toBreederAddress,
@@ -885,6 +885,8 @@ const buildSharedOrderLabelsPrintPayload = async (orderId: string) => {
   const debug = await isLabLabelDebugEnabled();
   const normalizedOrderId = String(order?.id || "").trim();
   const orderNumber = getSharedOrderNumber(order) || normalizedOrderId;
+  // Documents are issued under the laboratory the order actually went to.
+  const labProfile = resolveLabProfileForOrder(order);
   const animals = Array.isArray(order?.animals) ? order.animals : [];
   const breederName = String(
     breederInfo?.name ||
@@ -918,7 +920,7 @@ const buildSharedOrderLabelsPrintPayload = async (orderId: string) => {
         sampleStatus: "submitted",
         qrPayload: buildQrPayload(qrToken),
         sampleType: "shed",
-        labName: LAB_PROFILE.name,
+        labName: labProfile.name,
         sampleIndex: index + 1,
         sampleCount: animals.length,
       };
@@ -933,8 +935,8 @@ const buildSharedOrderLabelsPrintPayload = async (orderId: string) => {
     shippingLabel: {
       orderId: normalizedOrderId,
       orderNumber,
-      labName: LAB_PROFILE.name,
-      labAddress: LAB_PROFILE.address,
+      labName: labProfile.name,
+      labAddress: labProfile.address,
       breeder: {
         name: breederName,
         businessName: String(breederInfo?.businessName || "").trim() || undefined,

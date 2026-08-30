@@ -4,17 +4,7 @@ import type { TestOrder } from "../../types/lab";
 
 const BREEDER_INFO_STORAGE_KEY = "breedingPlannerBreederInfo";
 
-const LAB_PROFILE = {
-  name: "ProHerper Lab",
-  address: {
-    contactName: "Jurgen Wuyts",
-    line1: "Wijngaardstraat 27",
-    city: "Diest",
-    postalCode: "3290",
-    country: "Belgium",
-    phone: "+32 95 32 07 98",
-  },
-};
+import { resolveLabProfileForOrder } from "./labelProfileService";
 
 type BreederInfo = {
   name?: string;
@@ -90,11 +80,18 @@ export const generateMasterShipmentLabelArtifact = async (
   doc.setFont("helvetica", "bold");
   doc.text("SHIP TO", 15, 54);
   doc.setFont("helvetica", "normal");
-  doc.text(LAB_PROFILE.name, 15, 60);
-  doc.text(LAB_PROFILE.address.contactName, 15, 66);
-  doc.text(LAB_PROFILE.address.line1, 15, 72);
-  doc.text(`${LAB_PROFILE.address.postalCode} ${LAB_PROFILE.address.city}, ${LAB_PROFILE.address.country}`, 15, 78);
-  doc.text(`Tel: ${LAB_PROFILE.address.phone}`, 15, 84);
+  // Addressed to the laboratory this batch was actually submitted to, not to a
+  // single hardcoded lab.
+  const labProfile = resolveLabProfileForOrder(batch);
+  const shipTo = [
+    labProfile.name,
+    labProfile.address.contactName,
+    labProfile.address.line1,
+    [labProfile.address.postalCode, labProfile.address.city].filter(Boolean).join(" ") +
+      (labProfile.address.country ? `, ${labProfile.address.country}` : ""),
+    labProfile.address.phone ? `Tel: ${labProfile.address.phone}` : "",
+  ].filter((line) => String(line || "").trim());
+  shipTo.forEach((line, index) => doc.text(String(line), 15, 60 + index * 6));
 
   doc.setFont("helvetica", "bold");
   doc.text("FROM", 110, 54);

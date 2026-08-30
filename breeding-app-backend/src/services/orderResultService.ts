@@ -3,6 +3,7 @@ import { HttpError } from "../utils/errors";
 import { ensureSharedOrderNumbers } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
+import { LAB_IDENTITY_SELECT } from "./orderService";
 
 type PersistOrderResultUser = {
   id: string;
@@ -98,6 +99,9 @@ const loadEditableOrder = async (
     where: { id: orderId },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
+      // Certificates are issued under the *issuing* lab's name and logo, so the
+      // identity has to travel with the order rather than come from a constant.
+      labOrganization: { select: LAB_IDENTITY_SELECT },
       animals: { include: { tests: true } },
       results: { orderBy: { updatedAt: "desc" } },
     },
@@ -349,6 +353,9 @@ export const saveOrderResult = async (
     where: { id: order.id },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
+      // Certificates are issued under the *issuing* lab's name and logo, so the
+      // identity has to travel with the order rather than come from a constant.
+      labOrganization: { select: LAB_IDENTITY_SELECT },
       animals: { include: { tests: true } },
       results: { orderBy: { updatedAt: "desc" } },
     },
