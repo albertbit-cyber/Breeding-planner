@@ -31,6 +31,9 @@ export const LAB_IDENTITY_SELECT = {
       country: true,
       logoUrl: true,
       turnaroundDays: true,
+      iban: true,
+      bic: true,
+      vatNumber: true,
     },
   },
 } as const;

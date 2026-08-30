@@ -73,6 +73,8 @@ export const issuerFromOrder = (order: unknown): CertificateIssuer => {
     phone: account.phone || undefined,
     email: account.contactEmail || undefined,
     logoUrl: account.logoUrl || null,
+    iban: account.iban || undefined,
+    bic: account.bic || undefined,
   };
 };
 

@@ -62,9 +62,16 @@ export default function LabSettingsPage() {
     setMessage("");
     try {
       const payload = Object.fromEntries(
-        [...FIELDS.map((f) => f.key), "publicDescription", "turnaroundDays", "listedInDirectory", "logoUrl"].map(
-          (key) => [key, form?.[key] ?? null]
-        )
+        [
+          ...FIELDS.map((f) => f.key),
+          "publicDescription",
+          "turnaroundDays",
+          "listedInDirectory",
+          "logoUrl",
+          "iban",
+          "bic",
+          "vatNumber",
+        ].map((key) => [key, form?.[key] ?? null])
       );
       const data = await updateMyLabProfile(payload);
       setForm(data?.lab || form);
@@ -164,6 +171,41 @@ export default function LabSettingsPage() {
               ) : null}
             </div>
           </div>
+
+          <fieldset className="rounded border border-neutral-200 p-4">
+            <legend className="px-1 text-sm font-medium text-neutral-800">
+              Payment details on your certificates
+            </legend>
+            <p className="mb-3 text-xs text-neutral-500">
+              Printed on the certificates you issue. Not shown in the breeder directory.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="block text-sm">
+                <span className="text-neutral-700">IBAN</span>
+                <input
+                  className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                  value={form.iban ?? ""}
+                  onChange={(e) => set("iban", e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">BIC</span>
+                <input
+                  className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                  value={form.bic ?? ""}
+                  onChange={(e) => set("bic", e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">VAT number</span>
+                <input
+                  className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                  value={form.vatNumber ?? ""}
+                  onChange={(e) => set("vatNumber", e.target.value)}
+                />
+              </label>
+            </div>
+          </fieldset>
 
           <label className="flex items-start gap-2 text-sm">
             <input

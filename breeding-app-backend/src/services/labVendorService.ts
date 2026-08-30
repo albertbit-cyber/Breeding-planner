@@ -73,6 +73,9 @@ export const normalizeLabProfile = (row: any) => ({
   logoUrl: row.logoUrl || null,
   publicDescription: row.publicDescription || null,
   turnaroundDays: row.turnaroundDays ?? null,
+  iban: row.iban || null,
+  bic: row.bic || null,
+  vatNumber: row.vatNumber || null,
   listedInDirectory: Boolean(row.listedInDirectory),
   status: row.status,
   organizationStatus: row.organization?.status || null,
@@ -108,6 +111,11 @@ export const updateLabProfile = async (organizationId: string, payload: Record<s
   if (payload.country !== undefined) data.country = text(payload.country, 120);
   if (payload.publicDescription !== undefined) data.publicDescription = text(payload.publicDescription, 2000);
   if (payload.turnaroundDays !== undefined) data.turnaroundDays = optionalInt(payload.turnaroundDays, "Turnaround", 0, 365);
+  // Kept out of the public directory response deliberately: payment details
+  // belong on the documents a laboratory issues, not on a browsing page.
+  if (payload.iban !== undefined) data.iban = text(payload.iban, 40);
+  if (payload.bic !== undefined) data.bic = text(payload.bic, 20);
+  if (payload.vatNumber !== undefined) data.vatNumber = text(payload.vatNumber, 40);
   if (payload.listedInDirectory !== undefined) data.listedInDirectory = Boolean(payload.listedInDirectory);
   if (payload.logoUrl !== undefined) {
     const logo = String(payload.logoUrl ?? "").trim();

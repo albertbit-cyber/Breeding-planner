@@ -693,6 +693,15 @@ model LabAccount {
   /** Typical turnaround in days, shown in the lab directory. */
   turnaroundDays    Int?     @map("turnaround_days")
   /**
+   * Payment details printed on the certificates this laboratory issues. Held
+   * per-laboratory for the same reason as the address: they used to be a
+   * hardcoded constant belonging to one specific lab, and every certificate
+   * carried that lab's bank account whoever ran the test.
+   */
+  iban              String?
+  bic               String?
+  vatNumber         String?  @map("vat_number")
+  /**
    * Whether breeders may discover and order from this lab. Vendor-controlled —
    * a lab closing for holidays hides itself without an admin round-trip. An
    * admin suspending the Organization overrides this independently.
