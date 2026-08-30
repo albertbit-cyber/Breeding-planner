@@ -3,6 +3,7 @@ import "./MobileApp.css";
 import { useAppearance } from "../../contexts/AppearanceContext.jsx";
 import jsQR from "jsqr";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { estimateDataUrlBytes } from "../../utils/imageResize";
 import SuggestionsTab from "../suggestions/SuggestionsTab";
 import ShedTestTerminalPanel from "../lab/components/ShedTestTerminalPanel.jsx";
 import BreederOrderGeneticTestModal from "../lab/components/BreederOrderGeneticTestModal.jsx";
@@ -1864,8 +1865,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     if (!animal) return;
     setPhotoBusy(true);
     try {
+      // Capacitor downscales natively before the bytes ever reach JS, which is far cheaper than
+      // doing it on a canvas here. `width` caps the long edge the same way PHOTO_PRESET does, and
+      // correctOrientation bakes in the EXIF rotation so photos are not stored sideways.
       const result = await Camera.getPhoto({
-        quality: 85,
+        quality: 82,
+        width: 1600,
+        correctOrientation: true,
         allowEditing: false,
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
@@ -1877,6 +1883,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         addedAt: new Date().toISOString(),
         source: "camera",
         type: `image/${result.format || "jpeg"}`,
+        size: estimateDataUrlBytes(dataUrl),
       };
       const updated = { ...animal, photos: [...(animal.photos || []), newPhoto] };
       await updateAnimalInSnapshot(updated);
@@ -2375,8 +2382,13 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     if (!animal) return;
     setPhotoBusy(true);
     try {
+      // Capacitor downscales natively before the bytes ever reach JS, which is far cheaper than
+      // doing it on a canvas here. `width` caps the long edge the same way PHOTO_PRESET does, and
+      // correctOrientation bakes in the EXIF rotation so photos are not stored sideways.
       const result = await Camera.getPhoto({
-        quality: 85,
+        quality: 82,
+        width: 1600,
+        correctOrientation: true,
         allowEditing: false,
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
@@ -2388,6 +2400,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         addedAt: new Date().toISOString(),
         source: "camera",
         type: `image/${result.format || "jpeg"}`,
+        size: estimateDataUrlBytes(dataUrl),
       };
       await updateAnimalInSnapshot({ ...animal, photos: [...(animal.photos || []), newPhoto] });
       pushToast("Photo saved.");

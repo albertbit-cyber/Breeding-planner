@@ -95,6 +95,19 @@ import {
   validatePdfLabelLayout,
 } from "./features/labels/presets";
 import defaultMorphAliasesJson from "./config/morphAliases.json";
+import {
+  LOGO_PRESET,
+  PHOTO_PRESET,
+  mapWithConcurrency,
+  resizeImageFile,
+} from "./utils/imageResize";
+import {
+  PHOTO_COMPRESSION_STORAGE_KEY,
+  compressStoredPhotos,
+  estimateCompressionWork,
+  formatByteSize,
+  summarizeCompressionRun,
+} from "./services/photoCompression";
 // use the CDN worker by version
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -8079,6 +8092,32 @@ export default function BreedingPlannerApp() {
     };
   }, [backupSettings.frequency, backupSettings.lastRun, runAutoBackup]);
 
+  // One-time backfill for photos stored before the resize engine existed. New uploads are already
+  // compressed at capture time; this is the only way to reach the ones already on disk.
+  const handleCompressStoredPhotos = useCallback(async ({ onProgress, shouldCancel } = {}) => {
+    const { snakes: nextSnakes, stats } = await compressStoredPhotos(snakes, {
+      onProgress,
+      shouldCancel,
+    });
+    if (stats.processed > 0) {
+      // Replace by id rather than assigning wholesale: the user may have edited an unrelated
+      // animal while this was running, and those edits must survive.
+      const byId = new Map(nextSnakes.map(record => [record?.id, record]));
+      setSnakes(prev => prev.map(record => {
+        const updated = record?.id ? byId.get(record.id) : null;
+        if (!updated || updated === record) return record;
+        return { ...record, photos: updated.photos, imageUrl: updated.imageUrl };
+      }));
+    }
+    saveStoredJson(PHOTO_COMPRESSION_STORAGE_KEY, {
+      completedAt: new Date().toISOString(),
+      processed: stats.processed,
+      savedBytes: Math.max(0, stats.bytesBefore - stats.bytesAfter),
+      cancelled: stats.cancelled,
+    });
+    return stats;
+  }, [snakes, setSnakes]);
+
   const resetAppToDefaults = useCallback(async () => {
     const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
 
@@ -8960,23 +8999,43 @@ export default function BreedingPlannerApp() {
     const images = fileArray.filter(file => file && (typeof file.type !== 'string' || file.type.startsWith('image/')));
     if (!images.length) return { newEntries: [], combined: null, imageUrl: null };
     const sourceLabel = options.source === 'camera' ? 'camera' : 'upload';
-    const entries = await Promise.all(images.map(async (file) => {
+    // Two at a time: these photos are stored inline in the animal record, so every one of them is
+    // decoded to a full-resolution bitmap before being shrunk, and doing a whole multi-select at
+    // once is what makes a mid-range phone run out of memory.
+    const entries = await mapWithConcurrency(images, 2, async (file) => {
       try {
-        const dataUrl = await readFileAsDataURL(file);
+        // Resize before the data URL exists. The same bytes end up in localStorage, in the cloud
+        // sync body, and in PDF exports, so this is the one place that fixes all three.
+        const resized = await resizeImageFile(file, PHOTO_PRESET);
         return normalizePhotoEntry({
           id: uid('photo'),
-          url: dataUrl,
+          url: resized.dataUrl,
           name: file.name || '',
-          type: file.type || '',
-          size: file.size,
+          type: resized.type || file.type || '',
+          size: resized.bytes,
           addedAt: new Date().toISOString(),
           source: sourceLabel,
         });
       } catch (err) {
-        console.error('Failed to read image file', err);
-        return null;
+        // A photo the browser cannot decode is still worth keeping at full size.
+        console.warn('Could not resize image; storing it unchanged', err);
+        try {
+          const dataUrl = await readFileAsDataURL(file);
+          return normalizePhotoEntry({
+            id: uid('photo'),
+            url: dataUrl,
+            name: file.name || '',
+            type: file.type || '',
+            size: file.size,
+            addedAt: new Date().toISOString(),
+            source: sourceLabel,
+          });
+        } catch (readErr) {
+          console.error('Failed to read image file', readErr);
+          return null;
+        }
       }
-    }));
+    });
     const newEntries = entries.filter(Boolean);
     if (!newEntries.length) return { newEntries: [], combined: null, imageUrl: null };
 
@@ -11191,6 +11250,7 @@ export default function BreedingPlannerApp() {
             showAppAlert={showAppAlert}
             showAppPrompt={showAppPrompt}
             showAppConfirm={showAppConfirm}
+            onCompressStoredPhotos={handleCompressStoredPhotos}
             onResetToDefaults={resetAppToDefaults}
           />
         )}
@@ -16451,6 +16511,7 @@ function BreederSection({
   showAppAlert,
   showAppPrompt,
   showAppConfirm,
+  onCompressStoredPhotos,
   onResetToDefaults,
 }) {
   const { t } = useTranslation();
@@ -16552,6 +16613,9 @@ function BreederSection({
   const aliasImportInputRef = useRef(null);
   const geneAliasImportInputRef = useRef(null);
   const [backupFeedback, setBackupFeedback] = useState(null);
+  const [photoCompressionProgress, setPhotoCompressionProgress] = useState(null);
+  const [photoCompressionFeedback, setPhotoCompressionFeedback] = useState(null);
+  const photoCompressionCancelRef = useRef(false);
   const [restoreFeedback, setRestoreFeedback] = useState(null);
   const [accountState, setAccountState] = useState({
     loading: false,
@@ -17233,6 +17297,58 @@ function BreederSection({
       }
     }
   }, [onResetToDefaults, showAppAlert, showAppConfirm]);
+
+  // What the one-time photo compression would do, measured without decoding anything.
+  const photoCompressionWork = useMemo(() => estimateCompressionWork(snakes), [snakes]);
+  const lastPhotoCompression = useMemo(
+    () => loadStoredJson(PHOTO_COMPRESSION_STORAGE_KEY, null),
+    // Re-read after each run so the "last run" line updates without a reload.
+    [photoCompressionFeedback]
+  );
+  const photoCompressionRunning = photoCompressionProgress !== null;
+
+  const handleCompressPhotos = useCallback(async () => {
+    if (typeof onCompressStoredPhotos !== 'function' || photoCompressionRunning) return;
+    if (!photoCompressionWork.photos) {
+      setPhotoCompressionFeedback({ type: 'success', message: 'Nothing to compress — every stored photo is already within budget.' });
+      return;
+    }
+
+    // Rewriting photos marks those animals as changed, so the next sync re-uploads them. Say so
+    // before starting rather than letting it surprise anyone on a metered connection.
+    const proceed = typeof showAppConfirm === 'function'
+      ? await showAppConfirm(
+        `Compress ${photoCompressionWork.photos} photo${photoCompressionWork.photos === 1 ? '' : 's'} `
+        + `across ${photoCompressionWork.animals} animal${photoCompressionWork.animals === 1 ? '' : 's'} `
+        + `(${formatByteSize(photoCompressionWork.bytes)} today)?\n\n`
+        + 'Photos are re-saved at a smaller size. This cannot be undone, and the affected animals '
+        + 'will be re-uploaded on your next cloud sync. Download a backup first if you want the '
+        + 'originals kept.',
+        { confirmLabel: 'Compress', cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }), tone: 'warning' }
+      )
+      : true;
+    if (!proceed) return;
+
+    photoCompressionCancelRef.current = false;
+    setPhotoCompressionFeedback(null);
+    setPhotoCompressionProgress({ done: 0, total: photoCompressionWork.photos });
+    try {
+      const stats = await onCompressStoredPhotos({
+        onProgress: progress => setPhotoCompressionProgress(progress),
+        shouldCancel: () => photoCompressionCancelRef.current,
+      });
+      setPhotoCompressionFeedback({
+        type: stats.failed && !stats.processed ? 'error' : 'success',
+        message: summarizeCompressionRun(stats),
+      });
+    } catch (err) {
+      console.error('Photo compression failed', err);
+      setPhotoCompressionFeedback({ type: 'error', message: 'Could not compress photos. Nothing was changed.' });
+    } finally {
+      setPhotoCompressionProgress(null);
+      photoCompressionCancelRef.current = false;
+    }
+  }, [onCompressStoredPhotos, photoCompressionRunning, photoCompressionWork, showAppConfirm, t]);
 
   const handleManualBackupDownload = useCallback(() => {
     if (typeof createBackupPayload !== 'function') {
@@ -18354,10 +18470,18 @@ function BreederSection({
                     const f = e.target.files && e.target.files[0];
                     if (!f) return;
                     try {
-                      const data = await readFileAsDataURL(f);
-                      persistBreederInfo(prev => ({ ...prev, logoUrl: data }));
+                      // LOGO_PRESET keeps PNG when the artwork is transparent, so a logo on a
+                      // clear background is not flattened onto black in PDF headers.
+                      const resized = await resizeImageFile(f, LOGO_PRESET);
+                      persistBreederInfo(prev => ({ ...prev, logoUrl: resized.dataUrl }));
                     } catch (error) {
-                      console.error(error);
+                      console.warn('Could not resize logo; storing it unchanged', error);
+                      try {
+                        const data = await readFileAsDataURL(f);
+                        persistBreederInfo(prev => ({ ...prev, logoUrl: data }));
+                      } catch (readError) {
+                        console.error(readError);
+                      }
                     }
                   }}
                 />
@@ -19414,6 +19538,67 @@ function BreederSection({
       {setupTab === 'backup' && (
         <div className="border-t pt-4 space-y-6">
           <div className="space-y-3">
+            <div>
+              <div className="font-semibold text-sm">Compress stored photos</div>
+              <div className="text-xs text-neutral-500 mt-1">
+                Photos added from now on are shrunk automatically as you upload them. This is a
+                one-time pass over the ones already saved, for accounts that filled up before that
+                existed. Originals are replaced, so download a backup first if you want them kept.
+              </div>
+            </div>
+            <div className="text-xs text-neutral-500">
+              {photoCompressionWork.photos
+                ? (
+                  <>
+                    {photoCompressionWork.photos} photo{photoCompressionWork.photos === 1 ? '' : 's'} over budget
+                    {' '}across {photoCompressionWork.animals} animal{photoCompressionWork.animals === 1 ? '' : 's'}
+                    {' '}— {formatByteSize(photoCompressionWork.bytes)} stored today.
+                  </>
+                )
+                : 'Every stored photo is already within budget. Nothing to do.'}
+              {lastPhotoCompression?.completedAt && (
+                <span className="block mt-1">
+                  Last run: {formatDateTimeForDisplay(lastPhotoCompression.completedAt)}
+                  {lastPhotoCompression.savedBytes ? ` — saved ${formatByteSize(lastPhotoCompression.savedBytes)}.` : '.'}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className={cx(
+                  'px-3 py-2 rounded-lg text-sm text-white',
+                  primaryBtnClass(theme, true),
+                  (photoCompressionRunning || !photoCompressionWork.photos) && 'opacity-60 cursor-not-allowed'
+                )}
+                onClick={handleCompressPhotos}
+                disabled={photoCompressionRunning || !photoCompressionWork.photos}
+              >
+                {photoCompressionRunning ? 'Compressing…' : 'Compress existing photos'}
+              </button>
+              {photoCompressionRunning && (
+                <>
+                  <span className="text-xs text-neutral-500">
+                    {photoCompressionProgress.done} of {photoCompressionProgress.total}
+                  </span>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg border text-sm"
+                    onClick={() => { photoCompressionCancelRef.current = true; }}
+                  >
+                    Stop
+                  </button>
+                </>
+              )}
+            </div>
+            {photoCompressionFeedback && (
+              <div className={cx('text-xs', photoCompressionFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
+                {photoCompressionFeedback.message}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
             <div>
               <div className="font-semibold text-sm">Manual backup</div>
               <div className="text-xs text-neutral-500 mt-1">
