@@ -102,10 +102,10 @@ import {
   CATALOG_COLORS,
   CATALOG_METRICS,
   catalogBirthValue,
-  drawCatalogPanel,
+  catalogPhotoBox,
   catalogSexWord,
-  fitTextToBox,
-  pt2mm,
+  drawCatalogBand,
+  fitImageInBox,
 } from "./features/animals/catalogLayout";
 import { inferParentsForLocalSnake } from "./features/familyTree/FamilyTreePage.jsx";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
@@ -15010,6 +15010,52 @@ function resolveCatalogMorph(animal) {
   return tokens.join(', ');
 }
 
+// The photograph is fitted whole into a box wider than it is, which leaves a
+// margin either side. Filling that margin with a colour taken from the
+// picture's own edge makes it read as more of the surface the animal was shot
+// on rather than as a gap. Averaging the four edges is enough for the plain
+// backgrounds these photographs are taken against.
+function sampleImageEdgeColor(image, fallback) {
+  try {
+    const w = Number(image?.naturalWidth || image?.width || 0);
+    const h = Number(image?.naturalHeight || image?.height || 0);
+    if (!w || !h) return fallback;
+
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return fallback;
+    ctx.drawImage(image, 0, 0, size, size);
+
+    // A cross-origin photograph taints the canvas and getImageData throws.
+    const { data } = ctx.getImageData(0, 0, size, size);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let n = 0;
+    const take = (x, y) => {
+      const i = ((y * size) + x) * 4;
+      if (data[i + 3] < 8) return;
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      n += 1;
+    };
+    for (let i = 0; i < size; i += 1) {
+      take(i, 0);
+      take(i, size - 1);
+      take(0, i);
+      take(size - 1, i);
+    }
+    if (!n) return fallback;
+    return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+  } catch (err) {
+    return fallback;
+  }
+}
+
 function resolvePrimaryAnimalImage(animal) {
   if (!animal || typeof animal !== 'object') return '';
   if (typeof animal.primaryImage === 'string' && animal.primaryImage.trim()) return animal.primaryImage.trim();
@@ -15194,16 +15240,11 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
 
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const M = CATALOG_METRICS;
   const C = CATALOG_COLORS;
 
-  // Paper panel down the left, photograph full bleed to the right of it.
-  const panelW = pageW * M.panelRatio;
-  const textX = M.padLeft;
-  const textW = panelW - M.padLeft - M.padRight;
-  const panelBottom = pageH - M.padBottom;
-  const photoX = panelW;
-  const photoW = pageW - panelW;
+  // The photograph takes the full width across the top; the text reads
+  // beneath it. A wide box for a wide picture, so nothing needs cropping.
+  const photoBox = catalogPhotoBox(pageW, pageH);
 
   const hasCover = Boolean(breederInfo || coverTitle || coverSubtitle);
   if (hasCover) {
@@ -15239,14 +15280,13 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
         const naturalW = Number(image.naturalWidth || image.width || 0);
         const naturalH = Number(image.naturalHeight || image.height || 0);
         if (naturalW > 0 && naturalH > 0) {
-          // Cover, not contain: the column is filled edge to edge and the
-          // overflow is cropped, so no page carries a band of dead grey.
-          const scale = Math.max(photoW / naturalW, pageH / naturalH);
-          const drawW = naturalW * scale;
-          const drawH = naturalH * scale;
-          const drawX = photoX + ((photoW - drawW) / 2);
-          const drawY = (pageH - drawH) / 2;
-          doc.addImage(primaryImage, 'JPEG', drawX, drawY, drawW, drawH);
+          // Fit the whole frame -- the entire animal reaches the page -- and
+          // fill what is left with the photograph's own edge colour.
+          const ground = sampleImageEdgeColor(image, C.ground);
+          doc.setFillColor(ground[0], ground[1], ground[2]);
+          doc.rect(photoBox.x, photoBox.y, photoBox.w, photoBox.h, 'F');
+          const fit = fitImageInBox(naturalW, naturalH, photoBox);
+          doc.addImage(primaryImage, 'JPEG', fit.x, fit.y, fit.w, fit.h);
           imageDrawn = true;
         }
       } catch (err) {
@@ -15255,14 +15295,10 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
       }
     }
     if (!imageDrawn) {
-      drawCatalogImagePlaceholder(doc, photoX, 0, photoW, pageH);
+      drawCatalogImagePlaceholder(doc, photoBox.x, photoBox.y, photoBox.w, photoBox.h);
     }
 
-    // Overflow from the cover crop spills left over the panel; repaint it.
-    doc.setFillColor(C.paper[0], C.paper[1], C.paper[2]);
-    doc.rect(0, 0, panelW, pageH, 'F');
-
-    drawCatalogPanel(doc, {
+    drawCatalogBand(doc, {
       name: nameValue,
       id: idValue,
       sexWord,

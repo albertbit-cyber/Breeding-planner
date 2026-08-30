@@ -1,10 +1,15 @@
 /**
  * Geometry, palette and text fitting for the sales-catalog animal page.
  *
- * The page is A5 landscape. A paper panel holds the text down the left, the
- * photograph runs full bleed to the right of it. Everything here is in
- * millimetres and points, kept out of App.jsx so the fitting maths can be
- * tested without a PDF document.
+ * The page is A5 landscape. The photograph takes the full width across the top
+ * and the text runs in a band beneath it -- a wide box for a wide picture, so
+ * nothing has to be cropped to fill it.
+ *
+ * A 1.4 photograph in a 2.3 box still leaves a margin either side, so the box
+ * is painted with a colour sampled from the photograph's own edge before the
+ * image goes down. That sampling needs a canvas and therefore lives in the
+ * caller; everything here is millimetres, points and jsPDF, with no DOM, so
+ * the page can be rendered headlessly and actually looked at.
  */
 
 /** Points to millimetres. jsPDF is driven in mm, type is specified in pt. */
@@ -18,41 +23,46 @@ export const CATALOG_COLORS = {
   muted: [92, 97, 105],
   rule: [216, 214, 209],
   accent: [184, 117, 20],
+  ground: [141, 143, 140],
   placeholder: [225, 228, 232],
   placeholderEdge: [190, 195, 201],
   placeholderInk: [120, 125, 130],
 };
 
 export const CATALOG_METRICS = {
-  panelRatio: 0.42,
-  padTop: 11.5,
-  padLeft: 11.5,
-  padRight: 9,
-  padBottom: 9.5,
+  /** Share of the page height given to the photograph. */
+  photoRatio: 0.65,
 
-  nameMaxPt: 21,
+  bandPadTop: 6.4,
+  bandPadX: 11.5,
+  bandPadBottom: 9.5,
+  bandGap: 9,
+  /** Share of the band's width given to the name column. */
+  leadRatio: 0.56,
+
+  nameMaxPt: 16,
   nameMinPt: 8,
-  namePreferredLines: 3,
+  namePreferredLines: 2,
+  nameMaxHeightMm: 15,
 
-  metaPt: 8.5,
+  metaPt: 8,
   metaMinPt: 6.5,
-  metaTrack: 0.28,
+  metaTrack: 0.24,
 
-  labelPt: 7,
-  labelTrack: 0.4,
-  labelGap: 1.6,
+  labelPt: 6.5,
+  labelTrack: 0.36,
+  labelGap: 0.9,
 
-  valuePt: 11.5,
-  parentNamePt: 9.5,
-  parentGenPt: 9.5,
+  valuePt: 9.5,
+  parentNamePt: 9,
+  parentGenPt: 9,
 
-  pricePt: 16,
-  markPt: 7,
-  markTrack: 0.35,
+  pricePt: 14,
+  markPt: 6.5,
+  markTrack: 0.3,
 
   lineFactor: 1.18,
-  fieldGap: 3.6,
-  ruleGap: 4.2,
+  fieldGap: 2.4,
 };
 
 /**
@@ -125,29 +135,57 @@ export function catalogBirthValue(animal) {
   return '';
 }
 
+/** The box the photograph is placed in: full width, across the top. */
+export function catalogPhotoBox(pageW, pageH) {
+  return { x: 0, y: 0, w: pageW, h: pageH * CATALOG_METRICS.photoRatio };
+}
+
 /**
- * Draws the text panel of one animal page.
+ * Fits a picture inside a box without cropping it, centred.
+ * Returns the rectangle to draw the image into.
+ */
+export function fitImageInBox(naturalW, naturalH, box) {
+  const w = Number(naturalW) || 0;
+  const h = Number(naturalH) || 0;
+  if (w <= 0 || h <= 0) return { x: box.x, y: box.y, w: box.w, h: box.h };
+  const scale = Math.min(box.w / w, box.h / h);
+  const drawW = w * scale;
+  const drawH = h * scale;
+  return {
+    x: box.x + ((box.w - drawW) / 2),
+    y: box.y + ((box.h - drawH) / 2),
+    w: drawW,
+    h: drawH,
+  };
+}
+
+/**
+ * Draws the text band beneath the photograph.
  *
- * Pure jsPDF: no DOM, no React, no bundler-specific imports. That keeps the
- * page renderable headlessly, so the layout can be proofed as a real PDF
- * instead of being argued about from arithmetic. The photograph is drawn by
- * the caller, which is the only part that needs an <img> to measure.
+ * Left column carries the name, the identity caption and the animal's own
+ * genetics, with the price anchored to the foot. Right column carries the
+ * parents. Splitting them keeps both columns short enough to fit a band that
+ * is only about 40mm of usable height.
  *
  * @param row      { name, id, sexWord, bornWord, morph, sire, dam, pairing, price }
  * @param setFont  (doc, style) => void -- injected so the module never has to
  *                 import the app's font loader, which pulls in .ttf?url
  */
-export function drawCatalogPanel(doc, row = {}, options = {}) {
+export function drawCatalogBand(doc, row = {}, options = {}) {
   const { pageW, pageH, breederInfo = null, setFont = null } = options;
   const M = CATALOG_METRICS;
   const C = CATALOG_COLORS;
 
-  const panelW = pageW * M.panelRatio;
-  const textX = M.padLeft;
-  const textW = panelW - M.padLeft - M.padRight;
-  const panelBottom = pageH - M.padBottom;
+  const bandTop = (pageH * M.photoRatio) + M.bandPadTop;
+  const bandBottom = pageH - M.bandPadBottom;
+  const contentW = pageW - (M.bandPadX * 2);
+  const leadX = M.bandPadX;
+  const leadW = (contentW - M.bandGap) * M.leadRatio;
+  const parX = leadX + leadW + M.bandGap;
+  const parW = contentW - leadW - M.bandGap;
 
   const applyFont = (style) => { if (setFont) setFont(doc, style); else doc.setFont('helvetica', style); };
+  const setInk = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
 
   const nameValue = String(row.name || '').trim();
   const idValue = String(row.id || '').trim();
@@ -161,141 +199,129 @@ export function drawCatalogPanel(doc, row = {}, options = {}) {
   const priceValue = String(row.price === null || typeof row.price === 'undefined' ? '' : row.price).trim();
 
   doc.setLineHeightFactor(M.lineFactor);
-  let cursorY = M.padTop;
 
   // jsPDF measures with splitTextToSize but draws with setCharSpace, and the
   // two disagree: a tracked line wraps to the column and then grows past it.
-  // Wrapping at a budget reduced by the tracking the line will actually add
-  // is what keeps the meta line off the photograph.
-  const measureAt = (text, size, track = 0) => {
+  // Wrapping against a budget reduced by the tracking it will actually add is
+  // what keeps a caption inside its column.
+  const measureIn = (text, size, width, track = 0) => {
     doc.setFontSize(size);
-    if (!track) return doc.splitTextToSize(text, textW);
-    let budget = textW;
+    if (!track) return doc.splitTextToSize(text, width);
+    let budget = width;
     let lines = doc.splitTextToSize(text, budget);
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const widest = lines.reduce((max, line) => Math.max(
         max,
         doc.getTextWidth(line) + (track * Math.max(0, String(line).length - 1)),
       ), 0);
-      if (widest <= textW) break;
-      budget -= (widest - textW) + 0.5;
+      if (widest <= width) break;
+      budget -= (widest - width) + 0.5;
       lines = doc.splitTextToSize(text, budget);
     }
     return lines;
   };
-  const setInk = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
 
-  // Every run is drawn from its top edge, so the stack advances by exactly
-  // the height it consumed and two fields can never share a line.
-  const runBlock = (lines, size, style, rgb, track = 0) => {
-    if (!lines || !lines.length) return;
-    applyFont(style);
-    doc.setFontSize(size);
-    setInk(rgb);
-    if (track) doc.setCharSpace(track);
-    doc.text(lines, textX, cursorY, { baseline: 'top' });
-    if (track) doc.setCharSpace(0);
-    cursorY += lines.length * pt2mm(size * M.lineFactor);
+  // Each column runs its own cursor, so neither can push the other around.
+  const column = (x, width) => {
+    let cursorY = bandTop;
+    const run = (lines, size, style, rgb, track = 0) => {
+      if (!lines || !lines.length) return;
+      if (cursorY > bandBottom) return;
+      applyFont(style);
+      doc.setFontSize(size);
+      setInk(rgb);
+      if (track) doc.setCharSpace(track);
+      doc.text(lines, x, cursorY, { baseline: 'top' });
+      if (track) doc.setCharSpace(0);
+      cursorY += lines.length * pt2mm(size * M.lineFactor);
+    };
+    return {
+      run,
+      label: (text) => {
+        run(measureIn(text, M.labelPt, width, M.labelTrack), M.labelPt, 'bold', C.accent, M.labelTrack);
+        cursorY += M.labelGap;
+      },
+      gap: (mm) => { cursorY += mm; },
+      get y() { return cursorY; },
+    };
   };
 
-  const runLabel = (label) => {
-    runBlock(measureAt(label, M.labelPt, M.labelTrack), M.labelPt, 'bold', C.accent, M.labelTrack);
-    cursorY += M.labelGap;
-  };
+  // ---- left column: who the animal is -------------------------------------
+  const lead = column(leadX, leadW);
 
-  // The name leads. It shrinks to fit rather than being cut, so however long
-  // a hatchling name runs, all of it reaches the page.
   const nameSource = nameValue || idValue;
   if (nameSource) {
     const fitted = fitTextToBox({
       text: nameSource,
-      measure: measureAt,
+      measure: (text, size) => measureIn(text, size, leadW),
       startSize: M.nameMaxPt,
       minSize: M.nameMinPt,
       maxLines: M.namePreferredLines,
-      maxHeightMm: 34,
+      maxHeightMm: M.nameMaxHeightMm,
     });
-    runBlock(fitted.lines, fitted.size, 'bold', C.ink);
+    lead.run(fitted.lines, fitted.size, 'bold', C.ink);
   }
 
-  // Identity, sex and hatch date read as one quiet line rather than three
-  // labelled rows competing with the name above them.
   const metaParts = [];
   if (nameValue && idValue && nameValue !== idValue) metaParts.push(idValue);
   if (sexWord) metaParts.push(sexWord);
   if (bornWord) metaParts.push(bornWord);
   if (metaParts.length) {
-    cursorY += 1.8;
-    const metaText = metaParts.join('  ·  ').toUpperCase();
+    lead.gap(1.4);
     const metaFit = fitTextToBox({
-      text: metaText,
-      measure: (text, size) => measureAt(text, size, M.metaTrack),
+      text: metaParts.join('  ·  ').toUpperCase(),
+      measure: (text, size) => measureIn(text, size, leadW, M.metaTrack),
       startSize: M.metaPt,
       minSize: M.metaMinPt,
       maxLines: 1,
       step: 0.25,
     });
-    runBlock(metaFit.lines, metaFit.size, 'bold', C.muted, M.metaTrack);
+    lead.run(metaFit.lines, metaFit.size, 'bold', C.muted, M.metaTrack);
   }
 
-  cursorY += M.ruleGap;
-  doc.setDrawColor(C.rule[0], C.rule[1], C.rule[2]);
-  doc.setLineWidth(0.3);
-  doc.line(textX, cursorY, textX + textW, cursorY);
-  cursorY += M.ruleGap;
-
-  // An empty morph used to print a bare dash; a page says nothing rather
-  // than saying nothing at length.
+  // An empty morph used to print a bare dash; a page says nothing rather than
+  // saying nothing at length.
   if (morphValue) {
-    runLabel('MORPH');
-    runBlock(measureAt(morphValue, M.valuePt), M.valuePt, 'normal', C.ink);
-    cursorY += M.fieldGap;
+    lead.gap(M.fieldGap);
+    lead.label('MORPH');
+    lead.run(measureIn(morphValue, M.valuePt, leadW), M.valuePt, 'normal', C.ink);
   }
 
+  // ---- right column: where it came from ------------------------------------
+  const par = column(parX, parW);
   if (hasParents) {
     const drawParent = (label, parent) => {
       if (!parent.name && !parent.genetics) return;
-      runLabel(label);
-      if (parent.name) runBlock(measureAt(parent.name, M.parentNamePt), M.parentNamePt, 'bold', C.ink);
-      if (parent.genetics) runBlock(measureAt(parent.genetics, M.parentGenPt), M.parentGenPt, 'normal', C.soft);
-      cursorY += M.fieldGap;
+      par.label(label);
+      if (parent.name) par.run(measureIn(parent.name, M.parentNamePt, parW), M.parentNamePt, 'bold', C.ink);
+      if (parent.genetics) par.run(measureIn(parent.genetics, M.parentGenPt, parW), M.parentGenPt, 'normal', C.soft);
+      par.gap(M.fieldGap);
     };
     drawParent('SIRE', sire);
     drawParent('DAM', dam);
   } else if (pairingValue) {
     // Pairing only earns its place when the parents themselves are unknown;
     // otherwise it repeats the two blocks above it.
-    runLabel('PAIRING');
-    runBlock(measureAt(pairingValue, M.parentGenPt), M.parentGenPt, 'normal', C.soft);
-    cursorY += M.fieldGap;
+    par.label('PAIRING');
+    par.run(measureIn(pairingValue, M.parentGenPt, parW), M.parentGenPt, 'normal', C.soft);
   }
 
-  // Price anchors the foot of the panel, so a short entry no longer trails
-  // off into half a page of blank paper.
+  // ---- foot: price left, breeder right -------------------------------------
   const markText = String((breederInfo && (breederInfo.businessName || breederInfo.name)) || '').trim();
-  if (priceValue || markText) {
-    const footTop = panelBottom - pt2mm(M.pricePt * M.lineFactor);
-    const ruleY = footTop - 3.4;
-    if (priceValue && ruleY > cursorY) {
-      doc.setDrawColor(C.rule[0], C.rule[1], C.rule[2]);
-      doc.setLineWidth(0.3);
-      doc.line(textX, ruleY, textX + textW, ruleY);
-    }
-    if (priceValue) {
-      applyFont('bold');
-      doc.setFontSize(M.pricePt);
-      setInk(C.ink);
-      doc.text(priceValue, textX, footTop, { baseline: 'top' });
-    }
-    if (markText) {
-      applyFont('bold');
-      doc.setFontSize(M.markPt);
-      setInk(C.muted);
-      doc.setCharSpace(M.markTrack);
-      doc.text(markText.toUpperCase(), textX + textW, panelBottom, { align: 'right', baseline: 'bottom' });
-      doc.setCharSpace(0);
-    }
+  if (priceValue) {
+    applyFont('bold');
+    doc.setFontSize(M.pricePt);
+    setInk(C.ink);
+    doc.text(priceValue, leadX, bandBottom, { baseline: 'bottom' });
+  }
+  if (markText) {
+    applyFont('bold');
+    doc.setFontSize(M.markPt);
+    setInk(C.muted);
+    doc.setCharSpace(M.markTrack);
+    doc.text(markText.toUpperCase(), pageW - M.bandPadX, bandBottom, { align: 'right', baseline: 'bottom' });
+    doc.setCharSpace(0);
   }
 
-  return cursorY;
+  return Math.max(lead.y, par.y);
 }

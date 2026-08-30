@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CATALOG_METRICS,
   catalogBirthValue,
+  catalogPhotoBox,
   catalogSexWord,
+  fitImageInBox,
   fitTextToBox,
   pt2mm,
 } from './catalogLayout';
@@ -103,5 +105,59 @@ describe('catalogBirthValue', () => {
   it('returns empty when nothing was recorded', () => {
     expect(catalogBirthValue({})).toBe('');
     expect(catalogBirthValue(null)).toBe('');
+  });
+});
+
+describe('catalogPhotoBox', () => {
+  it('gives the photograph the full width across the top', () => {
+    const box = catalogPhotoBox(210, 148);
+    expect(box.x).toBe(0);
+    expect(box.y).toBe(0);
+    expect(box.w).toBe(210);
+    expect(box.h).toBeCloseTo(148 * CATALOG_METRICS.photoRatio, 5);
+  });
+
+  it('leaves enough band beneath for two parent blocks', () => {
+    const box = catalogPhotoBox(210, 148);
+    const usable = 148 - box.h - CATALOG_METRICS.bandPadTop - CATALOG_METRICS.bandPadBottom;
+    // label + name + two genetics lines + gap, twice over
+    const perParent = pt2mm(CATALOG_METRICS.labelPt * CATALOG_METRICS.lineFactor)
+      + CATALOG_METRICS.labelGap
+      + pt2mm(CATALOG_METRICS.parentNamePt * CATALOG_METRICS.lineFactor)
+      + (2 * pt2mm(CATALOG_METRICS.parentGenPt * CATALOG_METRICS.lineFactor))
+      + CATALOG_METRICS.fieldGap;
+    expect(usable).toBeGreaterThan(perParent * 2);
+  });
+});
+
+describe('fitImageInBox', () => {
+  const box = { x: 0, y: 0, w: 210, h: 96.2 };
+
+  it('never crops: the whole frame always fits inside the box', () => {
+    for (const aspect of [0.5, 0.75, 1, 4 / 3, 16 / 9, 3]) {
+      const fit = fitImageInBox(1000 * aspect, 1000, box);
+      expect(fit.w).toBeLessThanOrEqual(box.w + 0.001);
+      expect(fit.h).toBeLessThanOrEqual(box.h + 0.001);
+      expect(fit.x).toBeGreaterThanOrEqual(-0.001);
+      expect(fit.y).toBeGreaterThanOrEqual(-0.001);
+      // aspect ratio survives the fit
+      expect(fit.w / fit.h).toBeCloseTo(aspect, 4);
+    }
+  });
+
+  it('centres the picture in whatever space is left', () => {
+    const fit = fitImageInBox(1000, 1000, box);
+    expect(fit.x).toBeCloseTo((box.w - fit.w) / 2, 5);
+    expect(fit.h).toBeCloseTo(box.h, 5);
+  });
+
+  it('fills the width when the picture is wider than the box', () => {
+    const fit = fitImageInBox(3000, 1000, box);
+    expect(fit.w).toBeCloseTo(box.w, 5);
+    expect(fit.y).toBeGreaterThan(0);
+  });
+
+  it('falls back to the whole box for an unmeasurable image', () => {
+    expect(fitImageInBox(0, 0, box)).toEqual(box);
   });
 });
