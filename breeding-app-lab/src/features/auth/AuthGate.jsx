@@ -302,7 +302,7 @@ export default function AuthGate({ children }) {
   // ── Invitation acceptance ─────────────────────────────────────────────────
   if (inviteToken) {
     return (
-      <div className="auth-shell">
+      <div className="auth-shell lab-auth">
         <div className="auth-card">
           <h1 className="auth-card-title">
             {invite?.kind === "vendor_lab" ? "Set up your laboratory" : "Join the team"}
@@ -385,7 +385,7 @@ export default function AuthGate({ children }) {
 
   // ── Sign in ───────────────────────────────────────────────────────────────
   return (
-    <div className="auth-shell">
+    <div className="auth-shell lab-auth">
       <div className="auth-card">
         <h1 className="auth-card-title">
           {t("auth.lab.title", { defaultValue: "Laboratory Portal" })}

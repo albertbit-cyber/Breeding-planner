@@ -98,6 +98,11 @@ import {
 } from "./features/animals/animalSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
+import {
+  detectParentsFromName,
+  isBreederAnimal,
+  splitPairLabel,
+} from "./features/animals/parentage";
 import QuarantineSection from "./features/quarantine/QuarantineSection.jsx";
 import QuarantinePanel from "./features/quarantine/QuarantinePanel.jsx";
 import QuarantineNotice from "./features/quarantine/QuarantineNotice.jsx";
@@ -2702,6 +2707,10 @@ function cloneLogs(logs = {}) {
 
 const MAX_PHOTOS_PER_SNAKE = 60;
 
+// Every action in the snake editor's pinned header shares one footprint, so a long label like
+// "Order Genetic Test" does not make its button wider than "QR label" next to it.
+const SNAKE_EDITOR_ACTION_CLASS = 'snake-editor-action';
+
 function normalizePhotoEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const url = typeof raw.url === 'string' && raw.url.trim()
@@ -3911,6 +3920,30 @@ function initSnakeDraft(s) {
     feederProfile: normalizeFeederProfileForDraft(s.feederProfile),
     quarantine: normalizeQuarantine(s.quarantine),
   };
+}
+
+/**
+ * Fills in whichever parents the animal's name names and the record does not already record.
+ * Returns the draft unchanged when there is nothing to add, so opening a card that already has
+ * its parentage does not mark the draft dirty.
+ */
+function withParentsDetectedFromName(draft, animals) {
+  if (!draft || (draft.damId && draft.sireId)) return draft;
+  const { dam, sire } = detectParentsFromName({
+    name: draft.name,
+    animals,
+    excludeId: draft.id,
+  });
+  const patch = {};
+  if (!draft.damId && dam) {
+    patch.damId = dam.id;
+    patch.damName = dam.name || '';
+  }
+  if (!draft.sireId && sire) {
+    patch.sireId = sire.id;
+    patch.sireName = sire.name || '';
+  }
+  return Object.keys(patch).length ? { ...draft, ...patch } : draft;
 }
 
 const FEEDER_TYPE_OPTIONS = ['Rat', 'Multimammate', 'Mouse'];
@@ -6135,7 +6168,7 @@ function deriveQuickAddName(text, parsed = {}) {
   return candidate;
 }
 
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], theme='blue' }) {
   const { t } = useTranslation();
   const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
   const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
@@ -6711,6 +6744,15 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   setNewAnimal(a => ({ ...a, groups: [g] }));
                 }} />
               </div>
+            </div>
+            <div className="sm:col-span-2">
+              <ParentagePanel
+                draft={newAnimal}
+                setDraft={setNewAnimal}
+                animals={animals}
+                clutchOptions={clutchOptions}
+                autoDetectFromName
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
@@ -9253,6 +9295,39 @@ export default function BreedingPlannerApp() {
     return map;
   }, [clutchMetadataByPairingId]);
 
+  /**
+   * Every clutch that can be attached to an animal, newest first.
+   *
+   * Deliberately wider than `eggBoxes` below, which only covers clutches still incubating:
+   * hatchlings are attached to a clutch *after* it hatched, so completed pairings have to be
+   * offered too, or the animals that most need the link are the ones that cannot get it.
+   */
+  const clutchOptions = useMemo(() => {
+    const list = Array.isArray(pairings) ? pairings : [];
+    return list
+      .filter(pairing => pairing?.clutch?.date)
+      .map(pairing => {
+        const dam = snakeById(snakes, pairing.femaleId);
+        const sire = snakeById(snakes, pairing.maleId);
+        const clutchDate = pairing.clutch.date;
+        const year = String(clutchDate || '').slice(0, 4) || '';
+        const damName = dam?.name || pairing.femaleId || '';
+        const sireName = sire?.name || pairing.maleId || '';
+        return {
+          pairingId: pairing.id,
+          clutchId: buildClutchId(damName, sireName, year),
+          clutchDate,
+          year,
+          damId: pairing.femaleId || null,
+          damName,
+          sireId: pairing.maleId || null,
+          sireName,
+        };
+      })
+      .filter(option => option.clutchId)
+      .sort((a, b) => String(b.clutchDate).localeCompare(String(a.clutchDate)));
+  }, [pairings, snakes]);
+
   const eggBoxes = useMemo(() => {
     const list = Array.isArray(pairings) ? pairings : [];
     const activeClutchesWithDates = list
@@ -9871,8 +9946,12 @@ export default function BreedingPlannerApp() {
     setTab('animals');
     setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
     setEditSnake(snake);
-    setEditSnakeDraft(initSnakeDraft(snake));
-  }, [animalView, tab, speciesScope]);
+    // Generated hatchlings are named "<Dam> x <Sire> - N", so a name in that shape already names
+    // both parents. Read it once here, on open, rather than from an effect that would have to
+    // fight the keeper's own edits to the name field. Only empty slots are filled: a parent the
+    // hatch wizard recorded, or one the keeper picked, is never overwritten by a guess.
+    setEditSnakeDraft(withParentsDetectedFromName(initSnakeDraft(snake), snakes));
+  }, [animalView, tab, speciesScope, snakes]);
 
   const editDraftSpeciesId = editSnakeDraft ? resolveSpeciesId(editSnakeDraft.species) : '';
 
@@ -10246,6 +10325,14 @@ export default function BreedingPlannerApp() {
       photos: draftPhotos,
       logs: cloneLogs(newAnimal.logs),
       idSequence: Number.isFinite(idSequence) && idSequence > 0 ? idSequence : null,
+      // Same field names the hatch wizard writes, so a hand-added animal and a generated
+      // hatchling are indistinguishable to the family tree and to the mobile detail view.
+      clutchId: newAnimal.clutchId || null,
+      pairingId: newAnimal.pairingId || null,
+      damId: newAnimal.damId || null,
+      damName: newAnimal.damName || '',
+      sireId: newAnimal.sireId || null,
+      sireName: newAnimal.sireName || '',
       isDemo: false,
     };
 
@@ -12156,6 +12243,8 @@ export default function BreedingPlannerApp() {
               setGroups={setDraftGroups}
               availableGenetics={quickAddAvailableGenetics}
               onGeneticsForSpecies={geneticsForSpecies}
+              animals={snakes}
+              clutchOptions={clutchOptions}
               statusOptions={statusTagOptions}
               customStatusTags={customStatusTags}
               onCreateStatusTag={handleCreateStatusTag}
@@ -12758,23 +12847,25 @@ export default function BreedingPlannerApp() {
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
-      <div className="relative z-[10001] bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
-            <div className="p-5 border-b flex items-center justify-between">
-                        <div className="font-semibold">{editSnake.name}</div>
-                        <div className="flex items-center gap-2">
-                          <button className="px-3 py-2 rounded-xl text-sm border border-rose-200 text-rose-600"
+      <div className="relative z-[10001] bg-white w-full max-w-3xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
+            <div className="shrink-0 p-5 border-b flex items-center justify-between gap-4">
+                        <div className="font-semibold truncate min-w-0" title={editSnake.name}>{editSnake.name}</div>
+                        {/* Seven equal-size actions do not fit one row at max-w-3xl, so they wrap
+                            into a grid instead of stretching the header or squeezing the title. */}
+                        <div className="shrink-0 flex flex-wrap justify-end gap-2 max-w-[70%]">
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
                             onClick={()=>requestDeleteSnake(editSnake)}>
                             {t("actions.delete", { defaultValue: "Delete" })}
                           </button>
                           <button
-                            className="px-3 py-2 rounded-xl text-sm border"
+                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
                             onClick={() => openFamilyTreeForSnake(editSnakeDraft || editSnake)}
                           >
                             {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
                           </button>
-                          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
                           <button
-                            className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
+                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
                             disabled={!((editSnakeDraft.id || '').trim())}
                             onClick={async () => {
                               const trimmedId = (editSnakeDraft.id || '').trim();
@@ -12800,12 +12891,12 @@ export default function BreedingPlannerApp() {
                             {t("actions.qrLabel", { defaultValue: "QR label" })}
                           </button>
                           <button
-                            className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
                             onClick={() => setTestOrderSnake(editSnakeDraft)}
                           >
                             {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
                           </button>
-                          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))}
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))}
                             onClick={()=>{
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
@@ -12841,10 +12932,11 @@ export default function BreedingPlannerApp() {
                           })));
                           closeSnakeEditor();
                             }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
-                          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
                         </div>
             </div>
 
+            <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* basics */}
               <div className="md:col-span-1 flex flex-col gap-1">
@@ -13235,6 +13327,12 @@ export default function BreedingPlannerApp() {
 
               {/* Genetics picker removed from edit modal per user request */}
               <div className="md:col-span-2 space-y-5">
+                <ParentagePanel
+                  draft={editSnakeDraft}
+                  setDraft={setEditSnakeDraft}
+                  animals={snakes}
+                  clutchOptions={clutchOptions}
+                />
                 <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
 
                 {/* Reproductive Intelligence — females only */}
@@ -13364,6 +13462,7 @@ export default function BreedingPlannerApp() {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -25474,6 +25573,258 @@ function GroupsSection({ groups, setGroups, snakes, onDeleteGroup, onOpenSnake, 
 }
 
 // logs editor
+/**
+ * Parentage for one animal: the clutch it came out of, and its sire and dam.
+ *
+ * The clutch is the strong link -- picking one names both parents outright, so it overwrites
+ * whatever was in the two pickers. The pickers themselves stay editable for animals that never
+ * came from a tracked clutch (anything bought in, or logged before the pairing existed).
+ */
+function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], autoDetectFromName = false }) {
+  const { t } = useTranslation();
+
+  const damOptions = useMemo(() => buildParentOptions(animals, 'F', draft?.id), [animals, draft?.id]);
+  const sireOptions = useMemo(() => buildParentOptions(animals, 'M', draft?.id), [animals, draft?.id]);
+
+  const selectedClutch = useMemo(() => {
+    if (!draft) return null;
+    return clutchOptions.find(option => (
+      (draft.pairingId && option.pairingId === draft.pairingId)
+      || (draft.clutchId && option.clutchId === draft.clutchId)
+    )) || null;
+  }, [clutchOptions, draft?.pairingId, draft?.clutchId]);
+
+  // A clutch id typed by hand, or carried over from a pairing that no longer exists, still
+  // belongs to the animal -- show it rather than silently dropping it from the picker.
+  const unlistedClutchId = draft?.clutchId && !selectedClutch ? draft.clutchId : '';
+
+  // Whether what is in the pickers right now is what the name says. Recomputed rather than
+  // stored, so the hint disappears the moment the keeper picks something else.
+  const nameSplit = useMemo(() => splitPairLabel(draft?.name), [draft?.name]);
+  const detected = useMemo(() => detectParentsFromName({
+    name: draft?.name,
+    animals,
+    excludeId: draft?.id,
+  }), [draft?.name, draft?.id, animals]);
+  const damFromName = Boolean(!selectedClutch && detected.dam && detected.dam.id === draft?.damId);
+  const sireFromName = Boolean(!selectedClutch && detected.sire && detected.sire.id === draft?.sireId);
+
+  const draftDamId = draft?.damId || null;
+  const draftSireId = draft?.sireId || null;
+  useEffect(() => {
+    if (!autoDetectFromName) return;
+    if (draftDamId && draftSireId) return;
+    const patch = {};
+    if (!draftDamId && detected.dam) {
+      patch.damId = detected.dam.id;
+      patch.damName = detected.dam.name || '';
+    }
+    if (!draftSireId && detected.sire) {
+      patch.sireId = detected.sire.id;
+      patch.sireName = detected.sire.name || '';
+    }
+    if (!Object.keys(patch).length) return;
+    setDraft(prev => (prev ? { ...prev, ...patch } : prev));
+    // Keyed on the detection result, not on the draft: re-running after the patch lands would
+    // find both slots filled and stop, but depending on the draft would loop on every keystroke.
+  }, [autoDetectFromName, detected.dam, detected.sire, draftDamId, draftSireId, setDraft]);
+
+  const applyClutch = (pairingId) => {
+    if (!pairingId) {
+      // Unlinking drops the clutch only. The parents it filled in stay: they are still true.
+      setDraft(prev => prev ? ({ ...prev, pairingId: null, clutchId: null }) : prev);
+      return;
+    }
+    const option = clutchOptions.find(entry => entry.pairingId === pairingId);
+    if (!option) return;
+    setDraft(prev => prev ? ({
+      ...prev,
+      pairingId: option.pairingId,
+      clutchId: option.clutchId,
+      damId: option.damId,
+      damName: option.damName,
+      sireId: option.sireId,
+      sireName: option.sireName,
+    }) : prev);
+  };
+
+  const applyParent = (role, animalId) => {
+    const options = role === 'dam' ? damOptions : sireOptions;
+    const picked = animalId ? options.all.find(animal => animal.id === animalId) : null;
+    setDraft(prev => prev ? ({
+      ...prev,
+      [role === 'dam' ? 'damId' : 'sireId']: picked?.id || null,
+      [role === 'dam' ? 'damName' : 'sireName']: picked?.name || '',
+    }) : prev);
+  };
+
+  if (!draft) return null;
+
+  return (
+    <div className="p-3 border rounded-xl bg-white">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-medium text-sm">
+          {t("snakeEdit.parentage.title", { defaultValue: "Parentage" })}
+        </div>
+        <div className="text-xs text-neutral-500">
+          {t("snakeEdit.parentage.hint", { defaultValue: "Link a clutch, or pick the parents by hand." })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <label className="text-xs font-medium">
+            {t("snakeEdit.parentage.clutch", { defaultValue: "Clutch" })}
+          </label>
+          <select
+            className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
+            value={selectedClutch?.pairingId || ''}
+            onChange={e => applyClutch(e.target.value)}
+          >
+            <option value="">
+              {unlistedClutchId
+                ? t("snakeEdit.parentage.clutchUnlinked", { defaultValue: "Not linked to a tracked clutch" })
+                : t("snakeEdit.parentage.noClutch", { defaultValue: "No clutch" })}
+            </option>
+            {clutchOptions.map(option => (
+              <option key={option.pairingId} value={option.pairingId}>
+                {option.clutchId}{option.clutchDate ? ` (${option.clutchDate})` : ''}
+              </option>
+            ))}
+          </select>
+          {selectedClutch && (
+            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">
+                {t("snakeEdit.parentage.clutchIdLabel", { defaultValue: "Clutch ID" })}
+              </span>
+              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{selectedClutch.clutchId}</span>
+            </div>
+          )}
+          {unlistedClutchId && (
+            <div className="mt-1 text-[11px] text-neutral-500">
+              {t("snakeEdit.parentage.clutchRecorded", {
+                defaultValue: "Recorded clutch: {{clutchId}}. Pick one above to link it and fill in the parents.",
+                clutchId: unlistedClutchId,
+              })}
+            </div>
+          )}
+          {!clutchOptions.length && (
+            <div className="mt-1 text-[11px] text-neutral-500">
+              {t("snakeEdit.parentage.noClutchesYet", { defaultValue: "No clutches recorded in the breeding tracker yet." })}
+            </div>
+          )}
+        </div>
+
+        <ParentSelect
+          label={t("snakeEdit.parentage.dam", { defaultValue: "Dam" })}
+          placeholder={t("snakeEdit.parentage.noDam", { defaultValue: "No dam selected" })}
+          options={damOptions}
+          value={draft.damId || ''}
+          recordedName={draft.damName}
+          disabled={Boolean(selectedClutch)}
+          fromName={damFromName}
+          onChange={id => applyParent('dam', id)}
+        />
+        <ParentSelect
+          label={t("snakeEdit.parentage.sire", { defaultValue: "Sire" })}
+          placeholder={t("snakeEdit.parentage.noSire", { defaultValue: "No sire selected" })}
+          options={sireOptions}
+          value={draft.sireId || ''}
+          recordedName={draft.sireName}
+          disabled={Boolean(selectedClutch)}
+          fromName={sireFromName}
+          onChange={id => applyParent('sire', id)}
+        />
+
+        {selectedClutch ? (
+          <div className="text-[11px] text-neutral-500">
+            {t("snakeEdit.parentage.fromClutch", {
+              defaultValue: "Parents come from the linked clutch. Unlink it to set them by hand.",
+            })}
+          </div>
+        ) : nameSplit && (
+          <div className="text-[11px] text-neutral-500">
+            {t("snakeEdit.parentage.readFromName", {
+              defaultValue: "This name reads as {{dam}} (dam) x {{sire}} (sire).",
+              dam: nameSplit.damName,
+              sire: nameSplit.sireName,
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The animals that can fill one parent slot: the whole collection of that sex, minus the animal
+ * being edited. Breeders come first because that is where a parent nearly always is, but nothing
+ * is hidden -- a sire that has since been sold or retired still has to be selectable.
+ */
+function buildParentOptions(animals, sex, excludeId) {
+  const eligible = (Array.isArray(animals) ? animals : [])
+    .filter(animal => animal && animal.id !== excludeId && normalizeSexValue(animal.sex) === sex)
+    .sort((a, b) => String(a.name || a.id || '').localeCompare(String(b.name || b.id || '')));
+  return {
+    all: eligible,
+    breeders: eligible.filter(isBreederAnimal),
+    others: eligible.filter(animal => !isBreederAnimal(animal)),
+  };
+}
+
+function ParentSelect({ label, placeholder, options, value, recordedName, disabled, fromName, onChange }) {
+  const { t } = useTranslation();
+  const describe = (animal) => {
+    const name = animal.name || animal.id || '';
+    const genetics = getDisplayedSnakeGeneticsTokens(animal);
+    const detail = [animal.id, genetics.length ? genetics.join(', ') : ''].filter(Boolean).join(' - ');
+    return detail ? `${name} (${detail})` : name;
+  };
+  // An id with no matching animal means the parent left the collection. Keep showing the name
+  // that was recorded instead of letting the picker fall back to "no dam selected".
+  const missing = value && !options.all.some(animal => animal.id === value);
+
+  return (
+    <div>
+      <label className="text-xs font-medium">{label}</label>
+      <select
+        className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white disabled:bg-neutral-100 disabled:text-neutral-500"
+        value={value}
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+      >
+        <option value="">{placeholder}</option>
+        {missing && (
+          <option value={value}>
+            {recordedName || value} {t("snakeEdit.parentage.notInCollection", { defaultValue: "(not in collection)" })}
+          </option>
+        )}
+        {options.breeders.length ? (
+          <optgroup label={t("snakeEdit.parentage.breedersGroup", { defaultValue: "Breeders" })}>
+            {options.breeders.map(animal => (
+              <option key={animal.id} value={animal.id}>{describe(animal)}</option>
+            ))}
+          </optgroup>
+        ) : null}
+        {options.others.length ? (
+          <optgroup label={options.breeders.length
+            ? t("snakeEdit.parentage.otherAnimalsGroup", { defaultValue: "All other animals" })
+            : t("snakeEdit.parentage.allAnimalsGroup", { defaultValue: "All animals" })}>
+            {options.others.map(animal => (
+              <option key={animal.id} value={animal.id}>{describe(animal)}</option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+      {fromName && (
+        <div className="mt-0.5 text-[11px] text-neutral-500">
+          {t("snakeEdit.parentage.detectedFromName", { defaultValue: "Read from this animal's name. Change it if that is wrong." })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLastFeedDefaults }) {
   const { t } = useTranslation();
   const feedsRef = useRef(null);

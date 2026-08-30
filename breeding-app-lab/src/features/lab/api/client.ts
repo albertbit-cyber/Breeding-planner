@@ -274,8 +274,15 @@ const toLabAvailableTestRecord = (test: any, index = 0): LabAvailableTest => ({
   testKind: String(test?.testKind || "morph"),
   priceModel: String(test?.priceModel || "tier"),
   addonPriceCents: Number.isFinite(Number(test?.addonPriceCents)) ? Number(test.addonPriceCents) : undefined,
-  speciesId: test?.speciesId ? String(test.speciesId) : undefined,
-  speciesLabel: test?.speciesLabel ? String(test.speciesLabel) : undefined,
+  // A test covers one or more species, so the API sends a list. Keeping the
+  // singular label as a joined string is what the catalogue table renders.
+  speciesIds: Array.isArray(test?.speciesIds) ? test.speciesIds.map((id: unknown) => String(id)) : [],
+  species: Array.isArray(test?.species)
+    ? test.species.map((sp: any) => ({ id: String(sp?.id || ""), name: String(sp?.name || sp?.id || "") }))
+    : [],
+  speciesLabel: Array.isArray(test?.species) && test.species.length
+    ? test.species.map((sp: any) => String(sp?.name || sp?.id || "")).join(", ")
+    : undefined,
   aliases: Array.isArray(test?.aliases) ? test.aliases.map((a: unknown) => String(a)) : [],
   availability: String(test?.availability || "available"),
   panelScope: test?.panelScope ? String(test.panelScope) : undefined,

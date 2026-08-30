@@ -2833,3 +2833,149 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Laboratory Portal sign-in ─────────────────────────────────────────────
+   The Lab Portal's gate was rewritten when onboarding became invitation-only,
+   and its markup is simpler than the breeder gate it replaced: semantic
+   label > input rather than the old multi-step wrappers. The rules below dress
+   that structure. Without them the fields render as bare browser defaults and
+   the card sits unpositioned in the corner. */
+
+/* The gate renders its card directly inside the shell rather than through the
+   old overlay wrapper, so the shell does the centring and the backdrop itself. */
+.auth-shell.lab-auth {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, #eef2ff 0%, #e0f2fe 55%, #f8fafc 100%);
+  color: #0f172a;
+}
+
+.lab-auth form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.lab-auth label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.lab-auth input,
+.lab-auth textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-weight: 400;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 14px;
+  padding: 0.65rem 0.85rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lab-auth input:focus,
+.lab-auth textarea:focus {
+  outline: none;
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.lab-auth button {
+  border-radius: 999px;
+  padding: 0.7rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lab-auth button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lab-auth button.primary {
+  background: var(--primary, #2563eb);
+  color: var(--primary-contrast, #fff);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.3);
+}
+
+.lab-auth button.ghost {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.lab-auth button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.lab-auth .auth-notice {
+  background: rgba(22, 101, 52, 0.08);
+  color: #166534;
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.lab-auth .auth-error {
+  background: rgba(179, 38, 30, 0.08);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Invitation-only is the product rule, so the way in for a laboratory that
+   wants to join sits quietly at the foot of the card rather than beside the
+   sign-in button, where it would read as a second front door. */
+.lab-auth .auth-footnote {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.lab-auth .linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--primary, #2563eb);
+  text-decoration: underline;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.lab-auth .linklike:hover {
+  transform: none;
+}
+
+.lab-auth .auth-card-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.4rem;
+}
+
+.lab-auth ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  color: #475569;
+}

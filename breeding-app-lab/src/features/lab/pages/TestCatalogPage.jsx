@@ -276,10 +276,6 @@ export default function TestCatalogPage() {
                 <th className="px-3 py-2">{t("lab.catalog.colName", { defaultValue: "Name" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colKind", { defaultValue: "Kind" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colSpecies", { defaultValue: "Species" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colGeneticType", { defaultValue: "Type" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colGroup", { defaultValue: "Group" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colCode", { defaultValue: "Code" })}</th>
-                <th className="px-3 py-2">{t("lab.catalog.colPricingType", { defaultValue: "Pricing" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colPrice", { defaultValue: "Price" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colActive", { defaultValue: "Active" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colBreederVisible", { defaultValue: "Visible" })}</th>
@@ -331,22 +327,6 @@ export default function TestCatalogPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-xs text-neutral-600">{test.speciesLabel || "-"}</td>
-                  <td className="px-3 py-2">
-                    {test.geneticType ? (
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        test.geneticType === "recessive"
-                          ? "bg-purple-100 text-purple-800"
-                          : test.geneticType === "codominant"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-sky-100 text-sky-800"
-                      }`}>
-                        {test.geneticType}
-                      </span>
-                    ) : <span className="text-xs text-neutral-400">-</span>}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-neutral-600">{test.group || "-"}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-600">{test.internalCode}</td>
-                  <td className="px-3 py-2 text-xs text-neutral-600">{test.pricingType || "morph"}</td>
                   <td className="px-3 py-2 text-xs">
                     {test.priceModel === "flat" || test.testKind === "panel" ? (
                       <span className="font-medium">{formatEuroFromCents(test.priceCents)}</span>

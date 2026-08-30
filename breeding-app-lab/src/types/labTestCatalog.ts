@@ -22,7 +22,10 @@ export interface LabAvailableTest {
   priceModel?: string;
   /** Price when bundled onto a morph test on the same animal. */
   addonPriceCents?: number;
-  speciesId?: string;
+  /** Every species this test covers. */
+  speciesIds?: string[];
+  species?: Array<{ id: string; name: string }>;
+  /** The species names joined for display. */
   speciesLabel?: string;
   /** Other names the same test is known by, used to match a breeder's morphs. */
   aliases?: string[];
