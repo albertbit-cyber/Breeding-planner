@@ -1,4 +1,5 @@
 import { getGeneByName } from '../../genetics/geneDatabase';
+import { listSpecies } from '../../genetics/speciesRegistry';
 
 export type GeneticsType =
   | string
@@ -436,4 +437,113 @@ export function collectLiveGenetics(snakes: Array<Record<string, any>> = []): Ge
   });
 
   return [...map.values()];
+}
+
+/**
+ * Nicknames keepers actually type. Single words are only ever recognised from this list --
+ * never from a species' own name -- because a bare common word is exactly what collides with
+ * genetics. "Leopard" is a ball python gene, so leopard geckos are reachable as
+ * "leopard gecko" but never as "leopard".
+ */
+const SPECIES_TEXT_ALIASES: Record<string, string> = {
+  crestie: 'crested-gecko',
+  cresties: 'crested-gecko',
+  beardie: 'bearded-dragon',
+  beardies: 'bearded-dragon',
+  retic: 'reticulated-python',
+  retics: 'reticulated-python',
+  gargie: 'gargoyle-gecko',
+  gargies: 'gargoyle-gecko',
+  leachie: 'leachianus-gecko',
+  leachies: 'leachianus-gecko',
+  chahoua: 'chahoua-gecko',
+  cornsnake: 'corn-snake',
+  cornsnakes: 'corn-snake',
+  kingsnake: 'kingsnake',
+  kingsnakes: 'kingsnake',
+  milksnake: 'milk-snake',
+  milksnakes: 'milk-snake',
+  hognose: 'hognose-snake',
+  axolotl: 'axolotl',
+  axolotls: 'axolotl',
+};
+
+export type DetectedSpecies = {
+  speciesId: string;
+  /** The exact text that matched, so the caller can show what it acted on. */
+  matched: string;
+  /** The input with the species phrase removed, ready for genetics parsing. */
+  rest: string;
+};
+
+type SpeciesCandidate = { speciesId: string; phrase: string };
+
+let speciesCandidateCache: SpeciesCandidate[] | null = null;
+
+function speciesCandidates(): SpeciesCandidate[] {
+  if (speciesCandidateCache) return speciesCandidateCache;
+  const candidates: SpeciesCandidate[] = [];
+  const seen = new Set<string>();
+
+  const add = (speciesId: string, phrase: string) => {
+    const cleaned = normalizeWhitespace(phrase).toLowerCase();
+    // Multi-word only. A single word from a species' own name is too collision-prone; the
+    // alias table below is the vetted route for those.
+    if (!cleaned || cleaned.split(' ').length < 2) return;
+    const key = `${speciesId}|${cleaned}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ speciesId, phrase: cleaned });
+  };
+
+  listSpecies().forEach((species) => {
+    add(species.id, species.name);
+    // Registry names are plural ("Ball Pythons"); keepers usually type the singular.
+    add(species.id, species.name.replace(/s$/i, ''));
+    if (species.scientificName) add(species.id, species.scientificName);
+  });
+
+  Object.entries(SPECIES_TEXT_ALIASES).forEach(([alias, speciesId]) => {
+    const cleaned = alias.toLowerCase();
+    const key = `${speciesId}|${cleaned}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ speciesId, phrase: cleaned });
+  });
+
+  // Longest first, so "short-tailed python" wins over "python" and "crested gecko" over any
+  // shorter overlap.
+  candidates.sort((a, b) => b.phrase.length - a.phrase.length);
+  speciesCandidateCache = candidates;
+  return candidates;
+}
+
+/**
+ * Finds a species named anywhere in free text, and returns the text with that phrase removed.
+ *
+ * Anywhere rather than only at the start, because a realistic paste leads with an ID:
+ * "MS-24-033 0.1 crested gecko harlequin". Safety comes from what may match, not from where:
+ * multi-word phrases and vetted nicknames only.
+ *
+ * Returns null when nothing matched, which is the common case and not a failure -- the
+ * species picker is the primary control and this only ever fills it in.
+ */
+export function detectSpeciesFromText(text: string): DetectedSpecies | null {
+  const source = normalizeWhitespace(text);
+  if (!source) return null;
+  const haystack = source.toLowerCase();
+
+  for (const candidate of speciesCandidates()) {
+    const pattern = new RegExp(`(^|[^a-z0-9])(${toPattern(candidate.phrase)})(?![a-z0-9])`, 'i');
+    const match = pattern.exec(haystack);
+    if (!match) continue;
+    const start = match.index + match[1].length;
+    const end = start + match[2].length;
+    return {
+      speciesId: candidate.speciesId,
+      matched: source.slice(start, end),
+      rest: normalizeWhitespace(`${source.slice(0, start)} ${source.slice(end)}`),
+    };
+  }
+  return null;
 }

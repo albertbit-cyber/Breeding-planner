@@ -389,6 +389,7 @@ model Animal {
   name         String?
   sex          String?
   status       String?
+  species      String?
   payload      Json
   globalId     String?
   privacyLevel String    @default("private")
@@ -402,6 +403,7 @@ model Animal {
   @@unique([ownerId, appAnimalId])
   @@index([ownerId])
   @@index([ownerId, updatedAt])
+  @@index([ownerId, species])
   @@index([globalId])
 }
 

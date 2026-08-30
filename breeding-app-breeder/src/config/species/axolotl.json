@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "axolotl",
+  "speciesName": "Axolotls",
+  "scientificName": "Ambystoma mexicanum",
+  "genes": [
+    {
+      "geneName": "Axanthic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average",
+      "notes": null
+    },
+    {
+      "geneName": "Copper",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Dirty Leucistic",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "average",
+      "notes": null
+    },
+    {
+      "geneName": "Gfp",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "Golden Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "High Iridophores",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "lower",
+      "notes": null
+    },
+    {
+      "geneName": "Leucistic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Melanoid",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1961",
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Melanoid Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "common",
+      "notes": null
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "higher",
+      "notes": null
+    },
+    {
+      "geneName": "White",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": null,
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Axanthic",
+      "Copper",
+      "Golden Albino",
+      "Leucistic",
+      "Melanoid",
+      "Melanoid Albino",
+      "White"
+    ],
+    "incompleteDominantGenes": [
+      "Gfp"
+    ],
+    "dominantGenes": [],
+    "polygenicGenes": [
+      "Dirty Leucistic",
+      "High Iridophores"
+    ],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Normal"
+    ]
+  }
+}

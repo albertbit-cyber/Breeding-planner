@@ -266,6 +266,7 @@
   "lookup": "Lookup",
   "close": "Close",
   "actions.addAnimal": "Add animal",
+  "actions.addAnimalAndSpecies": "New animal & species",
   "actions.importAnimals": "Import animals",
   "actions.expand": "Expand",
   "actions.collapse": "Collapse",

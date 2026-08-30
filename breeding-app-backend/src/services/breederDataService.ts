@@ -628,6 +628,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       name: textValue(animal.name),
       sex: textValue(animal.sex),
       status: textValue(animal.status),
+      species: textValue(animal.species),
       payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
     };
     if (!existing) {

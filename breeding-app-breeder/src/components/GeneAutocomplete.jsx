@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getAllGenes } from '../genetics/geneDatabase';
+import { getAllGenes, getGeneDatabaseGeneration } from '../genetics/geneDatabase';
 
 const GENE_TYPE_META = {
   recessive:            { label: 'R',   bg: 'bg-purple-100', text: 'text-purple-700', title: 'Recessive' },
   incomplete_dominant:  { label: 'Co',  bg: 'bg-blue-100',   text: 'text-blue-700',   title: 'Codominant' },
   dominant:             { label: 'D',   bg: 'bg-green-100',  text: 'text-green-700',  title: 'Dominant' },
-  polygenic:            { label: 'P',   bg: 'bg-gray-100',   text: 'text-gray-500',   title: 'Polygenic / Other' },
+  polygenic:            { label: 'P',   bg: 'bg-gray-100',   text: 'text-gray-500',   title: 'Polygenic' },
+  locality:             { label: 'L',   bg: 'bg-amber-100',  text: 'text-amber-700',  title: 'Locality' },
+  physical:             { label: 'Ph',  bg: 'bg-gray-100',   text: 'text-gray-500',   title: 'Physical trait' },
+  other:                { label: '?',   bg: 'bg-gray-100',   text: 'text-gray-500',   title: 'Other / unclassified' },
 };
 
 const HEALTH_ICONS = {
@@ -16,7 +19,7 @@ const HEALTH_ICONS = {
 };
 
 function TypeBadge({ type }) {
-  const meta = GENE_TYPE_META[type] || GENE_TYPE_META.incomplete_dominant;
+  const meta = GENE_TYPE_META[type] || GENE_TYPE_META.other;
   return (
     <span
       className={`inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-bold shrink-0 ${meta.bg} ${meta.text}`}
@@ -150,7 +153,7 @@ function buildOptions(results, hetMode, buildToken) {
  *   placeholder?: string
  */
 export default function GeneAutocomplete({ morphs = [], hets = [], onChange, disabled = false, placeholder }) {
-  const allGenes = useMemo(() => getAllGenes(), []);
+  const allGenes = useMemo(() => getAllGenes(), [getGeneDatabaseGeneration()]);
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);

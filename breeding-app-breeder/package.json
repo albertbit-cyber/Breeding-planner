@@ -1,6 +1,6 @@
 {
   "name": "breeding-app-breeder",
-  "version": "0.1.28",
+  "version": "0.1.30",
   "private": true,
   "type": "module",
   "engines": {
@@ -22,6 +22,7 @@
     "android:install:debug": "powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 -Environment development -Artifact apk -BuildType debug -Install",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:browser": "node tests/browser/imageResize.browser.mjs",
     "test:e2e": "playwright test",
     "test:e2e:reset": "npm --prefix ../breeding-app-backend run e2e:reset:local && npm run test:e2e",
     "test:e2e:ui": "playwright test --ui",
