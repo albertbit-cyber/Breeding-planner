@@ -9470,7 +9470,7 @@ export default function BreedingPlannerApp() {
     const value = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
     saveStoredJson(STORAGE_KEYS.leucisticType, value);
   }, [lastLeucisticType]);
-      if (s) { setEditSnake(s); setEditSnakeDraft(initSnakeDraft(s)); }
+      if (s) { openSnakeEditor(s); }
     }
   }, [snakes]);
 
@@ -9933,6 +9933,22 @@ export default function BreedingPlannerApp() {
     setShowPairingModal(true);
   }, [setDraft, setFemaleSearchQuery, setMaleSearchQuery, setPairingSearchTarget, setPairingsView, setShowPairingModal, snakes, t]);
 
+  /**
+   * The single way the animal editor is opened. Every list had its own inline
+   * `setEditSnake` + `setEditSnakeDraft` pair, so anything added to the open step had to be
+   * repeated five times or silently miss whichever list was not updated.
+   *
+   * Generated hatchlings are named "<Dam> x <Sire> - N", so a name in that shape already names
+   * both parents. It is read here, on open, rather than from an effect that would have to fight
+   * the keeper's own edits to the name field. Only empty slots are filled: a parent the hatch
+   * wizard recorded, or one the keeper picked, is never overwritten by a guess.
+   */
+  const openSnakeEditor = useCallback((snake) => {
+    if (!snake) return;
+    setEditSnake(snake);
+    setEditSnakeDraft(withParentsDetectedFromName(initSnakeDraft(snake), snakes));
+  }, [snakes]);
+
   const openSnakeCard = useCallback((snake) => {
     if (!snake) return;
     // A scanned QR or a search hit can belong to a species other than the open one. Follow
@@ -9945,13 +9961,8 @@ export default function BreedingPlannerApp() {
     setReturnToGroupsAfterEdit(tab === 'animals' && animalView === 'groups');
     setTab('animals');
     setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
-    setEditSnake(snake);
-    // Generated hatchlings are named "<Dam> x <Sire> - N", so a name in that shape already names
-    // both parents. Read it once here, on open, rather than from an effect that would have to
-    // fight the keeper's own edits to the name field. Only empty slots are filled: a parent the
-    // hatch wizard recorded, or one the keeper picked, is never overwritten by a guess.
-    setEditSnakeDraft(withParentsDetectedFromName(initSnakeDraft(snake), snakes));
-  }, [animalView, tab, speciesScope, snakes]);
+    openSnakeEditor(snake);
+  }, [animalView, tab, speciesScope, openSnakeEditor]);
 
   const editDraftSpeciesId = editSnakeDraft ? resolveSpeciesId(editSnakeDraft.species) : '';
 
@@ -11666,7 +11677,7 @@ export default function BreedingPlannerApp() {
                   sortedAnimalList.length ? (
                     <SnakeListTable
                       snakes={sortedAnimalList}
-                      onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
+                      onEdit={openSnakeEditor}
                       onQuickPair={(sn)=> startPairingWithSnake(sn)}
                       onOpenFamilyTree={openFamilyTreeForSnake}
                       onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
@@ -11689,7 +11700,7 @@ export default function BreedingPlannerApp() {
                           s={s}
                           groups={groups}
                           setSnakes={setSnakes}
-                          onEdit={(sn)=>{ setEditSnake(sn); setEditSnakeDraft(initSnakeDraft(sn)); }}
+                          onEdit={openSnakeEditor}
                           onQuickPair={(sn)=> startPairingWithSnake(sn)}
                           onOpenFamilyTree={openFamilyTreeForSnake}
                           onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
@@ -12070,7 +12081,7 @@ export default function BreedingPlannerApp() {
           <QuarantineSection
             snakes={snakes}
             onUpdateSnake={updateSnakeById}
-            onOpenAnimal={(snake) => { setEditSnake(snake); setEditSnakeDraft(initSnakeDraft(snake)); }}
+            onOpenAnimal={openSnakeEditor}
             showAppPrompt={showAppPrompt}
             spaces={spacesState}
             onMoveToQuarantine={handleMoveToQuarantine}
@@ -12852,7 +12863,7 @@ export default function BreedingPlannerApp() {
                         <div className="font-semibold truncate min-w-0" title={editSnake.name}>{editSnake.name}</div>
                         {/* Seven equal-size actions do not fit one row at max-w-3xl, so they wrap
                             into a grid instead of stretching the header or squeezing the title. */}
-                        <div className="shrink-0 flex flex-wrap justify-end gap-2 max-w-[70%]">
+                        <div className="snake-editor-actions shrink-0">
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
                             onClick={()=>requestDeleteSnake(editSnake)}>
                             {t("actions.delete", { defaultValue: "Delete" })}
