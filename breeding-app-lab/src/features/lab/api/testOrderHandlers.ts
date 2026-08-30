@@ -14,11 +14,6 @@ import {
 } from "../../../services/lab/testOrderService";
 import { getBreederOrderOutcomeSummary } from "../../../services/lab/resultFinalizationService";
 import { getBreederCertificateArtifact } from "../../../services/lab/certificateService";
-import {
-  correctOrderStatusAsAdmin,
-  getOrderOversightForAdmin,
-  listAllOrdersForAdmin,
-} from "../../../services/lab/adminOversightService";
 import type { CreateTestOrderResult } from "../../../services/lab/testOrderService";
 import { listStatusHistoryRecords } from "../../../db/labStore";
 
@@ -345,112 +340,8 @@ export const getBreederCertificateArtifactHandler = async (
   }
 };
 
-export const listAdminAllOrdersHandler = (
-  context: RequestContext
-): ApiResponse<TestOrder[]> => {
-  try {
-    const actor = assertActor(context);
-    return toSuccess(listAllOrdersForAdmin(actor));
-  } catch (error) {
-    return handleError(error);
-  }
-};
 
-export const getAdminOrderOversightHandler = (
-  context: RequestContext,
-  payload: GetTestOrderPayload
-): ApiResponse<{
-  order: TestOrder;
-  statusHistory: StatusHistory[];
-  results: Array<{
-    id: string;
-    status: string;
-    testCode: string;
-    findings: Array<{ marker: string; outcome: string }>;
-    reportedAt?: string;
-    reviewedAt?: string;
-    releasedAt?: string;
-    certificateId?: string;
-  }>;
-  certificates: Array<{
-    id: string;
-    status: string;
-    certificateNumber: string;
-    issuedAt?: string;
-    fileUrl?: string;
-  }>;
-  geneticsChanges: Array<{
-    id: string;
-    status: string;
-    source: string;
-    changeType: string;
-    resultId?: string;
-    changedAt: string;
-    reason?: string;
-  }>;
-}> => {
-  try {
-    const actor = assertActor(context);
-    const orderId = assertString(payload?.orderId, "orderId");
-    const oversight = getOrderOversightForAdmin(actor, orderId);
-    return toSuccess({
-      order: oversight.order,
-      statusHistory: oversight.statusHistory,
-      results: oversight.results.map((entry) => ({
-        id: entry.id,
-        status: entry.status,
-        testCode: entry.testCode,
-        findings: entry.findings,
-        reportedAt: entry.reportedAt,
-        reviewedAt: entry.reviewedAt,
-        releasedAt: entry.releasedAt,
-        certificateId: entry.certificateId,
-      })),
-      certificates: oversight.certificates.map((entry) => ({
-        id: entry.id,
-        status: entry.status,
-        certificateNumber: entry.certificateNumber,
-        issuedAt: entry.issuedAt,
-        fileUrl: entry.fileUrl,
-      })),
-      geneticsChanges: oversight.geneticsChanges.map((entry) => ({
-        id: entry.id,
-        status: entry.status,
-        source: entry.source,
-        changeType: entry.changeType,
-        resultId: entry.resultId,
-        changedAt: entry.changedAt,
-        reason: entry.reason,
-      })),
-    });
-  } catch (error) {
-    return handleError(error);
-  }
-};
 
-export const adminCorrectOrderStatusHandler = (
-  context: RequestContext,
-  payload: AdminCorrectOrderStatusPayload
-): ApiResponse<TestOrder> => {
-  try {
-    const actor = assertActor(context);
-    const orderId = assertString(payload?.orderId, "orderId");
-    const statusValue = assertString(payload?.status, "status");
-    if (!TEST_ORDER_STATUSES.includes(statusValue as TestOrderStatus)) {
-      return toFailure("VALIDATION_ERROR", "Invalid status value.", {
-        allowed: [...TEST_ORDER_STATUSES],
-      });
-    }
-    const reason = assertString(payload?.reason, "reason");
-    const corrected = correctOrderStatusAsAdmin(actor, orderId, statusValue as TestOrderStatus, reason);
-    if (!corrected) {
-      return toFailure("NOT_FOUND", "Test order not found.");
-    }
-    return toSuccess(corrected);
-  } catch (error) {
-    return handleError(error);
-  }
-};
 
 export const TEST_ORDER_API_HANDLERS = {
   "lab.testOrders.create": createTestOrderHandler,
@@ -463,7 +354,4 @@ export const TEST_ORDER_API_HANDLERS = {
   "lab.testOrders.getAllowedTransitions": getAllowedOrderStatusTransitionsHandler,
   "lab.testOrders.getBreederOutcome": getBreederOrderOutcomeHandler,
   "lab.testOrders.getBreederCertificateArtifact": getBreederCertificateArtifactHandler,
-  "lab.admin.listAllOrders": listAdminAllOrdersHandler,
-  "lab.admin.getOrderOversight": getAdminOrderOversightHandler,
-  "lab.admin.correctOrderStatus": adminCorrectOrderStatusHandler,
 } as const;

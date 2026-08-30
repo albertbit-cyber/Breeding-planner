@@ -1203,6 +1203,32 @@ export const revokeAdminVendorInvite = async (id: string, reason: string) =>
     { method: "POST", body: JSON.stringify({ reason }) }
   );
 
+// ── Partner applications ─────────────────────────────────────────────────────
+//
+// Laboratories that have asked to be considered. Reviewing one records a
+// decision and nothing else — it never issues an invitation as a side effect,
+// so granting access stays a separate, deliberate act.
+
+export const fetchAdminPartnerApplications = async (params: Record<string, string | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ applications: Array<Record<string, unknown>>; statuses: string[] }>(
+    `/admin/partner-applications${suffix}`
+  );
+};
+
+export const reviewAdminPartnerApplication = async (
+  id: string,
+  payload: { status: "invited" | "declined"; note?: string }
+) =>
+  request<{ application: Record<string, unknown> }>(
+    `/admin/partner-applications/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(payload) }
+  );
+
 export const sendAdminNotification = async (payload: {
   recipientId?: string;
   audience: string;

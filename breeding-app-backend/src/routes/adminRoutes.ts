@@ -44,6 +44,10 @@ import {
   adminEmailSuppressions,
   adminReleaseEmailSuppression,
 } from "../controllers/adminEmailController";
+import {
+  adminPartnerApplications,
+  adminReviewPartnerApplication,
+} from "../controllers/partnerController";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/roles";
@@ -79,6 +83,11 @@ adminRoutes.patch("/lab-accounts/:id", asyncHandler(changeLabAccount));
 adminRoutes.get("/vendor-labs/invites", asyncHandler(vendorInvites));
 adminRoutes.post("/vendor-labs/invites", asyncHandler(createVendorInvite));
 adminRoutes.post("/vendor-labs/invites/:id/revoke", asyncHandler(revokeVendorInvite));
+// Laboratories that have asked to be considered. Reviewing one records a
+// decision; it never sends an invitation as a side effect — that stays a
+// separate, deliberate action.
+adminRoutes.get("/partner-applications", asyncHandler(adminPartnerApplications));
+adminRoutes.patch("/partner-applications/:id", asyncHandler(adminReviewPartnerApplication));
 adminRoutes.get("/vendor-labs/:id", asyncHandler(vendorLabDetail));
 adminRoutes.patch("/vendor-labs/:id/status", asyncHandler(changeVendorLabStatus));
 adminRoutes.post("/notifications/send", asyncHandler(sendNotification));

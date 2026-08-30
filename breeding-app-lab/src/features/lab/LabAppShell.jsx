@@ -6,7 +6,6 @@ import SampleIntakePage from "./pages/SampleIntakePage.jsx";
 import OrderDetailsPage from "./pages/OrderDetailsPage.jsx";
 import ResultEntryPage from "./pages/ResultEntryPage.jsx";
 import CompletedTestsPage from "./pages/CompletedTestsPage.jsx";
-import AdminOversightPage from "./pages/AdminOversightPage.jsx";
 import { createLabApiClient } from "./api/client";
 import TestCatalogPage from "./pages/TestCatalogPage.jsx";
 import PricingLogicPage from "./pages/PricingLogicPage.jsx";
@@ -136,7 +135,10 @@ const parseRoute = (path) => {
   if (normalized === "/lab/shed-tests") return { route: "/lab/incoming-orders" };
   if (normalized === "/lab/incoming-orders") return { route: "/lab/incoming-orders" };
   if (normalized === "/admin/shed-tests") return { route: "/lab/incoming-orders" };
-  if (normalized === "/admin" || normalized === "/admin/") return { route: "/lab/admin-oversight" };
+  // "/admin" used to land on a local-data oversight screen inside this portal.
+  // Platform oversight lives in the admin console now, so send stragglers to the
+  // dashboard rather than to a page that no longer exists.
+  if (normalized === "/admin" || normalized === "/admin/") return { route: "/lab/dashboard" };
   // presetToken/presetOrderId let the global Scan action (see GlobalScanOverlay)
   // land directly on the right step for a sample instead of making the tech
   // re-scan or hunt for the right order in a dropdown.
@@ -147,7 +149,6 @@ const parseRoute = (path) => {
     return { route: "/lab/result-entry", presetOrderId: params.get("orderId") || undefined };
   }
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
-  if (normalized === "/lab/admin-oversight") return { route: "/lab/admin-oversight" };
   if (normalized === "/lab/test-catalog") return { route: "/lab/test-catalog" };
   if (normalized === "/lab/pricing-logic") return { route: "/lab/pricing-logic" };
   if (normalized === "/lab/settings") return { route: "/lab/settings" };
@@ -167,7 +168,6 @@ const navItems = [
   { path: "/lab/sample-intake", label: "Sample Intake" },
   { path: "/lab/result-entry", label: "Result Entry" },
   { path: "/lab/completed-tests", label: "Completed Tests" },
-  { path: "/lab/admin-oversight", label: "Admin Oversight", roles: ["admin"] },
   { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
   { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
   { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
@@ -193,16 +193,6 @@ const pageForRoute = (parsedRoute, role) => {
       return <ResultEntryPage presetOrderId={parsedRoute.presetOrderId} />;
     case "/lab/completed-tests":
       return <CompletedTestsPage />;
-    case "/lab/admin-oversight":
-      if (role !== "admin") {
-        return (
-          <section className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700">Admin Oversight Restricted</h1>
-            <p className="text-sm text-neutral-700">Only admin users can access this oversight area.</p>
-          </section>
-        );
-      }
-      return <AdminOversightPage />;
     case "/lab/test-catalog":
       if (role !== "lab_staff" && role !== "admin") {
         return (

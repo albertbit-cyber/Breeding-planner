@@ -23,6 +23,7 @@ import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { reproductiveRoutes } from "./routes/reproductiveRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { inviteRoutes } from "./routes/inviteRoutes";
+import { partnerRoutes } from "./routes/partnerRoutes";
 import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -128,6 +129,8 @@ app.use("/api/reproductive", reproductiveRoutes);
 app.use("/api/emails", emailRoutes);
 // Unauthenticated: an invitee has a token instead of an account.
 app.use("/api/invites", inviteRoutes);
+// Unauthenticated: a laboratory asking to be considered has no account yet.
+app.use("/api/partners", partnerRoutes);
 
 app.use(errorHandler);
 

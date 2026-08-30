@@ -748,6 +748,27 @@ export const fetchInvite = async (token: string) =>
     requiresAuth: false,
   });
 
+/**
+ * A laboratory asking to be considered as a partner.
+ *
+ * Creates no account and grants no access — onboarding stays invitation-only.
+ * The response deliberately says only that it arrived.
+ */
+export const submitPartnerApplication = async (payload: {
+  labName: string;
+  contactName: string;
+  email: string;
+  phone?: string;
+  country?: string;
+  website?: string;
+  message?: string;
+}) =>
+  request<{ received: boolean }>("/partners/applications", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
+
 export const acceptInvite = async (
   token: string,
   payload: { fullName: string; password?: string }

@@ -1452,10 +1452,6 @@ export const createLabApiClient = () => {
     return updateLabAvailableTest({ id, isVisibleToBreeder } as any);
   };
 
-  const listAdminAllOrders = async (): Promise<TestOrder[]> => {
-    requireSessionRole("admin");
-    return listLabTestOrders();
-  };
 
   const deleteAllLabOrders = async (): Promise<{
     deletedOrders: number;
@@ -1484,23 +1480,7 @@ export const createLabApiClient = () => {
     });
   };
 
-  const getAdminOrderOversight = async (orderId: string) => {
-    requireSessionRole("admin");
-    const order = await getLabTestOrderDetails(orderId);
-    const statusHistory = await getLabOrderStatusHistory(orderId);
-    return {
-      order,
-      statusHistory,
-      results: [],
-      certificates: [],
-      geneticsChanges: [],
-    };
-  };
 
-  const adminCorrectOrderStatus = async (input: { orderId: string; status: string; reason: string; }): Promise<TestOrder> => {
-    requireSessionRole("admin");
-    return updateLabOrderWorkflowStatus({ orderId: input.orderId, status: input.status, reason: input.reason });
-  };
 
   const getLabAllowedWorkflowStatuses = async (orderId: string): Promise<string[]> => {
     const role = requireSessionRole("admin", "lab_staff", "breeder");
@@ -1615,11 +1595,8 @@ export const createLabApiClient = () => {
     updateLabAvailableTest,
     setLabAvailableTestActive,
     setLabAvailableTestVisibility,
-    listAdminAllOrders,
     deleteLabOrder,
     deleteAllLabOrders,
-    getAdminOrderOversight,
-    adminCorrectOrderStatus,
     getLabAllowedWorkflowStatuses,
     getLabResultEntryTemplate,
     saveLabResultDraft,

@@ -6,6 +6,7 @@ import {
   fetchInvite as fetchInviteApi,
   login as loginApi,
   requestPasswordReset as requestPasswordResetApi,
+  submitPartnerApplication as submitPartnerApplicationApi,
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 
@@ -78,6 +79,15 @@ export default function AuthGate({ children }) {
   const [loginError, setLoginError] = useState("");
   const [notice, setNotice] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyForm, setApplyForm] = useState({
+    labName: "",
+    contactName: "",
+    email: "",
+    country: "",
+    website: "",
+    message: "",
+  });
   const [resetEmail, setResetEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -213,6 +223,34 @@ export default function AuthGate({ children }) {
           defaultValue: "If that address has an account, a reset link is on its way.",
         })
       );
+    }
+  };
+
+  const handleApply = async (event) => {
+    event.preventDefault();
+    setLoginError("");
+    setBusy(true);
+    try {
+      await submitPartnerApplicationApi({
+        labName: applyForm.labName.trim(),
+        contactName: applyForm.contactName.trim(),
+        email: applyForm.email.trim(),
+        country: applyForm.country.trim() || undefined,
+        website: applyForm.website.trim() || undefined,
+        message: applyForm.message.trim() || undefined,
+      });
+      setIsApplying(false);
+      setApplyForm({ labName: "", contactName: "", email: "", country: "", website: "", message: "" });
+      setNotice(
+        t("auth.lab.applicationSent", {
+          defaultValue:
+            "Thank you — your details are with our team. If we go ahead, you will receive an invitation by email.",
+        })
+      );
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Could not send your application.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -427,13 +465,89 @@ export default function AuthGate({ children }) {
           </form>
         )}
 
-        {/* No registration link, by design. */}
-        <p className="auth-footnote">
-          {t("auth.lab.inviteOnly", {
-            defaultValue:
-              "Laboratory accounts are created by invitation. If your laboratory would like to join, contact us and we will send an invitation.",
-          })}
-        </p>
+        {/* Still no registration, by design. Applying creates no account and
+            grants no access — it sends the team a note. Only an administrator
+            issuing an invitation opens the door. */}
+        {isApplying ? (
+          <form onSubmit={handleApply} className="auth-apply">
+            <h2 className="auth-card-title">
+              {t("auth.lab.applyTitle", { defaultValue: "Apply to become a partner laboratory" })}
+            </h2>
+            <p className="auth-subtitle">
+              {t("auth.lab.applyHelp", {
+                defaultValue:
+                  "Tell us about your laboratory. This does not create an account — if we go ahead, we will send you an invitation.",
+              })}
+            </p>
+            <label>
+              {t("auth.lab.applyLabName", { defaultValue: "Laboratory name" })}
+              <input
+                value={applyForm.labName}
+                onChange={(e) => setApplyForm((p) => ({ ...p, labName: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              {t("auth.lab.applyContact", { defaultValue: "Your name" })}
+              <input
+                value={applyForm.contactName}
+                onChange={(e) => setApplyForm((p) => ({ ...p, contactName: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              {t("auth.fields.email", { defaultValue: "Email" })}
+              <input
+                type="email"
+                value={applyForm.email}
+                onChange={(e) => setApplyForm((p) => ({ ...p, email: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              {t("auth.lab.applyCountry", { defaultValue: "Country" })}
+              <input
+                value={applyForm.country}
+                onChange={(e) => setApplyForm((p) => ({ ...p, country: e.target.value }))}
+              />
+            </label>
+            <label>
+              {t("auth.lab.applyWebsite", { defaultValue: "Website" })}
+              <input
+                type="url"
+                placeholder="https://"
+                value={applyForm.website}
+                onChange={(e) => setApplyForm((p) => ({ ...p, website: e.target.value }))}
+              />
+            </label>
+            <label>
+              {t("auth.lab.applyMessage", { defaultValue: "What do you test?" })}
+              <textarea
+                rows={3}
+                value={applyForm.message}
+                onChange={(e) => setApplyForm((p) => ({ ...p, message: e.target.value }))}
+              />
+            </label>
+            <button type="submit" className="primary" disabled={busy}>
+              {busy
+                ? t("common.sending", { defaultValue: "Sending…" })
+                : t("auth.lab.applySend", { defaultValue: "Send application" })}
+            </button>
+            <button type="button" className="ghost" onClick={() => setIsApplying(false)}>
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </button>
+          </form>
+        ) : (
+          <p className="auth-footnote">
+            {t("auth.lab.inviteOnly", {
+              defaultValue:
+                "Laboratory accounts are created by invitation only.",
+            })}{" "}
+            <button type="button" className="linklike" onClick={() => setIsApplying(true)}>
+              {t("auth.lab.applyLink", { defaultValue: "Apply to become a partner laboratory" })}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

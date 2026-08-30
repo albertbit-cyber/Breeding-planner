@@ -122,6 +122,7 @@ model User {
   verificationReviews  VerificationRequest[] @relation("VerificationRequestReviewer")
   marketplacePermission MarketplacePermission?
   labAccount       LabAccount?
+  reviewedPartnerApplications PartnerApplication[] @relation("PartnerApplicationReviewer")
   gdprRequests     GdprRequest[] @relation("GdprRequestUser")
   gdprReviews      GdprRequest[] @relation("GdprRequestReviewer")
   subscriptions     UserSubscription[] @relation("UserSubscriptionUser")
@@ -225,6 +226,41 @@ model Membership {
 //     organization* plus an `owner` Membership. This is the only way a
 //     lab_vendor org ever comes into existence.
 //
+// A laboratory asking to be considered as a partner.
+//
+// Onboarding stays invitation-only: this creates no account, no organization
+// and no access whatsoever. It is a lead for an administrator to read, and its
+// only outcome is that the administrator decides to send a real invitation — or
+// does not. Without it a laboratory that hears about the platform has no way to
+// raise its hand at all, which is a gap in the journey rather than a hole in
+// the rule.
+model PartnerApplication {
+  id             String    @id @default(cuid())
+  labName        String    @map("lab_name")
+  contactName    String    @map("contact_name")
+  email          String
+  phone          String?
+  country        String?
+  website        String?
+  /** Free text: what they test, their capacity, why they want to join. */
+  message        String?   @db.Text
+
+  // pending | invited | declined
+  status         String    @default("pending")
+  reviewedBy     String?   @map("reviewed_by")
+  reviewer       User?     @relation("PartnerApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime? @map("reviewed_at")
+  /** Why it was declined, or which invitation it became. Admin-only. */
+  reviewNote     String?   @map("review_note") @db.Text
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([email])
+  @@map("partner_applications")
+}
+
 // Distinct from AccountToken (account lifecycle: verify email, reset password)
 // and from the existing internal-staff invite flow, which stays scoped to
 // internal ops accounts and does not create tenant orgs.

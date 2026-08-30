@@ -6,6 +6,8 @@ import Spinner from "../components/Spinner.jsx";
 import { useToast } from "../hooks/useToast.jsx";
 import { formatDate } from "../constants.js";
 import {
+  fetchAdminPartnerApplications,
+  reviewAdminPartnerApplication,
   fetchAdminLabAccounts,
   fetchAdminVendorInvites,
   fetchAdminVendorLab,
@@ -33,6 +35,7 @@ export default function LabsPage() {
 
   const [labs, setLabs] = useState([]);
   const [invites, setInvites] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,10 +54,15 @@ export default function LabsPage() {
   const load = () => {
     setLoading(true);
     setError("");
-    Promise.all([fetchAdminLabAccounts({ search }), fetchAdminVendorInvites()])
-      .then(([labData, inviteData]) => {
+    Promise.all([
+      fetchAdminLabAccounts({ search }),
+      fetchAdminVendorInvites(),
+      fetchAdminPartnerApplications({ status: "pending" }),
+    ])
+      .then(([labData, inviteData, applicationData]) => {
         setLabs(Array.isArray(labData?.labs) ? labData.labs : []);
         setInvites(Array.isArray(inviteData?.invites) ? inviteData.invites : []);
+        setApplications(Array.isArray(applicationData?.applications) ? applicationData.applications : []);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load laboratories."))
       .finally(() => setLoading(false));
@@ -125,6 +133,37 @@ export default function LabsPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const reviewApplication = async (application, status) => {
+    const note = window.prompt(
+      status === "invited"
+        ? "Mark as invited. Note for the audit log (optional):"
+        : "Decline this application. Reason for the audit log:"
+    );
+    if (status === "declined" && (!note || !note.trim())) return;
+    setBusy(true);
+    try {
+      await reviewAdminPartnerApplication(application.id, { status, note: note?.trim() || undefined });
+      toast(status === "invited" ? "Marked as invited." : "Application declined.");
+      load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not update that application.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startInviteFrom = (application) => {
+    setInviteForm({
+      email: application.email || "",
+      labName: application.labName || "",
+      contactPerson: application.contactName || "",
+      location: application.country || "",
+      reason: `From partner application ${application.id}`,
+    });
+    setShowInvite(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const pendingInvites = invites.filter((invite) => invite.status === "pending" && !invite.isExpired);
@@ -277,6 +316,76 @@ export default function LabsPage() {
           </table>
         </div>
       </div>
+
+      {applications.length ? (
+        <div className="admin-section">
+          <div className="admin-section-header">
+            <div>
+              <h2>Applications</h2>
+              <p>
+                Laboratories that have asked to be considered. Nothing here has an account
+                or any access — reviewing records your decision, and inviting is a separate step.
+              </p>
+            </div>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Laboratory</th>
+                  <th>Contact</th>
+                  <th>Country</th>
+                  <th>About</th>
+                  <th>Received</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {applications.map((application) => (
+                  <tr key={application.id}>
+                    <td>
+                      <div>{application.labName}</div>
+                      {application.website ? (
+                        <a href={application.website} target="_blank" rel="noreferrer noopener">
+                          {application.website}
+                        </a>
+                      ) : null}
+                    </td>
+                    <td>
+                      <div>{application.contactName}</div>
+                      <div className="admin-muted">{application.email}</div>
+                    </td>
+                    <td>{application.country || "-"}</td>
+                    <td style={{ maxWidth: 320 }}>{application.message || "-"}</td>
+                    <td>{formatDate(application.createdAt)}</td>
+                    <td>
+                      <div className="admin-row-actions">
+                        <button type="button" disabled={busy} onClick={() => startInviteFrom(application)}>
+                          Invite
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => reviewApplication(application, "invited")}
+                        >
+                          Mark invited
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => reviewApplication(application, "declined")}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       {pendingInvites.length ? (
         <div className="admin-section">
