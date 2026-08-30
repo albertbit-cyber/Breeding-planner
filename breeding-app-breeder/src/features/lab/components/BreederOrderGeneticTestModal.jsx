@@ -34,6 +34,10 @@ export default function BreederOrderGeneticTestModal({
   const [changingLab, setChangingLab] = useState(false);
 
   const snakeId = String(snake?.id || "").trim();
+  // Ordering starts from the animal: which laboratories appear, and which of
+  // their tests, both follow from what this animal is.
+  const speciesId = String(snake?.species || "").trim() || "ball-python";
+  const speciesLabel = String(snake?.speciesName || "").trim();
   const alreadyInCart = isInCart(snakeId);
 
   // Pre-populate test selection from cart if snake is already staged
@@ -56,7 +60,7 @@ export default function BreederOrderGeneticTestModal({
     setCatalogError("");
     const api = createLabApiClient();
     api
-      .getLabTestsCatalog({ breederView: true, labOrganizationId: selectedLabId })
+      .getLabTestsCatalog({ breederView: true, labOrganizationId: selectedLabId, speciesId })
       .then((tests) => setCatalogTests(tests || []))
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Unable to load this laboratory's tests.";
@@ -64,7 +68,7 @@ export default function BreederOrderGeneticTestModal({
         setCatalogError(message);
       })
       .finally(() => setIsLoadingCatalog(false));
-  }, [open, selectedLabId]);
+  }, [open, selectedLabId, speciesId]);
 
   // Switching labs invalidates any staged selection for the same reason.
   useEffect(() => {
@@ -205,7 +209,11 @@ export default function BreederOrderGeneticTestModal({
             ) : null}
             {!selectedLabId || changingLab ? (
               <div className={selectedLabId ? "mt-3" : ""}>
-                <LabPicker onChosen={() => setChangingLab(false)} />
+                <LabPicker
+                  speciesId={speciesId}
+                  speciesName={speciesLabel}
+                  onChosen={() => setChangingLab(false)}
+                />
               </div>
             ) : null}
           </div>

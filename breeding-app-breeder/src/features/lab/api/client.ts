@@ -1299,12 +1299,12 @@ export const createLabApiClient = () => {
    * else's. Without one, a lab user reads its own offerings.
    */
   const getLabTestsCatalog = async (
-    options: { breederView?: boolean; labOrganizationId?: string } = {}
+    options: { breederView?: boolean; labOrganizationId?: string; speciesId?: string } = {}
   ): Promise<ShedTestCatalogItem[]> => {
     requireSessionRole("admin", "lab_staff", "breeder");
     const labOrganizationId = String(options.labOrganizationId || "").trim();
     const data = labOrganizationId
-      ? await fetchLabOfferings(labOrganizationId)
+      ? await fetchLabOfferings(labOrganizationId, options.speciesId)
       : await apiRequest<{ offerings: any[] }>("/lab/my/tests");
     const tests = Array.isArray((data as any)?.tests)
       ? (data as any).tests

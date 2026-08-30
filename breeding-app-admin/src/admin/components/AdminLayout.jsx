@@ -15,7 +15,8 @@ const NAV = [
     items: [
       { href: "/admin/users", label: "All Users", icon: "◈" },
       { href: "/admin/verification", label: "Breeder Verification", icon: "✦" },
-      { href: "/admin/labs", label: "Lab Accounts", icon: "⬡" },
+      { href: "/admin/labs", label: "Vendor Labs", icon: "⬡" },
+      { href: "/admin/gene-submissions", label: "Gene Submissions", icon: "◇" },
     ],
   },
   {

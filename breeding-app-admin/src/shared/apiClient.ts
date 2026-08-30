@@ -1229,6 +1229,31 @@ export const reviewAdminPartnerApplication = async (
     { method: "PATCH", body: JSON.stringify(payload) }
   );
 
+// ── Gene submissions ─────────────────────────────────────────────────────────
+//
+// Approving one publishes a gene to every breeder keeping that species, which is
+// why the review can also correct the inheritance type before it lands.
+
+export const fetchAdminGeneSubmissions = async (params: Record<string, string | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ submissions: Array<Record<string, unknown>>; statuses: string[] }>(
+    `/admin/gene-submissions${suffix}`
+  );
+};
+
+export const reviewAdminGeneSubmission = async (
+  id: string,
+  payload: { status: "approved" | "rejected"; note?: string; geneType?: string }
+) =>
+  request<{ submission: Record<string, unknown> }>(
+    `/admin/gene-submissions/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(payload) }
+  );
+
 export const sendAdminNotification = async (payload: {
   recipientId?: string;
   audience: string;

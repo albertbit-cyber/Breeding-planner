@@ -10,19 +10,33 @@
  * laboratory builds its own through the Lab Portal.
  */
 
-export type ProHerperSpecies = {
-  id: string;
-  label: string;
-  scientificName: string | null;
-};
+/**
+ * Species ids come from the platform taxonomy, not from ProHerper's page. The
+ * page names them scientifically; a breeder's animal carries a slug. Using the
+ * scientific ids is what made the first import match nothing at all.
+ */
+export const PROHERPER_SERVED_SPECIES = [
+  "ball-python",
+  "corn-snake",
+  "boa-constrictor",
+  "burmese-python",
+  "green-tree-python",
+  // Covered by the colubrid sex determination test.
+  "hognose-snake",
+  "kingsnake",
+  "rat-snake",
+  "bullsnake",
+  "garter-snake",
+];
 
-export const PROHERPER_SPECIES: ProHerperSpecies[] = [
-  { id: "python_regius", label: "Ball python", scientificName: "Python regius" },
-  { id: "pantherophis_guttatus", label: "Corn snake", scientificName: "Pantherophis guttatus" },
-  { id: "boa_constrictor", label: "Boa constrictor", scientificName: "Boa constrictor" },
-  { id: "python_bivittatus", label: "Burmese python", scientificName: "Python bivittatus" },
-  { id: "morelia_viridis", label: "Green tree python", scientificName: "Morelia viridis" },
-  { id: "colubrid", label: "Colubrid snakes", scientificName: null },
+/** The six species ProHerper's single colubrid sex test covers. */
+const COLUBRID_SPECIES = [
+  "corn-snake",
+  "hognose-snake",
+  "kingsnake",
+  "rat-snake",
+  "bullsnake",
+  "garter-snake",
 ];
 
 export type ProHerperOffering = {
@@ -32,8 +46,8 @@ export type ProHerperOffering = {
   testKind: "morph" | "sex" | "panel";
   pricingType: "morph" | "sex";
   category: string;
-  speciesId: string | null;
-  speciesLabel: string | null;
+  /** One or more platform species ids. */
+  speciesIds: string[];
   aliases?: string[];
   availability?: "available" | "coming_soon";
   priceModel?: "tier" | "flat";
@@ -59,15 +73,13 @@ const bp = (
   testKind: "morph",
   pricingType: "morph",
   category: "morph",
-  speciesId: "python_regius",
-  speciesLabel: "Ball python",
+  speciesIds: ["ball-python"],
   sortOrder,
   ...extra,
 });
 
 const morphFor = (
   speciesId: string,
-  speciesLabel: string,
   key: string,
   name: string,
   sortOrder: number,
@@ -78,8 +90,7 @@ const morphFor = (
   testKind: "morph",
   pricingType: "morph",
   category: "morph",
-  speciesId,
-  speciesLabel,
+  speciesIds: [speciesId],
   sortOrder,
   ...extra,
 });
@@ -147,16 +158,16 @@ const BALL_PYTHON_MORPHS: ProHerperOffering[] = [
 
 // ── Other species (8 morph tests) ────────────────────────────────────────────
 const OTHER_SPECIES_MORPHS: ProHerperOffering[] = [
-  morphFor("pantherophis_guttatus", "Corn snake", "cs_scaleless", "Scaleless", 60),
-  morphFor("pantherophis_guttatus", "Corn snake", "cs_microscale", "Microscale", 61),
-  morphFor("pantherophis_guttatus", "Corn snake", "cs_lavender", "Lavender", 62),
-  morphFor("pantherophis_guttatus", "Corn snake", "cs_terrazzo", "Terrazzo", 63),
-  morphFor("boa_constrictor", "Boa constrictor", "boa_kahl_albino", "Kahl Albino", 70),
-  morphFor("boa_constrictor", "Boa constrictor", "boa_vpi_albino", "VPI Albino", 71),
-  morphFor("boa_constrictor", "Boa constrictor", "boa_anery_type_i", "Anery Type I", 72, {
+  morphFor("corn-snake", "cs_scaleless", "Scaleless", 60),
+  morphFor("corn-snake", "cs_microscale", "Microscale", 61),
+  morphFor("corn-snake", "cs_lavender", "Lavender", 62),
+  morphFor("corn-snake", "cs_terrazzo", "Terrazzo", 63),
+  morphFor("boa-constrictor", "boa_kahl_albino", "Kahl Albino", 70),
+  morphFor("boa-constrictor", "boa_vpi_albino", "VPI Albino", 71),
+  morphFor("boa-constrictor", "boa_anery_type_i", "Anery Type I", 72, {
     aliases: ["Anerythristic Type I"],
   }),
-  morphFor("python_bivittatus", "Burmese python", "burm_piebald", "Piebald", 80, {
+  morphFor("burmese-python", "burm_piebald", "Piebald", 80, {
     aliases: ["Pied"],
   }),
 ];
@@ -169,8 +180,7 @@ const SEX_TESTS: ProHerperOffering[] = [
     testKind: "sex",
     pricingType: "sex",
     category: "sex-determination",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     // Sold at EUR 10 when added to a morph test on the same animal.
     addonPriceCents: 1000,
     description:
@@ -183,8 +193,7 @@ const SEX_TESTS: ProHerperOffering[] = [
     testKind: "sex",
     pricingType: "sex",
     category: "sex-determination",
-    speciesId: "morelia_viridis",
-    speciesLabel: "Green tree python",
+    speciesIds: ["green-tree-python"],
     // Priced on its own scale, roughly double the standard sex test.
     tierPricesCents: { t1: 6500, t2: 6000, t3: 5500 },
     description:
@@ -197,8 +206,7 @@ const SEX_TESTS: ProHerperOffering[] = [
     testKind: "sex",
     pricingType: "sex",
     category: "sex-determination",
-    speciesId: "colubrid",
-    speciesLabel: "Colubrid snakes",
+    speciesIds: COLUBRID_SPECIES,
     description:
       "Corn snake, hognose, king snake, rat snake, bull snake, garter snake, grass snake and many others. Contact ProHerper if you are unsure whether it will work for your species.",
     sortOrder: 92,
@@ -217,8 +225,7 @@ const PANELS: ProHerperOffering[] = [
     testKind: "panel",
     pricingType: "morph",
     category: "morph",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     priceModel: "flat",
     priceCents: 12500,
     panelScope: "Checks all available morph tests.",
@@ -230,8 +237,7 @@ const PANELS: ProHerperOffering[] = [
     testKind: "panel",
     pricingType: "morph",
     category: "morph",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     priceModel: "flat",
     priceCents: 19500,
     panelScope:
@@ -244,8 +250,7 @@ const PANELS: ProHerperOffering[] = [
     testKind: "panel",
     pricingType: "morph",
     category: "morph",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     priceModel: "flat",
     priceCents: 9500,
     panelScope: "Checks all available recessive morphs.",
@@ -257,8 +262,7 @@ const PANELS: ProHerperOffering[] = [
     testKind: "panel",
     pricingType: "morph",
     category: "morph",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     priceModel: "flat",
     priceCents: 8000,
     panelScope: "Checks all available Spider complex morphs.",
@@ -270,8 +274,7 @@ const PANELS: ProHerperOffering[] = [
     testKind: "panel",
     pricingType: "morph",
     category: "morph",
-    speciesId: "python_regius",
-    speciesLabel: "Ball python",
+    speciesIds: ["ball-python"],
     priceModel: "flat",
     priceCents: 8000,
     panelScope: "Checks all available BEL (Blue-Eyed Leucistic) complex morphs.",

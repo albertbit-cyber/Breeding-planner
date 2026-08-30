@@ -72,6 +72,7 @@ import {
   setActiveSpecies,
 } from "./genetics/geneDatabase";
 import { DEFAULT_SPECIES_ID, getSpeciesById, resolveSpeciesId, speciesHasGeneDatabase } from "./genetics/speciesRegistry";
+import { syncGeneOverlay } from "./genetics/geneOverlaySync";
 import SpeciesSelect from "./components/SpeciesSelect";
 import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import {
@@ -7016,7 +7017,7 @@ export default function BreedingPlannerApp() {
   const openSpeciesWorkspace = useCallback((speciesId, destinationTab = 'animals') => {
     const resolved = resolveSpeciesId(speciesId);
     setSpeciesScope(resolved);
-    setActiveSpecies(resolved);
+    setActiveSpecies(resolved).then(() => syncGeneOverlay(resolved));
     setTab(destinationTab);
   }, []);
 
@@ -7286,6 +7287,10 @@ export default function BreedingPlannerApp() {
   const geneticsForSpecies = useCallback(async (speciesId) => {
     if (!speciesId) return [];
     const settled = await setActiveSpecies(speciesId);
+    // Genes partner laboratories test for that Morphpedia does not list. Fetched
+    // per species and merged over the generated table; failure is silent, since
+    // the generated database on its own is still perfectly usable.
+    syncGeneOverlay(settled);
     return buildQuickAddGeneticsSource(snakes, morphAliases, geneAliases, settled);
   }, [snakes, morphAliases, geneAliases]);
   const [importText, setImportText] = useState("");

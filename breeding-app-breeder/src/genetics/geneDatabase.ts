@@ -218,14 +218,82 @@ type GeneIndex = {
   defaultAliasRows: GeneAliasRow[];
 };
 
+/**
+ * Genes contributed by partner laboratories, keyed by species.
+ *
+ * The generated Morphpedia tables under config/species are never hand-edited -
+ * regenerating them is routine, and an edit would be silently lost. A laboratory
+ * that tests for something Morphpedia does not list needs that gene to exist
+ * anyway, or a confirmed result has nothing to write back to the animal.
+ *
+ * So contributions live server-side and are layered over the generated table
+ * here, at read time. A rebuild from Morphpedia cannot discard them, and the
+ * provenance travels with each gene so a contributed one is never mistaken for a
+ * curated one.
+ *
+ * What reaches this map has already been approved by a platform administrator,
+ * except for a laboratory's own pending submissions when it is the one asking -
+ * the backend decides that, not this file.
+ */
+const GENE_OVERLAYS = new Map<string, GeneRecord[]>();
+
+/**
+ * Installs the overlay for a species. Safe to call before or after the species
+ * is active: if it is already loaded, its index is rebuilt so the new genes
+ * appear immediately, and the generation bump tells memoizing callers to drop
+ * their caches.
+ */
+export function setSpeciesGeneOverlay(rawSpeciesId: string, genes: unknown): void {
+  const speciesId = resolveSpeciesId(rawSpeciesId);
+  const records = (Array.isArray(genes) ? genes : [])
+    .map(normalizeGeneRecord)
+    .filter((entry): entry is GeneRecord => Boolean(entry));
+
+  if (!records.length && !GENE_OVERLAYS.has(speciesId)) return;
+  GENE_OVERLAYS.set(speciesId, records);
+
+  // Rebuild from the generated table plus the new overlay, never from the
+  // previous index - otherwise removing a gene from the overlay would leave it
+  // behind forever.
+  const base = BASE_TABLES.get(speciesId);
+  if (base) {
+    LOADED_INDEXES.set(speciesId, createGeneIndex(speciesId, base));
+    if (speciesId === activeSpeciesId) {
+      geneDatabaseGeneration += 1;
+      rebuildActiveGeneAliasResolver();
+    }
+  }
+}
+
+export function getSpeciesGeneOverlay(speciesId: string): GeneRecord[] {
+  return GENE_OVERLAYS.get(resolveSpeciesId(speciesId)) || [];
+}
+
+/**
+ * The generated tables as loaded, before any overlay. Kept so an index can
+ * always be rebuilt from a known-clean base.
+ */
+const BASE_TABLES = new Map<string, unknown>();
+
 function createGeneIndex(speciesId: string, raw: unknown): GeneIndex {
   const rawDb = (raw || {}) as RawDatabase;
+  const generated = (Array.isArray(rawDb.genes) ? rawDb.genes : [])
+    .map(normalizeGeneRecord)
+    .filter((entry): entry is GeneRecord => Boolean(entry));
+
+  // Laboratory contributions layer over the generated table. A contribution
+  // never replaces a curated gene of the same name: Morphpedia is the authority
+  // on genes it documents, and a lab proposing one it already lists is a
+  // duplicate rather than a correction.
+  const generatedNames = new Set(generated.map((gene) => gene.geneName.trim().toLowerCase()));
+  const contributed = (GENE_OVERLAYS.get(speciesId) || []).filter(
+    (gene) => !generatedNames.has(gene.geneName.trim().toLowerCase())
+  );
+
   const db: SpeciesGeneticsDatabase = {
     ...rawDb,
     groups: rawDb.groups || ({} as GeneGroups),
-    genes: (Array.isArray(rawDb.genes) ? rawDb.genes : [])
-      .map(normalizeGeneRecord)
-      .filter((entry): entry is GeneRecord => Boolean(entry)),
+    genes: [...generated, ...contributed],
   };
 
   const index: GeneIndex = {
@@ -276,6 +344,11 @@ const LOADED_INDEXES = new Map<string, GeneIndex>([
   [DEFAULT_SPECIES_ID, createGeneIndex(DEFAULT_SPECIES_ID, ballPythonJson)],
 ]);
 
+// Ball python is statically imported rather than loaded through
+// setActiveSpecies, so its base table is registered here; without it an overlay
+// for the default species would have nothing clean to rebuild from.
+BASE_TABLES.set(DEFAULT_SPECIES_ID, ballPythonJson);
+
 /**
  * Species that legitimately have no gene table (most of the 64 -- Morphpedia publishes no
  * traits for them). They get an empty index so the app stays usable: a keeper can still
@@ -306,6 +379,7 @@ let geneDatabaseGeneration = 0;
 
 /** Sequence number for setActiveSpecies, so a slow load cannot overwrite a newer switch. */
 let latestSpeciesRequest = 0;
+
 
 export function getGeneDatabaseGeneration(): number {
   return geneDatabaseGeneration;
@@ -348,6 +422,7 @@ export async function setActiveSpecies(rawSpeciesId: string | null | undefined):
       // Caching the table is safe whoever won -- it is the load that was slow, not the
       // switch, and the next request for this species should not pay for it again.
       if (raw && !LOADED_INDEXES.has(speciesId)) {
+        BASE_TABLES.set(speciesId, raw);
         LOADED_INDEXES.set(speciesId, createGeneIndex(speciesId, raw));
       }
     }

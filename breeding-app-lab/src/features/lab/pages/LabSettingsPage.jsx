@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchMyLabProfile, updateMyLabProfile } from "../../../shared/apiClient";
+import { fetchMyLabProfile, fetchSpeciesCatalog, updateMyLabProfile } from "../../../shared/apiClient";
 import { setActiveLabProfile } from "../../../services/lab/labelProfileService";
 
 /**
@@ -29,10 +29,15 @@ export default function LabSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [speciesCatalog, setSpeciesCatalog] = useState([]);
+  const [speciesFilter, setSpeciesFilter] = useState("");
 
   const load = () => {
     setLoading(true);
     setError("");
+    fetchSpeciesCatalog()
+      .then((data) => setSpeciesCatalog(Array.isArray(data?.species) ? data.species : []))
+      .catch(() => setSpeciesCatalog([]));
     fetchMyLabProfile()
       .then((data) => setForm(data?.lab || null))
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load your laboratory."))
@@ -68,6 +73,7 @@ export default function LabSettingsPage() {
           "turnaroundDays",
           "listedInDirectory",
           "logoUrl",
+          "servedSpeciesIds",
           "iban",
           "bic",
           "vatNumber",
@@ -171,6 +177,87 @@ export default function LabSettingsPage() {
               ) : null}
             </div>
           </div>
+
+          {/* The species this laboratory works with. Bounds which species its
+              tests may claim, and decides which breeders see it at all. */}
+          <fieldset className="rounded border border-neutral-200 p-4">
+            <legend className="px-1 text-sm font-medium text-neutral-800">
+              Species you test
+            </legend>
+            <p className="mb-3 text-xs text-neutral-500">
+              A breeder ordering for one of these will see your laboratory. Your tests can only
+              be tagged with species listed here.
+            </p>
+
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {(form.servedSpeciesIds || []).length ? (
+                (form.servedSpeciesIds || []).map((id) => {
+                  const entry = speciesCatalog.find((sp) => sp.id === id);
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-xs"
+                    >
+                      {entry?.name || id}
+                      <button
+                        type="button"
+                        aria-label={`Stop testing ${entry?.name || id}`}
+                        className="text-neutral-500 hover:text-rose-600"
+                        onClick={() =>
+                          set(
+                            "servedSpeciesIds",
+                            (form.servedSpeciesIds || []).filter((x) => x !== id)
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="text-xs text-amber-700">
+                  None yet — until you add one, breeders cannot find your laboratory.
+                </span>
+              )}
+            </div>
+
+            <input
+              type="search"
+              placeholder="Search species to add…"
+              className="mb-2 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+              value={speciesFilter}
+              onChange={(e) => setSpeciesFilter(e.target.value)}
+            />
+            {speciesFilter.trim() ? (
+              <ul className="max-h-48 space-y-1 overflow-auto rounded border border-neutral-200 p-2">
+                {speciesCatalog
+                  .filter(
+                    (sp) =>
+                      !(form.servedSpeciesIds || []).includes(sp.id) &&
+                      String(sp.name).toLowerCase().includes(speciesFilter.trim().toLowerCase())
+                  )
+                  .slice(0, 40)
+                  .map((sp) => (
+                    <li key={sp.id}>
+                      <button
+                        type="button"
+                        className="w-full rounded px-2 py-1 text-left text-sm hover:bg-neutral-100"
+                        onClick={() => {
+                          set("servedSpeciesIds", [...(form.servedSpeciesIds || []), sp.id]);
+                          setSpeciesFilter("");
+                        }}
+                      >
+                        {sp.name}
+                        <span className="ml-2 text-xs text-neutral-400">
+                          {sp.scientificName || ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
+          </fieldset>
 
           <fieldset className="rounded border border-neutral-200 p-4">
             <legend className="px-1 text-sm font-medium text-neutral-800">

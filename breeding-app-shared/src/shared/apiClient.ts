@@ -563,20 +563,62 @@ export const fetchTestCatalog = async () => request<{ tests: unknown[] }>("/lab/
  * `fetchTestCatalog` above reads the platform's shared seed library, which is a
  * different thing and is not orderable.
  */
-export const fetchLabOfferings = async (labOrganizationId: string) => {
-  const data = await fetchLabDirectoryEntry(labOrganizationId);
+export const fetchLabOfferings = async (labOrganizationId: string, speciesId?: string) => {
+  const data = await fetchLabDirectoryEntry(labOrganizationId, speciesId);
   return { tests: Array.isArray(data?.offerings) ? data.offerings : [] };
 };
 
 // ── Lab directory (breeder-facing) ──────────────────────────────────────────
 
-export const fetchLabDirectory = async () =>
-  request<{ labs: Array<Record<string, unknown>> }>("/lab/directory");
+/**
+ * The platform species taxonomy. Generated alongside the breeder app's gene
+ * tables, so a laboratory can only claim a species breeders can record.
+ */
+export const fetchSpeciesCatalog = async () =>
+  request<{ species: Array<Record<string, unknown>>; groups: Array<Record<string, unknown>> }>(
+    "/lab/species"
+  );
+
+/**
+ * @param speciesId narrows to laboratories serving that species — what makes the
+ *   breeder's first choice meaningful when ordering for a particular animal.
+ */
+export const fetchLabDirectory = async (speciesId?: string) =>
+  request<{ labs: Array<Record<string, unknown>> }>(
+    speciesId ? `/lab/directory?species=${encodeURIComponent(speciesId)}` : "/lab/directory"
+  );
+
+// ── Lab-contributed genes ───────────────────────────────────────────────────
+
+export const submitLabGene = async (payload: {
+  speciesId: string;
+  geneName: string;
+  geneType: string;
+  aliases?: string[];
+  complex?: string;
+  hasSuperForm?: boolean;
+  superGeneName?: string;
+  notes?: string;
+}) =>
+  request<{ submission: Record<string, unknown> }>("/lab/my/genes", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMyGeneSubmissions = async () =>
+  request<{ submissions: Array<Record<string, unknown>> }>("/lab/my/genes");
+
+/** Approved lab-contributed genes for a species, merged over the generated table. */
+export const fetchGeneOverlay = async (speciesId: string) =>
+  request<{ speciesId: string; genes: Array<Record<string, unknown>> }>(
+    `/lab/genetics/${encodeURIComponent(speciesId)}/overlay`
+  );
 
 /** One lab's public profile, the tests it sells and the prices it charges. */
-export const fetchLabDirectoryEntry = async (labOrganizationId: string) =>
+export const fetchLabDirectoryEntry = async (labOrganizationId: string, speciesId?: string) =>
   request<{ lab: Record<string, unknown>; offerings: unknown[]; pricing: unknown }>(
-    `/lab/directory/${encodeURIComponent(labOrganizationId)}`
+    `/lab/directory/${encodeURIComponent(labOrganizationId)}` +
+      (speciesId ? `?species=${encodeURIComponent(speciesId)}` : "")
   );
 
 // ── The signed-in laboratory's own workspace ────────────────────────────────

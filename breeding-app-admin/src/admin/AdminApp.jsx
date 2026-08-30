@@ -10,6 +10,7 @@ import UserDetailPage from "./pages/UserDetailPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import VerificationPage from "./pages/VerificationPage.jsx";
 import LabsPage from "./pages/LabsPage.jsx";
+import GeneSubmissionsPage from "./pages/GeneSubmissionsPage.jsx";
 import TiersPage from "./pages/TiersPage.jsx";
 import TierEditorPage from "./pages/TierEditorPage.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
@@ -30,6 +31,7 @@ export default function AdminApp() {
             <Route path="/admin/reports" element={<ReportsPage />} />
             <Route path="/admin/verification" element={<VerificationPage />} />
             <Route path="/admin/labs" element={<LabsPage />} />
+            <Route path="/admin/gene-submissions" element={<GeneSubmissionsPage />} />
             <Route path="/admin/tiers" element={<TiersPage />} />
             <Route path="/admin/tiers/new" element={<TierEditorPage />} />
             <Route path="/admin/tiers/:id" element={<TierEditorPage />} />

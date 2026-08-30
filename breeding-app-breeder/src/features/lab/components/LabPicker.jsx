@@ -9,7 +9,7 @@ import { useBatchOrder } from "../contexts/BatchOrderContext";
  * every test and every price a breeder sees afterwards belongs to the lab
  * picked here. Nothing is shown from any other laboratory.
  */
-export default function LabPicker({ onChosen }) {
+export default function LabPicker({ onChosen, speciesId, speciesName }) {
   const { selectedLabId, chooseLab, cartItems } = useBatchOrder();
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,11 +18,13 @@ export default function LabPicker({ onChosen }) {
   useEffect(() => {
     setLoading(true);
     setError("");
-    fetchLabDirectory()
+    // Narrowed to the species being ordered for: a corn snake keeper has no use
+    // for a laboratory that only handles ball pythons.
+    fetchLabDirectory(speciesId)
       .then((data) => setLabs(Array.isArray(data?.labs) ? data.labs : []))
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load laboratories."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [speciesId]);
 
   const pick = (lab) => {
     chooseLab(lab);
@@ -40,7 +42,9 @@ export default function LabPicker({ onChosen }) {
   if (!labs.length) {
     return (
       <div className="text-sm text-neutral-600">
-        No laboratories are accepting orders right now. Please check back later.
+        {speciesName
+          ? `No laboratory currently tests ${speciesName}. Ask us to invite one, or check back later.`
+          : "No laboratories are accepting orders right now. Please check back later."}
       </div>
     );
   }
@@ -49,6 +53,7 @@ export default function LabPicker({ onChosen }) {
     <div className="space-y-2">
       <div className="text-sm font-medium text-neutral-900">Choose a laboratory</div>
       <p className="text-xs text-neutral-500">
+        {speciesName ? `Laboratories that test ${speciesName}. ` : ""}
         Available tests, prices and turnaround all come from the laboratory you choose.
       </p>
       <ul className="space-y-2">

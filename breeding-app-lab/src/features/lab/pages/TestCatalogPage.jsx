@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
+import { fetchMyLabProfile, submitLabGene } from "../../../shared/apiClient";
 
 const PRIORITY_OPTIONS = ["routine", "priority", "urgent"];
 
@@ -28,6 +29,10 @@ const emptyForm = () => ({
   isActive: true,
   isVisibleToBreeder: true,
   sortOrder: "0",
+  speciesIds: [],
+  testKind: "morph",
+  // Set when the gene this test reads is not yet in the platform database.
+  newGene: null,
 });
 
 export default function TestCatalogPage() {
@@ -41,6 +46,13 @@ export default function TestCatalogPage() {
   const [formError, setFormError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [servedSpecies, setServedSpecies] = useState([]);
+
+  useEffect(() => {
+    fetchMyLabProfile()
+      .then((data) => setServedSpecies(data?.lab?.servedSpecies || []))
+      .catch(() => setServedSpecies([]));
+  }, []);
 
   const loadTests = async () => {
     setIsLoading(true);
@@ -71,6 +83,9 @@ export default function TestCatalogPage() {
   const openEditForm = (test) => {
     setEditingId(test.id);
     setForm({
+      speciesIds: test.speciesIds || [],
+      testKind: test.testKind || "morph",
+      newGene: null,
       internalCode: test.internalCode || "",
       name: test.name || "",
       shortLabel: test.shortLabel || "",
@@ -128,6 +143,8 @@ export default function TestCatalogPage() {
         geneTarget: form.geneTarget.trim() || undefined,
         category: form.category.trim() || undefined,
         pricingType: form.pricingType,
+        testKind: form.testKind,
+        speciesIds: form.speciesIds,
         priceCents,
         currency: "EUR",
         allowedPriorities: form.allowedPriorities,
@@ -135,6 +152,26 @@ export default function TestCatalogPage() {
         isVisibleToBreeder: form.isVisibleToBreeder,
         sortOrder: Number(form.sortOrder) || 0,
       };
+
+      if (!form.speciesIds.length) {
+        setFormError(
+          t("lab.catalog.speciesRequired", {
+            defaultValue: "Choose at least one species this test is for.",
+          })
+        );
+        return;
+      }
+
+      // A test for a gene the platform does not know needs that gene defining,
+      // or a confirmed result has nothing to write back to the animal.
+      if (form.newGene?.geneName?.trim()) {
+        await submitLabGene({
+          speciesId: form.newGene.speciesId || form.speciesIds[0],
+          geneName: form.newGene.geneName.trim(),
+          geneType: form.newGene.geneType,
+          notes: form.newGene.notes?.trim() || undefined,
+        });
+      }
 
       if (editingId) {
         await api.updateLabAvailableTest({ id: editingId, ...payload });
@@ -436,6 +473,154 @@ export default function TestCatalogPage() {
                     placeholder="clown"
                   />
                 </label>
+
+                {/* Which animals this test is for. Limited to the species this
+                    laboratory has declared it serves, so its directory entry and
+                    its catalogue can never disagree. */}
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-neutral-700">
+                    {t("lab.catalog.fieldSpecies", { defaultValue: "Species this test is for" })}
+                  </span>
+                  {servedSpecies.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {servedSpecies.map((sp) => {
+                        const checked = form.speciesIds.includes(sp.id);
+                        return (
+                          <label
+                            key={sp.id}
+                            className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-1.5 text-sm ${
+                              checked ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  speciesIds: checked
+                                    ? prev.speciesIds.filter((x) => x !== sp.id)
+                                    : [...prev.speciesIds, sp.id],
+                                }))
+                              }
+                            />
+                            {sp.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-700">
+                      {t("lab.catalog.noServedSpecies", {
+                        defaultValue:
+                          "Add the species you test in Laboratory Settings first - a test has to be for something.",
+                      })}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    {t("lab.catalog.speciesMultiHelp", {
+                      defaultValue:
+                        "Pick more than one if the same test covers several - a colubrid sex test might cover six.",
+                    })}
+                  </p>
+                </label>
+
+                {/* Defining a gene the platform does not know yet. Without this a
+                    confirmed result has nothing to write back to the animal. */}
+                <div className="sm:col-span-2 rounded-xl border border-dashed border-neutral-300 p-3">
+                  {form.newGene ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-neutral-700">
+                          {t("lab.catalog.newGeneTitle", { defaultValue: "Define this gene" })}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          onClick={() => setForm((prev) => ({ ...prev, newGene: null }))}
+                        >
+                          {t("common.cancel", { defaultValue: "Cancel" })}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-neutral-500">
+                        {t("lab.catalog.newGeneHelp", {
+                          defaultValue:
+                            "You can use it straight away. It reaches other breeders once an administrator has reviewed the inheritance.",
+                        })}
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <input
+                          className="rounded-xl border px-3 py-2 text-sm"
+                          placeholder={t("lab.catalog.newGeneName", { defaultValue: "Gene name" })}
+                          value={form.newGene.geneName}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              newGene: { ...prev.newGene, geneName: e.target.value },
+                            }))
+                          }
+                        />
+                        <select
+                          className="rounded-xl border px-3 py-2 text-sm"
+                          value={form.newGene.geneType}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              newGene: { ...prev.newGene, geneType: e.target.value },
+                            }))
+                          }
+                        >
+                          <option value="recessive">
+                            {t("lab.catalog.recessive", { defaultValue: "Recessive" })}
+                          </option>
+                          <option value="co-dominant">
+                            {t("lab.catalog.coDominant", { defaultValue: "Co-dominant" })}
+                          </option>
+                          <option value="dominant">
+                            {t("lab.catalog.dominant", { defaultValue: "Dominant" })}
+                          </option>
+                        </select>
+                        <select
+                          className="rounded-xl border px-3 py-2 text-sm"
+                          value={form.newGene.speciesId}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              newGene: { ...prev.newGene, speciesId: e.target.value },
+                            }))
+                          }
+                        >
+                          {servedSpecies.map((sp) => (
+                            <option key={sp.id} value={sp.id}>
+                              {sp.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-sm underline"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          newGene: {
+                            geneName: prev.geneTarget || prev.name || "",
+                            geneType: "recessive",
+                            speciesId: prev.speciesIds[0] || servedSpecies[0]?.id || "",
+                            notes: "",
+                          },
+                        }))
+                      }
+                    >
+                      {t("lab.catalog.addNewGene", {
+                        defaultValue: "This gene isn't in the database yet - define it",
+                      })}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <label className="block text-sm">

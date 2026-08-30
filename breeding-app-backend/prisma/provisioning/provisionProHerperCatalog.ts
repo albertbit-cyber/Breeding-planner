@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   PANEL_MEMBERSHIP_RULES,
   PROHERPER_OFFERINGS,
+  PROHERPER_SERVED_SPECIES,
   PROHERPER_TIER_PRICING,
   type ProHerperOffering,
 } from "./proherperCatalog";
@@ -53,8 +54,7 @@ const toRow = (organizationId: string, offering: ProHerperOffering) => ({
   tierPricesJson: offering.tierPricesCents ?? undefined,
   addonPriceCents: offering.addonPriceCents ?? null,
   currency: "EUR",
-  speciesId: offering.speciesId,
-  speciesLabel: offering.speciesLabel,
+  speciesIds: offering.speciesIds,
   aliases: offering.aliases ?? [],
   availability: offering.availability ?? "available",
   panelScope: offering.panelScope ?? null,
@@ -78,6 +78,14 @@ const main = async () => {
   const organizationId = lab.organizationId;
   console.log(`Laboratory: ${lab.labName}  (org ${organizationId})\n`);
 
+  // The laboratory's served species must exist before any test can claim one.
+  if (apply) {
+    await prisma.labAccount.update({
+      where: { organizationId },
+      data: { servedSpeciesIds: PROHERPER_SERVED_SPECIES },
+    });
+  }
+
   const existing = await prisma.labTestOffering.findMany({ where: { organizationId } });
   const existingById = new Map(existing.map((row) => [row.id, row]));
   const incomingIds = new Set(PROHERPER_OFFERINGS.map((o) => offeringId(organizationId, o.key)));
@@ -96,6 +104,7 @@ const main = async () => {
   );
 
   const byKind = (kind: string) => PROHERPER_OFFERINGS.filter((o) => o.testKind === kind).length;
+  console.log(`Serves ${PROHERPER_SERVED_SPECIES.length} species: ${PROHERPER_SERVED_SPECIES.join(", ")}`);
   console.log(
     `Catalogue: ${PROHERPER_OFFERINGS.length} offerings ` +
       `(${byKind("morph")} morph, ${byKind("sex")} sex, ${byKind("panel")} panels)`
@@ -138,7 +147,7 @@ const main = async () => {
     where: {
       organizationId,
       testKind: "morph",
-      speciesId: "python_regius",
+      speciesIds: { has: "ball-python" },
       availability: "available",
       active: true,
     },
