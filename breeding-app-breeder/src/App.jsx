@@ -10336,28 +10336,29 @@ export default function BreedingPlannerApp() {
                 <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
                 <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
               </div>
-              <div className="w-full min-w-[230px] sm:w-auto">
-                <div className="header-search-shell">
-                  <input
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    placeholder={t("header.search")}
-                    className="header-search-input w-full pr-11"
-                  />
-                  {query ? (
-                    <button
-                      type="button"
-                      className="header-search-clear"
-                      onClick={() => setQuery("")}
-                      aria-label={t("filters.clear", { defaultValue: "Clear" })}
-                      title={t("filters.clear", { defaultValue: "Clear" })}
-                    >
-                      ✕
-                    </button>
-                  ) : null}
-                </div>
-              </div>
             </div>
+          </div>
+          {/* Search sits on its own row rather than sharing one with eight nav tabs. In the tab
+              row it was the first thing to wrap once the viewport narrowed, landing under the
+              buttons at an unpredictable width; given the full row it keeps one position. */}
+          <div className="mt-3 header-search-shell">
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={t("header.search")}
+              className="header-search-input w-full pr-11"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="header-search-clear"
+                onClick={() => setQuery("")}
+                aria-label={t("filters.clear", { defaultValue: "Clear" })}
+                title={t("filters.clear", { defaultValue: "Clear" })}
+              >
+                ✕
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
