@@ -18887,14 +18887,17 @@ function BreederSection({
                       data={{
                         orderId: 'order_preview',
                         orderNumber: 'BP-ORDER-001',
-                        labName: 'ProHerper Lab',
+                        // Obvious sample data. This is a layout preview, and the
+                        // real values come from whichever laboratory the order
+                        // is addressed to — not from a constant here.
+                        labName: 'Example Laboratory',
                         labAddress: {
-                          contactName: 'Jurgen Wuyts',
-                          line1: 'Wijngaardstraat 27',
-                          city: 'Diest',
-                          postalCode: '3290',
-                          country: 'Belgium',
-                          phone: '+32 95 32 07 98',
+                          contactName: 'Lab Contact',
+                          line1: '1 Example Street',
+                          city: 'Sample City',
+                          postalCode: '0000',
+                          country: 'Country',
+                          phone: '+00 000 00 00 00',
                         },
                         breeder: {
                           name: info.name || info.businessName || 'Breeder Name',
@@ -18929,7 +18932,7 @@ function BreederSection({
                         sampleStatus: 'pending',
                         qrPayload: 'lab-sample-preview',
                         sampleType: 'shed',
-                        labName: 'ProHerper Lab',
+                        labName: 'Example Laboratory',
                       }}
                     />
                   </div>
