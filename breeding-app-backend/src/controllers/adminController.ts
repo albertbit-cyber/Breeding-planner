@@ -22,6 +22,8 @@ import {
   markUserEmailVerified,
   updateAdminGdprRequest,
   updateAdminLabAccount,
+  getAdminVendorLab,
+  setVendorLabStatus,
   updateAdminMarketplacePermission,
   updateAdminReportStatus,
   updateAdminUserRole,
@@ -29,6 +31,11 @@ import {
   updateAdminUserSubscription,
   updateAdminUserVerification,
 } from "../services/adminService";
+import {
+  inviteVendorLab,
+  listVendorInvites,
+  revokeInvite,
+} from "../services/organizationInviteService";
 
 export const dashboard = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json(await getAdminDashboard());
@@ -128,6 +135,26 @@ export const labAccounts = async (req: Request, res: Response): Promise<void> =>
 
 export const changeLabAccount = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await updateAdminLabAccount(req.user!, req.params.id, req.body || {}));
+};
+
+export const vendorLabDetail = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getAdminVendorLab(req.params.id));
+};
+
+export const changeVendorLabStatus = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await setVendorLabStatus(req.user!, req.params.id, req.body || {}));
+};
+
+export const vendorInvites = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listVendorInvites(req.query));
+};
+
+export const createVendorInvite = async (req: Request, res: Response): Promise<void> => {
+  res.status(201).json(await inviteVendorLab(req.user!, req.body || {}));
+};
+
+export const revokeVendorInvite = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await revokeInvite(req.user!, req.params.id, { reason: req.body?.reason }));
 };
 
 export const sendNotification = async (req: Request, res: Response): Promise<void> => {

@@ -10,6 +10,19 @@ vi.mock("../lib/prisma", () => ({
     user: {
       findUnique: vi.fn().mockResolvedValue({ emailVerified: true }),
     },
+    // Every lab-order route now runs through `withOrgContext`, which resolves
+    // the acting user's organization. These tests exercise routing rather than
+    // tenancy, so the actor is given a stable org and the isolation rules
+    // themselves are asserted in tenantIsolation.test.ts.
+    membership: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: "mbr_test",
+        userId: "lab_staff-1",
+        organizationId: "org_lab_a",
+        role: "owner",
+        organization: { id: "org_lab_a", name: "Lab A", status: "active", kind: "lab_vendor" },
+      }),
+    },
   },
 }));
 
@@ -66,7 +79,8 @@ describe("lab order routes", () => {
     expect(res.status).toBe(200);
     expect(res.body.orders).toEqual([{ id: "order-1" }]);
     expect(listOrdersForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "breeder-1", role: "breeder" })
+      expect.objectContaining({ id: "breeder-1", role: "breeder" }),
+      expect.objectContaining({ organizationId: "org_lab_a" })
     );
   });
 
@@ -81,7 +95,8 @@ describe("lab order routes", () => {
     expect(res.body.order).toEqual({ id: "order-1" });
     expect(getOrderByIdForUser).toHaveBeenCalledWith(
       "order-1",
-      expect.objectContaining({ role: "lab_staff", persistedRole: "lab" })
+      expect.objectContaining({ role: "lab_staff", persistedRole: "lab" }),
+      expect.objectContaining({ organizationId: "org_lab_a" })
     );
   });
 
@@ -96,6 +111,7 @@ describe("lab order routes", () => {
 
   it("creates a lab order for an authenticated breeder", async () => {
     const payload = {
+      labOrganizationId: "org_lab_a",
       animals: [
         {
           animalId: "animal-1",
@@ -113,7 +129,7 @@ describe("lab order routes", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.order).toEqual({ id: "order-1", status: "submitted" });
-    expect(createOrder).toHaveBeenCalledWith("breeder-1", payload.animals);
+    expect(createOrder).toHaveBeenCalledWith("breeder-1", payload.animals, "org_lab_a");
   });
 
   it("rejects lab staff from breeder order creation", async () => {
@@ -159,7 +175,8 @@ describe("lab order routes", () => {
     expect(updateOrderStatus).toHaveBeenCalledWith(
       "order-1",
       "received",
-      expect.objectContaining({ role: "lab_staff" })
+      expect.objectContaining({ role: "lab_staff" }),
+      expect.objectContaining({ organizationId: "org_lab_a" })
     );
   });
 
@@ -203,7 +220,8 @@ describe("lab order routes", () => {
       "order-1",
       payload,
       expect.objectContaining({ id: "lab_staff-1", role: "lab_staff" }),
-      "draft"
+      "draft",
+      expect.objectContaining({ organizationId: "org_lab_a" })
     );
   });
 
@@ -237,7 +255,8 @@ describe("lab order routes", () => {
       "order-1",
       payload,
       expect.objectContaining({ id: "lab_staff-1", role: "lab_staff" }),
-      "submit"
+      "submit",
+      expect.objectContaining({ organizationId: "org_lab_a" })
     );
   });
 

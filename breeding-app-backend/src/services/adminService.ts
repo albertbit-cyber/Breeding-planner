@@ -168,14 +168,34 @@ const normalizeMarketplacePermission = (row: any) => row ? ({
 const normalizeLabAccount = (row: any) => ({
   id: row.id,
   userId: row.userId,
+  organizationId: row.organizationId,
   labName: row.labName,
   contactPerson: row.contactPerson || "",
+  contactEmail: row.contactEmail || "",
+  phone: row.phone || "",
   location: row.location || "",
+  city: row.city || "",
+  country: row.country || "",
+  turnaroundDays: row.turnaroundDays ?? null,
+  listedInDirectory: Boolean(row.listedInDirectory),
   status: row.status,
   permissions: row.permissionsJson || {},
   availableTests: row.availableTestsJson || [],
   pricing: row.pricingJson || {},
   user: row.user ? normalizeUser(row.user) : null,
+  organization: row.organization
+    ? {
+        id: row.organization.id,
+        name: row.organization.name,
+        status: row.organization.status,
+        kind: row.organization.kind,
+        suspendedAt: row.organization.suspendedAt,
+        suspendedReason: row.organization.suspendedReason,
+        memberCount: row.organization._count?.memberships ?? 0,
+        testCount: row.organization._count?.testOfferings ?? 0,
+        orderCount: row.organization._count?.labOrders ?? 0,
+      }
+    : null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -196,7 +216,12 @@ const normalizeGdprRequest = (row: any) => ({
   updatedAt: row.updatedAt,
 });
 
-const logAdminAction = async (input: {
+/**
+ * Exported so the organization-invite service can write to the same audit trail
+ * rather than keeping a parallel one — every admin action against a tenant needs
+ * to show up in one place for the oversight view.
+ */
+export const logAdminAction = async (input: {
   adminUserId?: string;
   targetUserId?: string;
   action: string;
@@ -605,6 +630,17 @@ export const updateAdminMarketplacePermission = async (
 
 const LAB_ACCOUNT_INCLUDE = {
   user: { select: USER_SELECT },
+  organization: {
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      kind: true,
+      suspendedAt: true,
+      suspendedReason: true,
+      _count: { select: { memberships: true, testOfferings: true, labOrders: true } },
+    },
+  },
 };
 
 export const listAdminLabAccounts = async (query: Record<string, unknown>) => {
@@ -654,6 +690,172 @@ export const updateAdminLabAccount = async (
     internalNote: String(payload.adminNote || "").trim(),
   });
   return { lab: normalizeLabAccount(updated) };
+};
+
+/**
+ * Full read-only view of one vendor laboratory (2026-08-30 decision: the admin
+ * sees everything and changes nothing but the on/off switch).
+ *
+ * Deliberately assembled here rather than by calling labVendorService: that
+ * module is the vendor's own write surface, and routing admin reads through it
+ * would put an admin one typo away from a write path they must never have.
+ */
+export const getAdminVendorLab = async (organizationId: string) => {
+  const organization = await db.organization.findFirst({
+    where: { id: organizationId, kind: "lab_vendor" },
+    include: {
+      labAccount: { include: LAB_ACCOUNT_INCLUDE },
+      memberships: {
+        include: { user: { select: { id: true, fullName: true, email: true, status: true, lastLoginAt: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+      invites: { orderBy: { createdAt: "desc" }, take: 50 },
+      testOfferings: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+      pricingConfig: true,
+    },
+  });
+  if (!organization) throw new HttpError(404, "Vendor laboratory not found.");
+
+  const [orders, orderStats] = await Promise.all([
+    db.shedTestOrder.findMany({
+      where: { labOrganizationId: organizationId },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        paymentStatus: true,
+        totalAnimals: true,
+        totalPrice: true,
+        currency: true,
+        createdAt: true,
+        breeder: { select: { id: true, fullName: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    db.shedTestOrder.groupBy({
+      by: ["status"],
+      where: { labOrganizationId: organizationId },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const memberUserIds = organization.memberships.map((row: any) => row.userId);
+  const auditLogs = memberUserIds.length
+    ? await db.adminAuditLog.findMany({
+        where: { targetUserId: { in: memberUserIds } },
+        include: { adminUser: { select: { id: true, fullName: true, email: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      })
+    : [];
+
+  return {
+    organization: {
+      id: organization.id,
+      name: organization.name,
+      status: organization.status,
+      suspendedAt: organization.suspendedAt,
+      suspendedReason: organization.suspendedReason,
+      createdAt: organization.createdAt,
+    },
+    lab: organization.labAccount ? normalizeLabAccount(organization.labAccount) : null,
+    members: organization.memberships.map((row: any) => ({
+      id: row.id,
+      userId: row.userId,
+      role: row.role,
+      fullName: row.user?.fullName || null,
+      email: row.user?.email || null,
+      status: row.user?.status || null,
+      lastLoginAt: row.user?.lastLoginAt || null,
+      joinedAt: row.createdAt,
+    })),
+    invites: organization.invites.map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      status: row.status,
+      expiresAt: row.expiresAt,
+      acceptedAt: row.acceptedAt,
+      createdAt: row.createdAt,
+    })),
+    offerings: organization.testOfferings.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      pricingType: row.pricingType,
+      priceCents: row.priceCents,
+      currency: row.currency,
+      active: row.active,
+      visibleInBreederApp: row.visibleInBreederApp,
+    })),
+    pricing: organization.pricingConfig || null,
+    orders: orders.map((row: any) => ({
+      ...row,
+      totalPrice: row.totalPrice?.toString?.() ?? row.totalPrice,
+    })),
+    orderStats: Object.fromEntries(orderStats.map((row: any) => [row.status, row._count._all])),
+    auditLogs: auditLogs.map((row: any) => ({
+      id: row.id,
+      action: row.action,
+      reason: row.reason,
+      adminUser: row.adminUser,
+      createdAt: row.createdAt,
+    })),
+  };
+};
+
+const ORGANIZATION_STATUSES = new Set(["active", "suspended"]);
+
+/**
+ * The one write an admin has against a vendor tenant.
+ *
+ * Suspension is reversible and non-destructive on purpose: it stops the lab
+ * signing in and hides it from the breeder directory, but touches none of its
+ * data, so a dispute that resolves in the vendor's favour costs nothing to undo.
+ */
+export const setVendorLabStatus = async (
+  actor: AuthenticatedUser,
+  organizationId: string,
+  payload: { status?: unknown; reason?: unknown }
+) => {
+  const status = String(payload.status || "").trim().toLowerCase();
+  if (!ORGANIZATION_STATUSES.has(status)) throw new HttpError(400, "Status must be active or suspended.");
+  const reason = assertReason(payload.reason);
+
+  const before = await db.organization.findFirst({
+    where: { id: organizationId, kind: "lab_vendor" },
+    include: { labAccount: true },
+  });
+  if (!before) throw new HttpError(404, "Vendor laboratory not found.");
+
+  const updated = await db.organization.update({
+    where: { id: organizationId },
+    data: {
+      status,
+      suspendedAt: status === "suspended" ? new Date() : null,
+      suspendedReason: status === "suspended" ? reason : null,
+    },
+  });
+
+  await logAdminAction({
+    adminUserId: actor.id,
+    targetUserId: before.labAccount?.userId,
+    action: status === "suspended" ? "vendor_lab_suspended" : "vendor_lab_reactivated",
+    beforeJson: { status: before.status },
+    afterJson: { status: updated.status },
+    reason,
+  });
+
+  return {
+    organization: {
+      id: updated.id,
+      name: updated.name,
+      status: updated.status,
+      suspendedAt: updated.suspendedAt,
+      suspendedReason: updated.suspendedReason,
+    },
+  };
 };
 
 export const sendAdminNotification = async (

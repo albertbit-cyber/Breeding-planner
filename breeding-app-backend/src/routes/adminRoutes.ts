@@ -10,6 +10,11 @@ import {
   changeEmailVerified,
   changeGdprRequest,
   changeLabAccount,
+  changeVendorLabStatus,
+  createVendorInvite,
+  revokeVendorInvite,
+  vendorInvites,
+  vendorLabDetail,
   changeMarketplacePermission,
   changeReportStatus,
   changeVerificationRequest,
@@ -65,6 +70,17 @@ adminRoutes.get("/users/:id/marketplace-permission", asyncHandler(marketplacePer
 adminRoutes.patch("/users/:id/marketplace-permission", asyncHandler(changeMarketplacePermission));
 adminRoutes.get("/lab-accounts", asyncHandler(labAccounts));
 adminRoutes.patch("/lab-accounts/:id", asyncHandler(changeLabAccount));
+
+// ── Vendor laboratories ──────────────────────────────────────────────────────
+// Read everything, change only the on/off switch. There is deliberately no
+// route here for a vendor's tests, prices, staff or results: the admin console
+// cannot reach them because the endpoints do not exist, rather than because a
+// role check turns them away.
+adminRoutes.get("/vendor-labs/invites", asyncHandler(vendorInvites));
+adminRoutes.post("/vendor-labs/invites", asyncHandler(createVendorInvite));
+adminRoutes.post("/vendor-labs/invites/:id/revoke", asyncHandler(revokeVendorInvite));
+adminRoutes.get("/vendor-labs/:id", asyncHandler(vendorLabDetail));
+adminRoutes.patch("/vendor-labs/:id/status", asyncHandler(changeVendorLabStatus));
 adminRoutes.post("/notifications/send", asyncHandler(sendNotification));
 adminRoutes.get("/gdpr-requests", asyncHandler(gdprRequests));
 adminRoutes.post("/users/:id/gdpr-requests", asyncHandler(createGdprRequest));

@@ -9,7 +9,9 @@ type OrderStatusValue = (typeof ORDER_STATUSES)[number];
 
 export const calculateOrderPrice = async (req: Request, res: Response): Promise<void> => {
   const animals = ensureAnimalsPayload(req.body);
-  const breakdown = await calculatePrice(animals);
+  // The lab is part of the question, not a detail: prices are per-laboratory,
+  // so "what does this cost" is unanswerable without knowing which lab.
+  const breakdown = await calculatePrice(animals, req.body?.labOrganizationId);
   res.status(200).json(breakdown);
 };
 
@@ -17,19 +19,19 @@ export const createLabOrder = async (req: Request, res: Response): Promise<void>
   if (!req.user) throw new HttpError(401, "Unauthorized");
 
   const animals = ensureAnimalsPayload(req.body);
-  const order = await createOrder(req.user.id, animals);
+  const order = await createOrder(req.user.id, animals, req.body?.labOrganizationId);
   res.status(201).json({ order });
 };
 
 export const listOrders = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const orders = await listOrdersForUser(req.user);
+  const orders = await listOrdersForUser(req.user, req.membership);
   res.status(200).json({ orders });
 };
 
 export const getOrderById = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const order = await getOrderByIdForUser(req.params.id, req.user);
+  const order = await getOrderByIdForUser(req.params.id, req.user, req.membership);
   res.status(200).json({ order });
 };
 
@@ -41,7 +43,7 @@ export const patchOrderStatus = async (req: Request, res: Response): Promise<voi
     throw new HttpError(400, `Invalid status. Allowed: ${ORDER_STATUSES.join(", ")}`);
   }
 
-  const order = await updateOrderStatus(req.params.id, status, req.user);
+  const order = await updateOrderStatus(req.params.id, status, req.user, req.membership);
   res.status(200).json({ order });
 };
 
@@ -56,7 +58,7 @@ export const removeAllOrders = async (req: Request, res: Response): Promise<void
 
 export const removeOrder = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const result = await deleteOrderById(req.params.id, req.user);
+  const result = await deleteOrderById(req.params.id, req.user, req.membership);
   res.status(200).json(result);
 };
 
@@ -68,13 +70,13 @@ export const cancelMyOrder = async (req: Request, res: Response): Promise<void> 
 
 export const saveOrderResultDraft = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const saved = await saveOrderResult(req.params.id, req.body, req.user, "draft");
+  const saved = await saveOrderResult(req.params.id, req.body, req.user, "draft", req.membership);
   res.status(200).json(saved);
 };
 
 export const submitOrderResult = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const saved = await saveOrderResult(req.params.id, req.body, req.user, "submit");
+  const saved = await saveOrderResult(req.params.id, req.body, req.user, "submit", req.membership);
   res.status(200).json(saved);
 };
 
@@ -91,7 +93,8 @@ export const patchOrderPayment = async (req: Request, res: Response): Promise<vo
   const order = await updateOrderPayment(
     req.params.id,
     { paymentStatus: paymentStatus as any, paymentRef },
-    req.user
+    req.user,
+    req.membership
   );
   res.status(200).json({ order });
 };

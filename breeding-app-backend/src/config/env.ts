@@ -47,6 +47,13 @@ export const env = {
     workerStuckJobMinutes: Number(process.env.EMAIL_WORKER_STUCK_JOB_MINUTES || 10),
   },
   publicAppUrl: (process.env.PUBLIC_APP_URL || process.env.CORS_ORIGIN || "").split(",")[0].trim(),
+  // The Lab Portal is a separate deployment from the breeder app, so links sent
+  // to vendor labs (invitations above all) must not be built from
+  // `publicAppUrl` — that would drop an invited lab on the breeder sign-in page.
+  // Falls back to it only so a single-origin dev setup keeps working.
+  labPortalUrl: (process.env.LAB_PORTAL_URL || process.env.PUBLIC_APP_URL || process.env.CORS_ORIGIN || "")
+    .split(",")[0]
+    .trim(),
   // "lax" is correct once every frontend reaches the backend through a same-origin
   // proxy (see docs/architecture/saas-implementation-plan.md Phase 0.5). Only set
   // this to "none" for an environment that still talks to the backend cross-origin

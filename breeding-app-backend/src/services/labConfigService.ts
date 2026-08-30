@@ -100,17 +100,6 @@ export const createCatalogItem = async (body: {
   });
 };
 
-export const getActivePricing = async () => {
-  const pricing = await prisma.pricingConfig.findFirst({
-    where: { isActive: true },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (!pricing) {
-    throw new HttpError(400, "No active pricing configuration found.");
-  }
-  return pricing;
-};
-
 export const updateCatalogItem = async (
   id: string,
   patch: {
@@ -194,15 +183,9 @@ export const updateCatalogItem = async (
   });
 };
 
-export const updatePricingConfig = async (
-  id: string,
-  patch: Record<string, unknown>
-) => {
-  const existing = await prisma.pricingConfig.findUnique({ where: { id } });
-  if (!existing) throw new HttpError(404, "Pricing config not found.");
-
-  return prisma.pricingConfig.update({
-    where: { id },
-    data: patch,
-  });
-};
+// `getActivePricing` and `updatePricingConfig` were removed with the move to
+// per-laboratory pricing. Both were unsafe once more than one lab exists:
+// the first returned whichever active config happened to sort first, and the
+// second took a raw config id from the caller, so a lab could have edited
+// another lab's prices by guessing an id. Their replacements live in
+// labVendorService and are keyed on the caller's own organization.

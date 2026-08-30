@@ -2,12 +2,15 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { ensureSharedOrderNumbers } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
-import { isLabRole } from "../auth/identity";
+import { isAdminRole, isLabRole } from "../auth/identity";
 
 type PersistOrderResultUser = {
   id: string;
   role: AppRole;
 };
+
+/** The actor's organization, loaded once per request by `withOrgContext`. */
+type OrgContext = { organizationId: string } | null | undefined;
 
 type ResultSaveMode = "draft" | "submit";
 
@@ -83,7 +86,11 @@ const normalizeConfidence = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const loadEditableOrder = async (orderId: string, user: PersistOrderResultUser) => {
+const loadEditableOrder = async (
+  orderId: string,
+  user: PersistOrderResultUser,
+  org: OrgContext
+) => {
   assertLabUser(user);
   await ensureSharedOrderNumbers();
 
@@ -97,6 +104,19 @@ const loadEditableOrder = async (orderId: string, user: PersistOrderResultUser) 
   });
 
   if (!order) throw new HttpError(404, "Order not found.");
+
+  // Writing a result is the most consequential thing a lab does to an order —
+  // it changes the animal's recorded genetics downstream — so the tenancy check
+  // belongs here and not only on the read path.
+  if (!isAdminRole(user.role)) {
+    if (!org?.organizationId) {
+      throw new HttpError(403, "This account does not belong to a laboratory.");
+    }
+    if (!order.labOrganizationId || order.labOrganizationId !== org.organizationId) {
+      throw new HttpError(404, "Order not found.");
+    }
+  }
+
   return order;
 };
 
@@ -191,7 +211,8 @@ export const saveOrderResult = async (
   orderId: string,
   payload: PersistOrderResultPayload,
   user: PersistOrderResultUser,
-  mode: ResultSaveMode
+  mode: ResultSaveMode,
+  org?: OrgContext
 ) => {
   const normalizedOrderId = requireNonEmpty(orderId, "orderId");
   const payloadOrderId = optionalString(payload?.orderId);
@@ -199,7 +220,7 @@ export const saveOrderResult = async (
     throw new HttpError(400, "Result payload orderId does not match the route orderId.");
   }
 
-  const order = await loadEditableOrder(normalizedOrderId, user);
+  const order = await loadEditableOrder(normalizedOrderId, user, org);
   if (order.status === "cancelled") {
     throw new HttpError(409, "Cancelled orders cannot accept lab results.");
   }

@@ -59,6 +59,18 @@ import {
   renderAccountDeletionCancelledTemplate,
   type AccountDeletionCancelledTemplateProps,
 } from "./accountDeletionCancelledTemplate";
+import {
+  VENDOR_LAB_INVITATION_TEMPLATE_KEY,
+  VENDOR_LAB_INVITATION_TEMPLATE_VERSION,
+  renderVendorLabInvitationTemplate,
+  type VendorLabInvitationTemplateProps,
+} from "./vendorLabInvitationTemplate";
+import {
+  ORG_TEAMMATE_INVITATION_TEMPLATE_KEY,
+  ORG_TEAMMATE_INVITATION_TEMPLATE_VERSION,
+  renderOrganizationTeammateInvitationTemplate,
+  type OrganizationTeammateInvitationTemplateProps,
+} from "./organizationTeammateInvitationTemplate";
 
 export type RenderedEmail = { subject: string; html: string; text: string };
 
@@ -108,6 +120,15 @@ const TEMPLATES: Record<string, TemplateEntry> = {
     version: ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
     render: (payload) => renderAccountDeletionCancelledTemplate(payload as unknown as AccountDeletionCancelledTemplateProps),
   },
+  [VENDOR_LAB_INVITATION_TEMPLATE_KEY]: {
+    version: VENDOR_LAB_INVITATION_TEMPLATE_VERSION,
+    render: (payload) => renderVendorLabInvitationTemplate(payload as unknown as VendorLabInvitationTemplateProps),
+  },
+  [ORG_TEAMMATE_INVITATION_TEMPLATE_KEY]: {
+    version: ORG_TEAMMATE_INVITATION_TEMPLATE_VERSION,
+    render: (payload) =>
+      renderOrganizationTeammateInvitationTemplate(payload as unknown as OrganizationTeammateInvitationTemplateProps),
+  },
 };
 
 export const renderEmailTemplate = (
@@ -154,6 +175,10 @@ export {
   ACCOUNT_DELETION_SCHEDULED_TEMPLATE_VERSION,
   ACCOUNT_DELETION_CANCELLED_TEMPLATE_KEY,
   ACCOUNT_DELETION_CANCELLED_TEMPLATE_VERSION,
+  VENDOR_LAB_INVITATION_TEMPLATE_KEY,
+  VENDOR_LAB_INVITATION_TEMPLATE_VERSION,
+  ORG_TEAMMATE_INVITATION_TEMPLATE_KEY,
+  ORG_TEAMMATE_INVITATION_TEMPLATE_VERSION,
 };
 export type {
   InvitationTemplateProps,
@@ -166,5 +191,7 @@ export type {
   AccountEmailChangedTemplateProps,
   AccountDeletionScheduledTemplateProps,
   AccountDeletionCancelledTemplateProps,
+  VendorLabInvitationTemplateProps,
+  OrganizationTeammateInvitationTemplateProps,
 };
 export type { BreedingReminderType } from "./breedingReminderTemplate";

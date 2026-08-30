@@ -180,9 +180,12 @@ model Organization {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  memberships Membership[]
-  invites     OrganizationInvite[]
-  labAccount  LabAccount?
+  memberships   Membership[]
+  invites       OrganizationInvite[]
+  labAccount    LabAccount?
+  testOfferings LabTestOffering[]
+  pricingConfig PricingConfig?
+  labOrders     ShedTestOrder[]
 
   @@index([kind])
   @@index([status])
@@ -236,6 +239,10 @@ model OrganizationInvite {
   // Set only for trigger 2 above; the org to create on acceptance.
   createsOrgKind OrganizationKind? @map("creates_org_kind")
   createsOrgName String?           @map("creates_org_name")
+  // Prefill for the LabAccount created on acceptance, so a vendor does not have
+  // to retype details the inviting admin already supplied. Vendor-editable after.
+  createsOrgLocation String?       @map("creates_org_location")
+  createsOrgContact  String?       @map("creates_org_contact")
   // Role the invitee receives. Trigger 2 always grants `owner`.
   role           OrgRole           @default(member)
   invitedBy      String?           @map("invited_by")
@@ -628,10 +635,39 @@ model LabAccount {
   permissionsJson   Json
   availableTestsJson Json
   pricingJson       Json
+
+  // ── Per-tenant identity ──────────────────────────────────────
+  //
+  // Every one of these used to be a hardcoded constant (LAB_PROFILE in
+  // labelProfileService.ts, plus a committed logo image), which meant every
+  // vendor's shipping labels and certificates went out branded as the single
+  // lab the feature was first built for. These are what the documents render
+  // from now, resolved per order via the order's owning lab.
+  contactEmail      String?  @map("contact_email")
+  phone             String?
+  addressLine1      String?  @map("address_line1")
+  addressLine2      String?  @map("address_line2")
+  city              String?
+  postalCode        String?  @map("postal_code")
+  country           String?
+  /** Data URI or hosted URL, rendered onto certificates. */
+  logoUrl           String?  @map("logo_url") @db.Text
+  /** Free text shown to breeders choosing a lab. */
+  publicDescription String?  @map("public_description") @db.Text
+  /** Typical turnaround in days, shown in the lab directory. */
+  turnaroundDays    Int?     @map("turnaround_days")
+  /**
+   * Whether breeders may discover and order from this lab. Vendor-controlled —
+   * a lab closing for holidays hides itself without an admin round-trip. An
+   * admin suspending the Organization overrides this independently.
+   */
+  listedInDirectory Boolean  @default(true) @map("listed_in_directory")
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([status])
+  @@index([listedInDirectory])
 }
 
 model GdprRequest {
@@ -1097,11 +1133,70 @@ model ShedTestCatalog {
   sortOrder           Int             @default(0)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
-  orderAnimalTests    ShedTestOrderAnimalTest[]
+  offerings           LabTestOffering[]
 }
 
+// What a vendor laboratory actually sells, and the only test data a breeder
+// ever sees once they have chosen a lab (2026-08-30 decision: labs define their
+// own tests, fully).
+//
+// The relationship to ShedTestCatalog is deliberately weak. A lab may copy a
+// standard test in from that library as a starting point — `catalogRefId` keeps
+// the link so results stay comparable across labs and the genetics engine can
+// map the gene — but a lab may equally invent a test that exists in no catalog.
+// The library never gates what a lab is allowed to offer.
+model LabTestOffering {
+  id                  String          @id @default(cuid())
+  organizationId      String          @map("organization_id")
+  organization        Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name                String
+  shortLabel          String?         @map("short_label")
+  category            String
+  pricingType         TestPricingType @map("pricing_type")
+  /** This lab's own price. Null means "priced by the tier table", not "free". */
+  priceCents          Int?            @map("price_cents")
+  currency            String          @default("EUR")
+  /**
+   * Gene this test reads, when the lab has mapped it. Drives the automatic
+   * genetics update on a confirmed result; a custom test may leave it null and
+   * simply reports a finding.
+   */
+  geneTarget          String?         @map("gene_target")
+  /** Optional provenance link to the shared seed library. Never a constraint. */
+  catalogRefId        String?         @map("catalog_ref_id")
+  catalogRef          ShedTestCatalog? @relation(fields: [catalogRefId], references: [id], onDelete: SetNull)
+
+  allowedPriorities   String[]        @default(["routine", "priority", "urgent"]) @map("allowed_priorities")
+  turnaroundDays      Int?            @map("turnaround_days")
+  active              Boolean         @default(true)
+  visibleInBreederApp Boolean         @default(true) @map("visible_in_breeder_app")
+  description         String?         @db.Text
+  sortOrder           Int             @default(0) @map("sort_order")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  orderAnimalTests    ShedTestOrderAnimalTest[]
+
+  // A lab cannot list the same name twice; across labs, duplicates are expected
+  // and correct — two labs both offering "Albino" are two distinct products.
+  @@unique([organizationId, name])
+  @@index([organizationId, active])
+  @@index([catalogRefId])
+  @@map("lab_test_offerings")
+}
+
+// Tier multipliers, now owned by a lab rather than the platform.
+//
+// A row with `organizationId = null` is the platform *template*: it seeds a new
+// vendor's config at invite acceptance and is never used to price an order. Order
+// pricing always resolves the ordering lab's own row and fails loudly if it is
+// missing, so a missing config can never silently fall back to someone else's
+// prices.
 model PricingConfig {
   id                             String   @id @default(cuid())
+  organizationId                 String?  @unique @map("organization_id")
+  organization                   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   currency                       String   @default("EUR")
   morphTier1to9FirstTest         Decimal  @db.Decimal(10, 2)
   morphTier1to9AdditionalTest    Decimal  @db.Decimal(10, 2)
@@ -1120,6 +1215,15 @@ model PricingConfig {
 model ShedTestOrder {
   id                String                @id @default(cuid())
   orderNumber       String?               @unique
+  /**
+   * The lab the breeder chose at order time. Nullable only so the migration
+   * could land against existing rows predating lab selection; every new order
+   * sets it, and it is what every lab-side read filters on. Restrict, not
+   * Cascade: deleting an organization must never silently delete a breeder's
+   * order history.
+   */
+  labOrganizationId String?               @map("lab_organization_id")
+  labOrganization   Organization?         @relation(fields: [labOrganizationId], references: [id], onDelete: Restrict)
   breederId         String
   // Cascade, not the Prisma default of Restrict: without this, deleting a user
   // who ever placed a lab order fails outright, which silently broke the
@@ -1142,6 +1246,7 @@ model ShedTestOrder {
 
   @@index([breederId])
   @@index([status])
+  @@index([labOrganizationId, status])
 }
 
 model ShedTestOrderAnimal {
@@ -1165,15 +1270,29 @@ model ShedTestOrderAnimalTest {
   id                  String             @id @default(cuid())
   orderAnimalId       String
   orderAnimal         ShedTestOrderAnimal @relation(fields: [orderAnimalId], references: [id], onDelete: Cascade)
-  testId              String
-  test                ShedTestCatalog?   @relation(fields: [testId], references: [id])
+
+  /**
+   * The lab offering this line was bought from. Nullable and SetNull because a
+   * lab may retire an offering years after an order shipped, and losing the
+   * order line with it would be data loss — the snapshot columns below are what
+   * make the historical record self-contained regardless.
+   */
+  offeringId          String?            @map("offering_id")
+  offering            LabTestOffering?   @relation(fields: [offeringId], references: [id], onDelete: SetNull)
+
+  /**
+   * Legacy provenance: the global-catalog id this line used before tests became
+   * lab-owned. Kept as a plain string with no foreign key so old orders stay
+   * readable; new orders leave it null and use `offeringId`.
+   */
+  testId              String?
   testNameSnapshot    String
   pricingTypeSnapshot TestPricingType
   priceApplied        Decimal            @db.Decimal(10, 2)
   createdAt           DateTime           @default(now())
 
   @@index([orderAnimalId])
-  @@index([testId])
+  @@index([offeringId])
 }
 
 model ShedTestOrderResult {
