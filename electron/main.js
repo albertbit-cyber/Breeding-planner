@@ -10,20 +10,12 @@ const APP_URL = process.env.ELECTRON_START_URL || (isDev
   ? DEV_SERVER_URL
   : `file://${path.join(__dirname, '../build/index.html')}`);
 
-const getSystemLocale = () => {
-  if (typeof app.getPreferredSystemLanguages === 'function') {
-    const [preferred] = app.getPreferredSystemLanguages();
-    if (preferred) {
-      return preferred;
-    }
-  }
-  if (typeof app.getLocale === 'function') {
-    return app.getLocale();
-  }
-  return process.env.LANG || 'en';
-};
+// The desktop shell always starts in English rather than following the OS
+// locale; the renderer drives any language change via the 'i18n:set-language'
+// channel below.
+const DEFAULT_LANGUAGE = 'en';
 
-const electronLocale = createElectronI18n(getSystemLocale());
+const electronLocale = createElectronI18n(DEFAULT_LANGUAGE);
 const localeReady = electronLocale.initPromise.catch((error) => {
   console.error('Failed to initialize electron translations', error);
 });
