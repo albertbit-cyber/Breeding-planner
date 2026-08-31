@@ -2,7 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const { createElectronI18n } = require('./i18n');
 
-const preloadLocale = createElectronI18n(typeof navigator !== 'undefined' ? navigator.language : undefined);
+// Start in English rather than following the browser/OS locale; the real
+// language is pulled from the main process by syncLanguageFromMain() below.
+const preloadLocale = createElectronI18n('en');
 const localeReady = preloadLocale.initPromise.catch((error) => {
   console.error('Failed to initialize preload translations', error);
 });
