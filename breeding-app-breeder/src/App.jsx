@@ -11117,8 +11117,12 @@ export default function BreedingPlannerApp() {
       {/* Desktop header — hidden on mobile via CSS */}
       <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className="flex items-center gap-3 min-w-0">
+          {/* Brand sits on its own centred row above the tabs. Side by side, the nav row was
+              forced onto one line by lg:flex-nowrap while every label carries white-space:nowrap,
+              so the row overflowed its box and painted over the logo and breeder name. Stacked,
+              the tabs are free to wrap and can never collide with the brand. */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0 max-w-full">
               {breederInfo.logoUrl ? (
                 <img src={breederInfo.logoUrl} alt="logo" className="w-16 h-16 rounded-full object-cover border shadow-sm" />
               ) : (
@@ -11129,33 +11133,35 @@ export default function BreedingPlannerApp() {
                 <div className="text-sm text-[#8257b1] truncate">{breederInfo.businessName ? `${breederInfo.businessName} | ${breederInfo.name || ''}` : (breederInfo.name || '')}</div>
               </div>
             </div>
-            <div className="flex flex-1 flex-wrap items-center justify-end gap-3 min-w-0">
-              <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-1.5">
-                <TabButton theme={theme} active={tab==="dashboard"} onClick={leaveSpeciesWorkspace} className="header-nav-button">{t("nav.dashboard", { defaultValue: "Dashboard" })}</TabButton>
-                {/* Genetics-shaped tabs. They only mean something inside one species, so they
-                    are absent until a species is open rather than shown in a broken state. */}
-                {speciesScope && (<>
-                  <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                  <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Tracker" })}</TabButton>
-                  <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
-                  <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
-                </>)}
-                {/* Logistics-shaped tabs, deliberately global: one feeding schedule, and racks
-                    that hold whatever fits in them regardless of species. Quarantine sits here
-                    too: an animal in intake is quarantined whatever species it is, and the rules
-                    keeping it out of shared racks are rack rules. */}
-                <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button">
-                  {t("nav.quarantine", { defaultValue: "Quarantine" })}
-                  {quarantineCount ? <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
-                </TabButton>
-                <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
-                <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
-                <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
-                <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
-              </div>
-              {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
-                  in the global header made it look like it searched the whole app. */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
+              <TabButton theme={theme} active={tab==="dashboard"} onClick={leaveSpeciesWorkspace} className="header-nav-button">{t("nav.dashboard", { defaultValue: "Dashboard" })}</TabButton>
+              {/* Genetics-shaped tabs. They only mean something inside one species, so they
+                  are absent until a species is open rather than shown in a broken state. */}
+              {speciesScope && (<>
+                <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Tracker" })}</TabButton>
+                <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
+                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
+              </>)}
+              {/* Logistics-shaped tabs, deliberately global: one feeding schedule, and racks
+                  that hold whatever fits in them regardless of species. Quarantine sits here
+                  too: an animal in intake is quarantined whatever species it is, and the rules
+                  keeping it out of shared racks are rack rules. Feed prep is one of them, and
+                  lives here rather than in the animals toolbar it used to hang off: the defrost
+                  list covers the whole collection, not the filtered list on screen. It opens a
+                  modal, so it marks itself active while that modal is up. */}
+              <TabButton theme={theme} active={showFeedPrepModal} onClick={()=>setShowFeedPrepModal(true)} className="header-nav-button">{t("nav.feedPrep", { defaultValue: "Feed Prep" })}</TabButton>
+              <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
+              <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button">
+                {t("nav.quarantine", { defaultValue: "Quarantine" })}
+                {quarantineCount ? <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
+              </TabButton>
+              <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
+              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
+              <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
             </div>
+            {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
+                in the global header made it look like it searched the whole app. */}
           </div>
         </div>
       </div>
@@ -11306,52 +11312,55 @@ export default function BreedingPlannerApp() {
               </div>
               {animalView !== "groups" && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className={cx(toolbarControlClass, animalLayout === 'cards' && 'bp-toolbar-control--selected')}
-                    aria-pressed={animalLayout === 'cards'}
-                    onClick={() => handleAnimalLayoutChange('cards')}
-                  >
-                    {t('ui.listControls.cards', { defaultValue: 'Cards' })}
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(toolbarControlClass, animalLayout === 'list' && 'bp-toolbar-control--selected')}
-                    aria-pressed={animalLayout === 'list'}
-                    onClick={() => handleAnimalLayoutChange('list')}
-                  >
-                    {t('ui.listControls.list', { defaultValue: 'List' })}
-                  </button>
-                  {/* Select and direction toggle share one pill so they read as a single sort
-                      control rather than two unrelated buttons. */}
-                  <div className={cx(toolbarControlClass, animalSortBy && 'bp-toolbar-control--selected')}>
-                    <select
-                      className="bp-toolbar-select"
-                      value={animalSortBy}
-                      onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
-                      aria-label={t('animals.sort.label', { defaultValue: 'Sort by' })}
-                    >
-                      <option value="">{t('animals.sort.default', { defaultValue: 'Default order' })}</option>
-                      {ANIMAL_SORT_FIELDS.map(field => (
-                        <option key={field.key} value={field.key}>
-                          {t(field.labelKey, { defaultValue: field.defaultLabel })}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Layout and sort are one control: all three decide how the same list is
+                      drawn. They share a single pill with hairline dividers so the row reads as
+                      one segmented switch rather than three unrelated buttons. */}
+                  <div className={cx(toolbarControlClass, 'bp-toolbar-segment')}>
                     <button
                       type="button"
-                      className={cx('bp-toolbar-sort-dir font-semibold', animalSortBy ? 'opacity-100' : 'opacity-40 cursor-not-allowed')}
-                      onClick={handleAnimalSortDirToggle}
-                      disabled={!animalSortBy}
-                      aria-label={animalSortDir === 'desc'
-                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
-                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
-                      title={animalSortDir === 'desc'
-                        ? t('animals.sort.descending', { defaultValue: 'Descending' })
-                        : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                      className={cx('bp-toolbar-segment__part', animalLayout === 'cards' && 'bp-toolbar-segment__part--selected')}
+                      aria-pressed={animalLayout === 'cards'}
+                      onClick={() => handleAnimalLayoutChange('cards')}
                     >
-                      {animalSortDir === 'desc' ? '↓' : '↑'}
+                      {t('ui.listControls.cards', { defaultValue: 'Cards' })}
                     </button>
+                    <button
+                      type="button"
+                      className={cx('bp-toolbar-segment__part', animalLayout === 'list' && 'bp-toolbar-segment__part--selected')}
+                      aria-pressed={animalLayout === 'list'}
+                      onClick={() => handleAnimalLayoutChange('list')}
+                    >
+                      {t('ui.listControls.list', { defaultValue: 'List' })}
+                    </button>
+                    <div className={cx('bp-toolbar-segment__part', animalSortBy && 'bp-toolbar-segment__part--selected')}>
+                      <select
+                        className="bp-toolbar-select"
+                        value={animalSortBy}
+                        onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
+                        aria-label={t('animals.sort.label', { defaultValue: 'Sort by' })}
+                      >
+                        <option value="">{t('animals.sort.default', { defaultValue: 'Default order' })}</option>
+                        {ANIMAL_SORT_FIELDS.map(field => (
+                          <option key={field.key} value={field.key}>
+                            {t(field.labelKey, { defaultValue: field.defaultLabel })}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className={cx('bp-toolbar-sort-dir font-semibold', animalSortBy ? 'opacity-100' : 'opacity-40 cursor-not-allowed')}
+                        onClick={handleAnimalSortDirToggle}
+                        disabled={!animalSortBy}
+                        aria-label={animalSortDir === 'desc'
+                          ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                          : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                        title={animalSortDir === 'desc'
+                          ? t('animals.sort.descending', { defaultValue: 'Descending' })
+                          : t('animals.sort.ascending', { defaultValue: 'Ascending' })}
+                      >
+                        {animalSortDir === 'desc' ? '↓' : '↑'}
+                      </button>
+                    </div>
                   </div>
                   {animalLayout === 'list' && (
                     <button
@@ -11379,9 +11388,9 @@ export default function BreedingPlannerApp() {
                 +
               </button>
               <div className="ml-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
-                <button onClick={()=>setShowExportModal(true)} className={toolbarControlClass}>{t("actions.exportQr")}</button>
-                <button onClick={()=>setShowFeedPrepModal(true)} className={toolbarControlClass}>{t("feedPrep.open", { defaultValue: "Feed prep" })}</button>
-                <button onClick={()=>setShowScanner(true)} className={toolbarControlClass}>{t("actions.scanQr")}</button>
+                {/* Adding animals comes first: it is what this row is mostly used for. The two
+                    QR actions sit last, next to the scanner status they belong with. Feed prep
+                    moved out to the header — it plans the whole collection, not this list. */}
                 <button
                   onClick={startNewAnimalDraft}
                   className={toolbarControlClass}
@@ -11389,6 +11398,8 @@ export default function BreedingPlannerApp() {
                   + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
                 <button onClick={() => setShowImportModal(true)} className={toolbarControlClass}>{t("actions.importAnimals")}</button>
+                <button onClick={()=>setShowExportModal(true)} className={toolbarControlClass}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowScanner(true)} className={toolbarControlClass}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
                 {isAnimalScannerView && (
@@ -12864,12 +12875,27 @@ export default function BreedingPlannerApp() {
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
-      <div className="relative z-[10001] bg-white w-full max-w-3xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
-            <div className="shrink-0 p-5 border-b flex items-center justify-between gap-4">
-                        <div className="font-semibold truncate min-w-0" title={editSnake.name}>{editSnake.name}</div>
-                        {/* Seven equal-size actions do not fit one row at max-w-3xl, so they wrap
-                            into a grid instead of stretching the header or squeezing the title. */}
-                        <div className="snake-editor-actions shrink-0">
+      <div className="relative z-[10001] bg-white w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
+            {/* Thumbnail on the left, name over one row of actions on the right. The name is no
+                longer truncated: which animal is open is the one thing the header has to say, and
+                a wrapped second line costs less than a name cut off mid-morph. */}
+            <div className="shrink-0 p-5 border-b flex items-stretch gap-4">
+                        <div className="snake-editor-thumb shrink-0">
+                          {(() => {
+                            const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
+                            const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
+                            return headerUrl ? (
+                              <img src={headerUrl} alt={editSnakeDraft.name || ''} className="w-full h-full object-cover object-center" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-center text-[11px] leading-tight text-neutral-400 px-1">
+                                {t("snakeEdit.image.none")}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col gap-3">
+                        <div className="font-semibold text-lg leading-snug break-words" title={editSnake.name}>{editSnake.name}</div>
+                        <div className="snake-editor-actions">
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
                             onClick={()=>requestDeleteSnake(editSnake)}>
                             {t("actions.delete", { defaultValue: "Delete" })}
@@ -12950,6 +12976,7 @@ export default function BreedingPlannerApp() {
                           closeSnakeEditor();
                             }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
+                        </div>
                         </div>
             </div>
 
@@ -13344,74 +13371,10 @@ export default function BreedingPlannerApp() {
 
               {/* Genetics picker removed from edit modal per user request */}
               <div className="md:col-span-2 space-y-5">
-                <ParentagePanel
-                  draft={editSnakeDraft}
-                  setDraft={setEditSnakeDraft}
-                  animals={snakes}
-                  clutchOptions={clutchOptions}
-                />
-                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
-
-                {/* Reproductive Intelligence — females only */}
-                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
-                  <ReproductiveIntelligencePanel snake={editSnake} />
-                )}
-
-                <div className="p-3 border rounded-xl bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
-                  </div>
-                  <div className="space-y-2">
-                    {(() => {
-                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
-                      const targetId = (editSnakeDraft.id || '').trim();
-                      const related = !targetId ? [] : pairings.filter(p => {
-                        if (!p) return false;
-                        const maleId = (p.maleId || '').trim();
-                        const femaleId = (p.femaleId || '').trim();
-                        if (!maleId && !femaleId) return false;
-                        return isFemale ? femaleId === targetId : maleId === targetId;
-                      });
-                      if (!related.length) {
-                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
-                      }
-                      const otherSnakes = isFemale ? malesById : femalesById;
-                      return related.map(pairing => {
-                        const stage = describePairingStage(pairing);
-                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
-                        const otherId = (otherIdRaw || '').trim();
-                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
-                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
-                        return (
-                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
-                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#{pairing.id})</div>
-                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
-                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
-                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-                {/* Quarantine record. Status here and the tag above are the same thing: changing
-                    either one moves the animal in or out of the quarantine section. */}
-                <div className="mt-4">
-                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
-                </div>
-
-                {/* Re-add logs editor so feeds/weights/sheds/cleanings/meds can be edited */}
-                <div className="mt-4 p-2 border rounded-xl bg-neutral-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.logsTitle")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.logsHint")}</div>
-                  </div>
-                  <LogsEditor editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
-                </div>
-
-                {/* Image panel moved under logs; upload button sits inside the picture area */}
-                <div className="mt-4 flex flex-col items-end gap-3">
+                {/* The picture leads the column: it is how a keeper recognises the animal,
+                    so it sits above the record rather than buried under the logs. Upload,
+                    camera and gallery controls sit under the frame. */}
+                <div className="flex flex-col items-end gap-3">
                   <div style={{width:318, height:318}} className="rounded-lg overflow-hidden border-2 border-neutral-200 relative">
                     {(() => {
                       const draftPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
@@ -13478,6 +13441,72 @@ export default function BreedingPlannerApp() {
                     </button>
                   </div>
                 </div>
+                <ParentagePanel
+                  draft={editSnakeDraft}
+                  setDraft={setEditSnakeDraft}
+                  animals={snakes}
+                  clutchOptions={clutchOptions}
+                />
+                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+
+                {/* Reproductive Intelligence — females only */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
+                  <ReproductiveIntelligencePanel snake={editSnake} />
+                )}
+
+                <div className="p-3 border rounded-xl bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
+                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
+                  </div>
+                  <div className="space-y-2">
+                    {(() => {
+                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
+                      const targetId = (editSnakeDraft.id || '').trim();
+                      const related = !targetId ? [] : pairings.filter(p => {
+                        if (!p) return false;
+                        const maleId = (p.maleId || '').trim();
+                        const femaleId = (p.femaleId || '').trim();
+                        if (!maleId && !femaleId) return false;
+                        return isFemale ? femaleId === targetId : maleId === targetId;
+                      });
+                      if (!related.length) {
+                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
+                      }
+                      const otherSnakes = isFemale ? malesById : femalesById;
+                      return related.map(pairing => {
+                        const stage = describePairingStage(pairing);
+                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
+                        const otherId = (otherIdRaw || '').trim();
+                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
+                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
+                        return (
+                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
+                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#{pairing.id})</div>
+                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
+                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
+                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+                {/* Quarantine record. Status here and the tag above are the same thing: changing
+                    either one moves the animal in or out of the quarantine section. */}
+                <div className="mt-4">
+                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
+                </div>
+
+                {/* Re-add logs editor so feeds/weights/sheds/cleanings/meds can be edited */}
+                <div className="mt-4 p-2 border rounded-xl bg-neutral-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-sm">{t("snakeEdit.logsTitle")}</div>
+                    <div className="text-xs text-neutral-500">{t("snakeEdit.logsHint")}</div>
+                  </div>
+                  <LogsEditor editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
+                </div>
+
               </div>
             </div>
             </div>

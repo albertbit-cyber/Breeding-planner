@@ -1563,6 +1563,50 @@
   padding: 0 !important;
 }
 
+/* Cards / List / sort are one control: all three decide how the same list is drawn. They live
+   in a single pill the same height and shape as every other button on the row, split by
+   hairline dividers, so the row reads as one segmented switch instead of three buttons that
+   happen to be adjacent. The pill keeps its own horizontal padding at zero — each segment
+   carries the padding instead, so the dividers reach the pill's edges. */
+.bp-toolbar-segment {
+  padding: 0 !important;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Segments must not paint their own fill over the pill. `.app-root button` forces a background
+   with !important, so transparency has to be forced back the same way. */
+.app-root .bp-toolbar-segment button,
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+.bp-toolbar-segment__part {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  font: inherit;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* Declared after the reset above, and with the extra `.app-root` needed to outrank it, or the
+   blanket `border: 0` would erase the dividers. */
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part + .bp-toolbar-segment__part {
+  border-left: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* One fill for the whole pill means the active segment cannot be marked with a different
+   colour; a translucent white wash keeps the shape identical and still shows which is on. */
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part--selected {
+  background: rgba(255, 255, 255, 0.24) !important;
+}
+
 /* The sort control is a native select; it has to inherit the pill's colours
    rather than the browser default, and the dropdown list needs readable
    colours of its own because it renders outside the pill. */
@@ -1623,15 +1667,40 @@
   box-shadow: 0 18px 32px rgba(220, 38, 38, 0.35);
 }
 
-/* Snake editor header actions. Fixed columns rather than min-width: with min-width alone the
-   label still decides the width, so "Order Genetic Test" came out wider than "QR label". A grid
-   of equal tracks plus a fixed height makes all seven exactly the same box, wrapping to a second
-   row instead of stretching the header. */
+/* Snake editor header. The cover photo takes roughly a fifth of the header width. It stretches
+   to whatever height the name and actions beside it need rather than holding a square: a square
+   at this width is taller than that stack, and the leftover space beside it read as a gap in
+   the header. */
+.snake-editor-thumb {
+  position: relative;
+  width: 20%;
+  max-width: 8.5rem;
+  align-self: stretch;
+  min-height: 5rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 2px solid rgb(229, 229, 229);
+  background: rgb(250, 250, 250);
+}
+
+/* Pinned rather than laid out in flow: a stretched flex item with no height of its own falls
+   back to its content's intrinsic size, so the square photo made the box square again and put
+   the gap back. Out of flow, the box is exactly as tall as the name and actions beside it. */
+.snake-editor-thumb > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* All seven actions on one row. Equal flex tracks rather than fixed columns, so the row fills
+   the header exactly and a long label like "Order Genetic Test" cannot make its own button
+   wider than "QR label" beside it. The labels wrap to a second line inside the button instead
+   of pushing the row wider. */
 .snake-editor-actions {
-  display: grid;
-  grid-template-columns: repeat(4, 7.5rem);
-  gap: 0.5rem;
-  justify-content: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .snake-editor-action {
@@ -1639,18 +1708,21 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  width: 100%;
-  height: 3.25rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  line-height: 1.15;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
   white-space: normal;
+  border-radius: 0.6rem;
 }
 
+/* Below the modal's own breakpoint the header stacks, and seven equal tracks would each be
+   too narrow to read; two rows of buttons are the honest fallback. */
 @media (max-width: 640px) {
-  .snake-editor-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    justify-content: stretch;
+  .snake-editor-action {
+    flex: 1 1 30%;
   }
 }
 
