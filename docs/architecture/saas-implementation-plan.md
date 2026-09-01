@@ -158,7 +158,7 @@ Add test coverage for `subscriptionService`/`subscriptionController` — current
 ### 5.1 Legal documents
 
 - Draft (or commission) a real privacy policy and terms of service. This needs to reflect what the product *actually does* with data (breeder records, lab results, marketplace transactions, email addresses, payment data once Phase 2 lands) — not a generic template, since the product spans several distinct data-handling contexts (health/genetic data via the lab portal is more sensitive than planner notes).
-- Publish them as real pages/routes in at minimum `breeding-app-public` and `breeding-app-breeder` (both currently have dead links to these documents in their signup forms).
+- Publish them as real pages/routes in at minimum `breeding-app-home` and `breeding-app-breeder` (both currently have dead links to these documents in their signup forms).
 - Wire the existing dead links in both signup forms to the real pages.
 
 ### 5.2 Self-service data rights

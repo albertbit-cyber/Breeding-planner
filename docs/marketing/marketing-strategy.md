@@ -24,7 +24,7 @@ Every asset below — email, ad, video script, social post — should pass these
 
 This is the centerpiece of Phase A (§5 of the GTM plan: "build community and a waitlist now"). The goal isn't just collecting emails — it's turning a waitlist into a warm, self-promoting community that arrives at Phase B's public beta already primed to activate and refer others.
 
-### 13.1 Landing page anatomy (`breeding-app-public`)
+### 13.1 Landing page anatomy (`breeding-app-home`)
 
 The existing public app has no waitlist yet — this is the first build item. Structure, section by section:
 

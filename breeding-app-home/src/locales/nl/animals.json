@@ -1,0 +1,36 @@
+{
+	"quickAdd": {
+		"date": "Datum",
+		"feedType": "Voertype",
+		"size": "Grootte",
+		"selectPlaceholder": "Selecteer",
+		"customSizePlaceholder": "Aangepaste grootte",
+		"weight": "Gewicht (g)",
+		"form": "Vorm",
+		"methodDetailsPlaceholder": "Methodedetails",
+		"gramsLabel": "Gram",
+		"recentProgress": "Recente voortgang",
+		"medicationDrug": "Medicijn",
+		"medicationDose": "Dosering",
+		"notes": "Notities",
+		"feedOptions": {
+			"mouse": "Muis",
+			"rat": "Rat",
+			"chick": "Kuiken",
+			"other": "Overig"
+		},
+		"sizeOptions": {
+			"pinky": "pinky",
+			"fuzzy": "fuzzy",
+			"medium": "medium",
+			"adult": "adult",
+			"other": "Overig"
+		},
+		"formOptions": {
+			"live": "Levend",
+			"fresh": "Vers gedood",
+			"frozen": "Diepvries/ontdooid",
+			"other": "Overig"
+		}
+	}
+}

@@ -1,0 +1,36 @@
+{
+	"quickAdd": {
+		"date": "Data",
+		"feedType": "Tipo di alimento",
+		"size": "Dimensione",
+		"selectPlaceholder": "Seleziona",
+		"customSizePlaceholder": "Dimensione personalizzata",
+		"weight": "Peso (g)",
+		"form": "Forma",
+		"methodDetailsPlaceholder": "Dettagli del metodo",
+		"gramsLabel": "Grammi",
+		"recentProgress": "Progressi recenti",
+		"medicationDrug": "Farmaco",
+		"medicationDose": "Dose",
+		"notes": "Note",
+		"feedOptions": {
+			"mouse": "Topo",
+			"rat": "Ratto",
+			"chick": "Pulcino",
+			"other": "Altro"
+		},
+		"sizeOptions": {
+			"pinky": "pinky",
+			"fuzzy": "fuzzy",
+			"medium": "medio",
+			"adult": "adulto",
+			"other": "Altro"
+		},
+		"formOptions": {
+			"live": "Vivo",
+			"fresh": "Appena ucciso",
+			"frozen": "Congelato/scongelato",
+			"other": "Altro"
+		}
+	}
+}

@@ -1,0 +1,148 @@
+{
+	"title": "Zucht-Berater",
+	"description": "Wir betrachten nur Tiere, die in der Gruppe <strong>Breeders</strong> markiert sind, und zeigen Paarungen mit einer sehr hohen Chance, Ihr ausgewähltes Morph-Ziel zu produzieren.",
+	"goal": {
+		"label": "Ziel (Name und Merkmale)",
+		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"tip": "Format-Tipp: \"Zielname: Merkmal eins, Merkmal zwei\". Wenn Sie nur Merkmale auflisten, erstellen wir ein generisches Ziel.",
+		"defaultName": "Benutzerdefiniertes Ziel"
+	},
+	"status": {
+		"heading": "Status"
+	},
+	"summary": {
+		"loading": "Punnett-Quadrate werden berechnet…",
+		"ready": "Starten Sie den Berater, um vielversprechende Paarungen zu entdecken.",
+		"supportingOnly": "Noch keine Paare erfüllen die Hochvertrauens-Schwelle, aber hier sind {{count}} Optionen zur Überprüfung.",
+		"noConfidence": "Keine Paarung hat die Vertrauensschwelle überschritten. Versuchen Sie, Ihre Sammlungen oder Ziele anzupassen.",
+		"confidentCount": "{{count}} Paarung(en) erreichen das Vertrauensziel ≥ {{threshold}}."
+	},
+	"stats": {
+		"males": "{{count}} Zuchtmännchen",
+		"males_plural": "{{count}} Zuchtmännchen",
+		"females": "{{count}} Zuchtweibchen",
+		"females_plural": "{{count}} Zuchtweibchen",
+		"confidenceBar": "Vertrauensschwelle ≥ {{threshold}}"
+	},
+	"buttons": {
+		"run": "Berater starten",
+		"generating": "Wird generiert...",
+		"reset": "Berater zurücksetzen"
+	},
+	"errors": {
+		"noBreeders": "Fügen Sie der Breeders-Gruppe Tiere hinzu, um Beraterempfehlungen zu sehen.",
+		"noGoals": "Fügen Sie Zielmerkmale hinzu, bevor Sie den Berater starten.",
+		"failure": "Vorschläge konnten nicht generiert werden."
+	},
+	"cards": {
+		"goalSuccessLabel": "Zielerfolgswahrscheinlichkeit:",
+		"belowTarget": "(unterhalb des Vertrauensziels)",
+		"demandSignals": "Nachfragesignale:",
+		"priceRange": "Preisrichtlinie: {{range}}",
+		"sources": "Quellen:",
+		"additionalHeading": "Weitere Paarungen zur Überprüfung",
+		"readyCallout": "Bereit wenn Sie es sind—klicken Sie auf <strong>Berater starten</strong>, um Ihre stärksten Zuchtpaarungen zu entdecken."
+	},
+	"genes": {
+		"goalVisuals": "Ziel-Visuals",
+		"goalHets": "Ziel-Hets",
+		"projectedVisuals": "Projizierte Visuals",
+		"projectedHets": "Projizierte Hets",
+		"holdbackVisuals": "Holdback-Visuals",
+		"holdbackHets": "Holdback-Hets",
+		"nextVisuals": "Nächste-Generation-Visuals",
+		"nextHets": "Nächste-Generation-Hets",
+		"focusVisuals": "Fokus-Visuals",
+		"focusHets": "Fokus-Hets"
+	},
+	"plan": {
+		"title": "Mehrgenerationsplan ({{strategy}})",
+		"strategy": {
+			"multi": "2-stufig",
+			"direct": "direkt"
+		},
+		"combinedProbability": "Kombiniert ≈ {{value}}",
+		"generationLabel": "Generation {{generation}}",
+		"prereqProbability": "Voraussetzung ≈ {{value}}",
+		"goalProbability": "Ziel ≈ {{value}}",
+		"holdbackProbability": "Holdback ≈ {{value}}",
+		"holdbackGenes": "Holdback-Gene: {{genes}}",
+		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
+		"status": {
+			"visual": "Visual",
+			"het": "Het",
+			"possibleHet": "Possible het",
+			"none": "Normal"
+		},
+		"expectation": {
+			"none-visual": "100% het",
+			"het-het": "≈66% het",
+			"het-none": "≈50% het"
+		}
+	},
+	"labels": {
+		"unknownAnimal": "Unbekannt",
+		"holdbackMale": "Holdback Männchen",
+		"holdbackFemale": "Holdback Weibchen",
+		"holdback": "Holdback"
+	},
+	"outcomes": {
+		"none": "Keine Projektion verfügbar.",
+		"unknownMorph": "Unbekannter Morph",
+		"probability": "{{genotype}} ({{chance}} Erscheinungswahrscheinlichkeit)"
+	},
+	"goals": {
+		"title": "Ziele",
+		"add": "Ziel hinzufügen",
+		"empty": "Noch keine Ziele. Fügen Sie eines hinzu, um Vorschläge anzupassen.",
+		"namePlaceholder": "Zielname",
+		"remove": "Entfernen",
+		"requireAll": {
+			"label": "Alle erforderlich",
+			"placeholder": "Merkmal hinzufügen und Enter drücken"
+		},
+		"requireAny": {
+			"label": "Mindestens eines erforderlich",
+			"placeholder": "Optionale Merkmale"
+		},
+		"avoid": {
+			"label": "Vermeiden",
+			"placeholder": "Problematische Merkmale"
+		},
+		"recessiveState": {
+			"label": "Rezessiver Status",
+			"any": "Beliebig",
+			"visual": "Visual",
+			"het": "Het",
+			"possibleHet": "Possible het"
+		},
+		"minProbability": "Mindestwahrscheinlichkeit ({{percent}}%)",
+		"weight": "Gewicht ({{value}})",
+		"idLabel": "ID: {{id}}",
+		"loadPreset": "Preset laden",
+		"presets": {
+			"title": "Presets",
+			"close": "Schließen"
+		},
+		"defaultName": "Neues Ziel"
+	},
+	"api": {
+		"rationaleSummary": "Projizierter Score {{score}} mit Nachfrageindex {{demand}}. {{goalSummary}}",
+		"noGoalTargets": "Keine spezifischen Ziele.",
+		"goalSummary": "{{prob}}% Chance, Ziel '{{goal}}' zu erreichen.",
+		"watchouts": " Hinweise: {{list}}.",
+		"sources": " Quellen: {{list}}.",
+		"plan": {
+			"stepTitle": "Generation {{generation}}: {{male}} × {{female}}",
+			"directSummary": "Die direkte Chance, das Ziel zu erreichen, beträgt {{chance}}%.",
+			"holdbackSummary": "Kein direktes Visual erwartet; Holdbacks produzieren, die {{traits}} tragen.",
+			"adjustedSummary": "Direkte Zielchance {{chance}}%. Priorität auf die Produktion von Holdbacks legen, die {{holdback}} tragen.",
+			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
+			"secondSummary": "Das {{sex}} Holdback ({{holdback}}) behalten. Mit {{partner}} paaren für {{chance}}% Chance auf das Ziel.",
+			"holdbackSex": {
+				"female": "Weibchen",
+				"male": "Männchen"
+			}
+		}
+	}
+}

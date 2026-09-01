@@ -1,0 +1,36 @@
+{
+	"quickAdd": {
+		"date": "Datum",
+		"feedType": "Futterart",
+		"size": "Größe",
+		"selectPlaceholder": "Auswählen",
+		"customSizePlaceholder": "Benutzerdefinierte Größe",
+		"weight": "Gewicht (g)",
+		"form": "Form",
+		"methodDetailsPlaceholder": "Methodendetails",
+		"gramsLabel": "Gramm",
+		"recentProgress": "Aktueller Fortschritt",
+		"medicationDrug": "Medikament",
+		"medicationDose": "Dosis",
+		"notes": "Notizen",
+		"feedOptions": {
+			"mouse": "Maus",
+			"rat": "Ratte",
+			"chick": "Küken",
+			"other": "Sonstiges"
+		},
+		"sizeOptions": {
+			"pinky": "pinky",
+			"fuzzy": "fuzzy",
+			"medium": "mittel",
+			"adult": "adult",
+			"other": "Sonstiges"
+		},
+		"formOptions": {
+			"live": "Lebendfutter",
+			"fresh": "Frisch getötet",
+			"frozen": "Gefroren/aufgetaut",
+			"other": "Sonstiges"
+		}
+	}
+}

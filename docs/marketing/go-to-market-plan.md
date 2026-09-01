@@ -80,7 +80,7 @@ This mirrors the implementation plan's phases deliberately — each marketing ph
 ### Phase A — Community Seeding & Waitlist (start now, no engineering dependency)
 
 **Goal:** build an owned audience and prove messaging before there's anything to sell.
-- Stand up a public "in development" landing presence (the existing `breeding-app-public` app) with honest framing — waitlist signup, no false claims of a finished paid product.
+- Stand up a public "in development" landing presence (the existing `breeding-app-home` app) with honest framing — waitlist signup, no false claims of a finished paid product.
 - Begin organic community presence: helpful, non-promotional participation in the Facebook groups/Reddit/Discord servers in §2.2. Credibility here is earned over months, not bought — start now regardless of engineering timeline.
 - Start content marketing (§6.2) — genetics/pedigree educational content is valuable to the community independent of whether Serpentora exists yet, and builds SEO equity early.
 - Recruit a small private beta cohort (10–30 breeders, ideally spanning hobbyist and pro) directly from community relationships — this doubles as Phase 1/2 QA (real multi-user, real data volume) and as the first word-of-mouth seed.
@@ -190,7 +190,7 @@ This plan is written to work at two very different spend levels — pick one del
 ## 10. Immediate Next Actions (30/60/90)
 
 **Next 30 days (Phase A start — no engineering dependency):**
-1. Confirm the "in development" waitlist landing page copy is honest about current status (no false paid-product claims) — coordinate with `breeding-app-public`.
+1. Confirm the "in development" waitlist landing page copy is honest about current status (no false paid-product claims) — coordinate with `breeding-app-home`.
 2. Identify and join 5–10 target Facebook groups/Discord servers/forums (§2.2); begin genuine, non-promotional participation.
 3. Draft the first 3–5 educational content pieces (genetics/pedigree topics from §6.2).
 4. Identify 5–10 candidate mid-size creator partners (§6.3) for future outreach — no outreach yet, just the list.

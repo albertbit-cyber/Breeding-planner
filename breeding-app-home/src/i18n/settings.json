@@ -1,0 +1,6 @@
+{
+  "supportedLangs": ["en", "es", "fr", "it", "de", "nl", "pl", "pt", "cs", "he"],
+  "namespaces": ["common", "animals", "advisor", "auth", "electron"],
+  "defaultNamespace": "common",
+  "fallbackLng": "en"
+}

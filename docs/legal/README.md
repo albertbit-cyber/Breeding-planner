@@ -5,11 +5,11 @@
 
 ## Where they live
 
-The documents are React pages in `breeding-app-public`, and those pages are the
+The documents are React pages in `breeding-app-home`, and those pages are the
 **single source of truth**:
 
-- `breeding-app-public/src/pages/PrivacyPage.jsx` → `/privacy`
-- `breeding-app-public/src/pages/TermsPage.jsx` → `/terms`
+- `breeding-app-home/src/home/pages/PrivacyPage.jsx` → `/privacy`
+- `breeding-app-home/src/home/pages/TermsPage.jsx` → `/terms`
 
 They are deliberately *not* mirrored into markdown here. Two copies of a legal
 document that can drift apart is worse than having one — if you need a copy for a
@@ -21,8 +21,8 @@ The readiness audit flagged that both signup forms linked to a Terms of Service
 and Privacy Policy that did not exist anywhere in the repository. That is now
 resolved in three places:
 
-- `breeding-app-public` footer — the two `href="#"` placeholders now route to the real pages.
-- `breeding-app-public` register form — "By signing up you agree to…" now links both documents.
+- `breeding-app-home` footer — the two `href="#"` placeholders now route to the real pages.
+- `breeding-app-home` register form — "By signing up you agree to…" now links both documents.
 - `breeding-app-breeder` signup (`AuthGate.jsx`) — the consent checkbox previously read
   "I agree to the Terms of Service and keeper guidelines" as plain text with nothing to open.
   It now renders links to the public site, via `VITE_PUBLIC_SITE_URL` (defaults to

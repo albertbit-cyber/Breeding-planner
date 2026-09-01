@@ -41,7 +41,7 @@ audience with a distinct job, while sharing one visual language (see §6).
 
 | Surface | Audience | Folder | Deployed as |
 |---|---|---|---|
-| **Public marketing site** | Prospective customers, logged-out visitors | `breeding-app-public` | Marketing website + login/register/pricing |
+| **Public marketing site** | Prospective customers, logged-out visitors | `breeding-app-home` | Marketing website + login/register/pricing |
 | **Breeder app** | Reptile breeders (the primary paying customer) | `breeding-app-breeder` (canonical), also `src` in repo root | Web, Electron desktop, Capacitor Android/iOS |
 | **Marketplace** | Breeders browsing/selling animals (buyer + seller in one surface) | `breeding-app-marketplace` | Embedded in breeder app + standalone web |
 | **Lab portal** | Lab technicians processing genetic test orders | `breeding-app-lab` | Web + Capacitor Android app for lab techs |

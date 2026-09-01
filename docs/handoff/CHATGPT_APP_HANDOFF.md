@@ -56,7 +56,7 @@ breeding-app-breeder/       Main breeder app (web + Electron + Capacitor Android
 breeding-app-admin/         Admin/moderation back-office (web only)
 breeding-app-lab/           Lab portal (web + its own Capacitor Android app)
 breeding-app-marketplace/   Standalone marketplace app (web only)
-breeding-app-public/        Public marketing site (web only)
+breeding-app-home/          Public landing page / marketing site (web only)
 breeding-app-shared/        Shared TS library (types, api client, constants, genetics) consumed by the others
 ```
 
@@ -112,7 +112,7 @@ Data model highlights (~45 Prisma models) — grouped by domain:
 
 Two Railway environments exist: **staging** and **production**, each with its own backend + database.
 Frontends are deployed to a mix of Railway and Netlify (each app folder has its own config; only
-`breeding-app-marketplace` lacks a `railway.toml`, only `breeding-app-public`/`breeding-app-backend`
+`breeding-app-marketplace` lacks a `railway.toml`, only `breeding-app-home`/`breeding-app-backend`
 lack a `netlify.toml`). Every frontend reads its backend URL from `VITE_API_URL` at **build time**
 (baked into the JS bundle, not runtime-configurable) — so mismatched staging/production URLs are a
 recurring class of bug (see §7). Android builds similarly bake in the backend URL via
@@ -128,7 +128,7 @@ One product family behind one login; a user's `role` (`breeder` / `lab` / `admin
 
 | Surface | Audience | Folder | Deployed as |
 |---|---|---|---|
-| **Public marketing site** | Prospective customers, logged-out visitors | `breeding-app-public` | Marketing website + login/register/pricing |
+| **Public marketing site** | Prospective customers, logged-out visitors | `breeding-app-home` | Marketing website + login/register/pricing |
 | **Breeder app** | Reptile breeders (primary paying customer) | `breeding-app-breeder` | Web, Electron desktop, Capacitor Android/iOS |
 | **Marketplace** | Breeders browsing/selling animals | `breeding-app-marketplace` | Embedded in breeder app + standalone web |
 | **Lab portal** | Lab technicians processing genetic test orders | `breeding-app-lab` | Web + Capacitor Android app for lab techs |
