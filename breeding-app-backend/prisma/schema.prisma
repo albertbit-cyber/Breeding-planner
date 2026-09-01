@@ -772,6 +772,12 @@ model LabAccount {
 
   @@index([status])
   @@index([listedInDirectory])
+  // GIN, because this is an array column queried with array containment.
+  // Declared here as well as in 20260831090000_species_vocabulary so the
+  // datamodel matches the database: while it was missing, `prisma migrate
+  // diff` reported a standing 125-byte drift that wanted to DROP both of
+  // these real, working indexes.
+  @@index([servedSpeciesIds(ops: ArrayOps)], type: Gin)
 }
 
 model GdprRequest {
@@ -1355,6 +1361,12 @@ model LabTestOffering {
   @@unique([organizationId, name])
   @@index([organizationId, active])
   @@index([catalogRefId])
+  // GIN, because this is an array column queried with array containment.
+  // Declared here as well as in 20260831090000_species_vocabulary so the
+  // datamodel matches the database: while it was missing, `prisma migrate
+  // diff` reported a standing 125-byte drift that wanted to DROP both of
+  // these real, working indexes.
+  @@index([speciesIds(ops: ArrayOps)], type: Gin)
   @@map("lab_test_offerings")
 }
 
