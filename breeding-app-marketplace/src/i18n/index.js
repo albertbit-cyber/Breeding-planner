@@ -143,12 +143,27 @@ const resources = {
   },
 };
 
+// Resolve the language to initialise with.
+// - Returning users: restore whatever they stored in localStorage.
+// - First-time users (nothing stored): always start in English.
+const getInitialLanguage = () => {
+  try {
+    const stored = localStorage.getItem("i18nextLng");
+    const base = stored ? stored.split("-")[0] : "";
+    if (base && SUPPORTED_LANGS.includes(base)) return base;
+  } catch {
+    // ignore - localStorage may be unavailable
+  }
+  return FALLBACK_LANGUAGE;
+};
+
 if (!i18n.isInitialized) {
   i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
       resources,
+      lng: getInitialLanguage(), // explicit > detector; ensures English on first load
       fallbackLng: FALLBACK_LANGUAGE,
       ns: NAMESPACES,
       defaultNS: DEFAULT_NAMESPACE,
@@ -158,7 +173,8 @@ if (!i18n.isInitialized) {
         escapeValue: false,
       },
       detection: {
-        order: ["localStorage", "navigator", "htmlTag", "path", "subdomain"],
+        // Only cache language changes the user explicitly makes via the selector.
+        order: ["localStorage"],
         caches: ["localStorage"],
       },
     });

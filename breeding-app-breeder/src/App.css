@@ -1614,6 +1614,135 @@
   backdrop-filter: blur(12px);
 }
 
+/* Animals toolbar — one shape and one colour for every control on the row.
+   The row used to mix three treatments: pill-shaped filter tabs, white outlined
+   boxes around the layout toggle and the sort select, and filled action buttons.
+   These classes put them all on the filled pill so the row reads as one strip.
+   Sizing uses !important for the same reason .header-nav-button does: the base
+   .appearance-btn / .appearance-tab rules and the Tailwind utilities on the
+   elements have equal specificity, so ordering alone decides the winner. */
+.bp-toolbar-control {
+  border-radius: 999px !important;
+  padding: 0.42rem 0.85rem !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Everything on the row shares a fill, so the selected filter cannot be marked with a different
+   colour. An inset ring keeps shape and colour identical and still shows which filter is active.
+   Scoped under .app-root to outrank .appearance-btn--filled's own box-shadow, which is declared
+   later in this file at the same specificity and would otherwise erase the ring. */
+.app-root .bp-toolbar-control--selected {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9), 0 15px 30px rgba(14, 165, 233, 0.25);
+}
+
+.bp-toolbar-control:disabled {
+  cursor: not-allowed;
+}
+
+/* `.app-root button` forces `background: var(--primary) !important` on every button in the app,
+   so the buttons on this row already share one colour. The sort control is a div wrapping a
+   select, so it never matches that rule and would fall back to `--color-primary`, a different
+   variable that can resolve to a different shade. Mirror the button rule so the whole row stays
+   one colour under every skin. */
+.app-root .bp-toolbar-control:not(button) {
+  background: var(--primary, var(--color-primary, #0ea5e9)) !important;
+  color: var(--primary-contrast, #fff) !important;
+  border-color: var(--primary-border, transparent) !important;
+}
+
+/* The direction toggle sits inside the sort pill. Without this it matches `.app-root button`
+   and paints its own fill on top of the pill it lives in. */
+.app-root .bp-toolbar-control .bp-toolbar-sort-dir {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+
+/* Cards / List / sort are one control: all three decide how the same list is drawn. They live
+   in a single pill the same height and shape as every other button on the row, split by
+   hairline dividers, so the row reads as one segmented switch instead of three buttons that
+   happen to be adjacent. The pill keeps its own horizontal padding at zero — each segment
+   carries the padding instead, so the dividers reach the pill's edges. */
+.bp-toolbar-segment {
+  padding: 0 !important;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Segments must not paint their own fill over the pill. `.app-root button` forces a background
+   with !important, so transparency has to be forced back the same way. */
+.app-root .bp-toolbar-segment button,
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+.bp-toolbar-segment__part {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  font: inherit;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* Declared after the reset above, and with the extra `.app-root` needed to outrank it, or the
+   blanket `border: 0` would erase the dividers. */
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part + .bp-toolbar-segment__part {
+  border-left: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* One fill for the whole pill means the active segment cannot be marked with a different
+   colour; a translucent white wash keeps the shape identical and still shows which is on. */
+.app-root .bp-toolbar-segment .bp-toolbar-segment__part--selected {
+  background: rgba(255, 255, 255, 0.24) !important;
+}
+
+/* The sort control is a native select; it has to inherit the pill's colours
+   rather than the browser default, and the dropdown list needs readable
+   colours of its own because it renders outside the pill. */
+.bp-toolbar-select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding-right: 0.2rem;
+  cursor: pointer;
+}
+
+.bp-toolbar-select:focus {
+  outline: none;
+}
+
+.bp-toolbar-select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+/* Scanner status sits at the end of the row and is deliberately quieter than
+   the buttons: it reports state, it is not something to press. */
+.bp-toolbar-status {
+  border-radius: 999px;
+  padding: 0.24rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 /* Appearance designer */
 .appearance-btn {
   font-weight: 600;
@@ -1639,6 +1768,65 @@
   color: var(--sk-text-on-accent, #fff);
   border-color: transparent;
   box-shadow: var(--sk-shadow-2);
+}
+
+/* Snake editor header. The cover photo takes roughly a fifth of the header width. It stretches
+   to whatever height the name and actions beside it need rather than holding a square: a square
+   at this width is taller than that stack, and the leftover space beside it read as a gap in
+   the header. */
+.snake-editor-thumb {
+  position: relative;
+  width: 20%;
+  max-width: 8.5rem;
+  align-self: stretch;
+  min-height: 5rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 2px solid rgb(229, 229, 229);
+  background: rgb(250, 250, 250);
+}
+
+/* Pinned rather than laid out in flow: a stretched flex item with no height of its own falls
+   back to its content's intrinsic size, so the square photo made the box square again and put
+   the gap back. Out of flow, the box is exactly as tall as the name and actions beside it. */
+.snake-editor-thumb > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* All seven actions on one row. Equal flex tracks rather than fixed columns, so the row fills
+   the header exactly and a long label like "Order Genetic Test" cannot make its own button
+   wider than "QR label" beside it. The labels wrap to a second line inside the button instead
+   of pushing the row wider. */
+.snake-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.snake-editor-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  white-space: normal;
+  border-radius: 0.6rem;
+}
+
+/* Below the modal's own breakpoint the header stacks, and seven equal tracks would each be
+   too narrow to read; two rows of buttons are the honest fallback. */
+@media (max-width: 640px) {
+  .snake-editor-action {
+    flex: 1 1 30%;
+  }
 }
 
 .appearance-btn:focus-visible {
@@ -3115,26 +3303,7 @@
   text-overflow: ellipsis;
 }
 
-.bp-header-mobile__search {
-  padding: 0 14px 10px;
-}
-
-.bp-header-mobile__search input {
-  width: 100%;
-  padding: 9px 14px;
-  border: 1.5px solid rgba(82, 47, 124, 0.25);
-  border-radius: 12px;
-  font-size: 0.875rem;
-  background: var(--sk-surface-2, #fafafa);
-  outline: none;
-  box-sizing: border-box;
-  color: var(--sk-text, #0f172a);
-}
-
-.bp-header-mobile__search input:focus {
-  border-color: rgba(82, 47, 124, 0.5);
-  background: var(--sk-surface, #fff);
-}
+/* The mobile header search moved into the Animals section and now reuses .header-search-*. */
 
 /* ── Mobile bottom navigation bar ────────────────────────────── */
 .bp-mobile-bottom-nav {

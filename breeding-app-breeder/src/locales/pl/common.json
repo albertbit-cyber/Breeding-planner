@@ -758,7 +758,6 @@
   "export.pairingsSheetName": "Pary",
   "export.errors.selectField": "Wybierz co najmniej jedno pole przed eksportem.",
   "export.errors.noAnimals": "Brak zwierz?t dost?pnych do eksportu.",
-  "export.errors.noSaleAnimals": "Nie znaleziono zwierz?t oznaczonych na sprzeda?.",
   "export.errors.noPairings": "Brak projekt?w hodowlanych dost?pnych do eksportu.",
   "export.feedback.animalsPdf": "{{count}} Tiere als PDF exportiert.",
   "export.feedback.animalsPdfFailed": "Tierexport als PDF fehlgeschlagen.",

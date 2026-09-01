@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "short-tailed-python",
+  "speciesName": "Short-Tailed Pythons",
+  "scientificName": "Python brongersmai",
+  "genes": [
+    {
+      "geneName": "Albino (T+)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Albino (T-) (Blood)",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": null,
+      "notes": null
+    },
+    {
+      "geneName": "Batik",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Caramel Albino (VPI)",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Golden Eye",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Matrix",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Pollen",
+      "geneType": "incomplete_dominant",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "2018",
+      "rarity": "rarest",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino (T+)",
+      "Albino (T-) (Blood)"
+    ],
+    "incompleteDominantGenes": [
+      "Batik",
+      "Caramel Albino (VPI)",
+      "Golden Eye",
+      "Matrix",
+      "Pollen"
+    ],
+    "dominantGenes": [],
+    "polygenicGenes": [],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": []
+  }
+}

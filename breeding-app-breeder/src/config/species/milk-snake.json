@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "speciesId": "milk-snake",
+  "speciesName": "Milk Snakes",
+  "scientificName": "Lampropeltis triangulum",
+  "genes": [
+    {
+      "geneName": "Albino",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1995",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Anerythristic",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Hypo",
+      "geneType": "recessive",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": "1993",
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Normal",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Paradox",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Striped",
+      "geneType": "other",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    },
+    {
+      "geneName": "Tangerine",
+      "geneType": "polygenic",
+      "complex": null,
+      "hasSuperForm": false,
+      "superGeneName": null,
+      "aliases": [],
+      "shorthand": [],
+      "healthFlags": [],
+      "yearDiscovered": null,
+      "rarity": "rarest",
+      "notes": null
+    }
+  ],
+  "groups": {
+    "recessiveGenes": [
+      "Albino",
+      "Anerythristic",
+      "Hypo"
+    ],
+    "incompleteDominantGenes": [],
+    "dominantGenes": [],
+    "polygenicGenes": [
+      "Tangerine"
+    ],
+    "localityGenes": [],
+    "physicalGenes": [],
+    "otherGenes": [
+      "Normal",
+      "Paradox",
+      "Striped"
+    ]
+  }
+}

@@ -48,6 +48,10 @@ const asRecord = (value: unknown): Record<string, any> => (
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {}
 );
 
+// Mirrors isQuarantineTag in the breeder app's services/quarantine.js: the status tag is the
+// single source of truth for whether an animal is in quarantine.
+const isQuarantineTag = (value: unknown): boolean => String(value ?? "").trim().toLowerCase() === "quarantine";
+
 const parseQrCode = (rawValue: unknown): string => {
   const raw = text(rawValue, 2000);
   if (!raw) throw new HttpError(400, "QR code is required.");
@@ -103,7 +107,11 @@ const normalizeAnimal = (row: any) => {
       payload.paired ? "paired" : "",
       payload.gravid ? "gravid" : "",
       payload.forSale || payload.marketplacePublished ? "for sale" : "",
-      payload.quarantine ? "quarantine" : "",
+      // The status tag is what actually marks an animal as quarantined. This used to test
+      // `payload.quarantine` for truthiness, which nothing ever wrote -- so the badge never
+      // appeared. `payload.quarantine` is now the record object (dates, notes, history) and is
+      // present for cleared animals too, so truthiness would badge the wrong ones.
+      isQuarantineTag(payload.status || row?.status) ? "quarantine" : "",
       payload.healthAlert ? "health alert" : "",
     ].filter(Boolean),
     logs: {
