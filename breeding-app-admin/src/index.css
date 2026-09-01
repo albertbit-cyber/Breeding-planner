@@ -11,6 +11,21 @@
    onto --sk-* directly. */
 :root {
   --color-primary:   var(--sk-primary);
+  /* The pre-skin AppearanceContext wrote --primary/--primary-border/
+     --primary-contrast onto the document from the resolved palette. That JS is
+     gone, but App.css still reads all three, and a var() with no definition and
+     no fallback is invalid at computed-value time -- so `background:
+     var(--primary) !important` was resolving to nothing while the neighbouring
+     `color: var(--primary-contrast, #fff)` still took its literal fallback,
+     leaving white text on an unpainted button. Bridged here like the --color-*
+     names above.
+
+     --primary-contrast maps to --sk-text-on-accent, NOT --sk-text as the old JS
+     had it: the label sits ON the primary fill, and conflating those two roles
+     is what used to render button text invisible. */
+  --primary:          var(--sk-primary);
+  --primary-border:   var(--sk-border-strong);
+  --primary-contrast: var(--sk-text-on-accent);
   --color-secondary: var(--sk-border-strong);
   --color-accent:    var(--sk-accent);
   --color-bg:        var(--sk-bg);

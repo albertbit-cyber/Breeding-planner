@@ -1645,15 +1645,21 @@
   cursor: not-allowed;
 }
 
-/* `.app-root button` forces `background: var(--primary) !important` on every button in the app,
-   so the buttons on this row already share one colour. The sort control is a div wrapping a
-   select, so it never matches that rule and would fall back to `--color-primary`, a different
-   variable that can resolve to a different shade. Mirror the button rule so the whole row stays
-   one colour under every skin. */
+/* The sort control is a div wrapping a select, so it never matches the button
+   baseline and would otherwise paint itself. It carries primaryBtnClass, so it
+   is mirrored onto the same skin roles .appearance-btn--filled uses and the
+   whole row stays one colour under every skin.
+
+   This used to read var(--primary, var(--color-primary, #0ea5e9)) to mirror the
+   blanket `.app-root button { background: var(--primary) !important }` hammer.
+   That hammer is gone -- replaced by the opt-in variants documented above -- and
+   --primary, --primary-contrast and --primary-border are now defined nowhere, so
+   every one of those three declarations was silently resolving to its literal
+   fallback: a fixed #0ea5e9 sky blue and white ink on all sixteen skins. */
 .app-root .bp-toolbar-control:not(button) {
-  background: var(--primary, var(--color-primary, #0ea5e9)) !important;
-  color: var(--primary-contrast, #fff) !important;
-  border-color: var(--primary-border, transparent) !important;
+  background: var(--sk-primary) !important;
+  color: var(--sk-text-on-accent) !important;
+  border-color: transparent !important;
 }
 
 /* The direction toggle sits inside the sort pill. Without this it matches `.app-root button`
@@ -1727,9 +1733,15 @@
   outline: none;
 }
 
+/* The native popup does not inherit the select's `color: inherit`, so it needs
+   the pair stated explicitly or a dark skin renders light text on the browser's
+   default white list. Stated as skin roles rather than a hardcoded white/ink
+   pair: skins.contrast.test.js holds --sk-text on --sk-surface to 4.5:1 on all
+   sixteen skins, so this is legible by construction on every one of them, which
+   the fixed pair only managed on the light skins. */
 .bp-toolbar-select option {
-  color: #0f172a;
-  background: #ffffff;
+  color: var(--sk-text);
+  background: var(--sk-surface);
 }
 
 /* Scanner status sits at the end of the row and is deliberately quieter than

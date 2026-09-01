@@ -93,6 +93,23 @@ describe("lab label layout engine", () => {
     });
     expect(layout.destinationBox.heightMm).toBeGreaterThan(0);
     expect(layout.senderBox.heightMm).toBeGreaterThan(0);
+    // The header word shares its line with the name on purpose, so that a small
+    // label does not spend a whole line on the word "TO" and then truncate the
+    // country off the bottom. This assertion used to expect a standalone "TO"
+    // and had been failing ever since that change.
+    expect(content.destinationLines[0]).toBe("TO: Lab");
+    expect(content.senderLines[0]).toBe("FROM: Breeder");
+  });
+
+  it("falls back to a bare TO/FROM header when there is no name to share the line", () => {
+    const content = buildShippingLabelContent({
+      orderId: "o1",
+      orderNumber: "ORDER-1",
+      labAddress: { line1: "123 Lab Lane", city: "Phoenix", postalCode: "85001", country: "US" },
+      breeder: { address: { line1: "456 Breeder Rd", city: "Berlin", postalCode: "10115", country: "DE" } },
+      createdAt: new Date().toISOString(),
+      sampleCount: 4,
+    });
     expect(content.destinationLines[0]).toBe("TO");
     expect(content.senderLines[0]).toBe("FROM");
   });
