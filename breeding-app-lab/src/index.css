@@ -1,18 +1,30 @@
+/* This app has no Tailwind, so it imports the skin palette only — no bridge.
+   Relative path: there are no npm workspaces in this repo, so a bare
+   "@breeding/shared" specifier would not resolve. */
+@import "../../breeding-app-shared/src/styles/skins.css";
+@import "../../breeding-app-shared/src/styles/materials.css";
+@import "../../breeding-app-shared/src/styles/materials-bridge.css";
+
+/* Compatibility shims. The legacy --color-* names are still referenced across
+   this app's App.css; they now read through to the skin roles so a skin change
+   reaches them without a stylesheet sweep. Delete these once the CSS is swept
+   onto --sk-* directly. */
 :root {
-  /* Shared visual language tokens — see VISUAL_LANGUAGE.md. Default preset values. */
-  --color-primary: #0ea5e9;
-  --color-secondary: #2563eb;
-  --color-accent: #f59e0b;
-  --color-bg: #f6f7f9;
-  --color-card: #ffffff;
-  --color-text: #0f172a;
+  --color-primary:   var(--sk-primary);
+  --color-secondary: var(--sk-border-strong);
+  --color-accent:    var(--sk-accent);
+  --color-bg:        var(--sk-bg);
+  --color-card:      var(--sk-surface);
+  --color-text:      var(--sk-text);
+  --border-radius:   var(--sk-radius, 8px);
   --font-family: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --border-radius: 8px;
 }
 
 body {
   margin: 0;
   font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif);
+  background: var(--mt-shell-bg, var(--sk-bg));
+  color: var(--sk-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

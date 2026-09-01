@@ -43,7 +43,7 @@ const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
           <button
             key={token}
             type="button"
-            className="inline-flex items-center rounded-full bg-slate-700 px-3 py-1 text-xs text-white hover:bg-slate-600"
+            className="inline-flex items-center rounded-full bg-slate-700 px-3 py-1 text-xs sk-on-accent hover:bg-slate-600"
             onClick={() => onChange(tokens.filter((t) => t !== token))}
           >
             <span>{token}</span>
@@ -57,7 +57,7 @@ const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
         onKeyDown={handleKeyDown}
         onBlur={() => handleAddToken(draft)}
         placeholder={placeholder}
-        className="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
+        className="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm sk-on-accent focus:border-slate-400 focus:outline-none"
       />
     </div>
   );
@@ -83,7 +83,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
           value={goal.name}
           onChange={(event) => onUpdate({ ...goal, name: event.target.value })}
           placeholder={t("advisor.goals.namePlaceholder", { defaultValue: "Goal name" })}
-          className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
+          className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm sk-on-accent focus:border-slate-400 focus:outline-none"
         />
         <button
           type="button"
@@ -126,7 +126,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
                 recessiveState: event.target.value ? event.target.value : undefined,
               })
             }
-            className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
+            className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm sk-on-accent focus:border-slate-400 focus:outline-none"
           >
             <option value="">{t("advisor.goals.recessiveState.any", { defaultValue: "Any" })}</option>
             <option value="visual">{t("advisor.goals.recessiveState.visual", { defaultValue: "Visual" })}</option>
@@ -179,7 +179,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
         <button
           type="button"
           onClick={requestPreset}
-          className="rounded bg-slate-700 px-3 py-1 text-sm text-white hover:bg-slate-600"
+          className="rounded bg-slate-700 px-3 py-1 text-sm sk-on-accent hover:bg-slate-600"
         >
           {t("advisor.goals.loadPreset", { defaultValue: "Load Preset" })}
         </button>
@@ -229,11 +229,11 @@ export const GoalsPanel = ({ goals, onChange }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">{t("advisor.goals.title", { defaultValue: "Goals" })}</h2>
+        <h2 className="text-lg font-semibold sk-on-accent">{t("advisor.goals.title", { defaultValue: "Goals" })}</h2>
         <button
           type="button"
           onClick={handleAddGoal}
-          className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+          className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium sk-on-accent hover:bg-emerald-500"
         >
           {t("advisor.goals.add", { defaultValue: "Add Goal" })}
         </button>
@@ -262,7 +262,7 @@ export const GoalsPanel = ({ goals, onChange }) => {
                     {t("advisor.goals.presets.close", { defaultValue: "Close" })}
                   </button>
                 </div>
-                <ul className="max-h-48 overflow-auto text-sm text-white">
+                <ul className="max-h-48 overflow-auto text-sm sk-on-accent">
                   {GOAL_PRESETS.map((preset) => (
                     <li key={preset.id}>
                       <button

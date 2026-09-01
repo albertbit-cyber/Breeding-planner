@@ -19,10 +19,10 @@ const ViewTabs = ({ activeTab, onTabChange }) => (
         className={[
           'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0',
           activeTab === tab.id
-            ? 'bg-violet-600 text-white shadow-sm'
+            ? 'sk-tab-active shadow-sm'
             : tab.ready
-            ? 'text-neutral-500 hover:bg-violet-50 hover:text-violet-700'
-            : 'text-neutral-300 cursor-not-allowed',
+            ? 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+            : 'text-neutral-400 cursor-not-allowed',
         ].join(' ')}
         disabled={!tab.ready}
       >

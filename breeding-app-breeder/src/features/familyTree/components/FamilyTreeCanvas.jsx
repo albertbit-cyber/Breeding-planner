@@ -96,26 +96,26 @@ const FlowBody = ({ initialNodes, initialEdges, onNodeClick }) => {
           zoomable
           pannable
           nodeColor={(n) => {
-            if (n.type === 'placeholderNode') return '#e5e7eb';
-            if (n.type === 'junctionNode') return '#7c3aed';
-            if (n.type === 'clutchNode') return '#8b5cf6';
+            if (n.type === 'placeholderNode') return 'var(--sk-border)';
+            if (n.type === 'junctionNode') return 'var(--sk-series-4)';
+            if (n.type === 'clutchNode') return 'var(--sk-series-6)';
             const role = n.data?.nodeRole;
-            if (n.data?.isSelected) return '#7c3aed';
-            if (role === 'sire')      return '#0ea5e9';
-            if (role === 'dam')       return '#ec4899';
-            if (role === 'offspring') return '#10b981';
-            return '#a78bfa';
+            if (n.data?.isSelected) return 'var(--sk-series-4)';
+            if (role === 'sire')      return 'var(--sk-series-1)';
+            if (role === 'dam')       return 'var(--sk-series-2)';
+            if (role === 'offspring') return 'var(--sk-series-3)';
+            return 'var(--sk-series-6)';
           }}
           style={{
-            background: '#f5f3ff',
-            border: '1px solid #ddd6fe',
+            background: 'var(--sk-surface-2)',
+            border: '1px solid var(--sk-border)',
             borderRadius: '10px',
           }}
         />
         <Controls
-          style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #ddd6fe' }}
+          style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--sk-border)' }}
         />
-        <Background gap={20} size={1} color="#ede9fe" variant="dots" />
+        <Background gap={20} size={1} color="var(--sk-border)" variant="dots" />
       </ReactFlow>
     </div>
   );

@@ -286,7 +286,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
               onClick={toggleHetMode}
               className={`px-2 py-0.5 rounded-l text-[11px] font-semibold leading-tight border transition-colors ${
                 hetMode
-                  ? 'bg-sky-500 text-white border-sky-500'
+                  ? 'bg-sky-500 sk-on-accent border-sky-500'
                   : 'bg-neutral-100 text-neutral-600 border-neutral-200 hover:bg-neutral-200'
               }`}
               title={hetMode ? 'Adding as het — click to switch to visual' : 'Adding as visual — click to switch to het'}
@@ -298,7 +298,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
                 <button
                   type="button"
                   onClick={() => setQualOpen(q => !q)}
-                  className="px-1.5 py-0.5 bg-sky-400 text-white text-[10px] font-medium border-l border-sky-600 rounded-r hover:bg-sky-500 leading-tight"
+                  className="px-1.5 py-0.5 bg-sky-400 sk-on-accent text-[10px] font-medium border-l border-sky-600 rounded-r hover:bg-sky-500 leading-tight"
                   title="Het qualifier (50%, 66%, Possible, etc.)"
                 >
                   {hetQualifier || '…'}

@@ -1,10 +1,14 @@
+@import "../../breeding-app-shared/src/styles/skins.css";
+@import "../../breeding-app-shared/src/styles/materials.css";
+@import "../../breeding-app-shared/src/styles/materials-bridge.css";
+
 /* ── Reset ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
   font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
-  background: #fff;
-  color: var(--color-text, #0f172a);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -13,47 +17,51 @@ button, input, select, textarea { font: inherit; }
 img { max-width: 100%; }
 
 /* ── CSS variables ─────────────────────────────────── */
+/* The palette now comes from the shared skin system. This app's own names
+   (--gold, --dark, --coral, …) are kept as aliases so the 200 lines of
+   component CSS below need no sweep, but every one of them now resolves to a
+   skin role instead of a literal. */
 :root {
-  /* Brand */
-  /* Shared visual language tokens — see VISUAL_LANGUAGE.md */
-  --color-primary: #0ea5e9;
-  --color-secondary: #2563eb;
-  --color-accent: #f59e0b;
-  --color-bg: #f6f7f9;
-  --color-card: #ffffff;
-  --color-text: #0f172a;
+  /* Legacy visual-language names, retained for one release. */
+  --color-primary:   var(--sk-primary);
+  --color-secondary: var(--sk-border-strong);
+  --color-accent:    var(--sk-accent);
+  --color-bg:        var(--sk-bg);
+  --color-card:      var(--sk-surface);
+  --color-text:      var(--sk-text);
   --font-family: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
-  --dark:     var(--color-text, #0f172a);
-  --dark2:    #1e293b;
-  --gold:     var(--color-primary, #0ea5e9);
-  --gold-lt:  #e0f2fe;
-  --gold-dk:  #075985;
+  --dark:     var(--sk-text);
+  --dark2:    var(--sk-text-secondary);
+  --gold:     var(--sk-primary);
+  --gold-lt:  var(--sk-success-bg);
+  --gold-dk:  var(--sk-primary-hover);
 
-  /* Data cell colors (from actual app screenshot) */
-  --feed:     #7ea8a2;
-  --weight:   #8fa898;
-  --cleaning: #c49282;
-  --shed:     #d4b96a;
-  --meds:     #b8806a;
-  --group:    #f0ece0;
+  /* Data cell colors — mapped onto the shared data-series roles so they
+     re-tint per skin instead of being frozen to one screenshot. */
+  --feed:     var(--sk-series-3);
+  --weight:   var(--sk-series-1);
+  --cleaning: var(--sk-series-5);
+  --shed:     var(--sk-series-2);
+  --meds:     var(--sk-series-6);
+  --group:    var(--sk-surface-3);
 
   /* Genetics tag colors */
-  --coral:    #d86060;
-  --coral-lt: #fbd5d5;
-  --coral-dk: #a03030;
-  --purple:   #9b65d6;
-  --purple-lt:#e8dff8;
-  --purple-dk:#5a2896;
+  --coral:    var(--sk-danger-text);
+  --coral-lt: var(--sk-danger-bg);
+  --coral-dk: var(--sk-danger-text);
+  --purple:   var(--sk-series-4);
+  --purple-lt:var(--sk-surface-2);
+  --purple-dk:var(--sk-series-4);
 
   /* Surfaces */
-  --bg:       var(--color-bg, #f6f7f9);
-  --bg-card:  #ffffff;
-  --border:   #e5e0d4;
-  --muted:    #7a7265;
-  --hint:     #a09888;
+  --bg:       var(--sk-bg);
+  --bg-card:  var(--sk-surface);
+  --border:   var(--sk-border);
+  --muted:    var(--sk-text-muted);
+  --hint:     var(--sk-text-subtle);
 
-  --radius:    8px;
+  --radius:    var(--sk-radius, 8px);
   --radius-lg: 12px;
 }
 

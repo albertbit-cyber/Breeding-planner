@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import React, { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "./i18n";
@@ -28,7 +28,7 @@ import {
 } from "./features/lab/utils/labelSizing";
 import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
-import { useAppearance } from "./contexts/AppearanceContext.jsx";
+import { useAppearance, HIGH_CONTRAST_SKIN, materialStatus } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
 import {
   changeAccountEmail,
@@ -179,7 +179,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+    <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
       <form className="w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
         <div>
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
@@ -306,7 +306,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
           <button type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
           <button
             type="submit"
-            className={cx('px-4 py-2 rounded-2xl text-white', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
+            className={cx('px-4 py-2 rounded-2xl sk-on-accent', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
             disabled={!canSubmit}
           >
             {mode === 'edit' ? t('common.save', { defaultValue: 'Save' }) : t('spaces.addRack', { defaultValue: 'Add Rack' })}
@@ -352,7 +352,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+    <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
       <form className="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
         <div>
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
@@ -431,7 +431,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
           <button type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
           <button
             type="submit"
-            className={cx('px-4 py-2 rounded-2xl text-white', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
+            className={cx('px-4 py-2 rounded-2xl sk-on-accent', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
             disabled={!canSubmit}
           >
             {mode === 'edit' ? t('common.save', { defaultValue: 'Save' }) : t('spaces.addTerrarium', { defaultValue: 'Add Terrarium' })}
@@ -554,7 +554,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
   const activeSlotOccupant = activeSlot?.snakeId ? snakeMap.get(activeSlot.snakeId) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-5xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
           <div>
@@ -615,7 +615,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
           ))}
         </div>
         {shouldShowAssignModal && activeSlot && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={dismissAssignModal}>
+          <div className="sk-scrim fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={dismissAssignModal}>
             <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -702,7 +702,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
   const isFull = remainingSlots === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
           <div>
@@ -752,7 +752,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
             </select>
             <button
               type="button"
-              className="w-full rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              className="w-full rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold sk-on-accent disabled:opacity-40"
               disabled={!canAssign}
               onClick={() => {
                 if (!canAssign) return;
@@ -806,7 +806,7 @@ function RoomModal({
   const canMoveDown = roomIndex < roomCount - 1;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-4" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 z-40 flex items-start justify-center overflow-y-auto p-3 sm:p-4" onClick={onClose}>
       <div className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 bg-white px-4 pt-4 sm:px-6 sm:pt-6 flex flex-col gap-4 border-b border-neutral-100 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -6574,7 +6574,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
         <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "This animal is saved in your planner on this device." })}</div>
         <div className="flex gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel")}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm text-white', canSubmit ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))} disabled={!canSubmit} onClick={onAdd}>
+          <button className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', canSubmit ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))} disabled={!canSubmit} onClick={onAdd}>
             {t("ui.animals.addAnimal.button")}
           </button>
         </div>
@@ -6588,10 +6588,18 @@ export default function BreedingPlannerApp() {
   const { appearanceState, resolvedAppearance, effectiveThemeMode, hydrateAppearance } = useAppearance();
   const { snapshot: sharedBackendSnapshot } = useSharedBackend();
   const theme = effectiveThemeMode;
-  const appRootStyle = useMemo(() => ({
-    backgroundColor: resolvedAppearance?.colors?.background || '#f6f7f9',
-    color: resolvedAppearance?.colors?.text || '#0f172a',
-  }), [resolvedAppearance]);
+  // Audit R1. This used to write `backgroundColor` and `color` inline on
+  // .app-root, where an inline style beats every stylesheet rule — so a frozen
+  // light background and, worse, a frozen `#0f172a` ink were inherited by
+  // roughly 300 nodes per dark skin no matter what the skin said.
+  //
+  // (It was doubly broken here: `resolvedAppearance.colors` no longer exists
+  // since the palette moved to skins.css, so both values were always the
+  // hardcoded fallbacks.)
+  //
+  // skins.css now carries `html, body { background: var(--sk-bg); color:
+  // var(--sk-text); }` and .app-root inherits it. The rule going forward: the
+  // theme engine writes custom properties only, never resolved values.
   // logs helpers are defined at module scope (updateLog, LogsEditor)
   // component state
   const [snakes, setSnakesState] = useState(() => {
@@ -7145,7 +7153,7 @@ export default function BreedingPlannerApp() {
             )}
             <button
               type="button"
-              className={cx('px-3 py-2 rounded-xl text-sm text-white', primaryBtnClass(theme, true))}
+              className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true))}
               onClick={handleAppDialogConfirm}
             >
               {confirmLabel}
@@ -8899,7 +8907,7 @@ export default function BreedingPlannerApp() {
       }}>
         ? Gene colors
       </button>
-      <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)'}}>
+      <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: 'var(--sk-surface)', border: '1px solid var(--sk-border)', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--sk-shadow-2)'}}>
         <GeneLegend />
       </div>
     </div>
@@ -10246,9 +10254,9 @@ export default function BreedingPlannerApp() {
 
   return (
     <div
-      className="app-root w-full min-h-screen"
+      className="app-root mt-shell w-full min-h-screen"
       data-background-mode={resolvedAppearance?.backgroundMode === 'logo' ? 'logo' : 'solid'}
-      style={{ ...appRootStyle, '--breeder-logo-bg': breederLogoBackground }}
+      style={{ '--breeder-logo-bg': breederLogoBackground }}
     >
       {appDialogOverlay}
       {/* Desktop header — hidden on mobile via CSS */}
@@ -10259,11 +10267,11 @@ export default function BreedingPlannerApp() {
               {breederInfo.logoUrl ? (
                 <img src={breederInfo.logoUrl} alt="logo" className="w-16 h-16 rounded-full object-cover border shadow-sm" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-400 border shadow-sm">Logo</div>
+                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-600 border shadow-sm">Logo</div>
               )}
               <div className="min-w-0">
-                <div className="text-[28px] leading-tight font-semibold tracking-tight text-[#3c1b73]">{t("app.title")}</div>
-                <div className="text-sm text-[#8257b1] truncate">{breederInfo.businessName ? `${breederInfo.businessName} | ${breederInfo.name || ''}` : (breederInfo.name || '')}</div>
+                <div className="mt-wordmark text-[28px] leading-tight tracking-tight">{t("app.title")}</div>
+                <div className="text-sm text-neutral-600 truncate">{breederInfo.businessName ? `${breederInfo.businessName} | ${breederInfo.name || ''}` : (breederInfo.name || '')}</div>
               </div>
             </div>
             <div className="flex flex-1 flex-wrap items-center justify-end gap-3 min-w-0">
@@ -10399,7 +10407,7 @@ export default function BreedingPlannerApp() {
                       className={cx(
                         'px-2 py-1 rounded-lg font-medium transition-colors',
                         animalLayout === 'cards'
-                          ? 'bg-sky-500 text-white shadow'
+                          ? 'sk-tab-active shadow'
                           : 'text-neutral-600 hover:text-neutral-900'
                       )}
                       aria-pressed={animalLayout === 'cards'}
@@ -10412,7 +10420,7 @@ export default function BreedingPlannerApp() {
                       className={cx(
                         'px-2 py-1 rounded-lg font-medium transition-colors',
                         animalLayout === 'list'
-                          ? 'bg-sky-500 text-white shadow'
+                          ? 'sk-tab-active shadow'
                           : 'text-neutral-600 hover:text-neutral-900'
                       )}
                       aria-pressed={animalLayout === 'list'}
@@ -10439,7 +10447,7 @@ export default function BreedingPlannerApp() {
                       type="button"
                       className={cx(
                         'px-2 py-1 rounded-lg font-medium transition-colors',
-                        animalSortBy ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-300 cursor-not-allowed'
+                        animalSortBy ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 cursor-not-allowed'
                       )}
                       onClick={handleAnimalSortDirToggle}
                       disabled={!animalSortBy}
@@ -11232,7 +11240,7 @@ export default function BreedingPlannerApp() {
                     const fileName = photo.name || `${photoGallerySnake.name || photoGallerySnake.id || 'snake'}-${photo.id}`;
                     return (
                       <div key={photo.id} className="border border-neutral-200 rounded-xl overflow-hidden bg-neutral-50 flex flex-col">
-                        <div className="relative bg-black/5">
+                        <div className="relative bg-neutral-100">
                           <img
                             src={photo.url}
                             alt={photo.name || `${photoGallerySnake.name || 'Snake'} photo`}
@@ -11240,7 +11248,7 @@ export default function BreedingPlannerApp() {
                             loading="lazy"
                           />
                           {isCover && (
-                            <div className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 text-white shadow">Cover</div>
+                            <div className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 sk-on-accent shadow">Cover</div>
                           )}
                         </div>
                         <div className="p-3 flex-1 flex flex-col gap-2 text-sm">
@@ -11492,7 +11500,7 @@ export default function BreedingPlannerApp() {
                   {t('modals.breedersOnly.cancel', { defaultValue: 'Cancel' })}
                 </button>
                 <button
-                  className={cx('px-3 py-2 rounded-xl text-sm text-white', primaryBtnClass(theme, true))}
+                  className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true))}
                   onClick={handlePairingGuardConfirm}
                 >
                   {t('modals.breedersOnly.addToBreedersAndPair', {
@@ -11638,7 +11646,7 @@ export default function BreedingPlannerApp() {
                   )}
                   <button
                     type="button"
-                    className={cx('px-3 py-2 rounded-xl text-sm text-white', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
+                    className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
                     onClick={handleWizardSaveCurrent}
                     disabled={!canAdvance}
                   >
@@ -11845,7 +11853,7 @@ export default function BreedingPlannerApp() {
               <div className="flex gap-2">
                 <button className="px-3 py-2 rounded-xl text-sm border" onClick={()=>setShowPairingModal(false)}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
                 <button
-                  className={cx("px-3 py-2 rounded-xl text-sm text-white", draft.femaleId && draft.maleId ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
+                  className={cx("px-3 py-2 rounded-xl text-sm sk-on-accent", draft.femaleId && draft.maleId ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
                   disabled={!draft.femaleId || !draft.maleId}
                   onClick={async () => {
                     if (!draft.maleId || !draft.femaleId) {
@@ -12254,7 +12262,7 @@ export default function BreedingPlannerApp() {
                             'w-full rounded-lg py-2 text-xs font-semibold transition-colors',
                             editForSalePublishing
                               ? 'bg-amber-100 text-amber-500 cursor-wait'
-                              : 'bg-amber-500 hover:bg-amber-600 text-white'
+                              : 'bg-amber-500 hover:bg-amber-600 sk-on-accent'
                           )}
                         >
                           {editForSalePublishing ? 'Publishing...' : 'Publish to Marketplace'}
@@ -12365,7 +12373,7 @@ export default function BreedingPlannerApp() {
                       );
                     })()}
                     {editUploadingPhoto && (
-                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center text-sm text-neutral-600">
+                      <div className="sk-scrim absolute inset-0 flex items-center justify-center text-sm text-neutral-600">
                         {t("snakeEdit.image.saving")}
                       </div>
                     )}
@@ -12761,7 +12769,7 @@ export {
       const hasManualValue = manualValue.trim().length > 0;
 
       const scannerContent = (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
+        <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
           <div className="relative z-[10011] bg-white p-4 rounded-lg shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
@@ -12777,14 +12785,14 @@ export {
                 <button
                   type="button"
                   onClick={() => handleModeChange('camera')}
-                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', isCameraMode ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
+                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', isCameraMode ? 'bg-sky-600 sk-on-accent border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
                 >
                   {t('deviceCamera')}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange('scanner')}
-                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', !isCameraMode ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
+                  className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', !isCameraMode ? 'bg-sky-600 sk-on-accent border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
                 >
                   {t('usbScanner')}
                 </button>
@@ -12845,7 +12853,7 @@ export {
                 />
                 <button
                   type="button"
-                  className={cx('px-3 py-2 rounded-lg text-sm border transition-colors', hasManualValue ? 'bg-sky-600 text-white border-sky-600' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
+                  className={cx('px-3 py-2 rounded-lg text-sm border transition-colors', hasManualValue ? 'bg-sky-600 sk-on-accent border-sky-600' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
                   onClick={handleManualSubmit}
                   disabled={!hasManualValue}
                 >
@@ -13028,7 +13036,7 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
   if (!snake) return null;
   if (typeof document === 'undefined') return null;
   return createPortal((
-    <div className="fixed inset-0 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
       <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="font-semibold text-lg">Delete {snake.name || 'this snake'}?</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
@@ -13056,6 +13064,90 @@ function overlayClass(theme) {
   return 'appearance-overlay';
 }
 
+/* Scale steps for a tab strip that must stay on one line. Stops at 0.7 rather
+   than shrinking without limit — past that the labels stop being readable, and
+   a strip you can scroll beats a strip you can't read. */
+const TAB_FIT_STEPS = [1, 0.94, 0.88, 0.82, 0.76, 0.7];
+
+/**
+ * Keeps a tab strip on exactly one line by scaling its buttons down until they
+ * fit, then leaving the rest to horizontal scroll.
+ *
+ * This has to measure rather than pick a fixed smaller size, because the label
+ * widths genuinely move at runtime: the appearance provider writes
+ * --font-family and --font-size-base onto <html>, materials change the display
+ * face and letter-spacing, and the label text itself runs 95 characters in
+ * English but 150 in Portuguese. No constant survives all of that.
+ *
+ * Returns a ref to put on the strip.
+ */
+function useFitOneLine() {
+  const ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+
+    const fit = () => {
+      let chosen = TAB_FIT_STEPS[TAB_FIT_STEPS.length - 1];
+      for (const step of TAB_FIT_STEPS) {
+        el.style.setProperty('--tab-fit', String(step));
+        // 1px of slack: sub-pixel layout can report scrollWidth a hair over
+        // clientWidth on a row that visually fits.
+        if (el.scrollWidth <= el.clientWidth + 1) {
+          chosen = step;
+          break;
+        }
+      }
+      el.style.setProperty('--tab-fit', String(chosen));
+    };
+
+    fit();
+
+    // Observe the PARENT, not the strip: fit() mutates the strip's own box, so
+    // observing it would feed the observer its own output.
+    const observers = [];
+    if (el.parentElement) {
+      let lastWidth = -1;
+      const ro = new ResizeObserver((entries) => {
+        const width = entries[0]?.contentRect?.width ?? -1;
+        // Scaling the strip changes its height, which changes the parent's
+        // height, which fires this observer again. Only a width change can
+        // actually require a different fit, so ignore everything else.
+        if (Math.abs(width - lastWidth) < 0.5) return;
+        lastWidth = width;
+        fit();
+      });
+      ro.observe(el.parentElement);
+      observers.push(() => ro.disconnect());
+    }
+
+    // Preset / material / typography changes land as attribute writes on
+    // <html> and never touch the container's width, so a ResizeObserver alone
+    // would miss every one of them.
+    const rootMo = new MutationObserver(fit);
+    rootMo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'data-skin', 'data-material', 'data-appearance-density'],
+    });
+    observers.push(() => rootMo.disconnect());
+
+    // Switching language rewrites every label.
+    const stripMo = new MutationObserver(fit);
+    stripMo.observe(el, { childList: true, subtree: true, characterData: true });
+    observers.push(() => stripMo.disconnect());
+
+    // A webfont landing after first paint changes every label's width.
+    let cancelled = false;
+    document.fonts?.ready?.then(() => { if (!cancelled) fit(); }).catch(() => {});
+    observers.push(() => { cancelled = true; });
+
+    return () => observers.forEach((off) => off());
+  }, []);
+
+  return ref;
+}
+
 function TabButton({ theme = 'blue', active, onClick, children, className }) {
   return (
     <button
@@ -13073,16 +13165,18 @@ function TabButton({ theme = 'blue', active, onClick, children, className }) {
 }
 
 function Card({ title, children }) {
+  // .mt-card carries the material's bevel, lift, radius and (for the paper
+  // materials) its own ink. On `flat` it resolves to today's surface + border.
   return (
-    <div className="bg-white border rounded-2xl shadow-sm">
-      <div className="px-4 py-3 border-b font-semibold">{title}</div>
+    <div className="mt-card border">
+      <div className="px-4 py-3 border-b mt-display font-semibold">{title}</div>
       <div className="p-4">{children}</div>
     </div>
   );
 }
 
 function Badge({ children }) {
-  return <span className="px-2 py-0.5 text-xs rounded-full border bg-neutral-50">{children}</span>;
+  return <span className="mt-chip border bg-neutral-50">{children}</span>;
 }
 
 function getStatusTone(status) {
@@ -13101,9 +13195,9 @@ function StatusBadge({ status }) {
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold"
       style={{
-        background: `var(--status-${tone}-bg, #f3f4f6)`,
-        borderColor: `var(--status-${tone}-border, #d1d5db)`,
-        color: `var(--status-${tone}-text, #6b7280)`,
+        background: `var(--sk-${tone}-bg, var(--sk-surface-2))`,
+        borderColor: `var(--sk-${tone}-border, var(--sk-border))`,
+        color: `var(--sk-${tone}-text, var(--sk-text-muted))`,
       }}
     >
       {status}
@@ -13584,7 +13678,7 @@ function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
   const geneticsTokens = combineMorphsAndHetsForDisplay(morphs, hets, possibleHets);
   if (typeof document === 'undefined') return null;
   return createPortal((
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
+        <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
       <div className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
         <div className="font-medium mb-2">QR for {name || id}</div>
         <div className="text-sm text-neutral-500 mb-2">ID: <span className="font-mono">{id}</span></div>
@@ -13620,7 +13714,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
   const goodEggsCount = Math.max(0, originalEggs - badEggsCount);
 
   return createPortal((
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-[10020]" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onClose}>
       <div className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b flex items-start justify-between gap-3">
           <div>
@@ -13778,7 +13872,7 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-lg border" onClick={onClose} disabled={isGenerating}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-lg text-white', primaryBtnClass(theme,true))} onClick={handleGenerate} disabled={isGenerating}>
+          <button className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))} onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? t("qrModal.generating", { defaultValue: "Generating..." }) : t("qrModal.generate", { defaultValue: "Generate PDF" })}
           </button>
         </div>
@@ -13899,7 +13993,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
           </button>
           <button
             type="button"
-            className={cx('px-3 py-2 rounded-xl text-sm text-white', primaryBtnClass(theme, true), !pairings.length && 'opacity-60 cursor-not-allowed')}
+            className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true), !pairings.length && 'opacity-60 cursor-not-allowed')}
             onClick={handleGenerate}
             disabled={!pairings.length || isGenerating}
           >
@@ -15533,7 +15627,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
     closeQuickAdd();
   }
   return (
-  <div ref={cardRef} className="bp-snake-card relative bg-white border rounded-xl p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
+  <div ref={cardRef} className="bp-snake-card mt-card relative p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
       <div className="flex items-start gap-3">
         {/* thumbnail top-left */}
         <div className="flex-shrink-0">
@@ -15547,7 +15641,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
               />
             </div>
           ) : (
-            <div className="w-12 h-12 rounded-full border bg-neutral-50 flex items-center justify-center text-[11px] text-neutral-400 text-center leading-tight px-1 ring-1 ring-white/60 shadow-sm">{t("snakeEdit.image.none")}</div>
+            <div className="w-12 h-12 rounded-full border bg-neutral-50 flex items-center justify-center text-[11px] text-neutral-600 text-center leading-tight px-1 shadow-sm">{t("snakeEdit.image.none")}</div>
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -15592,9 +15686,9 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           <span
             className="text-[11px] font-semibold rounded-full px-2 py-0.5 border"
             style={{
-              background: 'var(--status-warning-bg, #dcfce7)',
-              borderColor: 'var(--status-warning-border, #86efac)',
-              color: 'var(--status-warning-text, #166534)',
+              background: 'var(--sk-warning-bg, #dcfce7)',
+              borderColor: 'var(--sk-warning-border, #86efac)',
+              color: 'var(--sk-warning-text, #166534)',
             }}
           >
             For Sale
@@ -15683,10 +15777,10 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             const pal = activityPalettes[k] || { bg: '#efefef', border: '#ddd' };
             return (
               <div key={k} onClick={(e)=>{ if (isClickableActivity) { e.stopPropagation(); openQuickForKey(k,e); } }} role={isClickableActivity? 'button': undefined}
-                className={cx(isClickableActivity? 'cursor-pointer':'' ,'w-full px-2 py-1 text-[11px] rounded-lg border flex flex-col justify-between gap-1 min-h-[48px]')}
+                className={cx(isClickableActivity? 'cursor-pointer':'' ,'mt-well w-full px-2 py-1 text-[11px] flex flex-col justify-between gap-1 min-h-[48px]')}
                 style={{ backgroundColor: pal.bg, borderColor: pal.border }}>
                   <div className="flex items-center justify-between">
-                      <div className="text-[10px] text-neutral-600 font-semibold uppercase">{labelText}</div>
+                      <div className="mt-label text-[10px] font-semibold uppercase">{labelText}</div>
                       <div className="text-[10px] text-neutral-600">{formatDateForDisplay(date) || ' '}</div>
                     </div>
                 <div className="min-w-0">
@@ -15791,7 +15885,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
       {quickTagOpen && (
         <div
-          className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          className="sk-scrim fixed inset-0 z-[250] flex items-center justify-center p-4"
           onClick={(e) => {
             e.stopPropagation();
             closeQuickAdd();
@@ -15894,7 +15988,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                     {t("logs.refused", { defaultValue: "Refused feed" })}
                   </button>
                 )}
-                <button className="px-2 py-1 bg-emerald-500 text-white rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>{t("actions.add", { defaultValue: "Add" })}</button>
+                <button className="px-2 py-1 bg-emerald-500 sk-on-accent rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>{t("actions.add", { defaultValue: "Add" })}</button>
               </div>
             </div>
           </div>
@@ -16059,7 +16153,7 @@ function WeightTrendMiniChart({ data = [] }) {
           y={padding.top}
           width={innerWidth}
           height={innerHeight}
-          fill="#f8fafc"
+          fill="var(--sk-surface-2)"
           rx={12}
         />
         <line
@@ -16067,7 +16161,7 @@ function WeightTrendMiniChart({ data = [] }) {
           y1={baselineY}
           x2={padding.left + innerWidth}
           y2={baselineY}
-          stroke="#e2e8f0"
+          stroke="var(--sk-border)"
           strokeDasharray="4 4"
         />
         {areaPath ? (
@@ -16119,7 +16213,7 @@ function WeightTrendMiniChart({ data = [] }) {
 function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   const { t } = useTranslation();
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[200]" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[200]" onClick={onClose}>
       <div className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
@@ -16454,6 +16548,9 @@ function BreederSection({
   onResetToDefaults,
 }) {
   const { t } = useTranslation();
+  // Holds the settings tabs on one line whatever the skin, material,
+  // typography or language does to the label widths.
+  const setupTabStripRef = useFitOneLine();
   const info = useMemo(() => normalizeBreederInfo(breederInfo), [breederInfo]);
   const idConfig = useMemo(() => normalizeIdGeneratorConfig(info.idGenerator), [info.idGenerator]);
 
@@ -18260,7 +18357,7 @@ function BreederSection({
 
   return (
     <Card title={`${t("nav.setup", { defaultValue: "Settings" })} · Serpentora v${__APP_VERSION__}`}>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div ref={setupTabStripRef} className="settings-tab-strip mb-4">
         <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</TabButton>
@@ -18378,7 +18475,7 @@ function BreederSection({
 
           <div className="flex justify-end">
             <button
-              className={cx('px-3 py-2 rounded-lg text-white', primaryBtnClass(theme,true))}
+              className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))}
               onClick={() => {
                 if (typeof showAppAlert === 'function') {
                   showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
@@ -18637,7 +18734,7 @@ function BreederSection({
           </div>
 
           <div className="flex items-center gap-2">
-            <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
+            <button type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
               {editingAliasKey
                 ? t('setup.aliases.updateAlias', { defaultValue: 'Update alias' })
                 : t('setup.aliases.addAlias', { defaultValue: 'Add alias' })}
@@ -18731,7 +18828,7 @@ function BreederSection({
           </div>
 
           <div className="flex items-center gap-2">
-            <button type="button" className={cx('px-3 py-2 rounded-lg text-white text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
+            <button type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
               {editingGeneAliasKey
                 ? t('setup.aliases.updateGeneAlias', { defaultValue: 'Update gene alias' })
                 : t('setup.aliases.addGeneAlias', { defaultValue: 'Add gene alias' })}
@@ -18834,7 +18931,7 @@ function BreederSection({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                  className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                   onClick={handleSaveLabLabelSettings}
                 >
                   {t('modal.save', { defaultValue: 'Save' })}
@@ -19076,7 +19173,7 @@ function BreederSection({
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), (!hasAnimalData || !hasAnimalsInScope ? 'opacity-60 cursor-not-allowed' : ''))}
+                      className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), (!hasAnimalData || !hasAnimalsInScope ? 'opacity-60 cursor-not-allowed' : ''))}
                       onClick={handleAnimalsExportPdf}
                       disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
@@ -19251,7 +19348,7 @@ function BreederSection({
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), (!canExportPairings ? 'opacity-60 cursor-not-allowed' : ''))}
+                      className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), (!canExportPairings ? 'opacity-60 cursor-not-allowed' : ''))}
                       onClick={handlePairingsExportPdf}
                       disabled={!canExportPairings}
                     >
@@ -19282,7 +19379,7 @@ function BreederSection({
                       <button
                         type="button"
                         className={cx('px-2.5 py-1.5 rounded-full border text-xs font-semibold transition', pairingExportType === 'default'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          ? 'bg-blue-600 sk-on-accent border-blue-600 shadow-sm'
                           : 'border-neutral-300 text-neutral-700 bg-white')}
                         onClick={() => setPairingExportType('default')}
                       >
@@ -19291,7 +19388,7 @@ function BreederSection({
                       <button
                         type="button"
                         className={cx('px-2.5 py-1.5 rounded-full border text-xs font-semibold transition', pairingExportType === 'byPairing'
-                          ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                          ? 'bg-blue-900 sk-on-accent border-blue-900 shadow-sm'
                           : 'border-neutral-300 text-neutral-700 bg-white')}
                         onClick={() => setPairingExportType('byPairing')}
                       >
@@ -19423,7 +19520,7 @@ function BreederSection({
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleManualBackupDownload}
               >
                 Download backup ({BACKUP_FILE_DOT_EXTENSION})
@@ -19475,7 +19572,7 @@ function BreederSection({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleRunAutoBackupNow}
               >
                 Run now
@@ -19525,7 +19622,7 @@ function BreederSection({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true), cloudSyncStatus?.state === 'loading' ? 'opacity-60 cursor-wait' : '')}
+                className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), cloudSyncStatus?.state === 'loading' ? 'opacity-60 cursor-wait' : '')}
                 onClick={handleCloudSyncNow}
                 disabled={cloudSyncStatus?.state === 'loading'}
               >
@@ -19610,7 +19707,7 @@ function BreederSection({
                         </button>
                         <button
                           type="button"
-                          className={cx('px-3 py-1.5 rounded-lg text-xs text-white', primaryBtnClass(theme, true))}
+                          className={cx('px-3 py-1.5 rounded-lg text-xs sk-on-accent', primaryBtnClass(theme, true))}
                           onClick={() => handleRestoreVaultEntry(entry.id)}
                         >
                           Restore
@@ -20059,7 +20156,7 @@ function BreederSection({
                 />
                 <button
                   type="button"
-                  className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 disabled:opacity-60"
+                  className="px-3 py-2 rounded-lg text-sm sk-on-accent bg-red-600 disabled:opacity-60"
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleRequestAccountDeletion}
                 >
@@ -20119,36 +20216,79 @@ function BreederSection({
   );
 }
 
+/**
+ * Reads a resolved skin role off <html>.
+ *
+ * The palette lives in skins.css, so the pickers have to ask the document what
+ * the active skin actually resolved to rather than keeping a copy in JS. The
+ * swatches elsewhere in this panel avoid JS entirely by nesting inside a
+ * [data-skin] wrapper and letting custom properties inherit — that only fails
+ * for <input type="color">, which needs a literal hex.
+ */
+/** The four roles a preset card previews. Order reads left-to-right as
+ *  ground → surface → brand → accent. */
+const SKIN_SWATCH_ROLES = [
+  { role: '--sk-bg', label: 'Background' },
+  { role: '--sk-surface', label: 'Surface' },
+  { role: '--sk-primary', label: 'Primary' },
+  { role: '--sk-accent', label: 'Accent' },
+];
+
+function readSkinRole(role, fallback) {
+  if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(role).trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value) ? value : fallback;
+}
+
 function AppearanceSettingsPanel() {
   const { t } = useTranslation();
   const {
     appearanceState,
-    resolvedAppearance,
     appearancePresets,
     updateAppearance,
     resetAppearance,
     applyPreset,
     saveCustomPreset,
+    setColorOverride,
+    clearColorOverrides,
+    applyMaterial,
+    allowedMaterials,
     effectiveThemeMode,
+    skinId,
   } = useAppearance();
 
   const [customPresetName, setCustomPresetName] = useState('');
   const [presetFeedback, setPresetFeedback] = useState(null);
+  const [colorFeedback, setColorFeedback] = useState(null);
 
+  // `role` is the skin variable each picker overrides. `secondary` maps to
+  // --sk-border-strong because that is what it was always doing: App.css was
+  // using the old --sk-border-strong as a button border, not as a second brand
+  // colour.
   const colorFields = [
-    { key: 'primary', label: t('appearance.colors.primary', { defaultValue: 'Primary' }), helper: t('appearance.colors.primaryHelp', { defaultValue: 'Accent buttons & key highlights.' }) },
-    { key: 'secondary', label: t('appearance.colors.secondary', { defaultValue: 'Secondary' }), helper: t('appearance.colors.secondaryHelp', { defaultValue: 'Borders and subtle accents.' }) },
-    { key: 'accent', label: t('appearance.colors.accent', { defaultValue: 'Accent' }), helper: t('appearance.colors.accentHelp', { defaultValue: 'Warnings, success pills, quick highlights.' }) },
-    { key: 'background', label: t('appearance.colors.background', { defaultValue: 'Background' }), helper: t('appearance.colors.backgroundHelp', { defaultValue: 'Canvas & page backdrop.' }) },
-    { key: 'card', label: t('appearance.colors.card', { defaultValue: 'Cards' }), helper: t('appearance.colors.cardHelp', { defaultValue: 'Panels, cards, modals.' }) },
-    { key: 'text', label: t('appearance.colors.text', { defaultValue: 'Text' }), helper: t('appearance.colors.textHelp', { defaultValue: 'Body text & headers.' }) },
+    { key: 'primary', role: '--sk-primary', fallback: '#0ea5e9', label: t('appearance.colors.primary', { defaultValue: 'Primary' }), helper: t('appearance.colors.primaryHelp', { defaultValue: 'Accent buttons & key highlights.' }) },
+    { key: 'secondary', role: '--sk-border-strong', fallback: '#d4d4d4', label: t('appearance.colors.secondary', { defaultValue: 'Secondary' }), helper: t('appearance.colors.secondaryHelp', { defaultValue: 'Borders and subtle accents.' }) },
+    { key: 'accent', role: '--sk-accent', fallback: '#f59e0b', label: t('appearance.colors.accent', { defaultValue: 'Accent' }), helper: t('appearance.colors.accentHelp', { defaultValue: 'Warnings, success pills, quick highlights.' }) },
+    { key: 'background', role: '--sk-bg', fallback: '#f6f7f9', label: t('appearance.colors.background', { defaultValue: 'Background' }), helper: t('appearance.colors.backgroundHelp', { defaultValue: 'Canvas & page backdrop.' }) },
+    { key: 'card', role: '--sk-surface', fallback: '#ffffff', label: t('appearance.colors.card', { defaultValue: 'Cards' }), helper: t('appearance.colors.cardHelp', { defaultValue: 'Panels, cards, modals.' }) },
+    { key: 'text', role: '--sk-text', fallback: '#171717', label: t('appearance.colors.text', { defaultValue: 'Text' }), helper: t('appearance.colors.textHelp', { defaultValue: 'Body text & headers.' }) },
   ];
+
+  // Re-read whenever the skin or the overrides change, so the pickers show the
+  // colour actually on screen rather than a stale copy.
+  const colorValues = useMemo(() => {
+    const out = {};
+    for (const field of colorFields) {
+      out[field.key] = appearanceState.colorOverrides?.[field.key] || readSkinRole(field.role, field.fallback);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skinId, effectiveThemeMode, appearanceState.colorOverrides]);
 
   const themeModeOptions = [
     { value: 'system', label: t('appearance.modes.system', { defaultValue: 'Match system' }) },
     { value: 'light', label: t('appearance.modes.light', { defaultValue: 'Light' }) },
     { value: 'dark', label: t('appearance.modes.dark', { defaultValue: 'Dark' }) },
-    { value: 'high-contrast', label: t('appearance.modes.highContrast', { defaultValue: 'High contrast' }) },
   ];
 
   const fontFamilyOptions = [
@@ -20185,20 +20325,39 @@ function AppearanceSettingsPanel() {
     { value: 'rounded', label: t('appearance.borders.rounded', { defaultValue: 'Rounded' }) },
   ];
 
-  const currentPresetKey = appearanceState?.preset || 'custom';
+  const currentPresetKey = appearanceState?.preset || 'default';
   const motion = appearanceState?.motion || { animations: true, reducedMotion: false };
-  const visualImpairedEnabled = currentPresetKey === 'visualImpaired';
+  const highContrastEnabled = appearanceState?.preset === HIGH_CONTRAST_SKIN;
+  const hasColorOverrides = Object.keys(appearanceState?.colorOverrides || {}).length > 0;
 
+  // setColorOverride refuses anything that would make body text or button
+  // labels unreadable, so a rejection has to be surfaced rather than swallowed.
   const handleColorInput = useCallback((key, value) => {
     if (!key) return;
-    const safeValue = typeof value === 'string' ? value : '#000000';
-    updateAppearance({ colors: { [key]: safeValue } });
-  }, [updateAppearance]);
+    const result = setColorOverride(key, typeof value === 'string' ? value : '#000000');
+    if (result?.ok) {
+      setColorFeedback(null);
+      return;
+    }
+    if (result?.reason === 'invalid-hex') return; // mid-typing, not worth shouting about
+    setColorFeedback({
+      key,
+      message: result?.message || t('appearance.colors.rejected', {
+        defaultValue: 'That colour would be unreadable, so it was not applied.',
+      }),
+      ratio: result?.ratio,
+    });
+  }, [setColorOverride, t]);
 
   const handleHexInput = useCallback((key, event) => {
     const raw = event?.target?.value || '';
     handleColorInput(key, raw.startsWith('#') ? raw : `#${raw}`);
   }, [handleColorInput]);
+
+  const handleClearOverrides = useCallback(() => {
+    clearColorOverrides();
+    setColorFeedback(null);
+  }, [clearColorOverrides]);
 
   const handleThemeModeChange = useCallback((event) => {
     updateAppearance({ themeMode: event?.target?.value || 'system' });
@@ -20224,13 +20383,27 @@ function AppearanceSettingsPanel() {
     updateAppearance({ motion: { reducedMotion: event.target.checked, animations: event.target.checked ? false : motion.animations } });
   }, [updateAppearance, motion.animations]);
 
-  const handleVisualImpairedToggle = useCallback((event) => {
+  // The old `visualImpaired` preset is retired. High contrast is now an
+  // orthogonal mode that layers over any skin, so it is kept as a toggle
+  // rather than a palette — and it still brings the larger type and reduced
+  // motion that made the old preset worth having.
+  const handleHighContrastToggle = useCallback((event) => {
     if (event.target.checked) {
-      applyPreset('visualImpaired');
+      // Audit R9: select the AAA skin rather than layering a modifier over
+      // whatever palette happens to be active.
+      updateAppearance({
+        preset: HIGH_CONTRAST_SKIN,
+        typography: { fontSize: 'large', lineSpacing: 'relaxed' },
+        motion: { animations: false, reducedMotion: true },
+      });
     } else {
-      resetAppearance('default');
+      updateAppearance({
+        preset: 'default',
+        typography: { fontSize: 'medium', lineSpacing: 'normal' },
+        motion: { animations: true, reducedMotion: false },
+      });
     }
-  }, [applyPreset, resetAppearance]);
+  }, [updateAppearance]);
 
   const handleBackgroundModeChange = useCallback((event) => {
     const value = event?.target?.value === 'logo' ? 'logo' : 'solid';
@@ -20252,206 +20425,293 @@ function AppearanceSettingsPanel() {
     }
   }, [customPresetName, saveCustomPreset, t]);
 
+  // Bounded column: the preview holds still at the top while everything below
+  // it scrolls, so the thing you are editing stays in front of you. Sticky was
+  // the alternative and was rejected — the desktop header is already sticky, so
+  // a sticky preview would need a hardcoded offset matching a header whose
+  // height is not fixed.
   return (
-    <div className="border-t pt-4 space-y-6">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="font-semibold text-sm">{t('appearance.presets.title', { defaultValue: 'Presets' })}</div>
-            <div className="text-xs text-neutral-500">{t('appearance.presets.subtitle', { defaultValue: 'Start with a curated palette then fine tune the details.' })}</div>
+    <div className="border-t pt-4 flex flex-col gap-4 max-h-[calc(100vh-14rem)] min-h-[22rem]">
+      <div className="shrink-0">
+        <AppearancePreview density={appearanceState.layoutDensity} mode={effectiveThemeMode} />
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold text-sm">{t('appearance.presets.title', { defaultValue: 'Presets' })}</div>
+              <div className="text-xs text-neutral-500">{t('appearance.presets.subtitle', { defaultValue: 'Start with a curated palette then fine tune the details.' })}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="px-3 py-2 rounded-lg border text-xs" onClick={() => resetAppearance('default')}>
+                {t('appearance.actions.reset', { defaultValue: 'Reset to default' })}
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="px-3 py-2 rounded-lg border text-xs" onClick={() => resetAppearance('default')}>
-              {t('appearance.actions.reset', { defaultValue: 'Reset to default' })}
-            </button>
-          </div>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {appearancePresets.map((preset) => {
-            const active = currentPresetKey === preset.key;
-            return (
-              <div key={preset.key} className={cx('rounded-2xl border p-3 shadow-sm bg-white flex flex-col gap-3', active && 'ring-2 ring-offset-2 ring-sky-400')}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-sm">{preset.label}</div>
-                    <div className="text-xs text-neutral-500">{preset.description}</div>
+          <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+            {appearancePresets.map((preset) => {
+              const active = currentPresetKey === preset.key;
+              return (
+                <div key={preset.key} className={cx('rounded-xl border p-2 shadow-sm bg-white flex flex-col gap-2', active && 'ring-2 ring-offset-1 ring-sky-400')}>
+                  <div className="flex items-start justify-between gap-1">
+                    {/* min-w-0 so the long labels truncate instead of forcing the
+                        card wider than its quarter-row track. */}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs truncate" title={preset.label}>{preset.label}</div>
+                      <div className="text-[10px] leading-snug text-neutral-500 line-clamp-2" title={preset.description}>{preset.description}</div>
+                    </div>
+                    {active && <span className="text-[9px] font-semibold text-emerald-600 uppercase shrink-0">{t('appearance.presets.active', { defaultValue: 'Active' })}</span>}
                   </div>
-                  {active && <span className="text-[11px] font-semibold text-emerald-600 uppercase">{t('appearance.presets.active', { defaultValue: 'Active' })}</span>}
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
-                  {Object.entries(preset.state.colors)
-                    .filter(([colorKey, colorValue]) => typeof colorValue === 'string')
-                    .map(([colorKey, colorValue]) => (
-                      <span key={colorKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border">
-                        <span className="w-3 h-3 rounded-full border" style={{ background: colorValue }} />
-                        {colorKey}
-                      </span>
+                  {/* data-skin on the wrapper: custom properties inherit, so each
+                      swatch resolves that skin's own roles without JS ever
+                      holding a colour value. */}
+                  <div data-skin={preset.key} className="flex items-center gap-1">
+                    {SKIN_SWATCH_ROLES.map(({ role, label }) => (
+                      <span
+                        key={role}
+                        title={label}
+                        className="w-4 h-4 rounded-full border shrink-0"
+                        style={{ background: `var(${role})`, borderColor: 'var(--sk-border)' }}
+                      />
                     ))}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={cx('flex-1 px-3 py-2 rounded-xl text-sm', primaryBtnClass('appearance', !active))}
-                    onClick={() => applyPreset(preset.key)}
-                    disabled={active}
-                  >
-                    {active ? t('appearance.presets.selected', { defaultValue: 'Selected' }) : t('appearance.presets.apply', { defaultValue: 'Apply preset' })}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-4 space-y-3">
-          <div>
-            <div className="text-sm font-semibold text-neutral-800">{t('appearance.presets.saveTitle', { defaultValue: 'Save your own preset' })}</div>
-            <div className="text-xs text-neutral-500">{t('appearance.presets.saveSubtitle', { defaultValue: 'Capture the current colors and typography for reuse later.' })}</div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="flex-1 min-w-[180px] border rounded-xl px-3 py-2 text-sm"
-              value={customPresetName}
-              onChange={e => setCustomPresetName(e.target.value)}
-              placeholder={t('appearance.presets.namePlaceholder', { defaultValue: 'Preset name' })}
-            />
-            <button
-              type="button"
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
-              style={{ background: resolvedAppearance.colors.primary }}
-              disabled={!customPresetName.trim()}
-              onClick={handleSavePreset}
-            >
-              {t('appearance.presets.saveButton', { defaultValue: 'Save preset' })}
-            </button>
-          </div>
-          {presetFeedback && (
-            <div className={cx('text-xs', presetFeedback.type === 'success' ? 'text-emerald-600' : 'text-rose-600')}>
-              {presetFeedback.message}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.mode', { defaultValue: 'Mode & palette' })}</div>
-            <div className="mt-2 space-y-2">
-              <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
-                <input type="checkbox" checked={visualImpairedEnabled} onChange={handleVisualImpairedToggle} className="mt-0.5" />
-                <span>
-                  <span className="block font-semibold text-neutral-900">{t('appearance.accessibility.visualImpaired', { defaultValue: 'Visually impaired preset' })}</span>
-                  <span className="block text-xs text-neutral-500">{t('appearance.accessibility.visualImpairedHelp', { defaultValue: 'Bigger fonts, stronger contrast, spacious controls, and reduced motion.' })}</span>
-                </span>
-              </label>
-              <label className="text-xs font-medium">{t('appearance.modes.label', { defaultValue: 'Theme mode' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.themeMode} onChange={handleThemeModeChange}>
-                {themeModeOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <label className="text-xs font-medium">{t('appearance.background.label', { defaultValue: 'Background style' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.backgroundMode || 'solid'} onChange={handleBackgroundModeChange}>
-                <option value="solid">{t('appearance.background.solid', { defaultValue: 'Solid color' })}</option>
-                <option value="logo">{t('appearance.background.logo', { defaultValue: 'Breeder logo pattern' })}</option>
-              </select>
-              <div className="text-[11px] text-neutral-500">
-                {t('appearance.background.logoHelp', { defaultValue: 'The logo pattern uses the breeder logo uploaded in Breeder Info.' })}
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {colorFields.map(field => (
-              <div key={field.key} className="border rounded-xl p-3 space-y-2 bg-white">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-neutral-800">{field.label}</div>
-                    <div className="text-[11px] text-neutral-500">{field.helper}</div>
+                    <span className="text-[9px] uppercase tracking-wide text-neutral-500 ml-0.5">
+                      {preset.tone === 'light'
+                        ? t('appearance.presets.toneLight', { defaultValue: 'Light' })
+                        : preset.tone === 'dark'
+                          ? t('appearance.presets.toneDark', { defaultValue: 'Dark' })
+                          : ''}
+                    </span>
                   </div>
-                  <span className="w-7 h-7 rounded-full border" style={{ background: appearanceState.colors[field.key] }} />
+                  <div className="flex gap-2 mt-auto">
+                    <button
+                      type="button"
+                      className={cx('flex-1 px-2 py-1.5 rounded-lg text-xs', primaryBtnClass('appearance', !active))}
+                      onClick={() => applyPreset(preset.key)}
+                      disabled={active}
+                    >
+                      {active ? t('appearance.presets.selected', { defaultValue: 'Selected' }) : t('appearance.presets.apply', { defaultValue: 'Apply preset' })}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <input type="color" value={appearanceState.colors[field.key]} onChange={e => handleColorInput(field.key, e.target.value)} aria-label={field.label} className="h-9 w-14 cursor-pointer border rounded" />
-                  <input type="text" value={appearanceState.colors[field.key]} onChange={e => handleHexInput(field.key, e)} className="flex-1 border rounded px-2 py-1 font-mono text-xs" />
-                </div>
+              );
+            })}
+          </div>
+          {/* ── Material ───────────────────────────────────────────────────
+              The second axis. Colour is the skin; texture, depth and type are
+              the material. The list is filtered by the active skin: 96 pairs
+              exist, 81 ship, and the blocked ones are blocked for a reason
+              (glass/blueprint need a dark ground to read against; high contrast
+              takes `flat` alone, since the two opaque-bevel materials that used
+              to survive it have been retired). */}
+          <div className="space-y-3">
+            <div>
+              <div className="font-semibold text-sm">{t('appearance.materials.title', { defaultValue: 'Material' })}</div>
+              <div className="text-xs text-neutral-500">
+                {t('appearance.materials.subtitle', { defaultValue: 'Texture and depth, independent of colour. Only materials that suit the current skin are listed.' })}
               </div>
-            ))}
+            </div>
+            <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+              {allowedMaterials.map((material) => {
+                const active = (appearanceState?.material || 'flat') === material.key;
+                const status = materialStatus(material.key, skinId);
+                return (
+                  <button
+                    key={material.key}
+                    type="button"
+                    onClick={() => applyMaterial(material.key)}
+                    className={cx(
+                      'text-left rounded-lg border p-2 transition-colors',
+                      active ? 'border-neutral-400 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-xs font-semibold text-neutral-800 min-w-0 truncate" title={material.label}>{material.label}</span>
+                      {active && (
+                        <span className="text-[9px] font-semibold uppercase text-emerald-600 shrink-0">
+                          {t('appearance.presets.active', { defaultValue: 'Active' })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] leading-snug text-neutral-500 mt-0.5 line-clamp-2" title={material.description}>{material.description}</div>
+                    {status === 'review' && (
+                      <div className="text-[9px] leading-snug text-amber-700 mt-1 line-clamp-2">
+                        {material.tone === 'paper'
+                          ? t('appearance.materials.paperOnDark', { defaultValue: 'Paper face — reads as a light card on a dark skin.' })
+                          : t('appearance.materials.review', { defaultValue: 'Untested with this skin.' })}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-4 space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-neutral-800">{t('appearance.presets.saveTitle', { defaultValue: 'Save your own preset' })}</div>
+              <div className="text-xs text-neutral-500">{t('appearance.presets.saveSubtitle', { defaultValue: 'Capture the current colors and typography for reuse later.' })}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="flex-1 min-w-[180px] border rounded-xl px-3 py-2 text-sm"
+                value={customPresetName}
+                onChange={e => setCustomPresetName(e.target.value)}
+                placeholder={t('appearance.presets.namePlaceholder', { defaultValue: 'Preset name' })}
+              />
+              <button
+                type="button"
+                className="sk-btn sk-btn--filled px-4 py-2 rounded-xl text-sm font-semibold"
+                disabled={!customPresetName.trim()}
+                onClick={handleSavePreset}
+              >
+                {t('appearance.presets.saveButton', { defaultValue: 'Save preset' })}
+              </button>
+            </div>
+            {presetFeedback && (
+              <div className={cx('text-xs', presetFeedback.type === 'success' ? 'text-emerald-600' : 'text-rose-600')}>
+                {presetFeedback.message}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid gap-4">
-            <div className="border rounded-xl p-3 bg-white space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.typography', { defaultValue: 'Typography' })}</div>
-              <label className="text-xs font-medium">{t('appearance.type.font', { defaultValue: 'Font family' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontFamily} onChange={e => handleTypographyChange({ fontFamily: e.target.value })}>
-                {fontFamilyOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <label className="text-xs font-medium">{t('appearance.type.size', { defaultValue: 'Base size' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontSize} onChange={e => handleTypographyChange({ fontSize: e.target.value })}>
-                {fontSizeOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <label className="text-xs font-medium">{t('appearance.type.lineSpacing', { defaultValue: 'Line spacing' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.lineSpacing} onChange={e => handleTypographyChange({ lineSpacing: e.target.value })}>
-                {lineSpacingOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.mode', { defaultValue: 'Mode & palette' })}</div>
+              <div className="mt-2 space-y-2">
+                <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
+                  <input type="checkbox" checked={highContrastEnabled} onChange={handleHighContrastToggle} className="mt-0.5" />
+                  <span>
+                    <span className="block font-semibold text-neutral-900">{t('appearance.accessibility.highContrast', { defaultValue: 'High contrast mode' })}</span>
+                    <span className="block text-xs text-neutral-500">{t('appearance.accessibility.highContrastHelp', { defaultValue: 'Switches to the High contrast skin (AAA, 7:1), with bigger fonts and reduced motion.' })}</span>
+                  </span>
+                </label>
+                <label className="text-xs font-medium">{t('appearance.modes.label', { defaultValue: 'Theme mode' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.themeMode} onChange={handleThemeModeChange}>
+                  {themeModeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <label className="text-xs font-medium">{t('appearance.background.label', { defaultValue: 'Background style' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.backgroundMode || 'solid'} onChange={handleBackgroundModeChange}>
+                  <option value="solid">{t('appearance.background.solid', { defaultValue: 'Solid color' })}</option>
+                  <option value="logo">{t('appearance.background.logo', { defaultValue: 'Breeder logo pattern' })}</option>
+                </select>
+                <div className="text-[11px] text-neutral-500">
+                  {t('appearance.background.logoHelp', { defaultValue: 'The logo pattern uses the breeder logo uploaded in Breeder Info.' })}
+                </div>
+              </div>
             </div>
-
-            <div className="border rounded-xl p-3 bg-white space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.layout', { defaultValue: 'Layout & density' })}</div>
-              <label className="text-xs font-medium">{t('appearance.density.label', { defaultValue: 'Density' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.layoutDensity} onChange={handleDensityChange}>
-                {densityOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <label className="text-xs font-medium">{t('appearance.borders.label', { defaultValue: 'Corner radius' })}</label>
-              <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.borderStyle} onChange={handleBorderChange}>
-                {borderOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+            <div className="space-y-3">
+              {colorFields.map(field => (
+                <div key={field.key} className="border rounded-xl p-3 space-y-2 bg-white">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-neutral-800">{field.label}</div>
+                      <div className="text-[11px] text-neutral-500">{field.helper}</div>
+                    </div>
+                    <span className="w-7 h-7 rounded-full border" style={{ background: `var(${field.role})` }} />
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <input type="color" value={colorValues[field.key]} onChange={e => handleColorInput(field.key, e.target.value)} aria-label={field.label} className="h-9 w-14 cursor-pointer border rounded" />
+                    <input type="text" value={colorValues[field.key]} onChange={e => handleHexInput(field.key, e)} className="flex-1 border rounded px-2 py-1 font-mono text-xs" />
+                  </div>
+                  {colorFeedback?.key === field.key && (
+                    <div className="text-[11px] text-rose-600">
+                      {colorFeedback.message}
+                      {typeof colorFeedback.ratio === 'number' && ` (${colorFeedback.ratio.toFixed(2)}:1)`}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {hasColorOverrides && (
+                <button type="button" className="text-xs underline text-neutral-600" onClick={handleClearOverrides}>
+                  {t('appearance.colors.clearOverrides', { defaultValue: 'Reset colours to the skin defaults' })}
+                </button>
+              )}
             </div>
+          </div>
 
-            <div className="border rounded-xl p-3 bg-white space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.motion', { defaultValue: 'Motion' })}</div>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={motion.animations !== false} onChange={handleAnimationsToggle} />
-                {t('appearance.motion.animations', { defaultValue: 'Allow subtle animations' })}
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={motion.reducedMotion === true} onChange={handleReducedMotionToggle} />
-                {t('appearance.motion.reduce', { defaultValue: 'Prefer reduced motion' })}
-              </label>
+          <div className="space-y-4">
+            <div className="grid gap-4">
+              <div className="border rounded-xl p-3 bg-white space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.typography', { defaultValue: 'Typography' })}</div>
+                <label className="text-xs font-medium">{t('appearance.type.font', { defaultValue: 'Font family' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontFamily} onChange={e => handleTypographyChange({ fontFamily: e.target.value })}>
+                  {fontFamilyOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <label className="text-xs font-medium">{t('appearance.type.size', { defaultValue: 'Base size' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontSize} onChange={e => handleTypographyChange({ fontSize: e.target.value })}>
+                  {fontSizeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <label className="text-xs font-medium">{t('appearance.type.lineSpacing', { defaultValue: 'Line spacing' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.lineSpacing} onChange={e => handleTypographyChange({ lineSpacing: e.target.value })}>
+                  {lineSpacingOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border rounded-xl p-3 bg-white space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.layout', { defaultValue: 'Layout & density' })}</div>
+                <label className="text-xs font-medium">{t('appearance.density.label', { defaultValue: 'Density' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.layoutDensity} onChange={handleDensityChange}>
+                  {densityOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <label className="text-xs font-medium">{t('appearance.borders.label', { defaultValue: 'Corner radius' })}</label>
+                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.borderStyle} onChange={handleBorderChange}>
+                  {borderOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border rounded-xl p-3 bg-white space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.motion', { defaultValue: 'Motion' })}</div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={motion.animations !== false} onChange={handleAnimationsToggle} />
+                  {t('appearance.motion.animations', { defaultValue: 'Allow subtle animations' })}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={motion.reducedMotion === true} onChange={handleReducedMotionToggle} />
+                  {t('appearance.motion.reduce', { defaultValue: 'Prefer reduced motion' })}
+                </label>
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      <AppearancePreview resolvedAppearance={resolvedAppearance} density={appearanceState.layoutDensity} mode={effectiveThemeMode} />
     </div>
   );
 }
 
-function AppearancePreview({ resolvedAppearance, density, mode }) {
+// Reads nothing from JS: every colour below is a var(--sk-*) resolved by the
+// active [data-skin] block, so the preview is the real thing, not a mock.
+function AppearancePreview({ density, mode }) {
   const { t } = useTranslation();
   const sampleCounts = [8, 6, 4];
   const badgeStyle = {
-    background: resolvedAppearance.colors.secondary,
-    color: resolvedAppearance.colors.text,
+    background: 'var(--sk-surface-2)',
+    color: 'var(--sk-text-secondary)',
+    border: '1px solid var(--sk-border)',
     borderRadius: '999px',
     padding: '0.1rem 0.5rem',
     fontSize: '0.75rem',
   };
+  // --sk-text-on-accent, not --sk-text: the label sits ON the primary fill.
+  // Conflating those two is what made the old `minimal` preset render
+  // invisible button text.
   const buttonStyle = {
-    background: resolvedAppearance.colors.primary,
-    color: resolvedAppearance.colors.text,
+    background: 'var(--sk-primary)',
+    color: 'var(--sk-text-on-accent)',
   };
   const densityLabel = density === 'compact'
     ? t('appearance.preview.density.compact', { defaultValue: 'Tighter tables' })
@@ -20462,12 +20722,12 @@ function AppearancePreview({ resolvedAppearance, density, mode }) {
   return (
     <div className="appearance-preview border rounded-2xl bg-white/80 p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full border" style={{ background: resolvedAppearance.colors.accent }} />
+        <div className="w-12 h-12 rounded-full border" style={{ background: 'var(--sk-accent)' }} />
         <div>
           <div className="font-semibold">{t('appearance.preview.title', { defaultValue: 'Live preview' })}</div>
           <div className="text-xs text-neutral-500">{t('appearance.preview.subtitle', { defaultValue: 'Key UI tokens update instantly.' })}</div>
         </div>
-        <span style={badgeStyle}>{mode === 'high-contrast' ? 'Contrast +' : mode}</span>
+        <span style={badgeStyle}>{mode}</span>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="border rounded-xl p-3 bg-white space-y-2">
@@ -20888,17 +21148,17 @@ function PairingStageTracker({ reached }) {
       {PAIRING_STAGE_LABELS.map((label, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
-        const dotColor = done || active ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)';
-        const lineBeforeColor = i === 0 ? 'transparent' : (i <= activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
-        const lineAfterColor = i === PAIRING_STAGE_LABELS.length - 1 ? 'transparent' : (i < activeIdx ? 'var(--color-primary, #0ea5e9)' : 'var(--status-neutral-border, #e5e7eb)');
-        const textColor = active ? 'var(--color-primary, #0ea5e9)' : (done ? 'var(--status-neutral-text, #6b7280)' : 'var(--status-neutral-text, #9ca3af)');
+        const dotColor = done || active ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)';
+        const lineBeforeColor = i === 0 ? 'transparent' : (i <= activeIdx ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)');
+        const lineAfterColor = i === PAIRING_STAGE_LABELS.length - 1 ? 'transparent' : (i < activeIdx ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)');
+        const textColor = active ? 'var(--sk-primary, #0ea5e9)' : (done ? 'var(--sk-text-muted, #6b7280)' : 'var(--sk-text-muted, #9ca3af)');
         return (
           <div key={label} role="listitem" className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
             <div className="w-full flex items-center">
               <div className="flex-1 h-0.5" style={{ background: lineBeforeColor }} />
               <div
                 className="w-3 h-3 rounded-full shrink-0"
-                style={{ background: dotColor, boxShadow: active ? '0 0 0 3px var(--status-success-bg, #f0fdf4)' : 'none' }}
+                style={{ background: dotColor, boxShadow: active ? '0 0 0 3px var(--sk-success-bg, #f0fdf4)' : 'none' }}
                 aria-current={active ? 'step' : undefined}
               />
               <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
@@ -21385,11 +21645,11 @@ function PairingInlineCard({
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div
               className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
-              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+              style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
             >
               <div
                 className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
-                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+                style={{ background: 'var(--sk-surface-2, #f3f4f6)', color: 'var(--sk-text-muted, #6b7280)' }}
               >
                 {maleName ? maleName.slice(0, 2).toUpperCase() : '—'}
               </div>
@@ -21403,7 +21663,7 @@ function PairingInlineCard({
                     <button
                       type="button"
                       className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenMale}
                     >
                       {maleName}
@@ -21421,11 +21681,11 @@ function PairingInlineCard({
             </div>
             <div
               className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
-              style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+              style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
             >
               <div
                 className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
-                style={{ background: 'var(--status-neutral-bg, #f3f4f6)', color: 'var(--status-neutral-text, #6b7280)' }}
+                style={{ background: 'var(--sk-surface-2, #f3f4f6)', color: 'var(--sk-text-muted, #6b7280)' }}
               >
                 {femaleName ? femaleName.slice(0, 2).toUpperCase() : '—'}
               </div>
@@ -21439,7 +21699,7 @@ function PairingInlineCard({
                     <button
                       type="button"
                       className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                      style={{ color: 'var(--color-primary, #0284c7)' }}
+                      style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenFemale}
                     >
                       {femaleName}
@@ -21510,7 +21770,7 @@ function PairingInlineCard({
 
       <div
         className="mt-3 border rounded-2xl p-3"
-        style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+        style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
       >
         <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">Stage</div>
         <PairingStageTracker
@@ -21855,7 +22115,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                 <div
                   key={item.gene}
                   className="rounded-lg border px-3 py-2.5"
-                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                  style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
                 >
                   <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
                   <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
@@ -21868,10 +22128,10 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                               <span className="truncate">{out.label}</span>
                               <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
                             </div>
-                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
                               <div
                                 className="h-full rounded-full"
-                                style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-primary, #0ea5e9)' }}
+                                style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--sk-primary, #0ea5e9)' }}
                               />
                             </div>
                           </div>
@@ -21888,10 +22148,10 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                                 <span className="truncate">{out.label}</span>
                                 <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
                               </div>
-                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
                                 <div
                                   className="h-full rounded-full"
-                                  style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--color-secondary, #94a3b8)' }}
+                                  style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--sk-border-strong, #94a3b8)' }}
                                 />
                               </div>
                             </div>
@@ -21921,16 +22181,16 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                 <div
                   key={item.key}
                   className="rounded-lg border px-3 py-2 text-[11px] text-neutral-700"
-                  style={{ background: 'var(--color-card, #ffffff)', borderColor: 'var(--status-neutral-border, #e5e7eb)' }}
+                  style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
                 >
                   <div className="flex justify-between gap-2 mb-1">
                     <span className="truncate">{item.label}</span>
                     <span className="font-semibold text-neutral-900 shrink-0">{formatProbabilityPercent(item.probability)}</span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--status-neutral-bg, #f3f4f6)' }}>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${Math.round(item.probability * 100)}%`, background: 'var(--color-accent, #f59e0b)' }}
+                      style={{ width: `${Math.round(item.probability * 100)}%`, background: 'var(--sk-accent, #f59e0b)' }}
                     />
                   </div>
                   {breakdownItems.length ? (
@@ -23554,7 +23814,7 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
 function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel = 'Save', disableConfirm = false }) {
   const { t } = useTranslation();
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70]" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
@@ -23575,7 +23835,7 @@ function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', c
 function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue' }) {
   const { t } = useTranslation();
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70]" onClick={onClose}>
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
@@ -24070,7 +24330,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
             <button
-              className={cx("px-3 py-2 rounded-xl text-sm text-white", importCount ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
+              className={cx("px-3 py-2 rounded-xl text-sm sk-on-accent", importCount ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
               disabled={!importCount}
               onClick={applyImport}
             >
@@ -25430,7 +25690,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   <div
                     className={cx(
                       "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-medium",
-                      isToday ? "bg-sky-500 text-white shadow-sm" : "text-neutral-500"
+                      isToday ? "bg-sky-500 sk-on-accent shadow-sm" : "text-neutral-500"
                     )}
                   >
                     {cell.day}
@@ -26020,29 +26280,39 @@ function maleColorTokens(id, theme='blue') {
   };
 }
 
-// activity color palette (used for activity badges and calendar dots)
-// activity palettes: using explicit hex colors provided by the user
+// Activity colour palette (activity tiles on the animal card, and calendar dots).
+//
+// These were seven fixed pastels, which is why the tiles stayed cream on every
+// dark skin. Each category now keeps its own hue via a data-series role but
+// mixes into the active surface, so a tile reads as a tint of the current skin
+// rather than a light patch punched through it. `groups` is deliberately
+// neutral — it is a label holder, not a category.
+const tint = (role, amount) => `color-mix(in srgb, var(${role}) ${amount}%, var(--sk-surface))`;
+
 const activityPalettes = {
-  feeds: { bg: '#9EB7B8', border: '#9EB7B8' }, // Teal faded 50%
-  weights: { bg: '#BBC7B4', border: '#BBC7B4' }, // Muted Green faded 50%
-  cleanings: { bg: '#E6B6A0', border: '#E6B6A0' }, // Muted Orange faded 50%
-  sheds: { bg: '#ECD1A5', border: '#ECD1A5' }, // Mustard Yellow faded 50%
-  meds: { bg: '#DCAD9A', border: '#DCAD9A' }, // Terracotta faded 50%
-  groups: { bg: '#FAF5EE', border: '#FAF5EE' }, // Light Beige faded 50%
-  pairing: { bg: '#ECB5CE', border: '#ECB5CE' }, // dark oink faded 50%
+  feeds: { bg: tint('--sk-series-3', 22), border: tint('--sk-series-3', 45) },
+  weights: { bg: tint('--sk-series-1', 22), border: tint('--sk-series-1', 45) },
+  cleanings: { bg: tint('--sk-series-5', 22), border: tint('--sk-series-5', 45) },
+  sheds: { bg: tint('--sk-series-6', 22), border: tint('--sk-series-6', 45) },
+  meds: { bg: tint('--sk-series-2', 22), border: tint('--sk-series-2', 45) },
+  groups: { bg: 'var(--sk-surface-2)', border: 'var(--sk-border)' },
+  pairing: { bg: tint('--sk-series-4', 22), border: tint('--sk-series-4', 45) },
 };
 
 // gene groups database
-const HET_GENE_COLOR_CLASSES = 'bg-violet-200 border border-violet-300 text-violet-800';
-const SUPER_CODOMINANT_GENE_COLOR_CLASSES = 'bg-rose-500 border border-rose-600 text-white shadow-inner';
+// Audit R4/R2. These used raw Tailwind fills and, except for Het, set no text
+// colour at all — so the label inherited the page ink and vanished once the
+// fill followed the skin. Each class in skins.css is now a bg/fg pair.
+const HET_GENE_COLOR_CLASSES = 'sk-gene sk-gene--het';
+const SUPER_CODOMINANT_GENE_COLOR_CLASSES = 'sk-gene sk-gene--super shadow-inner';
 
 const GENE_GROUP_COLOR_CLASSES = {
   'SuperCodominant': SUPER_CODOMINANT_GENE_COLOR_CLASSES,
   'Het': HET_GENE_COLOR_CLASSES,
-  'Recessive': 'bg-violet-300 border border-violet-400',
-  'Incomplete Dominant': 'bg-rose-300 border border-rose-400',
-  'Dominant': 'bg-sky-300 border border-sky-400',
-  'Other': 'bg-emerald-300 border border-emerald-400'
+  'Recessive': 'sk-gene sk-gene--recessive',
+  'Incomplete Dominant': 'sk-gene sk-gene--incdom',
+  'Dominant': 'sk-gene sk-gene--dominant',
+  'Other': 'sk-gene sk-gene--other'
 };
 
 function getGeneChipClasses(gene, displayGroup, isSuper = false) {
@@ -26133,7 +26403,7 @@ function ScrollToTopButton({ theme = 'blue', className }) {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       className={cx(
-        'fixed bottom-6 right-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 text-white',
+        'fixed bottom-6 right-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         primaryBtnClass(theme, true),
         className
