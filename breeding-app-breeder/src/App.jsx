@@ -25265,7 +25265,20 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     setParsing(true);
     setMorphMarketError('');
     try {
-      const text = await file.text();
+      // animals.csv is what MorphMarket hands out, but a keeper who opened it in Excel and
+      // saved it back arrives with a workbook. Either is fine: the sheet is converted to CSV
+      // text and the SAME header-row detector decides whether it is really a MorphMarket
+      // export. The file's name is never part of that decision.
+      const fileName = (file.name || '').toLowerCase();
+      let text = '';
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        text = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+      } else {
+        text = await file.text();
+      }
+
       const plan = await buildMorphMarketImportPlan(text, {
         existingAnimals,
         parseGenetics: parseGeneticsForImport,
@@ -25273,7 +25286,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
       if (plan.source !== IMPORT_SOURCES.MORPHMARKET) {
         setMorphMarketPlan(null);
         setMorphMarketError(t('ui.animals.import.morphmarket.notRecognised', {
-          defaultValue: 'This file does not look like a MorphMarket animal export. Use "Upload sheet" for a generic CSV.',
+          defaultValue: 'This file does not look like a MorphMarket animal export. Use "Generic CSV / spreadsheet" instead.',
         }));
         return null;
       }
@@ -25357,7 +25370,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     <input
       ref={morphMarketInputRef}
       type="file"
-      accept=".csv,text/csv"
+      accept=".csv,.xlsx,.xls,text/csv"
       className="hidden"
       onChange={async e => {
         const file = e.target.files && e.target.files[0];
@@ -25377,7 +25390,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   // room, and none of the manual mapping controls apply to it.
   if (morphMarketPlan || morphMarketResult) {
     return (
-      <Card title={t("ui.animals.import.morphmarket.title", { defaultValue: "MorphMarket CSV import" })}>
+      <Card title={t("ui.animals.import.morphmarket.title", { defaultValue: "Import from MorphMarket" })}>
         <MorphMarketImportReview
           plan={morphMarketPlan}
           result={morphMarketResult}
@@ -25415,7 +25428,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             disabled={parsing}
             onClick={() => morphMarketInputRef.current?.click()}
           >
-            {parsing ? parsingLabel : t("ui.animals.import.morphmarket.chooseFile", { defaultValue: "MorphMarket CSV import" })}
+            {parsing ? parsingLabel : t("ui.animals.import.morphmarket.chooseFile", { defaultValue: "Import from MorphMarket" })}
           </button>
           <button
             type="button"
@@ -25436,7 +25449,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
         </div>
         <div className="mt-2 text-[11px] text-neutral-500">
           {t("ui.animals.import.morphmarket.sourceHint", {
-            defaultValue: "A MorphMarket export needs no column mapping — it is recognised from its header row, and a generic upload switches to it automatically.",
+            defaultValue: "Pick the animals.csv MorphMarket gives you — or any export that looks like one, whatever it is named. It is recognised from its header row, so there are no columns to map.",
           })}
         </div>
         {morphMarketError && <div className="mt-2 text-[11px] text-rose-600">{morphMarketError}</div>}
