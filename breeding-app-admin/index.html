@@ -4,12 +4,41 @@
     <meta charset="utf-8" />
     <link rel="icon" type="image/png" sizes="256x256" href="app-icons/icon_256x256.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#f6f7f9" />
     <meta name="description" content="Breeding planner advisor" />
     <link rel="apple-touch-icon" href="logo192.png" />
     <link rel="manifest" href="manifest.json" />
     <title>Breeding Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
+      <script>
+      /* Pre-paint skin stamp. Must stay inline and blocking: anything async
+         lands after first paint, which is the flash this removes. Mirrors
+         resolveSkinId() in breeding-app-shared/src/styles/applySkin.mjs. */
+      (function () {
+        try {
+          var a = JSON.parse(localStorage.getItem("breedingPlannerAppearance.v1") || "{}") || {};
+          var sysDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var mode = (!a.themeMode || a.themeMode === "system") ? (sysDark ? "dark" : "light") : a.themeMode;
+          /* Audit R9: the retired "high-contrast" mode maps to the AAA skin. */
+          var skin = (mode === "high-contrast") ? "high-contrast-forest"
+                   : (a.preset && a.preset !== "default") ? a.preset
+                   : (mode === "dark" ? "deep-canopy" : "default");
+          if (mode === "high-contrast") mode = "dark";
+          r.dataset.material = a.material || "flat";
+          var r = document.documentElement;
+          r.dataset.skin = skin;
+          r.dataset.themeMode = mode;
+          r.dataset.appearanceDensity = a.layoutDensity || "comfortable";
+          r.dataset.appearanceRadius = a.borderStyle || "soft";
+          r.dataset.backgroundMode = a.backgroundMode || "solid";
+        } catch (e) { /* first run, private mode, or corrupt state: default skin applies */ }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Display faces for the material layer (Fraunces, Cormorant, Inconsolata)
+         plus the six families the appearance panel offers. -->
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Cormorant+Garamond:wght@400;500;600;700&family=Inconsolata:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

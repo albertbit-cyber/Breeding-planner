@@ -1,0 +1,847 @@
+/* ============================================================================
+   skins.css — v2 — the single source of truth for colour across the suite.
+   breeding-app-shared/src/styles/skins.css · imported by all five frontends.
+
+   18 skins: default + 11 jungle + 6 added in v2.
+   A skin is one flat block of semantic --sk-* roles under [data-skin="…"] on
+   <html>. Adding a skin = adding one block. No JS, no build-time logic.
+
+   INVARIANT: a hex literal outside this file is a bug.
+
+   NEW IN V2, all three traceable to the contrast audit:
+     --sk-brand                              R3 — the wordmark had no role
+     --sk-primary-quiet / -quiet-text        R5 — the modal Add button had no
+                                             low-emphasis fill, so it used
+                                             rgba(15,23,42,0.04) and vanished
+     --sk-series-1…6 respaced 60° apart      series 1-2 were seeded from primary
+                                             and accent and collided whenever a
+                                             skin chose two close hues on purpose
+
+   Generated in OKLCH from a per-skin hue/chroma intent, so the neutral ramp,
+   the four status quartets and the six data series stay perceptually even.
+   Every block passes, measured (see skins.contrast.txt):
+     text · muted · subtle · secondary >= 4.5 against their surface
+     text-on-accent / primary >= 4.5 · primary-quiet-text / -quiet >= 4.5
+     brand >= 4.5 against BOTH bg and surface
+     focus >= 3 against BOTH surface and primary · border/surface >= 1.5
+     status text/bg >= 4.5 · series >= 60 deg apart and >= 3:1 on surface
+   high-contrast-forest is held to 7:1 (AAA) on every text pair.
+   ============================================================================ */
+
+:root,
+[data-skin="default"] {
+  /* Default — reproduces today's shipped appearance. Ships as a visual no-op. */
+  color-scheme: light;
+
+  --sk-bg:                 #f6f7f9;
+  --sk-bg-2:               #f6f7f9;
+  --sk-surface:            #ffffff;
+  --sk-surface-2:          #fafafa;
+  --sk-surface-3:          #f5f5f5;
+  --sk-surface-raised:     #ffffff;
+  --sk-scrim:              15 23 42;
+
+  --sk-border:             #e5e5e5;
+  --sk-border-strong:      #d4d4d4;
+
+  --sk-text:               #171717;
+  --sk-text-secondary:     #404040;
+  --sk-text-muted:         #737373;
+  --sk-text-subtle:        #5f5f5f;
+  --sk-text-on-accent:     #ffffff;
+
+  /* was the hardcoded text-[#3c1b73] on the wordmark (audit R3) */
+  --sk-brand:              #3c1b73;
+
+  --sk-primary:            #0369a1;
+  --sk-primary-hover:      #075985;
+  --sk-primary-quiet:      #f0f9ff;
+  --sk-primary-quiet-text: #075985;
+  --sk-accent:             #b45309;
+  --sk-link:               #0369a1;
+  --sk-focus:              #0ea5e9;
+
+  --sk-success-bg: #f0fdf4;  --sk-success-border: #bbf7d0;  --sk-success-text: #166534;
+  --sk-warning-bg: #fffbeb;  --sk-warning-border: #fde68a;  --sk-warning-text: #92400e;
+  --sk-danger-bg:  #fee2e2;  --sk-danger-border:  #fca5a5;  --sk-danger-text:  #991b1b;
+  --sk-info-bg:    #eff6ff;  --sk-info-border:    #bfdbfe;  --sk-info-text:    #1e40af;
+
+  --sk-shadow-color: 15 23 42;
+
+  --sk-series-1: #0369a1;  --sk-series-2: #9d174d;  --sk-series-3: #047857;
+  --sk-series-4: #6d28d9;  --sk-series-5: #b45309;  --sk-series-6: #4338ca;
+}
+
+/* ══ Jungle skins ═════════════════════════════════════════════════════════ */
+
+[data-skin="jungle-glass"] {
+  /* Jungle Glass — dark
+     Moss green drifting into deep teal. The signature skin. */
+  color-scheme: dark;
+
+  --sk-bg:                 #16211c;
+  --sk-bg-2:               #152325;
+  --sk-surface:            #202a26;
+  --sk-surface-2:          #2a3430;
+  --sk-surface-3:          #343f3a;
+  --sk-surface-raised:     #252f2b;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #455750;
+  --sk-border-strong:      #5b6e66;
+
+  --sk-text:               #ebf7f1;
+  --sk-text-secondary:     #c7d7d0;
+  --sk-text-muted:         #a2b5ad;
+  --sk-text-subtle:        #85978f;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #a8dca8;
+
+  --sk-primary:            #396a2e;
+  --sk-primary-hover:      #4a7c3f;
+  --sk-primary-quiet:      #2b3a28;
+  --sk-primary-quiet-text: #b3e4a9;
+  --sk-accent:             #c4b86e;
+  --sk-link:               #a0d2a1;
+  --sk-focus:              #c2f0a9;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 140 200 260 320 20 80 — 60° apart, anchored on the primary */
+  --sk-series-1: #89c37c;  --sk-series-2: #3cc7ce;  --sk-series-3: #86b2fa;
+  --sk-series-4: #d299df;  --sk-series-5: #f19293;  --sk-series-6: #d7a955;
+}
+
+[data-skin="moss-mist"] {
+  /* Moss & Mist — dark
+     Desaturated sage on warm slate green. Softest contrast. */
+  color-scheme: dark;
+
+  --sk-bg:                 #1b201a;
+  --sk-bg-2:               #1d221d;
+  --sk-surface:            #252924;
+  --sk-surface-2:          #2f332e;
+  --sk-surface-3:          #393d38;
+  --sk-surface-raised:     #2a2e29;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #4e554c;
+  --sk-border-strong:      #646b62;
+
+  --sk-text:               #f0f5ef;
+  --sk-text-secondary:     #ced5cd;
+  --sk-text-muted:         #aab2a9;
+  --sk-text-subtle:        #8d958c;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #addba3;
+
+  --sk-primary:            #416927;
+  --sk-primary-hover:      #527b39;
+  --sk-primary-quiet:      #2d3a26;
+  --sk-primary-quiet-text: #bae3a4;
+  --sk-accent:             #bfba70;
+  --sk-link:               #a6d19c;
+  --sk-focus:              #c9eea4;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 135 195 255 315 15 75 — 60° apart, anchored on the primary */
+  --sk-series-1: #91c276;  --sk-series-2: #3dc8c8;  --sk-series-3: #7eb4f9;
+  --sk-series-4: #cd9ae3;  --sk-series-5: #f19299;  --sk-series-6: #dca657;
+}
+
+[data-skin="rainforest-night"] {
+  /* Rainforest Night — dark
+     Deep blue-green with a cool cyan read. */
+  color-scheme: dark;
+
+  --sk-bg:                 #112121;
+  --sk-bg-2:               #122426;
+  --sk-surface:            #1c2b2b;
+  --sk-surface-2:          #263535;
+  --sk-surface-3:          #303f3f;
+  --sk-surface-raised:     #213030;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #3e5858;
+  --sk-border-strong:      #546f6f;
+
+  --sk-text:               #e7f7f7;
+  --sk-text-secondary:     #c1d8d8;
+  --sk-text-muted:         #9bb6b5;
+  --sk-text-subtle:        #7f9898;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #82e0d7;
+
+  --sk-primary:            #036b62;
+  --sk-primary-hover:      #067e74;
+  --sk-primary-quiet:      #1d3c38;
+  --sk-primary-quiet-text: #87e9dc;
+  --sk-accent:             #a8c17d;
+  --sk-link:               #7dd5cf;
+  --sk-focus:              #87f7e9;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 185 245 305 5 65 125 — 60° apart, anchored on the primary */
+  --sk-series-1: #45c9bb;  --sk-series-2: #6fb8f5;  --sk-series-3: #c29eec;
+  --sk-series-4: #ef91a7;  --sk-series-5: #e3a15e;  --sk-series-6: #a0be6a;
+}
+
+[data-skin="fern-clay"] {
+  /* Fern & Clay — dark
+     Olive base with terracotta warmth. */
+  color-scheme: dark;
+
+  --sk-bg:                 #211e14;
+  --sk-bg-2:               #271f16;
+  --sk-surface:            #2a281f;
+  --sk-surface-2:          #343228;
+  --sk-surface-3:          #3e3c32;
+  --sk-surface-raised:     #2f2d24;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #565343;
+  --sk-border-strong:      #6d6959;
+
+  --sk-text:               #f6f4e9;
+  --sk-text-secondary:     #d6d3c4;
+  --sk-text-muted:         #b4b09f;
+  --sk-text-subtle:        #969282;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #d1d18c;
+
+  --sk-primary:            #655f00;
+  --sk-primary-hover:      #777017;
+  --sk-primary-quiet:      #38371f;
+  --sk-primary-quiet-text: #ddd88e;
+  --sk-accent:             #e9a383;
+  --sk-link:               #c5c887;
+  --sk-focus:              #f0e28e;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 105 165 225 285 345 45 — 60° apart, anchored on the primary */
+  --sk-series-1: #bcb559;  --sk-series-2: #60c89f;  --sk-series-3: #51c0e8;
+  --sk-series-4: #a9a6f7;  --sk-series-5: #e593c2;  --sk-series-6: #ee9972;
+}
+
+[data-skin="emerald-brass"] {
+  /* Emerald & Brass — dark
+     Emerald glass with restrained brass accents. */
+  color-scheme: dark;
+
+  --sk-bg:                 #16211a;
+  --sk-bg-2:               #19231b;
+  --sk-surface:            #212a24;
+  --sk-surface-2:          #2a342e;
+  --sk-surface-3:          #343f38;
+  --sk-surface-raised:     #252f29;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #46574c;
+  --sk-border-strong:      #5c6e62;
+
+  --sk-text:               #ebf7ef;
+  --sk-text-secondary:     #c8d7cd;
+  --sk-text-muted:         #a3b5a9;
+  --sk-text-subtle:        #86978c;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #99deb6;
+
+  --sk-primary:            #086e47;
+  --sk-primary-hover:      #268058;
+  --sk-primary-quiet:      #233c2f;
+  --sk-primary-quiet-text: #9ce8bf;
+  --sk-accent:             #d2b16d;
+  --sk-link:               #91d4b0;
+  --sk-focus:              #a6f5c1;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 160 220 280 340 40 100 — 60° apart, anchored on the primary */
+  --sk-series-1: #69c898;  --sk-series-2: #4ac2e3;  --sk-series-3: #a3a9f9;
+  --sk-series-4: #e294c8;  --sk-series-5: #ef9778;  --sk-series-6: #c2b356;
+}
+
+[data-skin="marsh-dusk"] {
+  /* Marsh Dusk — dark
+     Cool grey-plum shell so the moss accents carry the colour. */
+  color-scheme: dark;
+
+  --sk-bg:                 #201d22;
+  --sk-bg-2:               #1e221c;
+  --sk-surface:            #29262c;
+  --sk-surface-2:          #333036;
+  --sk-surface-3:          #3d3a40;
+  --sk-surface-raised:     #2e2b31;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #55505a;
+  --sk-border-strong:      #6c6670;
+
+  --sk-text:               #f5f2f8;
+  --sk-text-secondary:     #d5d0d9;
+  --sk-text-muted:         #b2adb7;
+  --sk-text-subtle:        #95909a;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #bbd898;
+
+  --sk-primary:            #4f6619;
+  --sk-primary-hover:      #5f772d;
+  --sk-primary-quiet:      #313923;
+  --sk-primary-quiet-text: #c6e09b;
+  --sk-accent:             #c4a7e7;
+  --sk-link:               #b0ce94;
+  --sk-focus:              #d0ec9f;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 125 185 245 305 5 65 — 60° apart, anchored on the primary */
+  --sk-series-1: #a0be6a;  --sk-series-2: #45c9bb;  --sk-series-3: #6fb8f5;
+  --sk-series-4: #c29eec;  --sk-series-5: #ef91a7;  --sk-series-6: #e3a15e;
+}
+
+[data-skin="slate-botanical"] {
+  /* Slate Botanical — dark
+     Neutral blue-grey chrome, chartreuse for data. Most tool-like. */
+  color-scheme: dark;
+
+  --sk-bg:                 #182021;
+  --sk-bg-2:               #192323;
+  --sk-surface:            #22292b;
+  --sk-surface-2:          #2c3335;
+  --sk-surface-3:          #363d3f;
+  --sk-surface-raised:     #272e30;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #485558;
+  --sk-border-strong:      #5e6c6f;
+
+  --sk-text:               #edf5f7;
+  --sk-text-secondary:     #c9d5d8;
+  --sk-text-muted:         #a5b2b5;
+  --sk-text-subtle:        #889598;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #bfd796;
+
+  --sk-primary:            #536514;
+  --sk-primary-hover:      #637629;
+  --sk-primary-quiet:      #323922;
+  --sk-primary-quiet-text: #c9df98;
+  --sk-accent:             #bfba70;
+  --sk-link:               #b6cd90;
+  --sk-focus:              #d6ea9a;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 122 182 242 302 2 62 — 60° apart, anchored on the primary */
+  --sk-series-1: #a5bd67;  --sk-series-2: #48c9b6;  --sk-series-3: #6abaf4;
+  --sk-series-4: #bf9fee;  --sk-series-5: #ee91ab;  --sk-series-6: #e5a061;
+}
+
+[data-skin="bamboo-daylight"] {
+  /* Bamboo Daylight — light
+     Light: paper-warm ground, deep green ink, no glare. */
+  color-scheme: light;
+
+  --sk-bg:                 #f3f5ea;
+  --sk-bg-2:               #f2f1e5;
+  --sk-surface:            #fdfef5;
+  --sk-surface-2:          #f3f4eb;
+  --sk-surface-3:          #e9eae1;
+  --sk-surface-raised:     #ffffff;
+  --sk-scrim:              24 25 23;
+
+  --sk-border:             #cecfc1;
+  --sk-border-strong:      #b7b9ab;
+
+  --sk-text:               #2a2b24;
+  --sk-text-secondary:     #494a41;
+  --sk-text-muted:         #5b5c50;
+  --sk-text-subtle:        #717367;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #133702;
+
+  --sk-primary:            #1b3d00;
+  --sk-primary-hover:      #122d00;
+  --sk-primary-quiet:      #e2f3da;
+  --sk-primary-quiet-text: #2a4d12;
+  --sk-accent:             #7a681c;
+  --sk-link:               #32582a;
+  --sk-focus:              #71934c;
+
+  --sk-success-bg: #e0f7e5;  --sk-success-border: #aeddb9;  --sk-success-text: #0f592e;
+  --sk-warning-bg: #fdefd1;  --sk-warning-border: #e9cc8f;  --sk-warning-text: #5f4600;
+  --sk-danger-bg:  #feebe9;  --sk-danger-border:  #febcb6;  --sk-danger-text:  #832323;
+  --sk-info-bg:    #e0f4fe;  --sk-info-border:    #a0d9f5;  --sk-info-text:    #00526e;
+
+  --sk-shadow-color: 41 42 26;
+
+  /* hues 135 195 255 315 15 75 — 60° apart, anchored on the primary */
+  --sk-series-1: #507d34;  --sk-series-2: #067f7f;  --sk-series-3: #3d70b0;
+  --sk-series-4: #88589c;  --sk-series-5: #a74f59;  --sk-series-6: #946303;
+}
+
+[data-skin="sandstone-vivarium"] {
+  /* Sandstone Vivarium — light
+     Light: sand ground, bark browns, one leaf-green accent. */
+  color-scheme: light;
+
+  --sk-bg:                 #faf3e6;
+  --sk-bg-2:               #f9eee2;
+  --sk-surface:            #fffdfa;
+  --sk-surface-2:          #f9f3e8;
+  --sk-surface-3:          #efe9de;
+  --sk-surface-raised:     #feffff;
+  --sk-scrim:              25 24 23;
+
+  --sk-border:             #d6cdbc;
+  --sk-border-strong:      #c0b6a6;
+
+  --sk-text:               #2e2a22;
+  --sk-text-secondary:     #4e483d;
+  --sk-text-muted:         #615a4c;
+  --sk-text-subtle:        #787162;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #2b3200;
+
+  --sk-primary:            #323700;
+  --sk-primary-hover:      #252800;
+  --sk-primary-quiet:      #ebf0d4;
+  --sk-primary-quiet-text: #414700;
+  --sk-accent:             #905b2a;
+  --sk-link:               #475417;
+  --sk-focus:              #848d3d;
+
+  --sk-success-bg: #e0f7e5;  --sk-success-border: #aeddb9;  --sk-success-text: #0f592e;
+  --sk-warning-bg: #fdefd1;  --sk-warning-border: #e9cc8f;  --sk-warning-text: #5f4600;
+  --sk-danger-bg:  #feebe9;  --sk-danger-border:  #febcb6;  --sk-danger-text:  #832323;
+  --sk-info-bg:    #e0f4fe;  --sk-info-border:    #a0d9f5;  --sk-info-text:    #00526e;
+
+  --sk-shadow-color: 50 39 19;
+
+  /* hues 115 175 235 295 355 55 — 60° apart, anchored on the primary */
+  --sk-series-1: #6d7614;  --sk-series-2: #04816b;  --sk-series-3: #0678a6;
+  --sk-series-4: #745faa;  --sk-series-5: #a14f72;  --sk-series-6: #a15a22;
+}
+
+/* ══ Added in v2 ══════════════════════════════════════════════════════════ */
+
+[data-skin="high-contrast-forest"] {
+  /* High Contrast Forest — dark — AAA, 7:1 floor
+     Accessibility. Replaces highContrast / visualImpaired — held to 7:1 (AAA), not 4.5. */
+  color-scheme: dark;
+
+  --sk-bg:                 #030604;
+  --sk-bg-2:               #060906;
+  --sk-surface:            #0c0f0c;
+  --sk-surface-2:          #141815;
+  --sk-surface-3:          #1d221e;
+  --sk-surface-raised:     #101411;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #6f7770;
+  --sk-border-strong:      #8c958e;
+
+  --sk-text:               #ffffff;
+  --sk-text-secondary:     #ebf2ec;
+  --sk-text-muted:         #d3dcd5;
+  --sk-text-subtle:        #b6bfb8;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #b5e3ab;
+
+  --sk-primary:            #195620;
+  --sk-primary-hover:      #2c6730;
+  --sk-primary-quiet:      #172817;
+  --sk-primary-quiet-text: #c1f9c1;
+  --sk-accent:             #e0dc91;
+  --sk-link:               #bbeebc;
+  --sk-focus:              #ebffeb;
+
+  --sk-success-bg: #04200d;  --sk-success-border: #497555;  --sk-success-text: #b5fcc7;
+  --sk-warning-bg: #231700;  --sk-warning-border: #7f652a;  --sk-warning-text: #ffe5b0;
+  --sk-danger-bg:  #310909;  --sk-danger-border:  #96534e;  --sk-danger-text:  #fee0dd;
+  --sk-info-bg:    #001d2a;  --sk-info-border:    #3a708a;  --sk-info-text:    #cceeff;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 145 205 265 325 25 85 — 60° apart, anchored on the primary */
+  --sk-series-1: #97db99;  --sk-series-2: #5addeb;  --sk-series-3: #adc7fe;
+  --sk-series-4: #eeadf1;  --sk-series-5: #feb0a9;  --sk-series-6: #eac26b;
+}
+
+[data-skin="nocturne-amber"] {
+  /* Nocturne Amber — dark
+     Low blue light. For evening snake-room work — no cool hue in the shell. */
+  color-scheme: dark;
+
+  --sk-bg:                 #1d1610;
+  --sk-bg-2:               #1f1812;
+  --sk-surface:            #27201b;
+  --sk-surface-2:          #312a24;
+  --sk-surface-3:          #3b342e;
+  --sk-surface-raised:     #2c251f;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #5a4f45;
+  --sk-border-strong:      #71655b;
+
+  --sk-text:               #f7eee8;
+  --sk-text-secondary:     #dbd0c7;
+  --sk-text-muted:         #bbaea4;
+  --sk-text-subtle:        #9c9086;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #e9bb82;
+
+  --sk-primary:            #804e00;
+  --sk-primary-hover:      #935f1a;
+  --sk-primary-quiet:      #402f1d;
+  --sk-primary-quiet-text: #fec990;
+  --sk-accent:             #eda885;
+  --sk-link:               #ebbc8a;
+  --sk-focus:              #ffd8af;
+
+  --sk-success-bg: #16321f;  --sk-success-border: #315c3e;  --sk-success-text: #9fe4b1;
+  --sk-warning-bg: #392800;  --sk-warning-border: #664d0b;  --sk-warning-text: #f5cb70;
+  --sk-danger-bg:  #461d1a;  --sk-danger-border:  #7c3b37;  --sk-danger-text:  #febfb9;
+  --sk-info-bg:    #0a303f;  --sk-info-border:    #205870;  --sk-info-text:    #95dcff;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 68 128 188 248 308 8 — 60° apart, anchored on the primary */
+  --sk-series-1: #e5a65f;  --sk-series-2: #9fc271;  --sk-series-3: #46ccc2;
+  --sk-series-4: #76bafa;  --sk-series-5: #c9a0ed;  --sk-series-6: #f394a6;
+}
+
+[data-skin="graphite-neutral"] {
+  /* Graphite Neutral — dark
+     Zero hue in the shell. Colour appears only in data, status and the primary action. */
+  color-scheme: dark;
+
+  --sk-bg:                 #202021;
+  --sk-bg-2:               #212223;
+  --sk-surface:            #2b2b2c;
+  --sk-surface-2:          #353536;
+  --sk-surface-3:          #3f4041;
+  --sk-surface-raised:     #303031;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #545557;
+  --sk-border-strong:      #6a6c6d;
+
+  --sk-text:               #f4f5f6;
+  --sk-text-secondary:     #d3d4d5;
+  --sk-text-muted:         #b1b3b4;
+  --sk-text-subtle:        #97989a;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #f0f2f4;
+
+  --sk-primary:            #216b3c;
+  --sk-primary-hover:      #357d4d;
+  --sk-primary-quiet:      #2a3f2f;
+  --sk-primary-quiet-text: #a5e7b6;
+  --sk-accent:             #cdb66e;
+  --sk-link:               #9bd4a9;
+  --sk-focus:              #acf6bf;
+
+  --sk-success-bg: #1b3824;  --sk-success-border: #345f40;  --sk-success-text: #9fe4b1;
+  --sk-warning-bg: #3e2d04;  --sk-warning-border: #695010;  --sk-warning-text: #f5cb70;
+  --sk-danger-bg:  #4c221f;  --sk-danger-border:  #7f3e3a;  --sk-danger-text:  #febfb9;
+  --sk-info-bg:    #103545;  --sk-info-border:    #235b73;  --sk-info-text:    #95dcff;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 152 212 272 332 32 92 — 60° apart, anchored on the primary */
+  --sk-series-1: #77c88e;  --sk-series-2: #44c6dd;  --sk-series-3: #99aefc;
+  --sk-series-4: #de97d3;  --sk-series-5: #f39684;  --sk-series-6: #cdb056;
+}
+
+[data-skin="obsidian-canopy"] {
+  /* Obsidian Canopy — dark
+     Near-black canvas for OLED phones. Saves battery on the Capacitor build. */
+  color-scheme: dark;
+
+  --sk-bg:                 #000201;
+  --sk-bg-2:               #010301;
+  --sk-surface:            #060c08;
+  --sk-surface-2:          #0f1612;
+  --sk-surface-3:          #19201c;
+  --sk-surface-raised:     #0b110d;
+  --sk-scrim:              0 0 0;
+
+  --sk-border:             #47534c;
+  --sk-border-strong:      #606d65;
+
+  --sk-text:               #eef6f1;
+  --sk-text-secondary:     #d0dbd4;
+  --sk-text-muted:         #aebbb3;
+  --sk-text-subtle:        #89968e;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #a6dba7;
+
+  --sk-primary:            #357a47;
+  --sk-primary-hover:      #488c58;
+  --sk-primary-quiet:      #0e2112;
+  --sk-primary-quiet-text: #acebb8;
+  --sk-accent:             #d0c77d;
+  --sk-link:               #a8e0b2;
+  --sk-focus:              #bbffc8;
+
+  --sk-success-bg: #011b09;  --sk-success-border: #356042;  --sk-success-text: #a7edb9;
+  --sk-warning-bg: #1d1300;  --sk-warning-border: #6b5112;  --sk-warning-text: #fdd378;
+  --sk-danger-bg:  #2c0505;  --sk-danger-border:  #803f3b;  --sk-danger-text:  #ffcbc5;
+  --sk-info-bg:    #001823;  --sk-info-border:    #255c75;  --sk-info-text:    #aae3ff;
+
+  --sk-shadow-color: 0 0 0;
+
+  /* hues 150 210 270 330 30 90 — 60° apart, anchored on the primary */
+  --sk-series-1: #86d396;  --sk-series-2: #50d2e6;  --sk-series-3: #a5bbfe;
+  --sk-series-4: #e8a2e1;  --sk-series-5: #ffa191;  --sk-series-6: #daba61;
+}
+
+[data-skin="glasshouse-mint"] {
+  /* Glasshouse Mint — light
+     Cool light. The only cool-ground option — both original light skins are warm. */
+  color-scheme: light;
+
+  --sk-bg:                 #eef8f4;
+  --sk-bg-2:               #eaf5f1;
+  --sk-surface:            #fdfffe;
+  --sk-surface-2:          #eef7f3;
+  --sk-surface-3:          #e4edea;
+  --sk-surface-raised:     #ffffff;
+  --sk-scrim:              24 25 24;
+
+  --sk-border:             #c2d0cb;
+  --sk-border-strong:      #acb9b4;
+
+  --sk-text:               #222826;
+  --sk-text-secondary:     #404945;
+  --sk-text-muted:         #505c57;
+  --sk-text-subtle:        #66726e;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #013728;
+
+  --sk-primary:            #003a2a;
+  --sk-primary-hover:      #002b1e;
+  --sk-primary-quiet:      #d6f6e8;
+  --sk-primary-quiet-text: #004c38;
+  --sk-accent:             #046869;
+  --sk-link:               #00553f;
+  --sk-focus:              #2f9474;
+
+  --sk-success-bg: #e1f8e6;  --sk-success-border: #acdcb8;  --sk-success-text: #0a562b;
+  --sk-warning-bg: #fef0d2;  --sk-warning-border: #e7ca8e;  --sk-warning-text: #5c4300;
+  --sk-danger-bg:  #feeceb;  --sk-danger-border:  #ffbab3;  --sk-danger-text:  #7f2021;
+  --sk-info-bg:    #e1f5ff;  --sk-info-border:    #9ed7f3;  --sk-info-text:    #004f6a;
+
+  --sk-shadow-color: 29 45 39;
+
+  /* hues 168 228 288 348 48 108 — 60° apart, anchored on the primary */
+  --sk-series-1: #017c5d;  --sk-series-2: #027396;  --sk-series-3: #675ca7;
+  --sk-series-4: #984b74;  --sk-series-5: #9d5126;  --sk-series-6: #706d03;
+}
+
+[data-skin="field-daylight"] {
+  /* Field Daylight — light
+     High-contrast light. Readable on a phone in a sunlit room or outdoors at a show. */
+  color-scheme: light;
+
+  --sk-bg:                 #fcfbf5;
+  --sk-bg-2:               #f8f8f2;
+  --sk-surface:            #ffffff;
+  --sk-surface-2:          #f6f6f1;
+  --sk-surface-3:          #ecebe6;
+  --sk-surface-raised:     #ffffff;
+  --sk-scrim:              25 25 25;
+
+  --sk-border:             #bbbbb3;
+  --sk-border-strong:      #9f9f97;
+
+  --sk-text:               #141411;
+  --sk-text-secondary:     #2e2e29;
+  --sk-text-muted:         #42413b;
+  --sk-text-subtle:        #5e5e57;
+  --sk-text-on-accent:     #ffffff;
+
+  --sk-brand:              #032500;
+
+  --sk-primary:            #0b2b00;
+  --sk-primary-hover:      #051e00;
+  --sk-primary-quiet:      #e4f7de;
+  --sk-primary-quiet-text: #103800;
+  --sk-accent:             #544301;
+  --sk-link:               #1d3f0f;
+  --sk-focus:              #548344;
+
+  --sk-success-bg: #e3fbe8;  --sk-success-border: #9dcba8;  --sk-success-text: #003e1c;
+  --sk-warning-bg: #fff2d9;  --sk-warning-border: #d7ba7e;  --sk-warning-text: #423000;
+  --sk-danger-bg:  #fef0ee;  --sk-danger-border:  #f3a7a0;  --sk-danger-text:  #65000a;
+  --sk-info-bg:    #e7f6fe;  --sk-info-border:    #8fc7e2;  --sk-info-text:    #00384d;
+
+  --sk-shadow-color: 42 41 32;
+
+  /* hues 138 198 258 318 18 78 — 60° apart, anchored on the primary */
+  --sk-series-1: #2f611a;  --sk-series-2: #005f61;  --sk-series-3: #265191;
+  --sk-series-4: #6c3b7b;  --sk-series-5: #86323a;  --sk-series-6: #6e4b02;
+}
+
+/* ── shared, skin-independent ───────────────────────────────────────────────
+   Elevation and scrim derive from each skin's channel triples, so a new skin
+   never authors a shadow.                                                    */
+:root {
+  --sk-shadow-1: 0 1px 2px rgb(var(--sk-shadow-color) / 0.06);
+  --sk-shadow-2: 0 4px 12px rgb(var(--sk-shadow-color) / 0.10);
+  --sk-shadow-3: 0 24px 72px rgb(var(--sk-shadow-color) / 0.32);
+}
+
+/* Fix for audit R1. The theme engine must stop writing color/background-color
+   inline on .app-root; these two rules are what it inherits instead. */
+html { background: var(--mt-shell-bg, var(--sk-bg)); color: var(--sk-text); }
+body { background: var(--mt-shell-bg, var(--sk-bg)); color: var(--sk-text); }
+
+/* Fix for audit R2/R5. Any filled control gets its paired foreground here, so
+   a rule can no longer set one without the other. */
+.sk-btn { padding: var(--sk-btn-y, .55rem) var(--sk-btn-x, 1rem); border-radius: var(--sk-radius, 8px);
+          border: 1px solid transparent; font: inherit; cursor: pointer; }
+.sk-btn--filled { background: var(--sk-primary); color: var(--sk-text-on-accent); }
+.sk-btn--filled:hover { background: var(--sk-primary-hover); }
+.sk-btn--quiet  { background: var(--sk-primary-quiet); color: var(--sk-primary-quiet-text);
+                  border-color: var(--sk-border); }
+.sk-btn--ghost  { background: var(--sk-surface-2); color: var(--sk-text-secondary);
+                  border-color: var(--sk-border); }
+.sk-btn--danger { background: var(--sk-danger-bg); color: var(--sk-danger-text);
+                  border-color: var(--sk-danger-border); }
+/* real colours, not opacity — opacity reads as invisible on dark skins */
+.sk-btn[disabled] { background: var(--sk-surface-3); color: var(--sk-text-subtle);
+                    border-color: var(--sk-border); cursor: not-allowed; }
+
+/* Fix for audit R4. Replaces the ~12 hardcoded bg-black/NN modal backdrops. */
+.sk-scrim { background: rgb(var(--sk-scrim) / 0.45); backdrop-filter: blur(12px); }
+
+/* Fix for audit R3. The wordmark had no role, so someone reached for a literal. */
+.sk-wordmark { color: var(--sk-brand); }
+
+/* Focus ring, offset in the underlying surface so it reads on plain surfaces
+   and on primary-filled buttons alike (both pairs verified >= 3:1). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sk-focus);
+  outline-offset: 2px;
+}
+
+/* Wires up the three <html> attributes the provider already writes and that no
+   CSS ever read. */
+[data-appearance-density="compact"]     { --sk-card-pad: .75rem;  --sk-row-h: 2.25rem; --sk-list-gap: .40rem; --sk-btn-y: .35rem; --sk-btn-x: .85rem; }
+[data-appearance-density="comfortable"] { --sk-card-pad: 1.15rem; --sk-row-h: 2.65rem; --sk-list-gap: .65rem; --sk-btn-y: .55rem; --sk-btn-x: 1rem; }
+[data-appearance-density="spacious"]    { --sk-card-pad: 1.50rem; --sk-row-h: 3.10rem; --sk-list-gap: .90rem; --sk-btn-y: .75rem; --sk-btn-x: 1.35rem; }
+
+[data-appearance-radius="sharp"]   { --sk-radius: 2px; }
+[data-appearance-radius="soft"]    { --sk-radius: 8px; }
+[data-appearance-radius="rounded"] { --sk-radius: 16px; }
+
+[data-motion-preference="reduced"] *,
+[data-motion-preference="reduced"] *::before,
+[data-motion-preference="reduced"] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}
+
+/* Optional Living Glass shell. Every skin supplies --sk-bg / --sk-bg-2 either way. */
+.sk-canvas { background: linear-gradient(165deg, var(--sk-bg-2), var(--sk-bg) 55%, var(--sk-bg-2)); }
+.sk-glass {
+  background: color-mix(in oklab, var(--sk-surface) 78%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sk-border) 70%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--sk-shadow-2);
+}
+
+/* Sex indicators (audit R6). Were `text-sky-500` / `text-pink-500` hardcoded in
+   two Family Tree components; routed at the data-series roles so they stay
+   distinct and legible on every skin. */
+.sk-sex-male    { color: var(--sk-series-3); }
+.sk-sex-female  { color: var(--sk-series-4); }
+.sk-sex-unknown { color: var(--sk-text-subtle); }
+
+/* Active segmented-tab fill. Was `bg-violet-600 text-white`, which the bridge
+   maps to a series colour plus --sk-surface — a dark label on a coloured tile
+   under every dark skin (audit R8). */
+.sk-tab-active { background: var(--sk-primary); color: var(--sk-text-on-accent); }
+
+/* Audit R2/R8. `text-white` bridges to --color-white -> --sk-surface, so any
+   "coloured chip with a white label" lost its label on dark skins. This is the
+   paired foreground for a saturated fill; every skin authors it. */
+.sk-on-accent { color: var(--sk-text-on-accent); }
+
+/* Genetics chips (audit R4/R2). These set a Tailwind background and no
+   foreground at all, so the label inherited the page ink — light-on-light once
+   the background followed the skin ("Pinstripe" measured 1.96:1). Each class
+   is a background/foreground pair, and the hues are the data-series roles so
+   the six genetic classes stay distinguishable on every skin. */
+.sk-gene           { border: 1px solid transparent; }
+.sk-gene--het      { background: color-mix(in srgb, var(--sk-series-4) 22%, var(--sk-surface));
+                     border-color: color-mix(in srgb, var(--sk-series-4) 45%, var(--sk-surface));
+                     color: var(--sk-text); }
+.sk-gene--super    { background: var(--sk-series-2); color: var(--sk-text-on-accent);
+                     border-color: var(--sk-series-2); }
+.sk-gene--recessive{ background: color-mix(in srgb, var(--sk-series-4) 34%, var(--sk-surface));
+                     border-color: color-mix(in srgb, var(--sk-series-4) 55%, var(--sk-surface));
+                     color: var(--sk-text); }
+.sk-gene--incdom   { background: color-mix(in srgb, var(--sk-series-2) 30%, var(--sk-surface));
+                     border-color: color-mix(in srgb, var(--sk-series-2) 50%, var(--sk-surface));
+                     color: var(--sk-text); }
+.sk-gene--dominant { background: color-mix(in srgb, var(--sk-series-3) 30%, var(--sk-surface));
+                     border-color: color-mix(in srgb, var(--sk-series-3) 50%, var(--sk-surface));
+                     color: var(--sk-text); }
+.sk-gene--other    { background: color-mix(in srgb, var(--sk-series-1) 30%, var(--sk-surface));
+                     border-color: color-mix(in srgb, var(--sk-series-1) 50%, var(--sk-surface));
+                     color: var(--sk-text); }

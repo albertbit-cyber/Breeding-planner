@@ -13,7 +13,7 @@ const ComingSoonCanvas = ({ label }) => (
   <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-violet-50/40">
     <div className="text-5xl opacity-20">🌳</div>
     <div className="text-sm font-semibold text-neutral-400">{label} — coming soon</div>
-    <div className="text-xs text-neutral-300 text-center max-w-xs">
+    <div className="text-xs text-neutral-400 text-center max-w-xs">
       This view will display the pedigree in a different layout. Switch back to Tree View to explore the interactive graph.
     </div>
   </div>
@@ -555,14 +555,14 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
       <div className="ft-header">
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-base flex-shrink-0 shadow-sm"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)' }}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm"
+            style={{ background: 'linear-gradient(135deg, var(--sk-series-4), var(--sk-series-6))', color: 'var(--sk-text-on-accent)' }}
           >
             🌳
           </div>
           <div className="min-w-0">
             <div className="text-base font-bold text-neutral-900 leading-tight">Family Tree</div>
-            <div className="text-[11px] text-violet-500 font-medium">
+            <div className="text-[11px] text-neutral-500 font-medium">
               Interactive pedigree graph
               {displaySnake && ` · ${displaySnake.name}`}
             </div>

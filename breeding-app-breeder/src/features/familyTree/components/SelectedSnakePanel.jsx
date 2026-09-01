@@ -9,7 +9,7 @@ const normSex = (s) => {
   return 'unknown';
 };
 const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
-const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500', unknown: 'text-neutral-400' };
+const SEX_COLOR = { male: 'sk-sex-male', female: 'sk-sex-female', unknown: 'sk-sex-unknown' };
 
 const STATUS_CHIP = {
   breeding:  'bg-violet-100 text-violet-700 border-violet-200',
@@ -32,8 +32,8 @@ const AvatarPlaceholder = ({ snake }) => {
   const initial = snake?.name?.charAt(0)?.toUpperCase() || '?';
   const gradient =
     normSex(snake?.sex) === 'male'
-      ? 'linear-gradient(135deg, #7c3aed, #a78bfa)'
-      : 'linear-gradient(135deg, #7c3aed, #f472b6)';
+      ? 'linear-gradient(135deg, var(--sk-series-4), var(--sk-series-6))'
+      : 'linear-gradient(135deg, var(--sk-series-4), var(--sk-series-2))';
 
   if (snake?.photoUrl) {
     return (
@@ -46,8 +46,8 @@ const AvatarPlaceholder = ({ snake }) => {
   }
   return (
     <div
-      className="w-full h-full rounded-2xl flex items-center justify-center text-3xl font-bold text-white shadow-inner"
-      style={{ background: gradient }}
+      className="w-full h-full rounded-2xl flex items-center justify-center text-3xl font-bold shadow-inner"
+      style={{ background: gradient, color: 'var(--sk-text-on-accent)' }}
     >
       {initial}
     </div>

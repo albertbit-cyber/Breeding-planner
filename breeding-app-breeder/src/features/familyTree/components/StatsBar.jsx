@@ -5,7 +5,7 @@ const Stat = ({ icon, label, value }) => (
     <span className="text-base">{icon}</span>
     <div className="flex flex-col leading-tight">
       <span className="text-xs font-bold text-neutral-700">{value ?? '—'}</span>
-      <span className="text-[10px] text-neutral-400">{label}</span>
+      <span className="text-[10px] text-neutral-500">{label}</span>
     </div>
   </div>
 );
@@ -14,13 +14,13 @@ const StatusDot = ({ online }) => (
   <div className="flex items-center gap-1.5 px-4 ml-auto flex-shrink-0">
     <div
       className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-300'}`}
-      style={online ? { boxShadow: '0 0 0 3px rgba(52, 211, 153, 0.2)' } : {}}
+      style={online ? { boxShadow: '0 0 0 3px color-mix(in srgb, var(--sk-success-text) 20%, transparent)' } : {}}
     />
     <span className="text-[10px] font-semibold text-neutral-500">
       {online ? 'Live' : 'Offline'}
     </span>
     {!online && (
-      <span className="text-[10px] text-amber-500 font-medium ml-1">(Mock data)</span>
+      <span className="text-[10px] text-amber-700 font-medium ml-1">(Mock data)</span>
     )}
   </div>
 );

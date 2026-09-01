@@ -749,7 +749,7 @@ function LoginScreen({ onLogin }) {
             />
           </label>
           {error && <p className="mbl-login-error">{error}</p>}
-          <button type="submit" className="mbl-btn mbl-btn--primary mbl-btn--wide" disabled={busy}>
+          <button type="submit" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" disabled={busy}>
             {busy ? <Spinner /> : "Sign in"}
           </button>
         </form>
@@ -923,7 +923,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
       ))}
       <div className="mbl-edit-actions">
         <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>Cancel</button>
-        <button type="submit" className="mbl-btn mbl-btn--primary" disabled={busy}>
+        <button type="submit" className="mbl-btn mbl-btn--sk-primary" disabled={busy}>
           {busy ? <Spinner /> : "Save changes"}
         </button>
       </div>
@@ -946,7 +946,7 @@ function FeedModal({ animal, onSave, onClose }) {
             onClick={() => setResult(v)}>{cap(v)}</button>
         ))}
       </div>
-      <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide"
+      <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, food, result })}>
         Save feed
       </button>
@@ -962,7 +962,7 @@ function WeightModal({ animal, onSave, onClose }) {
         <input type="number" inputMode="numeric" value={grams}
           onChange={(e) => setGrams(e.target.value)} />
       </label>
-      <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide"
+      <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, grams })}>
         Save weight
       </button>
@@ -980,7 +980,7 @@ function ShedModal({ animal, onSave, onClose }) {
             onClick={() => setResult(v)}>{v === "bad" ? "Bad shed" : "Complete"}</button>
         ))}
       </div>
-      <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide"
+      <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, result })}>
         Save shed
       </button>
@@ -1003,7 +1003,7 @@ function NoteModal({ animal, onSave, onClose }) {
         onChange={(e) => setNote(e.target.value)} placeholder="Type or use voice…" />
       <div className="mbl-edit-actions">
         <button type="button" className="mbl-btn" onClick={startVoice}>🎤 Voice</button>
-        <button type="button" className="mbl-btn mbl-btn--primary"
+        <button type="button" className="mbl-btn mbl-btn--sk-primary"
           onClick={() => onSave({ animalId: animal.appAnimalId, note })}>
           Save note
         </button>
@@ -1018,7 +1018,7 @@ function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, bu
   const currentIcon = animal?.imageUrl;
   return (
     <ActionSheet title="Photos" onClose={onClose}>
-      <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={onTakePhoto} disabled={busy}>
+      <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" onClick={onTakePhoto} disabled={busy}>
         {busy ? <Spinner /> : "📷 Take Photo"}
       </button>
       {photos.length > 0 ? (
@@ -1211,7 +1211,7 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
         <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>
           Cancel
         </button>
-        <button type="button" className="mbl-btn mbl-btn--primary"
+        <button type="button" className="mbl-btn mbl-btn--sk-primary"
           onClick={save} disabled={busy || !date}>
           {busy ? <Spinner /> : `Log ${STAGE_LABELS[stageKey]}`}
         </button>
@@ -1724,7 +1724,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
 
       {subtab === "photos" && (
         <div className="mbl-photo-panel">
-          <button type="button" className="mbl-btn mbl-btn--primary mbl-btn--wide" onClick={handleTakePhoto} disabled={photoBusy}>
+          <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" onClick={handleTakePhoto} disabled={photoBusy}>
             {photoBusy ? <Spinner /> : "📷 Take Photo"}
           </button>
           {(animal.photos || []).length > 0 ? (
@@ -1999,7 +1999,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
           <form className="mbl-manual-row" onSubmit={handleManual}>
             <input value={manual} onChange={(e) => setManual(e.target.value)}
               placeholder="Or paste QR value / animal ID" disabled={busy} />
-            <button type="submit" className="mbl-btn mbl-btn--primary" disabled={busy || !manual.trim()}>
+            <button type="submit" className="mbl-btn mbl-btn--sk-primary" disabled={busy || !manual.trim()}>
               Open
             </button>
           </form>
@@ -2103,7 +2103,7 @@ function TaskCard({ task, animalMap, onComplete, onOpen }) {
         <small>{[task.location, task.dueStatus].filter(Boolean).join(" · ") || "—"}</small>
       </div>
       <div className="mbl-task-btns">
-        <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--primary" onClick={() => onComplete(task, "done")}>Done</button>
+        <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--sk-primary" onClick={() => onComplete(task, "done")}>Done</button>
         {task.type === "Feed" && (
           <button type="button" className="mbl-btn mbl-btn--sm" onClick={() => onComplete(task, "refused")}>Refused</button>
         )}
@@ -2547,7 +2547,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
           <QRScanner onScan={openAnimal} onError={(e) => { pushToast(e); setScanOpen(false); }} />
           <form className="mbl-manual-row" onSubmit={(e) => { e.preventDefault(); const v = e.target.elements.qr.value.trim(); if (v) { openAnimal(v); e.target.reset(); } }}>
             <input name="qr" placeholder="Or paste QR / animal ID" />
-            <button type="submit" className="mbl-btn mbl-btn--primary">Open</button>
+            <button type="submit" className="mbl-btn mbl-btn--sk-primary">Open</button>
           </form>
           {recent.length > 0 && (
             <>

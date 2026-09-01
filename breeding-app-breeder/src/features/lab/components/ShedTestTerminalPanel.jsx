@@ -571,7 +571,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                             <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                className="rounded-md border border-rose-300 bg-rose-600 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-60"
+                                className="rounded-md border border-rose-300 bg-rose-600 px-2 py-1 text-[11px] font-medium sk-on-accent disabled:opacity-60"
                                 disabled={cancelInFlightId === order.id}
                                 onClick={() => handleCancelOrder(order.id)}
                               >
@@ -688,7 +688,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                       </button>
                       <button
                         type="button"
-                        className="rounded-md border border-neutral-900 bg-neutral-900 px-2 py-0.5 text-[11px] text-white"
+                        className="rounded-md border border-neutral-900 bg-neutral-900 px-2 py-0.5 text-[11px] sk-on-accent"
                         onClick={saveEditedTests}
                       >
                         {t("common.save", { defaultValue: "Save" })}
@@ -763,7 +763,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
             </div>
             <button
               type="button"
-              className="rounded-lg border bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+              className="rounded-lg border bg-neutral-900 px-3 py-1.5 text-xs font-medium sk-on-accent disabled:opacity-60"
               disabled={submitting || loadingQuote || !pricingConfig || !(quote.items || []).length}
               onClick={submitBatch}
             >

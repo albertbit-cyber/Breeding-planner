@@ -263,7 +263,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
             </button>
             {/* Clicking Print calls window.print() (browser) or webContents.print({ silent: false }) (Electron).
                 The OS print dialog opens — no printer is pre-selected and silent mode is never used. */}
-            <button type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
+            <button type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm sk-on-accent disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
               {isPrinting ? t("lab.orders.openingPrintDialog", { defaultValue: "Opening..." }) : t("actions.print", { defaultValue: "Print" })}
             </button>
           </div>

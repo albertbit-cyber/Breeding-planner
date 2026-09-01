@@ -1,10 +1,24 @@
+/* Order matters.
+   1. Tailwind first, so its stock theme variables exist.
+   2. skins.css next — the --sk-* palette every skin block defines.
+   3. tw-bridge.css, so its @theme re-points Tailwind's palette at those roles.
+   4. materials.css last — the material layer reads --sk-* and adds texture,
+      depth and type. Without data-material it is a no-op. Imported by relative path rather than a package specifier because
+      the Tailwind v4 Vite plugin resolves @import with its own resolver before
+      Vite runs, so a Vite alias would not be honoured here. */
 @import "tailwindcss";
+@import "../../breeding-app-shared/src/styles/skins.css";
+@import "../../breeding-app-shared/src/styles/tw-bridge.css";
+@import "../../breeding-app-shared/src/styles/materials.css";   /* AFTER skins */
+@import "../../breeding-app-shared/src/styles/materials-bridge.css";   /* LAST */
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+    sans-serif);
+  background: var(--mt-shell-bg, var(--sk-bg));
+  color: var(--sk-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

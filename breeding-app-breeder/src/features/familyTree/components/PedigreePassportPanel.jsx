@@ -192,7 +192,7 @@ const ComingSoonTab = ({ label }) => (
   <div className="flex flex-col items-center justify-center h-40 gap-3">
     <div className="text-3xl opacity-30">🔬</div>
     <div className="text-sm font-semibold text-neutral-400">{label} coming soon</div>
-    <div className="text-xs text-neutral-300 text-center">
+    <div className="text-xs text-neutral-400 text-center">
       This section will show health records, test results, and documentation.
     </div>
   </div>

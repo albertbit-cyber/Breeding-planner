@@ -244,7 +244,7 @@ export default function InlineResultEntry({ orderId, onSaved }) {
         <div key={group.animalId} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
           {/* Animal header */}
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-white">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold sk-on-accent">
               {groupIdx + 1}
             </span>
             <div>
@@ -336,7 +336,7 @@ export default function InlineResultEntry({ orderId, onSaved }) {
         </button>
         <button
           type="button"
-          className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium sk-on-accent disabled:opacity-60"
           disabled={Boolean(submitLoading)}
           onClick={() => runSave("submit")}
         >

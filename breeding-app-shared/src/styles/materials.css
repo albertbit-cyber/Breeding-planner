@@ -1,0 +1,589 @@
+/* ============================================================================
+   materials.css — the material layer.
+   breeding-app-shared/src/styles/materials.css
+
+   Colour is a skin. MATERIAL IS NOT — a texture, a bevel and a four-layer
+   shadow cannot live in a --sk-* value. So material is a SECOND, orthogonal
+   axis on <html>:
+
+       <html data-skin="jungle-glass" data-material="vitrine">
+
+   This file defines 5 materials as blocks of --mt-* variables, plus the
+   component classes that consume them (.mt-shell, .mt-card, .mt-btn, …).
+
+   DIVISION OF LABOUR — the rule that keeps 16 skins × 6 materials sane:
+     skins.css     owns HUE, text colour, status colour, data series.
+     materials.css owns TEXTURE, DEPTH, RADIUS, BEVEL, TYPE.
+   Every material surface is built with color-mix() over the skin's own
+   --sk-surface / --sk-bg, so switching skin still moves the hue and switching
+   material still changes only the feel. No material hardcodes a hue.
+
+   ONE HONEST EXCEPTION: the three paper materials (vellum, vitrine,
+   rattan) put a light paper face under body text by definition — that is what
+   paper is. On a dark skin they read as light cards on a dark room, not as a
+   dark UI. That is a real constraint, not a bug; see the compatibility table
+   in MATERIALS.md before pairing them.
+
+   --mt-tone: paper | surface   documents which kind a material is, so
+   components (and the compat test) can branch on it.
+   ============================================================================ */
+
+/* ── the contract ──────────────────────────────────────────────────────────
+   Every material MUST define all of these. Defaults below are the flat
+   fallback: installing materials.css without setting data-material leaves the
+   app looking exactly as it does now.                                       */
+:root {
+  --mt-tone: surface;
+
+  --mt-radius-shell:   12px;
+  --mt-radius-card:    12px;
+  --mt-radius-control:  8px;
+  --mt-radius-chip:    999px;
+
+  /* shell = the page ground. card = panels. well = recessed containers. */
+  --mt-shell-bg:    var(--sk-bg);
+  --mt-shell-tex:   none;
+  --mt-shell-blend: normal;
+  --mt-card-bg:     var(--sk-surface);
+  --mt-card-tex:    none;
+  --mt-card-blend:  normal;
+  --mt-well-bg:     var(--sk-surface-2);
+
+  /* depth. one light source, top-left, in every material. */
+  --mt-bevel-card:    0 0 0 1px var(--sk-border);
+  --mt-bevel-control: 0 0 0 1px var(--sk-border);
+  --mt-bevel-well:    0 0 0 1px var(--sk-border) inset;
+  --mt-lift-card:     var(--sk-shadow-2);
+  --mt-lift-shell:    var(--sk-shadow-3);
+  --mt-lift-control:  var(--sk-shadow-1);
+
+  /* type. materials may swap the display face; body stays the app's. */
+  --mt-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --mt-font-ui:      'Space Grotesk', system-ui, sans-serif;
+  --mt-font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+  --mt-display-weight: 600;
+  --mt-display-track:  -0.01em;
+  --mt-display-case:   none;
+  --mt-label-track:    0.02em;
+  --mt-label-case:     none;
+
+  /* engraved / embossed text. none by default. */
+  --mt-text-relief: none;
+
+  /* a material may draw one accent rule (kintsugi seam, brass inlay). */
+  --mt-seam: transparent;
+  --mt-seam-width: 0px;
+
+  /* per-card rotation, for the materials that want a hand-placed feel. */
+  --mt-card-tilt: 0deg;
+}
+
+/* Reusable noise. Defined once, referenced by the materials that want grain.
+   Grain sits UNDER the colour via background-blend-mode, never as a grey film
+   over it, and never behind body text — only on shells and card faces. */
+:root {
+  --mt-grain-fine:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.34'/%3E%3C/svg%3E");
+  --mt-grain-coarse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='190' height='190'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.45' numOctaves='6'/%3E%3C/filter%3E%3Crect width='190' height='190' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  --mt-grain-stone:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.5' numOctaves='5'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  --mt-weave-warp:   repeating-linear-gradient(90deg, rgba(255,235,190,.16) 0 7px, rgba(0,0,0,.16) 7px 14px);
+  --mt-weave-weft:   repeating-linear-gradient(0deg, rgba(255,235,190,.13) 0 7px, rgba(0,0,0,.13) 7px 14px);
+  --mt-grid-fine:    repeating-linear-gradient(0deg, rgba(160,205,225,.09) 0 1px, transparent 1px 22px),
+                     repeating-linear-gradient(90deg, rgba(160,205,225,.09) 0 1px, transparent 1px 22px);
+  --mt-cloth:        repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px),
+                     repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 1px, transparent 1px 3px);
+  --mt-linen:        repeating-linear-gradient(90deg, rgba(0,0,0,.045) 0 1px, transparent 1px 4px),
+                     repeating-linear-gradient(0deg, rgba(0,0,0,.045) 0 1px, transparent 1px 4px);
+}
+
+
+/* ══ 1. vellum — pressed paper, debossed type ══════════════════════════════
+   Mockup 5a. Type pressed INTO the sheet; cards are the only thing that rises.
+   Calmest of the ten for long sessions.                                     */
+[data-material="vellum"] {
+  --mt-tone: paper;
+  --mt-radius-shell: 4px;  --mt-radius-card: 3px;
+  --mt-radius-control: 3px; --mt-radius-chip: 2px;
+
+  --mt-paper:      #e8e2d2;
+  --mt-paper-hi:   #f2ecdd;
+  --mt-paper-ink:  #33301f;
+  --mt-paper-line: #c4bda8;
+
+  /* the skin still tints the paper — 8% of its bg keeps hue continuity */
+  --mt-shell-bg:    color-mix(in oklab, var(--mt-paper) 92%, var(--sk-bg));
+  --mt-shell-tex:   var(--mt-grain-fine);
+  --mt-shell-blend: multiply;
+  --mt-card-bg:     color-mix(in oklab, var(--mt-paper-hi) 94%, var(--sk-bg));
+  --mt-card-tex:    none;
+  --mt-well-bg:     color-mix(in oklab, var(--mt-paper) 88%, var(--sk-bg));
+
+  --mt-bevel-card:    0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(90,84,64,.3);
+  --mt-bevel-control: 0 1px 2px rgba(90,84,64,.35) inset, 0 -1px 0 rgba(255,255,255,.6) inset;
+  --mt-bevel-well:    0 1px 2px rgba(90,84,64,.25) inset;
+  --mt-lift-card:     0 8px 18px rgba(90,84,64,.22);
+  --mt-lift-shell:    0 1px 0 rgba(255,255,255,.7) inset, 0 40px 80px rgba(0,0,0,.45);
+  --mt-lift-control:  0 2px 3px rgba(80,74,54,.4);
+
+  --mt-font-display: 'Fraunces', Georgia, serif;
+  --mt-label-track: .08em;  --mt-label-case: uppercase;
+  --mt-text-relief: 0 -1px 0 rgba(90,84,64,.55), 0 1px 0 rgba(255,255,255,.85);
+}
+
+/* ══ 2. terrarium-glass — panes with lit and shadowed edges ════════════════
+   Mockup 5b. Real glass: bright top-left edge, dark bottom-right, casts onto
+   the substrate. Needs a dark skin to have anything to be glass over.       */
+[data-material="terrarium-glass"] {
+  --mt-tone: surface;
+  --mt-radius-shell: 20px; --mt-radius-card: 16px;
+  --mt-radius-control: 10px; --mt-radius-chip: 999px;
+
+  --mt-shell-bg:    var(--sk-bg);
+  --mt-shell-tex:   radial-gradient(120% 90% at 12% 4%, color-mix(in oklab, var(--sk-accent) 24%, transparent), transparent 58%),
+                    radial-gradient(90% 80% at 88% 96%, color-mix(in oklab, var(--sk-primary) 30%, transparent), transparent 60%),
+                    var(--mt-grain-coarse);
+  --mt-shell-blend: screen, normal, soft-light;
+  --mt-card-bg:     linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04) 45%, rgba(255,255,255,.07));
+  --mt-well-bg:     rgba(0,0,0,.2);
+
+  --mt-bevel-card:    0 1px 0 rgba(255,255,255,.34) inset, -1px 0 0 rgba(255,255,255,.16) inset, 0 -1px 0 rgba(0,0,0,.34) inset;
+  --mt-bevel-control: 0 1px 0 rgba(255,255,255,.2) inset, 0 -1px 0 rgba(0,0,0,.25) inset;
+  --mt-bevel-well:    0 1px 3px rgba(0,0,0,.4) inset, 0 -1px 0 rgba(255,255,255,.1) inset;
+  --mt-lift-card:     0 3px 6px rgba(0,0,0,.3), 0 18px 40px rgba(0,0,0,.4);
+  --mt-lift-shell:    0 40px 80px rgba(0,0,0,.5);
+  --mt-lift-control:  0 4px 12px rgba(0,0,0,.3);
+  --mt-card-blur: 20px;
+
+  --mt-font-display: 'Fraunces', Georgia, serif;
+}
+
+
+/* ══ 3. vitrine — brass frame, linen mount, spotlight ══════════════════════
+   Mockup 5e. Treats the collection as an exhibit. Expensive: wants real
+   photography, and the frame costs vertical space on small screens.         */
+[data-material="vitrine"] {
+  --mt-tone: paper;
+  --mt-radius-shell: 6px; --mt-radius-card: 0px;
+  --mt-radius-control: 2px; --mt-radius-chip: 0px;
+
+  --mt-brass:      #a08a4e;
+  --mt-brass-dark: #6a5a2e;
+  --mt-mount:      #dfd8c2;
+  --mt-case:       #1a1d17;
+
+  --mt-shell-bg:    linear-gradient(160deg, var(--mt-brass), var(--mt-brass-dark) 40%, #8b7740);
+  --mt-case-bg:     color-mix(in oklab, var(--mt-case) 84%, var(--sk-bg));
+  --mt-case-tex:    radial-gradient(80% 60% at 50% 0%, rgba(230,215,160,.16), transparent 70%), var(--mt-grain-fine);
+  --mt-card-bg:     color-mix(in oklab, var(--mt-mount) 94%, var(--sk-bg));
+  --mt-card-tex:    var(--mt-linen);
+  --mt-card-blend:  normal;
+  --mt-well-bg:     transparent;
+
+  --mt-bevel-card:    0 2px 6px rgba(0,0,0,.3) inset;
+  --mt-bevel-control: 0 1px 0 rgba(255,255,255,.44) inset, 0 -1px 0 rgba(0,0,0,.3) inset;
+  --mt-bevel-well:    none;
+  --mt-lift-card:     0 1px 0 rgba(255,255,255,.26) inset, 0 14px 34px rgba(0,0,0,.6);
+  --mt-lift-shell:    0 1px 0 rgba(255,255,255,.34) inset, 0 -1px 0 rgba(0,0,0,.4) inset, 0 40px 80px rgba(0,0,0,.55);
+  --mt-lift-control:  0 3px 7px rgba(0,0,0,.5);
+
+  --mt-font-display: 'Cormorant Garamond', Georgia, serif;
+  --mt-display-weight: 500;
+  --mt-display-track: .1em; --mt-display-case: uppercase;
+  --mt-label-track: .16em; --mt-label-case: uppercase;
+}
+
+/* ══ 4. blueprint — cyanotype, tracing-paper overlays ══════════════════════
+   Mockup 5g. Depth from stacked translucent paper rather than lighting — the
+   only material here whose depth is not shadow-driven.                      */
+[data-material="blueprint"] {
+  --mt-tone: surface;
+  --mt-radius-shell: 4px; --mt-radius-card: 0px;
+  --mt-radius-control: 0px; --mt-radius-chip: 0px;
+
+  --mt-shell-bg:    color-mix(in oklab, #1c3340 78%, var(--sk-bg));
+  --mt-shell-tex:   var(--mt-grid-fine), var(--mt-grain-fine);
+  --mt-shell-blend: normal, normal, soft-light;
+  --mt-card-bg:     rgba(214,236,246,.14);
+  --mt-well-bg:     rgba(20,42,54,.5);
+
+  --mt-bevel-card:    0 1px 0 rgba(255,255,255,.24) inset, 0 0 0 1px rgba(190,225,240,.3);
+  --mt-bevel-control: 0 0 0 1px rgba(190,225,240,.4);
+  --mt-bevel-well:    none;
+  --mt-lift-card:     0 10px 26px rgba(0,0,0,.42);
+  --mt-lift-shell:    0 40px 80px rgba(0,0,0,.5);
+  --mt-lift-control:  0 3px 10px rgba(0,0,0,.3);
+  --mt-card-blur: 3px;
+
+  --mt-font-display: 'Inconsolata', ui-monospace, monospace;
+  --mt-font-ui:      'Inconsolata', ui-monospace, monospace;
+  --mt-display-weight: 500;
+  --mt-display-track: .06em; --mt-display-case: uppercase;
+  --mt-label-track: .14em;   --mt-label-case: uppercase;
+}
+
+/* ══ 5. rattan — interlaced warp and weft ══════════════════════════════════
+   Mockup 5i. Genuinely woven, not a repeated tile. Warm and handmade.       */
+[data-material="rattan"] {
+  --mt-tone: paper;
+  --mt-radius-shell: 10px; --mt-radius-card: 12px;
+  --mt-radius-control: 9px; --mt-radius-chip: 999px;
+
+  --mt-cane:  #6b5a3c;
+  --mt-paper: #f6f0df;
+
+  --mt-shell-bg:    color-mix(in oklab, var(--mt-cane) 80%, var(--sk-bg));
+  --mt-shell-tex:   var(--mt-weave-warp), var(--mt-weave-weft), var(--mt-grain-fine);
+  --mt-shell-blend: overlay, overlay, soft-light;
+  --mt-card-bg:     color-mix(in oklab, var(--mt-paper) 95%, var(--sk-bg));
+  --mt-well-bg:     color-mix(in oklab, #eee7d2 94%, var(--sk-bg));
+
+  --mt-bevel-card:    0 1px 0 rgba(255,255,255,.9) inset, 0 3px 6px rgba(52,40,22,.4);
+  --mt-bevel-control: 0 1px 0 rgba(255,235,190,.16) inset;
+  --mt-bevel-well:    0 1px 3px rgba(90,84,64,.28) inset;
+  --mt-lift-card:     0 16px 36px rgba(52,40,22,.42);
+  --mt-lift-shell:    0 1px 0 rgba(255,235,190,.2) inset, 0 -2px 0 rgba(0,0,0,.3) inset, 0 40px 80px rgba(0,0,0,.5);
+  --mt-lift-control:  0 3px 8px rgba(0,0,0,.4);
+
+  --mt-font-display: 'Fraunces', Georgia, serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+   These are what the app actually uses. Each reads only --mt-* and --sk-*, so
+   they are correct for every skin × material pair without knowing either.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.mt-shell {
+  background-color: var(--mt-shell-bg);
+  background-image: var(--mt-shell-tex);
+  background-blend-mode: var(--mt-shell-blend);
+  border-radius: var(--mt-radius-shell);
+  box-shadow: var(--mt-lift-shell);
+  color: var(--sk-text);
+}
+
+.mt-card {
+  position: relative;
+  background-color: var(--mt-card-bg);
+  background-image: var(--mt-card-tex);
+  background-blend-mode: var(--mt-card-blend);
+  border-radius: var(--mt-radius-card);
+  box-shadow: var(--mt-bevel-card), var(--mt-lift-card);
+  backdrop-filter: blur(var(--mt-card-blur, 0px));
+  transform: rotate(var(--mt-card-tilt));
+  color: var(--sk-text);
+}
+/* the seam materials draw their accent rule here */
+.mt-card--seam::before {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: var(--mt-seam-width);
+  background: var(--mt-seam);
+  border-radius: var(--mt-radius-card) 0 0 var(--mt-radius-card);
+}
+.mt-card--seam { padding-left: calc(var(--mt-seam-width) + 8px); }
+
+/* recessed container — stat cells, inputs, list wells */
+.mt-well {
+  background: var(--mt-well-bg);
+  border-radius: var(--mt-radius-control);
+  box-shadow: var(--mt-bevel-well);
+}
+
+.mt-btn {
+  font-family: var(--mt-font-ui);
+  font-weight: 600;
+  letter-spacing: var(--mt-label-track);
+  text-transform: var(--mt-label-case);
+  padding: var(--sk-btn-y, .625rem) var(--sk-btn-x, 1.125rem);
+  border-radius: var(--mt-radius-control);
+  border: 0;
+  cursor: pointer;
+}
+/* filled + its paired foreground, so audit R2 cannot recur through this layer */
+.mt-btn--primary {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--sk-primary) 88%, #fff 12%), var(--sk-primary));
+  color: var(--sk-text-on-accent);
+  box-shadow: var(--mt-bevel-control), var(--mt-lift-control);
+}
+.mt-btn--primary:hover { background: var(--sk-primary-hover); }
+.mt-btn--quiet {
+  background: var(--sk-primary-quiet);
+  color: var(--sk-primary-quiet-text);
+  box-shadow: var(--mt-bevel-control);
+}
+.mt-btn--ghost {
+  background: var(--mt-well-bg);
+  color: var(--sk-text-secondary);
+  box-shadow: var(--mt-bevel-control);
+}
+.mt-btn--danger {
+  background: var(--sk-danger-bg);
+  color: var(--sk-danger-text);
+  box-shadow: var(--mt-bevel-control);
+}
+.mt-btn[disabled] {
+  background: var(--sk-surface-3);
+  color: var(--sk-text-subtle);
+  box-shadow: var(--mt-bevel-well);
+  cursor: not-allowed;
+}
+
+.mt-chip {
+  font-family: var(--mt-font-ui);
+  font-weight: 600;
+  font-size: .625rem;
+  letter-spacing: var(--mt-label-track);
+  text-transform: var(--mt-label-case);
+  padding: .3125rem .75rem;
+  border-radius: var(--mt-radius-chip);
+  box-shadow: var(--mt-bevel-well);
+}
+
+.mt-display {
+  font-family: var(--mt-font-display);
+  font-weight: var(--mt-display-weight);
+  letter-spacing: var(--mt-display-track);
+  text-transform: var(--mt-display-case);
+  text-shadow: var(--mt-text-relief);
+}
+.mt-label {
+  font-family: var(--mt-font-mono);
+  font-weight: 500;
+  letter-spacing: var(--mt-label-track);
+  text-transform: var(--mt-label-case);
+  color: var(--sk-text-muted);
+}
+.mt-wordmark {
+  font-family: var(--mt-font-display);
+  font-weight: var(--mt-display-weight);
+  letter-spacing: var(--mt-display-track);
+  text-transform: var(--mt-display-case);
+  color: var(--sk-brand);
+  text-shadow: var(--mt-text-relief);
+}
+
+/* ── paper materials on dark skins ─────────────────────────────────────────
+   A paper card face is light by definition. When the skin is dark, the skin's
+   own --sk-text would be near-white on that light face — unreadable. So paper
+   materials re-declare text INSIDE the card only, from the material's ink.
+   This is the one place material overrides a skin colour, and it is why the
+   compat table in MATERIALS.md exists.                                      */
+/* vellum and rattan make the ENTIRE ground light — their
+   --mt-shell-bg is a paper tone, not just their card face. So on a dark skin
+   the skin's near-white ink is wrong everywhere on them, not only inside
+   cards: the header, the shell and the out-of-shell banner all need paper ink
+   too. (Measured: "Serpentora" 1.04, "Logo" 1.07, "Retry" 1.02.)
+
+   Derived from --mt-shell-bg here, and refined per-card in the block below.
+   vitrine is deliberately absent: its shell is a brass frame over a DARK case
+   and only the mount card is light, so it stays card-scoped.                 */
+[data-material="vellum"] body {
+  --sk-text:           var(--mt-paper-ink, #2b2b1c);
+  --sk-text-secondary: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 88%, var(--mt-shell-bg));
+  --sk-text-muted:     color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 80%, var(--mt-shell-bg));
+  --sk-text-subtle:    color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 70%, var(--mt-shell-bg));
+
+  --sk-surface:        var(--mt-shell-bg);
+  --sk-surface-2:      color-mix(in oklab, var(--mt-shell-bg) 93%, var(--mt-paper-ink, #2b2b1c));
+  --sk-surface-3:      color-mix(in oklab, var(--mt-shell-bg) 86%, var(--mt-paper-ink, #2b2b1c));
+  --sk-border:         color-mix(in oklab, var(--mt-shell-bg) 76%, var(--mt-paper-ink, #2b2b1c));
+  --sk-border-strong:  color-mix(in oklab, var(--mt-shell-bg) 60%, var(--mt-paper-ink, #2b2b1c));
+  --sk-brand:          var(--mt-paper-ink, #2b2b1c);
+
+  --color-white:       var(--mt-shell-bg);
+  --color-neutral-50:  var(--sk-surface-2);
+  --color-neutral-100: var(--sk-surface-3);
+  --color-neutral-200: var(--sk-border);
+  --color-neutral-300: var(--sk-border-strong);
+  --color-neutral-400: var(--sk-text-subtle);
+  --color-neutral-500: var(--sk-text-muted);
+  --color-neutral-600: var(--sk-text-secondary);
+  --color-neutral-700: var(--sk-text-secondary);
+  --color-neutral-800: var(--sk-text);
+  --color-neutral-900: var(--sk-text);
+
+  /* The shared-backend banner renders OUTSIDE .app-root and uses the status
+     quartets (bg-emerald-50 / text-emerald-800). On a dark skin those are a
+     dark chip with light-green text — correct there, but vellum's ground is
+     paper, so the light text landed on light paper at 1.02:1 ("Retry",
+     "Diagnostics"). Re-derive the quartets against the paper ground. */
+  --sk-success-bg: color-mix(in oklab, var(--mt-shell-bg) 88%, var(--sk-series-3));
+  --sk-warning-bg: color-mix(in oklab, var(--mt-shell-bg) 88%, var(--sk-series-5));
+  --sk-danger-bg:  color-mix(in oklab, var(--mt-shell-bg) 88%, var(--sk-series-2));
+  --sk-info-bg:    color-mix(in oklab, var(--mt-shell-bg) 88%, var(--sk-series-1));
+  --sk-success-text: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-3));
+  --sk-warning-text: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-5));
+  --sk-danger-text:  color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-2));
+  --sk-info-text:    color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-1));
+
+  --color-emerald-50:  var(--sk-success-bg);
+  --color-emerald-200: var(--sk-success-border);
+  --color-emerald-600: var(--sk-success-text);
+  --color-emerald-700: var(--sk-success-text);
+  --color-emerald-800: var(--sk-success-text);
+  --color-red-200:     var(--sk-danger-border);
+  --color-rose-200:    var(--sk-danger-border);
+  --color-rose-700:    var(--sk-danger-text);
+  --color-red-800:     var(--sk-danger-text);
+  --color-red-900:     var(--sk-danger-text);
+  --color-amber-200:   var(--sk-warning-border);
+  --color-amber-900:   var(--sk-warning-text);
+  --color-sky-800:     var(--sk-info-text);
+  --color-sky-900:     var(--sk-info-text);
+  --sk-success-border: color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-3));
+  --sk-danger-border:  color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-2));
+  --sk-warning-border: color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-5));
+  --color-amber-50:    var(--sk-warning-bg);
+  --color-amber-700:   var(--sk-warning-text);
+  --color-amber-800:   var(--sk-warning-text);
+  --color-red-50:      var(--sk-danger-bg);
+  --color-rose-50:     var(--sk-danger-bg);
+  --color-red-700:     var(--sk-danger-text);
+  --color-rose-600:    var(--sk-danger-text);
+  --color-sky-50:      var(--sk-info-bg);
+  --color-sky-600:     var(--sk-info-text);
+  --color-sky-700:     var(--sk-info-text);
+}
+
+[data-material="vellum"] .mt-card,
+[data-material="vitrine"] .mt-card,
+[data-material="rattan"] .mt-card {
+  color: var(--mt-paper-ink, #2b2b1c);
+}
+[data-material="vellum"] .mt-card .mt-label,
+[data-material="vitrine"] .mt-card .mt-label,
+[data-material="rattan"] .mt-card .mt-label {
+  color: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 62%, transparent);
+}
+[data-material="vitrine"] { --mt-paper-ink: #262318; }
+[data-material="rattan"]  { --mt-paper-ink: #33301f; }
+
+/* ── the vitrine needs one extra layer: frame > case > mount ───────────────
+   Wrap .mt-shell (the brass frame) around .mt-case, then .mt-card inside. */
+.mt-case {
+  background-color: var(--mt-case-bg, var(--mt-shell-bg));
+  background-image: var(--mt-case-tex, none);
+  background-blend-mode: screen, soft-light;
+  border-radius: 3px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.6) inset;
+  padding: 1.625rem;
+}
+
+/* ── paper materials: re-scope the skin roles, not just `color` ─────────────
+   ADDED DURING ROLLOUT — measured fix, not part of the shipped v3 file.
+
+   The block above sets `color` on .mt-card, which only reaches descendants
+   that inherit. Anything carrying an explicit text class does not: the Tailwind
+   bridge maps those to --sk-text-* , which on a dark skin is near-white, and
+   near-white on a paper face measured 1.04:1 ("Breeders" inside an activity
+   well, moss-mist + vellum/rattan; vitrine hit 1.05).
+
+   Redefining the roles themselves inside the card fixes every descendant at
+   once, because the bridge reads these variables. Values derive from the
+   material's own ink and card face, so no hue is hardcoded.
+
+   This is why MATERIALS.md marks paper-on-dark `review`. It is now measured
+   rather than assumed — but see MIGRATION-NOTES: a light card face on a dark
+   skin is still a different product than the skin promises, and that judgement
+   is unchanged.                                                              */
+[data-material="vellum"] .mt-card,
+[data-material="vitrine"] .mt-card,
+[data-material="rattan"] .mt-card {
+  --sk-text:           var(--mt-paper-ink, #2b2b1c);
+  --sk-text-secondary: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 88%, var(--mt-card-bg));
+  --sk-text-muted:     color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 74%, var(--mt-card-bg));
+  --sk-text-subtle:    color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 70%, var(--mt-card-bg));
+
+  --sk-surface:        var(--mt-card-bg);
+  --sk-surface-2:      color-mix(in oklab, var(--mt-card-bg) 93%, var(--mt-paper-ink, #2b2b1c));
+  --sk-surface-3:      color-mix(in oklab, var(--mt-card-bg) 86%, var(--mt-paper-ink, #2b2b1c));
+  --sk-border:         color-mix(in oklab, var(--mt-card-bg) 76%, var(--mt-paper-ink, #2b2b1c));
+  --sk-border-strong:  color-mix(in oklab, var(--mt-card-bg) 60%, var(--mt-paper-ink, #2b2b1c));
+
+  /* Status quartets are authored for the skin's own ground. On a dark skin
+     they are dark-on-dark chips, which land on paper as mud. Re-derive them
+     from the paper face so the tint survives and the label stays ink. */
+  --sk-success-bg: color-mix(in oklab, var(--mt-card-bg) 88%, var(--sk-success-text));
+  --sk-warning-bg: color-mix(in oklab, var(--mt-card-bg) 88%, var(--sk-warning-text));
+  --sk-danger-bg:  color-mix(in oklab, var(--mt-card-bg) 88%, var(--sk-danger-text));
+  --sk-info-bg:    color-mix(in oklab, var(--mt-card-bg) 88%, var(--sk-info-text));
+  --sk-success-text: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-3));
+  --sk-warning-text: color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-5));
+  --sk-danger-text:  color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-2));
+  --sk-info-text:    color-mix(in oklab, var(--mt-paper-ink, #2b2b1c) 78%, var(--sk-series-1));
+
+  /* The Tailwind bridge declares --color-* AT :root, so its var(--sk-*)
+     references were already substituted there. Re-scoping --sk-* alone does
+     not reach a utility class; the --color-* names have to be re-declared too.
+     (This is what left `text-neutral-600` at the dark skin's near-white inside
+     a paper card — measured 1.11:1.) These resolve against the roles declared
+     immediately above, on this same element. */
+  --color-white:       var(--sk-surface);
+  --color-neutral-50:  var(--sk-surface-2);
+  --color-neutral-100: var(--sk-surface-3);
+  --color-neutral-200: var(--sk-border);
+  --color-neutral-300: var(--sk-border-strong);
+  --color-neutral-400: var(--sk-text-subtle);
+  --color-neutral-500: var(--sk-text-muted);
+  --color-neutral-600: var(--sk-text-secondary);
+  --color-neutral-700: var(--sk-text-secondary);
+  --color-neutral-800: var(--sk-text);
+  --color-neutral-900: var(--sk-text);
+
+  --color-red-50:      var(--sk-danger-bg);
+  --color-rose-50:     var(--sk-danger-bg);
+  --color-red-700:     var(--sk-danger-text);
+  --color-rose-600:    var(--sk-danger-text);
+  --color-rose-700:    var(--sk-danger-text);
+  --color-amber-50:    var(--sk-warning-bg);
+  --color-amber-700:   var(--sk-warning-text);
+  --color-amber-800:   var(--sk-warning-text);
+  --color-emerald-50:  var(--sk-success-bg);
+  --color-emerald-200: var(--sk-success-border);
+  --color-emerald-600: var(--sk-success-text);
+  --color-emerald-700: var(--sk-success-text);
+  --color-emerald-800: var(--sk-success-text);
+  --color-red-200:     var(--sk-danger-border);
+  --color-rose-200:    var(--sk-danger-border);
+  --color-rose-700:    var(--sk-danger-text);
+  --color-red-800:     var(--sk-danger-text);
+  --color-red-900:     var(--sk-danger-text);
+  --color-amber-200:   var(--sk-warning-border);
+  --color-amber-900:   var(--sk-warning-text);
+  --color-sky-800:     var(--sk-info-text);
+  --color-sky-900:     var(--sk-info-text);
+  --sk-success-border: color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-3));
+  --sk-danger-border:  color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-2));
+  --sk-warning-border: color-mix(in oklab, var(--mt-shell-bg) 70%, var(--sk-series-5));
+  --color-sky-50:      var(--sk-info-bg);
+  --color-sky-600:     var(--sk-info-text);
+  --color-sky-700:     var(--sk-info-text);
+  --color-violet-50:   var(--sk-surface-2);
+  --color-violet-100:  var(--sk-surface-3);
+  --color-violet-200:  var(--sk-border);
+  --color-violet-700:  var(--sk-text-secondary);
+  --color-pink-50:     var(--sk-surface-2);
+  --color-pink-700:    var(--sk-text-secondary);
+}
+
+/* ── surface materials: restore muted contrast on the tinted card face ──────
+   ADDED DURING ROLLOUT — measured fix, not part of the shipped v3 file.
+
+   The skins guarantee --sk-text-muted >= 4.5:1 against --sk-surface. A surface
+   material repaints the card as color-mix(--sk-surface, --sk-text ~3%), which
+   is slightly darker, so muted lands just under on light skins (measured 4.05
+   to 4.46 on `default` — the "Tag" label). Nudging muted the same direction as
+   the face restores the pair.
+
+   --mt-muted-base is a separate name resolved at :root, which is what makes
+   this legal: --sk-text-muted cannot reference itself. `flat` is excluded so
+   the no-op stays a no-op, and paper is excluded because it re-derives its own
+   ink above.                                                                 */
+:root { --mt-muted-base: var(--sk-text-muted); }
+
+[data-material="terrarium-glass"] .mt-card,
+[data-material="blueprint"] .mt-card {
+  --sk-text-muted:     color-mix(in oklab, var(--mt-muted-base) 74%, var(--sk-text));
+  --color-neutral-500: color-mix(in oklab, var(--mt-muted-base) 74%, var(--sk-text));
+}

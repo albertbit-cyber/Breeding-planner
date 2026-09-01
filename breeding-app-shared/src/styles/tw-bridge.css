@@ -1,0 +1,85 @@
+/* ============================================================================
+   tw-bridge.css — v2
+   Re-points Tailwind v4's stock palette at the skin roles.
+   breeding-app-shared/src/styles/tw-bridge.css
+
+   Import AFTER "tailwindcss", in the breeder app only (the other four
+   frontends don't use Tailwind).
+
+   Tailwind v4 compiles every colour utility to var(--color-*), so this file
+   converts ~2,000 of the 2,433 palette-literal utility usages without editing
+   a single call site. Opacity modifiers survive the chain — bg-white/80
+   becomes color-mix(… var(--color-white) 80% …).
+   ============================================================================ */
+
+@theme {
+  /* the neutral ramp carries this app's whole text + surface hierarchy */
+  --color-white:       var(--sk-surface);
+  --color-neutral-50:  var(--sk-surface-2);
+  --color-neutral-100: var(--sk-surface-3);
+  --color-neutral-200: var(--sk-border);          /* 28 sites */
+  --color-neutral-300: var(--sk-border-strong);
+  --color-neutral-400: var(--sk-text-subtle);
+  --color-neutral-500: var(--sk-text-muted);      /* 334 sites */
+  --color-neutral-600: var(--sk-text-secondary);
+  --color-neutral-700: var(--sk-text-secondary);
+  --color-neutral-800: var(--sk-text);
+  --color-neutral-900: var(--sk-text);
+
+  /* audit R6 — these were used directly for muted text and icons */
+  --color-sky-300:     var(--sk-series-3);
+  --color-pink-300:    var(--sk-series-4);
+  --color-amber-500:   var(--sk-warning-text);
+
+  /* audit R4 — the -50 tints used as panel backgrounds inside themed cards */
+  --color-red-50:      var(--sk-danger-bg);
+  --color-red-200:     var(--sk-danger-border);
+  --color-rose-200:    var(--sk-danger-border);
+  --color-rose-600:    var(--sk-danger-text);
+  --color-amber-50:    var(--sk-warning-bg);
+  --color-amber-200:   var(--sk-warning-border);
+  --color-amber-700:   var(--sk-warning-text);
+  --color-emerald-50:  var(--sk-success-bg);
+  --color-emerald-700: var(--sk-success-text);
+  --color-sky-50:      var(--sk-info-bg);
+  --color-violet-50:   var(--sk-surface-2);
+  --color-pink-50:     var(--sk-surface-2);
+
+
+  /* Audit R4, completing the pairs. Mapping a -50 tint to a semantic *-bg
+     without mapping the matching dark text ramp leaves the label on the raw
+     Tailwind ramp — dark-on-dark once the background follows the skin. A rule
+     that themes one half of a pair must theme the other. */
+  --color-red-700:     var(--sk-danger-text);
+  --color-red-800:     var(--sk-danger-text);
+  --color-red-900:     var(--sk-danger-text);
+  --color-rose-50:     var(--sk-danger-bg);
+  --color-rose-700:    var(--sk-danger-text);
+  --color-rose-800:    var(--sk-danger-text);
+  --color-amber-800:   var(--sk-warning-text);
+  --color-amber-900:   var(--sk-warning-text);
+  --color-emerald-200: var(--sk-success-border);
+  --color-emerald-600: var(--sk-success-text);
+  --color-emerald-800: var(--sk-success-text);
+  --color-sky-800:     var(--sk-info-text);
+  --color-sky-900:     var(--sk-info-text);
+  --color-violet-100:  var(--sk-surface-3);
+  --color-violet-200:  var(--sk-border);
+  --color-violet-700:  var(--sk-text-secondary);
+  --color-violet-800:  var(--sk-text);
+  --color-pink-700:    var(--sk-text-secondary);
+
+  /* audit R7 — the sky accent that leaked through every skin */
+  --color-sky-400:     var(--sk-focus);
+  --color-sky-500:     var(--sk-primary);
+  --color-sky-600:     var(--sk-link);
+  --color-sky-700:     var(--sk-link);
+  --color-violet-500:  var(--sk-series-4);
+
+  /* NOT overridden on purpose: --color-black. The label-preview checkerboard
+     and the QR renderer need true black. Modal backdrops use .sk-scrim. */
+}
+
+/* v4 preflight is `border: 0 solid`, so a bare `border` utility inherits
+   currentColor. One rule gives every bare-border element a real token. */
+*, ::before, ::after { border-color: var(--sk-border); }

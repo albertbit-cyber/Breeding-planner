@@ -2,7 +2,7 @@ import React from 'react';
 import { Handle, Position } from 'reactflow';
 
 const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
-const SEX_COLOR = { male: 'text-sky-500', female: 'text-pink-500', unknown: 'text-neutral-400' };
+const SEX_COLOR = { male: 'sk-sex-male', female: 'sk-sex-female', unknown: 'sk-sex-unknown' };
 
 const STATUS_CHIP = {
   breeding:  'bg-violet-100 text-violet-700',
@@ -31,12 +31,12 @@ const ROLE_BG = {
 };
 
 const AVATAR_GRADIENT = {
-  selected:  'linear-gradient(135deg, #7c3aed, #a78bfa)',
-  sire:      'linear-gradient(135deg, #0ea5e9, #38bdf8)',
-  dam:       'linear-gradient(135deg, #ec4899, #f9a8d4)',
-  offspring: 'linear-gradient(135deg, #10b981, #6ee7b7)',
-  sibling:   'linear-gradient(135deg, #f59e0b, #fcd34d)',
-  ancestor:  'linear-gradient(135deg, #6366f1, #a5b4fc)',
+  selected:  'linear-gradient(135deg, var(--sk-series-4), var(--sk-series-6))',
+  sire:      'linear-gradient(135deg, var(--sk-series-1), var(--sk-focus))',
+  dam:       'linear-gradient(135deg, var(--sk-series-2), var(--sk-accent))',
+  offspring: 'linear-gradient(135deg, var(--sk-series-3), var(--sk-success-text))',
+  sibling:   'linear-gradient(135deg, var(--sk-series-5), var(--sk-warning-text))',
+  ancestor:  'linear-gradient(135deg, var(--sk-series-6), var(--sk-series-4))',
 };
 
 const SnakeNode = ({ data }) => {
@@ -68,8 +68,8 @@ const SnakeNode = ({ data }) => {
       {/* Header row: avatar + name/id + sex */}
       <div className="flex items-center gap-2.5">
         <div
-          className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold text-white shadow-sm"
-          style={{ background: AVATAR_GRADIENT[role] || AVATAR_GRADIENT.ancestor }}
+          className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-sm"
+          style={{ background: AVATAR_GRADIENT[role] || AVATAR_GRADIENT.ancestor, color: 'var(--sk-text-on-accent)' }}
         >
           {snake.photoUrl ? (
             <img
@@ -129,7 +129,7 @@ const SnakeNode = ({ data }) => {
 
       {/* Hatch year if available */}
       {snake.hatchDate && (
-        <div className="mt-1 text-[9px] text-neutral-300 text-right font-mono">
+        <div className="mt-1 text-[9px] text-neutral-400 text-right font-mono">
           {snake.hatchDate.slice(0, 4)}
         </div>
       )}

@@ -267,7 +267,7 @@ export default function BreederOrderGeneticTestModal({
             </button>
             <button
               type="button"
-              className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium sk-on-accent disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!selectedTests.length || isLoadingCatalog || !!catalogError || added}
               onClick={handleAddToBatch}
             >
