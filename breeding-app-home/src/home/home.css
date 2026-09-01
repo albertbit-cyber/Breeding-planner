@@ -1,6 +1,6 @@
-@import "../../breeding-app-shared/src/styles/skins.css";
-@import "../../breeding-app-shared/src/styles/materials.css";
-@import "../../breeding-app-shared/src/styles/materials-bridge.css";
+@import "../../../breeding-app-shared/src/styles/skins.css";
+@import "../../../breeding-app-shared/src/styles/materials.css";
+@import "../../../breeding-app-shared/src/styles/materials-bridge.css";
 
 /* ── Reset ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
