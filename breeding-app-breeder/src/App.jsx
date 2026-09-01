@@ -95,6 +95,7 @@ import {
   normalizeSexValue,
   sexOrUnknown,
 } from "./features/animals/animalSex";
+import { retagIdForSex } from "./features/animals/animalIdSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
 import { resolveCatalogParent } from "./features/animals/catalogParentLabel";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
@@ -8002,6 +8003,9 @@ export default function BreedingPlannerApp() {
   // edit snake
   const [editSnake, setEditSnake] = useState(null);
   const [editSnakeDraft, setEditSnakeDraft] = useState(null);
+  // Set when sexing an animal would have moved its ID onto one already in use, so the field can
+  // say why it stayed put instead of leaving the keeper to notice the letter never changed.
+  const [editIdRetagBlocked, setEditIdRetagBlocked] = useState(false);
   const [editForSalePublishing, setEditForSalePublishing] = useState(false);
   const [editForSalePublishError, setEditForSalePublishError] = useState('');
   const [qrFor, setQrFor] = useState(null);
@@ -9996,6 +10000,7 @@ export default function BreedingPlannerApp() {
   const closeSnakeEditor = useCallback(() => {
     setEditSnake(null);
     setEditSnakeDraft(null);
+    setEditIdRetagBlocked(false);
     setEditForSalePublishError('');
     if (returnToGroupsAfterEdit) {
       setTab('animals');
@@ -10966,6 +10971,37 @@ export default function BreedingPlannerApp() {
       };
     });
   }, [snakes, editSnake, breederInfo]);
+
+  /**
+   * Sexing an animal in the edit card, with its ID following along.
+   *
+   * A hatchling is logged unsexed and its ID says so -- 26-U-242. The moment the keeper picks
+   * Male here the U becomes an M, in the field, before saving, so what they are about to write
+   * on the tub label is the thing they can see. Only the marker moves; `retagIdForSex` refuses
+   * to touch an ID that never stated a sex.
+   *
+   * The one case it will not carry through is a collision, because handing two animals the same
+   * ID loses one of them everywhere the ID is the key. The sex still changes -- that is the fact
+   * the keeper just recorded -- and the field explains why the ID did not.
+   */
+  const handleEditSnakeSexChange = useCallback((rawSex) => {
+    if (!editSnakeDraft) return;
+    const nextSex = sexOrUnknown(rawSex);
+    const template = normalizeIdGeneratorConfig(breederInfo?.idGenerator).template;
+    const currentId = String(editSnakeDraft.id || '');
+    const retagged = retagIdForSex(currentId, nextSex, { template });
+    const collides = retagged !== currentId && snakes.some(s => (
+      s
+      && s.id !== editSnake?.id
+      && String(s.id || '').trim().toLowerCase() === retagged.trim().toLowerCase()
+    ));
+    setEditIdRetagBlocked(collides);
+    setEditSnakeDraft(draft => {
+      if (!draft) return draft;
+      if (retagged === currentId || collides) return { ...draft, sex: nextSex };
+      return { ...draft, sex: nextSex, id: retagged };
+    });
+  }, [editSnakeDraft, snakes, editSnake, breederInfo]);
 
   const handleUpdatePairing = useCallback(async (pairingId, updater) => {
     let conflictInfo = null;
@@ -12967,12 +13003,51 @@ export default function BreedingPlannerApp() {
                                 morphs: normalizedGenetics.morphs,
                                 hets: normalizedGenetics.hets,
                                 feederProfile: normalizedFeederProfile,
-                              }, { today: quarantineTodayYmd() }) : s));
+                              }, { today: quarantineTodayYmd() }) : (
+                                // Every offspring names its parents by ID, and that is what the
+                                // family tree draws its edges from. Rename a breeder without
+                                // carrying this across and its whole clutch comes loose from it.
+                                newId !== oldId && (s?.sireId === oldId || s?.damId === oldId)
+                                  ? {
+                                      ...s,
+                                      sireId: s.sireId === oldId ? newId : s.sireId,
+                                      damId: s.damId === oldId ? newId : s.damId,
+                                    }
+                                  : s
+                              )));
                           setPairings(prev => prev.map(p => ({
                             ...p,
                             maleId: p.maleId === oldId ? newId : p.maleId,
                             femaleId: p.femaleId === oldId ? newId : p.femaleId,
                           })));
+                          // The ID is the key Spaces stores, so a rename that stops here would
+                          // leave the tub and the terrarium pointing at an animal that no longer
+                          // exists -- the record survives, but it vanishes off the rack.
+                          if (newId !== oldId) {
+                            updateSpacesState(prev => ({
+                              ...prev,
+                              heatRacks: prev.heatRacks.map(rack => {
+                                const slots = Array.isArray(rack.slots) ? rack.slots : [];
+                                if (!slots.some(slot => slot?.snakeId === oldId)) return rack;
+                                return {
+                                  ...rack,
+                                  slots: slots.map(slot => (
+                                    slot?.snakeId === oldId ? { ...slot, snakeId: newId } : slot
+                                  )),
+                                  updatedAt: nowIsoString(),
+                                };
+                              }),
+                              terrariums: prev.terrariums.map(terrarium => {
+                                const occupants = Array.isArray(terrarium.occupantIds) ? terrarium.occupantIds : [];
+                                if (!occupants.includes(oldId)) return terrarium;
+                                return {
+                                  ...terrarium,
+                                  occupantIds: occupants.map(id => (id === oldId ? newId : id)),
+                                  updatedAt: nowIsoString(),
+                                };
+                              }),
+                            }));
+                          }
                           closeSnakeEditor();
                             }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
@@ -13076,16 +13151,23 @@ export default function BreedingPlannerApp() {
                     </div>
                   </div>
                   <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm font-mono" value={editSnakeDraft.id}
-                    onChange={e=>setEditSnakeDraft(d=>({...d,id:e.target.value}))} />
+                    onChange={e=>{ setEditIdRetagBlocked(false); setEditSnakeDraft(d=>({...d,id:e.target.value})); }} />
                   {!((editSnakeDraft.id || '').trim()) && (
                     <div className="mt-0.5 text-[11px] text-neutral-500">{t("snakeEdit.idHint")}</div>
+                  )}
+                  {editIdRetagBlocked && (
+                    <div className="mt-0.5 text-[11px] text-amber-600">
+                      {t("snakeEdit.idSexRetagTaken", {
+                        defaultValue: "The sex was recorded, but the ID kept its old letter because the new one is already in use by another animal.",
+                      })}
+                    </div>
                   )}
                 </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.sex")}</label>
                   <select className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
                     value={normalizeSexValue(editSnakeDraft.sex)}
-                    onChange={e=>setEditSnakeDraft(d=>({...d,sex:e.target.value}))}>
+                    onChange={e=>handleEditSnakeSexChange(e.target.value)}>
                     <option value="U">{t("snakeEdit.sexUnknown", { defaultValue: "Unknown" })}</option>
                     <option value="F">{t("snakeEdit.sexFemale")}</option>
                     <option value="M">{t("snakeEdit.sexMale")}</option>
