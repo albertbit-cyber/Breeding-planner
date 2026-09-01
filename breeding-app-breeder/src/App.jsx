@@ -98,6 +98,10 @@ import {
 } from "./features/animals/animalSex";
 import { retagIdForSex } from "./features/animals/animalIdSex";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
+import { parseCsvToRows, detectHeaderKey } from "./utils/csvRows";
+import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/importSource";
+import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
+import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import {
   detectParentsFromName,
@@ -5997,59 +6001,8 @@ function parsePipeSeparatedLines(raw) {
   return out;
 }
 
-// Simple CSV parser that returns rows (array of cells). Handles quoted fields.
-function parseCsvToRows(csvText) {
-  const rows = [];
-  let i = 0;
-  const len = csvText.length;
-  let cur = '';
-  let row = [];
-  let inQuotes = false;
-  while (i < len) {
-    const ch = csvText[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i+1 < len && csvText[i+1] === '"') { cur += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
-      }
-      cur += ch; i++; continue;
-    }
-    if (ch === '"') { inQuotes = true; i++; continue; }
-    if (ch === ',') { row.push(cur); cur = ''; i++; continue; }
-    if (ch === '\r') { i++; continue; }
-    if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; i++; continue; }
-    cur += ch; i++;
-  }
-  // push last
-  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
-  return rows;
-}
-
-function normalizeHeaderLabel(label) {
-  return String(label || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function detectHeaderKey(label) {
-  const normalized = normalizeHeaderLabel(label);
-  if (!normalized) return null;
-  if (/^name$|^animal name$|^snake name$/.test(normalized)) return 'name';
-  if (/^id$|^animal id$|^snake id$|^identifier$/.test(normalized)) return 'id';
-  if (/(^|\s)(sex|gender)(\s|$)/.test(normalized)) return 'sex';
-  if (/(^|\s)(morph|visual|combo)(s)?(\s|$)/.test(normalized)) return 'morphs';
-  if (/(^|\s)(het|hetero)(s)?(\s|$)/.test(normalized)) return 'hets';
-  if (/(^|\s)(genetic|gene|traits?)(s)?(\s|$)/.test(normalized)) return 'genetics';
-  if (/(^|\s)(group|collection|category|rack)(s)?(\s|$)/.test(normalized)) return 'groups';
-  if (/(^|\s)(tag|keyword)(s)?(\s|$)/.test(normalized)) return 'tags';
-  if (/(^|\s)(birth|hatch|dob)(\s|$)/.test(normalized)) return 'birthDate';
-  if (/^year$|^birth year$|^hatch year$/.test(normalized)) return 'year';
-  if (/(^|\s)weight(\s|$)|(^|\s)grams?(\s|$)/.test(normalized)) return 'weight';
-  if (/(^|\s)status(\s|$)/.test(normalized)) return 'status';
-  if (/(^|\s)notes?(\s|$)|(^|\s)comments?(\s|$)/.test(normalized)) return 'notes';
-  return null;
-}
+// parseCsvToRows, normalizeHeaderLabel and detectHeaderKey now live in utils/csvRows so the
+// MorphMarket adapter and its tests share ONE csv parser with this file. See the import above.
 
 function splitMultiValueCell(value) {
   if (value === null || value === undefined) return [];
@@ -10495,6 +10448,126 @@ export default function BreedingPlannerApp() {
     setImportSpecies('');
   }
 
+  /**
+   * Writes a reviewed MorphMarket plan. Deliberately the SAME path a hand-added animal takes:
+   * convertParsedToSnake builds the record, the quarantine reconciler decides its status, and
+   * setSnakes stores it. This function only decides which rows go where and what an update is
+   * allowed to touch -- it is not a second animal-creation system.
+   */
+  function applyMorphMarketImport(plan) {
+    const { create, update, skipped, failed } = selectRowsToCommit(plan?.rows || []);
+    const today = quarantineTodayYmd();
+
+    // A weight from MorphMarket is a reading taken on the day the sheet was exported, so it is
+    // recorded as one -- through the weight history the rest of the app already reads, not as a
+    // bare number that no chart can see.
+    const initialWeightLog = (weight) => (
+      weight === null || weight === undefined
+        ? []
+        : [{
+          id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `mm-${today}-${weight}`,
+          date: today,
+          grams: weight,
+          notes: 'MorphMarket import',
+        }]
+    );
+
+    const existingIds = snakes.map(snake => snake.id).filter(Boolean);
+    const existingRecords = snakes.map(snake => ({ id: snake.id, idSequence: snake.idSequence }));
+
+    const created = create.map(row => {
+      const draft = row.animal;
+      const converted = convertParsedToSnake(
+        {
+          name: draft.name,
+          id: draft.id,
+          sex: draft.sex,
+          morphs: draft.morphs,
+          hets: draft.hets,
+          weight: draft.weight ?? 0,
+          birthDate: draft.birthDate,
+          __existingIds: existingIds,
+          __existingRecords: existingRecords,
+        },
+        breederInfo?.idGenerator
+      );
+      existingIds.push(converted.id);
+      existingRecords.push({ id: converted.id, idSequence: converted.idSequence });
+      return reconcileQuarantineWithStatus(
+        {
+          ...converted,
+          // convertParsedToSnake strips a leading year off a name to seed the id generator,
+          // which would quietly turn the title "2026 Pastel Male" into "Pastel Male". The id it
+          // derived is still wanted; the title is not its to edit.
+          name: draft.name,
+          sex: draft.sex,
+          species: draft.species,
+          // MorphMarket's Price is a reference value only. forSale is untouched on purpose:
+          // a marketplace state over there must never publish a listing over here.
+          price: draft.price,
+          logs: { ...converted.logs, weights: initialWeightLog(draft.weight) },
+          importSource: draft.importSource,
+          importedAt: draft.importedAt,
+          importRawTraits: draft.importRawTraits,
+          isDemo: false,
+        },
+        { today }
+      );
+    });
+
+    // Updates touch ONLY the fields this importer maps, and only where MorphMarket actually had
+    // a value -- a blank cell is an absent value, never an instruction to erase what is stored.
+    const updatesById = new Map();
+    update.forEach(row => {
+      updatesById.set(row.conflictWithId, row.animal);
+    });
+
+    setSnakes(prev => {
+      const base = prev.filter(snake => !snake.isDemo);
+      const merged = base.map(snake => {
+        const draft = updatesById.get(snake.id);
+        if (!draft) return snake;
+        const next = {
+          ...snake,
+          name: draft.name || snake.name,
+          sex: draft.sex,
+          species: draft.species,
+          importSource: draft.importSource,
+          importedAt: draft.importedAt,
+          importRawTraits: draft.importRawTraits,
+        };
+        if (draft.morphs.length || draft.hets.length) {
+          next.morphs = draft.morphs;
+          next.hets = draft.hets;
+        }
+        if (draft.birthDate) next.birthDate = draft.birthDate;
+        if (draft.price) next.price = draft.price;
+        if (draft.weight !== null && draft.weight !== undefined) {
+          next.weight = draft.weight;
+          next.logs = {
+            ...(snake.logs || {}),
+            weights: [...((snake.logs && snake.logs.weights) || []), ...initialWeightLog(draft.weight)],
+          };
+        }
+        return next;
+      });
+      return [...merged, ...created];
+    });
+
+    setAnimalView('all');
+    // Land in the species most of the batch went into, so the animals are there when the
+    // result panel is dismissed.
+    const landingSpecies = plan?.summary?.bySpecies?.[0]?.speciesId;
+    if (landingSpecies) openSpeciesWorkspace(landingSpecies);
+
+    return {
+      created: created.length,
+      updated: update.length,
+      skipped: skipped.length,
+      failed: failed.length,
+    };
+  }
+
     const openHatchWizardForPayload = useCallback((payload) => {
       if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
       const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
@@ -12709,6 +12782,9 @@ export default function BreedingPlannerApp() {
                     theme={theme}
                     onCancel={()=>setShowImportModal(false)}
                     showAppAlert={showAppAlert}
+                    existingAnimals={snakes}
+                    onGeneticsForSpecies={geneticsForSpecies}
+                    onCommitMorphMarketImport={applyMorphMarketImport}
                   />
                 </div>
               </div>
@@ -25159,12 +25235,68 @@ function parseYmd(dateStr) {
 }
 
 // import tab
-function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert }) {
+function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const sheetInputRef = useRef();
+  const morphMarketInputRef = useRef();
   const resolvingPreviewRef = useRef(false);
   const { t } = useTranslation();
+  // A MorphMarket file takes over the whole panel: its columns are already mapped, so the
+  // species picker and the text preview below would only be in the way.
+  const [morphMarketPlan, setMorphMarketPlan] = useState(null);
+  const [morphMarketResult, setMorphMarketResult] = useState(null);
+  const [morphMarketError, setMorphMarketError] = useState('');
+
+  /**
+   * The genetics engine, wired exactly as Quick Add wires it: the species' own vocabulary,
+   * then the app's free-text parser. Memoised per species so a 200-animal file does not
+   * reload the same gene table 200 times.
+   */
+  const geneticsCacheRef = useRef(new Map());
+  const parseGeneticsForImport = useCallback(async (speciesId, traitsText) => {
+    if (typeof onGeneticsForSpecies !== 'function') return null;
+    const cache = geneticsCacheRef.current;
+    if (!cache.has(speciesId)) cache.set(speciesId, await onGeneticsForSpecies(speciesId));
+    return parseAnimalText(traitsText, cache.get(speciesId) || []);
+  }, [onGeneticsForSpecies]);
+
+  const readMorphMarketFile = useCallback(async (file) => {
+    setParsing(true);
+    setMorphMarketError('');
+    try {
+      const text = await file.text();
+      const plan = await buildMorphMarketImportPlan(text, {
+        existingAnimals,
+        parseGenetics: parseGeneticsForImport,
+      });
+      if (plan.source !== IMPORT_SOURCES.MORPHMARKET) {
+        setMorphMarketPlan(null);
+        setMorphMarketError(t('ui.animals.import.morphmarket.notRecognised', {
+          defaultValue: 'This file does not look like a MorphMarket animal export. Use "Upload sheet" for a generic CSV.',
+        }));
+        return null;
+      }
+      setMorphMarketPlan(plan);
+      setMorphMarketResult(null);
+      return plan;
+    } catch (err) {
+      console.error('morphmarket import failed', err);
+      setMorphMarketError(t('ui.animals.import.morphmarket.readFailed', {
+        defaultValue: 'That file could not be read.',
+      }));
+      return null;
+    } finally {
+      setParsing(false);
+    }
+  }, [existingAnimals, parseGeneticsForImport, t]);
+
+  const setRowResolution = useCallback((rowNumber, resolution) => {
+    setMorphMarketPlan(prev => (prev ? {
+      ...prev,
+      rows: prev.rows.map(row => (row.rowNumber === rowNumber ? { ...row, resolution } : row)),
+    } : prev));
+  }, []);
   const importCount = Array.isArray(importPreview) ? importPreview.length : 0;
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
   const canImport = importCount > 0 && Boolean(importSpecies);
@@ -25221,8 +25353,94 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     };
   }, [importPreview, resolveLeucisticEntry, setImportPreview]);
 
+  const morphMarketFileInput = (
+    <input
+      ref={morphMarketInputRef}
+      type="file"
+      accept=".csv,text/csv"
+      className="hidden"
+      onChange={async e => {
+        const file = e.target.files && e.target.files[0];
+        try {
+          if (file) {
+            setSelectedFile(file);
+            await readMorphMarketFile(file);
+          }
+        } finally {
+          try { e.target.value = null; } catch (err) { /* input reset is best-effort */ }
+        }
+      }}
+    />
+  );
+
+  // A recognised MorphMarket file replaces the panel wholesale: reviewing 26 rows needs the
+  // room, and none of the manual mapping controls apply to it.
+  if (morphMarketPlan || morphMarketResult) {
+    return (
+      <Card title={t("ui.animals.import.morphmarket.title", { defaultValue: "MorphMarket CSV import" })}>
+        <MorphMarketImportReview
+          plan={morphMarketPlan}
+          result={morphMarketResult}
+          busy={parsing}
+          primaryButtonClass={primaryBtnClass(theme, true)}
+          onChangeResolution={setRowResolution}
+          onConfirm={() => {
+            if (typeof onCommitMorphMarketImport !== 'function') return;
+            const result = onCommitMorphMarketImport(morphMarketPlan);
+            setMorphMarketPlan(null);
+            setMorphMarketResult(result);
+          }}
+          onCancel={() => {
+            setMorphMarketPlan(null);
+            setMorphMarketResult(null);
+            setSelectedFile(null);
+            if (onCancel) onCancel();
+          }}
+        />
+      </Card>
+    );
+  }
+
   return (
     <Card title={t("ui.animals.import.title", { defaultValue: "Import snakes from text" })}>
+      {morphMarketFileInput}
+      <div className="mb-4 p-3 border rounded-xl bg-neutral-50">
+        <div className="text-xs font-medium">
+          {t("ui.animals.import.sourceLabel", { defaultValue: "Where are these animals coming from?" })}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={cx('text-xs px-3 py-1.5 rounded-lg', primaryBtnClass(theme, true))}
+            disabled={parsing}
+            onClick={() => morphMarketInputRef.current?.click()}
+          >
+            {parsing ? parsingLabel : t("ui.animals.import.morphmarket.chooseFile", { defaultValue: "MorphMarket CSV import" })}
+          </button>
+          <button
+            type="button"
+            className="text-xs px-3 py-1.5 rounded-lg border bg-white"
+            disabled={parsing}
+            onClick={() => sheetInputRef.current?.click()}
+          >
+            {t("ui.animals.import.genericCsv", { defaultValue: "Generic CSV / spreadsheet" })}
+          </button>
+          <button
+            type="button"
+            className="text-xs px-3 py-1.5 rounded-lg border bg-white"
+            disabled={parsing}
+            onClick={() => { const el = document.getElementById('import-pdf-input'); if (el) el.click(); }}
+          >
+            {t("ui.animals.import.uploadPdfButton", { defaultValue: "Upload PDF" })}
+          </button>
+        </div>
+        <div className="mt-2 text-[11px] text-neutral-500">
+          {t("ui.animals.import.morphmarket.sourceHint", {
+            defaultValue: "A MorphMarket export needs no column mapping — it is recognised from its header row, and a generic upload switches to it automatically.",
+          })}
+        </div>
+        {morphMarketError && <div className="mt-2 text-[11px] text-rose-600">{morphMarketError}</div>}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste text exported from the PDF" })}</label>
@@ -25230,7 +25448,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             value={importText} onChange={e=>setImportText(e.target.value.replace(/Ball Python\s*\(Python regius\)/ig, ''))} placeholder={t("ui.animals.import.pastePlaceholder", { defaultValue: "Paste content here..." })}/>
 
           <div className="mt-2">
-            <label className="text-xs font-medium">{t("ui.animals.import.uploadSectionLabel", { defaultValue: "Upload PDF" })}</label>
+            <label className="text-xs font-medium">{t("ui.animals.import.selectedFileLabel", { defaultValue: "Selected file" })}</label>
             <div className="flex items-center gap-2 mt-1">
               <input
                 id="import-pdf-input"
@@ -25376,6 +25594,20 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                   const rows = parseCsvToRows(text || '');
                   if (!rows || !rows.length) { setImportPreview([]); return; }
 
+                  // A MorphMarket export dropped on the generic uploader is still a MorphMarket
+                  // export. Recognise it from its header row and switch to the mapped importer
+                  // rather than making the keeper map columns it already knows.
+                  if (detectImportSource(rows[0] || []) === IMPORT_SOURCES.MORPHMARKET) {
+                    const plan = await buildMorphMarketImportPlan(text || '', {
+                      existingAnimals,
+                      parseGenetics: parseGeneticsForImport,
+                    });
+                    setMorphMarketPlan(plan);
+                    setMorphMarketResult(null);
+                    setSelectedFile(f);
+                    return;
+                  }
+
                   const { index: headerIndex, hasHeader } = buildHeaderIndex(rows[0] || []);
 
                   const parseWithHeaders = (row) => {
@@ -25499,20 +25731,8 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                   try { e.target.value = null; } catch (e2) {}
                 }
               }} />
-              <button
-                className={cx('text-xs px-2 py-1 rounded-lg', primaryBtnClass(theme,true))}
-                onClick={()=>{ const el = document.getElementById('import-pdf-input'); if (el) el.click(); }}
-                disabled={parsing}
-              >
-                {parsing ? parsingLabel : t("ui.animals.import.uploadPdfButton", { defaultValue: "Upload PDF" })}
-              </button>
-              <button
-                className={cx('text-xs px-2 py-1 rounded-lg', 'ml-2', primaryBtnClass(theme,true))}
-                onClick={()=>{ const el = document.getElementById('import-sheet-input'); if (el) el.click(); }}
-                disabled={parsing}
-              >
-                {parsing ? parsingLabel : t("ui.animals.import.uploadSheetButton", { defaultValue: "Upload sheet" })}
-              </button>
+              {/* The buttons that open these two inputs live in the source chooser at the top
+                  of the panel, so every way in is offered in one place. */}
               <div className="text-xs text-neutral-500">{selectedFile ? selectedFile.name : t("ui.animals.import.noFileSelected", { defaultValue: "No file selected" })}</div>
             </div>
           </div>
