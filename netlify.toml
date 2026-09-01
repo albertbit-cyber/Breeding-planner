@@ -1,0 +1,18 @@
+# Deploy config for the `deploy/home` branch, which exists to feed the public
+# site (breeding-app-home) to Netlify.
+#
+# This lives at the repo ROOT so the build is correct even when the Netlify site
+# has no base directory set. Without it Netlify installs the root Electron/
+# Capacitor package and builds the wrong project entirely.
+#
+# Keep in step with breeding-app-home/netlify.toml. Whichever of the two Netlify
+# reads, the outcome must be identical: install and build in breeding-app-home,
+# publish breeding-app-home/build.
+#
+# Do NOT merge this branch into main. This file is deliberately branch-local; on
+# main it would be picked up by any Netlify site that has no base directory set.
+
+[build]
+  base = "breeding-app-home"
+  command = "npm install && npm run build && node ../scripts/generate-netlify-redirects.cjs"
+  publish = "build"
