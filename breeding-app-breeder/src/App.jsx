@@ -104,6 +104,15 @@ import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/anima
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import {
+  DEFAULT_ANIMAL_EXPORT_SCOPE,
+  collectAnimalScopeOptions,
+  isAnimalForSale,
+  isAnimalScopeNarrowed,
+  resolveCatalogSelection,
+  selectAnimalsForExport,
+  selectScopeCandidates,
+} from "./features/animals/exportScope";
+import {
   detectParentsFromName,
   isBreederAnimal,
   splitPairLabel,
@@ -6630,7 +6639,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.weight", { defaultValue: "Weight (g)" })}</label>
               <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" value={newAnimal.weight} onChange={e=>setNewAnimal(a=>({...a,weight:e.target.value}))} placeholder="0" />
             </div>
-            {isSnakeTaggedForSell(newAnimal) && (
+            {isAnimalForSale(newAnimal) && (
               <div>
                 <label className="text-xs font-medium">{t("ui.animals.addAnimal.price", { defaultValue: "Price" })}</label>
                 <input
@@ -15317,27 +15326,6 @@ function resolvePrimaryAnimalImage(animal) {
   return '';
 }
 
-function isSnakeTaggedForSell(animal) {
-  if (!animal || typeof animal !== 'object') return false;
-  if (animal.forSale === true || animal.isForSale === true) return true;
-  const statusToken = String(animal.status || '').trim().toLowerCase();
-  if (
-    statusToken === 'for sale'
-    || statusToken === 'forsale'
-    || statusToken === 'for sell'
-    || statusToken === 'forsell'
-    || statusToken.includes('for sale')
-    || statusToken.includes('for sell')
-  ) {
-    return true;
-  }
-  const tags = Array.isArray(animal.tags) ? animal.tags : [];
-  return tags.some((tag) => {
-    const token = String(tag || '').trim().toLowerCase();
-    return token === 'for sale' || token === 'forsale' || token === 'for sell' || token === 'forsell' || token === 'sale' || token === 'available';
-  });
-}
-
 function drawCatalogImagePlaceholder(doc, x, y, width, height) {
   doc.setFillColor(225, 228, 232);
   doc.rect(x, y, width, height, 'F');
@@ -15386,7 +15374,7 @@ async function generateSnakeCatalogPDF(animals = []) {
     const morphValue = resolveCatalogMorph(animal) || '—';
     const priceRaw = animal.price;
     const pairingRaw = animal.pairing;
-    const taggedForSell = isSnakeTaggedForSell(animal);
+    const taggedForSell = isAnimalForSale(animal);
     const hasPrice = !(priceRaw === null || typeof priceRaw === 'undefined' || String(priceRaw).trim() === '');
     const hasPairing = !(pairingRaw === null || typeof pairingRaw === 'undefined' || String(pairingRaw).trim() === '');
 
@@ -16604,7 +16592,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
     return raw || t("snakeEdit.status", { defaultValue: "Status" });
   }, [s?.status, t]);
   const quarantineDayCount = useMemo(() => getQuarantineDays(s), [s?.status, s?.quarantine]);
-  const isForSale = s?.forSale === true || isSnakeTaggedForSell(s);
+  const isForSale = s?.forSale === true || isAnimalForSale(s);
   const cardPriceText = useMemo(() => {
     const raw = String(s?.price ?? '').trim();
     return raw || '—';
@@ -17852,7 +17840,10 @@ function BreederSection({
   const [exportGroups, setExportGroups] = useState(() => OPTIONAL_EXPORT_GROUP_IDS);
   // Which animals the Animals export covers: everything, a set of groups, a set
   // of tags, or a hand-picked list.
-  const [animalExportScope, setAnimalExportScope] = useState({ mode: 'all', groups: [], tags: [], ids: [] });
+  const [animalExportScope, setAnimalExportScope] = useState(() => ({ ...DEFAULT_ANIMAL_EXPORT_SCOPE }));
+  // Filter for the refine list. With a real collection the list is hundreds of rows long, and
+  // scrolling it to find one animal to hold back is not a selection tool.
+  const [animalScopeSearch, setAnimalScopeSearch] = useState('');
   // The plain-text list, held while the keeper looks it over before copying. Null means closed;
   // the text is generated once on open rather than re-derived on every render.
   const [animalTextListPreview, setAnimalTextListPreview] = useState(null);
@@ -17873,57 +17864,55 @@ function BreederSection({
   // Group and tag pickers are built from the animals themselves rather than the
   // saved group list, so a group nothing is filed under never offers itself as a
   // filter that would export zero rows.
-  const animalScopeOptions = useMemo(() => {
-    const groupSet = new Set();
-    const tagSet = new Set();
-    (Array.isArray(snakes) ? snakes : []).forEach(snake => {
-      (Array.isArray(snake?.groups) ? snake.groups : []).forEach(value => {
-        const token = String(value || '').trim();
-        if (token) groupSet.add(token);
-      });
-      (Array.isArray(snake?.tags) ? snake.tags : []).forEach(value => {
-        const token = String(value || '').trim();
-        if (token) tagSet.add(token);
-      });
-    });
-    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-    return {
-      groups: [...groupSet].sort((a, b) => collator.compare(a, b)),
-      tags: [...tagSet].sort((a, b) => collator.compare(a, b)),
-    };
-  }, [snakes]);
+  const animalScopeOptions = useMemo(() => collectAnimalScopeOptions(snakes), [snakes]);
 
-  const animalsToExport = useMemo(() => {
-    const all = Array.isArray(snakes) ? snakes.filter(Boolean) : [];
-    const { mode, groups: pickedGroups, tags: pickedTags, ids } = animalExportScope;
+  // The filter's catch, before anything is deselected. This is what the refine list shows, so
+  // choosing a group narrows the list you then pick from rather than making you hunt the whole
+  // collection for the three animals you meant.
+  const animalScopeCandidates = useMemo(
+    () => selectScopeCandidates(snakes, animalExportScope),
+    [snakes, animalExportScope]
+  );
 
-    // An empty picker means "nothing chosen yet" rather than "match nothing":
-    // falling through to every animal here would silently export the lot under a
-    // heading that says otherwise.
-    if (mode === 'groups') {
-      if (!pickedGroups.length) return [];
-      const wanted = new Set(pickedGroups);
-      return all.filter(snake => (Array.isArray(snake.groups) ? snake.groups : [])
-        .some(value => wanted.has(String(value || '').trim())));
-    }
-    if (mode === 'tags') {
-      if (!pickedTags.length) return [];
-      const wanted = new Set(pickedTags);
-      return all.filter(snake => (Array.isArray(snake.tags) ? snake.tags : [])
-        .some(value => wanted.has(String(value || '').trim())));
-    }
-    if (mode === 'pick') {
-      if (!ids.length) return [];
-      const wanted = new Set(ids);
-      return all.filter(snake => wanted.has(snake.id));
-    }
-    return all;
-  }, [snakes, animalExportScope]);
+  const animalsToExport = useMemo(
+    () => selectAnimalsForExport(snakes, animalExportScope),
+    [snakes, animalExportScope]
+  );
 
-  const animalScopeIsNarrowed = animalExportScope.mode !== 'all';
+  // The refine list, filtered by whatever was typed in its search box. The search only hides rows;
+  // a hidden animal stays in the export, because a search box is a way to find a row, not a filter
+  // on the selection.
+  const visibleScopeCandidates = useMemo(() => {
+    const needle = animalScopeSearch.trim().toLowerCase();
+    if (!needle) return animalScopeCandidates;
+    return animalScopeCandidates.filter(snake => (
+      String(snake?.name || '').toLowerCase().includes(needle)
+      || String(snake?.id || '').toLowerCase().includes(needle)
+    ));
+  }, [animalScopeCandidates, animalScopeSearch]);
+
+  const excludedAnimalIds = useMemo(
+    () => new Set(Array.isArray(animalExportScope.excludedIds) ? animalExportScope.excludedIds : []),
+    [animalExportScope]
+  );
+
+  // What the catalog would print right now, and under which rule -- so the panel can say so before
+  // the keeper presses the button rather than after the PDF comes out short.
+  const catalogSelection = useMemo(
+    () => resolveCatalogSelection(snakes, animalExportScope),
+    [snakes, animalExportScope]
+  );
+
+  const animalScopeIsNarrowed = useMemo(
+    () => isAnimalScopeNarrowed(snakes, animalExportScope),
+    [snakes, animalExportScope]
+  );
   const hasAnimalsInScope = animalsToExport.length > 0;
 
   const setAnimalScopeMode = useCallback((mode) => {
+    // Exclusions are kept across a mode change: they are scoped to the animals the new filter
+    // matches (see `hasExplicitAnimalPicks`), so switching to a group and back finds the same
+    // hand-picked selection waiting rather than a reset one.
     setAnimalExportScope(prev => ({ ...prev, mode }));
   }, []);
 
@@ -17937,8 +17926,42 @@ function BreederSection({
     });
   }, []);
 
+  const toggleAnimalScopeSelection = useCallback((animalId) => {
+    const id = String(animalId ?? '');
+    if (!id) return;
+    setAnimalExportScope(prev => {
+      const current = Array.isArray(prev.excludedIds) ? prev.excludedIds : [];
+      return {
+        ...prev,
+        excludedIds: current.includes(id) ? current.filter(item => item !== id) : [...current, id],
+      };
+    });
+  }, []);
+
+  // Select-all and select-none act on the rows the keeper can currently see. Acting on the hidden
+  // ones as well would make a search box quietly rewrite a selection it is only supposed to filter.
+  const selectAllVisibleScopeAnimals = useCallback(() => {
+    const visible = new Set(visibleScopeCandidates.map(snake => String(snake?.id ?? '')));
+    setAnimalExportScope(prev => ({
+      ...prev,
+      excludedIds: (Array.isArray(prev.excludedIds) ? prev.excludedIds : []).filter(id => !visible.has(id)),
+    }));
+  }, [visibleScopeCandidates]);
+
+  const clearVisibleScopeAnimals = useCallback(() => {
+    setAnimalExportScope(prev => {
+      const current = new Set(Array.isArray(prev.excludedIds) ? prev.excludedIds : []);
+      visibleScopeCandidates.forEach(snake => {
+        const id = String(snake?.id ?? '');
+        if (id) current.add(id);
+      });
+      return { ...prev, excludedIds: [...current] };
+    });
+  }, [visibleScopeCandidates]);
+
   const clearAnimalScope = useCallback(() => {
-    setAnimalExportScope({ mode: 'all', groups: [], tags: [], ids: [] });
+    setAnimalExportScope({ ...DEFAULT_ANIMAL_EXPORT_SCOPE });
+    setAnimalScopeSearch('');
   }, []);
   const animalFieldSections = useMemo(() => groupFieldDefsBySection(ANIMAL_EXPORT_FIELD_DEFS), []);
   const pairingFieldSections = useMemo(() => groupFieldDefsBySection(PAIRING_EXPORT_FIELD_DEFS), []);
@@ -18827,11 +18850,12 @@ function BreederSection({
     const timestamp = new Date().toISOString();
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     try {
-      // Pairing lookups still use the full collection; only the catalog's own
-      // rows are narrowed, and the for-sale rule still applies on top.
+      // Pairing lookups still use the full collection; only the catalog's own rows are narrowed.
+      // The for-sale rule applies on top of a filter-only scope, but a selection the keeper built
+      // animal by animal is already the answer to "which animals" and is printed as given.
       const pairingsBySnakeId = groupPairingsBySnake(pairings, makeSnakeMap(snakes));
-      const forSaleAnimals = (Array.isArray(animalsToExport) ? animalsToExport : [])
-        .filter((snake) => isSnakeTaggedForSell(snake))
+      const catalogAnimals = catalogSelection.animals
+        .slice()
         .sort((a, b) => collator.compare(String(a?.id || ''), String(b?.id || '')))
         .map((snake) => {
           const linkedPairings = pairingsBySnakeId.get(snake.id) || [];
@@ -18844,14 +18868,19 @@ function BreederSection({
           };
         });
 
-      if (!forSaleAnimals.length) {
-        throw new Error(t('export.errors.noSaleAnimals', { defaultValue: 'No animals marked for sale were found.' }));
+      if (!catalogAnimals.length) {
+        // Two different dead ends, and telling them apart is the whole point: an empty selection is
+        // the keeper's own doing, whereas a full selection with nothing marked for sale is the rule
+        // quietly eating the lot, and that used to look like a broken button.
+        throw new Error(catalogSelection.selectedCount
+          ? t('export.errors.noSaleAnimals', { defaultValue: 'No animals marked for sale were found.' })
+          : t('export.errors.noAnimalsInScope', { defaultValue: 'No animals are selected to export.' }));
       }
 
-      await generateSnakeCatalogPDF(forSaleAnimals);
+      await generateSnakeCatalogPDF(catalogAnimals);
       setExportFeedback({
         type: 'success',
-        message: t('export.feedback.catalogGenerated', { defaultValue: 'Generated snake catalog ({{count}} pages).', count: forSaleAnimals.length }),
+        message: t('export.feedback.catalogGenerated', { defaultValue: 'Generated snake catalog ({{count}} pages).', count: catalogAnimals.length }),
         context: 'animals',
         timestamp,
       });
@@ -18864,7 +18893,7 @@ function BreederSection({
         timestamp,
       });
     }
-  }, [animalsToExport, pairings, setExportFeedback, snakes, t]);
+  }, [catalogSelection, pairings, setExportFeedback, snakes, t]);
 
   // The text list runs off the same scope picker as the catalog, but without the catalog's
   // for-sale rule: what the keeper selected is what gets written.
@@ -20517,12 +20546,14 @@ function BreederSection({
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                     {t('export.whichAnimals', { defaultValue: 'Which animals' })}
                   </div>
+                  <div className="text-[11px] text-neutral-500">
+                    {t('export.scope.step1', { defaultValue: '1. Start from' })}
+                  </div>
                   <div className="flex flex-wrap gap-3 text-sm text-neutral-700">
                     {[
                       { mode: 'all', label: t('export.scope.all', { defaultValue: 'All animals' }) },
                       { mode: 'groups', label: t('export.scope.byGroup', { defaultValue: 'By group' }) },
                       { mode: 'tags', label: t('export.scope.byTag', { defaultValue: 'By tag' }) },
-                      { mode: 'pick', label: t('export.scope.pick', { defaultValue: 'Choose animals' }) },
                     ].map(option => (
                       <label key={option.mode} className="inline-flex items-center gap-2 cursor-pointer">
                         <input
@@ -20578,21 +20609,77 @@ function BreederSection({
                     )
                   )}
 
-                  {animalExportScope.mode === 'pick' && (
-                    <div className="max-h-56 overflow-y-auto rounded-lg border bg-white divide-y">
-                      {(Array.isArray(snakes) ? snakes : []).filter(Boolean).map(snake => (
-                        <label key={snake.id} className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-neutral-50">
-                          <input
-                            type="checkbox"
-                            checked={animalExportScope.ids.includes(snake.id)}
-                            onChange={() => toggleAnimalScopeValue('ids', snake.id)}
-                          />
-                          <span className="font-medium">{snake.name || snake.id}</span>
-                          <span className="text-neutral-500">{snake.id}</span>
-                        </label>
-                      ))}
+                  {/* Step two lists only what step one caught, so choosing a group and then picking
+                      three animals out of it is two obvious moves rather than a hunt through the
+                      whole collection. Everything starts ticked: the filter is the statement, and
+                      this is where exceptions come out of it. */}
+                  <div className="border-t pt-2 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] text-neutral-500">
+                        {t('export.scope.step2', { defaultValue: '2. Refine — untick anything you are holding back' })}
+                      </div>
+                      {animalScopeCandidates.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg border bg-white text-[11px]"
+                            onClick={selectAllVisibleScopeAnimals}
+                          >
+                            {t('export.scope.selectAll', { defaultValue: 'Select all' })}
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg border bg-white text-[11px]"
+                            onClick={clearVisibleScopeAnimals}
+                          >
+                            {t('export.scope.selectNone', { defaultValue: 'Select none' })}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {animalScopeCandidates.length === 0 ? (
+                      <div className="text-[11px] text-neutral-500">
+                        {animalExportScope.mode === 'all'
+                          ? t('export.scope.noAnimals', { defaultValue: 'You have no animals to export yet.' })
+                          : t('export.scope.pickFilterFirst', { defaultValue: 'Pick a group or tag above to choose animals from it.' })}
+                      </div>
+                    ) : (
+                      <>
+                        {animalScopeCandidates.length > 8 && (
+                          <input
+                            type="search"
+                            className="w-full border rounded-lg px-2 py-1.5 text-xs"
+                            placeholder={t('export.scope.searchPlaceholder', { defaultValue: 'Search by name or ID' })}
+                            value={animalScopeSearch}
+                            onChange={e => setAnimalScopeSearch(e.target.value)}
+                          />
+                        )}
+                        <div className="max-h-56 overflow-y-auto rounded-lg border bg-white divide-y">
+                          {visibleScopeCandidates.length ? visibleScopeCandidates.map(snake => (
+                            <label key={snake.id} className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-neutral-50">
+                              <input
+                                type="checkbox"
+                                checked={!excludedAnimalIds.has(String(snake.id))}
+                                onChange={() => toggleAnimalScopeSelection(snake.id)}
+                              />
+                              <span className="font-medium">{snake.name || snake.id}</span>
+                              <span className="text-neutral-500">{snake.id}</span>
+                              {isAnimalForSale(snake) && (
+                                <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-700">
+                                  {t('export.scope.forSaleFlag', { defaultValue: 'For sale' })}
+                                </span>
+                              )}
+                            </label>
+                          )) : (
+                            <div className="px-2 py-3 text-[11px] text-neutral-500">
+                              {t('export.scope.noSearchMatch', { defaultValue: 'No animal in this selection matches that search.' })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   <div className="flex flex-wrap items-center gap-3">
                     <span className={cx('text-[11px]', hasAnimalsInScope ? 'text-neutral-600' : 'text-amber-700')}>
@@ -20604,6 +20691,23 @@ function BreederSection({
                           })
                         : t('export.scope.empty', { defaultValue: 'Nothing selected — pick at least one animal to export.' })}
                     </span>
+                    {/* The catalog is the one export that does not simply print the selection, so
+                        it says which rule it is about to apply. Finding that out from a short PDF
+                        is how this used to read as a broken button. */}
+                    {hasAnimalsInScope && (
+                      <span className={cx('text-[11px]', catalogSelection.animals.length ? 'text-neutral-500' : 'text-amber-700')}>
+                        {catalogSelection.handPicked
+                          ? t('export.scope.catalogHandPicked', {
+                              defaultValue: 'Catalog: all {{count}} selected, including any not marked for sale.',
+                              count: catalogSelection.animals.length,
+                            })
+                          : t('export.scope.catalogForSale', {
+                              defaultValue: 'Catalog: {{forSale}} of {{selected}} are marked for sale. Untick animals above to print the selection as-is.',
+                              forSale: catalogSelection.forSaleCount,
+                              selected: catalogSelection.selectedCount,
+                            })}
+                      </span>
+                    )}
                     {animalScopeIsNarrowed && (
                       <button
                         type="button"
