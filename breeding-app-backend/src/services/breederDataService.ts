@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
@@ -310,13 +311,28 @@ const mergeSnapshotPayload = (
   return merged;
 };
 
-const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => (
-  mergeSnapshotPayload(existingPayload, incomingPayload, {
+const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
+  const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
     stringArrayKeys: ["morphs", "hets", "possibleHets", "tags", "groups"],
     recordArrayKeys: ["photos"],
     mergeLogs: true,
-  })
-);
+  });
+
+  // The genetics arrays merge as a union, so a device still holding the animal's
+  // pre-test genetics would otherwise reintroduce exactly what a laboratory just
+  // disproved — "50% het Albino" reappearing days after the test came back
+  // negative. Re-asserting the stored decisions is idempotent, so an already
+  // correct payload passes through untouched.
+  const confirmation = merged.labGeneticsConfirmation;
+  if (confirmation) {
+    const corrected = reapplyConfirmation(readSnapshot(merged), confirmation);
+    merged.morphs = corrected.morphs;
+    merged.hets = corrected.hets;
+    merged.possibleHets = corrected.possibleHets;
+  }
+
+  return merged;
+};
 
 const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
   const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {

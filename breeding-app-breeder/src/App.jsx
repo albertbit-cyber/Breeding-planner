@@ -7836,6 +7836,23 @@ export default function BreedingPlannerApp() {
     }
   }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
+  // A laboratory submitting a result now writes the animal's genetics on the
+  // backend, so the way to see it here is to pull, not to recompute it locally.
+  // Recomputing was how the same finding could land twice under two different
+  // trade names for one gene.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleLabCloudSyncRequested = () => {
+      // Silent: this fires from opening an order, and a keeper reading their
+      // results did not ask for a sync banner.
+      runCloudBreederSync({ silent: true }).catch(() => {});
+    };
+
+    window.addEventListener('lab:cloud-sync-requested', handleLabCloudSyncRequested);
+    return () => window.removeEventListener('lab:cloud-sync-requested', handleLabCloudSyncRequested);
+  }, [runCloudBreederSync]);
+
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'idle') return;
@@ -9439,6 +9456,14 @@ export default function BreedingPlannerApp() {
       if (s) { openSnakeEditor(s); }
     }
   }, [snakes]);
+
+  // Land on the Shed Test Terminal when a laboratory email links here. Without
+  // it, "View your order" opened the collection and left the reader to find the
+  // tab themselves.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (/^#shed-terminal/.test(window.location.hash)) setTab('shedTerminal');
+  }, []);
 
   // open pairing if URL contains #pairing=id
   useEffect(()=>{

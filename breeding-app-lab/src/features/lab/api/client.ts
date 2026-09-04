@@ -11,25 +11,6 @@ import {
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
-  calculateLabOrderPriceHandler,
-  getLabTestsCatalogHandler,
-  getLabTestsPricingHandler,
-} from "./pricingHandlers";
-import {
-  createAvailableTestHandler,
-  listBreederVisibleTestsHandler,
-  listLabAvailableTestsHandler,
-  setAvailableTestActiveHandler,
-  setAvailableTestVisibilityHandler,
-  updateAvailableTestHandler,
-} from "./testCatalogHandlers";
-import { markSampleReceivedHandler, resolveQrTokenHandler } from "./qrLookupHandlers";
-import {
-  getBreederAllLabelsArtifactHandler,
-  getBreederSampleLabelsArtifactHandler,
-  getBreederShipmentLabelArtifactHandler,
-} from "./shipmentLabelHandlers";
-import {
   resolveLabProfileForOrder,
   loadBreederInfo,
   loadSnakeById,
@@ -37,7 +18,6 @@ import {
   isLabLabelDebugEnabled,
 } from "../../../services/lab/labelProfileService";
 import { buildLabCertificateTemplateData } from "../../../services/lab/certificateTemplate";
-import { applyConfirmedResultGeneticsUpdate } from "../../../services/lab/geneticsUpdateEngine";
 import { resolveLabTestNumber } from "../../../services/lab/testNumber";
 import {
   type AllOrderLabelsArtifactResponse,
@@ -45,21 +25,6 @@ import {
   type SampleLabelsArtifactResponse,
   type ShippingLabelArtifactResponse,
 } from "../../../services/lab/shipmentLabelService";
-import {
-  getResultEntryTemplateHandler,
-  saveResultDraftHandler,
-  submitResultHandler,
-} from "./resultEntryHandlers";
-import {
-  addPendingShedTestHandler,
-  getShedBatchArtifactsHandler,
-  listPendingShedTestsHandler,
-  listShedSubmissionBatchesHandler,
-  quotePendingShedTestsHandler,
-  removePendingShedTestHandler,
-  submitPendingShedBatchHandler,
-  updatePendingShedTestHandler,
-} from "./shedTerminalHandlers";
 import type { LabAvailableTest, LabAvailableTestBreederView, CreateLabAvailableTestInput, UpdateLabAvailableTestInput } from "../../../types/labTestCatalog";
 import type { LabResultEntryTemplate } from "../../../types/labResultEntry";
 import type { PendingShedTestItem, ShedSubmissionBatch, ShedTerminalQuote } from "../../../types/labShedTerminal";
@@ -580,42 +545,28 @@ const toSharedLocalResultRecord = (order: any, result: any): TestResult | null =
   };
 };
 
-const syncSharedResultSnakeGenetics = async (role: LegacyRole, order: any, result: any): Promise<void> => {
-  if (!order || !result) return;
+/**
+ * The backend writes a confirmed result onto the breeder's animals inside the
+ * same transaction that stores the result. The portal used to recompute that
+ * change here as well, against snake data held in the browser -- data a
+ * laboratory account has never had, so on this side it could only ever fail and
+ * be swallowed by its own catch. On the breeder's side it was worse than
+ * useless: the two sides resolve a test name to a gene from different tables, so
+ * one finding could land twice under two names for the same gene.
+ *
+ * Kept as no-ops rather than deleted at each call site, because the call sites
+ * read better for saying plainly that this is the backend's job now.
+ */
+const syncSharedResultSnakeGenetics = async (
+  _role: LegacyRole,
+  _order: any,
+  _result: any
+): Promise<void> => {};
 
-  const legacyOrder = toLegacyOrder(order);
-  const localResult = toSharedLocalResultRecord(order, result);
-  if (!legacyOrder.id || !legacyOrder.animalId || !localResult) return;
-
-  try {
-    await applyConfirmedResultGeneticsUpdate({
-      actor: buildActorFromSessionRole(role),
-      order: legacyOrder,
-      result: localResult,
-    }, {
-      allowNonLabActor: role === "breeder",
-    });
-
-    const updatedSnake = await loadSnakeById(legacyOrder.animalId);
-    if (updatedSnake && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("lab:snake-genetics-updated", {
-        detail: {
-          snakeId: legacyOrder.animalId,
-          snake: updatedSnake,
-        },
-      }));
-    }
-  } catch (error) {
-    console.warn("Failed to synchronize shared lab genetics into local snake data.", error);
-  }
-};
-
-const syncSharedLatestCompletedResultSnakeGenetics = async (role: LegacyRole, order: any): Promise<void> => {
-  const completedResult = (Array.isArray(order?.results) ? order.results : [])
-    .find((entry: any) => String(entry?.status || "").trim() === "completed");
-  if (!completedResult) return;
-  await syncSharedResultSnakeGenetics(role, order, completedResult);
-};
+const syncSharedLatestCompletedResultSnakeGenetics = async (
+  _role: LegacyRole,
+  _order: any
+): Promise<void> => {};
 
 const buildSharedTemplateExistingResult = (result: any) => {
   if (!result) return undefined;

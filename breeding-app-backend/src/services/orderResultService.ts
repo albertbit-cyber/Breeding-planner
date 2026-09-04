@@ -4,6 +4,8 @@ import { ensureSharedOrderNumbers } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
 import { LAB_IDENTITY_SELECT } from "./orderService";
+import { applyConfirmedResultGenetics, type LabGeneticsApplication } from "./labGeneticsService";
+import { notifyResultsReady } from "./labOrderNotificationService";
 
 type PersistOrderResultUser = {
   id: string;
@@ -279,6 +281,8 @@ export const saveOrderResult = async (
       ? "in_progress"
       : order.status;
 
+  let geneticsApplications: LabGeneticsApplication[] = [];
+
   const savedResults = await prisma.$transaction(async (tx: any) => {
     const results: any[] = [];
 
@@ -346,8 +350,23 @@ export const saveOrderResult = async (
       });
     }
 
+    // A submitted result is the point at which the finding becomes true about the
+    // animal, so the genetics move in the same transaction. A draft says nothing
+    // final yet and must not touch the breeder's collection.
+    if (mode === "submit") {
+      geneticsApplications = await applyConfirmedResultGenetics(tx, {
+        order: order as any,
+        results,
+        actorUserId: user.id,
+      });
+    }
+
     return results;
-  });
+  },
+  // The default is 5 seconds. Result submission now also reads the ordered
+  // offerings and writes the animals, and an order can carry fifty of them; a
+  // timeout here would roll back a laboratory's completed work.
+  { timeout: 20000 });
 
   const refreshedOrder = await prisma.shedTestOrder.findUnique({
     where: { id: order.id },
@@ -363,11 +382,19 @@ export const saveOrderResult = async (
 
   if (!refreshedOrder) throw new HttpError(404, "Order not found after saving result.");
 
+  // Only a submission is news. A draft is the analyst still working, and mailing
+  // the breeder every time one is saved would train them to ignore the one that
+  // matters.
+  if (mode === "submit") {
+    await notifyResultsReady({ order: refreshedOrder as any, results: savedResults as any });
+  }
+
   return {
     // Return the first saved result for backward compat (single-animal callers expect `result`)
     result: savedResults[0] || null,
     results: savedResults,
     order: refreshedOrder,
     mode,
+    genetics: geneticsApplications,
   };
 };

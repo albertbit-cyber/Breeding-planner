@@ -225,6 +225,86 @@ describe("breederDataService", () => {
     expect(tx.animal.createMany).not.toHaveBeenCalled();
   });
 
+  it("does not let a stale device resurrect a gene the laboratory disproved", async () => {
+    // The lab tested this animal and cleared the guess. The stored payload carries
+    // the decision that settled it.
+    const labConfirmation = {
+      source: "genetic-test",
+      note: "Confirmed by shed test",
+      confirmedAt: "2026-09-04T10:00:00.000Z",
+      markers: [],
+      decisions: [{ key: "clown", gene: "Clown", outcome: "notDetected" }],
+    };
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        {
+          id: "snake-1",
+          morphs: [],
+          hets: [],
+          possibleHets: [],
+          labGeneticsConfirmation: labConfirmation,
+          updatedAt: "2026-09-04T10:00:00.000Z",
+        },
+        "2026-09-04T10:00:00.000Z"
+      ),
+    ]);
+
+    // A phone that has not synced since before the test still holds the guess, and
+    // pushes it with a newer timestamp because the keeper edited something else.
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        morphs: [],
+        hets: [],
+        possibleHets: ["66% poss het Clown"],
+        labGeneticsConfirmation: labConfirmation,
+        updatedAt: "2026-09-05T10:00:00.000Z",
+      }],
+      pairings: [],
+    });
+
+    // The genetics arrays merge as a union, so without re-applying the decision
+    // the disproved guess would be back on the animal.
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.possibleHets).toEqual([]);
+  });
+
+  it("still accepts genetics a laboratory never ruled on", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        {
+          id: "snake-1",
+          morphs: ["Pastel"],
+          labGeneticsConfirmation: {
+            source: "genetic-test",
+            note: "Confirmed by shed test",
+            confirmedAt: "2026-09-04T10:00:00.000Z",
+            markers: [],
+            decisions: [{ key: "clown", gene: "Clown", outcome: "notDetected" }],
+          },
+          updatedAt: "2026-09-04T10:00:00.000Z",
+        },
+        "2026-09-04T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        morphs: ["Pastel", "Enchi"],
+        updatedAt: "2026-09-05T10:00:00.000Z",
+      }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.morphs).toEqual(["Pastel", "Enchi"]);
+  });
+
   it("merges nested animal logs when the incoming animal is newer", async () => {
     vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
       existingRow("appAnimalId", "snake-1", {

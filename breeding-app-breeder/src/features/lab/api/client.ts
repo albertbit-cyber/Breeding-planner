@@ -9,7 +9,6 @@ import {
   fetchMyLabPricing,
   fetchTestCatalog,
 } from "../../../shared/apiClient";
-import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
   resolveLabProfileForOrder,
   loadBreederInfo,
@@ -18,7 +17,6 @@ import {
   isLabLabelDebugEnabled,
 } from "../../../services/lab/labelProfileService";
 import { buildLabCertificateTemplateData } from "../../../services/lab/certificateTemplate";
-import { applyConfirmedResultGeneticsUpdate } from "../../../services/lab/geneticsUpdateEngine";
 import { resolveLabTestNumber } from "../../../services/lab/testNumber";
 import {
   type AllOrderLabelsArtifactResponse,
@@ -99,17 +97,6 @@ const requireSessionRole = (...roles: LegacyRole[]): LegacyRole => {
     throw new Error("Access denied for this role.");
   }
   return role;
-};
-
-const buildActorFromSessionRole = (role: LegacyRole): ServiceActor => {
-  const session = getSession();
-  const profile = session?.profile || {};
-  const userId = String(profile.email || profile.displayName || "local-user").trim() || "local-user";
-  return {
-    userId,
-    role,
-    labId: role === "lab_staff" || role === "admin" ? DEFAULT_LAB_ID : undefined,
-  };
 };
 
 const unwrapLocalResponse = async <T>(
@@ -557,34 +544,22 @@ const toSharedLocalResultRecord = (order: any, result: any): TestResult | null =
   };
 };
 
-const syncSharedResultSnakeGenetics = async (role: LegacyRole, order: any, result: any): Promise<void> => {
+const syncSharedResultSnakeGenetics = async (_role: LegacyRole, order: any, result: any): Promise<void> => {
   if (!order || !result) return;
 
-  const legacyOrder = toLegacyOrder(order);
-  const localResult = toSharedLocalResultRecord(order, result);
-  if (!legacyOrder.id || !legacyOrder.animalId || !localResult) return;
-
-  try {
-    await applyConfirmedResultGeneticsUpdate({
-      actor: buildActorFromSessionRole(role),
-      order: legacyOrder,
-      result: localResult,
-    }, {
-      allowNonLabActor: role === "breeder",
-    });
-
-    const updatedSnake = await loadSnakeById(legacyOrder.animalId);
-    if (updatedSnake && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("lab:snake-genetics-updated", {
-        detail: {
-          snakeId: legacyOrder.animalId,
-          snake: updatedSnake,
-        },
-      }));
-    }
-  } catch (error) {
-    console.warn("Failed to synchronize shared lab genetics into local snake data.", error);
-  }
+  // The backend applies a confirmed result to the animal inside the same
+  // transaction that stores the result, and it covers every animal on the order
+  // rather than only the first. All this has to do is pull.
+  //
+  // It used to recompute the change here as well. Both sides resolve a test name
+  // to a gene, and they do it from different tables -- the lab's own geneTarget
+  // on the backend, the app's alias table here -- so one finding could be
+  // written twice under two names for the same gene, and the sync's union merge
+  // would keep both.
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("lab:cloud-sync-requested", {
+    detail: { reason: "lab-result", orderId: String(order?.id || "").trim() },
+  }));
 };
 
 const syncSharedLatestCompletedResultSnakeGenetics = async (role: LegacyRole, order: any): Promise<void> => {
