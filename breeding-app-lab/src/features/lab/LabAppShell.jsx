@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchMyLabProfile } from "../../shared/apiClient";
 import { canAccessLabApp, getCurrentAppRole } from "./auth/roleGuard";
 import LabDashboardPage from "./pages/LabDashboardPage.jsx";
 import IncomingOrdersPage from "./pages/IncomingOrdersPage.jsx";
@@ -255,6 +256,10 @@ export default function LabAppShell() {
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  // Whose laboratory this is. The chrome said "Laboratory" twice, hardcoded, so
+  // every vendor saw the same anonymous portal -- the one thing the tenancy work
+  // exists to give them was the one thing the header never showed.
+  const [labName, setLabName] = useState("");
 
   useEffect(() => {
     const onHashChange = () => {
@@ -263,6 +268,20 @@ export default function LabAppShell() {
 
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyLabProfile()
+      .then((data) => {
+        if (!cancelled) setLabName(String(data?.lab?.labName || "").trim());
+      })
+      // A laboratory that cannot load its own profile still has a portal to
+      // work in; the header simply falls back to the generic word.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Close the mobile nav drawer and scan overlay whenever the route changes.
@@ -381,7 +400,7 @@ export default function LabAppShell() {
           bar below, kept off this row so it doesn't compete for space. */}
       <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 lg:hidden">
         <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
-        <div className="text-base font-semibold text-neutral-900">Laboratory</div>
+        <div className="text-base font-semibold text-neutral-900">{labName || "Laboratory"}</div>
       </div>
 
       {/* "More" bottom sheet — the rest of the nav list (Sample Intake without
@@ -465,7 +484,7 @@ export default function LabAppShell() {
         <aside className="hidden w-64 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm lg:block">
           <div className="px-2 py-2">
             <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
-            <div className="text-lg font-semibold text-neutral-900">Laboratory</div>
+            <div className="text-lg font-semibold text-neutral-900">{labName || "Laboratory"}</div>
           </div>
           <nav className="mt-2 flex flex-col gap-1">
             {navButtons(navigateToHashPath)}

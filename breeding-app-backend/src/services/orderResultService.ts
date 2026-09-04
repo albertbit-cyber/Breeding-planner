@@ -61,8 +61,20 @@ const sanitizeKeyPart = (value: string): string =>
     .trim()
     .replace(/[^A-Za-z0-9-]/g, "_") || "order";
 
-const getSharedSampleId = (orderId: string, animalIndex: number): string =>
-  `${sanitizeKeyPart(orderId)}-sample-${animalIndex + 1}`;
+/**
+ * The id printed on the tube.
+ *
+ * Derived from the order *number*, because that is what the sample label carries
+ * and what a technician reads back at intake. It used to be built from the
+ * order's cuid with a different separator, so the id stored against a result
+ * matched nothing on the physical sample -- invisible day to day, and exactly
+ * the sort of thing that makes a sample impossible to trace when someone finally
+ * needs to.
+ *
+ * Falls back to the id for an order that has not been assigned a number yet.
+ */
+const getSharedSampleId = (order: { id: string; orderNumber?: string | null }, animalIndex: number): string =>
+  `${sanitizeKeyPart(String(order.orderNumber || order.id))}-${animalIndex + 1}`;
 
 const assertLabUser = (user: PersistOrderResultUser): void => {
   if (!isLabRole(user.role)) {
@@ -299,7 +311,7 @@ export const saveOrderResult = async (
         animalId,
         mode
       );
-      const sampleId = getSharedSampleId(order.id, animalTemplate.animalIdx);
+      const sampleId = getSharedSampleId(order, animalTemplate.animalIdx);
 
       // Use findFirst + update/create instead of upsert to avoid relying on
       // the named compound unique key — Prisma client may be out of sync with

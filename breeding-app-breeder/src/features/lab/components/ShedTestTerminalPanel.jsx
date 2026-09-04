@@ -111,14 +111,10 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
     setQueueUnavailable(false);
     try {
       const api = createLabApiClient();
-      const [tests, pricing, orders] = await Promise.all([
-        api.getLabTestsCatalog({ breederView: true }),
-        api.getLabTestsPricing(),
-        api.listBreederTestOrders().catch((err) => {
-          if (isPendingQueueUnavailableError(err)) return [];
-          throw err;
-        }),
-      ]);
+      const orders = await api.listBreederTestOrders().catch((err) => {
+        if (isPendingQueueUnavailableError(err)) return [];
+        throw err;
+      });
 
       let pending = [];
       let nextBatches = [];
@@ -135,6 +131,21 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
         }
         nextQueueUnavailable = true;
       }
+
+      // Tests and prices belong to the laboratory this queue is going to. Asked
+      // for without one, the client falls back to "my laboratory" -- a
+      // vendor-only endpoint, so every breeder opening this panel got a bare
+      // "Forbidden" and the whole terminal stopped loading, orders included.
+      // An empty queue has no laboratory and nothing to price.
+      const queueLabId = (pending || [])
+        .map((item) => String(item?.labId || "").trim())
+        .find(Boolean) || "";
+      const [tests, pricing] = queueLabId
+        ? await Promise.all([
+            api.getLabTestsCatalog({ breederView: true, labOrganizationId: queueLabId }),
+            api.getLabTestsPricing({ labOrganizationId: queueLabId }),
+          ])
+        : [[], null];
 
       setPendingItems(nextQueueUnavailable ? [] : (pending || []));
       setCatalog(tests || []);
