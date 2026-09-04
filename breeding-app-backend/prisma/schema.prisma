@@ -102,6 +102,7 @@ model User {
   updatedAt        DateTime       @updatedAt
   profile          Profile?
   orders           ShedTestOrder[]
+  pendingShedTests PendingShedTest[]
   animals          Animal[]
   pairings         Pairing[]
   clutches         Clutch[]
@@ -189,6 +190,7 @@ model Organization {
   geneSubmissions LabGeneSubmission[]
   pricingConfig PricingConfig?
   labOrders     ShedTestOrder[]
+  pendingShedTests PendingShedTest[]
 
   @@index([kind])
   @@index([status])
@@ -1394,6 +1396,49 @@ model PricingConfig {
   isActive                       Boolean  @default(true)
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
+}
+
+/**
+ * A shed test a breeder has saved but not yet ordered.
+ *
+ * Sheds arrive one animal at a time over a season, so the queue is the thing a keeper builds
+ * up between orders. It lives here rather than in the browser because it is accumulated over
+ * months: in localStorage a cleared cache would silently discard a season's collecting, and it
+ * would never follow the keeper from their phone to their desk.
+ *
+ * Rows are deleted once submitted -- the resulting ShedTestOrder is the durable record, and
+ * keeping a copy here would leave two answers to "what did I send?".
+ */
+model PendingShedTest {
+  id                String       @id @default(cuid())
+  breederId         String       @map("breeder_id")
+  breeder           User         @relation(fields: [breederId], references: [id], onDelete: Cascade)
+  /**
+   * The lab this draft is destined for. Cascade, not Restrict: a draft is an intention, not a
+   * record of work, so it should not be able to block deleting an organization.
+   */
+  labOrganizationId String       @map("lab_organization_id")
+  labOrganization   Organization @relation(fields: [labOrganizationId], references: [id], onDelete: Cascade)
+  animalId          String       @map("animal_id")
+  animalDisplayId   String?      @map("animal_display_id")
+  animalName        String?      @map("animal_name")
+  /**
+   * Offering ids as plain strings, deliberately unconstrained. A lab may retire a test while a
+   * keeper's draft still names it; that must surface as a validation message at submit time,
+   * not as a foreign key that deletes the draft out from under them.
+   */
+  selectedTestIds   String[]     @default([]) @map("selected_test_ids")
+  priority          String       @default("routine")
+  sampleType        String       @default("shed") @map("sample_type")
+  notes             String?
+  /** Whether this row is ticked for the next submission. The keeper may bank some and send others. */
+  selected          Boolean      @default(true)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  @@index([breederId])
+  @@index([breederId, labOrganizationId])
+  @@map("pending_shed_tests")
 }
 
 model ShedTestOrder {

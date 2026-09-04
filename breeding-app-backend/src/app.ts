@@ -7,6 +7,7 @@ import { env } from "./config/env";
 import { authRoutes } from "./routes/authRoutes";
 import { labRoutes } from "./routes/labRoutes";
 import { orderRoutes } from "./routes/orderRoutes";
+import { pendingShedRoutes } from "./routes/pendingShedRoutes";
 import { breederDataRoutes } from "./routes/breederDataRoutes";
 import { profileRoutes } from "./routes/profileRoutes";
 import { listingRoutes } from "./routes/listingRoutes";
@@ -135,6 +136,8 @@ app.use("/api/mobile", mobileRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);
+// After /api/lab so the broader router gets first refusal, same as the order routes.
+app.use("/api/lab/pending-sheds", pendingShedRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
 app.use("/api/reproductive", reproductiveRoutes);
 app.use("/api/emails", emailRoutes);

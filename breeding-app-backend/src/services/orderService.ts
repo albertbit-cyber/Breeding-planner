@@ -1,12 +1,19 @@
 import type { AnimalOrderInput } from "../types/api";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
-import { calculateOrderBreakdown, toPublicBreakdown } from "./pricingService";
-import { buildNextOrderNumber, ensureSharedOrderNumbers } from "./orderNumberService";
+import { calculateOrderBreakdown, splitAnimalTestPrices, toPublicBreakdown } from "./pricingService";
+import { buildNextOrderNumber, ensureSharedOrderNumbers, getOrderMonthToken } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
+// Prisma's unstated default is a 5 second budget, which an order covering a season's worth of
+// collected sheds could exhaust on round trips alone. Stated here so the limit is a decision
+// rather than a default nobody chose, and matching what the cloud-sync write already asks for.
+const ORDER_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 30_000,
+};
 
 /**
  * The issuing laboratory's identity, carried on every order the clients read.
@@ -92,7 +99,7 @@ const assertLabOwnsOrder = (
  * rather than falling back to a platform default, because a silent fallback
  * would quote one lab's prices for another lab's work.
  */
-const resolveLabPricingContext = async (labOrganizationId: string) => {
+export const resolveLabPricingContext = async (labOrganizationId: string) => {
   const [lab, offerings, pricing] = await Promise.all([
     prisma.labAccount.findFirst({
       where: {
@@ -117,7 +124,7 @@ const resolveLabPricingContext = async (labOrganizationId: string) => {
   return { labName: lab.labName, offerings, pricing };
 };
 
-const requireLabOrganizationId = (value: unknown): string => {
+export const requireLabOrganizationId = (value: unknown): string => {
   const labOrganizationId = String(value || "").trim();
   if (!labOrganizationId) {
     throw new HttpError(400, "Choose a laboratory before requesting a price.");
@@ -146,13 +153,24 @@ export const createOrder = async (
     breakdown: toPublicBreakdown(breakdown),
   } as unknown as Record<string, unknown>;
 
+  // Outside the transaction, deliberately. This is a one-off backfill of rows that predate
+  // order numbering, not a step in creating an order. Run inside, its writes were rolled back
+  // with the transaction whenever the whole thing overran -- so the next attempt found exactly
+  // the same unnumbered rows, redid exactly the same work, and overran at exactly the same
+  // point. Retrying could never clear it; submitting simply stopped working.
+  await ensureSharedOrderNumbers();
+
   const created = await prisma.$transaction(async (tx: any) => {
-    await ensureSharedOrderNumbers(tx);
     // Scoped to the receiving lab: a shared sequence would let each vendor infer
-    // the others' order volume from the gaps in its own numbering.
+    // the others' order volume from the gaps in its own numbering. Narrowed further to this
+    // month, taking only the highest -- the query used to return every order the lab had ever
+    // received, so the cost of placing an order grew with the lab's own history.
+    const monthToken = getOrderMonthToken();
     const existingOrders = await tx.shedTestOrder.findMany({
-      where: { labOrganizationId: resolvedLabId },
+      where: { labOrganizationId: resolvedLabId, orderNumber: { startsWith: monthToken } },
       select: { orderNumber: true },
+      orderBy: { orderNumber: "desc" },
+      take: 1,
     });
     const orderNumber = buildNextOrderNumber(
       existingOrders.map((entry: { orderNumber?: string | null }) => entry.orderNumber),
@@ -173,59 +191,46 @@ export const createOrder = async (
       },
     });
 
-    for (const row of breakdown.perAnimal) {
-      const orderAnimal = await tx.shedTestOrderAnimal.create({
-        data: {
-          orderId: order.id,
-          animalId: row.animalId,
-          animalName: row.animalName,
-          morphBaseCost: toPrice(row.morphBaseCost),
-          additionalMorphCost: toPrice(row.additionalMorphCost),
-          sexCost: toPrice(row.sexCost),
-          panelCost: toPrice(row.panelCost),
-          total: toPrice(row.total),
-        },
-      });
+    // One round trip for every animal's row, then one for every test line, instead of a
+    // separate INSERT per animal and per test in a loop. A batch collected over a season used
+    // to spend the whole transaction budget on that chatter alone.
+    const orderAnimals = await tx.shedTestOrderAnimal.createManyAndReturn({
+      data: breakdown.perAnimal.map((row) => ({
+        orderId: order.id,
+        animalId: row.animalId,
+        animalName: row.animalName,
+        morphBaseCost: toPrice(row.morphBaseCost),
+        additionalMorphCost: toPrice(row.additionalMorphCost),
+        sexCost: toPrice(row.sexCost),
+        panelCost: toPrice(row.panelCost),
+        total: toPrice(row.total),
+      })),
+      select: { id: true, animalId: true },
+    });
 
-      // Splitting the animal's total back across its lines, so each line records
-      // what it actually cost rather than an even share.
-      const isFlat = (entry: { priceModel?: string | null; testKind?: string | null }) =>
-        String(entry.priceModel || "tier") === "flat" || String(entry.testKind || "") === "panel";
-      const tieredMorphs = row.selectedCatalogTests.filter(
-        (entry) => !isFlat(entry) && entry.pricingType === "morph"
-      );
-      const tieredSexTests = row.selectedCatalogTests.filter(
-        (entry) => !isFlat(entry) && entry.pricingType === "sex"
-      );
+    // createManyAndReturn preserves input order, but one order may legitimately carry the same
+    // animal twice, so rows are paired by position rather than looked up by animalId.
+    const testRows = breakdown.perAnimal.flatMap((row, index) => {
+      const orderAnimalId = orderAnimals[index]?.id;
+      if (!orderAnimalId) return [];
 
-      for (const test of row.selectedCatalogTests) {
-        const morphIndex = tieredMorphs.findIndex((entry) => entry.id === test.id);
+      // Shared with the saved-queue quote, so the figure a keeper is shown before submitting is
+      // the same one that lands on the invoice.
+      return splitAnimalTestPrices(row).map(({ test, priceApplied }) => ({
+        orderAnimalId,
+        offeringId: test.id,
+        testNameSnapshot: test.name,
+        pricingTypeSnapshot: test.pricingType,
+        priceApplied: toPrice(priceApplied),
+      }));
+    });
 
-        const priceApplied = (() => {
-          // A flat-priced item carries its own price, whatever the order size.
-          if (isFlat(test)) return (test.priceCents ?? 0) / 100;
-          if (test.pricingType === "sex") {
-            return tieredSexTests.length ? row.sexCost / tieredSexTests.length : 0;
-          }
-          if (morphIndex === 0) return row.morphBaseCost;
-          if (morphIndex > 0) return row.additionalMorphCost / (tieredMorphs.length - 1);
-          return 0;
-        })();
-
-        await tx.shedTestOrderAnimalTest.create({
-          data: {
-            orderAnimalId: orderAnimal.id,
-            offeringId: test.id,
-            testNameSnapshot: test.name,
-            pricingTypeSnapshot: test.pricingType,
-            priceApplied: toPrice(priceApplied),
-          },
-        });
-      }
+    if (testRows.length) {
+      await tx.shedTestOrderAnimalTest.createMany({ data: testRows });
     }
 
     return order;
-  });
+  }, ORDER_TRANSACTION_OPTIONS);
 
   // Temporary debug log requested.
   console.log("[orders] order creation result", {

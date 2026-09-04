@@ -71,14 +71,22 @@ export const errorHandler = (error: unknown, req: Request, res: Response, _next:
     return;
   }
 
-  // The write transaction ran past its budget and was closed underneath us, so nothing was
-  // committed. Worth alerting on (it means an account outgrew the sync path again), but the
-  // caller deserves better than "Internal server error" for a retryable, nothing-was-lost state.
+  // A write transaction ran past its budget and was closed underneath us, so nothing was
+  // committed. Worth alerting on, but the caller deserves better than "Internal server error"
+  // for a retryable, nothing-was-lost state.
+  //
+  // The message used to name cloud sync whatever had actually timed out. P2028 is raised by
+  // every transaction in the service, so a failing lab order reported itself as a sync failure
+  // and sent everyone looking at the wrong subsystem. The path is the only thing that knows.
   if (prismaCode === "P2028") {
-    console.error("[cloud-sync] transaction timed out and was rolled back:", error);
+    // originalUrl, not path: inside a mounted router req.path is relative to the mount point,
+    // so "/api/breeder/snapshot" reads as "/snapshot" and would never match.
+    const route = req.originalUrl || req.path;
+    console.error(`[transaction-timeout] ${req.method} ${route} timed out and was rolled back:`, error);
     captureException(error, { path: req.path, method: req.method });
+    const subject = route.startsWith("/api/breeder/snapshot") ? "Cloud sync" : "That request";
     res.status(503).json({
-      message: "Cloud sync took too long and was rolled back — nothing was saved. Please try again.",
+      message: `${subject} took too long and was rolled back — nothing was saved. Please try again.`,
     });
     return;
   }

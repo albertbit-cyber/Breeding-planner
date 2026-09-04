@@ -32,6 +32,9 @@ export default function BreederOrderGeneticTestModal({
   const [added, setAdded] = useState(false);
   const [hasAppliedSuggestions, setHasAppliedSuggestions] = useState(false);
   const [changingLab, setChangingLab] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const snakeId = String(snake?.id || "").trim();
   // Ordering starts from the animal: which laboratories appear, and which of
@@ -119,8 +122,42 @@ export default function BreederOrderGeneticTestModal({
     }, 800);
   };
 
+  /**
+   * Banks the test in the saved queue instead of the batch cart.
+   *
+   * The cart is for a box going out now; this is for a shed that arrived today when the rest of
+   * the season's are still weeks away. It is kept server-side, so months of collecting survive a
+   * cleared cache and follow the keeper between devices.
+   */
+  const handleSaveForLater = async () => {
+    const requestedTests = unique(selectedTests);
+    if (!requestedTests.length || !selectedLabId) return;
+    setSaveError("");
+    setSaving(true);
+    try {
+      const api = createLabApiClient();
+      await api.addPendingShedTest({
+        snakeId: String(snake?.id || "").trim(),
+        snakeDisplayId: snake?.displayId || snake?.code || undefined,
+        snakeName: snake?.name || undefined,
+        labId: selectedLabId,
+        selectedTestIds: requestedTests,
+      });
+      setSaved(true);
+      setTimeout(() => {
+        onClose?.();
+      }, 800);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Unable to save this test for later.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const closeAndReset = useCallback(() => {
     setAdded(false);
+    setSaved(false);
+    setSaveError("");
     setSelectedTests([]);
     onClose?.();
   }, [onClose]);
@@ -312,14 +349,33 @@ export default function BreederOrderGeneticTestModal({
             </div>
           ) : null}
 
+          {saveError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {saveError}
+            </div>
+          ) : null}
+
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button
               type="button"
               className="rounded-xl border px-4 py-2 text-sm"
               onClick={closeAndReset}
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
+            </button>
+            {/* Banks the shed for a later box, rather than the one going out now. */}
+            <button
+              type="button"
+              className="rounded-xl border px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!selectedLabId || !selectedTests.length || isLoadingCatalog || !!catalogError || saving || saved}
+              onClick={handleSaveForLater}
+            >
+              {saved
+                ? t("lab.pending.saved", { defaultValue: "Saved" })
+                : saving
+                  ? t("lab.pending.saving", { defaultValue: "Saving…" })
+                  : t("lab.pending.saveForLater", { defaultValue: "Save for later" })}
             </button>
             <button
               type="button"

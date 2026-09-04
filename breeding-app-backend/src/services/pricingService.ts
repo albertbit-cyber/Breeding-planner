@@ -191,6 +191,43 @@ export const calculateOrderBreakdown = (
   };
 };
 
+/**
+ * Splits one animal's total back across its individual test lines, so each line records what
+ * it actually cost rather than an even share.
+ *
+ * Lives here, beside the pricing it undoes, because two callers need the same answer: the order
+ * writes these figures to the invoice, and the saved-queue quote shows them to the keeper before
+ * they commit. Computed in two places they would eventually disagree, and a quote that does not
+ * match the bill is worse than no quote.
+ */
+export const splitAnimalTestPrices = (
+  row: EnrichedAnimalBreakdown
+): Array<{ test: CatalogShape; priceApplied: number }> => {
+  const tieredMorphs = row.selectedCatalogTests.filter(
+    (entry) => !isFlatPriced(entry) && entry.pricingType === "morph"
+  );
+  const tieredSexTests = row.selectedCatalogTests.filter(
+    (entry) => !isFlatPriced(entry) && entry.pricingType === "sex"
+  );
+
+  return row.selectedCatalogTests.map((test) => {
+    const morphIndex = tieredMorphs.findIndex((entry) => entry.id === test.id);
+
+    const priceApplied = (() => {
+      // A flat-priced item carries its own price, whatever the order size.
+      if (isFlatPriced(test)) return (test.priceCents ?? 0) / 100;
+      if (test.pricingType === "sex") {
+        return tieredSexTests.length ? row.sexCost / tieredSexTests.length : 0;
+      }
+      if (morphIndex === 0) return row.morphBaseCost;
+      if (morphIndex > 0) return row.additionalMorphCost / (tieredMorphs.length - 1);
+      return 0;
+    })();
+
+    return { test, priceApplied };
+  });
+};
+
 export const toPublicBreakdown = (breakdown: InternalBreakdown): PriceBreakdownResponse => ({
   animalCount: breakdown.animalCount,
   tier: breakdown.tier,

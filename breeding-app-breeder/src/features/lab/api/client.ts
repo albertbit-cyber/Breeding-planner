@@ -1368,9 +1368,15 @@ export const createLabApiClient = () => {
     }));
   };
 
+  // The saved shed-test queue. Sheds arrive one animal at a time across a season, so a keeper
+  // banks tests here and submits the lot when the box is ready. Server-side rather than in the
+  // browser: it is accumulated over months, and a cleared cache must not discard it.
+  const PENDING_SHEDS = "/lab/pending-sheds";
+
   const listPendingShedTests = async (): Promise<PendingShedTestItem[]> => {
     requireSessionRole("breeder");
-    throw new Error("Pending shed queue is not available on the shared backend. Create submitted orders directly.");
+    const response = await apiRequest<{ items: PendingShedTestItem[] }>(PENDING_SHEDS);
+    return Array.isArray(response?.items) ? response.items : [];
   };
 
   const addPendingShedTest = async (input: {
@@ -1378,37 +1384,84 @@ export const createLabApiClient = () => {
     snakeDisplayId?: string;
     snakeName?: string;
     selectedTestIds: string[];
+    labId?: string;
     priority?: "routine" | "priority" | "urgent";
     sampleType?: "shed" | "bellyScaleClip";
     notes?: string;
   }): Promise<PendingShedTestItem> => {
     requireSessionRole("breeder");
-    throw new Error("Pending shed queue is not available on the shared backend. Create the order directly instead.");
+    const response = await apiRequest<{ item: PendingShedTestItem }>(PENDING_SHEDS, {
+      method: "POST",
+      body: JSON.stringify({
+        snakeId: String(input.snakeId || "").trim(),
+        snakeDisplayId: input.snakeDisplayId,
+        snakeName: input.snakeName,
+        labId: String(input.labId || "").trim(),
+        selectedTestIds: Array.from(
+          new Set((input.selectedTestIds || []).map((id) => String(id || "").trim()).filter(Boolean))
+        ),
+        priority: input.priority,
+        sampleType: input.sampleType,
+        notes: input.notes,
+      }),
+    });
+    return response.item;
   };
 
   const updatePendingShedTest = async (input: { pendingItemId: string; selectedTestIds?: string[]; priority?: "routine" | "priority" | "urgent"; sampleType?: "shed" | "bellyScaleClip"; notes?: string; selected?: boolean; }): Promise<PendingShedTestItem> => {
     requireSessionRole("breeder");
-    throw new Error("Pending shed queue is not available on the shared backend.");
+    const { pendingItemId, ...patch } = input;
+    const response = await apiRequest<{ item: PendingShedTestItem }>(
+      `${PENDING_SHEDS}/${encodeURIComponent(String(pendingItemId || "").trim())}`,
+      { method: "PATCH", body: JSON.stringify(patch) }
+    );
+    return response.item;
   };
 
   const removePendingShedTest = async (pendingItemId: string): Promise<void> => {
     requireSessionRole("breeder");
-    throw new Error("Pending queue deletion is not supported on hosted backend. Orders are already submitted on creation.");
+    await apiRequest(`${PENDING_SHEDS}/${encodeURIComponent(String(pendingItemId || "").trim())}`, {
+      method: "DELETE",
+    });
   };
 
   const quotePendingShedTests = async (pendingItemIds?: string[]): Promise<ShedTerminalQuote> => {
     requireSessionRole("breeder");
-    throw new Error("Pending shed pricing is not available on the shared backend. Submitted orders are priced by the backend.");
+    const response = await apiRequest<{ quote: ShedTerminalQuote }>(`${PENDING_SHEDS}/quote`, {
+      method: "POST",
+      body: JSON.stringify({ pendingItemIds }),
+    });
+    return response.quote;
   };
 
   const submitPendingShedBatch = async (pendingItemIds?: string[]) => {
     requireSessionRole("breeder");
-    throw new Error("Pending shed batch submission is not available on the shared backend. Orders are created immediately.");
+    const response = await apiRequest<{ batch: ShedSubmissionBatch; order: any }>(
+      `${PENDING_SHEDS}/submit`,
+      { method: "POST", body: JSON.stringify({ pendingItemIds }) }
+    );
+    // No label artifacts from this route; the terminal's downloadArtifact ignores a missing one.
+    return { batch: response.batch, order: toLegacyOrder(response.order || null) } as any;
   };
 
+  // Submitted batches are the orders they became -- there is no second record to keep, and one
+  // that could drift from the order would be worse than none.
   const listShedSubmissionBatches = async (): Promise<ShedSubmissionBatch[]> => {
     requireSessionRole("breeder");
-    throw new Error("Shed submission batches are not available on the shared backend.");
+    const orders = await listBreederTestOrders();
+    return orders.map((order) => ({
+      id: order.id,
+      breederUserId: String((order as any).breederId || ""),
+      labId: String((order as any).labOrganizationId || ""),
+      pendingItemIds: [],
+      orderIds: [order.id],
+      itemCount: Array.isArray((order as any).animalIds) ? (order as any).animalIds.length : 0,
+      totalCents: Math.round(Number((order as any).totalPrice || 0) * 100),
+      currency: String((order as any).currency || "EUR"),
+      submittedAt: String((order as any).createdAt || ""),
+      createdAt: String((order as any).createdAt || ""),
+      updatedAt: String((order as any).updatedAt || (order as any).createdAt || ""),
+    }));
   };
 
   const getShedBatchArtifacts = async (batchId: string) => {
