@@ -72,4 +72,22 @@ describe("shed test suggestions", () => {
     ]);
     expect(getSuggestedHetTestIds(snake, catalog)).toEqual([]);
   });
+
+  it('matches a gene to the trade name the lab prints for it', () => {
+    // The keeper writes 'Piebald'; this catalogue lists the test as 'Pied'.
+    expect(matchSuggestedHetTests({ possibleHets: ['Piebald'] }, catalog)).toEqual([
+      expect.objectContaining({ gene: 'Piebald', matched: true, testId: 'morph-pied' }),
+    ]);
+    expect(getSuggestedHetTestIds({ hets: ['66% het Piebald'] }, catalog)).toEqual([
+      'morph-pied',
+    ]);
+  });
+
+  it('matches in the other direction when the lab uses the formal name', () => {
+    const formalCatalog = [{ id: 'pb-test', name: 'Piebald', pricingType: 'morph' }];
+
+    expect(getSuggestedHetTestIds({ possibleHets: ['Pied'] }, formalCatalog)).toEqual([
+      'pb-test',
+    ]);
+  });
 });
