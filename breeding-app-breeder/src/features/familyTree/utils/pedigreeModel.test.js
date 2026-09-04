@@ -245,3 +245,47 @@ describe('clutchLabel', () => {
     expect(clutchLabel(model.clutch('pair:P1'), model)).toBe('Runa x Confusion 2026');
   });
 });
+
+/**
+ * These came from `inferParents.test.js`, which covered the old page-level inference. That code
+ * is gone, but the rules it locked down are not: the tree once read the first half of a
+ * "Dam x Sire" name as the sire, swapping the parents of every name-inferred animal and
+ * reversing the clutch id rebuilt from them.
+ */
+describe('buildPedigree - names as keepers actually write them', () => {
+  const dam = { id: 'F1', name: 'Runa', sex: 'F', groups: ['Breeders'] };
+  const sire = { id: 'M1', name: 'Confusion Lesser Pastel het Clown', sex: 'M', groups: ['Breeders'] };
+
+  it('reads the dam from the first half and the sire from the second', () => {
+    const child = { id: 'C1', name: 'Runa × Confusion Lesser Pastel het Clown - 4', sex: 'F' };
+    const model = buildPedigree({ animals: [dam, sire, child] });
+    expect(model.parents('C1')).toMatchObject({ damId: 'F1', sireId: 'M1' });
+  });
+
+  it('reads a name with the year written in front of it', () => {
+    const child = { id: 'C1', name: '26 Runa x Confusion Lesser Pastel het Clown - 4', sex: 'F' };
+    const model = buildPedigree({ animals: [dam, sire, child] });
+    expect(model.parents('C1')).toMatchObject({ damId: 'F1', sireId: 'M1' });
+  });
+
+  it('reads a year run straight into the name with no space', () => {
+    const child = { id: 'C1', name: '26Runa x Confusion Lesser Pastel het Clown - 4', sex: 'F' };
+    const model = buildPedigree({ animals: [dam, sire, child] });
+    expect(model.parents('C1')).toMatchObject({ damId: 'F1', sireId: 'M1' });
+  });
+
+  it('rebuilds the clutch label in the order the name was written', () => {
+    const child = { id: 'C1', name: '26 Runa x Confusion Lesser Pastel het Clown - 4', sex: 'F' };
+    const model = buildPedigree({ animals: [dam, sire, child] });
+    const clutch = model.clutch(model.parents('C1').clutchKey);
+    expect(clutchLabel(clutch, model)).toBe('Runa x Confusion Lesser Pastel het Clown 2026');
+  });
+
+  it('keeps recorded parent ids in preference to anything read from the name', () => {
+    // The name names Hydra; the record says Confusion. The record wins.
+    const other = { id: 'M9', name: 'Hydra', sex: 'M', groups: ['Breeders'] };
+    const child = { id: 'C1', name: 'Runa × Hydra - 4', sex: 'F', damId: 'F1', sireId: 'M1' };
+    const model = buildPedigree({ animals: [dam, sire, other, child] });
+    expect(model.parents('C1')).toMatchObject({ damId: 'F1', sireId: 'M1' });
+  });
+});

@@ -165,6 +165,38 @@ function clutchKeyFor({ pairingId, clutchId, sireId, damId }) {
   return null;
 }
 
+// ── Names ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Hatchlings are very often named with the year in front -- "26 Runa x Confusion - 4", and
+ * "26Runa x ..." with no space. The shared `splitPairLabel` strips a trailing index and a
+ * trailing year but knows nothing about a leading one, so the dam came back as "26 Runa" and
+ * matched no animal at all. Every hatchling named that way silently lost both parents.
+ */
+const LEADING_YEAR_RE = /^(\d{4})\s+|^(\d{2})(?=[A-Za-z])|^(\d{2})\s+/;
+
+function readYear(twoOrFourDigits) {
+  const value = Number(twoOrFourDigits);
+  if (!Number.isFinite(value)) return null;
+  if (String(twoOrFourDigits).length === 4) return value;
+  // A two-digit year: 70 and up reads as last century, anything lower as this one.
+  return value >= 70 ? 1900 + value : 2000 + value;
+}
+
+/** Splits "<Dam> x <Sire>", tolerating a leading year, and reports the year if one was there. */
+function splitAnimalName(rawName) {
+  const text = String(rawName ?? '').trim();
+  if (!text) return null;
+
+  const match = LEADING_YEAR_RE.exec(text);
+  const digits = match && (match[1] || match[2] || match[3]);
+  const body = match ? text.slice(match[0].length).trim() : text;
+
+  const split = splitPairLabel(body) || splitPairLabel(text);
+  if (!split) return null;
+  return { ...split, hatchYear: digits ? readYear(digits) : null };
+}
+
 // ── Parent resolution ──────────────────────────────────────────────────────────────────
 
 /** Index of exact lowercased name -> animals, so a name lookup is not a scan per animal. */
@@ -271,7 +303,7 @@ export function buildPedigree({ animals = [], pairings = [], server = null } = {
     // 3. Read out of the name, strictly. Dam first -- that is how the hatch wizard writes it.
     let split = null;
     if (!sireId || !damId) {
-      split = splitPairLabel(animal.name) || splitPairLabel(animal.clutchId);
+      split = splitAnimalName(animal.name) || splitAnimalName(animal.clutchId);
       if (split) {
         if (!sireId) {
           const found = lookupByName(nameIndex, split.sireName, SEX_MALE, animal.id);
@@ -309,7 +341,13 @@ export function buildPedigree({ animals = [], pairings = [], server = null } = {
     }
 
     if (sireId || damId) {
-      parentsOf.set(animal.id, { sireId, damId, confidence: confidence || CONFIDENCE.GUESSED, clutchKey: null });
+      parentsOf.set(animal.id, {
+        sireId,
+        damId,
+        confidence: confidence || CONFIDENCE.GUESSED,
+        clutchKey: null,
+        nameYear: split?.hatchYear ?? null,
+      });
     }
   }
 
@@ -369,7 +407,7 @@ export function buildPedigree({ animals = [], pairings = [], server = null } = {
       damId: parents.damId,
       clutchId: animal.clutchId,
       pairingId: animal.pairingId,
-      date: animal.hatchDate,
+      date: animal.hatchDate || (parents.nameYear ? String(parents.nameYear) : null),
     });
     clutch.childIds.push(animal.id);
     clutchOfChild.set(animal.id, key);
@@ -536,4 +574,34 @@ export function clutchLabel(clutch, model) {
   const names = [dam, sire].filter(Boolean).join(' x ');
   if (names && year) return `${names} ${year}`;
   return names || 'Clutch';
+}
+
+/**
+ * The catalog page fills a missing sire or dam from whatever the pedigree can work out, and it
+ * asks per animal while mapping over the whole collection. Building a model per call would be
+ * quadratic, so the model is cached against the array it was built from -- a stable reference
+ * for the length of a render, which is exactly the span that matters.
+ *
+ * The animals handed back are the caller's own records, not the tree's normalised copies: the
+ * catalog reads `morphs` off them, which only the originals carry.
+ */
+const pedigreeCache = new WeakMap();
+
+export function inferParentsForLocalSnake(child, animals = []) {
+  if (!child?.id || !Array.isArray(animals) || !animals.length) return { sire: null, dam: null };
+
+  let cached = pedigreeCache.get(animals);
+  if (!cached) {
+    cached = {
+      model: buildPedigree({ animals }),
+      byId: new Map(animals.filter(animal => animal?.id).map(animal => [animal.id, animal])),
+    };
+    pedigreeCache.set(animals, cached);
+  }
+
+  const { sireId, damId } = cached.model.parents(child.id);
+  return {
+    sire: (sireId && cached.byId.get(sireId)) || null,
+    dam: (damId && cached.byId.get(damId)) || null,
+  };
 }
