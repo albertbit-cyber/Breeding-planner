@@ -1,3 +1,5 @@
+import { resolveActiveGeneAliasToken } from "../../../genetics/geneDatabase";
+
 const normalizeGeneKey = (value) =>
   String(value || "")
     .trim()
@@ -73,7 +75,22 @@ export const extractSuggestedHetGenes = (snake) => {
   return uniqueSuggestions([...fromHets, ...fromPossibleHets, ...fromGeneticsText]);
 };
 
-const catalogKeysForTest = (test) => {
+/**
+ * A keeper writes "Piebald"; a laboratory prints "Pied". Same gene, and the order
+ * screen has to know it -- otherwise the one test the keeper came to buy shows up
+ * as "no matching catalog test". Both the animal's gene and the lab's test name are
+ * resolved through the gene alias table, so either side may use any trade name.
+ */
+const canonicalGeneKeys = (value, resolveCanonical) => {
+  const direct = String(value || "").trim();
+  const normalized = normalizeGeneKey(direct);
+  const keys = [normalized];
+  const canonical = resolveCanonical(direct) || resolveCanonical(normalized);
+  if (canonical) keys.push(normalizeGeneKey(canonical));
+  return Array.from(new Set(keys.filter(Boolean)));
+};
+
+const catalogKeysForTest = (test, resolveCanonical) => {
   const values = [
     test?.name,
     test?.shortLabel,
@@ -81,10 +98,23 @@ const catalogKeysForTest = (test) => {
     test?.id,
     String(test?.id || "").replace(/^morph[-_]/i, ""),
   ];
-  return values.map(normalizeGeneKey).filter(Boolean);
+  return Array.from(
+    new Set(values.flatMap((value) => canonicalGeneKeys(value, resolveCanonical)))
+  );
 };
 
-export const matchSuggestedHetTests = (snake, catalogTests) => {
+export const matchSuggestedHetTests = (snake, catalogTests, options = {}) => {
+  const resolveCanonical =
+    typeof options.resolveCanonicalGene === "function"
+      ? options.resolveCanonicalGene
+      : resolveActiveGeneAliasToken;
+  const safeResolve = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const canonical = resolveCanonical(raw);
+    return canonical ? String(canonical) : null;
+  };
+
   const suggestions = extractSuggestedHetGenes(snake);
   const tests = Array.isArray(catalogTests) ? catalogTests : [];
   const testByGeneKey = new Map();
@@ -93,13 +123,15 @@ export const matchSuggestedHetTests = (snake, catalogTests) => {
     const pricingType = String(test?.pricingType || "").toLowerCase();
     const category = String(test?.category || "").toLowerCase();
     if (pricingType === "sex" || category === "sex-determination") return;
-    catalogKeysForTest(test).forEach((key) => {
+    catalogKeysForTest(test, safeResolve).forEach((key) => {
       if (!testByGeneKey.has(key)) testByGeneKey.set(key, test);
     });
   });
 
   return suggestions.map((suggestion) => {
-    const test = testByGeneKey.get(suggestion.key);
+    const test = canonicalGeneKeys(suggestion.gene, safeResolve)
+      .map((key) => testByGeneKey.get(key))
+      .find(Boolean);
     return {
       ...suggestion,
       testId: test?.id ? String(test.id) : null,
@@ -109,7 +141,7 @@ export const matchSuggestedHetTests = (snake, catalogTests) => {
   });
 };
 
-export const getSuggestedHetTestIds = (snake, catalogTests) =>
-  matchSuggestedHetTests(snake, catalogTests)
+export const getSuggestedHetTestIds = (snake, catalogTests, options = {}) =>
+  matchSuggestedHetTests(snake, catalogTests, options)
     .filter((suggestion) => suggestion.matched && suggestion.testId)
     .map((suggestion) => suggestion.testId);
