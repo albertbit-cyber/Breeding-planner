@@ -23,7 +23,7 @@ export const SOURCE_NOTES = {
   expo: ['quarantine.sourceNote.expo', 'Shared tables and handling with dozens of other collections.'],
   import: ['quarantine.sourceNote.import', 'Long transport, mixed shipments, high stress on arrival.'],
   'wild-caught': ['quarantine.sourceNote.wildCaught', 'Assume parasites. Extended observation and repeat faecals.'],
-  unknown: ['quarantine.sourceNote.unknown', 'Treated as medium risk until you know more.'],
+  unknown: ['quarantine.sourceNote.unknown', 'Provenance you cannot check. Treated as the highest risk until you know more.'],
 };
 
 export const RISK_TONES = {

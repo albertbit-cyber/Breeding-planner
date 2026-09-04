@@ -302,6 +302,11 @@ describe('source-driven duration', () => {
     expect(getDefaultDaysForSource('wild-caught')).toBe(180);
   });
 
+  // An animal whose history nobody can vouch for is the worst case, not a middling one.
+  it('suggests the longest clock when the source is unknown', () => {
+    expect(getDefaultDaysForSource('unknown')).toBe(180);
+  });
+
   it('applies the source default when an animal enters quarantine', () => {
     const snake = applyQuarantineStatus({ status: 'Active' }, QUARANTINE_STATUS.IN, { today: TODAY, source: 'expo' });
     expect(snake.quarantine.source).toBe('expo');
