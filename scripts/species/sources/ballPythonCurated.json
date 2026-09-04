@@ -283,8 +283,8 @@
       "geneName": "Banana",
       "geneType": "incomplete_dominant",
       "complex": null,
-      "hasSuperForm": false,
-      "superGeneName": null,
+      "hasSuperForm": true,
+      "superGeneName": "Super Banana",
       "aliases": [
         "Coral Glow",
         "Whitesmoke"

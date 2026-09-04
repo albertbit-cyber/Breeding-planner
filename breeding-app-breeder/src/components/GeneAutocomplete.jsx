@@ -67,30 +67,56 @@ function scoreMatch(gene, query) {
 }
 
 const HET_STRIP_RE = /^(?:\d{1,3}%\s*)?(?:(?:pos(?:s?i?a?ble)?|probable|maybe|ph)\s+)?het\s+/i;
-const PCT_STRIP_RE = /^(\d{1,3}%)\s+/i;
-const POS_STRIP_RE = /^(pos(?:s?i?a?ble)?|probable|maybe|ph)\s+/i;
+const PCT_STRIP_RE = /^(\d{1,3})%\s+/i;
+const POS_STRIP_RE = /^(?:pos(?:s?i?a?ble)?|probable|maybe|ph)\s+/i;
+const SUPER_STRIP_RE = /^super[\s-]+/i;
 
-function detectQualifier(raw) {
+// Typing a qualifier is never required -- every form a gene can take is already its own
+// row in the dropdown. But a keeper who types "66 clown" or "super pastel" out of habit
+// should land on the row they meant, so a recognised qualifier simply preselects it.
+function detectVariant(raw) {
   const r = raw.trim();
+  if (SUPER_STRIP_RE.test(r)) return 'super';
+  const pct = PCT_STRIP_RE.exec(r);
+  if (pct) {
+    if (pct[1] === '66') return 'het66';
+    if (pct[1] === '50') return 'het50';
+    return 'het';
+  }
+  if (POS_STRIP_RE.test(r)) return 'possibleAny';
   if (HET_STRIP_RE.test(r)) return 'het';
-  if (PCT_STRIP_RE.test(r)) return PCT_STRIP_RE.exec(r)[1];
-  if (POS_STRIP_RE.test(r)) return 'possible';
   return null;
+}
+
+// "possible" means the possible-het row on a recessive and the possible-visual row on
+// everything else, so it resolves against whichever the matched gene actually offers.
+const VARIANT_PREFERENCE = {
+  super:       ['super'],
+  het:         ['het'],
+  het66:       ['het66'],
+  het50:       ['het50'],
+  possibleAny: ['hetPossible', 'possible'],
+};
+
+function preferredIndex(options, variant) {
+  if (!variant || !options.length) return 0;
+  for (const wanted of VARIANT_PREFERENCE[variant] || []) {
+    const idx = options.findIndex(o => o.variant === wanted);
+    if (idx >= 0) return idx;
+  }
+  return 0;
 }
 
 function stripQualifier(raw) {
   return raw.trim()
+    .replace(SUPER_STRIP_RE, '')
     .replace(HET_STRIP_RE, '')
     .replace(PCT_STRIP_RE, '')
     .replace(POS_STRIP_RE, '')
     .trim();
 }
 
-function searchGenes(allGenes, query) {
-  if (!query || query.length < 1) return [];
-  const cleaned = stripQualifier(query.toLowerCase().trim());
-  const q = cleaned || query.toLowerCase().trim();
-  if (!q) return [];
+function collectMatches(allGenes, q) {
   const results = [];
   for (const gene of allGenes) {
     const s = scoreMatch(gene, q);
@@ -106,38 +132,86 @@ function searchGenes(allGenes, query) {
     .slice(0, 8);
 }
 
-const HET_QUICK_VARIANTS = [
-  { label: 'Pos. Het', prefix: 'Possible' },
-  { label: '50% Het', prefix: '50%' },
-  { label: '66% Het', prefix: '66%' },
+function searchGenes(allGenes, query) {
+  const raw = query.toLowerCase().trim();
+  if (!raw) return [];
+  const cleaned = stripQualifier(raw);
+  const results = cleaned ? collectMatches(allGenes, cleaned) : [];
+  // A gene whose own name opens with a word we treat as a qualifier would be stripped
+  // down to nothing findable, so fall back to the untouched query rather than go blank.
+  if (results.length || cleaned === raw) return results;
+  return collectMatches(allGenes, raw);
+}
+
+const HET_VARIANTS = [
+  { variant: 'het',         prefix: 'Het' },
+  { variant: 'het66',       prefix: '66% Het' },
+  { variant: 'het50',       prefix: '50% Het' },
+  { variant: 'hetPossible', prefix: 'Possible Het' },
 ];
 
-// Expands each matched gene into selectable rows. Recessive genes offer the
-// full set of het probabilities plus visual; other gene types (and manual
-// het-mode entry, which already carries its own qualifier) get a single row.
-function buildOptions(results, hetMode, buildToken) {
+const HET_VARIANT_KEYS = new Set(HET_VARIANTS.map(v => v.variant));
+
+/**
+ * Super forms read "Super <Gene>", with the trade name appended when the database knows
+ * one -- "Super Spotnose (Powerball)". The genetic name has to lead: Blue-Eyed Leucistic
+ * is the super of Mojave, Lesser, Butter AND Phantom alike, so the nickname on its own
+ * could never tell punnett.ts which allele the animal is actually carrying.
+ *
+ * Genes whose super form is lethal -- Spider, Champagne, Hidden Gene Woma -- are never
+ * offered one. No keeper can hold that animal, so it must not be selectable. Those three
+ * also carry hasSuperForm: false today, but the health flag is what the rule reads: a
+ * later data correction flipping that boolean must not quietly put the row back.
+ */
+export function superLabelFor(gene) {
+  if (!gene.hasSuperForm) return null;
+  if ((gene.healthFlags || []).includes('lethal_super')) return null;
+  const plain = `Super ${gene.geneName}`;
+  const nickname = (gene.superGeneName || '').trim();
+  if (!nickname || nickname.toLowerCase() === plain.toLowerCase()) return plain;
+  return `${plain} (${nickname})`;
+}
+
+/**
+ * Expands each matched gene into the forms it can actually take, plain form first so that
+ * typing a name and pressing Enter records the animal as you would read it off the label:
+ *
+ *   recessive        visual, het, 66% het, 50% het, possible het
+ *   co-dominant      single gene, super (where one exists), possible
+ *   everything else  the gene, possible
+ *
+ * A super form gets no "possible" row of its own. "Possible" records that the keeper is
+ * unsure the gene is there at all, and punnett.ts keeps it out of predictions entirely.
+ */
+function buildOptions(results) {
   const options = [];
   for (const { gene, matchedAlias } of results) {
-    if (hetMode) {
-      const token = buildToken(gene.geneName);
-      options.push({ type: 'het', gene, matchedAlias, label: token, token, showMeta: true });
-      continue;
-    }
+    const rows = [{ variant: 'visual', token: gene.geneName }];
+
     if (gene.geneType === 'recessive') {
-      for (const variant of HET_QUICK_VARIANTS) {
-        options.push({
-          type: 'het',
-          gene,
-          matchedAlias: null,
-          label: `${variant.label} ${gene.geneName}`,
-          token: `${variant.prefix} ${gene.geneName}`,
-          showMeta: false,
-        });
+      for (const v of HET_VARIANTS) {
+        rows.push({ variant: v.variant, token: `${v.prefix} ${gene.geneName}` });
       }
-      options.push({ type: 'visual', gene, matchedAlias, label: `${gene.geneName} (visual)`, token: gene.geneName, showMeta: true });
     } else {
-      options.push({ type: 'visual', gene, matchedAlias, label: gene.geneName, token: gene.geneName, showMeta: true });
+      if (gene.geneType === 'incomplete_dominant') {
+        const superLabel = superLabelFor(gene);
+        if (superLabel) rows.push({ variant: 'super', token: superLabel });
+      }
+      rows.push({ variant: 'possible', token: `Possible ${gene.geneName}` });
     }
+
+    rows.forEach((row, i) => {
+      options.push({
+        ...row,
+        gene,
+        matchedAlias,
+        label: row.token,
+        isHet: HET_VARIANT_KEYS.has(row.variant),
+        // Aliases, health icons and complex names ride on the first row of each gene
+        // only -- repeating them down every form of the same gene is just noise.
+        showMeta: i === 0,
+      });
+    });
   }
   return options;
 }
@@ -147,7 +221,7 @@ function buildOptions(results, hetMode, buildToken) {
  *
  * Props:
  *   morphs: string[]           – current visual gene tokens
- *   hets: string[]             – current het tokens (may include "Het X", "50% X", "Possible X")
+ *   hets: string[]             – current het tokens ("Het X", "66% Het X", "Possible Het X")
  *   onChange({ morphs, hets }) – called whenever the selection changes
  *   disabled?: boolean
  *   placeholder?: string
@@ -158,35 +232,23 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
   const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [hetMode, setHetMode] = useState(false);
-  const [hetQualifier, setHetQualifier] = useState('');
-  const [qualOpen, setQualOpen] = useState(false);
 
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
   const containerRef = useRef(null);
 
-  const buildToken = useCallback((geneName) => {
-    if (!hetMode) return geneName;
-    const qualifier = hetQualifier.trim();
-    if (!qualifier) return `Het ${geneName}`;
-    return `${qualifier} ${geneName}`;
-  }, [hetMode, hetQualifier]);
-
   useEffect(() => {
-    if (detectQualifier(inputValue) === 'het') setHetMode(true);
     const results = searchGenes(allGenes, inputValue);
-    const opts = buildOptions(results, hetMode, buildToken);
+    const opts = buildOptions(results);
     setOptions(opts);
-    setActiveIdx(0);
+    setActiveIdx(preferredIndex(opts, detectVariant(inputValue)));
     setOpen(opts.length > 0 && inputValue.trim().length > 0);
-  }, [inputValue, allGenes, hetMode, buildToken]);
+  }, [inputValue, allGenes]);
 
   useEffect(() => {
     function handleClickOutside(e) {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setOpen(false);
-        setQualOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -194,8 +256,8 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
   }, []);
 
   const selectOption = useCallback((option) => {
-    const nextMorphs = option.type === 'het' ? morphs : [...morphs, option.token];
-    const nextHets = option.type === 'het' ? [...hets, option.token] : hets;
+    const nextMorphs = option.isHet ? morphs : [...morphs, option.token];
+    const nextHets = option.isHet ? [...hets, option.token] : hets;
     onChange({ morphs: nextMorphs, hets: nextHets });
     setInputValue('');
     setOpen(false);
@@ -235,15 +297,6 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
     }
   }, [open, options, activeIdx, selectOption, inputValue, hets, morphs, removeHet, removeMorph]);
 
-  const toggleHetMode = useCallback(() => {
-    setHetMode(m => !m);
-    setHetQualifier('');
-    setQualOpen(false);
-    inputRef.current?.focus();
-  }, []);
-
-  const HET_QUALIFIERS = ['Het', '50%', '66%', 'Possible'];
-
   return (
     <div ref={containerRef} className="relative">
       <div
@@ -282,68 +335,18 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
           </span>
         ))}
 
-        <div className="flex items-center gap-1 flex-1 min-w-32">
-          <div className="relative flex items-center">
-            <button
-              type="button"
-              onClick={toggleHetMode}
-              className={`px-2 py-0.5 rounded-l text-[11px] font-semibold leading-tight border transition-colors ${
-                hetMode
-                  ? 'bg-sky-500 sk-on-accent border-sky-500'
-                  : 'bg-neutral-100 text-neutral-600 border-neutral-200 hover:bg-neutral-200'
-              }`}
-              title={hetMode ? 'Adding as het — click to switch to visual' : 'Adding as visual — click to switch to het'}
-            >
-              {hetMode ? 'Het' : 'Visual'}
-            </button>
-            {hetMode && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setQualOpen(q => !q)}
-                  className="px-1.5 py-0.5 bg-sky-400 sk-on-accent text-[10px] font-medium border-l border-sky-600 rounded-r hover:bg-sky-500 leading-tight"
-                  title="Het qualifier (50%, 66%, Possible, etc.)"
-                >
-                  {hetQualifier || '…'}
-                </button>
-                {qualOpen && (
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-white border rounded-lg shadow-lg min-w-20 text-xs overflow-hidden">
-                    <button
-                      type="button"
-                      className="block w-full text-left px-3 py-1.5 hover:bg-neutral-50 text-neutral-600"
-                      onClick={() => { setHetQualifier(''); setQualOpen(false); inputRef.current?.focus(); }}
-                    >
-                      Het (plain)
-                    </button>
-                    {HET_QUALIFIERS.filter(q => q !== 'Het').map(q => (
-                      <button
-                        key={q}
-                        type="button"
-                        className="block w-full text-left px-3 py-1.5 hover:bg-neutral-50 text-neutral-600"
-                        onClick={() => { setHetQualifier(q); setQualOpen(false); inputRef.current?.focus(); }}
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => { if (options.length && inputValue.trim()) setOpen(true); }}
-            placeholder={placeholder || (hetMode ? 'Search het gene…' : 'Search gene…')}
-            className="flex-1 outline-none text-sm px-1 bg-transparent min-w-24"
-            disabled={disabled}
-            autoComplete="off"
-          />
-        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => { if (options.length && inputValue.trim()) setOpen(true); }}
+          placeholder={placeholder || 'Search gene…'}
+          className="flex-1 outline-none text-sm px-1 bg-transparent min-w-32"
+          disabled={disabled}
+          autoComplete="off"
+        />
       </div>
 
       {open && options.length > 0 && (
@@ -354,7 +357,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
         >
           {options.map((option, idx) => (
             <button
-              key={`${option.gene.geneName}-${option.type}-${option.token}`}
+              key={`${option.gene.geneName}-${option.variant}`}
               type="button"
               role="option"
               aria-selected={idx === activeIdx}

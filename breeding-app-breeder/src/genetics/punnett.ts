@@ -109,13 +109,38 @@ const updateEntry = (
   return entry;
 };
 
+/**
+ * Super forms are written "Super <Gene> (<Nickname>)" -- "Super Spotnose (Powerball)",
+ * "Super Mojave (Blue-Eyed Leucistic)". The genetic name leads so the allele can be
+ * identified; the trade name only rides along for the keeper's benefit. Blue-Eyed
+ * Leucistic alone would be ambiguous -- it is the super of Mojave, Lesser, Butter AND
+ * Phantom -- so the nickname can never be the thing we do genetics on.
+ *
+ * The parenthetical is stripped ONLY behind a "Super " prefix. Six real gene names carry
+ * their own parentheses (Axanthic (VPI), (GCR), (TSK), (MJ), (Jolliff), Ghost (Vesper))
+ * and those lines are distinct, non-complementary genes -- stripping unconditionally
+ * would silently merge all five Axanthics into one.
+ */
 const parseCodomMorph = (name: string): { gene: string; alleleCount: 1 | 2 } => {
   const trimmed = name.trim();
   if (/^super\s+/i.test(trimmed)) {
-    return { gene: trimmed.replace(/^super\s+/i, "").trim(), alleleCount: 2 };
+    const base = trimmed
+      .replace(/^super\s+/i, "")
+      .replace(/\s*\([^)]*\)\s*$/, "")
+      .trim();
+    if (base) return { gene: base, alleleCount: 2 };
   }
   return { gene: trimmed, alleleCount: 1 };
 };
+
+/**
+ * A leading "Possible"/"Probable"/"Maybe"/"PH" marks a gene the keeper is not sure is
+ * there at all. It is a label, not a probability -- see hasPossibleQualifier's callers.
+ * Anchored to the front so a gene whose own name contains one of these words is safe.
+ */
+const POSSIBLE_PREFIX_RE = /^(?:pos(?:s?i?a?ble)?|probable|maybe|ph)\s+/i;
+
+const hasPossibleQualifier = (label: string): boolean => POSSIBLE_PREFIX_RE.test(label.trim());
 
 const parsePossibleProbability = (label: string): number | undefined => {
   const percentMatch = label.match(/(\d+(?:\.\d+)?)\s*%/);
@@ -148,6 +173,12 @@ const gatherAnimalGenes = (animal: Animal): Map<string, ParentGeneEntry> => {
     if (!morph?.name) return;
     const name = morph.name.trim();
     if (!name) return;
+    // "Possible Pastel" records that the keeper is unsure the gene is present at all --
+    // an identification note, not an allele probability. It is excluded from the cross on
+    // purpose. It used to be excluded by accident: the lookup failed, the gene fell
+    // through to "polygenic", and the skip below dropped it while wrongly tagging the
+    // pairing with a polygenic disclaimer.
+    if (hasPossibleQualifier(name)) return;
     if (morph.type === "recessive") {
       const dist = emptyDistribution();
       dist[2] = 1;
@@ -173,8 +204,14 @@ const gatherAnimalGenes = (animal: Animal): Map<string, ParentGeneEntry> => {
 
   (animal.hets || []).forEach((het) => {
     if (!het) return;
+    // "50% Het Clown" and "66% Het Clown" live in this list alongside confirmed hets.
+    // They were previously all forced to dist[1] = 1, so an unproven het fed the odds as
+    // if it had been confirmed. Only a het with no qualifier at all is certain.
+    const probability = parsePossibleProbability(het)
+      ?? (hasPossibleQualifier(het) ? 0.5 : 1);
     const dist = emptyDistribution();
-    dist[1] = 1;
+    dist[1] = probability;
+    dist[0] = 1 - probability;
     assign(het, "recessive", dist);
   });
 
