@@ -10,18 +10,20 @@ const Stat = ({ icon, label, value }) => (
   </div>
 );
 
+/**
+ * Where the figures came from. There is no mock data behind this any more -- "This collection"
+ * means the counts are drawn from the animals in the browser, which is the normal case and not
+ * a degraded one, so it is not dressed up as an outage.
+ */
 const StatusDot = ({ online }) => (
   <div className="flex items-center gap-1.5 px-4 ml-auto flex-shrink-0">
     <div
-      className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-300'}`}
-      style={online ? { boxShadow: '0 0 0 3px color-mix(in srgb, var(--sk-success-text) 20%, transparent)' } : {}}
+      className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-violet-300'}`}
+      style={online ? { boxShadow: '0 0 0 3px rgba(52, 211, 153, 0.2)' } : {}}
     />
     <span className="text-[10px] font-semibold text-neutral-500">
-      {online ? 'Live' : 'Offline'}
+      {online ? 'Shared pedigree' : 'This collection'}
     </span>
-    {!online && (
-      <span className="text-[10px] text-amber-700 font-medium ml-1">(Mock data)</span>
-    )}
   </div>
 );
 

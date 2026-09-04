@@ -8,6 +8,7 @@ const STATUS_CHIP = {
   breeding:  'bg-violet-100 text-violet-700',
   holdback:  'bg-amber-100  text-amber-700',
   hatchling: 'bg-emerald-100 text-emerald-700',
+  egg:       'bg-amber-100  text-amber-700',
   sold:      'bg-neutral-100 text-neutral-500',
   retired:   'bg-gray-100   text-gray-500',
 };
@@ -19,6 +20,8 @@ const ROLE_BORDER = {
   offspring: 'border-emerald-200',
   sibling:   'border-amber-200',
   ancestor:  'border-neutral-200',
+  // An egg is a place in a clutch, not an animal on file, so it is drawn as an outline.
+  egg:       'border-amber-200 border-dashed',
 };
 
 const ROLE_BG = {
@@ -28,6 +31,7 @@ const ROLE_BG = {
   offspring: 'bg-emerald-50',
   sibling:   'bg-amber-50',
   ancestor:  'bg-white',
+  egg:       'bg-amber-50/50',
 };
 
 const AVATAR_GRADIENT = {
@@ -37,13 +41,14 @@ const AVATAR_GRADIENT = {
   offspring: 'linear-gradient(135deg, var(--sk-series-3), var(--sk-success-text))',
   sibling:   'linear-gradient(135deg, var(--sk-series-5), var(--sk-warning-text))',
   ancestor:  'linear-gradient(135deg, var(--sk-series-6), var(--sk-series-4))',
+  egg:       'linear-gradient(135deg, var(--sk-series-5), var(--sk-surface-2))',
 };
 
 const SnakeNode = ({ data }) => {
   const { snake, nodeRole = 'ancestor', isSelected } = data;
   const role = isSelected ? 'selected' : nodeRole;
 
-  const initial = snake.name?.charAt(0)?.toUpperCase() || '?';
+  const initial = snake.isEgg ? '○' : (snake.name?.charAt(0)?.toUpperCase() || '?');
   const sexIcon  = SEX_ICON[snake.sex]  || '?';
   const sexColor = SEX_COLOR[snake.sex] || 'text-neutral-400';
   const statusClass = STATUS_CHIP[snake.status] || 'bg-neutral-100 text-neutral-500';
@@ -58,12 +63,15 @@ const SnakeNode = ({ data }) => {
         ROLE_BG[role]    || 'bg-white',
       ].join(' ')}
     >
-      {/* Incoming edge handle (top) */}
+      {/* Incoming edges. Stacked layouts come in from above; horizontal ones from the left,
+          where a visible dot would sit oddly against the card edge, so that handle is hidden. */}
       <Handle
+        id="t-top"
         type="target"
         position={Position.Top}
         className="!w-2 !h-2 !bg-violet-400 !border-violet-300"
       />
+      <Handle id="t-left" type="target" position={Position.Left} className="!w-2 !h-2 !opacity-0 !border-0" />
 
       {/* Header row: avatar + name/id + sex */}
       <div className="flex items-center gap-2.5">
@@ -134,12 +142,14 @@ const SnakeNode = ({ data }) => {
         </div>
       )}
 
-      {/* Outgoing edge handle (bottom) */}
+      {/* Outgoing edges, mirroring the two above. */}
       <Handle
+        id="s-bottom"
         type="source"
         position={Position.Bottom}
         className="!w-2 !h-2 !bg-violet-400 !border-violet-300"
       />
+      <Handle id="s-right" type="source" position={Position.Right} className="!w-2 !h-2 !opacity-0 !border-0" />
     </div>
   );
 };

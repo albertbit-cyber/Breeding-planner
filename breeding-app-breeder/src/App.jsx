@@ -119,7 +119,7 @@ import {
   drawCatalogBand,
   fitImageInBox,
 } from "./features/animals/catalogLayout";
-import { inferParentsForLocalSnake } from "./features/familyTree/FamilyTreePage.jsx";
+import { inferParentsForLocalSnake } from "./features/familyTree/utils/pedigreeModel";
 import {
   detectParentsFromName,
   isBreederAnimal,
