@@ -371,7 +371,12 @@ export const buildSampleLabelContent = (sample: LabSampleLabelData) => ({
     `Order ID: ${normalizeText(sample.orderNumber || sample.orderId) || "-"}`,
     sample.sampleIndex && sample.sampleCount ? `Sample ${sample.sampleIndex} of ${sample.sampleCount}` : undefined,
   ]),
-  animalId: `Animal ID: ${normalizeText(sample.animalId) || "-"}`,
+  // Name above id. Whoever is holding the tube is looking for the animal they know by name;
+  // the id is what the lab matches on. The name was carried on the label data all along and
+  // simply never drawn, so every sample label went out identifying the snake by id alone.
+  animalId: normalizeText(sample.animalName)
+    ? normalizeLineList([normalizeText(sample.animalName), `ID: ${normalizeText(sample.animalId) || "-"}`])
+    : [`Animal ID: ${normalizeText(sample.animalId) || "-"}`],
   breederName: `Breeder: ${normalizeText(sample.breederName) || "-"}`,
   requestedTests: (() => {
     const requestedTests = normalizeRequestedTests(sample.requestedTests);

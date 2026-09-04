@@ -20708,6 +20708,9 @@ function BreederSection({
                         orderId: 'order_preview',
                         orderNumber: 'BP-ORDER-001',
                         animalId: 'ANIMAL-001',
+                        // Named, so the size preview shows the two-line animal block a real
+                        // label prints rather than the id-only fallback.
+                        animalName: 'Example Snake',
                         breederName: info.name || info.businessName || 'Breeder Name',
                         requestedTests: ['Clown', 'Ultramel', 'Sex Determination', 'Puzzle'],
                         sampleStatus: 'pending',
