@@ -11,7 +11,7 @@ vi.mock("../../lib/prisma", () => ({
 }));
 
 import { prisma } from "../../lib/prisma";
-import { isCategoryEnabled, listPreferences, setPreference } from "../../email/preferencesService";
+import { isCategoryEnabled, listPreferences, setPreference, NOTIFICATION_CATEGORIES } from "../../email/preferencesService";
 
 const db = prisma as any;
 
@@ -66,7 +66,10 @@ describe("preferencesService", () => {
       { category: "breeding_reminders", enabled: false, timezone: "UTC", leadTimeMinutes: 60, digest: "immediate" },
     ]);
     const preferences = await listPreferences("user-1");
-    expect(preferences).toHaveLength(7);
+    // Asserted against the list itself: the point is that every known category
+    // comes back, not that there happen to be seven of them today.
+    expect(preferences).toHaveLength(NOTIFICATION_CATEGORIES.length);
+    expect(preferences.map((p) => p.category).sort()).toEqual([...NOTIFICATION_CATEGORIES].sort());
     const breeding = preferences.find((p) => p.category === "breeding_reminders");
     expect(breeding?.enabled).toBe(false);
     const security = preferences.find((p) => p.category === "account_and_security");

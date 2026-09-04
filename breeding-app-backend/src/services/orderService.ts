@@ -1,6 +1,7 @@
 import type { AnimalOrderInput } from "../types/api";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
+import { notifyOrderStatusChanged, notifyPaymentInvoiced } from "./labOrderNotificationService";
 import { calculateOrderBreakdown, splitAnimalTestPrices, toPublicBreakdown } from "./pricingService";
 import { buildNextOrderNumber, ensureSharedOrderNumbers, getOrderMonthToken } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
@@ -327,7 +328,10 @@ export const updateOrderStatus = async (
 ) => {
   assertLabWorkflowUser(user);
 
-  const existing = await prisma.shedTestOrder.findUnique({ where: { id: orderId } });
+  const existing = await prisma.shedTestOrder.findUnique({
+    where: { id: orderId },
+    include: { animals: { select: { animalId: true, animalName: true } } },
+  });
   if (!existing) throw new HttpError(404, "Order not found.");
   assertLabOwnsOrder(user, org, existing);
 
@@ -337,10 +341,20 @@ export const updateOrderStatus = async (
     extraData.paymentRequestedAt = new Date();
   }
 
-  return prisma.shedTestOrder.update({
+  const updated = await prisma.shedTestOrder.update({
     where: { id: orderId },
     data: { status, ...extraData },
   });
+
+  // After the write, and never able to fail it: the status change is the fact,
+  // telling the breeder is a consequence of it.
+  await notifyOrderStatusChanged({
+    order: { ...updated, animals: existing.animals },
+    previousStatus: existing.status,
+    nextStatus: status,
+  });
+
+  return updated;
 };
 
 export const updateOrderPayment = async (
@@ -360,7 +374,7 @@ export const updateOrderPayment = async (
     throw new HttpError(400, `Invalid payment status. Allowed: ${PAYMENT_STATUSES.join(", ")}`);
   }
 
-  return prisma.shedTestOrder.update({
+  const updated = await prisma.shedTestOrder.update({
     where: { id: orderId },
     data: {
       paymentStatus: input.paymentStatus as any,
@@ -373,6 +387,14 @@ export const updateOrderPayment = async (
       results: { orderBy: { updatedAt: "desc" } },
     },
   });
+
+  await notifyPaymentInvoiced({
+    order: updated as any,
+    previousPaymentStatus: existing.paymentStatus,
+    nextPaymentStatus: input.paymentStatus,
+  });
+
+  return updated;
 };
 
 const loadOrderForDeletion = async (orderId: string) => {

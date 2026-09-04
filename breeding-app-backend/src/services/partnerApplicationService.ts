@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { notifyLabApplicationReceived } from "./labOrderNotificationService";
 import { HttpError } from "../utils/errors";
 import { logAdminAction } from "./adminService";
 import { recordSecurityEvent } from "./securityEventService";
@@ -90,6 +91,17 @@ export const submitApplication = async (payload: Record<string, unknown>) => {
     type: "partner_application.submitted",
     outcome: "success",
     metadata: { applicationId: application.id, labName },
+  });
+
+  // Until now this row waited for an administrator to happen to open the Vendor
+  // Labs page. A laboratory that hears nothing assumes the answer was no.
+  await notifyLabApplicationReceived({
+    id: application.id,
+    labName: application.labName,
+    contactPerson: application.contactName,
+    email: application.email,
+    location: application.country,
+    reason: application.message,
   });
 
   // Deliberately returns nothing about the record. An applicant learns only

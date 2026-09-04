@@ -6,6 +6,7 @@ const db = prisma as any;
 export const NOTIFICATION_CATEGORIES = [
   "account_and_security",
   "organization_invitations",
+  "lab_orders",
   "breeding_reminders",
   "incubation_reminders",
   "unexpected_breeding_events",
@@ -29,6 +30,9 @@ export const REQUIRED_CATEGORIES: ReadonlySet<NotificationCategory> = new Set(["
 const DEFAULT_ENABLED: Record<NotificationCategory, boolean> = {
   account_and_security: true,
   organization_invitations: true,
+  // A laboratory order is a transaction the breeder started and is waiting on.
+  // Defaulting it off would mean results arriving with nobody told.
+  lab_orders: true,
   breeding_reminders: true,
   incubation_reminders: true,
   unexpected_breeding_events: true,

@@ -72,6 +72,31 @@ import {
   type OrganizationTeammateInvitationTemplateProps,
 } from "./organizationTeammateInvitationTemplate";
 
+import {
+  LAB_ORDER_STATUS_TEMPLATE_KEY,
+  LAB_ORDER_STATUS_TEMPLATE_VERSION,
+  renderLabOrderStatusTemplate,
+  type LabOrderStatusTemplateProps,
+} from "./labOrderStatusTemplate";
+import {
+  LAB_RESULTS_READY_TEMPLATE_KEY,
+  LAB_RESULTS_READY_TEMPLATE_VERSION,
+  renderLabResultsReadyTemplate,
+  type LabResultsReadyTemplateProps,
+} from "./labResultsReadyTemplate";
+import {
+  LAB_PAYMENT_REQUESTED_TEMPLATE_KEY,
+  LAB_PAYMENT_REQUESTED_TEMPLATE_VERSION,
+  renderLabPaymentRequestedTemplate,
+  type LabPaymentRequestedTemplateProps,
+} from "./labPaymentRequestedTemplate";
+import {
+  LAB_APPLICATION_RECEIVED_TEMPLATE_KEY,
+  LAB_APPLICATION_RECEIVED_TEMPLATE_VERSION,
+  renderLabApplicationReceivedTemplate,
+  type LabApplicationReceivedTemplateProps,
+} from "./labApplicationReceivedTemplate";
+
 export type RenderedEmail = { subject: string; html: string; text: string };
 
 type TemplateEntry = {
@@ -129,6 +154,22 @@ const TEMPLATES: Record<string, TemplateEntry> = {
     render: (payload) =>
       renderOrganizationTeammateInvitationTemplate(payload as unknown as OrganizationTeammateInvitationTemplateProps),
   },
+  [LAB_ORDER_STATUS_TEMPLATE_KEY]: {
+    version: LAB_ORDER_STATUS_TEMPLATE_VERSION,
+    render: (payload) => renderLabOrderStatusTemplate(payload as unknown as LabOrderStatusTemplateProps),
+  },
+  [LAB_RESULTS_READY_TEMPLATE_KEY]: {
+    version: LAB_RESULTS_READY_TEMPLATE_VERSION,
+    render: (payload) => renderLabResultsReadyTemplate(payload as unknown as LabResultsReadyTemplateProps),
+  },
+  [LAB_PAYMENT_REQUESTED_TEMPLATE_KEY]: {
+    version: LAB_PAYMENT_REQUESTED_TEMPLATE_VERSION,
+    render: (payload) => renderLabPaymentRequestedTemplate(payload as unknown as LabPaymentRequestedTemplateProps),
+  },
+  [LAB_APPLICATION_RECEIVED_TEMPLATE_KEY]: {
+    version: LAB_APPLICATION_RECEIVED_TEMPLATE_VERSION,
+    render: (payload) => renderLabApplicationReceivedTemplate(payload as unknown as LabApplicationReceivedTemplateProps),
+  },
 };
 
 export const renderEmailTemplate = (
@@ -179,6 +220,14 @@ export {
   VENDOR_LAB_INVITATION_TEMPLATE_VERSION,
   ORG_TEAMMATE_INVITATION_TEMPLATE_KEY,
   ORG_TEAMMATE_INVITATION_TEMPLATE_VERSION,
+  LAB_ORDER_STATUS_TEMPLATE_KEY,
+  LAB_ORDER_STATUS_TEMPLATE_VERSION,
+  LAB_RESULTS_READY_TEMPLATE_KEY,
+  LAB_RESULTS_READY_TEMPLATE_VERSION,
+  LAB_PAYMENT_REQUESTED_TEMPLATE_KEY,
+  LAB_PAYMENT_REQUESTED_TEMPLATE_VERSION,
+  LAB_APPLICATION_RECEIVED_TEMPLATE_KEY,
+  LAB_APPLICATION_RECEIVED_TEMPLATE_VERSION,
 };
 export type {
   InvitationTemplateProps,
@@ -193,5 +242,10 @@ export type {
   AccountDeletionCancelledTemplateProps,
   VendorLabInvitationTemplateProps,
   OrganizationTeammateInvitationTemplateProps,
+  LabOrderStatusTemplateProps,
+  LabResultsReadyTemplateProps,
+  LabPaymentRequestedTemplateProps,
+  LabApplicationReceivedTemplateProps,
 };
 export type { BreedingReminderType } from "./breedingReminderTemplate";
+export type { LabOrderStatusEvent } from "./labOrderStatusTemplate";
