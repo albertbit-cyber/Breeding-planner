@@ -18,8 +18,23 @@ that only you have.
 | `20260831090000_species_vocabulary` | Remaps species onto the platform taxonomy and makes an offering multi-species. **Rewrites existing rows.** |
 | `20260831100000_add_lab_gene_submissions` | New empty table for lab-contributed genes. No backfill, no risk. |
 | `20260830180000_extend_lab_offerings` | Widens a test offering: kind (morph/sex/panel), flat vs tier pricing, per-test tier overrides, add-on price, species, aliases, availability, panel scope and membership. Additive and defaulted, so existing offerings keep behaving identically. |
+| `20260904090000_add_pending_shed_tests` | New empty table for the breeder's saved shed queue. No backfill, no risk. |
+| `20260904120000_scope_order_number_to_lab` | Replaces the global unique index on `orderNumber` with one scoped to the laboratory. **Changes a constraint, changes no data** — see below. |
 
 The first and the species remap both rewrite existing rows; the rest are additive.
+
+`20260904120000_scope_order_number_to_lab` is the one to understand before
+deploying, because it fixes a defect that only appears with more than one
+laboratory. Order numbers have always been generated per laboratory — a shared
+sequence would let each vendor read the others' order volume out of the gaps in
+its own numbering — but the unique index was global. The first laboratory to
+number an order `09AA00001` took that value away from every other laboratory, so
+the *second* laboratory to receive an order in a given month failed with a
+unique-constraint error and the breeder saw "Internal server error".
+
+The migration only narrows the constraint. Numbers that were unique globally
+remain unique per laboratory, so there is nothing to back-fill and nothing that
+can fail on existing rows.
 
 ---
 
@@ -204,7 +219,15 @@ you can and cannot do afterwards.
 
 ## Still open after this deploys
 
-- Browser end-to-end tests are updated but have not been run against a live
-  environment.
 - The breeder side is not yet organization-scoped (plan §3.2 step 2). Laboratories
   are tenants; breeder collections still belong to individuals.
+- There is no payment processing anywhere. The payment status a laboratory sets is
+  bookkeeping it ticks by hand, and the invoice email says so rather than offering
+  a button that does not exist. Worth confirming that is the intent.
+- The breeder app logs a React "Maximum update depth exceeded" warning on load.
+  It predates this branch and is not in the lab flow, but it is real and worth
+  its own investigation.
+
+Browser end-to-end tests **have** now been run against a live stack — 27 in the
+Lab Portal, 11 in the breeder app, all green. What they caught is in the commit
+"Run the browser tests against a live stack, and repair what that found".
