@@ -10,6 +10,9 @@ export const breederEmail = process.env.E2E_BREEDER_EMAIL || "breeder@proherper.
 export const labEmail = process.env.E2E_LAB_EMAIL || "lab@proherper.dev";
 export const expectedSeedSnakeId = process.env.E2E_BREEDER_SEED_SNAKE_ID || "25Ath-1";
 export const expectedSeedSnakeName = process.env.E2E_BREEDER_SEED_SNAKE_NAME || "Athena - DEMO";
+export const expectedSeedLabName = process.env.E2E_SEED_LAB_NAME || "Seed Genetics Lab";
+export const expectedSeedSnakeSpecies =
+  process.env.E2E_BREEDER_SEED_SNAKE_SPECIES || "Ball Pythons";
 
 export const requireBreederPassword = () => {
   const password = String(process.env.E2E_BREEDER_PASSWORD || "breeder1234").trim();
@@ -109,17 +112,44 @@ export const collectConsoleErrors = (page) => {
   return errors;
 };
 
-export const fetchBreederCatalogTestId = async (request, breederToken) => {
-  const response = await request.get(`${backendUrl}/api/lab/tests/catalog?breederView=true`, {
+/**
+ * Pick a laboratory and one of its tests.
+ *
+ * Tests belong to a laboratory now, not to the platform, so there is no
+ * catalogue to order from until one is chosen. These helpers used to read the
+ * shared seed library and post an order with no laboratory at all, which the
+ * backend rightly refuses.
+ */
+export const chooseLabAndTest = async (request, breederToken) => {
+  const directoryResponse = await request.get(`${backendUrl}/api/lab/directory`, {
     headers: authHeaders(breederToken),
   });
-  expect(response.status()).toBe(200);
-  const body = await response.json();
-  const tests = Array.isArray(body?.tests) ? body.tests : [];
-  const first = tests.find((entry) => entry?.id);
+  expect(directoryResponse.status()).toBe(200);
+  const directoryBody = await directoryResponse.json();
+  const labs = Array.isArray(directoryBody?.labs) ? directoryBody.labs : [];
+  // Named rather than taken by position. The directory is ordered by laboratory
+  // name, so "the first one" is whichever sorts first -- and these specs then act
+  // on the order as the seeded laboratory, which would be a different tenant and
+  // a correct 404.
+  const chosen = labs.find((lab) => lab?.labName === expectedSeedLabName) || labs[0];
+  const labOrganizationId = String(chosen?.organizationId || "");
+  expect(labOrganizationId, `Expected laboratory ${expectedSeedLabName} in the directory`).toBeTruthy();
+
+  const labResponse = await request.get(
+    `${backendUrl}/api/lab/directory/${encodeURIComponent(labOrganizationId)}`,
+    { headers: authHeaders(breederToken) }
+  );
+  expect(labResponse.status()).toBe(200);
+  const labBody = await labResponse.json();
+  const offerings = Array.isArray(labBody?.offerings) ? labBody.offerings : [];
+  const first = offerings.find((entry) => entry?.id);
   expect(first?.id).toBeTruthy();
-  return String(first.id);
+
+  return { labOrganizationId, testId: String(first.id) };
 };
+
+export const fetchBreederCatalogTestId = async (request, breederToken) =>
+  (await chooseLabAndTest(request, breederToken)).testId;
 
 export const createBreederOrderForSnake = async (
   request,
@@ -127,10 +157,11 @@ export const createBreederOrderForSnake = async (
   animalId = expectedSeedSnakeId,
   animalName = animalId === expectedSeedSnakeId ? expectedSeedSnakeName : `Breeder E2E ${animalId}`
 ) => {
-  const testId = await fetchBreederCatalogTestId(request, breederToken);
+  const { labOrganizationId, testId } = await chooseLabAndTest(request, breederToken);
   const response = await request.post(`${backendUrl}/api/lab/orders`, {
     headers: authHeaders(breederToken),
     data: {
+      labOrganizationId,
       animals: [
         {
           animalId,
@@ -215,9 +246,25 @@ export const completeBreederOrderForCertificate = async (
   return order;
 };
 
+/**
+ * Pick the laboratory in the order modal.
+ *
+ * Tests, prices and turnaround all come from the chosen laboratory, so nothing
+ * is selectable until one is picked. These specs predate that step and went
+ * straight for a test checkbox.
+ */
+export const chooseLabInOrderModal = async (page, labName = expectedSeedLabName) => {
+  const labButton = page.getByRole("button", { name: new RegExp(labName, "i") }).first();
+  await expect(labButton).toBeVisible();
+  await labButton.click();
+};
+
 export const openSeedSnakeEditor = async (page) => {
   await openAuthenticatedBreeder(page);
-  await page.getByRole("button", { name: /^Animals$/i }).click();
+  // Since multi-species landed, the collection is reached through a species
+  // rather than through a single Animals tab -- that tab only exists once a
+  // species is chosen. These specs still navigated the old way.
+  await page.getByRole("button", { name: expectedSeedSnakeSpecies }).first().click();
   await page.getByPlaceholder(/Search name, morph, het, tag/i).fill(expectedSeedSnakeName);
   await expect(page.getByText(expectedSeedSnakeName)).toBeVisible();
   await page.getByRole("button", { name: /^Edit$/i }).first().click();

@@ -19,5 +19,5 @@ test("lab order list shows seeded backend order", async ({ page }) => {
   expect(Array.isArray(ordersBody.orders)).toBeTruthy();
   expect(ordersBody.orders.length).toBeGreaterThan(0);
   await expect(page.getByRole("heading", { name: /all shed test orders/i })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
 });

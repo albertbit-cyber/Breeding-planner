@@ -1,5 +1,5 @@
 import base from "@playwright/test";
-import { expect, openSeedSnakeEditor } from "./helpers.js";
+import { expect, openSeedSnakeEditor, chooseLabInOrderModal } from "./helpers.js";
 
 const test = base;
 
@@ -8,6 +8,7 @@ test("breeder can create a lab order from the snake editor UI", async ({ page })
 
   await page.getByRole("button", { name: /Order Genetic Test/i }).click();
   await expect(page.getByText(/Add to Batch Order/i)).toBeVisible();
+  await chooseLabInOrderModal(page);
   const firstTest = page.getByRole("checkbox", { name: /Clown/i }).first();
   await expect(firstTest).toBeVisible();
   if (!(await firstTest.isChecked())) {

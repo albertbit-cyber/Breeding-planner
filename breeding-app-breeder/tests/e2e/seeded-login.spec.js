@@ -22,5 +22,7 @@ test("seeded breeder can log in through the browser", async ({ page }) => {
   await page.locator('input[type="password"]').fill(requireBreederPassword());
   await page.getByRole("button", { name: /continue/i }).click();
   await expect(page.getByText(/signed in as/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Animals$/i })).toBeVisible();
+  // The Animals tab appears once a species is chosen; what proves a signed-in
+  // breeder landed is the dashboard nav itself.
+  await expect(page.getByRole("button", { name: /^Shed Test Terminal$/i })).toBeVisible();
 });

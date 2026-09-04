@@ -78,7 +78,10 @@ test.describe("vendor laboratory isolation", () => {
     const listResponse = await request.get(`${backendUrl}/api/lab/orders`, {
       headers: authHeaders(labA),
     });
-    const targetId = String(((await listResponse.json())?.orders ?? [])[0]?.id || "");
+    const targetOrder = ((await listResponse.json())?.orders ?? [])[0];
+    const targetId = String(targetOrder?.id || "");
+    const paymentStatusBefore = targetOrder?.paymentStatus;
+    const statusBefore = targetOrder?.status;
 
     const statusAttempt = await request.patch(
       `${backendUrl}/api/lab/orders/${encodeURIComponent(targetId)}/status`,
@@ -92,13 +95,16 @@ test.describe("vendor laboratory isolation", () => {
     );
     expect(paymentAttempt.status()).toBe(404);
 
-    // And the order is untouched.
+    // And the order is untouched -- compared against what it was a moment ago
+    // rather than against "not paid", because earlier specs in this run bill the
+    // same seeded order legitimately as laboratory A.
     const after = await request.get(
       `${backendUrl}/api/lab/orders/${encodeURIComponent(targetId)}`,
       { headers: authHeaders(labA) }
     );
     const order = (await after.json())?.order;
-    expect(order?.paymentStatus).not.toBe("paid");
+    expect(order?.paymentStatus).toBe(paymentStatusBefore);
+    expect(order?.status).toBe(statusBefore);
   });
 
   test("a laboratory cannot write results onto another's order", async ({ request }) => {
@@ -163,8 +169,15 @@ test.describe("vendor laboratory isolation", () => {
     expect(aConfig.organizationId).not.toBe(bConfig.organizationId);
   });
 
-  test("the portal shows a signed-in laboratory only its own queue", async ({ page }) => {
+  test("the portal shows a signed-in laboratory only its own queue", async ({ browser }) => {
     const { loginAsLabUser } = await import("./helpers");
+
+    // A context of its own, with no stored session: the suite signs in as
+    // laboratory A for every other test, and this one must actually arrive at
+    // the sign-in screen as laboratory B rather than find itself already inside
+    // A's portal.
+    const context = await browser.newContext({ storageState: undefined });
+    const page = await context.newPage();
 
     // Through the real UI rather than the API, because a filter applied in the
     // service but dropped in the client would still be a leak on screen.
@@ -175,5 +188,6 @@ test.describe("vendor laboratory isolation", () => {
 
     // Laboratory B has no orders, so the seeded order number must not appear.
     await expect(page.getByText("05AA00001")).toHaveCount(0);
+    await context.close();
   });
 });

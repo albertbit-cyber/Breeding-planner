@@ -149,7 +149,9 @@ export const getFirstSyntheticSample = async (
   const animalId = String(animal?.animalId || "").trim();
   expect(animalId.length).toBeGreaterThan(0);
 
-  const sampleId = `${sanitizeKeyPart(orderId)}-sample-1`;
+  // The id the sample label prints and intake looks up: order number, then the
+  // animal's position in the order.
+  const sampleId = `${sanitizeKeyPart(String(order.orderNumber || orderId))}-1`;
   const qrToken = stableQrToken(`${orderId}:${animalId}:${sampleId}`);
   const rawQrPayload = JSON.stringify({ v: 1, t: qrToken });
 

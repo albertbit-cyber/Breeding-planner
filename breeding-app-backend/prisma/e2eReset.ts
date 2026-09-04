@@ -36,6 +36,10 @@ const E2E_USERS = {
   },
 };
 
+// The species the seeded animal belongs to, and therefore the one the seeded
+// laboratory has to serve for the breeder flow to be exercisable at all.
+const E2E_SERVED_SPECIES = ["ball-python"];
+
 const E2E_ANIMAL = {
   id: "25Ath-1",
   name: "Athena - DEMO",
@@ -107,6 +111,9 @@ const assertLocalDatabaseUrl = () => {
 
 const passwordHash = async (password: string) => bcrypt.hash(password, 12);
 
+// Fixed rather than "now", so a reset produces byte-identical rows every time.
+const VERIFIED_AT = new Date("2026-05-01T00:00:00.000Z");
+
 const upsertUser = async (user: (typeof E2E_USERS)[keyof typeof E2E_USERS]) =>
   prisma.user.upsert({
     where: { email: user.email },
@@ -114,6 +121,12 @@ const upsertUser = async (user: (typeof E2E_USERS)[keyof typeof E2E_USERS]) =>
       fullName: user.fullName,
       role: user.role,
       isActive: true,
+      // Verified, because placing an order requires it and these fixtures stand
+      // in for established accounts. Without this the seeded breeder could sign
+      // in, browse a laboratory's catalogue, and get a bare 403 at the one step
+      // the fixtures exist to exercise.
+      emailVerified: true,
+      emailVerifiedAt: VERIFIED_AT,
       passwordHash: await passwordHash(user.password),
     },
     create: {
@@ -121,6 +134,8 @@ const upsertUser = async (user: (typeof E2E_USERS)[keyof typeof E2E_USERS]) =>
       fullName: user.fullName,
       role: user.role,
       isActive: true,
+      emailVerified: true,
+      emailVerifiedAt: VERIFIED_AT,
       passwordHash: await passwordHash(user.password),
     },
   });
@@ -204,6 +219,7 @@ const ensureLabOfferingsAndPricing = async (organizationId: string, suffix = "")
     active: true,
     visibleInBreederApp: true,
     description: "Deterministic E2E Clown genetic test",
+    speciesIds: E2E_SERVED_SPECIES,
     sortOrder: 1,
   };
 
@@ -265,28 +281,43 @@ const ensureOrganizationFor = async (
   return organizationId;
 };
 
-const ensureLabAccount = async (labUserId: string, organizationId: string) => {
+// Named per laboratory: two approved labs both called "Seed Genetics Lab" made
+// the breeder's laboratory picker show the same row twice, which is unreadable
+// for a human and unaddressable for a test.
+const ensureLabAccount = async (labUserId: string, organizationId: string, labName: string) => {
   await prisma.labAccount.upsert({
     where: { userId: labUserId },
     update: {
-      labName: "Seed Genetics Lab",
+      labName,
       contactPerson: E2E_USERS.lab.fullName,
       location: "Germany",
       status: "approved",
       permissionsJson: { can_manage_test_orders: true, can_upload_results: true },
       availableTestsJson: [E2E_BASELINE_ORDER.testId],
       pricingJson: { currency: "EUR", baseMorphTest: 35 },
+      // A breeder's laboratory directory is filtered to the species they are
+      // ordering for. Without this the seeded laboratory exists, is approved and
+      // is listed -- and every breeder still sees "no laboratories are accepting
+      // orders right now", which is what the fixtures were quietly reproducing.
+      servedSpeciesIds: E2E_SERVED_SPECIES,
+      listedInDirectory: true,
     },
     create: {
       userId: labUserId,
       organizationId,
-      labName: "Seed Genetics Lab",
+      labName,
       contactPerson: E2E_USERS.lab.fullName,
       location: "Germany",
       status: "approved",
       permissionsJson: { can_manage_test_orders: true, can_upload_results: true },
       availableTestsJson: [E2E_BASELINE_ORDER.testId],
       pricingJson: { currency: "EUR", baseMorphTest: 35 },
+      // A breeder's laboratory directory is filtered to the species they are
+      // ordering for. Without this the seeded laboratory exists, is approved and
+      // is listed -- and every breeder still sees "no laboratories are accepting
+      // orders right now", which is what the fixtures were quietly reproducing.
+      servedSpeciesIds: E2E_SERVED_SPECIES,
+      listedInDirectory: true,
     },
   });
 };
@@ -391,8 +422,8 @@ const main = async () => {
   await ensureOrganizationFor(breederUser, "breeder", breederUser.fullName);
 
   await ensureCatalogAndPricing();
-  await ensureLabAccount(labUser.id, labOrganizationId);
-  await ensureLabAccount(labBUser.id, labBOrganizationId);
+  await ensureLabAccount(labUser.id, labOrganizationId, "Seed Genetics Lab");
+  await ensureLabAccount(labBUser.id, labBOrganizationId, "Second Genetics Lab");
   await ensureLabOfferingsAndPricing(labOrganizationId);
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);

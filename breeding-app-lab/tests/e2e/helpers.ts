@@ -60,18 +60,26 @@ export const loginAsLabUser = async (
   await expect(page.getByRole("heading", { name: /laboratory portal/i })).toBeVisible();
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
-  await page.getByRole("button", { name: /^sign in$/i }).click();
+  // The portal's submit button reads "Log in". These specs were written against
+  // an older sign-in screen and had never been run against a live portal.
+  await page.getByRole("button", { name: /^log in$/i }).click();
   await page.evaluate(() => {
     window.location.hash = "/lab/incoming-orders";
   });
-  await expect(page.getByText("Laboratory")).toBeVisible();
+  // Anchored on the workflow header and the nav, not on the word "Laboratory":
+  // the sidebar now shows the signed-in laboratory's own name, so that word
+  // appears in several places and in none of them predictably.
   await expect(page.getByText("Lab Workflow")).toBeVisible();
+  await expect(page.getByRole("button", { name: "All Shed Orders" })).toBeVisible();
 };
 
 export const openAuthenticatedLab = async (page: Page, hashPath = "/lab/incoming-orders"): Promise<void> => {
   await page.goto(`/#${hashPath}`);
-  await expect(page.getByText("Laboratory")).toBeVisible();
+  // Anchored on the workflow header and the nav, not on the word "Laboratory":
+  // the sidebar now shows the signed-in laboratory's own name, so that word
+  // appears in several places and in none of them predictably.
   await expect(page.getByText("Lab Workflow")).toBeVisible();
+  await expect(page.getByRole("button", { name: "All Shed Orders" })).toBeVisible();
 };
 
 export const loginViaApi = async (request: APIRequestContext): Promise<string> => {

@@ -60,7 +60,7 @@ const openSeededOrderFromList = async (page: Page, orderId: string) => {
   await page.getByRole("button", { name: "All Shed Orders" }).click();
   await expect(page.getByRole("heading", { name: /all shed test orders/i })).toBeVisible();
   await page.getByPlaceholder(/order number, snake, breeder/i).fill(expectedOrderNumber);
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
 
   const detailResponsePromise = page.waitForResponse((response) =>
     response.url().startsWith(`${backendUrl}/api/lab/orders/${encodeURIComponent(orderId)}`) &&
@@ -73,8 +73,8 @@ const openSeededOrderFromList = async (page: Page, orderId: string) => {
   const body = await detailResponse.json();
   expect(body?.order?.id).toBe(orderId);
 
-  await expect(page.getByRole("heading", { name: /shed test order details/i })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^order details$/i })).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
 };
 
 const openSeededOrderDetail = async (page: Page, orderId: string) => {
@@ -89,8 +89,8 @@ const openSeededOrderDetail = async (page: Page, orderId: string) => {
   const body = await detailResponse.json();
   expect(body?.order?.id).toBe(orderId);
 
-  await expect(page.getByRole("heading", { name: /shed test order details/i })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^order details$/i })).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
 };
 
 test("lab order detail opens seeded backend order from order list", async ({ page, request }) => {
@@ -99,11 +99,13 @@ test("lab order detail opens seeded backend order from order list", async ({ pag
 
   await openSeededOrderFromList(page, order.id);
 
-  await expect(page.getByText("Order Overview")).toBeVisible();
-  await expect(page.getByText("Workflow Status").first()).toBeVisible();
-  await expect(page.getByText("Payment Status").first()).toBeVisible();
+  // The detail page's own section headings, which is what a lab analyst reads
+  // down. These assertions had drifted from the page some time ago.
+  await expect(page.getByText("Order Submission")).toBeVisible();
+  await expect(page.getByText("Testing & Workflow").first()).toBeVisible();
+  await expect(page.getByText("Payment").first()).toBeVisible();
   await expect(page.getByText("Requested Tests").first()).toBeVisible();
-  await expect(page.getByText("Status History Timeline")).toBeVisible();
+  await expect(page.getByText("Status History").first()).toBeVisible();
 });
 
 test("lab order workflow status can be updated from detail page", async ({ page, request }) => {
@@ -113,16 +115,16 @@ test("lab order workflow status can be updated from detail page", async ({ page,
 
   await openSeededOrderDetail(page, order.id);
   await expect(
-    page.locator("section").filter({ hasText: "Order Overview" }).getByText("Submitted").first()
+    page.locator("section").filter({ hasText: "Order Submission" }).getByText("Submitted").first()
   ).toBeVisible();
-  await page.getByPlaceholder(/optional transition note/i).fill("Playwright local E2E status check");
+  await page.getByPlaceholder(/add a note before advancing/i).fill("Playwright local E2E status check");
 
   const statusResponsePromise = page.waitForResponse((response) =>
     response.url().startsWith(`${backendUrl}/api/lab/orders/${encodeURIComponent(order.id)}/status`) &&
     response.request().method() === "PATCH" &&
     response.status() === 200
   );
-  await page.getByRole("button", { name: /set sample received/i }).click();
+  await page.getByRole("button", { name: /sample received/i }).click();
   const statusResponse = await statusResponsePromise;
   const statusBody = await statusResponse.json();
   expect(statusBody?.order?.status).toBe("received");

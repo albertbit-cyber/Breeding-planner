@@ -14,8 +14,8 @@ const openSeededOrderDetail = async (page: Page, orderId: string) => {
   const body = await detailResponse.json();
   expect(body?.order?.id).toBe(orderId);
 
-  await expect(page.getByRole("heading", { name: /shed test order details/i })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^order details$/i })).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
 };
 
 const prepareCompletedOrder = async (request: any) => {

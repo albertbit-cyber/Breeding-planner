@@ -28,7 +28,7 @@ test("sample intake resolves a seeded sample ID and submits intake", async ({ pa
   await resolveInput(page, sample.sampleId);
 
   await expect(page.getByText("Linked Order Context", { exact: true })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
   await expect(page.getByText(sample.sampleId)).toBeVisible();
   await expect(page.getByText(sample.animalId).first()).toBeVisible();
 
@@ -56,7 +56,7 @@ test("sample intake resolves a seeded QR payload", async ({ page, request }) => 
   await resolveInput(page, sample.rawQrPayload);
 
   await expect(page.getByText("Linked Order Context", { exact: true })).toBeVisible();
-  await expect(page.getByText(expectedOrderNumber)).toBeVisible();
+  await expect(page.getByText(expectedOrderNumber).first()).toBeVisible();
   await expect(page.getByText(sample.sampleId)).toBeVisible();
   await expect(page.getByText(/Expected|Sample Received|In Progress/i).first()).toBeVisible();
   expect(consoleErrors).toEqual([]);
