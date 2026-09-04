@@ -6632,7 +6632,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 />
               </div>
               <div className="mt-1 text-[11px] text-neutral-500">
-                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "Toggle Visual / Het, type a gene name or alias, then select. Click × to remove." })}
+                {t("ui.animals.addAnimal.geneticsHelp", { defaultValue: "Type a gene name or alias, then pick the form you need — visual, super, het, 66%, 50%, or possible. Click × to remove." })}
               </div>
             </div>
             <div>
