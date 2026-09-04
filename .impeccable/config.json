@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "breeding-app-breeder/src/features/familyTree/components/ViewTabs.jsx"
+        ],
+        "createdAt": "2026-09-04T05:24:25.680Z",
+        "reason": "false positive: text-neutral-500 sits on the transparent inactive background; the only colored background (hover:bg-violet-50) is applied together with hover:text-violet-700, so gray never renders on color"
+      }
+    ]
+  }
+}

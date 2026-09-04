@@ -1,55 +1,54 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { buildTreeGraph } from '../utils/buildTreeGraph';
-import {
-  fetchSnakePedigree,
-  fetchTreeStats,
-} from '../api/familyTreeApi';
-
-const EMPTY_PEDIGREE = {
-  snakes:           [],
-  relationships:    [],
-  clutches:         [],
-  ownershipHistory: [],
-};
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildPedigree, clutchLabel, computeGenerations } from '../utils/pedigreeModel';
+import { buildGraphForView } from '../utils/layouts';
+import { fetchSnakePedigree, fetchTreeStats } from '../api/familyTreeApi';
 
 /**
- * Fetches and derives all data needed by the Family Tree page.
+ * Everything the Family Tree page reads.
  *
- * selectedSnakeId: the database Animal.id of the currently centred snake.
- *                  Pass null/undefined to show the empty state.
+ * The animals held in the browser are the source of truth: they are what the keeper edits, and
+ * they are complete. The server is asked as well, but only ever to add what the browser has not
+ * got -- a relative held by another keeper, an ownership record. It used to be the other way
+ * round, and a successful-but-empty response would replace a working tree with a lone animal.
+ * So a failed request here is not an error worth showing while there are animals to draw.
  */
-export function useFamilyTreeData({ selectedSnakeId }) {
-  const [pedigree, setPedigree]     = useState(EMPTY_PEDIGREE);
-  const [stats, setStats]           = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [error, setError]           = useState(null);
+export function useFamilyTreeData({ animals = [], pairings = [], selectedSnakeId, view = 'tree' }) {
+  const [server, setServer] = useState(null);
+  const [serverError, setServerError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(null);
 
-  // Load pedigree whenever the selected snake changes
+  // Cache per animal, so flipping between views or back to an animal already looked at does not
+  // re-request it.
+  const serverCache = useRef(new Map());
+
   useEffect(() => {
     if (!selectedSnakeId) {
-      setPedigree(EMPTY_PEDIGREE);
-      setError(null);
-      return;
+      setServer(null);
+      setServerError(null);
+      return undefined;
+    }
+
+    if (serverCache.current.has(selectedSnakeId)) {
+      setServer(serverCache.current.get(selectedSnakeId));
+      setServerError(null);
+      return undefined;
     }
 
     let cancelled = false;
     setLoading(true);
-    setError(null);
 
     fetchSnakePedigree(selectedSnakeId)
       .then((data) => {
-        if (!cancelled) {
-          setPedigree({
-            snakes:           data.snakes           ?? [],
-            relationships:    data.relationships    ?? [],
-            clutches:         data.clutches         ?? [],
-            ownershipHistory: data.ownershipHistory ?? [],
-          });
-        }
+        if (cancelled) return;
+        serverCache.current.set(selectedSnakeId, data);
+        setServer(data);
+        setServerError(null);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Failed to load pedigree');
+        if (cancelled) return;
+        setServer(null);
+        setServerError(err?.message || 'Could not reach the pedigree service');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -58,85 +57,100 @@ export function useFamilyTreeData({ selectedSnakeId }) {
     return () => { cancelled = true; };
   }, [selectedSnakeId]);
 
-  // Load stats once on mount
   useEffect(() => {
     let cancelled = false;
-    setStatsLoading(true);
     fetchTreeStats()
       .then((data) => { if (!cancelled) setStats(data); })
-      .catch(() => {}) // stats are non-critical
-      .finally(() => { if (!cancelled) setStatsLoading(false); });
+      .catch(() => {});   // the bar falls back to locally derived counts
     return () => { cancelled = true; };
   }, []);
 
-  // Derived data
+  // ── The model ────────────────────────────────────────────────────────────────────────
 
-  const snakeMap = useMemo(
-    () => new Map(pedigree.snakes.map((s) => [s.id, s])),
-    [pedigree.snakes]
+  const model = useMemo(
+    () => buildPedigree({ animals, pairings, server }),
+    [animals, pairings, server],
   );
 
-  const selectedSnake = useMemo(() => {
-    if (!selectedSnakeId) return null;
-    // Try DB id first, then fall back to localId match (when caller passes app-local id)
-    return snakeMap.get(selectedSnakeId)
-      ?? pedigree.snakes.find((s) => s.localId === selectedSnakeId)
-      ?? null;
-  }, [snakeMap, selectedSnakeId, pedigree.snakes]);
+  const selectedSnake = useMemo(
+    () => (selectedSnakeId ? model.get(selectedSnakeId) : null),
+    [model, selectedSnakeId],
+  );
 
-  const { nodes, edges } = useMemo(() => {
-    if (!selectedSnake || !pedigree.snakes.length) return { nodes: [], edges: [] };
-    return buildTreeGraph({
-      snakes:        pedigree.snakes,
-      relationships: pedigree.relationships,
-      selectedSnakeId: selectedSnake.id,
-    });
-  }, [pedigree.snakes, pedigree.relationships, selectedSnake]);
+  const graph = useMemo(() => {
+    if (!selectedSnake && view !== 'universe') return { nodes: [], edges: [] };
+    if (view === 'universe') return buildGraphForView(view, model, selectedSnakeId);
+    return buildGraphForView(view, model, selectedSnake.id);
+  }, [model, selectedSnake, selectedSnakeId, view]);
 
-  const snakeParents = useMemo(() => {
+  // ── Panel data ───────────────────────────────────────────────────────────────────────
+
+  const parents = useMemo(() => {
     if (!selectedSnake) return { sire: null, dam: null };
-    const rels = pedigree.relationships.filter((r) => r.childId === selectedSnake.id);
-    return {
-      sire: snakeMap.get(rels.find((r) => r.role === 'sire')?.parentId) ?? null,
-      dam:  snakeMap.get(rels.find((r) => r.role === 'dam') ?.parentId) ?? null,
-    };
-  }, [selectedSnake, pedigree.relationships, snakeMap]);
+    const { sireId, damId } = model.parents(selectedSnake.id);
+    return { sire: model.get(sireId), dam: model.get(damId) };
+  }, [model, selectedSnake]);
 
-  const snakeOffspring = useMemo(() => {
+  const offspring = useMemo(() => {
     if (!selectedSnake) return [];
-    const childIds = [...new Set(
-      pedigree.relationships
-        .filter((r) => r.parentId === selectedSnake.id)
-        .map((r) => r.childId)
-    )];
-    return childIds.map((id) => snakeMap.get(id)).filter(Boolean);
-  }, [selectedSnake, pedigree.relationships, snakeMap]);
+    return model.children(selectedSnake.id).map(id => model.get(id)).filter(Boolean);
+  }, [model, selectedSnake]);
 
-  const snakeClutches = useMemo(
-    () => pedigree.clutches,
-    [pedigree.clutches]
+  const clutches = useMemo(() => {
+    if (!selectedSnake) return [];
+    const own = model.parents(selectedSnake.id).clutchKey;
+    const list = [...model.clutchesOf(selectedSnake.id)];
+    const ownClutch = own ? model.clutch(own) : null;
+    if (ownClutch && !list.some(c => c.key === ownClutch.key)) list.unshift(ownClutch);
+
+    return list.map(clutch => ({
+      id: clutch.key,
+      displayId: clutchLabel(clutch, model),
+      hatchDate: clutch.date,
+      eggCount: clutch.laidCount ?? clutch.memberIds.length,
+      hatchedCount: clutch.childIds.length,
+    }));
+  }, [model, selectedSnake]);
+
+  const ownershipHistory = useMemo(
+    () => (server?.ownershipHistory || []).filter(record => record.snakeId === selectedSnakeId),
+    [server, selectedSnakeId],
   );
 
-  const snakeOwnershipHistory = useMemo(
-    () => pedigree.ownershipHistory.filter((o) => o.snakeId === selectedSnakeId),
-    [pedigree.ownershipHistory, selectedSnakeId]
-  );
+  // Counts drawn from what is actually on screen. The server's own figures are used for the
+  // things only it can know -- how many breeders are on the network.
+  const derivedStats = useMemo(() => {
+    const depths = computeGenerations(model);
+    const deepest = depths.size ? Math.max(...depths.values()) : 0;
+    return {
+      totalSnakes: [...model.animalsById.values()].filter(animal => !animal.isEgg).length,
+      totalClutches: model.clutches.size,
+      totalBreeders: stats?.totalBreeders ?? 1,
+      totalBloodlines: model.parentsOf.size,
+      // A collection with no recorded parentage spans no generations, not one.
+      generationsTracked: model.parentsOf.size ? deepest + 1 : 0,
+      networkStatus: server ? 'online' : 'local',
+    };
+  }, [model, stats, server]);
+
+  const refresh = useCallback(() => {
+    serverCache.current.delete(selectedSnakeId);
+    setServer(null);
+  }, [selectedSnakeId]);
 
   return {
-    loading,
-    statsLoading,
-    error,
-    snakes:               pedigree.snakes,
-    snakeMap,
-    relationships:        pedigree.relationships,
-    clutches:             pedigree.clutches,
-    stats,
+    model,
+    graph,
+    nodes: graph.nodes,
+    edges: graph.edges,
     selectedSnake,
-    snakeParents,
-    snakeOffspring,
-    snakeClutches,
-    snakeOwnershipHistory,
-    nodes,
-    edges,
+    parents,
+    offspring,
+    clutches,
+    ownershipHistory,
+    stats: derivedStats,
+    loading,
+    serverError,
+    refresh,
   };
 }
