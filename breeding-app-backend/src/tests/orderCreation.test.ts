@@ -133,6 +133,46 @@ describe("createOrder", () => {
     expect(options.timeout).toBeGreaterThan(5_000);
   });
 
+  it("retries when two orders to one laboratory claim the same number", async () => {
+    const conflict = Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: { target: ["lab_organization_id", "orderNumber"] },
+    });
+    let attempts = 0;
+    db.$transaction.mockImplementation(async (fn: any) => {
+      attempts += 1;
+      // The first attempt loses the race; the second reads the number again and
+      // sees the winner's row.
+      if (attempts === 1) throw conflict;
+      return fn(db);
+    });
+
+    const order = await createOrder("breeder-1", [], "lab-1");
+
+    expect(attempts).toBe(2);
+    expect(order).toBeTruthy();
+  });
+
+  it("gives up rather than looping forever on a number it can never take", async () => {
+    const conflict = Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: { target: ["lab_organization_id", "orderNumber"] },
+    });
+    db.$transaction.mockRejectedValue(conflict);
+
+    await expect(createOrder("breeder-1", [], "lab-1")).rejects.toThrow("Unique constraint failed");
+    expect(db.$transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a failure that has nothing to do with the order number", async () => {
+    db.$transaction.mockRejectedValue(
+      Object.assign(new Error("duplicate breeder"), { code: "P2002", meta: { target: ["breederId"] } })
+    );
+
+    await expect(createOrder("breeder-1", [], "lab-1")).rejects.toThrow("duplicate breeder");
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+  });
+
   it("asks only for this lab's highest order number this month", async () => {
     await createOrder("breeder-1", [], "lab-1");
 

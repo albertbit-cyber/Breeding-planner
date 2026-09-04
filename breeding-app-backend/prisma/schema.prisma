@@ -1443,7 +1443,16 @@ model PendingShedTest {
 
 model ShedTestOrder {
   id                String                @id @default(cuid())
-  orderNumber       String?               @unique
+  /**
+   * Sequential per laboratory, and unique per laboratory rather than globally.
+   *
+   * The sequence is deliberately scoped to the receiving lab so no vendor can
+   * infer another's order volume from gaps in its own numbering. A global unique
+   * index contradicted that: two laboratories each numbering their first order of
+   * the month 09AA00001 collided, and order creation failed outright the moment a
+   * second laboratory took an order.
+   */
+  orderNumber       String?
   /**
    * The lab the breeder chose at order time. Nullable only so the migration
    * could land against existing rows predating lab selection; every new order
@@ -1473,6 +1482,7 @@ model ShedTestOrder {
   animals               ShedTestOrderAnimal[]
   results               ShedTestOrderResult[]
 
+  @@unique([labOrganizationId, orderNumber])
   @@index([breederId])
   @@index([status])
   @@index([labOrganizationId, status])

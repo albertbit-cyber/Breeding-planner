@@ -139,6 +139,40 @@ export const calculatePrice = async (animals: AnimalOrderInput[], labOrganizatio
   return toPublicBreakdown(breakdown);
 };
 
+/**
+ * Retry an order creation that lost the race for its own order number.
+ *
+ * The number is the next one free for that laboratory this month, read and then
+ * written; two orders reaching the same laboratory at the same moment both read
+ * the same value and one of them loses on the unique index. Reading it again is
+ * all that is needed, and the second attempt sees the first one's row.
+ *
+ * Bounded rather than open-ended: three collisions in a row is no longer a race,
+ * and a retry loop that never gives up would hide whatever it really is.
+ */
+const ORDER_NUMBER_CONFLICT_ATTEMPTS = 3;
+
+const isOrderNumberConflict = (error: unknown): boolean => {
+  const code = (error as { code?: string })?.code;
+  if (code !== "P2002") return false;
+  const target = (error as { meta?: { target?: unknown } })?.meta?.target;
+  const fields = Array.isArray(target) ? target.map(String) : [String(target ?? "")];
+  return fields.some((field) => field.toLowerCase().includes("ordernumber"));
+};
+
+const withOrderNumberRetry = async <T>(run: () => Promise<T>): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= ORDER_NUMBER_CONFLICT_ATTEMPTS; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      if (!isOrderNumberConflict(error)) throw error;
+      lastError = error;
+    }
+  }
+  throw lastError;
+};
+
 export const createOrder = async (
   breederId: string,
   animals: AnimalOrderInput[],
@@ -161,7 +195,7 @@ export const createOrder = async (
   // point. Retrying could never clear it; submitting simply stopped working.
   await ensureSharedOrderNumbers();
 
-  const created = await prisma.$transaction(async (tx: any) => {
+  const created = await withOrderNumberRetry(() => prisma.$transaction(async (tx: any) => {
     // Scoped to the receiving lab: a shared sequence would let each vendor infer
     // the others' order volume from the gaps in its own numbering. Narrowed further to this
     // month, taking only the highest -- the query used to return every order the lab had ever
@@ -231,7 +265,7 @@ export const createOrder = async (
     }
 
     return order;
-  }, ORDER_TRANSACTION_OPTIONS);
+  }, ORDER_TRANSACTION_OPTIONS));
 
   // Temporary debug log requested.
   console.log("[orders] order creation result", {
