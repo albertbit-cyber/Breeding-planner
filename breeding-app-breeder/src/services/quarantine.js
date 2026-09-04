@@ -38,7 +38,7 @@ export const QUARANTINE_SOURCES = [
   { key: 'expo', defaultDays: 120, risk: 'medium' },
   { key: 'import', defaultDays: 180, risk: 'high' },
   { key: 'wild-caught', defaultDays: 180, risk: 'high' },
-  { key: 'unknown', defaultDays: 120, risk: 'medium' },
+  { key: 'unknown', defaultDays: 180, risk: 'high' },
 ];
 
 const SOURCE_KEYS = new Set(QUARANTINE_SOURCES.map(entry => entry.key));
