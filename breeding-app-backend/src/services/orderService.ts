@@ -3,11 +3,18 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import { calculateOrderBreakdown, toPublicBreakdown } from "./pricingService";
 import { getActivePricing, listCatalog } from "./labConfigService";
-import { buildNextOrderNumber, ensureSharedOrderNumbers } from "./orderNumberService";
+import { buildNextOrderNumber, ensureSharedOrderNumbers, getOrderMonthToken } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
+// Prisma's unstated default is a 5 second budget, which an order covering a batch of animals
+// could exhaust on round trips alone. Stated here so the limit is a decision rather than a
+// default nobody chose, and matching the allowance the cloud-sync write already asks for.
+const ORDER_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 30_000,
+};
 type OrderActor = { id?: string; role: AppRole };
 
 const assertOrderWorkflowUser = (user: OrderActor): void => {
@@ -45,10 +52,23 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
     breakdown: toPublicBreakdown(breakdown),
   } as unknown as Record<string, unknown>;
 
+  // Outside the transaction, deliberately. This is a one-off backfill of rows that predate
+  // order numbering, not a step in creating an order. Run inside, its writes were rolled back
+  // with the transaction whenever the whole thing overran -- so the next attempt found exactly
+  // the same unnumbered rows, redid exactly the same work, and overran at exactly the same
+  // point. Retrying could never clear it; submitting simply stopped working.
+  await ensureSharedOrderNumbers();
+
   const created = await prisma.$transaction(async (tx: any) => {
-    await ensureSharedOrderNumbers(tx);
+    // Only this month's numbers, and only enough of them to find the highest. The previous
+    // query selected every order number in the database to pick the next one, so the cost of
+    // placing an order grew with the number of orders ever placed.
+    const monthToken = getOrderMonthToken();
     const existingOrders = await tx.shedTestOrder.findMany({
+      where: { orderNumber: { startsWith: monthToken } },
       select: { orderNumber: true },
+      orderBy: { orderNumber: "desc" },
+      take: 1,
     });
     const orderNumber = buildNextOrderNumber(
       existingOrders.map((entry: { orderNumber?: string | null }) => entry.orderNumber),
@@ -68,23 +88,32 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
       },
     });
 
-    for (const row of breakdown.perAnimal) {
-      const orderAnimal = await tx.shedTestOrderAnimal.create({
-        data: {
-          orderId: order.id,
-          animalId: row.animalId,
-          animalName: row.animalName,
-          morphBaseCost: toPrice(row.morphBaseCost),
-          additionalMorphCost: toPrice(row.additionalMorphCost),
-          sexCost: toPrice(row.sexCost),
-          total: toPrice(row.total),
-        },
-      });
+    // One round trip for every animal's row, then one for every test line, instead of a
+    // separate INSERT per animal and per test in a loop. A large order used to spend its whole
+    // budget on that chatter.
+    const orderAnimals = await tx.shedTestOrderAnimal.createManyAndReturn({
+      data: breakdown.perAnimal.map((row) => ({
+        orderId: order.id,
+        animalId: row.animalId,
+        animalName: row.animalName,
+        morphBaseCost: toPrice(row.morphBaseCost),
+        additionalMorphCost: toPrice(row.additionalMorphCost),
+        sexCost: toPrice(row.sexCost),
+        total: toPrice(row.total),
+      })),
+      select: { id: true, animalId: true },
+    });
 
-      for (const test of row.selectedCatalogTests) {
-        const isMorph = test.pricingType === "morph";
-        const morphTests = row.selectedCatalogTests.filter((entry) => entry.pricingType === "morph");
-        const morphIndex = isMorph ? morphTests.findIndex((entry) => entry.id === test.id) : -1;
+    // createManyAndReturn preserves input order, but an order may legitimately carry the same
+    // animalId twice, so the rows are paired by position rather than looked up by animal.
+    const testRows = breakdown.perAnimal.flatMap((row, index) => {
+      const orderAnimalId = orderAnimals[index]?.id;
+      if (!orderAnimalId) return [];
+      const morphTests = row.selectedCatalogTests.filter((entry) => entry.pricingType === "morph");
+      return row.selectedCatalogTests.map((test) => {
+        const morphIndex = test.pricingType === "morph"
+          ? morphTests.findIndex((entry) => entry.id === test.id)
+          : -1;
 
         const priceApplied = (() => {
           if (test.pricingType === "sex") return row.sexCost > 0 ? row.sexCost : 0;
@@ -93,20 +122,22 @@ export const createOrder = async (breederId: string, animals: AnimalOrderInput[]
           return 0;
         })();
 
-        await tx.shedTestOrderAnimalTest.create({
-          data: {
-            orderAnimalId: orderAnimal.id,
-            testId: test.id,
-            testNameSnapshot: test.name,
-            pricingTypeSnapshot: test.pricingType,
-            priceApplied: toPrice(priceApplied),
-          },
-        });
-      }
+        return {
+          orderAnimalId,
+          testId: test.id,
+          testNameSnapshot: test.name,
+          pricingTypeSnapshot: test.pricingType,
+          priceApplied: toPrice(priceApplied),
+        };
+      });
+    });
+
+    if (testRows.length) {
+      await tx.shedTestOrderAnimalTest.createMany({ data: testRows });
     }
 
     return order;
-  });
+  }, ORDER_TRANSACTION_OPTIONS);
 
   // Temporary debug log requested.
   console.log("[orders] order creation result", {

@@ -7,6 +7,7 @@ const LETTER_BLOCK_COUNT = LETTER_ALPHABET.length * LETTER_ALPHABET.length;
 
 type OrderNumberStore = {
   shedTestOrder: {
+    count: (args: Record<string, unknown>) => Promise<number>;
     findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string; createdAt: Date; orderNumber?: string | null }>>;
     update: (args: Record<string, unknown>) => Promise<unknown>;
   };
@@ -88,7 +89,22 @@ export const buildNextOrderNumber = (
   return formatOrderNumber(monthToken, maxSequence + 1);
 };
 
+/**
+ * Backfills order numbers onto rows that predate numbering.
+ *
+ * Must NOT be called inside another transaction. Each update commits on its own, so an
+ * interrupted run keeps the progress it made and the next call has less to do. Sharing a
+ * caller's transaction made it all-or-nothing instead: when the caller overran its budget the
+ * rollback undid the backfill too, so every retry started from scratch and failed identically.
+ */
 export const ensureSharedOrderNumbers = async (db: OrderNumberStore = prisma as unknown as OrderNumberStore): Promise<void> => {
+  // Almost every call has nothing to do. Ask that question with one indexed count rather than
+  // by reading every order in the database, which is what this cost on the order-placing path
+  // and on every listing. Rows carrying a non-null but malformed number are not rescued by the
+  // fast path; nothing writes one, since formatOrderNumber is the only source of the value.
+  const pendingCount = await db.shedTestOrder.count({ where: { orderNumber: null } });
+  if (pendingCount === 0) return;
+
   const orders = await db.shedTestOrder.findMany({
     select: { id: true, createdAt: true, orderNumber: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
