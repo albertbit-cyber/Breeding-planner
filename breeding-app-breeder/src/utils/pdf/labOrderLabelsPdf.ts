@@ -129,10 +129,12 @@ export const renderSampleLabelPage = async (
     maxLines: 2,
     bold: true,
   });
+  // Three lines, not two: the animal box now carries the name above the id, and a long name
+  // that wraps must not push the id off the label.
   drawFittedText(doc, layout.animalIdBox, content.animalId, {
     maxFontPt: clamp(Math.min(size.widthMm, size.heightMm) * 0.2, 7.5, 11),
     minFontPt: 6,
-    maxLines: 2,
+    maxLines: 3,
     bold: true,
   });
   drawFittedText(doc, layout.breederNameBox, content.breederName, {

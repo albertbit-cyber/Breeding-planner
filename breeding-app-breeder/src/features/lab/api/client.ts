@@ -1440,8 +1440,25 @@ export const createLabApiClient = () => {
       `${PENDING_SHEDS}/submit`,
       { method: "POST", body: JSON.stringify({ pendingItemIds }) }
     );
-    // No label artifacts from this route; the terminal's downloadArtifact ignores a missing one.
-    return { batch: response.batch, order: toLegacyOrder(response.order || null) } as any;
+
+    // Labels are rendered from the order that was just created: a shipping label, then one
+    // sample label per shed carrying that animal's name, id, QR and its own requested tests.
+    // Best-effort by design -- the order is already placed, so a label that fails to render
+    // must not read as a failed submission. The terminal offers a re-download either way.
+    let masterLabel: any = undefined;
+    try {
+      const orderId = String(response.order?.id || response.batch?.orderIds?.[0] || "").trim();
+      if (orderId) masterLabel = await getSharedOrderLabelsArtifact(orderId);
+    } catch (err) {
+      console.warn("[lab] order placed, but its labels could not be rendered", err);
+    }
+
+    return {
+      batch: response.batch,
+      order: toLegacyOrder(response.order || null),
+      masterLabel,
+      individualLabels: [],
+    } as any;
   };
 
   // Submitted batches are the orders they became -- there is no second record to keep, and one
@@ -1464,9 +1481,13 @@ export const createLabApiClient = () => {
     }));
   };
 
+  // A submitted batch is the order it became, so its id is the order's and re-downloading the
+  // labels is re-rendering that order's.
   const getShedBatchArtifacts = async (batchId: string) => {
     requireSessionRole("breeder");
-    return unsupported("Batch artifact download");
+    const orderId = String(batchId || "").trim();
+    if (!orderId) throw new Error("A batch is required to download labels.");
+    return { masterLabel: await getSharedOrderLabelsArtifact(orderId), individualLabels: [] } as any;
   };
 
   const listLabAvailableTests = async (): Promise<LabAvailableTest[]> => {
