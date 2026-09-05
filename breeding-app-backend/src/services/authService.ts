@@ -18,6 +18,7 @@ import { createOrganizationWithOwner, defaultOrganizationName } from "./organiza
 import { issueToken, consumeToken, revokeAllForPurpose } from "./accountTokenService";
 import { enqueueEmail } from "../email/queueService";
 import { maskEmail } from "../utils/maskEmail";
+import { logEmailAttempt } from "../email/sendLog";
 import {
   ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_KEY,
   ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_VERSION,
@@ -81,6 +82,35 @@ const resetPasswordActionUrl = (rawToken: string): string =>
 
 const confirmEmailChangeActionUrl = (rawToken: string): string =>
   `${publicAppBaseUrl()}/confirm-email-change?token=${encodeURIComponent(rawToken)}`;
+
+/**
+ * Queues an email behind an endpoint whose response is deliberately identical
+ * whether or not the account exists.
+ *
+ * A throw here must not become a 500: an unknown address returns 200 while a
+ * known one 500s is itself an account-enumeration oracle, and it would strand
+ * the caller with no signal at all. The failure is logged in full instead —
+ * the server log is the only place this can surface.
+ */
+const queueEmailWithoutLeakingFailure = async <T>(
+  operation: () => Promise<T>,
+  context: { recipient: string; template: string }
+): Promise<T | null> => {
+  try {
+    return await operation();
+  } catch (error) {
+    logEmailAttempt({
+      jobId: "(not queued)",
+      recipient: context.recipient,
+      template: context.template,
+      category: "account_and_security",
+      outcome: "failed",
+      reason: "enqueue_failed",
+      error,
+    });
+    return null;
+  }
+};
 
 /** Issues a fresh verify_email token (superseding any prior one) and queues the verification email. */
 const queueVerificationEmail = async (user: { id: string; email: string; fullName: string }) => {
@@ -505,24 +535,32 @@ export const requestPasswordReset = async (email: string) => {
 
   const { rawToken, record } = await issueToken(user.id, "reset_password", user.email, RESET_PASSWORD_TTL_MS);
 
-  await enqueueEmail({
-    ownerId: user.id,
-    recipientEmail: user.email,
-    category: "account_and_security",
-    templateKey: ACCOUNT_PASSWORD_RESET_TEMPLATE_KEY,
-    templateVersion: ACCOUNT_PASSWORD_RESET_TEMPLATE_VERSION,
-    templatePayload: {
-      fullName: user.fullName,
-      actionUrl: resetPasswordActionUrl(rawToken),
-      expiresInMinutesDisplay: "60 minutes",
-    },
-    subject: "Reset your Breeding Planner password",
-    idempotencyKey: passwordResetIdempotencyKey(user.id, record.id),
-    relatedEntityType: "user",
-    relatedEntityId: user.id,
-  });
+  const job = await queueEmailWithoutLeakingFailure(
+    () =>
+      enqueueEmail({
+        ownerId: user.id,
+        recipientEmail: user.email,
+        category: "account_and_security",
+        templateKey: ACCOUNT_PASSWORD_RESET_TEMPLATE_KEY,
+        templateVersion: ACCOUNT_PASSWORD_RESET_TEMPLATE_VERSION,
+        templatePayload: {
+          fullName: user.fullName,
+          actionUrl: resetPasswordActionUrl(rawToken),
+          expiresInMinutesDisplay: "60 minutes",
+        },
+        subject: "Reset your Breeding Planner password",
+        idempotencyKey: passwordResetIdempotencyKey(user.id, record.id),
+        relatedEntityType: "user",
+        relatedEntityId: user.id,
+      }),
+    { recipient: user.email, template: ACCOUNT_PASSWORD_RESET_TEMPLATE_KEY }
+  );
 
-  await recordSecurityEvent({ type: "auth.password_reset_requested", actorUserId: user.id, outcome: "success" });
+  await recordSecurityEvent({
+    type: "auth.password_reset_requested",
+    actorUserId: user.id,
+    outcome: job ? "success" : "failure",
+  });
   return { message: GENERIC_RESET_MESSAGE };
 };
 
@@ -623,11 +661,14 @@ export const resendVerificationEmail = async (email: string) => {
     return { message: GENERIC_RESEND_MESSAGE };
   }
 
-  const job = await queueVerificationEmail(user);
+  const job = await queueEmailWithoutLeakingFailure(() => queueVerificationEmail(user), {
+    recipient: user.email,
+    template: ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_KEY,
+  });
   await recordSecurityEvent({
     type: "auth.verification_email_resent",
     actorUserId: user.id,
-    outcome: "success",
+    outcome: job ? "success" : "failure",
     metadata: { jobId: job?.id },
   });
 

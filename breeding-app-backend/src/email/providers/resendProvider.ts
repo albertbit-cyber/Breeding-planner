@@ -58,19 +58,23 @@ export class ResendEmailProvider implements EmailProvider {
     } catch (error) {
       // Network-level failure (DNS, timeout, connection reset) — always retryable.
       const reason = error instanceof Error ? error.message : "Unknown network error";
-      throw new RetryableProviderError(`Resend request failed: ${reason}`);
+      throw new RetryableProviderError(`Resend request failed: ${reason}`, {
+        code: (error as { code?: string })?.code,
+        cause: (error as { cause?: unknown })?.cause,
+      });
     }
 
     if (response.error) {
       const { name, message: providerMessage } = response.error;
+      // Keep the provider's own error object so the send log can print it verbatim.
       if (RETRYABLE_RESEND_ERROR_NAMES.has(name)) {
-        throw new RetryableProviderError(`Resend error (${name}): ${providerMessage}`);
+        throw new RetryableProviderError(`Resend error (${name}): ${providerMessage}`, response.error);
       }
-      throw new PermanentProviderError(`Resend error (${name}): ${providerMessage}`);
+      throw new PermanentProviderError(`Resend error (${name}): ${providerMessage}`, response.error);
     }
 
     if (!response.data?.id) {
-      throw new RetryableProviderError("Resend response did not include a message id.");
+      throw new RetryableProviderError("Resend response did not include a message id.", { data: response.data });
     }
 
     return { provider: this.name, providerMessageId: response.data.id };

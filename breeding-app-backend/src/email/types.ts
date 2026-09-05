@@ -28,53 +28,60 @@ export type EmailErrorCode =
 export class EmailError extends Error {
   public readonly code: EmailErrorCode;
   public readonly retryable: boolean;
+  /**
+   * Raw provider diagnostics (SMTP response line, Resend error body, ...).
+   * Carried so failures can be logged in full without the log site needing to
+   * know which provider produced them. Never surfaced in an HTTP response.
+   */
+  public readonly details?: unknown;
 
-  constructor(code: EmailErrorCode, message: string, retryable: boolean) {
+  constructor(code: EmailErrorCode, message: string, retryable: boolean, details?: unknown) {
     super(message);
     this.name = "EmailError";
     this.code = code;
     this.retryable = retryable;
+    this.details = details;
   }
 }
 
 export class EmailConfigurationError extends EmailError {
-  constructor(message: string) {
-    super("configuration_error", message, false);
+  constructor(message: string, details?: unknown) {
+    super("configuration_error", message, false, details);
     this.name = "EmailConfigurationError";
   }
 }
 
 export class EmailValidationError extends EmailError {
-  constructor(message: string) {
-    super("validation_error", message, false);
+  constructor(message: string, details?: unknown) {
+    super("validation_error", message, false, details);
     this.name = "EmailValidationError";
   }
 }
 
 export class EmailRenderingError extends EmailError {
-  constructor(message: string) {
-    super("rendering_error", message, false);
+  constructor(message: string, details?: unknown) {
+    super("rendering_error", message, false, details);
     this.name = "EmailRenderingError";
   }
 }
 
 export class SuppressedRecipientError extends EmailError {
-  constructor(message: string) {
-    super("suppressed_recipient", message, false);
+  constructor(message: string, details?: unknown) {
+    super("suppressed_recipient", message, false, details);
     this.name = "SuppressedRecipientError";
   }
 }
 
 export class RetryableProviderError extends EmailError {
-  constructor(message: string) {
-    super("retryable_provider_error", message, true);
+  constructor(message: string, details?: unknown) {
+    super("retryable_provider_error", message, true, details);
     this.name = "RetryableProviderError";
   }
 }
 
 export class PermanentProviderError extends EmailError {
-  constructor(message: string) {
-    super("permanent_provider_error", message, false);
+  constructor(message: string, details?: unknown) {
+    super("permanent_provider_error", message, false, details);
     this.name = "PermanentProviderError";
   }
 }

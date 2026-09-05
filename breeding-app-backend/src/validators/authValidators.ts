@@ -1,12 +1,20 @@
 import { z } from "zod";
 import { ACCOUNT_EXPORT_GROUP_IDS } from "../services/accountDataExportService";
 
+/**
+ * Checks run in declaration order, so normalization has to come before
+ * validation: with `.email()` first, a pasted " user@example.com " was rejected
+ * outright instead of being trimmed and accepted. Every email field below
+ * shares this so no one path drifts back to the stricter ordering.
+ */
+const emailField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.string().email("A valid email is required."));
+
 export const registerSchema = z.object({
-  email: z
-    .string()
-    .email("A valid email is required.")
-    .toLowerCase()
-    .trim(),
+  email: emailField,
   password: z
     .string()
     .min(8, "Password must be at least 8 characters."),
@@ -18,22 +26,14 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .email("A valid email is required.")
-    .toLowerCase()
-    .trim(),
+  email: emailField,
   password: z
     .string()
     .min(1, "password is required."),
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .email("A valid email is required.")
-    .toLowerCase()
-    .trim(),
+  email: emailField,
 });
 
 export const resetPasswordSchema = z.object({
@@ -44,11 +44,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export const changeEmailSchema = z.object({
-  email: z
-    .string()
-    .email("A valid email is required.")
-    .toLowerCase()
-    .trim(),
+  email: emailField,
   currentPassword: z
     .string()
     .min(1, "currentPassword is required."),
@@ -64,11 +60,7 @@ export const changePasswordSchema = z.object({
 });
 
 export const resendVerificationSchema = z.object({
-  email: z
-    .string()
-    .email("A valid email is required.")
-    .toLowerCase()
-    .trim(),
+  email: emailField,
 });
 
 export const confirmEmailChangeSchema = z.object({

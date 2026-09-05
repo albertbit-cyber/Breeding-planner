@@ -1,6 +1,6 @@
 import { env } from "../config/env";
 import type { EmailProvider } from "./provider";
-import { getEmailProvider } from "./providerFactory";
+import { getEmailProvider, logMailTransportStatus } from "./providerFactory";
 import { isCategoryEnabled, REQUIRED_CATEGORIES, type NotificationCategory } from "./preferencesService";
 import { isRecipientSuppressed } from "./suppressionService";
 import { renderEmailTemplate } from "./templates";
@@ -14,6 +14,7 @@ import {
   scheduleRetry,
 } from "./queueService";
 import { EmailError } from "./types";
+import { logDevActionLink, logEmailAttempt } from "./sendLog";
 
 /** Processes exactly one already-claimed (status=processing) job. Never throws — every failure path updates the job row instead. */
 export const processEmailJob = async (job: any, provider: EmailProvider): Promise<void> => {
@@ -24,12 +25,28 @@ export const processEmailJob = async (job: any, provider: EmailProvider): Promis
       const enabled = await isCategoryEnabled(job.ownerId, category);
       if (!enabled) {
         await markCancelledBySystem(job.id, "Recipient has disabled this notification category.");
+        logEmailAttempt({
+          jobId: job.id,
+          recipient: job.recipientEmail,
+          template: job.templateKey,
+          category,
+          outcome: "skipped",
+          reason: "Recipient has disabled this notification category.",
+        });
         return;
       }
 
       const suppressed = await isRecipientSuppressed(job.recipientEmail);
       if (suppressed) {
         await markSuppressed(job.id);
+        logEmailAttempt({
+          jobId: job.id,
+          recipient: job.recipientEmail,
+          template: job.templateKey,
+          category,
+          outcome: "skipped",
+          reason: "Recipient address is suppressed (previous bounce or complaint).",
+        });
         return;
       }
     }
@@ -46,16 +63,42 @@ export const processEmailJob = async (job: any, provider: EmailProvider): Promis
     });
 
     await markSent(job.id, result.provider, result.providerMessageId);
-    console.info("[email-worker] sent", { jobId: job.id, ownerId: job.ownerId, category });
+    logEmailAttempt({
+      jobId: job.id,
+      recipient: job.recipientEmail,
+      template: job.templateKey,
+      category,
+      outcome: "sent",
+      provider: result.provider,
+      providerMessageId: result.providerMessageId,
+      attempt: job.attemptCount,
+    });
+
+    // The mock provider accepted this and threw it away. In development that is
+    // recoverable — print the link the recipient would have clicked instead of
+    // leaving them with nothing.
+    if (result.provider === "mock") {
+      logDevActionLink(job);
+    }
   } catch (error) {
     if (error instanceof EmailError) {
       if (error.retryable) {
         await scheduleRetry(job.id, error.code, error.message);
-        console.warn("[email-worker] retryable failure", { jobId: job.id, ownerId: job.ownerId, code: error.code });
       } else {
         await markPermanentFailure(job.id, error.code, error.message);
-        console.error("[email-worker] permanent failure", { jobId: job.id, ownerId: job.ownerId, code: error.code });
       }
+      logEmailAttempt({
+        jobId: job.id,
+        recipient: job.recipientEmail,
+        template: job.templateKey,
+        category,
+        outcome: "failed",
+        provider: provider.name,
+        reason: error.code,
+        error,
+        attempt: job.attemptCount,
+        willRetry: error.retryable,
+      });
       return;
     }
 
@@ -63,7 +106,18 @@ export const processEmailJob = async (job: any, provider: EmailProvider): Promis
     // doesn't strand a job forever, but they still count against maximumAttempts.
     const message = error instanceof Error ? error.message : "Unknown error";
     await scheduleRetry(job.id, "unknown_error", message);
-    console.error("[email-worker] unexpected error", { jobId: job.id, ownerId: job.ownerId, message });
+    logEmailAttempt({
+      jobId: job.id,
+      recipient: job.recipientEmail,
+      template: job.templateKey,
+      category,
+      outcome: "failed",
+      provider: provider.name,
+      reason: "unknown_error",
+      error,
+      attempt: job.attemptCount,
+      willRetry: true,
+    });
   }
 };
 
@@ -84,7 +138,17 @@ let timer: ReturnType<typeof setInterval> | null = null;
 let inFlightTick: Promise<number> = Promise.resolve(0);
 
 export const startEmailWorker = (): void => {
-  if (!env.email.workerEnabled || timer) return;
+  if (timer) return;
+
+  // Emitted before the early return below, so "why did no mail arrive?" is
+  // answerable from the boot log whether the transport or the worker is the
+  // thing that is switched off.
+  logMailTransportStatus();
+
+  if (!env.email.workerEnabled) {
+    console.warn("[mail] EMAIL_WORKER_ENABLED=false - queued emails will not be processed by this process.");
+    return;
+  }
   const provider = getEmailProvider();
   timer = setInterval(() => {
     inFlightTick = inFlightTick.then(() =>

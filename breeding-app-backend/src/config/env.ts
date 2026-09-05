@@ -17,8 +17,13 @@ const emailProvider = (process.env.EMAIL_PROVIDER || "resend").trim().toLowerCas
 // Fail loudly at startup if email sending is turned on without the config it needs.
 // This must never be silently downgraded to a working state — a missing key here
 // means production would otherwise try to send through an unconfigured provider.
-if (emailEnabled && emailProvider === "resend") {
-  const emailRequired = ["RESEND_API_KEY", "EMAIL_FROM_NAME", "EMAIL_FROM_ADDRESS"] as const;
+if (emailEnabled) {
+  const emailRequired: readonly string[] =
+    emailProvider === "resend"
+      ? ["RESEND_API_KEY", "EMAIL_FROM_NAME", "EMAIL_FROM_ADDRESS"]
+      : emailProvider === "smtp"
+        ? ["SMTP_HOST", "EMAIL_FROM_ADDRESS"]
+        : [];
   const missing = emailRequired.filter((key) => !process.env[key]);
   if (missing.length) {
     throw new Error(
@@ -26,6 +31,8 @@ if (emailEnabled && emailProvider === "resend") {
     );
   }
 }
+
+const smtpPort = Number(process.env.SMTP_PORT || 1025);
 
 export const env = {
   nodeEnv,
@@ -35,9 +42,20 @@ export const env = {
   corsOrigin: process.env.CORS_ORIGIN || "",
   email: {
     enabled: emailEnabled,
-    provider: emailProvider as "resend" | "mock",
+    provider: emailProvider as "resend" | "smtp" | "mock",
     resendApiKey: process.env.RESEND_API_KEY || "",
     resendWebhookSecret: process.env.RESEND_WEBHOOK_SECRET || "",
+    smtp: {
+      host: (process.env.SMTP_HOST || "").trim(),
+      port: smtpPort,
+      user: process.env.SMTP_USER || "",
+      password: process.env.SMTP_PASSWORD || "",
+      // Port 465 is implicit TLS; 587 and Mailpit's 1025 negotiate with STARTTLS
+      // (or, for Mailpit, no TLS at all) and must not set this.
+      secure: process.env.SMTP_SECURE
+        ? String(process.env.SMTP_SECURE).trim().toLowerCase() === "true"
+        : smtpPort === 465,
+    },
     fromName: process.env.EMAIL_FROM_NAME || "Serpentora",
     fromAddress: process.env.EMAIL_FROM_ADDRESS || "notifications@serpentora.com",
     replyTo: process.env.EMAIL_REPLY_TO || "",
