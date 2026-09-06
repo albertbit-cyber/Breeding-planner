@@ -1,13 +1,14 @@
 # Shed Testing — status across all four apps
 
-Updated 2026-09-04, against `feature/lab-vendor-onboarding`.
+Updated 2026-09-06. **Merged into `main` and deployed.**
 
 The chain now works end to end, verified by running it rather than by reading it:
 27 Lab Portal browser tests and 11 breeder browser tests against a live backend
 and database, plus 472 backend tests. All green.
 
-**One thing stands between this and production, and it is yours: rehearsing the
-migration against a copy of the live database.**
+The migration was rehearsed against a copy of the live database before deploying:
+every migration applied without error, and **zero orders and zero order lines were
+left unattributed**. All eight then applied to production on boot.
 
 ---
 
@@ -85,37 +86,33 @@ longer exists. The demo credentials are untouched.
 
 ## 3. What is left
 
-### 3.1 Rehearse the migration against a copy of production — **blocks the deploy**
-`docs/architecture/lab-tenancy-deploy-runbook.md` step 2. Needs the Railway
-`DATABASE_URL`, which only you have. Seeded data only exercises the
-single-laboratory branch; live data has orders placed before laboratories existed.
-If the run reports orders left unattributed, they become invisible to every lab
-queue — a decision to make before deploying, not after.
+Nothing blocks the deploy any more — it has shipped. What follows is what still
+needs a person.
 
-### 3.2 Two environment variables and a Netlify site
+### 3.1 Two environment variables and a Netlify site — **do this before inviting a lab**
 `LAB_PORTAL_URL` must point at labpoints.serpentora.com, or every invitation link
 drops an invited laboratory on the *breeder* sign-in page. `CORS_ORIGIN` needs the
 new origin appended, not substituted. Plus a Netlify site and DNS for the
 subdomain.
 
-### 3.3 Decide that there is no payment processing
+### 3.2 Decide that there is no payment processing
 No gateway of any kind. The payment status a laboratory sets is bookkeeping it
 ticks by hand, and the invoice email now says so rather than offering a button
 that does not exist. That may well be right — worth deciding rather than
 discovering.
 
-### 3.4 With ProHerper
+### 3.3 With ProHerper
 Three panels (Recessive, Spider complex, BEL complex) price correctly but do not
 list which tests they include, because ProHerper does not publish that. And Jurgen
 should confirm the tier prices before breeders order against them.
 
-### 3.5 Deliberate deferrals
+### 3.4 Deliberate deferrals
 The breeder side is not organization-scoped. Laboratories are tenants; breeder
 collections still belong to individuals. It touches 125 ownership checks on the
 cloud-sync path, that path has an open data-loss investigation, and the change is
 behaviourally invisible today.
 
-### 3.6 One thing found and not fixed
+### 3.5 One thing found and not fixed
 The breeder app logs a React "Maximum update depth exceeded" warning on load. It
 predates this branch and is not in the lab flow, but it is a real render loop and
 deserves its own investigation.
