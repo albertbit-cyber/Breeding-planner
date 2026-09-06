@@ -17,7 +17,7 @@ left unattributed**. All eight then applied to production on boot.
 | Piece | Where | What it is |
 |---|---|---|
 | **Breeder app** | `breeding-app-breeder` | Orders tests. Shed Test Terminal, per-animal test picker, batch cart, labels, results, certificate. |
-| **Lab Portal** | `breeding-app-lab` → labpoints.serpentora.com | A vendor laboratory runs itself: queue, intake, result entry, own catalogue, own prices, own team. |
+| **Lab Portal** | `breeding-app-lab` → lab.serpentora.com | A vendor laboratory runs itself: queue, intake, result entry, own catalogue, own prices, own team. |
 | **Admin Portal** | `breeding-app-admin` | Oversight. Invites labs, reviews applications, approves lab-contributed genes. One write: on/off. |
 | **Backend** | `breeding-app-backend` | One API, one Postgres. All three apps talk to it and nothing else. |
 
@@ -90,7 +90,7 @@ Nothing blocks the deploy any more — it has shipped. What follows is what stil
 needs a person.
 
 ### 3.1 Two environment variables and a Netlify site — **do this before inviting a lab**
-`LAB_PORTAL_URL` must point at labpoints.serpentora.com, or every invitation link
+`LAB_PORTAL_URL` must point at lab.serpentora.com, or every invitation link
 drops an invited laboratory on the *breeder* sign-in page. `CORS_ORIGIN` needs the
 new origin appended, not substituted. Plus a Netlify site and DNS for the
 subdomain.

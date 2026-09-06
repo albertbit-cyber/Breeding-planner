@@ -104,12 +104,14 @@ psql -h localhost -U postgres -c 'DROP DATABASE "prod_rehearsal";'
 
 ## 3. Set the two environment variables
 
-The Lab Portal is served from **labpoints.serpentora.com**. The backend needs to
+The Lab Portal is served from **lab.serpentora.com** — `lab`, then a dot. It was
+written here as "labpoints.serpentora.com" for a while, which is that dot read
+aloud and then typed; no such host has ever existed. The backend needs to
 know that twice, for two unrelated reasons.
 
 ```
-LAB_PORTAL_URL=https://labpoints.serpentora.com
-CORS_ORIGIN=<existing origins>,https://labpoints.serpentora.com
+LAB_PORTAL_URL=https://lab.serpentora.com
+CORS_ORIGIN=<existing origins>,https://lab.serpentora.com
 ```
 
 `LAB_PORTAL_URL` — where invited laboratories land.
@@ -125,7 +127,7 @@ play, so check the boot log rather than trusting silence to mean it is set.
 `CORS_ORIGIN` is a comma-separated allowlist (`src/app.ts`), and an origin absent
 from it gets no CORS headers back. The portal talks to the same backend as the
 breeder app, so a missing entry does not degrade gracefully: every request from
-labpoints.serpentora.com fails in the browser, starting with the sign-in an
+lab.serpentora.com fails in the browser, starting with the sign-in an
 invited laboratory lands on. Append the new origin rather than replacing the
 value — the breeder and admin origins live in the same variable.
 
