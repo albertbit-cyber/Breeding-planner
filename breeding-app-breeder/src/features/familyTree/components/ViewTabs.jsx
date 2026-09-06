@@ -30,8 +30,8 @@ const ViewTabs = ({ activeTab, onTabChange }) => (
           className={[
             'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0',
             active
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-neutral-500 hover:bg-violet-50 hover:text-violet-700',
+              ? 'sk-tab-active shadow-sm'
+              : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800',
           ].join(' ')}
         >
           <span aria-hidden="true">{tab.icon}</span>

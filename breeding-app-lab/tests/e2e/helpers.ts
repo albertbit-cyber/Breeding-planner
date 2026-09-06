@@ -69,7 +69,7 @@ export const loginAsLabUser = async (
   // Anchored on the workflow header and the nav, not on the word "Laboratory":
   // the sidebar now shows the signed-in laboratory's own name, so that word
   // appears in several places and in none of them predictably.
-  await expect(page.getByText("Lab Workflow")).toBeVisible();
+  await expect(page.getByText("Lab Workflow", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "All Shed Orders" })).toBeVisible();
 };
 
@@ -78,7 +78,7 @@ export const openAuthenticatedLab = async (page: Page, hashPath = "/lab/incoming
   // Anchored on the workflow header and the nav, not on the word "Laboratory":
   // the sidebar now shows the signed-in laboratory's own name, so that word
   // appears in several places and in none of them predictably.
-  await expect(page.getByText("Lab Workflow")).toBeVisible();
+  await expect(page.getByText("Lab Workflow", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "All Shed Orders" })).toBeVisible();
 };
 

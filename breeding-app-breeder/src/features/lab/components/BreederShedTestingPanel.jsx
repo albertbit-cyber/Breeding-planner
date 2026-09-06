@@ -132,7 +132,8 @@ const PrintableSampleLabel = ({ size, data, qrDataUrl, debug }) => {
   const layout = buildSampleLabelLayout(activeSize, safeArea);
   const content = buildSampleLabelContent(data);
   const orderFit = fitTextToBox(content.orderId, layout.orderIdBox, { maxLines: 2, maxFontPt: 10, minFontPt: 6 });
-  const animalFit = fitTextToBox(content.animalId, layout.animalIdBox, { maxLines: 2, maxFontPt: 11, minFontPt: 6 });
+  // Matches the PDF and the preview: name above id, with room for a wrapped name.
+  const animalFit = fitTextToBox(content.animalId, layout.animalIdBox, { maxLines: 3, maxFontPt: 11, minFontPt: 6 });
   const breederFit = fitTextToBox(content.breederName, layout.breederNameBox, { maxLines: 2, maxFontPt: 9, minFontPt: 6 });
   const testsFit = fitTextToBox(content.requestedTests, layout.testsBox, {
     maxLines: SAMPLE_LABEL_TESTS_FIT_OPTIONS[layout.variant].maxLines,
@@ -263,7 +264,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
             </button>
             {/* Clicking Print calls window.print() (browser) or webContents.print({ silent: false }) (Electron).
                 The OS print dialog opens — no printer is pre-selected and silent mode is never used. */}
-            <button type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
+            <button type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm sk-on-accent disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
               {isPrinting ? t("lab.orders.openingPrintDialog", { defaultValue: "Opening..." }) : t("actions.print", { defaultValue: "Print" })}
             </button>
           </div>

@@ -102,8 +102,10 @@ export function selectAnimalsForExport(animals = [], scope) {
  * Whether the keeper reached into the list and dropped animals that the filter had matched.
  *
  * Exclusions left over from a previous filter do not count: deselecting an animal, then switching
- * to a group that animal is not in, is not a statement about the new group. The catalog leans on
- * this to decide whether the selection is deliberate enough to override its for-sale rule.
+ * to a group that animal is not in, is not a statement about the new group. This is what lets the
+ * panel tell "narrowed by hand" apart from "the filter happens to match everything", and what the
+ * catalog leans on to decide whether a selection is deliberate enough to override its for-sale
+ * rule.
  */
 export function hasExplicitAnimalPicks(animals = [], scope) {
   const excluded = new Set(normalizeAnimalExportScope(scope).excludedIds);
@@ -145,25 +147,4 @@ export function isAnimalForSale(animal) {
     const token = String(tag || '').trim().toLowerCase();
     return token === 'for sale' || token === 'forsale' || token === 'for sell' || token === 'forsell' || token === 'sale' || token === 'available';
   });
-}
-
-/**
- * The animals the catalog will actually print, and why.
- *
- * The catalog has always narrowed to animals marked for sale, which is right when the keeper asked
- * for a whole group and expects the app to know what is available. It is wrong once they have gone
- * through the list by hand: six animals chosen one at a time is already the answer to "which
- * animals", and filtering four of them away without saying so reads as a bug. So a hand-picked
- * selection is taken at its word, and the caller shows which rule applied either way.
- */
-export function resolveCatalogSelection(animals = [], scope) {
-  const selected = selectAnimalsForExport(animals, scope);
-  const forSale = selected.filter(isAnimalForSale);
-  const handPicked = hasExplicitAnimalPicks(animals, scope);
-  return {
-    animals: handPicked ? selected : forSale,
-    handPicked,
-    selectedCount: selected.length,
-    forSaleCount: forSale.length,
-  };
 }

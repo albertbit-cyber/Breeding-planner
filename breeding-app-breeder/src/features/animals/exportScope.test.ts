@@ -6,7 +6,6 @@ import {
   isAnimalForSale,
   isAnimalScopeNarrowed,
   normalizeAnimalExportScope,
-  resolveCatalogSelection,
   selectAnimalsForExport,
   selectScopeCandidates,
 } from './exportScope';
@@ -142,33 +141,5 @@ describe('what counts as for sale', () => {
   it('leaves an unmarked animal alone', () => {
     expect(isAnimalForSale({ status: 'holdback', tags: ['breeder'] })).toBe(false);
     expect(isAnimalForSale(null)).toBe(false);
-  });
-});
-
-describe('what the catalog prints', () => {
-  it('keeps the for-sale rule when the keeper only chose a group', () => {
-    const result = resolveCatalogSelection(COLLECTION, scope({ mode: 'groups', groups: ['2026 Hatchlings'] }));
-    expect(ids(result.animals)).toEqual(['A1']);
-    expect(result.handPicked).toBe(false);
-    expect(result.selectedCount).toBe(3);
-    expect(result.forSaleCount).toBe(1);
-  });
-
-  it('takes a hand-picked selection at its word', () => {
-    const result = resolveCatalogSelection(
-      COLLECTION,
-      scope({ mode: 'groups', groups: ['2026 Hatchlings'], excludedIds: ['A3'] }),
-    );
-    expect(ids(result.animals)).toEqual(['A1', 'A2']);
-    expect(result.handPicked).toBe(true);
-    expect(result.forSaleCount).toBe(1);
-  });
-
-  it('reports an empty catalog rather than falling back to the whole group', () => {
-    const result = resolveCatalogSelection(COLLECTION, scope({ mode: 'groups', groups: ['Breeders'] }));
-    expect(ids(result.animals)).toEqual(['B1']);
-    const nothingMarked = resolveCatalogSelection(COLLECTION, scope({ mode: 'tags', tags: ['hold back'] }));
-    expect(nothingMarked.animals).toEqual([]);
-    expect(nothingMarked.selectedCount).toBe(1);
   });
 });

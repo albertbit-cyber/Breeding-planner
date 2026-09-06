@@ -1,0 +1,234 @@
+/* ============================================================================
+   materials-bridge.css — makes the material layer land WITHOUT adding classes
+   breeding-app-shared/src/styles/materials-bridge.css
+
+   Import LAST:
+     tailwindcss → skins.css → tw-bridge.css → materials.css → materials-bridge.css
+
+   WHY THIS FILE EXISTS
+   materials.css styles .mt-shell / .mt-card / .mt-btn / .mt-well / .mt-chip.
+   The app's markup doesn't carry those classes, so setting data-material only
+   changed the handful of things that happened to have one — which is why
+   "blueprint" showed the blue-teal ground and the mono wordmark but none of
+   the grid texture, translucent card faces or dashed rules.
+
+   This file maps the material variables onto selectors the app ALREADY has.
+   Same trick as tw-bridge.css: convert most of the surface area without
+   touching a single component.
+
+   ⚠ CONFIRM THE SELECTORS. They're taken from the contrast audit's own
+   findings, so they're real, but your card markup may differ. Each block below
+   says what it's targeting; comment out anything that misfires and add the
+   .mt-* class to that component instead — that's the precise path, this is the
+   fast one.
+   ============================================================================ */
+
+/* ── SELECTOR AUDIT, run against this codebase ─────────────────────────────
+   The header says "CONFIRM THE SELECTORS". Measured on the Animals screen:
+
+     .app-root :is(.rounded-xl,.rounded-2xl,.rounded-lg):not(button)…
+        8 matches, 8 of them false positives — the Cards/List segmented
+        toggle, the "Scanner ready" chip, and five filter <label>s. ZERO real
+        panels, because the real ones already carry .mt-card (5 on screen),
+        which materials.css styles directly.
+
+   So every structural rule below is narrowed from the rounded-* guess to
+   .mt-card. That is the bridge's own recommended path ("add the .mt-* class
+   to that component instead") and it is already done.
+
+   Kept as-is, because they measured clean:
+     .bg-neutral-50/100 wells (6)   buttons (42)   chips (21)
+     small-caps labels (78)         headings (4)
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── 1. the shell. THE BIG ONE. ────────────────────────────────────────────
+   The texture (grid, grain, weave) lives here. Without this rule no material
+   shows any texture at all — which is the main thing that was missing.
+   .app-root is where the audit found the frozen inline style, so it's the
+   right element; html/body carry the ground behind it.                       */
+html,
+body,
+.app-root {
+  background-color: var(--mt-shell-bg);
+  background-image: var(--mt-shell-tex);
+  background-blend-mode: var(--mt-shell-blend);
+  background-attachment: fixed;   /* texture doesn't scroll with content */
+  color: var(--sk-text);
+}
+
+/* Audit R1 (resolved): .app-root's inline background-color/color used to beat
+   every rule above. `appRootStyle` was deleted from App.jsx, so the shell
+   texture paints. Verified: .app-root computes the blueprint grid with
+   background-blend-mode "normal, normal, soft-light". */
+
+
+/* ── 2. card faces ─────────────────────────────────────────────────────────
+   Tailwind v4 compiles bg-white to var(--color-white), which tw-bridge.css
+   already points at --sk-surface. Re-point it one step further, at the
+   MATERIAL's card face, so panels pick up translucency, gradient and blur. */
+/* SCOPED from @theme (:root) to .mt-card — measured reason:
+   moss-mist shell/card lightness is vellum 84/89, rattan 34/91,
+   vitrine -16/82. Two of the three paper materials have a DARK
+   shell with a LIGHT card, so re-pointing --color-white globally gave every
+   bg-white element outside a card a light paper face under near-white ink
+   ("Serpentora" 1.04, "Logo" 1.07, "Retry" 1.02). Inside a card it is right,
+   so that is where it now applies. */
+.app-root .mt-card {
+  --color-white:       var(--mt-card-bg);
+  --color-neutral-50:  var(--mt-well-bg);
+  --color-neutral-100: var(--mt-well-bg);
+}
+
+/* The bevel and lift can't come through a colour variable, so they attach to
+   the shapes the app actually uses for panels. Tailwind's rounded-* utilities
+   are the reliable hook.
+   ⚠ Narrow this to your real card class if it over-applies. */
+/* NARROWED from :is(.rounded-xl,…) — see SELECTOR AUDIT above. materials.css
+   already styles .mt-card; this only adds the texture/blend the base class
+   leaves to the bridge. */
+.app-root .mt-card {
+  background-image: var(--mt-card-tex);
+  background-blend-mode: var(--mt-card-blend);
+}
+
+/* Recessed containers — the group/stat wells in the animal cards. */
+/* :not([class*="rounded-full"]) — the "Logo" and "No image" avatar
+   placeholders are bg-neutral-100/50 circles; without this they get a square
+   control radius and a recessed bevel. */
+.app-root :is(.bg-neutral-50, .bg-neutral-100):not([class*="rounded-full"]) {
+  background: var(--mt-well-bg);
+  border-radius: var(--mt-radius-control);
+  box-shadow: var(--mt-bevel-well);
+}
+
+
+/* ── 3. controls ───────────────────────────────────────────────────────────
+   Depends on FIXES.md Fix 2 having removed the .app-root button !important
+   hammer — while that rule exists it beats everything here. */
+.app-root button:not([class*="rounded-full"]) {
+  border-radius: var(--mt-radius-control);
+  box-shadow: var(--mt-bevel-control), var(--mt-lift-control);
+  font-family: var(--mt-font-ui);
+  letter-spacing: var(--mt-label-track);
+  text-transform: var(--mt-label-case);
+}
+
+/* Pills / segmented toggles keep their own shape but take the material's
+   bevel, so they don't look pasted on. */
+.app-root button[class*="rounded-full"] {
+  box-shadow: var(--mt-bevel-control);
+  font-family: var(--mt-font-ui);
+  letter-spacing: var(--mt-label-track);
+}
+
+/* Primary fill + its paired foreground. Audit R2 cannot recur through here. */
+.app-root button:is([data-variant="primary"], .btn-primary, [class*="bg-sky"], [class*="bg-primary"]) {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--sk-primary) 88%, #fff 12%), var(--sk-primary));
+  color: var(--sk-text-on-accent);
+}
+
+.app-root :is(input, select, textarea) {
+  background: var(--mt-well-bg);
+  border-radius: var(--mt-radius-control);
+  box-shadow: var(--mt-bevel-well);
+  color: var(--sk-text);
+  font-family: var(--mt-font-ui);
+}
+
+
+/* ── 4. chips and tags ─────────────────────────────────────────────────────
+   The morph tags and status pills. Keeps each chip's own colour (they're
+   genetics-coded) and only changes shape and depth. */
+.app-root :is([class*="rounded-full"]:not(button), .chip, .tag, .status-tag) {
+  border-radius: var(--mt-radius-chip);
+  box-shadow: var(--mt-bevel-well);
+  font-family: var(--mt-font-ui);
+  letter-spacing: var(--mt-label-track);
+}
+
+
+/* ── 5. type ───────────────────────────────────────────────────────────────
+   The display face and the engraved/embossed relief. This is what makes
+   vellum read as letterpress and vitrine as framed.                         */
+.app-root :is(h1, h2, h3, .text-2xl, .text-xl, .text-lg) {
+  font-family: var(--mt-font-display);
+  font-weight: var(--mt-display-weight);
+  letter-spacing: var(--mt-display-track);
+  text-shadow: var(--mt-text-relief);
+}
+
+/* Big numerals — the stat tiles. Same treatment as headings. */
+.app-root :is(.text-3xl, .text-4xl, .tabular-nums) {
+  font-family: var(--mt-font-display);
+  text-shadow: var(--mt-text-relief);
+}
+
+/* Small caps labels: "GENETICS:", "GROUP", "ALL ANIMALS (15)". */
+.app-root :is(.text-xs, .text-\[10px\], .text-\[11px\], label) {
+  font-family: var(--mt-font-mono);
+  letter-spacing: var(--mt-label-track);
+  text-transform: var(--mt-label-case);
+}
+
+/* The wordmark. Pairs with FIXES.md Fix 4 (--sk-brand replacing #3c1b73). */
+.app-root :is(.sk-wordmark, .mt-wordmark, [data-wordmark]) {
+  font-family: var(--mt-font-display);
+  font-weight: var(--mt-display-weight);
+  letter-spacing: var(--mt-display-track);
+  text-transform: var(--mt-display-case);
+  color: var(--sk-brand);
+  text-shadow: var(--mt-text-relief);
+}
+
+
+/* ── 6. material-specific structure the bridge can reach ───────────────────
+   A few materials need one detail that isn't a variable. */
+
+/* blueprint: dashed rules instead of solid, and a 1px light card outline —
+   this plus the shell grid is most of what was missing from your screenshot. */
+[data-material="blueprint"] .app-root :is(hr, .border-t, .border-b) {
+  border-style: dashed;
+  border-color: rgba(190, 225, 240, .36);
+}
+[data-material="blueprint"] .app-root .mt-card {
+  border: 1px solid rgba(190, 225, 240, .3);
+}
+
+/* vitrine: the brass frame needs a real wrapper element, which a bridge
+   cannot invent. Approximate it as an inset frame on the shell; for the full
+   frame > case > mount stack, add .mt-shell > .mt-case > .mt-card in JSX. */
+/* vitrine needs a real frame > case > mount stack. MATERIALS.md wraps the page
+   in <div class="mt-shell"><div class="mt-case">, but the app-root's children
+   are inline JSX inside a 26k-line component and adding a wrapper there risks
+   the layout for one material.
+
+   The same two-element stack already exists in the document, so use it:
+   `body` becomes the brass frame and `.app-root` becomes the inner case. The
+   result is the intended nesting with no JSX change, and it stays inert on
+   every other material because it is scoped to [data-material="vitrine"].
+
+   (The shipped border-image approximation is dropped rather than doubled up;
+   it was also the only palette hex literal in this file.) */
+[data-material="vitrine"] body {
+  background: var(--mt-shell-bg);
+  padding: 10px;
+}
+[data-material="vitrine"] .app-root {
+  background-color: var(--mt-case-bg);
+  background-image: var(--mt-case-tex);
+  background-blend-mode: screen, soft-light;
+  border-radius: 3px;
+  box-shadow: 0 3px 12px rgb(var(--sk-shadow-color) / .6) inset;
+  min-height: calc(100vh - 20px);
+}
+
+
+/* ── 7. what the bridge cannot do ──────────────────────────────────────────
+   Add the real classes for these:
+     · vitrine's frame > case > mount stack        → .mt-shell > .mt-case > .mt-card
+     · per-card seam placement on cards that
+       aren't rounded-*                            → .mt-card--seam
+     · anything drawn on <canvas> (Family Tree,
+       charts, QR) — no CSS reaches inside          → pass --mt- and --sk- values in JS
+   ────────────────────────────────────────────────────────────────────────── */

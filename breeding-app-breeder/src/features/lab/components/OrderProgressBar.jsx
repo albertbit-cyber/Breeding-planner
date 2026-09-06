@@ -43,7 +43,7 @@ export default function OrderProgressBar({ status }) {
         const isActive = index === activeStep;
 
         const dotClass = isCompleted || isActive
-          ? "h-5 w-5 rounded-full border-2 border-neutral-800 bg-neutral-800 text-white flex items-center justify-center shrink-0"
+          ? "h-5 w-5 rounded-full border-2 border-neutral-800 bg-neutral-800 sk-on-accent flex items-center justify-center shrink-0"
           : "h-5 w-5 rounded-full border-2 border-neutral-300 bg-white shrink-0";
 
         const labelClass = isActive

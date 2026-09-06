@@ -758,7 +758,6 @@
   "export.pairingsSheetName": "Koppelingen",
   "export.errors.selectField": "Selecteer ten minste een veld voordat je exporteert.",
   "export.errors.noAnimals": "Geen dieren beschikbaar om te exporteren.",
-  "export.errors.noSaleAnimals": "Geen dieren gemarkeerd voor verkoop gevonden.",
   "export.errors.noPairings": "Geen fokprojecten beschikbaar om te exporteren.",
   "export.feedback.animalsPdf": "{{count}} Tiere als PDF exportiert.",
   "export.feedback.animalsPdfFailed": "Tierexport als PDF fehlgeschlagen.",

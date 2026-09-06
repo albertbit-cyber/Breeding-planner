@@ -1,0 +1,313 @@
+# Materials — installing the ten directions as skins
+
+> **RETIRED, 2026-09-01.** Two skins (`deep-canopy`, `copper-canopy`) and five materials
+> (`journal`, `soapstone`, `moss-relief`, `lacquer`, `basalt`) were removed from the
+> picker. **16 skins x 6 materials** ship now. This document still describes the original
+> ten-material delivery because it is the install history for the layer; the counts,
+> lists and compatibility table below have been corrected, but prose about the removed
+> materials is left where it explains *why* the layer is built the way it is.
+>
+> Saved states pointing at a removed value are remapped in `sanitizeAppearance()`
+> (`deep-canopy` -> `moss-mist`, `copper-canopy` -> `fern-clay`, `journal` -> `vellum`,
+> the rest -> `flat`), covered by `appearanceRetirement.test.js`.
+>
+> One consequence worth stating plainly: `soapstone` and `basalt` were the only materials
+> cleared for `high-contrast-forest`, so **the AAA skin now offers `flat` alone.**
+
+Companion to `materials.css`, `skins.css`, `tw-bridge.css` and the two test files.
+
+**Source files live at `D:\Git Clone\Breeding-planner\serpentora-materials-v3`.**
+Read them from that folder — do not regenerate or hand-write them; copy them to the
+destinations in Step 1.
+
+---
+
+## The one thing to understand first
+
+You asked for the ten mockups "as skins". They can't be — and the reason shapes the whole
+package.
+
+A skin is a flat block of colour values. A texture, a four-layer shadow, a bevel and a
+type pairing are not values; they're component CSS. Pressing type *into* vellum needs a
+`text-shadow` with two offsets. Glass needs a lit top edge and a dark bottom edge, which is
+two more shadow layers. None of that fits in a `--sk-*` variable.
+
+So material is a **second, orthogonal axis**:
+
+```html
+<html data-skin="jungle-glass" data-material="vitrine">
+```
+
+| layer | owns | file |
+|---|---|---|
+| skin | hue, text, status, data series | `skins.css` |
+| material | texture, depth, radius, bevel, type | `materials.css` |
+
+16 skins × 6 materials. Every material surface is built with `color-mix()` over the skin's
+own `--sk-bg` / `--sk-surface`, so **no material hardcodes a hue** — switching skin still
+moves colour, switching material still changes only feel. That's why all ten mockups read
+green-and-yellow despite being ten different materials.
+
+**The honest caveat:** three of the six are paper (vellum, vitrine, rattan). A
+paper card face is light *by definition* — that's what paper is. On a dark skin those read
+as light cards in a dark room. Legible (the material supplies its own ink) but a different
+product than the skin promises. That's the compatibility table below, and it's a real
+constraint rather than something to engineer away.
+
+---
+
+## Step 1 — Install
+
+```
+materials.css               →  breeding-app-shared/src/styles/materials.css
+materials-bridge.css        →  breeding-app-shared/src/styles/materials-bridge.css
+skins.css                   →  breeding-app-shared/src/styles/skins.css
+tw-bridge.css               →  breeding-app-shared/src/styles/tw-bridge.css
+skins.contrast.test.js      →  breeding-app-shared/src/styles/__tests__/
+materials.compat.test.js    →  breeding-app-shared/src/styles/__tests__/
+```
+
+**breeder** (`src/index.css`) — order matters, materials last:
+
+```css
+@import "tailwindcss";
+@import "@breeding/shared/styles/skins.css";
+@import "@breeding/shared/styles/tw-bridge.css";   /* AFTER tailwindcss */
+@import "@breeding/shared/styles/materials.css";   /* AFTER skins */
+@import "@breeding/shared/styles/materials-bridge.css";   /* LAST */
+```
+
+**admin / lab / marketplace / public** — `skins.css`, `materials.css`,
+`materials-bridge.css`. No `tw-bridge.css` (no Tailwind), but the material bridge is
+still wanted: its `@theme` block is simply inert there while the selector rules work.
+
+### Why there are two material files
+
+`materials.css` styles `.mt-shell`, `.mt-card`, `.mt-btn`, `.mt-well`, `.mt-chip`. Your
+components don't carry those classes, so setting `data-material` on its own changes only
+the few elements that happen to have one — you get the skin's ground and maybe the
+wordmark, and **none of the texture, card faces or bevels.** If blueprint looks like a
+flat dark-teal app rather than a cyanotype, that's this.
+
+`materials-bridge.css` maps the `--mt-*` variables onto selectors you already have, the
+same way `tw-bridge.css` did for colour. It gets you roughly 80% with no JSX edits.
+
+**The bridge's selectors are guesses from the audit's findings.** Real, but your card
+markup may differ — every block is labelled with what it targets. Comment out anything
+that misfires and add the `.mt-*` class to that component instead: the bridge is the fast
+path, the classes are the precise one.
+
+**Two prerequisites, both from `FIXES.md`:**
+
+- **Fix 1** — while `.app-root` carries an inline `background-color`, no shell texture can
+  appear. Inline style beats every rule in this file; that is not overridable from CSS.
+- **Fix 2** — while the `.app-root button { … !important }` hammer exists, no material
+  bevel reaches a button.
+
+Neither is optional. The material layer is mostly invisible until both are done.
+
+Three things the bridge genuinely can't do, which need the real classes:
+the vitrine's frame > case > mount stack, seams on panels that aren't `rounded-*`,
+and anything drawn on
+`<canvas>` — Family Tree, charts and QR take no CSS, so pass the `--mt-*` / `--sk-*`
+values into them from JS.
+
+**Fonts.** The materials use four display faces beyond what the app loads today. Add to
+every `index.html` — and note the audit already found that only 2 of the 6 fonts the
+settings panel offers are actually loaded, so this needs doing regardless:
+
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Cormorant+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+```
+
+| material | needs |
+|---|---|
+| vellum, rattan, terrarium-glass | Fraunces |
+| vitrine | Cormorant Garamond |
+| blueprint | Inconsolata |
+
+**Installing `materials.css` without setting `data-material` changes nothing** — the
+`:root` block is a flat fallback that reproduces current appearance. Same no-op discipline
+as `default` in the skin layer. Verify that before going further.
+
+---
+
+## Step 2 — Write the attribute
+
+In `AppearanceContext.jsx`, beside the line that already sets `data-skin`:
+
+```js
+root.dataset.skin     = appearanceState.preset;
+root.dataset.material = appearanceState.material || 'flat';
+```
+
+And in the pre-paint script in each `index.html`, so material doesn't flash either:
+
+```html
+<script>
+  try {
+    var a = JSON.parse(localStorage.getItem('breedingPlannerAppearance.v2') || '{}');
+    document.documentElement.dataset.skin = a.preset || 'default';
+    document.documentElement.dataset.material = a.material || 'flat';
+  } catch (e) {}
+</script>
+```
+
+`'flat'` has no block, which is the point — it lands on the `:root` fallback.
+
+Add to the preset list:
+
+```js
+const MATERIALS = {
+  flat:              { key: 'flat',              label: 'Flat',                 tone: 'surface' },
+  vellum:            { key: 'vellum',            label: 'Vellum & Letterpress', tone: 'paper'   },
+  terrariumGlass:    { key: 'terrarium-glass',   label: 'Terrarium Glass',      tone: 'surface' },
+  vitrine:           { key: 'vitrine',           label: 'Museum Vitrine',       tone: 'paper'   },
+  blueprint:         { key: 'blueprint',         label: 'Botanical Blueprint',  tone: 'surface' },
+  rattan:            { key: 'rattan',            label: 'Woven Rattan',         tone: 'paper'   },
+};
+```
+
+---
+
+## Step 3 — Gate the picker
+
+96 pairs exist; not all of them should ship. Filter the material list by the active skin
+rather than letting users find the bad combinations themselves:
+
+```js
+import { POLICY } from './materials.compat.test.js';   // or copy the table
+
+const LIGHT_SKINS = ['default','bamboo-daylight','sandstone-vivarium','glasshouse-mint','field-daylight'];
+const HC_SKINS    = ['high-contrast-forest'];
+
+export function getAllowedMaterials(skinId) {
+  const kind = HC_SKINS.includes(skinId) ? 'hc'
+             : LIGHT_SKINS.includes(skinId) ? 'light' : 'dark';
+  return Object.entries(POLICY)
+    .filter(([, p]) => p[kind] !== 'no')
+    .map(([id]) => id);
+}
+```
+
+### Compatibility table
+
+`ok` ships · `review` needs a look before shipping · `no` must not be offered
+
+| material | tone | dark skins | light skins | high-contrast-forest |
+|---|---|---|---|---|
+| Flat | surface | **ok** | **ok** | **ok** |
+| Vellum | paper | review | **ok** | no |
+| Terrarium Glass | surface | **ok** | no | no |
+| Museum Vitrine | paper | **ok** | review | no |
+| Botanical Blueprint | surface | **ok** | no | no |
+| Woven Rattan | paper | review | **ok** | no |
+
+`flat` is listed here for completeness but has no `[data-material]` block — it is the
+`:root` fallback, which is why it never appears in `POLICY` in the compat test.
+
+Why the `no`s are `no`:
+
+- **Glass and blueprint on light skins.** Both get their depth from light edges
+  against a dark ground. On a light skin there's nothing for the highlight to read against
+  and they collapse to flat panels — worse than `flat`, because the bevels still cost
+  contrast.
+- **Everything except `flat` on `high-contrast-forest`.** That skin exists to clear 7:1.
+  Texture, translucency and soft shadows all reduce effective contrast, so pairing them
+  fights the skin's only job. The two that used to survive it, soapstone and basalt, did
+  so because their depth was opaque bevels that never touched the text/background pair —
+  both have since been retired, so the AAA skin is now deliberately flat-only.
+
+---
+
+## Step 4 — Use the classes
+
+The material layer ships component classes so the app doesn't repeat shadow stacks. Each
+reads only `--mt-*` and `--sk-*`, so it's correct for every pair without knowing either.
+
+```jsx
+<div className="mt-shell">
+  <div className="mt-wordmark">Serpentora</div>
+
+  <button className="mt-btn mt-btn--primary">+ Add animal</button>
+  <button className="mt-btn mt-btn--ghost">Export QR</button>
+
+  <div className="mt-card">
+    <h2 className="mt-display">Athena</h2>
+    <div className="mt-label">BP-2024-0142 · Hatchlings 2026</div>
+
+    <div className="mt-well">
+      <div className="mt-display">14</div>
+      <div className="mt-label">offspring</div>
+    </div>
+
+    <span className="mt-chip">Pastel</span>
+  </div>
+</div>
+```
+
+| class | role |
+|---|---|
+| `.mt-shell` | the page ground — texture, blend, ambient shadow |
+| `.mt-card` | a panel — bevel, lift, optional tilt and blur |
+| `.mt-card--seam` | adds an accent rule down the panel edge (no shipping material uses it since basalt and lacquer were retired; kept for the contract) |
+| `.mt-well` | recessed container — stat cells, inputs, list wells |
+| `.mt-btn` + `--primary` / `--quiet` / `--ghost` / `--danger` | buttons; `--primary` sets `--sk-text-on-accent` itself, so audit R2 can't recur through this layer |
+| `.mt-chip` | morph tags, status pills |
+| `.mt-display` / `.mt-label` / `.mt-wordmark` | the type roles, including the engrave/emboss `text-shadow` |
+| `.mt-case` | vitrine only — the inner case between brass frame and mount |
+
+One material needs an extra wrapper:
+
+```jsx
+{/* vitrine: brass frame > case > linen mount */}
+<div className="mt-shell"><div className="mt-case"><div className="mt-card">…</div></div></div>
+```
+
+---
+
+## Step 5 — Verify
+
+```bash
+node materials.compat.test.js     # contract + the matrix
+node skins.contrast.test.js       # 16 skins
+```
+
+`materials.compat.test.js` checks what a static test honestly can:
+
+- every material declares the full `--mt-*` contract (a missing variable means one pair
+  silently falls back to flat in one place, which is miserable to debug),
+- `--mt-tone` matches the policy table,
+- no surface material hardcodes a hex where it should `color-mix()` over a skin role,
+- the policy table and the CSS agree on the material list — a picker offering a material
+  with no block renders the fallback.
+
+**What it can't check:** the material layer is `color-mix()`, `box-shadow` and
+`background-blend-mode`, none of which resolve outside a browser. So the perceptual half is
+still your DOM audit script — point it at every pair marked `review`, plus `ok` pairs on the
+paper materials, since those are the ones where a light card face meets a dark skin's text
+tokens.
+
+Add both to CI. And keep the hex-literal lint from the v2 package: `materials.css` is now
+the second and last file allowed to contain one.
+
+---
+
+## Cost, if you're picking one
+
+Of what still ships:
+
+**Middle** — `vellum`, `rattan`, `blueprint`, `terrarium-glass`. Each wants some care:
+vellum's debossed type needs checking at every font size; blueprint changes the type
+system wholesale.
+
+**Most expensive** — `vitrine`. Wants real photography and per-card placement to look
+intentional rather than gimmicky. The frame also costs real vertical space on a phone,
+which matters for the Capacitor build.
+
+The cheap-and-calm tier (`soapstone`, `basalt`, `moss-relief`) has been retired in full,
+so there is no longer a low-cost depth option — `flat` is the only zero-cost choice.
+`flat` remains the default: the material axis is worth shipping as a preference, not as
+a mandate.

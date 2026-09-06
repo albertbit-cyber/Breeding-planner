@@ -4,11 +4,12 @@
    rest of the app and doesn't break existing pages.
    ============================================================ */
 
-:root {
-  --ft-purple:         #7c3aed;
-  --ft-purple-light:   #ede9fe;
-  --ft-purple-medium:  #a78bfa;
-  --ft-purple-border:  #ddd6fe;
+.ft-page,
+.ft-canvas-area {
+  --ft-purple:         var(--sk-series-4);
+  --ft-purple-light:   var(--sk-surface-2);
+  --ft-purple-medium:  var(--sk-series-6);
+  --ft-purple-border:  var(--sk-border);
   --ft-header-h:       52px;
   --ft-stats-h:        44px;
   --ft-left-w:         272px;
@@ -21,7 +22,7 @@
   flex-direction: column;
   /* Subtract header nav height (App.jsx sticky header ~64px) + small gap */
   height: calc(100vh - 72px);
-  background: #faf9ff;
+  background: var(--sk-bg);
   overflow: hidden;
   border-radius: 16px;
   border: 1px solid var(--ft-purple-border);
@@ -37,7 +38,7 @@
   height: var(--ft-header-h);
   padding: 0 16px;
   border-bottom: 1px solid var(--ft-purple-border);
-  background: white;
+  background: var(--sk-surface);
   flex-shrink: 0;
 }
 
@@ -55,7 +56,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #faf9ff;
+  background: var(--sk-bg);
 }
 
 .ft-center-col {
@@ -63,7 +64,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
-  background: white;
+  background: var(--sk-surface);
 }
 
 /* ── Left panel content ───────────────────────────────────── */
@@ -92,7 +93,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #faf9ff;
+  background: var(--sk-bg);
 }
 
 /* ── ReactFlow canvas area ────────────────────────────────── */
@@ -107,7 +108,7 @@
 .ft-stats-bar {
   height: var(--ft-stats-h);
   border-top: 1px solid var(--ft-purple-border);
-  background: white;
+  background: var(--sk-surface);
   flex-shrink: 0;
   overflow-x: auto;
 }
@@ -133,7 +134,7 @@
 }
 
 .ft-canvas-area .react-flow__controls-button {
-  background: white;
+  background: var(--sk-surface);
   border-bottom: 1px solid var(--ft-purple-border);
   color: var(--ft-purple);
 }

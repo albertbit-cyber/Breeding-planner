@@ -6,6 +6,7 @@ import PedigreePassportPanel from './components/PedigreePassportPanel';
 import ViewTabs, { VIEW_TABS } from './components/ViewTabs';
 import StatsBar from './components/StatsBar';
 import './familyTree.css';
+import { splitPairLabel } from '../animals/parentage';
 
 /**
  * The Family Tree.
@@ -118,14 +119,14 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
       <div className="ft-header">
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-base flex-shrink-0 shadow-sm"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)' }}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm"
+            style={{ background: 'linear-gradient(135deg, var(--sk-series-4), var(--sk-series-6))', color: 'var(--sk-text-on-accent)' }}
           >
             🌳
           </div>
           <div className="min-w-0">
             <div className="text-base font-bold text-neutral-900 leading-tight">Family Tree</div>
-            <div className="text-[11px] text-violet-500 font-medium truncate">
+            <div className="text-[11px] text-neutral-500 font-medium truncate">
               {activeTab.hint}
               {selectedSnake && ` · ${selectedSnake.name}`}
             </div>

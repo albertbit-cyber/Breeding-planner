@@ -150,7 +150,7 @@ function CycleRow({ cycle }) {
               ))}
             </div>
           )}
-          <span className="text-neutral-300 text-xs">{open ? '▲' : '▼'}</span>
+          <span className="text-neutral-400 text-xs">{open ? '▲' : '▼'}</span>
         </div>
       </button>
 
@@ -436,7 +436,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
                   <div className="text-center py-4 space-y-1">
                     <div className="text-2xl opacity-20">🐍</div>
                     <div className="text-xs text-neutral-400 font-semibold">No cycles recorded yet</div>
-                    <div className="text-[11px] text-neutral-300">
+                    <div className="text-[11px] text-neutral-400">
                       Predictions will improve after the first complete breeding season.
                     </div>
                   </div>

@@ -34,17 +34,21 @@ function patchImportMetaEnv(): import("vite").Plugin {
 
 export default defineConfig({
   plugins: [patchImportMetaEnv(), react()],
+  // Vite resolves vite.config.ts BEFORE vite.config.mts, so this file is the one
+  // that has always been in effect. The exclude list lived in the .mts twin and
+  // therefore never ran: vitest collected the Playwright specs under tests/e2e,
+  // which drive a running backend and a built frontend and cannot execute as unit
+  // tests, and the collection errors were read as real failures -- 12 of them.
+  // The twin has been deleted.
   test: {
-    // Playwright drives everything under tests/e2e against a running backend and
-    // a built frontend. Vitest must not try to execute those files as unit
-    // tests: it cannot, and the resulting collection errors were being read as
-    // real failures. This exclusion previously lived in a stale vite.config.mts
-    // that Vite never resolved (it tries .ts before .mts), so it never applied.
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
       "**/build/**",
+      "**/.{idea,git,cache,output,temp}/**",
       "tests/e2e/**",
+      "server/**",
+      "src/genetics/punnett.test.ts",
     ],
   },
   define: {

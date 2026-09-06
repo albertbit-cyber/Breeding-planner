@@ -1010,7 +1010,7 @@ export const SuggestionsTab = ({
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-start gap-3">
-            <div className="text-2xl font-bold text-neutral-300 leading-none w-7 shrink-0">{rank}</div>
+            <div className="text-2xl font-bold text-neutral-400 leading-none w-7 shrink-0">{rank}</div>
             <div className="flex flex-col items-center w-16 shrink-0">
               <div className={`text-2xl font-bold leading-none ${highConfidence ? "text-emerald-600" : "text-amber-600"}`}>
                 {formatPercent(goalProb, 0)}
@@ -1281,7 +1281,7 @@ export const SuggestionsTab = ({
               type="button"
               onClick={runSuggestions}
               disabled={loading}
-              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800"
+              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold sk-on-accent shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800"
             >
               {loading ? t("advisor.buttons.generating", { defaultValue: "Generating..." }) : t("advisor.buttons.run", { defaultValue: "Run Advisor" })}
             </button>

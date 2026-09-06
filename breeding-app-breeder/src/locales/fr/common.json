@@ -722,7 +722,6 @@
   "export.pairingsSheetName": "Accouplements",
   "export.errors.selectField": "S?lectionnez au moins un champ avant d?exporter.",
   "export.errors.noAnimals": "Aucun animal disponible pour l?export.",
-  "export.errors.noSaleAnimals": "Aucun animal marqu? ? vendre n?a ?t? trouv?.",
   "export.errors.noPairings": "Aucun projet de reproduction disponible pour l?export.",
   "export.feedback.animalsPdf": "{{count}} animaux export?s en PDF.",
   "export.feedback.animalsPdfFailed": "?chec de l?export PDF des animaux.",

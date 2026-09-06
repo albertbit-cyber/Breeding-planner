@@ -379,7 +379,10 @@ export default function BreederOrderGeneticTestModal({
             </button>
             <button
               type="button"
-              className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl border bg-neutral-900 px-4 py-2 text-sm font-medium sk-on-accent disabled:cursor-not-allowed disabled:opacity-60"
+              // The laboratory is part of the answer now: tests, prices and
+              // turnaround all come from it, so there is nothing to add to a
+              // batch until one is chosen.
               disabled={!selectedLabId || !selectedTests.length || isLoadingCatalog || !!catalogError || added}
               onClick={handleAddToBatch}
             >

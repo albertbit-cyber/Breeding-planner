@@ -99,6 +99,11 @@ export function detectParentsFromName({ name, animals = [], excludeId = null }) 
  * True when a group name reads as a breeders group. The `groups` field is free text, so this
  * matches by wording rather than by a fixed id -- "Breeders", "breeding stock", "Zuchttiere"
  * are all things keepers actually type.
+ *
+ * Deliberately looser than the family tree's own `isBreederGroupSnake`, which only accepts an
+ * exact "Breeder(s)". This one merely decides which options sort to the top of a picker, where
+ * being generous costs nothing; the tree uses its test to pick parents outright, where it must
+ * not guess.
  */
 export function isBreederGroupName(rawName) {
   return /breed|zucht|riproduttor|reproduct/i.test(String(rawName ?? ''));

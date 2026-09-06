@@ -95,9 +95,24 @@ describe("lab label layout engine", () => {
     expect(layout.senderBox.heightMm).toBeGreaterThan(0);
     // "TO"/"FROM" deliberately share their line with the name rather than
     // standing alone: fitTextToBox() drops trailing lines first on a small
-    // label, and a standalone header word costs the line the country needs.
+    // label, so a standalone header word costs exactly the line the country
+    // needs. This assertion used to expect a bare "TO" and had been failing
+    // ever since that change.
     expect(content.destinationLines[0]).toBe("TO: Lab");
     expect(content.senderLines[0]).toBe("FROM: Breeder");
+  });
+
+  it("falls back to a bare TO/FROM header when there is no name to share the line", () => {
+    const content = buildShippingLabelContent({
+      orderId: "o1",
+      orderNumber: "ORDER-1",
+      labAddress: { line1: "123 Lab Lane", city: "Phoenix", postalCode: "85001", country: "US" },
+      breeder: { address: { line1: "456 Breeder Rd", city: "Berlin", postalCode: "10115", country: "DE" } },
+      createdAt: new Date().toISOString(),
+      sampleCount: 4,
+    });
+    expect(content.destinationLines[0]).toBe("TO");
+    expect(content.senderLines[0]).toBe("FROM");
   });
 
   it("generates one multi-page PDF for a 4-sample order", async () => {

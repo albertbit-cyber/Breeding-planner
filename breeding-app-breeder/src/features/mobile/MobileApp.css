@@ -9,8 +9,8 @@
   min-height: 100vh;
   max-width: 520px;
   margin: 0 auto;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--sk-bg);
+  color: var(--sk-text);
   font-family: var(--font-family);
   font-size: 16px;
   line-height: 1.5;
@@ -32,9 +32,9 @@
   transform: translateX(-50%);
   max-width: calc(100vw - 2rem);
   min-width: 220px;
-  background: #1a2e24;
-  color: #d6f0de;
-  border: 1px solid #2d5a3e;
+  background: var(--sk-surface-2, #1a2e24);
+  color: var(--sk-success-text, #d6f0de);
+  border: 1px solid var(--sk-success-border, #2d5a3e);
   border-radius: 12px;
   padding: 0.75rem 1.1rem;
   font-weight: 700;
@@ -42,7 +42,7 @@
   z-index: 9999;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: var(--sk-shadow-2);
 }
 
 /* ─── Spinner ────────────────────────────────────────────────────────────── */
@@ -63,7 +63,7 @@
   gap: 0.75rem;
   justify-content: center;
   padding: 2.5rem 1rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
 }
 
 /* ─── Offline banner ─────────────────────────────────────────────────────── */
@@ -73,13 +73,13 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.85rem;
-  background: color-mix(in srgb, var(--color-card) 90%, var(--color-secondary));
+  background: color-mix(in srgb, var(--sk-surface) 90%, var(--sk-border-strong));
   font-size: 0.82rem;
   font-weight: 700;
 }
 .mbl-offline-bar.is-offline {
-  background: #5f2619;
-  color: #fff;
+  background: var(--sk-warning-bg, #5f2619);
+  color: var(--sk-text-on-accent, #fff);
 }
 
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
@@ -90,18 +90,18 @@
   gap: 0.4rem;
   min-height: 44px;
   padding: 0.55rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 18%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-secondary) 20%, var(--color-card));
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--sk-border-strong) 20%, var(--sk-surface));
+  color: var(--sk-text);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
 }
-.mbl-btn--primary {
-  background: var(--color-primary);
-  color: var(--color-bg);
+.mbl-btn--sk-primary {
+  background: var(--sk-primary);
+  color: var(--sk-bg);
   border-color: transparent;
 }
 .mbl-btn--wide { width: 100%; }
@@ -111,7 +111,7 @@
 .mbl-text-btn {
   background: none;
   border: none;
-  color: var(--color-primary);
+  color: var(--sk-primary);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -122,7 +122,7 @@
 .mbl-icon-btn {
   background: none;
   border: none;
-  color: var(--color-text);
+  color: var(--sk-text);
   font-size: 1.1rem;
   cursor: pointer;
   width: 36px;
@@ -134,7 +134,7 @@
 .mbl-back-btn {
   background: none;
   border: none;
-  color: var(--color-primary);
+  color: var(--sk-primary);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -150,16 +150,16 @@
 .mbl-field span {
   font-size: 0.82rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 70%, transparent);
 }
 .mbl-field input,
 .mbl-field select,
 .mbl-field textarea {
   min-height: 46px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 16%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   padding: 0.65rem 0.8rem;
   font: inherit;
   font-size: 1rem;
@@ -172,11 +172,11 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   padding: 0.4rem 0 0.1rem;
 }
 .mbl-empty {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   text-align: center;
   padding: 2rem 1rem;
 }
@@ -189,23 +189,23 @@
   align-items: center;
   min-height: 68px;
   padding: 0.65rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   text-align: left;
   cursor: pointer;
   width: 100%;
 }
 .mbl-animal-row > div { display: flex; flex-direction: column; gap: 0.1rem; }
 .mbl-animal-row strong { font-weight: 800; }
-.mbl-animal-row small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.mbl-animal-row small { font-size: 0.8rem; color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
 
 .mbl-avatar-sm {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-primary) 25%, var(--color-card));
+  background: color-mix(in srgb, var(--sk-primary) 25%, var(--sk-surface));
   display: grid;
   place-items: center;
   font-weight: 900;
@@ -218,10 +218,10 @@
 .mbl-search-input {
   width: 100%;
   min-height: 46px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 16%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   padding: 0.65rem 0.8rem;
   font: inherit;
 }
@@ -234,10 +234,10 @@
 }
 .mbl-manual-row input {
   min-height: 46px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 16%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   padding: 0.65rem 0.8rem;
   font: inherit;
 }
@@ -247,7 +247,7 @@
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  background: #050908;
+  background: var(--sk-bg, #050908);
   aspect-ratio: 4/3;
 }
 .mbl-camera-video {
@@ -263,10 +263,10 @@
   transform: translate(-50%, -50%);
   width: 55%;
   aspect-ratio: 1;
-  border: 3px solid var(--color-primary);
+  border: 3px solid var(--sk-primary);
   border-radius: 12px;
   pointer-events: none;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+  box-shadow: var(--sk-shadow-1);
 }
 
 /* ─── Quick action buttons ───────────────────────────────────────────────── */
@@ -277,10 +277,10 @@
 }
 .mbl-quick-btn {
   min-height: 52px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 14%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-secondary) 15%, var(--color-card));
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--sk-border-strong) 15%, var(--sk-surface));
+  color: var(--sk-text);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -295,17 +295,17 @@
 .mbl-seg button {
   flex: 1;
   min-height: 44px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 14%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
 .mbl-seg button.is-active {
-  background: var(--color-primary);
-  color: var(--color-bg);
+  background: var(--sk-primary);
+  color: var(--sk-bg);
   border-color: transparent;
 }
 
@@ -322,14 +322,14 @@
   width: 100%;
   max-width: 520px;
   margin: 0 auto;
-  background: var(--color-card);
+  background: var(--sk-surface);
   border-radius: 20px 20px 0 0;
   padding: 0 0 env(safe-area-inset-bottom, 0);
 }
 .mbl-sheet-handle {
   width: 40px;
   height: 4px;
-  background: color-mix(in srgb, var(--color-text) 25%, transparent);
+  background: color-mix(in srgb, var(--sk-text) 25%, transparent);
   border-radius: 99px;
   margin: 0.75rem auto 0;
 }
@@ -348,10 +348,10 @@
 }
 .mbl-note-area {
   width: 100%;
-  border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 14%, transparent);
   border-radius: 10px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--sk-bg);
+  color: var(--sk-text);
   padding: 0.65rem;
   font: inherit;
   resize: vertical;
@@ -363,7 +363,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
+  background: var(--sk-bg);
   padding: 1.5rem;
 }
 .mbl-login-card {
@@ -393,13 +393,13 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 600;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   text-align: center;
 }
 .mbl-login-sub {
   margin: 0;
   font-size: 0.9rem;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 60%, transparent);
   text-align: center;
 }
 .mbl-login-form {
@@ -414,7 +414,7 @@
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
   background: rgba(180,40,30,0.12);
-  color: #e05050;
+  color: var(--sk-danger-text, #e05050);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -422,7 +422,7 @@
 /* ─── MODE SELECT SCREEN ─────────────────────────────────────────────────── */
 .mbl-mode-shell {
   min-height: 100vh;
-  background: var(--color-bg);
+  background: var(--sk-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -446,11 +446,11 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 70%, transparent);
 }
 .mbl-mode-signout {
   font-size: 0.82rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
 }
 .mbl-mode-cards {
   display: flex;
@@ -468,9 +468,9 @@
   min-height: 130px;
   padding: 1.25rem;
   border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
-  background: var(--color-card);
-  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   text-align: left;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
@@ -478,9 +478,9 @@
 .mbl-mode-card:active { transform: scale(0.97); }
 .mbl-mode-icon { font-size: 1.5rem; }
 .mbl-mode-card strong { font-size: 1.2rem; font-weight: 900; }
-.mbl-mode-card span { font-size: 0.88rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
-.mbl-mode-card--terminal { border-left: 4px solid var(--color-primary); }
-.mbl-mode-card--full { border-left: 4px solid var(--color-accent, var(--color-primary)); }
+.mbl-mode-card span { font-size: 0.88rem; color: color-mix(in srgb, var(--sk-text) 65%, transparent); }
+.mbl-mode-card--terminal { border-left: 4px solid var(--sk-primary); }
+.mbl-mode-card--full { border-left: 4px solid var(--sk-accent, var(--sk-primary)); }
 
 /* ─── TERMINAL MODE ──────────────────────────────────────────────────────── */
 .mbl-terminal-topbar {
@@ -488,15 +488,15 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-terminal-topbar .mbl-text-btn:last-child { text-align: right; }
 .mbl-terminal-badge {
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.1em;
-  color: var(--color-primary);
-  border: 1.5px solid var(--color-primary);
+  color: var(--sk-primary);
+  border: 1.5px solid var(--sk-primary);
   border-radius: 6px;
   padding: 0.15rem 0.5rem;
   justify-self: center;
@@ -510,7 +510,7 @@
 }
 .mbl-terminal-hero { text-align: center; padding: 0.5rem 0; }
 .mbl-terminal-hero h1 { margin: 0; font-size: 1.8rem; }
-.mbl-terminal-hero p  { margin: 0.25rem 0 0; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.mbl-terminal-hero p  { margin: 0.25rem 0 0; color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
 
 .mbl-recent-section { display: flex; flex-direction: column; gap: 0.5rem; }
 .mbl-recent-section h2 { margin: 0; font-size: 0.9rem; font-weight: 800; }
@@ -527,7 +527,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-card-topbar span { font-weight: 700; flex: 1; }
 
@@ -540,15 +540,16 @@
 }
 .mbl-avatar-placeholder {
   border-radius: 14px;
-  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-card));
+  background: color-mix(in srgb, var(--sk-primary) 20%, var(--sk-surface));
   display: grid;
   place-items: center;
   font-weight: 900;
+  color: var(--sk-text-on-accent);
 }
 .mbl-avatar-lg { width: 72px; height: 72px; font-size: 1.8rem; }
 .mbl-card-identity h2 { margin: 0; font-size: 1.3rem; }
-.mbl-card-identity p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
-.mbl-card-identity small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.mbl-card-identity p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--sk-text) 65%, transparent); }
+.mbl-card-identity small { font-size: 0.8rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); }
 
 /* ─── Edit form ──────────────────────────────────────────────────────────── */
 .mbl-edit-form {
@@ -570,7 +571,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-full-title { font-weight: 900; font-size: 1rem; }
 
@@ -578,7 +579,7 @@
 
 .mbl-hero-row { text-align: center; padding: 0.5rem 0; }
 .mbl-hero-row h1 { margin: 0; font-size: 1.5rem; }
-.mbl-hero-row p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.mbl-hero-row p  { margin: 0.2rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
 
 /* ─── Bottom navigation ──────────────────────────────────────────────────── */
 .mbl-bottom-nav {
@@ -590,8 +591,8 @@
   max-width: 520px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  background: var(--color-card);
-  border-top: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  background: var(--sk-surface);
+  border-top: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   padding-bottom: env(safe-area-inset-bottom, 0);
   z-index: 100;
 }
@@ -599,7 +600,7 @@
   min-height: 56px;
   background: none;
   border: none;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -612,7 +613,7 @@
   padding: 0.4rem 0.25rem;
 }
 .mbl-nav-btn.is-active {
-  color: var(--color-primary);
+  color: var(--sk-primary);
   font-weight: 900;
 }
 
@@ -623,7 +624,7 @@
   align-items: center;
   gap: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-profile-topbar span { font-weight: 700; }
 .mbl-profile-hero {
@@ -639,19 +640,19 @@
   object-fit: cover;
 }
 .mbl-profile-hero-text h1 { margin: 0; font-size: 1.35rem; }
-.mbl-profile-hero-text p  { margin: 0.25rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
-.mbl-profile-hero-text small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.mbl-profile-hero-text p  { margin: 0.25rem 0 0; font-size: 0.9rem; color: color-mix(in srgb, var(--sk-text) 65%, transparent); }
+.mbl-profile-hero-text small { font-size: 0.8rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); }
 
 .mbl-subtabs {
   display: flex;
   gap: 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   padding-bottom: 0.5rem;
 }
 .mbl-subtabs button {
   background: none;
   border: none;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   font: inherit;
   font-weight: 700;
   font-size: 0.9rem;
@@ -660,8 +661,8 @@
   border-radius: 8px;
 }
 .mbl-subtabs button.is-active {
-  background: color-mix(in srgb, var(--color-primary) 15%, var(--color-card));
-  color: var(--color-primary);
+  background: color-mix(in srgb, var(--sk-primary) 15%, var(--sk-surface));
+  color: var(--sk-primary);
 }
 
 .mbl-data-grid {
@@ -674,11 +675,11 @@
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
-.mbl-data-card span { font-size: 0.78rem; color: color-mix(in srgb, var(--color-text) 55%, transparent); font-weight: 700; }
+.mbl-data-card span { font-size: 0.78rem; color: color-mix(in srgb, var(--sk-text) 55%, transparent); font-weight: 700; }
 .mbl-data-card strong { font-size: 0.95rem; }
 
 .mbl-log-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -688,13 +689,13 @@
   gap: 0.5rem;
   align-items: center;
   padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 9%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
 .mbl-log-row strong { font-size: 0.85rem; font-weight: 800; }
 .mbl-log-row span   { font-size: 0.9rem; }
-.mbl-log-row small  { font-size: 0.78rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.mbl-log-row small  { font-size: 0.78rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); }
 
 /* ─── Task cards ─────────────────────────────────────────────────────────── */
 .mbl-task-card {
@@ -703,22 +704,22 @@
   gap: 0.5rem;
   align-items: center;
   padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
 .mbl-task-info { display: flex; flex-direction: column; gap: 0.15rem; }
 .mbl-task-info strong { font-weight: 800; }
 .mbl-task-info span  { font-size: 0.9rem; }
-.mbl-task-info small { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.mbl-task-info small { font-size: 0.8rem; color: color-mix(in srgb, var(--sk-text) 55%, transparent); }
 .mbl-task-btns { display: flex; flex-direction: column; gap: 0.4rem; }
 
 /* ─── Rack mode ──────────────────────────────────────────────────────────── */
 .mbl-rack-room {
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 14px;
   padding: 0.75rem;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
 .mbl-rack-room h2 { margin: 0 0 0.5rem; font-size: 1rem; }
 .mbl-rack h3 { margin: 0.5rem 0 0.35rem; font-size: 0.85rem; font-weight: 700; }
@@ -730,9 +731,9 @@
 .mbl-tub {
   min-height: 56px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
-  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-card));
-  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
+  background: color-mix(in srgb, var(--sk-border-strong) 12%, var(--sk-surface));
+  color: var(--sk-text);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -742,9 +743,9 @@
   font: inherit;
 }
 .mbl-tub strong { font-size: 0.82rem; font-weight: 900; }
-.mbl-tub small  { font-size: 0.65rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
-.mbl-tub.is-alert  { border-color: #e05050; background: rgba(224,80,80,0.1); }
-.mbl-tub.is-feed   { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-card)); }
+.mbl-tub small  { font-size: 0.65rem; color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
+.mbl-tub.is-alert  { border-color: var(--sk-danger-text, #e05050); background: color-mix(in srgb, var(--sk-danger-text) 10%, transparent); }
+.mbl-tub.is-feed   { border-color: var(--sk-primary); background: color-mix(in srgb, var(--sk-primary) 12%, var(--sk-surface)); }
 
 /* ─── More tab ───────────────────────────────────────────────────────────── */
 .mbl-more-grid {
@@ -759,10 +760,10 @@
   align-items: center;
   gap: 0.35rem;
   min-height: 90px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 14px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   cursor: pointer;
   font: inherit;
   font-weight: 800;
@@ -773,17 +774,17 @@
 .mbl-more-row {
   min-height: 52px;
   padding: 0.65rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
   text-align: left;
   width: 100%;
 }
-.mbl-more-row--danger { color: #e05050; border-color: rgba(224,80,80,0.25); }
+.mbl-more-row--danger { color: var(--sk-danger-text, #e05050); border-color: color-mix(in srgb, var(--sk-danger-text) 25%, transparent); }
 
 @media (max-width: 380px) {
   .mbl-quick-actions { grid-template-columns: repeat(3, 1fr); }
@@ -800,23 +801,23 @@
   aspect-ratio: 1;
   object-fit: cover;
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-photo-btns  { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-.mbl-btn--danger { color: #e05050; border-color: rgba(224,80,80,0.3); }
-.mbl-btn--danger:active { background: rgba(224,80,80,0.1); }
+.mbl-btn--danger { color: var(--sk-danger-text, #e05050); border-color: color-mix(in srgb, var(--sk-danger-text) 30%, transparent); }
+.mbl-btn--danger:active { background: color-mix(in srgb, var(--sk-danger-text) 10%, transparent); }
 .mbl-btn--icon-active {
-  background: color-mix(in srgb, var(--color-primary) 18%, var(--color-card));
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: color-mix(in srgb, var(--sk-primary) 18%, var(--sk-surface));
+  border-color: var(--sk-primary);
+  color: var(--sk-primary);
 }
 
 /* ─── Breeding panel ─────────────────────────────────────────────────────── */
 .mbl-breeding-list { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem 0; }
 .mbl-bp-card {
-  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
   overflow: hidden;
 }
 .mbl-bp-header {
@@ -824,8 +825,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.6rem 0.85rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
-  background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-card));
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 8%, transparent);
+  background: color-mix(in srgb, var(--sk-border-strong) 6%, var(--sk-surface));
 }
 .mbl-bp-header strong { font-size: 0.9rem; font-weight: 800; }
 .mbl-bp-status {
@@ -833,13 +834,13 @@
   font-weight: 700;
   padding: 0.15rem 0.55rem;
   border-radius: 99px;
-  background: color-mix(in srgb, var(--color-text) 10%, transparent);
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--sk-text) 10%, transparent);
+  color: var(--sk-text);
   text-transform: capitalize;
 }
-.mbl-bp-status--active     { background: color-mix(in srgb, #22c55e 18%, transparent); color: #16a34a; }
-.mbl-bp-status--completed  { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #2563eb; }
-.mbl-bp-status--cancelled  { background: color-mix(in srgb, #e05050 12%, transparent); color: #e05050; }
+.mbl-bp-status--active     { background: color-mix(in srgb, var(--sk-success-text) 18%, transparent); color: var(--sk-success-text, #16a34a); }
+.mbl-bp-status--completed  { background: color-mix(in srgb, var(--sk-primary) 15%, transparent); color: var(--sk-primary, #2563eb); }
+.mbl-bp-status--cancelled  { background: color-mix(in srgb, var(--sk-danger-text) 12%, transparent); color: var(--sk-danger-text, #e05050); }
 .mbl-bp-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -854,14 +855,14 @@
   height: 64px;
   border-radius: 12px;
   object-fit: cover;
-  border: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border: 2px solid color-mix(in srgb, var(--sk-primary) 30%, transparent);
 }
 
 /* ─── Breeding stages (interactive cycle logging) ────────────────────────── */
 .mbl-bp-meta {
   display: block;
   font-size: 0.74rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   margin-top: 0.1rem;
 }
 .mbl-bp-stages {
@@ -869,7 +870,7 @@
   flex-direction: column;
 }
 .mbl-cs {
-  border-top: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--sk-text) 8%, transparent);
 }
 .mbl-cs-header {
   display: flex;
@@ -880,7 +881,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-text);
+  color: var(--sk-text);
   text-align: left;
   gap: 0.5rem;
 }
@@ -893,24 +894,24 @@
 .mbl-cs-title strong { font-size: 0.85rem; font-weight: 700; }
 .mbl-cs-latest {
   font-size: 0.76rem;
-  color: var(--color-primary);
+  color: var(--sk-primary);
   font-weight: 500;
 }
 .mbl-cs-none {
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 45%, transparent);
 }
 .mbl-cs-right {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   flex-shrink: 0;
 }
 .mbl-cs-badge {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--sk-primary);
+  color: var(--sk-text-on-accent, #fff);
   font-size: 0.65rem;
   font-weight: 700;
   border-radius: 99px;
@@ -921,15 +922,15 @@
   padding: 0.3rem 0.85rem 0.45rem;
   font-size: 0.74rem;
   font-weight: 600;
-  color: color-mix(in srgb, var(--color-primary) 85%, var(--color-text));
-  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+  color: color-mix(in srgb, var(--sk-primary) 85%, var(--sk-text));
+  background: color-mix(in srgb, var(--sk-primary) 7%, transparent);
 }
 .mbl-cs-body {
   padding: 0.65rem 0.85rem 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background: color-mix(in srgb, var(--color-secondary) 4%, var(--color-card));
+  background: color-mix(in srgb, var(--sk-border-strong) 4%, var(--sk-surface));
 }
 .mbl-cs-form {
   display: flex;
@@ -946,22 +947,22 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   padding-bottom: 0.2rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 6%, transparent);
 }
 .mbl-cs-entry {
   padding: 0.4rem 0.5rem;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-card));
-  border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--sk-border-strong) 8%, var(--sk-surface));
+  border: 1px solid color-mix(in srgb, var(--sk-text) 8%, transparent);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 .mbl-cs-entry.is-latest {
-  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-card));
+  border-color: color-mix(in srgb, var(--sk-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--sk-primary) 6%, var(--sk-surface));
 }
 .mbl-cs-entry-row {
   display: flex;
@@ -979,8 +980,8 @@
   letter-spacing: 0.04em;
   padding: 0.05rem 0.35rem;
   border-radius: 99px;
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--sk-primary);
+  color: var(--sk-text-on-accent, #fff);
 }
 .mbl-cs-entry-detail {
   display: flex;
@@ -989,11 +990,11 @@
 }
 .mbl-cs-entry-detail span {
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 70%, transparent);
 }
 .mbl-cs-entry-notes {
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 65%, transparent);
   font-style: italic;
 }
 
@@ -1009,9 +1010,9 @@
 }
 .mbl-topbar-qr-btn {
   background: none;
-  border: 1.5px solid color-mix(in srgb, var(--color-text) 20%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--sk-text) 20%, transparent);
   border-radius: 8px;
-  color: var(--color-text);
+  color: var(--sk-text);
   font-size: 1.1rem;
   width: 36px;
   height: 36px;
@@ -1022,14 +1023,14 @@
 .mbl-topbar-offline {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #e05050;
-  border: 1.5px solid #e05050;
+  color: var(--sk-danger-text, #e05050);
+  border: 1.5px solid var(--sk-danger-border, #e05050);
   border-radius: 6px;
   padding: 0.1rem 0.45rem;
 }
 .mbl-topbar-sync-time {
   font-size: 0.7rem;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   white-space: nowrap;
 }
 
@@ -1053,10 +1054,10 @@
 .mbl-chip {
   min-height: 32px;
   padding: 0.2rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 16%, transparent);
   border-radius: 99px;
-  background: var(--color-card);
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  background: var(--sk-surface);
+  color: color-mix(in srgb, var(--sk-text) 70%, transparent);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
@@ -1064,8 +1065,8 @@
   transition: background 0.12s;
 }
 .mbl-chip.is-active {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--sk-primary);
+  color: var(--sk-text-on-accent, #fff);
   border-color: transparent;
 }
 
@@ -1077,10 +1078,10 @@
   align-items: center;
   min-height: 72px;
   padding: 0.65rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 14px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   text-align: left;
   cursor: pointer;
   width: 100%;
@@ -1093,20 +1094,20 @@
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-primary) 22%, var(--color-card));
+  background: color-mix(in srgb, var(--sk-primary) 22%, var(--sk-surface));
   display: grid;
   place-items: center;
   font-weight: 900;
   font-size: 1.3rem;
-  color: var(--color-primary);
+  color: var(--sk-primary);
 }
 .mbl-animal-card-body   { display: flex; flex-direction: column; gap: 0.18rem; min-width: 0; }
 .mbl-animal-card-row1   { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
 .mbl-animal-card-name   { font-weight: 800; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mbl-animal-card-genetics { font-size: 0.8rem; color: color-mix(in srgb, var(--color-text) 60%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbl-animal-card-genetics { font-size: 0.8rem; color: color-mix(in srgb, var(--sk-text) 60%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mbl-animal-card-row3   { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.mbl-animal-card-loc    { font-size: 0.74rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
-.mbl-animal-card-chevron { font-size: 1.1rem; color: color-mix(in srgb, var(--color-text) 30%, transparent); }
+.mbl-animal-card-loc    { font-size: 0.74rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); }
+.mbl-animal-card-chevron { font-size: 1.1rem; color: color-mix(in srgb, var(--sk-text) 30%, transparent); }
 
 /* ── Status + sex badges ─────────────────────────────────────────────────── */
 .mbl-status-badge {
@@ -1117,19 +1118,19 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-.mbl-status--active     { background: color-mix(in srgb, #22c55e 18%, transparent); color: #16a34a; }
-.mbl-status--for-sale   { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #2563eb; }
-.mbl-status--sold       { background: color-mix(in srgb, var(--color-text) 10%, transparent); color: color-mix(in srgb, var(--color-text) 60%, transparent); }
-.mbl-status--deceased   { background: rgba(224,80,80,0.12); color: #e05050; }
-.mbl-status--quarantine { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #d97706; }
+.mbl-status--active     { background: color-mix(in srgb, var(--sk-success-text) 18%, transparent); color: var(--sk-success-text, #16a34a); }
+.mbl-status--for-sale   { background: color-mix(in srgb, var(--sk-primary) 15%, transparent); color: var(--sk-primary, #2563eb); }
+.mbl-status--sold       { background: color-mix(in srgb, var(--sk-text) 10%, transparent); color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
+.mbl-status--deceased   { background: color-mix(in srgb, var(--sk-danger-text) 12%, transparent); color: var(--sk-danger-text, #e05050); }
+.mbl-status--quarantine { background: color-mix(in srgb, var(--sk-warning-text) 15%, transparent); color: var(--sk-warning-text, #d97706); }
 
 .mbl-sex-badge {
   font-size: 0.7rem;
   font-weight: 700;
   padding: 0.08rem 0.4rem;
   border-radius: 99px;
-  background: color-mix(in srgb, var(--color-secondary) 15%, var(--color-card));
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  background: color-mix(in srgb, var(--sk-border-strong) 15%, var(--sk-surface));
+  color: color-mix(in srgb, var(--sk-text) 70%, transparent);
 }
 
 /* ── Animal profile redesign ─────────────────────────────────────────────── */
@@ -1139,7 +1140,7 @@
   align-items: center;
   gap: 0.5rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-profile-topbar-name { font-weight: 700; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1148,7 +1149,7 @@
   height: 76px;
   border-radius: 16px;
   object-fit: cover;
-  border: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border: 2px solid color-mix(in srgb, var(--sk-primary) 30%, transparent);
 }
 .mbl-avatar-placeholder.mbl-avatar--profile {
   width: 76px;
@@ -1175,15 +1176,15 @@
   padding: 0.1rem 0.5rem;
   border-radius: 99px;
 }
-.mbl-pill--sex    { background: color-mix(in srgb, var(--color-secondary) 18%, var(--color-card)); color: color-mix(in srgb, var(--color-text) 70%, transparent); }
-.mbl-pill--green  { background: color-mix(in srgb, #22c55e 18%, transparent); color: #16a34a; }
-.mbl-pill--blue   { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #2563eb; }
-.mbl-pill--gray   { background: color-mix(in srgb, var(--color-text) 10%, transparent); color: color-mix(in srgb, var(--color-text) 60%, transparent); }
-.mbl-pill--red    { background: rgba(224,80,80,0.12); color: #e05050; }
-.mbl-pill--orange { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #d97706; }
+.mbl-pill--sex    { background: color-mix(in srgb, var(--sk-border-strong) 18%, var(--sk-surface)); color: color-mix(in srgb, var(--sk-text) 70%, transparent); }
+.mbl-pill--green  { background: color-mix(in srgb, var(--sk-success-text) 18%, transparent); color: var(--sk-success-text, #16a34a); }
+.mbl-pill--blue   { background: color-mix(in srgb, var(--sk-primary) 15%, transparent); color: var(--sk-primary, #2563eb); }
+.mbl-pill--gray   { background: color-mix(in srgb, var(--sk-text) 10%, transparent); color: color-mix(in srgb, var(--sk-text) 60%, transparent); }
+.mbl-pill--red    { background: color-mix(in srgb, var(--sk-danger-text) 12%, transparent); color: var(--sk-danger-text, #e05050); }
+.mbl-pill--orange { background: color-mix(in srgb, var(--sk-warning-text) 15%, transparent); color: var(--sk-warning-text, #d97706); }
 
-.mbl-profile-genetics { margin: 0; font-size: 0.82rem; color: color-mix(in srgb, var(--color-text) 65%, transparent); line-height: 1.4; }
-.mbl-profile-location { font-size: 0.76rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); display: block; margin-top: 0.2rem; }
+.mbl-profile-genetics { margin: 0; font-size: 0.82rem; color: color-mix(in srgb, var(--sk-text) 65%, transparent); line-height: 1.4; }
+.mbl-profile-location { font-size: 0.76rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); display: block; margin-top: 0.2rem; }
 
 /* ── Icon quick-action row ───────────────────────────────────────────────── */
 .mbl-quick-actions--icon  { grid-template-columns: repeat(7, 1fr); gap: 0.35rem; }
@@ -1195,10 +1196,10 @@
   justify-content: center;
   gap: 0.15rem;
   padding: 0.35rem 0.2rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   font: inherit;
   cursor: pointer;
 }
@@ -1219,9 +1220,9 @@
 .mbl-overview-section { display: flex; flex-direction: column; gap: 0.65rem; }
 
 .mbl-info-list {
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
   overflow: hidden;
 }
 .mbl-info-row {
@@ -1230,10 +1231,10 @@
   gap: 0.5rem;
   align-items: baseline;
   padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 6%, transparent);
 }
 .mbl-info-row:last-child { border-bottom: none; }
-.mbl-info-row span { font-size: 0.78rem; font-weight: 700; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.mbl-info-row span { font-size: 0.78rem; font-weight: 700; color: color-mix(in srgb, var(--sk-text) 55%, transparent); }
 .mbl-info-row strong { font-size: 0.9rem; }
 .mbl-info-row--full { grid-template-columns: 1fr; }
 .mbl-info-row--full p { margin: 0.2rem 0 0; font-size: 0.88rem; line-height: 1.5; }
@@ -1245,15 +1246,15 @@
   gap: 0.5rem;
   align-items: center;
   padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 9%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
 .mbl-log-type-icon { font-size: 1.1rem; text-align: center; }
 .mbl-log-body { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
 .mbl-log-body strong { font-size: 0.82rem; font-weight: 800; }
 .mbl-log-body span   { font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mbl-log-row small   { font-size: 0.74rem; color: color-mix(in srgb, var(--color-text) 50%, transparent); white-space: nowrap; }
+.mbl-log-row small   { font-size: 0.74rem; color: color-mix(in srgb, var(--sk-text) 50%, transparent); white-space: nowrap; }
 
 /* ── Task card redesign ──────────────────────────────────────────────────── */
 .mbl-task-card {
@@ -1262,13 +1263,13 @@
   gap: 0.55rem;
   align-items: center;
   padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
 }
-.mbl-task-card--due { border-left: 3px solid var(--color-primary); }
+.mbl-task-card--due { border-left: 3px solid var(--sk-primary); }
 .mbl-task-card-icon { font-size: 1.2rem; text-align: center; }
-.mbl-section-label--danger { color: #e05050; }
+.mbl-section-label--danger { color: var(--sk-danger-text, #e05050); }
 
 /* ── Rack empty tub ──────────────────────────────────────────────────────── */
 .mbl-tub.is-empty {
@@ -1278,9 +1279,9 @@
 
 /* ── Breeding tab — pairing cards ────────────────────────────────────────── */
 .mbl-pairing-card {
-  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
   border-radius: 14px;
-  background: var(--color-card);
+  background: var(--sk-surface);
   overflow: hidden;
 }
 .mbl-pairing-card-header {
@@ -1291,7 +1292,7 @@
   padding: 0.75rem 0.85rem;
   background: none;
   border: none;
-  color: var(--color-text);
+  color: var(--sk-text);
   cursor: pointer;
   width: 100%;
   text-align: left;
@@ -1322,16 +1323,16 @@
   font-weight: 900;
   flex-shrink: 0;
 }
-.mbl-pairing-dot--f { background: color-mix(in srgb, #ec4899 18%, transparent); color: #db2777; }
-.mbl-pairing-dot--m { background: color-mix(in srgb, #3b82f6 18%, transparent); color: #2563eb; }
-.mbl-pairing-x { font-size: 0.75rem; color: color-mix(in srgb, var(--color-text) 40%, transparent); font-weight: 900; }
+.mbl-pairing-dot--f { background: color-mix(in srgb, var(--sk-series-2) 18%, transparent); color: var(--sk-series-2, #db2777); }
+.mbl-pairing-dot--m { background: color-mix(in srgb, var(--sk-primary) 18%, transparent); color: var(--sk-primary, #2563eb); }
+.mbl-pairing-x { font-size: 0.75rem; color: color-mix(in srgb, var(--sk-text) 40%, transparent); font-weight: 900; }
 .mbl-pairing-header-right {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex-shrink: 0;
 }
-.mbl-pairing-chevron { font-size: 0.75rem; color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.mbl-pairing-chevron { font-size: 0.75rem; color: color-mix(in srgb, var(--sk-text) 45%, transparent); }
 
 /* ── Cycle progress bar ─────────────────────────────────────────────────── */
 .mbl-pairing-progress {
@@ -1351,32 +1352,33 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--color-text) 25%, transparent);
-  background: var(--color-card);
+  border: 2px solid color-mix(in srgb, var(--sk-text) 25%, transparent);
+  background: var(--sk-surface);
   transition: background 0.15s, border-color 0.15s;
 }
 .mbl-stage-pip.is-done .mbl-stage-pip-dot {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--sk-primary);
+  border-color: var(--sk-primary);
 }
 .mbl-stage-pip span {
   font-size: 0.6rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   white-space: nowrap;
 }
-.mbl-stage-pip.is-done span { color: var(--color-primary); }
+.mbl-stage-pip.is-done span { color: var(--sk-primary); }
 .mbl-stage-line {
   flex: 1;
   height: 2px;
-  background: color-mix(in srgb, var(--color-text) 15%, transparent);
+  background: color-mix(in srgb, var(--sk-text) 15%, transparent);
   margin-bottom: 18px;
 }
-.mbl-stage-line.is-done { background: var(--color-primary); }
+.mbl-stage-line.is-done { background: var(--sk-primary); }
 
 .mbl-pairing-body {
-  border-top: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
-  background: color-mix(in srgb, var(--color-secondary) 4%, var(--color-card));
+  border-top: 1px solid color-mix(in srgb, var(--sk-text) 8%, transparent);
+  background: color-mix(in srgb, var(--sk-border-strong) 4%, var(--sk-surface));
+  color: var(--sk-text-on-accent);
 }
 
 /* ── More tab redesign ───────────────────────────────────────────────────── */
@@ -1394,10 +1396,10 @@
   justify-content: center;
   gap: 0.3rem;
   min-height: 80px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 14px;
-  background: var(--color-card);
-  color: var(--color-text);
+  background: var(--sk-surface);
+  color: var(--sk-text);
   cursor: pointer;
   font: inherit;
   font-weight: 800;
@@ -1406,9 +1408,9 @@
 .mbl-more-quick-card span { font-size: 1.4rem; }
 
 .mbl-settings-list {
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
   border-radius: 12px;
-  background: var(--color-card);
+  background: var(--sk-surface);
   overflow: hidden;
 }
 .mbl-settings-row {
@@ -1418,7 +1420,7 @@
   gap: 0.5rem;
   min-height: 48px;
   padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 7%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 7%, transparent);
   font-size: 0.9rem;
 }
 .mbl-settings-row:last-child { border-bottom: none; }
@@ -1427,23 +1429,23 @@
   border-left: none;
   border-right: none;
   border-top: none;
-  color: var(--color-text);
+  color: var(--sk-text);
   font: inherit;
   cursor: pointer;
   width: 100%;
   text-align: left;
 }
 .mbl-settings-row--btn:last-child { border-bottom: none !important; }
-.mbl-settings-row--danger { color: #e05050; }
-.mbl-settings-chevron { font-size: 1.1rem; color: color-mix(in srgb, var(--color-text) 35%, transparent); }
+.mbl-settings-row--danger { color: var(--sk-danger-text, #e05050); }
+.mbl-settings-chevron { font-size: 1.1rem; color: color-mix(in srgb, var(--sk-text) 35%, transparent); }
 .mbl-settings-badge {
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.1rem 0.5rem;
   border-radius: 99px;
 }
-.mbl-settings-badge--green { background: color-mix(in srgb, #22c55e 18%, transparent); color: #16a34a; }
-.mbl-settings-badge--red   { background: rgba(224,80,80,0.12); color: #e05050; }
+.mbl-settings-badge--green { background: color-mix(in srgb, var(--sk-success-text) 18%, transparent); color: var(--sk-success-text, #16a34a); }
+.mbl-settings-badge--red   { background: color-mix(in srgb, var(--sk-danger-text) 12%, transparent); color: var(--sk-danger-text, #e05050); }
 
 /* ─── Settings screen additions ──────────────────────────────────────────── */
 .mbl-settings-screen { gap: 1rem; }
@@ -1452,17 +1454,17 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  background: var(--color-card);
+  background: var(--sk-surface);
   border-radius: 14px;
   padding: 1rem;
-  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
 .mbl-profile-card-avatar {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--color-primary);
-  color: var(--color-bg);
+  background: var(--sk-primary);
+  color: var(--sk-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1486,7 +1488,7 @@
 }
 .mbl-profile-card-info span {
   font-size: 0.8rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1513,18 +1515,18 @@
 
 .mbl-settings-muted {
   font-size: 0.82rem;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
 }
 .mbl-device-id {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.68rem;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 45%, transparent);
   word-break: break-all;
   line-height: 1.4;
 }
 .mbl-settings-hint {
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 50%, transparent);
   line-height: 1.45;
   padding: 0.15rem 0.1rem 0;
 }
@@ -1542,9 +1544,10 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-primary) 18%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-card));
+  background: color-mix(in srgb, var(--sk-primary) 8%, var(--sk-surface));
+  color: var(--sk-text-on-accent);
 }
 .mbl-feed-card div {
   display: flex;
@@ -1555,7 +1558,7 @@
 .mbl-feed-card span {
   font-size: 0.76rem;
   font-weight: 800;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 55%, transparent);
 }
 .mbl-feed-card strong {
   font-size: 0.95rem;
@@ -1566,9 +1569,9 @@
   font-style: normal;
   font-size: 0.72rem;
   font-weight: 900;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 13%, var(--color-card));
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  color: var(--sk-primary);
+  background: color-mix(in srgb, var(--sk-primary) 13%, var(--sk-surface));
+  border: 1px solid color-mix(in srgb, var(--sk-primary) 24%, transparent);
   border-radius: 999px;
   padding: 0.18rem 0.55rem;
 }
@@ -1583,7 +1586,7 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0;
-  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 52%, transparent);
   padding: 0 0.1rem;
 }
 
@@ -1594,9 +1597,9 @@
 }
 .mbl-summary-grid > div {
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--color-text) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sk-text) 9%, transparent);
   border-radius: 10px;
-  background: var(--color-card);
+  background: var(--sk-surface);
   padding: 0.65rem 0.75rem;
   display: flex;
   flex-direction: column;
@@ -1605,7 +1608,7 @@
 .mbl-summary-grid span {
   font-size: 0.74rem;
   font-weight: 800;
-  color: color-mix(in srgb, var(--color-text) 54%, transparent);
+  color: color-mix(in srgb, var(--sk-text) 54%, transparent);
 }
 .mbl-summary-grid strong {
   font-size: 1.05rem;
@@ -1624,10 +1627,10 @@
   gap: 0.4rem;
   margin-bottom: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid #dc2626;
+  border: 1px solid var(--sk-danger-border, #dc2626);
   border-radius: 8px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--sk-danger-bg, #fef2f2);
+  color: var(--sk-danger-text, #991b1b);
   font-size: 0.84rem;
   line-height: 1.4;
 }
@@ -1644,7 +1647,7 @@
 }
 
 [data-theme="dark"] .mbl-sync-error {
-  border-color: #ef4444;
-  background: #3f1518;
-  color: #fecaca;
+  border-color: var(--sk-danger-border, #ef4444);
+  background: var(--sk-danger-bg, #3f1518);
+  color: var(--sk-danger-text, #fecaca);
 }

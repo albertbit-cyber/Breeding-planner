@@ -5,7 +5,7 @@ const Stat = ({ icon, label, value }) => (
     <span className="text-base">{icon}</span>
     <div className="flex flex-col leading-tight">
       <span className="text-xs font-bold text-neutral-700">{value ?? '—'}</span>
-      <span className="text-[10px] text-neutral-400">{label}</span>
+      <span className="text-[10px] text-neutral-500">{label}</span>
     </div>
   </div>
 );

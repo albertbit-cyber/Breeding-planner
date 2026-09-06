@@ -82,17 +82,17 @@ const GenLabelOverlay = ({ nodes, orientation }) => {
 };
 
 const MINIMAP_COLOR = (node) => {
-  if (node.type === 'placeholderNode') return '#e5e7eb';
-  if (node.type === 'junctionNode') return '#7c3aed';
-  if (node.type === 'clutchNode') return '#8b5cf6';
-  if (node.data?.isSelected) return '#7c3aed';
+  if (node.type === 'placeholderNode') return 'var(--sk-border)';
+  if (node.type === 'junctionNode') return 'var(--sk-series-4)';
+  if (node.type === 'clutchNode') return 'var(--sk-series-6)';
+  if (node.data?.isSelected) return 'var(--sk-series-4)';
   switch (node.data?.nodeRole) {
-    case 'sire': return '#0ea5e9';
-    case 'dam': return '#ec4899';
-    case 'offspring': return '#10b981';
-    case 'sibling': return '#f59e0b';
-    case 'egg': return '#fbbf24';
-    default: return '#a78bfa';
+    case 'sire': return 'var(--sk-series-1)';
+    case 'dam': return 'var(--sk-series-2)';
+    case 'offspring': return 'var(--sk-series-3)';
+    case 'sibling': return 'var(--sk-series-5)';
+    case 'egg': return 'var(--sk-series-5)';
+    default: return 'var(--sk-series-6)';
   }
 };
 
@@ -148,13 +148,13 @@ const FlowBody = ({ initialNodes, initialEdges, onNodeClick, fitKey, orientation
           pannable
           nodeColor={MINIMAP_COLOR}
           style={{
-            background: '#f5f3ff',
-            border: '1px solid #ddd6fe',
+            background: 'var(--sk-surface-2)',
+            border: '1px solid var(--sk-border)',
             borderRadius: '10px',
           }}
         />
-        <Controls style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #ddd6fe' }} />
-        <Background gap={20} size={1} color="#ede9fe" variant="dots" />
+        <Controls style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--sk-border)' }} />
+        <Background gap={20} size={1} color="var(--sk-border)" variant="dots" />
       </ReactFlow>
     </div>
   );

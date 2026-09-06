@@ -7,60 +7,101 @@ wins — update the frontend, not the doc (propose changes here first, then roll
 
 ## Source of truth
 
-The canonical implementation lives in `breeding-app-breeder/src/contexts/AppearanceContext.jsx`. It is
-the only app in the suite with a real design-token system: colors, typography, spacing, radius, and
-motion are all expressed as CSS custom properties on `<html>`, computed from a small set of named
-presets. Every other frontend should wire its own components to these same variable names rather than
-hardcoding hex values.
+The palette lives in **`breeding-app-shared/src/styles/skins.css`** — one
+`[data-skin="…"]` block per skin, plus a `[data-theme-mode="high-contrast"]`
+modifier. That file is the only place in the entire repo where a colour literal
+belongs.
+
+`breeding-app-breeder/src/contexts/AppearanceContext.jsx` no longer holds any
+colours. It decides which skin is active and stamps `data-skin` /
+`data-theme-mode` onto `<html>`; everything genuinely dynamic (typography,
+density, radius, motion, persistence, user overrides) still lives there. The
+other four frontends share `breeding-app-shared/src/styles/applySkin.mjs` and
+carry an 83-line provider that only reads.
+
+**Invariant: a hex literal outside `skins.css` is a bug.**
+
+### How Tailwind participates
+
+The breeder is the only Tailwind app. `tw-bridge.css` re-points Tailwind v4's
+stock palette variables at the skin roles:
+
+```css
+@theme {
+  --color-neutral-500: var(--sk-text-muted);   /* 334 existing call sites */
+  --color-white:       var(--sk-surface);
+  --color-neutral-200: var(--sk-border);
+}
+```
+
+Tailwind v4 compiles every colour utility to `var(--color-*)`, so this converts
+roughly 2,000 existing `bg-white` / `text-neutral-500` / `border-neutral-200`
+usages without editing a single one of them. Import order matters:
+`tailwindcss`, then `skins.css`, then `tw-bridge.css`.
+
+`--color-black` is deliberately **not** re-pointed — the label-preview
+checkerboard and QR rendering need true black. Modal scrims use `.sk-scrim`.
 
 ## 1. Color roles
 
-Colors are never referenced by hex value in components — only by role, via CSS custom properties.
-This is what lets end users re-skin the breeder app with presets (see §5) without touching component
-code, and it's what lets every other frontend match without copy-pasting colors.
+Colours are never referenced by hex value in components — only by role.
 
-| Role | CSS variable | Default value | Used for |
-|---|---|---|---|
-| Primary | `--color-primary` | `#0ea5e9` | Primary actions, links, active states, focus rings |
-| Secondary | `--color-secondary` | `#2563eb` | Secondary actions, border accents |
-| Accent | `--color-accent` | `#f59e0b` | Highlights, callouts, "new"/attention markers |
-| Background | `--color-bg` | `#f6f7f9` | App/page background |
-| Card | `--color-card` | `#ffffff` | Panels, cards, modals, table surfaces |
-| Text | `--color-text` | `#0f172a` | Primary text color |
+| Role | Variable | Used for |
+|---|---|---|
+| Page ground | `--sk-bg`, `--sk-bg-2` | app/page background |
+| Surface | `--sk-surface` | cards, panels, table rows |
+| Surface (subtle) | `--sk-surface-2`, `--sk-surface-3` | zebra rows, hover fills |
+| Raised | `--sk-surface-raised` | modals, popovers, menus |
+| Scrim | `--sk-scrim` (R G B channels) | modal backdrops, via `.sk-scrim` |
+| Divider | `--sk-border`, `--sk-border-strong` | borders, inputs |
+| Text | `--sk-text` | headings, primary copy |
+| Text (secondary) | `--sk-text-secondary` | body |
+| Text (muted) | `--sk-text-muted` | labels, hints |
+| Text (subtle) | `--sk-text-subtle` | placeholders, disabled |
+| On accent | `--sk-text-on-accent` | copy that sits **on** `--sk-primary` |
+| Brand | `--sk-primary`, `--sk-primary-hover`, `--sk-accent` | actions, highlights |
+| Wordmark | `--sk-brand` | the product name — checked against **both** `--sk-bg` and `--sk-surface` |
+| Low-emphasis fill | `--sk-primary-quiet`, `--sk-primary-quiet-text` | secondary CTAs that need a fill but not the full primary |
+| Link | `--sk-link` | links |
+| Focus | `--sk-focus` | focus rings |
+| Status | `--sk-{success,warning,danger,info}-{bg,border,text}` | state feedback |
+| Elevation | `--sk-shadow-color`, `--sk-shadow-1/2/3` | shadows |
+| Data series | `--sk-series-1` … `--sk-series-6` | charts, Family Tree roles |
 
-Derived/compat aliases set alongside the above (some older components read these names — new code
-should prefer the `--color-*` names above):
+`--sk-text-on-accent` is authored explicitly by every skin and is **never**
+derived from `--sk-text`. Conflating them is what made the old `minimal` preset
+render invisible button labels.
 
-- `--primary` = `--color-primary`
-- `--primary-border` = `--color-secondary`
-- `--primary-contrast` = `--color-text`
-- `--overlay-color` = `rgba(15,23,42,0.35)` in light mode, `rgba(15,23,42,0.6)` in dark mode
+### Authoring a skin
 
-### Semantic status colors (fixed, not themeable)
+One `[data-skin="your-name"]` block, ~34 declarations, then:
 
-These are used consistently for state feedback regardless of the active preset:
+```
+node breeding-app-shared/src/styles/__tests__/skins.contrast.test.js   # prints a table
+npm --prefix breeding-app-shared run test                              # under vitest
+```
 
-| State | Background | Border | Text |
-|---|---|---|---|
-| Success | `#f0fdf4` | `#bbf7d0` | `#166534` |
-| Error | `#fff1f2` | `#fecaca` | `#9f1239` |
-| Warning / recommended | `#dcfce7` | `#86efac` | `#166534` |
-| Danger / inactive | `#fee2e2` | `#fca5a5` | `#991b1b` |
-| Neutral / hidden | `#f3f4f6` | `#d1d5db` | `#6b7280` |
+The test enforces every text pair, the focus ring against **both** surface and
+primary, the four status quartets, and that the six data series stay >= 60 deg
+apart and >= 3:1 on surface. `high-contrast-forest` is held to 7:1 (AAA).
 
-### Preset palette (reference)
+`default` carries three pinned legacy shortfalls (focus 2.77 / 2.14, border
+1.26) — today's shipped values, pinned at value rather than ignored so they
+cannot drift worse. See `docs/skins/MIGRATION-NOTES.md`.
 
-The breeder app ships six presets. Any frontend that offers theming should be able to reuse this table
-verbatim; frontends that don't offer theming should just use the **Default** row.
+**The static test cannot catch everything.** The worst finding of the 24 Aug
+audit was an inline style on `.app-root`, not a stylesheet value — skins.css
+passed its own suite while the running app was unreadable. Keep the DOM audit
+(measure rendered foreground against rendered background, per skin, per route)
+and run both.
 
-| Preset | primary | secondary | accent | background | text |
-|---|---|---|---|---|---|
-| Default | `#0ea5e9` | `#2563eb` | `#f59e0b` | `#f6f7f9` | `#0f172a` |
-| Minimal | `#0f172a` | `#94a3b8` | `#f97316` | `#fbfbfb` | `#0f172a` |
-| High contrast | `#ffb100` | `#ffd700` | `#ff4d4f` | `#000000` | `#ffffff` |
-| Visually impaired | `#005fcc` | `#111827` | `#b45309` | `#ffffff` | `#000000` |
-| Dark breeder | `#12b981` | `#0f172a` | `#ef4444` | `#05070d` | `#e2e8f0` |
-| Soft pastel | `#f472b6` | `#a5b4fc` | `#34d399` | `#fef6fb` | `#2e1065` |
+### Surfaces frozen on `default`
+
+These deliberately do **not** follow the user's skin: the 13 backend email
+templates, jsPDF certificates and labels, the Capacitor splash and status bar,
+and the PWA manifest. A breeder's personal skin should not change what their
+customers receive by email. Note that `html2canvas` exports *will* bake the
+active skin into shared images.
 
 ## 2. Typography
 
