@@ -105,8 +105,12 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
     });
   }, [submittedOrders]);
 
-  const refreshData = async () => {
-    setLoading(true);
+  const refreshData = async ({ initial } = { initial: true }) => {
+    // Only the first load blanks the terminal. This used to flip on every
+    // thirty-second poll, which unmounted the saved shed queue and the panel
+    // body -- so a keeper part-way through editing a row's note or ticking what
+    // to send watched it vanish and come back from the server.
+    if (initial) setLoading(true);
     setError("");
     setQueueUnavailable(false);
     try {
@@ -254,7 +258,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const handleRefresh = () => {
-      refreshData();
+      refreshData({ initial: false });
     };
     const intervalId = window.setInterval(handleRefresh, 30_000);
     window.addEventListener("lab:test-order-created", handleRefresh);
@@ -442,7 +446,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                 : t("lab.terminal.showHistory", { defaultValue: "Show Batch History" })}
             </button>
           ) : null}
-          <button type="button" className="rounded-lg border px-2 py-1 text-[11px]" onClick={refreshData}>
+          <button type="button" className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => refreshData()}>
             {t("common.refresh", { defaultValue: "Refresh" })}
           </button>
         </div>

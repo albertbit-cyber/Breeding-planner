@@ -77,8 +77,10 @@ export function useLabDashboardData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async ({ initial } = { initial: true }) => {
+    // Only the first load blanks the dashboard. A background refresh keeps the
+    // current cards on screen and swaps the numbers underneath them.
+    if (initial) setIsLoading(true);
     setError("");
     try {
       const api = createLabApiClient();

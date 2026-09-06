@@ -1124,6 +1124,24 @@ export const createLabApiClient = () => {
     return toSharedSampleLookupResult(match.order, match.animal, match.sample, "qrToken");
   };
 
+  /**
+   * The sample for an order the caller already holds.
+   *
+   * `resolveLabSampleBySampleId` has to search, so it lists every order to find
+   * the one it was given an id from. Calling it once per row -- which the order
+   * board did -- turned one refresh into one full order list per order, every
+   * twenty seconds. Nothing here needs the network: the synthetic sample is
+   * derived from the order itself.
+   */
+  const getLabSampleForOrder = async (order: any, animalIndex = 0) => {
+    requireSessionRole("admin", "lab_staff", "breeder");
+    const animals = getSharedOrderAnimals(order);
+    const animal = animals[animalIndex];
+    if (!animal) return null;
+    const sample = await buildSharedSyntheticSample(order, animal, animalIndex);
+    return toSharedSampleLookupResult(order, animal, sample, "sampleId");
+  };
+
   const resolveLabSampleBySampleId = async (sampleId: string) => {
     requireSessionRole("admin", "lab_staff", "breeder");
     const match = await findSharedSampleBySampleId(String(sampleId || "").trim());
@@ -1538,6 +1556,7 @@ export const createLabApiClient = () => {
     getLabOrderOutcome,
     resolveLabSampleByQrToken,
     resolveLabSampleBySampleId,
+    getLabSampleForOrder,
     markSampleAsReceived,
     submitLabSampleIntake,
     getLabTestOrderDetails,

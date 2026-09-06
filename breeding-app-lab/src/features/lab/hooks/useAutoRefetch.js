@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
- * Shared auto-refresh hook used across lab pages and the breeder panel.
+ * Shared auto-refresh hook used across the lab pages.
  *
  * Triggers a re-fetch:
  *   - Immediately on mount
@@ -9,43 +9,77 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *   - When the window regains focus
  *   - When any of the custom `events` are dispatched on `window`
  *
- * @param {() => void | Promise<void>} fetchFn  Async or sync function to call on each refresh.
- * @param {{ intervalMs?: number, events?: string[] }} options
+ * `fetchFn` is called with `{ initial }`. Only the mount call is initial; every
+ * other one is a background refresh. Pages use that to keep showing what they
+ * already have instead of tearing the view down and rendering a spinner --
+ * whoever is reading the queue did not ask for it to vanish every twenty
+ * seconds, and whatever they had open in it went with it.
+ *
+ * @param {(context: { initial: boolean }) => void | Promise<void>} fetchFn
+ * @param {{ intervalMs?: number, events?: string[], focusThrottleMs?: number }} options
  * @returns {{ refetch: () => void }}
  */
-export function useAutoRefetch(fetchFn, { intervalMs = 30_000, events = [] } = {}) {
-  const [revision, setRevision] = useState(0);
+export function useAutoRefetch(fetchFn, { intervalMs = 30_000, events = [], focusThrottleMs = 5_000 } = {}) {
   const fetchFnRef = useRef(fetchFn);
+  const lastFetchAtRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
 
-  // Keep ref current so the interval/event handlers always call the latest version
-  // without needing to be re-registered when fetchFn changes.
+  // Keep the ref current so the interval and listeners always call the latest
+  // version without being re-registered when fetchFn changes identity.
   useEffect(() => {
     fetchFnRef.current = fetchFn;
   }, [fetchFn]);
 
-  const refetch = useCallback(() => setRevision((r) => r + 1), []);
+  const run = useCallback((options) => {
+    lastFetchAtRef.current = Date.now();
+    // `initial` means "show that something is happening": the first load, and an
+    // explicit press of Refresh, because a person asked and deserves feedback.
+    // The timer, the window regaining focus and the workflow events are all
+    // background, and must leave what is on screen alone.
+    const initial = options?.initial ?? !hasLoadedOnceRef.current;
+    hasLoadedOnceRef.current = true;
+    fetchFnRef.current({ initial });
+  }, []);
 
-  // Register polling, focus listener, and custom event listeners.
+  // Ignores whatever it is handed -- it is wired straight to onClick in places,
+  // and a MouseEvent must not be read as options.
+  const refetch = useCallback(() => run({ initial: true }), [run]);
+
+  // The event list is almost always written inline at the call site, so it is a
+  // new array on every render. Depending on it directly tore this effect down
+  // and rebuilt the interval on every render, which quietly reset the countdown
+  // and made the poll fire late or not at all.
+  const eventsKey = events.join("|");
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    const handle = () => refetch();
+    const names = eventsKey ? eventsKey.split("|") : [];
 
-    const allEvents = [...events, "focus"];
-    allEvents.forEach((evt) => window.addEventListener(evt, handle));
+    const handleEvent = () => run({ initial: false });
 
-    const timer = window.setInterval(handle, intervalMs);
+    // A window that is alt-tabbed away from and back to -- to read a tube label,
+    // or a paper form -- would otherwise refetch on every single return.
+    const handleFocus = () => {
+      if (Date.now() - lastFetchAtRef.current < focusThrottleMs) return;
+      run({ initial: false });
+    };
+
+    names.forEach((name) => window.addEventListener(name, handleEvent));
+    window.addEventListener("focus", handleFocus);
+    const timer = window.setInterval(handleEvent, intervalMs);
 
     return () => {
-      allEvents.forEach((evt) => window.removeEventListener(evt, handle));
+      names.forEach((name) => window.removeEventListener(name, handleEvent));
+      window.removeEventListener("focus", handleFocus);
       window.clearInterval(timer);
     };
-  }, [refetch, intervalMs, events]);
+  }, [run, intervalMs, eventsKey, focusThrottleMs]);
 
-  // Call fetchFn whenever revision increments (mount + every trigger above).
+  // Mount.
   useEffect(() => {
-    fetchFnRef.current();
-  }, [revision]);
+    run();
+  }, [run]);
 
   return { refetch };
 }

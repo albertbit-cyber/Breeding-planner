@@ -352,13 +352,15 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
   // Label size preference is saved to localStorage; printer choice stays in the OS dialog.
   const [labelSizeOverride, setLabelSizeOverride] = useState(() => loadLabelSizePref());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ initial } = { initial: true }) => {
     const snakeId = String(snake?.id || "").trim();
     if (!snakeId) {
       setOrders([]);
       return;
     }
-    setIsLoading(true);
+    // Only the first load empties the panel. A background refresh leaves the
+    // orders on screen and updates them in place.
+    if (initial) setIsLoading(true);
     setError("");
     try {
       const api = createLabApiClient();

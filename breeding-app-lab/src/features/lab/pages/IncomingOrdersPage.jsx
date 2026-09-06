@@ -134,8 +134,11 @@ export default function IncomingOrdersPage() {
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [showCancelled, setShowCancelled] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ initial } = { initial: true }) => {
+    // Only the first load shows the placeholder. Flipping this on every poll is
+    // what made the whole board vanish and come back every twenty seconds --
+    // and again on every window focus -- taking anything open in it along.
+    if (initial) setLoading(true);
     setError("");
 
     try {
@@ -144,13 +147,12 @@ export default function IncomingOrdersPage() {
 
       const orderList = (Array.isArray(orders) ? orders : []).slice().sort((a, b) => toRecentTs(b) - toRecentTs(a));
 
+      // Derived from the order in hand rather than looked up by id: the lookup
+      // searches, so it re-listed every order once per row.
       const sampleLookupEntries = await Promise.all(
         orderList.map(async (order) => {
-          const sampleId = Array.isArray(order.sampleIds) && order.sampleIds.length ? String(order.sampleIds[0]).trim() : "";
-          if (!sampleId) return [order.id, null];
           try {
-            const resolved = await api.resolveLabSampleBySampleId(sampleId);
-            return [order.id, resolved];
+            return [order.id, await api.getLabSampleForOrder(order)];
           } catch {
             return [order.id, null];
           }
