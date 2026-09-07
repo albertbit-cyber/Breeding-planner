@@ -88,20 +88,38 @@ const main = async () => {
 
   const existing = await prisma.labTestOffering.findMany({ where: { organizationId } });
   const existingById = new Map(existing.map((row) => [row.id, row]));
-  const incomingIds = new Set(PROHERPER_OFFERINGS.map((o) => offeringId(organizationId, o.key)));
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const existingByName = new Map(existing.map((row) => [normalizeName(row.name), row]));
+
+  // A laboratory cannot list the same name twice, so a seeded "Clown" and this
+  // catalogue's "Clown" are the same product under two ids. Creating the second
+  // one violates that constraint outright -- which is exactly what happened the
+  // first time this ran against a laboratory the migration had already seeded.
+  //
+  // The seeded row is adopted instead: updated in place, keeping its id, so the
+  // order lines already pointing at it keep resolving. Matching on the id first
+  // means a laboratory that has run this before still updates cleanly.
+  const targetIdFor = (offering: ProHerperOffering): string => {
+    const stableId = offeringId(organizationId, offering.key);
+    if (existingById.has(stableId)) return stableId;
+    const sameName = existingByName.get(normalizeName(offering.name));
+    return sameName ? sameName.id : stableId;
+  };
+
+  const adopted = PROHERPER_OFFERINGS.filter((o) => {
+    const stableId = offeringId(organizationId, o.key);
+    return !existingById.has(stableId) && existingByName.has(normalizeName(o.name));
+  });
+  const claimedIds = new Set(PROHERPER_OFFERINGS.map(targetIdFor));
 
   // Anything already on the laboratory's list that this catalogue does not
   // mention: either something they added themselves, or a leftover from the
   // platform's generic seed. Reported, never deleted — an offering an order
   // points at must keep resolving.
-  const notInCatalogue = existing.filter((row) => !incomingIds.has(row.id));
+  const notInCatalogue = existing.filter((row) => !claimedIds.has(row.id));
 
-  const created = PROHERPER_OFFERINGS.filter(
-    (o) => !existingById.has(offeringId(organizationId, o.key))
-  );
-  const updated = PROHERPER_OFFERINGS.filter((o) =>
-    existingById.has(offeringId(organizationId, o.key))
-  );
+  const created = PROHERPER_OFFERINGS.filter((o) => !existingById.has(targetIdFor(o)));
+  const updated = PROHERPER_OFFERINGS.filter((o) => existingById.has(targetIdFor(o)));
 
   const byKind = (kind: string) => PROHERPER_OFFERINGS.filter((o) => o.testKind === kind).length;
   console.log(`Serves ${PROHERPER_SERVED_SPECIES.length} species: ${PROHERPER_SERVED_SPECIES.join(", ")}`);
@@ -111,6 +129,14 @@ const main = async () => {
   );
   console.log(`  to create: ${created.length}`);
   console.log(`  to update: ${updated.length}`);
+  if (adopted.length) {
+    console.log(
+      `  of those updates, ${adopted.length} adopt a seeded offering of the same name ` +
+        `(kept by id so existing order lines still resolve):`
+    );
+    for (const row of adopted.slice(0, 10)) console.log(`    - ${row.name}`);
+    if (adopted.length > 10) console.log(`    … and ${adopted.length - 10} more`);
+  }
   if (notInCatalogue.length) {
     console.log(`\n  ${notInCatalogue.length} existing offering(s) are not in this catalogue:`);
     for (const row of notInCatalogue.slice(0, 10)) console.log(`    - ${row.name}`);
@@ -133,7 +159,7 @@ const main = async () => {
   }
 
   for (const offering of PROHERPER_OFFERINGS) {
-    const id = offeringId(organizationId, offering.key);
+    const id = targetIdFor(offering);
     const data = toRow(organizationId, offering);
     await prisma.labTestOffering.upsert({
       where: { id },

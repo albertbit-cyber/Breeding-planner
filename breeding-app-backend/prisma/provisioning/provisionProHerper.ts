@@ -26,6 +26,9 @@ import { PrismaClient } from "@prisma/client";
  *   cd breeding-app-backend
  *   npx tsx prisma/provisioning/provisionProHerper.ts            # dry run
  *   npx tsx prisma/provisioning/provisionProHerper.ts --apply    # write
+ *
+ * Add --replace-seeded when the laboratory still carries the migration's
+ * placeholder name and contact, which are not a vendor's own choice.
  */
 
 const prisma = new PrismaClient();
@@ -38,6 +41,9 @@ const PROHERPER = {
   phone: "+32 95 32 07 98",
   addressLine1: "Wijngaardstraat 27",
   city: "Diest",
+  // The directory shows `location` ahead of city+country, so leaving the seed's
+  // value here put "Germany" under a Diest address on the breeder's lab picker.
+  location: "Diest, Belgium",
   postalCode: "3290",
   country: "Belgium",
   iban: "BE62 0636 4963 1061",
@@ -79,6 +85,7 @@ const findLab = async () => {
 
 const main = async () => {
   const apply = process.argv.includes("--apply");
+  const replaceSeeded = process.argv.includes("--replace-seeded");
 
   const lab = await findLab();
   if (!lab) {
@@ -100,14 +107,41 @@ const main = async () => {
 
   // Only fill blanks. If the laboratory has already set a field for itself,
   // theirs wins — this script must never overwrite a vendor's own decision.
+  //
+  // The exception, behind --replace-seeded: a value the *seed* wrote. The
+  // tenancy migration had to give the first laboratory some name, so it carries
+  // "Seed Genetics Lab" and "Seed Lab User" — placeholders nobody chose, which
+  // read as "already set" and would otherwise keep ProHerper's real identity out
+  // for good. Matching on the exact placeholder rather than replacing whatever
+  // is there keeps the property that makes this script safe to re-run: a
+  // laboratory that has named itself is still untouchable, flag or no flag.
+  const SEED_PLACEHOLDERS: Record<string, string[]> = {
+    labName: ["Seed Genetics Lab", "Second Genetics Lab"],
+    contactPerson: ["Seed Lab User", "Second Lab User"],
+    // Safe only because this script names one laboratory and finds it by its own
+    // email: "Germany" is a real answer for some laboratory somewhere, but not
+    // for this one, which is in Diest.
+    location: ["Germany"],
+  };
+  const isSeedPlaceholder = (key: string, current: unknown): boolean =>
+    (SEED_PLACEHOLDERS[key] || []).some(
+      (placeholder) => String(current).trim().toLowerCase() === placeholder.toLowerCase()
+    );
+
   const changes: Record<string, unknown> = {};
+  const replaced: string[] = [];
   const skipped: string[] = [];
   for (const [key, value] of Object.entries(desired)) {
     const current = (lab as Record<string, unknown>)[key];
     if (current === null || current === undefined || current === "") {
       changes[key] = value;
-    } else if (current !== value) {
-      skipped.push(key);
+    } else if (current === value) {
+      // Already correct.
+    } else if (replaceSeeded && isSeedPlaceholder(key, current)) {
+      changes[key] = value;
+      replaced.push(`${key} (was "${String(current)}")`);
+    } else {
+      skipped.push(isSeedPlaceholder(key, current) ? `${key} — seeded, pass --replace-seeded` : key);
     }
   }
 
