@@ -123,8 +123,22 @@ const main = async () => {
     // for this one, which is in Diest.
     location: ["Germany"],
   };
+
+  // The stronger signal, and the one that needs no list: a name still identical
+  // to the organization's own is one the platform filled in, not one anybody
+  // chose. Every place that creates a laboratory without being told its name --
+  // the seed, accepting an invitation, repairing a missing profile -- copies the
+  // organization name across. A laboratory that has since named itself no longer
+  // matches, and stays untouchable.
+  const organizationName = String((lab as { organization?: { name?: string } }).organization?.name || "").trim();
+  const isPlatformFilled = (key: string, current: unknown): boolean => {
+    if (key !== "labName" && key !== "contactPerson") return false;
+    return Boolean(organizationName) && String(current).trim() === organizationName;
+  };
+
   const isSeedPlaceholder = (key: string, current: unknown): boolean =>
-    (SEED_PLACEHOLDERS[key] || []).some(
+    isPlatformFilled(key, current)
+    || (SEED_PLACEHOLDERS[key] || []).some(
       (placeholder) => String(current).trim().toLowerCase() === placeholder.toLowerCase()
     );
 
