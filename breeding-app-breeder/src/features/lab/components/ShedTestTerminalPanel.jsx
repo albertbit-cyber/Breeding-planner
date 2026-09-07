@@ -144,12 +144,27 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       const queueLabId = (pending || [])
         .map((item) => String(item?.labId || "").trim())
         .find(Boolean) || "";
-      const [tests, pricing] = queueLabId
-        ? await Promise.all([
-            api.getLabTestsCatalog({ breederView: true, labOrganizationId: queueLabId }),
-            api.getLabTestsPricing({ labOrganizationId: queueLabId }),
-          ])
-        : [[], null];
+      // Best-effort, and deliberately not fatal. The directory only returns a
+      // laboratory that is approved and listed, so a queue naming one that has
+      // since been unlisted answers 404 -- and losing the whole terminal,
+      // including orders that loaded perfectly well, is far worse than showing
+      // the queue without its price. The quote comes from the server anyway.
+      let tests = [];
+      let pricing = null;
+      let labUnavailable = "";
+      if (queueLabId) {
+        const [catalogResult, pricingResult] = await Promise.allSettled([
+          api.getLabTestsCatalog({ breederView: true, labOrganizationId: queueLabId }),
+          api.getLabTestsPricing({ labOrganizationId: queueLabId }),
+        ]);
+        if (catalogResult.status === "fulfilled") tests = catalogResult.value || [];
+        if (pricingResult.status === "fulfilled") pricing = pricingResult.value || null;
+        if (catalogResult.status === "rejected" || pricingResult.status === "rejected") {
+          labUnavailable = t("lab.terminal.labUnavailable", {
+            defaultValue: "The laboratory this queue is addressed to could not be read. Your saved sheds are safe; choose a laboratory again before submitting.",
+          });
+        }
+      }
 
       setPendingItems(nextQueueUnavailable ? [] : (pending || []));
       setCatalog(tests || []);
@@ -157,6 +172,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       setBatches(nextQueueUnavailable ? [] : (nextBatches || []));
       setSubmittedOrders(orders || []);
       setQueueUnavailable(nextQueueUnavailable);
+      if (labUnavailable) setError(labUnavailable);
       console.debug("[lab-pricing-debug] pricing response", pricing || null);
       console.debug("[lab-pricing-debug] catalog response", tests || []);
     } catch (err) {
@@ -187,61 +203,29 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
     }
   };
 
-  const refreshQuote = async (currentPending = pendingItems, currentCatalog = catalog, currentPricing = pricingConfig) => {
+  const refreshQuote = async (currentPending = pendingItems) => {
     const selectedItems = (currentPending || []).filter((entry) => entry.selected);
-    if (!currentPricing) {
-      setQuote(EMPTY_QUOTE);
-      setError(t("lab.terminal.pricingUnavailable", { defaultValue: "Pricing is unavailable. Please refresh and try again." }));
-      return;
-    }
     if (!selectedItems.length) {
-      setQuote({ ...EMPTY_QUOTE, currency: currentPricing.currency || "EUR" });
+      setQuote(EMPTY_QUOTE);
       return;
     }
-
-    const animals = selectedItems.map((entry) => ({
-      animalId: String(entry?.snakeId || entry?.id || "").trim(),
-      selectedTestIds: Array.isArray(entry?.selectedTestIds)
-        ? entry.selectedTestIds.map((id) => String(id || "").trim()).filter(Boolean)
-        : [],
-    })).filter((entry) => entry.animalId);
 
     setLoadingQuote(true);
     try {
       const api = createLabApiClient();
-      console.debug("[lab-pricing-debug] calculate request", { animals });
-      const breakdown = await api.calculateLabOrderPrice({ animals });
-      console.debug("[lab-pricing-debug] calculate response", breakdown);
-
-      const byAnimalId = new Map((breakdown?.perAnimal || []).map((row) => [String(row?.animalId || ""), row]));
-      const currency = currentPricing.currency || "EUR";
-      const items = selectedItems.map((entry) => {
-        const key = String(entry?.snakeId || entry?.id || "").trim();
-        const animalBreakdown = byAnimalId.get(key);
-        const tests = (entry?.selectedTestIds || []).map((testId) => {
-          const test = (currentCatalog || []).find((catalogEntry) => catalogEntry?.id === testId);
-          return {
-            id: testId,
-            name: test?.name || testId,
-            priceCents: 0,
-            currency,
-          };
-        });
-        return {
-          pendingItemId: entry.id,
-          snakeId: entry.snakeId,
-          tests,
-          itemTotalCents: Number(animalBreakdown?.total || 0),
-          currency,
-          priority: entry.priority,
-        };
-      });
-
+      // Priced by the server, as the single order this queue is about to become.
+      // Summing it here re-derived the tier from a catalogue the panel had to be
+      // holding, reported `total` in currency units while rendering it as cents
+      // -- so a 35 euro batch read as 35 cents -- and sent no laboratory at all,
+      // which the backend refused outright with "Choose a laboratory before
+      // requesting a price." The figure shown is now the one that reaches the
+      // invoice, because submitting runs the same code.
+      const priced = await api.quotePendingShedTests(selectedItems.map((entry) => entry.id));
       setQuote({
-        items,
-        subtotalCents: Number(breakdown?.total || 0),
-        totalCents: Number(breakdown?.total || 0),
-        currency,
+        items: Array.isArray(priced?.items) ? priced.items : [],
+        subtotalCents: Number(priced?.subtotalCents || 0),
+        totalCents: Number(priced?.totalCents || 0),
+        currency: String(priced?.currency || "EUR"),
       });
     } catch (err) {
       setQuote(EMPTY_QUOTE);
