@@ -3,6 +3,7 @@ import {
   applyChangedRecords,
   applyRemoteDeletions,
   backfillLogIds,
+  mergeGeneticsLists,
   selectRecordsToUpload,
 } from "./cloudSyncPayload";
 
@@ -103,5 +104,48 @@ describe("applyChangedRecords", () => {
   it("keeps existing planner state when the response carries none", () => {
     const snapshot = { snakes: [], plannerState: { groups: ["Breeders"] } };
     expect(applyChangedRecords(snapshot, { snakes: [] }).plannerState).toEqual({ groups: ["Breeders"] });
+  });
+});
+
+describe("mergeGeneticsLists", () => {
+  // The regression that mattered: these lists used to union. A keeper who deleted a gene and
+  // saved got it back on the next sync from the server's copy, which still had it -- and the
+  // merge result was then uploaded, so the gene it took a deliberate edit to remove became the
+  // canonical value and survived every later refresh.
+  it("keeps a gene deleted when the winning side dropped it", () => {
+    const afterEdit = ["Pastel"];
+    const stillOnServer = ["Pastel", "Clown"];
+    expect(mergeGeneticsLists(afterEdit, stillOnServer)).toEqual(["Pastel"]);
+  });
+
+  it("lets the winning side clear the list entirely", () => {
+    expect(mergeGeneticsLists([], ["Pastel", "Clown"])).toEqual([]);
+  });
+
+  it("takes additions from the winning side", () => {
+    expect(mergeGeneticsLists(["Pastel", "Enchi"], ["Pastel"])).toEqual(["Pastel", "Enchi"]);
+  });
+
+  // Equal timestamps mean neither save is demonstrably later, so nothing justifies discarding
+  // either one. Two devices saving in the same second keep both additions.
+  it("unions both sides when the timestamps tie", () => {
+    expect(mergeGeneticsLists(["Pastel", "Enchi"], ["Pastel", "Clown"], { tied: true }))
+      .toEqual(["Pastel", "Clown", "Enchi"]);
+  });
+
+  it("treats an absent list as no opinion rather than a deletion", () => {
+    expect(mergeGeneticsLists(undefined, ["Pastel"])).toEqual(["Pastel"]);
+    expect(mergeGeneticsLists(null, ["Pastel"])).toEqual(["Pastel"]);
+  });
+
+  // possibleHets was a comma/newline string on older records; reading it as "no genetics" would
+  // delete a list the keeper never touched.
+  it("reads the legacy comma-separated string form", () => {
+    expect(mergeGeneticsLists("50% het Albino, 66% het Clown", ["Pastel"]))
+      .toEqual(["50% het Albino", "66% het Clown"]);
+  });
+
+  it("trims and de-duplicates whatever it keeps", () => {
+    expect(mergeGeneticsLists([" Pastel ", "pastel", ""], [])).toEqual(["Pastel"]);
   });
 });

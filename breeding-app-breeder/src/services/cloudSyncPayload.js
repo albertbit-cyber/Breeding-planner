@@ -119,3 +119,49 @@ export function applyChangedRecords(snapshot = {}, changed = {}) {
     plannerState: changed.plannerState || snapshot.plannerState,
   };
 }
+
+// --- Genetics merging -----------------------------------------------------------------------
+// Every other string list on an animal (tags, groups) merges as a union, and for those a union is
+// right: two devices adding a tag each should end up with both. Genetics are different, because a
+// keeper deletes them. A union can only ever add, so "delete Pastel, save" was undone on the very
+// next sync by whichever copy still carried it -- and the resurrected gene was then uploaded as the
+// canonical value, which is why it survived every later refresh. Deletions could never propagate.
+//
+// So genetics follow the record's own timestamp, exactly like name, sex and weight already do: the
+// later save wins the whole list. Equal timestamps are a true tie -- neither side is demonstrably
+// later -- and those still union, so two devices that saved within the same second keep both
+// additions rather than one silently losing its work.
+
+export function mergeStringValues(...values) {
+  const merged = [];
+  const seen = new Set();
+  values.flatMap(value => (Array.isArray(value) ? value : [])).forEach(item => {
+    const normalized = String(item || '').trim();
+    if (!normalized || seen.has(normalized.toLowerCase())) return;
+    seen.add(normalized.toLowerCase());
+    merged.push(normalized);
+  });
+  return merged;
+}
+
+// possibleHets has been a comma/newline string on older records, and sanitizeSnakeRecord splits it
+// on load. Merging can see the raw form, and reading it as "no genetics" would delete the list.
+function toGeneticsList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return value.split(/[,\n]/);
+  return [];
+}
+
+/**
+ * Picks an animal's genetics list from the two sides of a sync merge.
+ *
+ * `winnerValue` comes from the record with the later timestamp. Pass `tied` when the two
+ * timestamps are equal, which restores the old union.
+ */
+export function mergeGeneticsLists(winnerValue, loserValue, { tied = false } = {}) {
+  if (tied) return mergeStringValues(toGeneticsList(loserValue), toGeneticsList(winnerValue));
+  // A record that never carried the field at all is not asserting an empty list. Only a side that
+  // actually holds genetics can speak for them, otherwise a partial payload wipes the animal.
+  if (winnerValue === undefined || winnerValue === null) return mergeStringValues(toGeneticsList(loserValue));
+  return mergeStringValues(toGeneticsList(winnerValue));
+}

@@ -265,8 +265,8 @@ describe("breederDataService", () => {
       pairings: [],
     });
 
-    // The genetics arrays merge as a union, so without re-applying the decision
-    // the disproved guess would be back on the animal.
+    // The phone's payload is the later one and now owns the genetics outright, so without
+    // re-applying the decision the disproved guess would be back on the animal.
     const written = tx.animal.update.mock.calls[0][0].data.payload;
     expect(written.possibleHets).toEqual([]);
   });
@@ -303,6 +303,119 @@ describe("breederDataService", () => {
 
     const written = tx.animal.update.mock.calls[0][0].data.payload;
     expect(written.morphs).toEqual(["Pastel", "Enchi"]);
+  });
+
+  // These lists used to merge as a union, which made a deletion impossible to express: the
+  // keeper removed a gene, saved, and the stored copy that still carried it handed it straight
+  // back on the next sync -- and the union was then written as canonical, so the gene the keeper
+  // had deliberately deleted survived every later refresh.
+  it("keeps a gene the keeper deleted out of the stored animal", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        { id: "snake-1", morphs: ["Pastel", "Clown"], hets: ["Pied"], updatedAt: "2026-09-04T10:00:00.000Z" },
+        "2026-09-04T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{
+        id: "snake-1",
+        morphs: ["Pastel"],
+        hets: [],
+        updatedAt: "2026-09-05T10:00:00.000Z",
+      }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.morphs).toEqual(["Pastel"]);
+    expect(written.hets).toEqual([]);
+  });
+
+  // A behind-the-times device does not get to delete anything: its whole payload is rejected
+  // before the merge, by the same timestamp gate that already protects every other field.
+  it("ignores a deletion pushed by a device that is behind the stored copy", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        { id: "snake-1", morphs: ["Pastel", "Clown"], updatedAt: "2026-09-06T10:00:00.000Z" },
+        "2026-09-06T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", morphs: ["Pastel"], updatedAt: "2026-09-05T10:00:00.000Z" }],
+      pairings: [],
+    });
+
+    expect(tx.animal.update).not.toHaveBeenCalled();
+  });
+
+  // Equal timestamps mean neither save is demonstrably later, so nothing justifies discarding
+  // either side's work.
+  it("still unions genetics when both copies carry the same timestamp", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        { id: "snake-1", morphs: ["Pastel", "Clown"], updatedAt: "2026-09-05T10:00:00.000Z" },
+        "2026-09-05T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", morphs: ["Pastel", "Enchi"], updatedAt: "2026-09-05T10:00:00.000Z" }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.morphs).toEqual(["Pastel", "Clown", "Enchi"]);
+  });
+
+  // A payload that never carried the field is not asserting an empty one. Only a side that
+  // actually holds genetics can speak for them.
+  it("leaves stored genetics alone when the incoming payload omits them", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        { id: "snake-1", morphs: ["Pastel", "Clown"], updatedAt: "2026-09-04T10:00:00.000Z" },
+        "2026-09-04T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", weight: "1550", updatedAt: "2026-09-05T10:00:00.000Z" }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.morphs).toEqual(["Pastel", "Clown"]);
+  });
+
+  // Tags and groups deliberately keep the union: two devices adding a tag each should end up
+  // with both, and unlike genetics they are not the record of what the animal is.
+  it("still unions tags and groups across devices", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow(
+        "appAnimalId",
+        "snake-1",
+        { id: "snake-1", tags: ["Holdback"], groups: ["Rack A"], updatedAt: "2026-09-04T10:00:00.000Z" },
+        "2026-09-04T10:00:00.000Z"
+      ),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", tags: ["Proven"], groups: ["Rack B"], updatedAt: "2026-09-05T10:00:00.000Z" }],
+      pairings: [],
+    });
+
+    const written = tx.animal.update.mock.calls[0][0].data.payload;
+    expect(written.tags).toEqual(["Holdback", "Proven"]);
+    expect(written.groups).toEqual(["Rack A", "Rack B"]);
   });
 
   it("merges nested animal logs when the incoming animal is newer", async () => {

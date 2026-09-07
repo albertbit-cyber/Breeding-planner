@@ -286,10 +286,24 @@ const mergePayloadMetadata = (older: JsonRecord, newer: JsonRecord): JsonRecord 
   return Object.keys(metadata).length ? metadata : undefined;
 };
 
+// possibleHets was a comma/newline string on older records. While these lists unioned, a stale
+// array on the other side covered for the raw form; now that one side owns the list outright it
+// has to be read properly, or an old client's save empties the animal's genetics.
+const geneticsListValue = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return value.split(/[,\n]/);
+  return [];
+};
+
 const mergeSnapshotPayload = (
   existingPayload: unknown,
   incomingPayload: JsonRecord,
-  options: { stringArrayKeys?: string[]; recordArrayKeys?: string[]; mergeLogs?: boolean } = {},
+  options: {
+    stringArrayKeys?: string[];
+    lastWriterStringArrayKeys?: string[];
+    recordArrayKeys?: string[];
+    mergeLogs?: boolean;
+  } = {},
 ): JsonRecord => {
   const existing = asRecord(existingPayload) || {};
   const incomingTime = payloadUpdatedAtMs(incomingPayload);
@@ -299,6 +313,22 @@ const mergeSnapshotPayload = (
   const merged: JsonRecord = { ...older, ...newer };
   (options.stringArrayKeys || []).forEach((key) => {
     merged[key] = mergeStringArrays(older[key], newer[key]);
+  });
+  // Lists the keeper deletes from, so a union would be a one-way ratchet: removing a gene and
+  // syncing handed it straight back from the copy that still had it, and that resurrected value
+  // was then stored as canonical. These follow the record's timestamp instead — the later save
+  // owns the whole list — while equal timestamps stay a union, since neither side is later and
+  // dropping a concurrent addition would be its own kind of loss.
+  (options.lastWriterStringArrayKeys || []).forEach((key) => {
+    if (incomingTime === existingTime) {
+      merged[key] = mergeStringArrays(geneticsListValue(older[key]), geneticsListValue(newer[key]));
+      return;
+    }
+    // Absence is not deletion. A payload that never carried the key cannot speak for it, so the
+    // other side's list stands rather than being wiped by a partial write.
+    merged[key] = newer[key] === undefined || newer[key] === null
+      ? mergeStringArrays(geneticsListValue(older[key]))
+      : mergeStringArrays(geneticsListValue(newer[key]));
   });
   (options.recordArrayKeys || []).forEach((key) => {
     merged[key] = mergeRecordArrays(older[key], newer[key], key);
@@ -313,16 +343,17 @@ const mergeSnapshotPayload = (
 
 const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
   const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
-    stringArrayKeys: ["morphs", "hets", "possibleHets", "tags", "groups"],
+    stringArrayKeys: ["tags", "groups"],
+    lastWriterStringArrayKeys: ["morphs", "hets", "possibleHets"],
     recordArrayKeys: ["photos"],
     mergeLogs: true,
   });
 
-  // The genetics arrays merge as a union, so a device still holding the animal's
-  // pre-test genetics would otherwise reintroduce exactly what a laboratory just
-  // disproved — "50% het Albino" reappearing days after the test came back
-  // negative. Re-asserting the stored decisions is idempotent, so an already
-  // correct payload passes through untouched.
+  // A device that has not synced since the test still holds the animal's pre-test genetics, and
+  // if it saves last its list now wins outright — reintroducing exactly what a laboratory just
+  // disproved, "50% het Albino" reappearing days after the result came back negative. The lab's
+  // verdict outranks any single device's copy, so the stored decisions are re-asserted here.
+  // Idempotent: an already correct payload passes through untouched.
   const confirmation = merged.labGeneticsConfirmation;
   if (confirmation) {
     const corrected = reapplyConfirmation(readSnapshot(merged), confirmation);

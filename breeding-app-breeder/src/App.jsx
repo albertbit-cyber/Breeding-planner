@@ -55,6 +55,8 @@ import {
   selectRecordsToUpload,
   applyRemoteDeletions,
   applyChangedRecords,
+  mergeGeneticsLists,
+  mergeStringValues,
 } from "./services/cloudSyncPayload";
 import {
   getGeneGroups,
@@ -3029,15 +3031,7 @@ function mergeLogArrays(localEntries = [], backendEntries = [], key) {
 }
 
 function mergeArrayValues(...values) {
-  const merged = [];
-  const seen = new Set();
-  values.flatMap(value => (Array.isArray(value) ? value : [])).forEach(item => {
-    const normalized = String(item || '').trim();
-    if (!normalized || seen.has(normalized.toLowerCase())) return;
-    seen.add(normalized.toLowerCase());
-    merged.push(normalized);
-  });
-  return merged;
+  return mergeStringValues(...values);
 }
 
 function sanitizePlannerObjectRecord(value) {
@@ -3185,12 +3179,17 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   allLogKeys.forEach(key => {
     logs[key] = mergeLogArrays(localAnimal.logs?.[key], backendAnimal.logs?.[key], key);
   });
+  // Genetics follow the timestamp instead of unioning, so a gene the keeper deleted stays
+  // deleted rather than being handed back by whichever side still held it. See
+  // mergeGeneticsLists. Tags and groups keep the union: nobody expects two devices adding a
+  // tag each to lose one, and unlike genetics they are not the record of what the animal is.
+  const tiedTimestamps = localTime === backendTime;
   return sanitizeSnakeRecord({
     ...other,
     ...base,
-    morphs: mergeArrayValues(other.morphs, base.morphs),
-    hets: mergeArrayValues(other.hets, base.hets),
-    possibleHets: mergeArrayValues(other.possibleHets, base.possibleHets),
+    morphs: mergeGeneticsLists(base.morphs, other.morphs, { tied: tiedTimestamps }),
+    hets: mergeGeneticsLists(base.hets, other.hets, { tied: tiedTimestamps }),
+    possibleHets: mergeGeneticsLists(base.possibleHets, other.possibleHets, { tied: tiedTimestamps }),
     tags: mergeArrayValues(other.tags, base.tags),
     groups: mergeArrayValues(other.groups, base.groups),
     photos: mergeLogArrays(other.photos, base.photos, 'photo').slice(0, MAX_PHOTOS_PER_SNAKE),
