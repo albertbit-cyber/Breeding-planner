@@ -8,6 +8,7 @@ import GeneAutocomplete from "./components/GeneAutocomplete.jsx";
 import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
+import { resolveCollapseView } from './utils/pairingsViewReturn';
 import SuggestionsTab from "./features/suggestions/SuggestionsTab";
 import FamilyTreePage from "./features/familyTree/index.jsx";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
@@ -7080,6 +7081,9 @@ export default function BreedingPlannerApp() {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [pairingsView, setPairingsView] = useState('dashboard');
+  // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
+  // Only the dashboard asks for a return trip; every other entry point leaves this null.
+  const [pairingsReturnView, setPairingsReturnView] = useState(null);
   const [completedYearFilter, setCompletedYearFilter] = useState('All');
   const [completedOutcomeFilter, setCompletedOutcomeFilter] = useState('all');
   const [animalView, setAnimalView] = useState('all');
@@ -11939,6 +11943,7 @@ export default function BreedingPlannerApp() {
                   onClick={() => {
                     setPairingsView('dashboard');
                     setFocusedPairingId(null);
+                    setPairingsReturnView(null);
                     setCompletedYearFilter('All');
                     setCompletedOutcomeFilter('all');
                   }}
@@ -11951,6 +11956,7 @@ export default function BreedingPlannerApp() {
                   onClick={() => {
                     setPairingsView('active');
                     setFocusedPairingId(null);
+                    setPairingsReturnView(null);
                     setCompletedYearFilter('All');
                     setCompletedOutcomeFilter('all');
                   }}
@@ -11963,6 +11969,7 @@ export default function BreedingPlannerApp() {
                   onClick={() => {
                     setPairingsView('completed');
                     setFocusedPairingId(null);
+                    setPairingsReturnView(null);
                     setCompletedYearFilter('All');
                     setCompletedOutcomeFilter('all');
                   }}
@@ -11975,6 +11982,7 @@ export default function BreedingPlannerApp() {
                   onClick={() => {
                     setPairingsView('incubator');
                     setFocusedPairingId(null);
+                    setPairingsReturnView(null);
                     setCompletedYearFilter('All');
                     setCompletedOutcomeFilter('all');
                   }}
@@ -12077,6 +12085,7 @@ export default function BreedingPlannerApp() {
                   const p = pairings.find(x => x.id === pid);
                   if (p) {
                     setPairingsView(isPairingCompleted(p) ? 'completed' : 'active');
+                    setPairingsReturnView({ pairingId: p.id, view: 'dashboard' });
                     setFocusedPairingId(p.id);
                   }
                 }}
@@ -12211,6 +12220,13 @@ export default function BreedingPlannerApp() {
               clutchMetadataByPairingId={clutchMetadataByPairingId}
               focusedPairingId={focusedPairingId}
               onFocusPairing={setFocusedPairingId}
+              onCollapsePairing={(pid) => {
+                // The focus has to go with the collapse: while it is set, the effect that
+                // keeps a focused pairing visible would drag the view straight back here.
+                setFocusedPairingId(prev => (prev === pid ? null : prev));
+                setPairingsView(prev => resolveCollapseView(prev, pairingsReturnView, pid));
+                setPairingsReturnView(prev => (prev?.pairingId === pid ? null : prev));
+              }}
               theme={theme}
               title={pairingsView === 'completed'
                 ? `${t('pairing.completedProjects', { count: filteredCompletedCount })}${completedYearFilter !== 'All' ? ` - ${completedYearFilter}` : ''}`
@@ -22894,6 +22910,7 @@ function PairingsSection({
   theme = 'blue',
   focusedPairingId = null,
   onFocusPairing,
+  onCollapsePairing,
   title,
   emptyMessage = '{t("snakeEdit.noPairingsYet")} yet. Use "New pairing".',
   variant = 'default',
@@ -22930,6 +22947,7 @@ function PairingsSection({
             theme={theme}
             isFocused={focusedPairingId === p.id}
             onFocus={onFocusPairing ? () => onFocusPairing(p.id) : undefined}
+            onCollapse={onCollapsePairing ? () => onCollapsePairing(p.id) : undefined}
             variant={variant}
             showAppAlert={showAppAlert}
           />
@@ -23093,6 +23111,7 @@ function PairingInlineCard({
   theme = 'blue',
   isFocused = false,
   onFocus,
+  onCollapse,
   variant = 'default',
   showAppAlert,
 }) {
@@ -23438,6 +23457,13 @@ function PairingInlineCard({
     isFocused ? 'ring-2 ring-sky-400 ring-offset-1' : 'ring-0'
   );
 
+  // A card that was opened from the dashboard hands the view back on collapse; the parent
+  // owns that decision, since it is the one that knows where the keeper came from.
+  const handleCollapse = useCallback(() => {
+    setIsExpanded(false);
+    if (typeof onCollapse === 'function') onCollapse();
+  }, [onCollapse]);
+
   if (!isExpanded) {
     const handleExpand = () => {
       setIsExpanded(true);
@@ -23657,7 +23683,7 @@ function PairingInlineCard({
             <button
               type="button"
               className="text-xs px-2 py-1 border rounded-lg"
-              onClick={() => setIsExpanded(false)}
+              onClick={handleCollapse}
             >
               {collapseLabel}
             </button>
