@@ -40,11 +40,16 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
   }
 
   if (!labs.length) {
+    // Two different situations, and saying the wrong one sends people looking in
+    // the wrong place. With a species, the directory was filtered to it and came
+    // back empty -- a laboratory exists, it just has not said it tests this
+    // animal. Without one, nothing was filtered, so there genuinely is no
+    // laboratory listed at all.
     return (
       <div className="text-sm text-neutral-600">
         {speciesName
-          ? `No laboratory currently tests ${speciesName}. Ask us to invite one, or check back later.`
-          : "No laboratories are accepting orders right now. Please check back later."}
+          ? `No laboratory is receiving orders for ${speciesName} yet. A laboratory has to list the species it tests before it appears here.`
+          : "No laboratories are receiving orders right now. Please check back later."}
       </div>
     );
   }
@@ -53,7 +58,9 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
     <div className="space-y-2">
       <div className="text-sm font-medium text-neutral-900">Choose a laboratory</div>
       <p className="text-xs text-neutral-500">
-        {speciesName ? `Laboratories that test ${speciesName}. ` : ""}
+        {speciesName
+          ? `Laboratories that test ${speciesName}. `
+          : "Showing every laboratory, because this animal has no species set. "}
         Available tests, prices and turnaround all come from the laboratory you choose.
       </p>
       <ul className="space-y-2">

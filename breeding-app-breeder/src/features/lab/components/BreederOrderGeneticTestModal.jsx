@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 import LabPicker from "./LabPicker.jsx";
+import { getSpeciesById } from "../../../genetics/speciesRegistry";
 import {
   getSuggestedHetTestIds,
   matchSuggestedHetTests,
@@ -39,8 +40,16 @@ export default function BreederOrderGeneticTestModal({
   const snakeId = String(snake?.id || "").trim();
   // Ordering starts from the animal: which laboratories appear, and which of
   // their tests, both follow from what this animal is.
-  const speciesId = String(snake?.species || "").trim() || "ball-python";
-  const speciesLabel = String(snake?.speciesName || "").trim();
+  // No silent default. Treating an animal with no species on file as a ball
+  // python filtered the laboratory directory to ball-python labs and then said
+  // "no laboratories are accepting orders", which is neither true nor
+  // actionable. An animal whose species is unknown asks for every laboratory
+  // instead, and the picker says why it is showing all of them.
+  const speciesId = String(snake?.species || "").trim() || "";
+  const speciesLabel =
+    String(snake?.speciesName || "").trim()
+    || getSpeciesById(speciesId)?.name
+    || "";
   const alreadyInCart = isInCart(snakeId);
 
   // Pre-populate test selection from cart if snake is already staged
