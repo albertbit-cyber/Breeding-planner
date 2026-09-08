@@ -6,6 +6,7 @@ import { isAdminRole, isLabRole } from "../auth/identity";
 import { LAB_IDENTITY_SELECT } from "./orderService";
 import { applyConfirmedResultGenetics, type LabGeneticsApplication } from "./labGeneticsService";
 import { notifyResultsReady } from "./labOrderNotificationService";
+import { recordCertificatesForSubmittedResults } from "./labCertificateService";
 
 type PersistOrderResultUser = {
   id: string;
@@ -398,6 +399,19 @@ export const saveOrderResult = async (
   // the breeder every time one is saved would train them to ignore the one that
   // matters.
   if (mode === "submit") {
+    // The certificate becomes the breeder's here, not when someone opens it.
+    // Stored before the notification, because the mail invites them to go and
+    // download it, and after the transaction, because a certificate row failing
+    // must never roll back a laboratory's completed work.
+    try {
+      await recordCertificatesForSubmittedResults({
+        order: refreshedOrder as any,
+        results: savedResults as any,
+      });
+    } catch (error) {
+      console.error("[certificates] failed to record certificate for order", order.id, error);
+    }
+
     await notifyResultsReady({ order: refreshedOrder as any, results: savedResults as any });
   }
 

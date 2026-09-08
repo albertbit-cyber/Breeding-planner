@@ -80,7 +80,8 @@ describe("lab order routes", () => {
     expect(res.body.orders).toEqual([{ id: "order-1" }]);
     expect(listOrdersForUser).toHaveBeenCalledWith(
       expect.objectContaining({ id: "breeder-1", role: "breeder" }),
-      expect.objectContaining({ organizationId: "org_lab_a" })
+      expect.objectContaining({ organizationId: "org_lab_a" }),
+      { archiveScope: "active" }
     );
   });
 

@@ -97,7 +97,8 @@ describe("one laboratory cannot reach another's orders", () => {
 
     expect(res.status).toBe(200);
     expect(db.shedTestOrder.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { labOrganizationId: ORG_B } })
+      // Scoped to this lab, and to the orders it has not archived.
+      expect.objectContaining({ where: { labOrganizationId: ORG_B, archivedAt: null } })
     );
   });
 

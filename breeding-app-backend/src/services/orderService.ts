@@ -278,13 +278,37 @@ export const createOrder = async (
   return getOrderByIdForUser(created.id, { id: breederId, role: "breeder" }, null);
 };
 
-export const listOrdersForUser = async (user: { id: string; role: AppRole }, org?: OrgContext) => {
+/**
+ * Which side of the archive a caller wants.
+ *
+ * "active" is the default because every lab queue, every dashboard count and
+ * every search is asking about work in hand; an archived order answering those
+ * is exactly what archiving is meant to stop. The breeder is never filtered:
+ * archiving is the laboratory filing its own copy away, and it is not entitled
+ * to hide an order from the person who paid for it.
+ */
+export type OrderArchiveScope = "active" | "archived" | "all";
+
+const archiveWhere = (scope: OrderArchiveScope) => {
+  if (scope === "archived") return { archivedAt: { not: null } };
+  if (scope === "all") return {};
+  return { archivedAt: null };
+};
+
+export const listOrdersForUser = async (
+  user: { id: string; role: AppRole },
+  org?: OrgContext,
+  options?: { archiveScope?: OrderArchiveScope }
+) => {
   assertOrderWorkflowUser(user);
   await ensureSharedOrderNumbers();
+
+  const scope: OrderArchiveScope = options?.archiveScope || "active";
 
   // Platform admins see every tenant's queue; that is the oversight console.
   if (isAdminRole(user.role)) {
     return prisma.shedTestOrder.findMany({
+      where: archiveWhere(scope),
       include: {
         breeder: { select: { id: true, email: true, fullName: true, role: true } },
         labOrganization: { select: LAB_IDENTITY_SELECT },
@@ -302,7 +326,7 @@ export const listOrdersForUser = async (user: { id: string; role: AppRole }, org
       throw new HttpError(403, "This account does not belong to a laboratory.");
     }
     return prisma.shedTestOrder.findMany({
-      where: { labOrganizationId: org.organizationId },
+      where: { labOrganizationId: org.organizationId, ...archiveWhere(scope) },
       include: {
         breeder: { select: { id: true, email: true, fullName: true, role: true } },
         animals: { include: { tests: true } },
@@ -456,6 +480,16 @@ const loadOrderForDeletion = async (orderId: string) => {
   return existing;
 };
 
+/**
+ * Removes the laboratory's copy of an order.
+ *
+ * What survives is deliberate and worth stating, because the lab is told it in
+ * the confirmation: the breeder's animals keep the genetics this order
+ * confirmed (that was written onto the animal record when the result was
+ * submitted, and nothing here touches it), and the certificates issued from the
+ * order keep themselves — their `orderId` is SetNull, not Cascade. Deleting an
+ * order withdraws the lab's record, not the breeder's result.
+ */
 const deleteOrderAndReturnCounts = async (existing: Awaited<ReturnType<typeof loadOrderForDeletion>>) => {
   const deletedAnimals = existing.animals.length;
   const deletedAnimalTests = existing.animals.reduce(
@@ -463,6 +497,9 @@ const deleteOrderAndReturnCounts = async (existing: Awaited<ReturnType<typeof lo
     0
   );
   const deletedResults = existing.results.length;
+  const preservedCertificates = await prisma.shedTestCertificate.count({
+    where: { orderId: existing.id },
+  });
 
   await prisma.shedTestOrder.delete({
     where: { id: existing.id },
@@ -473,6 +510,8 @@ const deleteOrderAndReturnCounts = async (existing: Awaited<ReturnType<typeof lo
     deletedAnimals,
     deletedAnimalTests,
     deletedResults,
+    /** Certificates left standing in the breeder's hands, with no order behind them. */
+    preservedCertificates,
   };
 };
 
@@ -485,6 +524,57 @@ export const deleteOrderById = async (
   const existing = await loadOrderForDeletion(orderId);
   assertLabOwnsOrder(user, org, existing);
   return deleteOrderAndReturnCounts(existing);
+};
+
+/**
+ * Files an order away without touching a single row of it.
+ *
+ * The distinction from deletion is the whole point: an archived order keeps its
+ * animals, tests, results and certificate, and can be brought back. It simply
+ * stops appearing in the queues the laboratory works from, which is what a lab
+ * actually wants when it says it is "done" with an order.
+ */
+export const setOrderArchived = async (
+  orderId: string,
+  archived: boolean,
+  user: { id: string; role: AppRole },
+  org?: OrgContext
+) => {
+  assertLabWorkflowUser(user);
+
+  const existing = await prisma.shedTestOrder.findUnique({
+    where: { id: orderId },
+    select: { id: true, labOrganizationId: true, archivedAt: true },
+  });
+  if (!existing) throw new HttpError(404, "Order not found.");
+  assertLabOwnsOrder(user, org, existing);
+
+  // Re-archiving an already archived order would otherwise move its archive
+  // date, shuffling it between months in the year/month archive for no reason.
+  if (archived && existing.archivedAt) {
+    return prisma.shedTestOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        breeder: { select: { id: true, email: true, fullName: true, role: true } },
+        labOrganization: { select: LAB_IDENTITY_SELECT },
+        animals: { include: { tests: true } },
+        results: { orderBy: { updatedAt: "desc" } },
+      },
+    });
+  }
+
+  return prisma.shedTestOrder.update({
+    where: { id: orderId },
+    data: archived
+      ? { archivedAt: new Date(), archivedById: user.id }
+      : { archivedAt: null, archivedById: null },
+    include: {
+      breeder: { select: { id: true, email: true, fullName: true, role: true } },
+      labOrganization: { select: LAB_IDENTITY_SELECT },
+      animals: { include: { tests: true } },
+      results: { orderBy: { updatedAt: "desc" } },
+    },
+  });
 };
 
 export const cancelOwnOrderById = async (

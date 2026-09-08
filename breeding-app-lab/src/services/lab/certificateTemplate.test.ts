@@ -77,4 +77,72 @@ describe("buildLabCertificateTemplateData", () => {
     expect(template.resultRows[0].testCode).toBe(template.resultRows[0].testNumber);
     expect(template.snake.imageUrl).toBe("data:image/png;base64,cover");
   });
+
+  describe("the snake's photo on the certificate", () => {
+    const baseInput = {
+      order,
+      result: {
+        id: "result-1",
+        testCode: "shed_panel_v1",
+        reportedAt: "2026-04-24T09:30:00.000Z",
+        findings: [{ marker: "Clown", sourceOrderedName: "Clown", outcome: "positive" }],
+      } as any,
+      certificateId: "cert-1",
+      certificateNumber: "CERT-1",
+      verificationCode: "VERIFY-1",
+      breeder,
+    };
+
+    it("uses the same photo the animal card shows as its cover", () => {
+      // The card takes the last photo in the list, so the certificate has to as
+      // well -- otherwise the breeder sees one picture on the animal and a
+      // different one on its certificate.
+      const template = buildLabCertificateTemplateData({
+        ...baseInput,
+        snake: {
+          id: "snake-1",
+          displayId: "ARUN-01",
+          photos: [
+            { url: "data:image/png;base64,first" },
+            { url: "data:image/png;base64,cover" },
+          ],
+        } as any,
+      });
+
+      expect(template.snake.imageUrl).toBe("data:image/png;base64,cover");
+    });
+
+    it("prefers an explicit imageUrl over the photo list", () => {
+      const template = buildLabCertificateTemplateData({
+        ...baseInput,
+        snake: {
+          id: "snake-1",
+          imageUrl: "data:image/png;base64,explicit",
+          photos: [{ url: "data:image/png;base64,cover" }],
+        } as any,
+      });
+
+      expect(template.snake.imageUrl).toBe("data:image/png;base64,explicit");
+    });
+
+    it("leaves the photo out rather than failing when the animal has none", () => {
+      // The lab portal has no copy of the breeder's animals, so this is the
+      // normal case there, not an error.
+      const template = buildLabCertificateTemplateData({
+        ...baseInput,
+        snake: { id: "snake-1", displayId: "ARUN-01" } as any,
+      });
+
+      expect(template.snake.imageUrl).toBeUndefined();
+      expect(template.snake.displayId).toBe("ARUN-01");
+    });
+
+    it("survives the animal being absent altogether", () => {
+      const template = buildLabCertificateTemplateData({ ...baseInput, snake: null });
+
+      expect(template.snake.imageUrl).toBeUndefined();
+      // Falls back to the order's animal id so the row still identifies a snake.
+      expect(template.snake.displayId).toBe("snake-1");
+    });
+  });
 });

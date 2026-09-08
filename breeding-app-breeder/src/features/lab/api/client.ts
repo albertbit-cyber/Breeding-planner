@@ -153,6 +153,8 @@ const toLegacyOrder = (order: any): TestOrder => {
     paymentRef: String(order?.paymentRef || "").trim() || undefined,
     createdAt: String(order?.createdAt || ""),
     updatedAt: String(order?.updatedAt || ""),
+    archivedAt: String(order?.archivedAt || "").trim() || undefined,
+    archivedById: String(order?.archivedById || "").trim() || undefined,
   };
 };
 
@@ -627,12 +629,16 @@ const buildSharedResultEntryTemplate = (order: any): LabResultEntryTemplate => {
 
 const buildSharedCertificateNumber = (order: any, issuedAt: string): string => {
   const parsed = new Date(issuedAt || "");
+  // UTC, not local time. The same number is derived here, in the lab portal and
+  // on the server when the certificate is stored; a local-time stamp made it
+  // depend on whose clock asked, so a result reported at 23:30 UTC produced one
+  // number for a browser in Amsterdam and another for the server.
   const stamp = Number.isNaN(parsed.getTime())
     ? String(issuedAt || "").replace(/[^0-9]/g, "").slice(0, 8)
     : [
-        parsed.getFullYear(),
-        String(parsed.getMonth() + 1).padStart(2, "0"),
-        String(parsed.getDate()).padStart(2, "0"),
+        parsed.getUTCFullYear(),
+        String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+        String(parsed.getUTCDate()).padStart(2, "0"),
       ].join("");
   const suffix = String(order?.id || "").replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase() || "GEN";
   return `PH-GC-${stamp || "00000000"}-${suffix}`;
@@ -789,14 +795,57 @@ const toSharedBreederSummary = (order: any) => {
   };
 };
 
-const listSharedOrdersRaw = async (): Promise<any[]> => {
-  const data = await apiRequest<{ orders: any[] }>("/lab/orders");
+/**
+ * Which side of the archive to list. The server defaults to "active", so every
+ * existing caller keeps asking about work in hand and archived orders drop out
+ * of the queues without any of them having to opt in.
+ */
+export type OrderArchiveScope = "active" | "archived" | "all";
+
+const listSharedOrdersRaw = async (scope?: OrderArchiveScope): Promise<any[]> => {
+  const query = scope && scope !== "active" ? `?archive=${encodeURIComponent(scope)}` : "";
+  const data = await apiRequest<{ orders: any[] }>(`/lab/orders${query}`);
   return Array.isArray(data?.orders) ? data.orders : [];
 };
 
 const fetchSharedOrderRaw = async (orderId: string): Promise<any> => {
   const data = await fetchOrderById(String(orderId || "").trim());
   return (data as any)?.order || null;
+};
+
+export type StoredCertificateSummary = {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  animalId: string;
+  certificateNumber: string;
+  verificationCode: string;
+  issuedAt: string;
+  /** False once the laboratory has removed its copy of the order. */
+  orderAvailable: boolean;
+};
+
+/**
+ * The certificates the breeder holds, which is not the same question as "which
+ * orders exist". A certificate is stored when the result is submitted and keeps
+ * itself afterwards, so this still answers for an order the laboratory has since
+ * deleted -- the one case the order list cannot cover.
+ */
+const listStoredCertificatesRaw = async (): Promise<StoredCertificateSummary[]> => {
+  const data = await apiRequest<{ certificates: StoredCertificateSummary[] }>("/lab/orders/certificates");
+  return Array.isArray(data?.certificates) ? data.certificates : [];
+};
+
+/** The stored order-and-result snapshot a certificate was issued from. */
+const fetchStoredCertificateRaw = async (
+  certificateId: string
+): Promise<{ certificate: StoredCertificateSummary; order: any } | null> => {
+  const normalized = String(certificateId || "").trim();
+  if (!normalized) return null;
+  const data = await apiRequest<{ certificate: StoredCertificateSummary; order: any }>(
+    `/lab/orders/certificates/${encodeURIComponent(normalized)}`
+  );
+  return data?.certificate ? { certificate: data.certificate, order: data.order } : null;
 };
 
 const findSharedSampleBySampleId = async (sampleId: string) => {
@@ -1089,19 +1138,19 @@ export const createLabApiClient = () => {
     return attachSharedCurrentGenetics(order, await buildSharedOrderOutcome(order));
   };
 
-  const getBreederCertificateArtifact = async (orderId: string) => {
-    const role = requireSessionRole("breeder", "admin", "lab_staff");
-    const order = await fetchSharedOrderRaw(orderId);
-    if (!order) {
-      throw new Error("Order not found.");
-    }
-
-    const completedResult = (Array.isArray(order?.results) ? order.results : [])
-      .find((entry: any) => String(entry?.status || "").trim() === "completed");
-    if (!completedResult) {
-      throw new Error("Certificate is not available for this order yet.");
-    }
-
+  /**
+   * Renders a certificate from an order-shaped object, live or stored.
+   *
+   * The snake's photo and morph are read from this device, never from the
+   * snapshot: the animal's picture is the breeder's, it is not sent to the
+   * laboratory, and it should reflect the card as it stands now.
+   */
+  const renderCertificateFrom = async (
+    role: LegacyRole,
+    order: any,
+    completedResult: any,
+    storedCertificate?: StoredCertificateSummary | null
+  ) => {
     // Capture the snake's genetics BEFORE syncing the lab result so the certificate
     // morph column shows the snake's known morphs at the time of testing.
     const legacyOrderForSnap = toLegacyOrder(order);
@@ -1110,7 +1159,21 @@ export const createLabApiClient = () => {
       : null;
 
     await syncSharedResultSnakeGenetics(role, order, completedResult);
-    const certificate = await buildSharedCertificateSummary(order, completedResult);
+
+    // A stored certificate is the authority on its own number and code -- those
+    // were fixed when it was issued. The derivation below only has to answer for
+    // orders completed before certificates were stored at all.
+    const derived = await buildSharedCertificateSummary(order, completedResult);
+    const certificate = storedCertificate
+      ? {
+          ...derived,
+          id: storedCertificate.id,
+          certificateNumber: storedCertificate.certificateNumber,
+          verificationCode: storedCertificate.verificationCode,
+          issuedAt: storedCertificate.issuedAt,
+        }
+      : derived;
+
     const template = await buildSharedCertificateTemplate(order, completedResult, certificate, preUpdateSnake);
     const rendered = await renderLabCertificatePdf(template, { includeQr: false });
 
@@ -1122,7 +1185,85 @@ export const createLabApiClient = () => {
       mimeType: "application/pdf" as const,
       base64: bytesToBase64(rendered.arrayBuffer),
       byteLength: rendered.byteLength,
+      /** True when rendered from a stored snapshot because the order is gone. */
+      fromArchive: Boolean(storedCertificate && !storedCertificate.orderAvailable),
     };
+  };
+
+  const findCompletedResult = (order: any) =>
+    (Array.isArray(order?.results) ? order.results : []).find(
+      (entry: any) => String(entry?.status || "").trim() === "completed"
+    ) || null;
+
+  /**
+   * A certificate the breeder already holds, rendered from its stored snapshot.
+   *
+   * This is the path that works when the laboratory has removed the order: the
+   * certificate was written when the result was submitted and does not depend on
+   * the order still existing.
+   */
+  const getStoredCertificateArtifact = async (certificateId: string) => {
+    const role = requireSessionRole("breeder", "admin", "lab_staff");
+    const stored = await fetchStoredCertificateRaw(certificateId);
+    if (!stored?.order) {
+      throw new Error("Certificate not found.");
+    }
+
+    const completedResult = findCompletedResult(stored.order);
+    if (!completedResult) {
+      throw new Error("This certificate's stored result could not be read.");
+    }
+
+    return renderCertificateFrom(role, stored.order, completedResult, stored.certificate);
+  };
+
+  const getBreederCertificateArtifact = async (orderId: string) => {
+    const role = requireSessionRole("breeder", "admin", "lab_staff");
+    const normalizedOrderId = String(orderId || "").trim();
+
+    // The live order first, because it is the current truth and the only source
+    // for an order completed before certificates were stored.
+    let order: any = null;
+    try {
+      order = await fetchSharedOrderRaw(normalizedOrderId);
+    } catch {
+      // A deleted order 404s here. That is not an error for the breeder: their
+      // certificate outlives the laboratory's copy, so fall through to it.
+      order = null;
+    }
+
+    // Best-effort: the stored record supplies the authoritative number and code,
+    // but a live order can be certified without it -- an older backend has no
+    // such endpoint, and orders completed before certificates were stored have
+    // no row. Losing the lookup must not cost the breeder the download.
+    let stored: StoredCertificateSummary | undefined;
+    try {
+      stored = (await listStoredCertificatesRaw()).find(
+        (entry) => entry.orderId === normalizedOrderId
+      );
+    } catch {
+      stored = undefined;
+    }
+
+    if (order) {
+      const completedResult = findCompletedResult(order);
+      if (!completedResult) {
+        throw new Error("Certificate is not available for this order yet.");
+      }
+      return renderCertificateFrom(role, order, completedResult, stored || null);
+    }
+
+    if (stored) {
+      return getStoredCertificateArtifact(stored.id);
+    }
+
+    throw new Error("Order not found.");
+  };
+
+  /** Every certificate this breeder holds, including any whose order is gone. */
+  const listBreederCertificates = async (): Promise<StoredCertificateSummary[]> => {
+    requireSessionRole("breeder", "admin", "lab_staff");
+    return listStoredCertificatesRaw();
   };
 
   const listLabTestOrders = async (): Promise<TestOrder[]> => {
@@ -1650,6 +1791,8 @@ export const createLabApiClient = () => {
     cancelBreederTestOrder,
     getBreederOrderOutcome,
     getBreederCertificateArtifact,
+    getStoredCertificateArtifact,
+    listBreederCertificates,
     listLabTestOrders,
     getLabOrderOutcome,
     resolveLabSampleByQrToken,

@@ -102,6 +102,7 @@ model User {
   updatedAt        DateTime       @updatedAt
   profile          Profile?
   orders           ShedTestOrder[]
+  labCertificates  ShedTestCertificate[]
   pendingShedTests PendingShedTest[]
   animals          Animal[]
   pairings         Pairing[]
@@ -190,6 +191,7 @@ model Organization {
   geneSubmissions LabGeneSubmission[]
   pricingConfig PricingConfig?
   labOrders     ShedTestOrder[]
+  labCertificates ShedTestCertificate[]
   pendingShedTests PendingShedTest[]
 
   @@index([kind])
@@ -1479,13 +1481,65 @@ model ShedTestOrder {
   paymentRef            String?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
+  /**
+   * Set when the laboratory files the order away. An archived order keeps every
+   * row it had -- it is simply out of the working queues, which is the whole
+   * difference between archiving and deleting.
+   */
+  archivedAt            DateTime?             @map("archived_at")
+  archivedById          String?               @map("archived_by_id")
   animals               ShedTestOrderAnimal[]
   results               ShedTestOrderResult[]
+  certificates          ShedTestCertificate[]
 
   @@unique([labOrganizationId, orderNumber])
   @@index([breederId])
   @@index([status])
   @@index([labOrganizationId, status])
+  @@index([labOrganizationId, archivedAt])
+}
+
+/**
+ * A certificate the breeder keeps, whatever the laboratory later does with its
+ * own records.
+ *
+ * A certificate used to have no row anywhere. It was re-derived from the live
+ * order every time someone opened it, so the laboratory deleting an order took
+ * the breeder's certificate with it -- the confirmed genetics stayed on the
+ * animal, but the document proving it vanished. Issuing is the point of no
+ * return: from then on the certificate is the breeder's, and `orderId` is
+ * SetNull rather than Cascade precisely so removing the order cannot remove it.
+ *
+ * `snapshotJson` holds the order and result exactly as the breeder app reads
+ * them from `/orders/:id`, so the app renders the same PDF from a deleted
+ * order's snapshot as it does from a live one, with no second copy of the
+ * certificate layout to keep in step.
+ */
+model ShedTestCertificate {
+  id                String         @id @default(cuid())
+  orderId           String?        @map("order_id")
+  order             ShedTestOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  breederId         String         @map("breeder_id")
+  breeder           User           @relation(fields: [breederId], references: [id], onDelete: Cascade)
+  /** The issuing laboratory. Restrict, so retiring a lab cannot erase what it certified. */
+  labOrganizationId String?        @map("lab_organization_id")
+  labOrganization   Organization?  @relation(fields: [labOrganizationId], references: [id], onDelete: Restrict)
+  /** The breeder's own animal id, which outlives the order rows. */
+  animalAppId       String         @map("animal_app_id")
+  resultId          String?        @map("result_id")
+  orderNumber       String?        @map("order_number")
+  certificateNumber String         @unique @map("certificate_number")
+  verificationCode  String         @unique @map("verification_code")
+  issuedAt          DateTime       @map("issued_at")
+  snapshotJson      Json           @map("snapshot_json")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([breederId, animalAppId, certificateNumber])
+  @@index([breederId])
+  @@index([animalAppId])
+  @@index([labOrganizationId])
+  @@index([orderId])
 }
 
 model ShedTestOrderAnimal {

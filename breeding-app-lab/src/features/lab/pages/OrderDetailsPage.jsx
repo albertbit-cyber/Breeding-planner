@@ -109,6 +109,7 @@ export default function OrderDetailsPage({ orderId }) {
   const [allowedStatuses, setAllowedStatuses] = useState([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [archiveAction, setArchiveAction] = useState({ loading: false, error: "" });
   const [certificateAction, setCertificateAction] = useState({ loading: false, error: "" });
   const [paymentAction, setPaymentAction] = useState({ loading: false, error: "" });
 
@@ -207,14 +208,57 @@ export default function OrderDetailsPage({ orderId }) {
   const isLabOrAdmin = canAccessLabApp(currentRole);
   const canEnterResults = isLabOrAdmin && order && RESULT_ENTRY_STATUSES.has(order.status);
   const canDeleteOrder = isLabOrAdmin && Boolean(order?.id);
+  const canArchiveOrder = isLabOrAdmin && Boolean(order?.id);
+  const isArchived = Boolean(order?.archivedAt);
+
+  /**
+   * Files the order away, or brings it back.
+   *
+   * Deliberately without a confirmation prompt: nothing is lost and it is one
+   * click to undo. Asking "are you sure" here would only train staff to click
+   * through the prompt that does matter, on Delete.
+   */
+  const handleArchiveToggle = async () => {
+    if (!order?.id || archiveAction.loading) return;
+
+    setArchiveAction({ loading: true, error: "" });
+    try {
+      const api = createLabApiClient();
+      if (isArchived) {
+        await api.unarchiveLabOrder(order.id);
+      } else {
+        await api.archiveLabOrder(order.id);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("lab:test-order-updated", {
+          detail: { orderId: order.id, archived: !isArchived },
+        }));
+      }
+      await loadAll();
+      setArchiveAction({ loading: false, error: "" });
+    } catch (err) {
+      setArchiveAction({
+        loading: false,
+        error: err instanceof Error ? err.message : "Failed to update the archive.",
+      });
+    }
+  };
 
   const handleDeleteOrder = async () => {
     if (!order?.id || deleteLoading) return;
 
+    // The old wording said this removed the breeder's history too, which was
+    // never quite true and is now plainly false: the genetics was written onto
+    // the animal when the result was submitted, and the certificate is a record
+    // of its own that outlives the order. Saying so is the difference between
+    // staff avoiding Delete out of fear and picking the right one of the two.
     const confirmed = typeof window === "undefined"
       ? true
       : window.confirm(
-        "Delete this lab order permanently?\n\nThe order will be removed from the lab portal and breeder history.\n\nThis cannot be undone."
+        "Delete this lab order permanently?\n\n" +
+        "This removes the laboratory's copy: the order, its samples and its results.\n\n" +
+        "The breeder keeps the confirmed genetics on their animal, and keeps their certificate.\n\n" +
+        "This cannot be undone. To take the order off the dashboard without losing it, use Archive instead."
       );
 
     if (!confirmed) return;
@@ -318,7 +362,15 @@ export default function OrderDetailsPage({ orderId }) {
               {order?.orderNumber ? (
                 <span className="text-sm text-neutral-500">#{order.orderNumber}</span>
               ) : null}
+              {isArchived ? (
+                <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                  Archived {formatDateTime(order.archivedAt)}
+                </span>
+              ) : null}
             </div>
+            {archiveAction.error ? (
+              <div className="mt-2 text-xs text-rose-700">{archiveAction.error}</div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {order?.status === "completed" ? (
@@ -329,6 +381,18 @@ export default function OrderDetailsPage({ orderId }) {
                 disabled={certificateAction.loading}
               >
                 {certificateAction.loading ? "Loading..." : "Download Certificate PDF"}
+              </button>
+            ) : null}
+            {canArchiveOrder ? (
+              <button
+                type="button"
+                className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:border-neutral-500 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleArchiveToggle}
+                disabled={archiveAction.loading}
+              >
+                {archiveAction.loading
+                  ? isArchived ? "Restoring..." : "Archiving..."
+                  : isArchived ? "Restore from Archive" : "Archive Order"}
               </button>
             ) : null}
             {canDeleteOrder ? (

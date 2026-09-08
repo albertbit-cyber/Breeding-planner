@@ -5,7 +5,11 @@ vi.mock("../lib/prisma", () => ({
     shedTestOrder: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      update: vi.fn(),
       delete: vi.fn(),
+    },
+    shedTestCertificate: {
+      count: vi.fn(),
     },
   },
 }));
@@ -19,6 +23,7 @@ import {
   deleteOrderById,
   getOrderByIdForUser,
   listOrdersForUser,
+  setOrderArchived,
 } from "../services/orderService";
 
 const LAB_A = { organizationId: "org_lab_a" };
@@ -34,6 +39,7 @@ const order = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked((prisma as any).shedTestCertificate.count).mockResolvedValue(0);
 });
 
 describe("orderService breeder visibility", () => {
@@ -57,7 +63,9 @@ describe("orderService breeder visibility", () => {
 
     expect((prisma as any).shedTestOrder.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { labOrganizationId: "org_lab_a" },
+        // Archived orders are out of the working queue by default: that is the
+        // entire difference between archiving an order and deleting it.
+        where: { labOrganizationId: "org_lab_a", archivedAt: null },
         include: expect.objectContaining({
           breeder: expect.any(Object),
         }),
@@ -78,7 +86,7 @@ describe("orderService breeder visibility", () => {
     await listOrdersForUser({ id: "admin-1", role: "admin" }, null);
 
     const call = vi.mocked((prisma as any).shedTestOrder.findMany).mock.calls[0][0];
-    expect(call.where).toBeUndefined();
+    expect(call.where).toEqual({ archivedAt: null });
   });
 
   it("hides another lab's order detail behind a 404", async () => {
@@ -139,6 +147,7 @@ describe("orderService breeder visibility", () => {
       deletedAnimals: 1,
       deletedAnimalTests: 2,
       deletedResults: 1,
+      preservedCertificates: 0,
     });
 
     expect((prisma as any).shedTestOrder.delete).toHaveBeenCalledWith({
@@ -159,5 +168,110 @@ describe("orderService breeder visibility", () => {
       deleteOrderById("order-1", { role: "lab_staff" }, LAB_B)
     ).rejects.toMatchObject({ statusCode: 404 });
     expect((prisma as any).shedTestOrder.delete).not.toHaveBeenCalled();
+  });
+
+  it("reports the certificates a deletion leaves standing", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue({
+      id: "order-1",
+      labOrganizationId: LAB_A.organizationId,
+      animals: [],
+      results: [{ id: "result-1" }],
+    });
+    vi.mocked((prisma as any).shedTestOrder.delete).mockResolvedValue({ id: "order-1" });
+    vi.mocked((prisma as any).shedTestCertificate.count).mockResolvedValue(2);
+
+    const result = await deleteOrderById("order-1", { role: "lab_staff" }, LAB_A);
+
+    // The certificate rows are not deleted alongside the order -- the foreign
+    // key nulls out instead -- so the lab can be told what the breeder keeps.
+    expect(result.preservedCertificates).toBe(2);
+    expect((prisma as any).shedTestCertificate.count).toHaveBeenCalledWith({
+      where: { orderId: "order-1" },
+    });
+  });
+});
+
+describe("orderService archiving", () => {
+  const archivable = {
+    id: "order-1",
+    labOrganizationId: LAB_A.organizationId,
+    archivedAt: null,
+  };
+
+  it("stamps the archive date and the member who filed it", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue(archivable);
+    vi.mocked((prisma as any).shedTestOrder.update).mockResolvedValue({ id: "order-1" });
+
+    await setOrderArchived("order-1", true, { id: "lab-1", role: "lab_staff" }, LAB_A);
+
+    const call = vi.mocked((prisma as any).shedTestOrder.update).mock.calls[0][0];
+    expect(call.where).toEqual({ id: "order-1" });
+    expect(call.data.archivedById).toBe("lab-1");
+    expect(call.data.archivedAt).toBeInstanceOf(Date);
+  });
+
+  it("clears both archive columns when restoring", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue({
+      ...archivable,
+      archivedAt: new Date("2026-01-05T10:00:00.000Z"),
+    });
+    vi.mocked((prisma as any).shedTestOrder.update).mockResolvedValue({ id: "order-1" });
+
+    await setOrderArchived("order-1", false, { id: "lab-1", role: "lab_staff" }, LAB_A);
+
+    const call = vi.mocked((prisma as any).shedTestOrder.update).mock.calls[0][0];
+    expect(call.data).toEqual({ archivedAt: null, archivedById: null });
+  });
+
+  it("leaves an already-archived order's date alone", async () => {
+    // Otherwise re-archiving would move the order between months in the
+    // year/month archive for no reason the lab did anything to cause.
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue({
+      ...archivable,
+      archivedAt: new Date("2026-01-05T10:00:00.000Z"),
+    });
+
+    await setOrderArchived("order-1", true, { id: "lab-1", role: "lab_staff" }, LAB_A);
+
+    expect((prisma as any).shedTestOrder.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses to archive another laboratory's order", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findUnique).mockResolvedValue(archivable);
+
+    await expect(
+      setOrderArchived("order-1", true, { id: "lab-2", role: "lab_staff" }, LAB_B)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect((prisma as any).shedTestOrder.update).not.toHaveBeenCalled();
+  });
+
+  it("lists the archive when asked for it, and everything when asked for that", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findMany).mockResolvedValue([]);
+
+    await listOrdersForUser({ id: "lab-1", role: "lab_staff" }, LAB_A, {
+      archiveScope: "archived",
+    });
+    expect(
+      vi.mocked((prisma as any).shedTestOrder.findMany).mock.calls[0][0].where
+    ).toEqual({ labOrganizationId: "org_lab_a", archivedAt: { not: null } });
+
+    await listOrdersForUser({ id: "lab-1", role: "lab_staff" }, LAB_A, { archiveScope: "all" });
+    expect(
+      vi.mocked((prisma as any).shedTestOrder.findMany).mock.calls[1][0].where
+    ).toEqual({ labOrganizationId: "org_lab_a" });
+  });
+
+  it("never hides an order from the breeder who paid for it", async () => {
+    vi.mocked((prisma as any).shedTestOrder.findMany).mockResolvedValue([]);
+
+    // Archiving is the laboratory filing its own copy away. The breeder's list
+    // is unfiltered whatever scope is asked for.
+    await listOrdersForUser({ id: "breeder-1", role: "breeder" }, null, {
+      archiveScope: "active",
+    });
+
+    expect(
+      vi.mocked((prisma as any).shedTestOrder.findMany).mock.calls[0][0].where
+    ).toEqual({ breederId: "breeder-1" });
   });
 });
