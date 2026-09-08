@@ -1,0 +1,638 @@
+<title>Serpentora Site Blueprint</title>
+<style>
+:root{
+  --ground:#EDF1F4; --surface:#FFFFFF; --surface-2:#F5F8FA;
+  --ink:#0E1A22; --ink-2:#2B3B46; --muted:#5A6B77;
+  --rule:#D2DCE3; --rule-soft:#E3EAEF;
+  --brand:#0972B8; --brand-ink:#075E99; --brand-wash:#E4F0FA;
+  --live:#1B7A5A; --live-wash:#E2F2EC;
+  --wired:#7A5AA8; --wired-wash:#EEE9F7;
+  --hold:#A6522A; --hold-wash:#F7EBE2;
+  --shadow:0 1px 2px rgba(14,26,34,.05), 0 8px 24px -12px rgba(14,26,34,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1218; --surface:#121C24; --surface-2:#16222B;
+    --ink:#E6EEF4; --ink-2:#C2D0DA; --muted:#8FA2AF;
+    --rule:#25333E; --rule-soft:#1D2933;
+    --brand:#4FA9E4; --brand-ink:#7CC3F1; --brand-wash:#12293A;
+    --live:#5FC49E; --live-wash:#123027;
+    --wired:#B49BE0; --wired-wash:#241C36;
+    --hold:#E0996B; --hold-wash:#332114;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B1218; --surface:#121C24; --surface-2:#16222B;
+  --ink:#E6EEF4; --ink-2:#C2D0DA; --muted:#8FA2AF;
+  --rule:#25333E; --rule-soft:#1D2933;
+  --brand:#4FA9E4; --brand-ink:#7CC3F1; --brand-wash:#12293A;
+  --live:#5FC49E; --live-wash:#123027;
+  --wired:#B49BE0; --wired-wash:#241C36;
+  --hold:#E0996B; --hold-wash:#332114;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Segoe UI","Avenir Next",Optima,system-ui,-apple-system,sans-serif;
+  font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:Charter,"Bitstream Charter","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;text-wrap:balance;margin:0;font-weight:600;letter-spacing:-.01em}
+h1{font-size:clamp(2.1rem,4.6vw,3.35rem);line-height:1.06;letter-spacing:-.025em}
+h2{font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.15}
+h3{font-size:1.115rem;line-height:1.3}
+h4{font-size:.95rem;line-height:1.35}
+p{margin:0}
+a{color:var(--brand-ink)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:3px}
+.mono{font-family:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;font-size:.85em}
+.tnum{font-variant-numeric:tabular-nums}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(18px,4vw,44px)}
+.grid-shell{display:grid;gap:clamp(28px,4vw,56px);grid-template-columns:1fr}
+@media(min-width:1040px){.grid-shell{grid-template-columns:212px minmax(0,1fr)}}
+.rail{display:none}
+@media(min-width:1040px){
+  .rail{display:block;position:sticky;top:0;align-self:start;padding:56px 0;max-height:100vh;overflow-y:auto}
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rail a{display:block;padding:5px 10px;border-radius:6px;text-decoration:none;color:var(--muted);font-size:.845rem;line-height:1.3;border-left:2px solid transparent}
+.rail a:hover{color:var(--ink);background:var(--surface);border-left-color:var(--brand)}
+.rail .rail-hd{font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);padding:0 10px 10px;font-weight:700}
+main{padding:clamp(34px,5vw,56px) 0 96px;min-width:0}
+section{scroll-margin-top:24px}
+.stack{display:flex;flex-direction:column}
+
+.hero{display:flex;flex-direction:column;gap:22px;padding-bottom:34px}
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.16em;font-weight:700;color:var(--brand-ink)}
+.mark{width:26px;height:26px;flex:none}
+.lede{font-size:clamp(1.02rem,1.7vw,1.16rem);color:var(--ink-2);max-width:63ch}
+.scales{height:16px;border-radius:2px;
+  background-image:radial-gradient(circle at 50% 118%, transparent 60%, var(--rule) 61%, var(--rule) 64%, transparent 65%);
+  background-size:19px 16px;background-repeat:repeat-x;opacity:.85}
+.statstrip{display:grid;gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);border-radius:10px;overflow:hidden;grid-template-columns:repeat(2,1fr)}
+@media(min-width:660px){.statstrip{grid-template-columns:repeat(4,1fr)}}
+.statstrip div{background:var(--surface);padding:15px 16px}
+.statstrip b{display:block;font-family:Charter,Georgia,serif;font-size:1.55rem;line-height:1;color:var(--brand-ink);font-variant-numeric:tabular-nums}
+.statstrip span{display:block;margin-top:6px;font-size:.755rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+
+.sec-hd{display:flex;flex-direction:column;gap:9px;padding:52px 0 22px;border-top:1px solid var(--rule);margin-top:44px}
+.sec-hd .kicker{font-size:.7rem;text-transform:uppercase;letter-spacing:.15em;font-weight:700;color:var(--muted)}
+.sec-hd p{color:var(--ink-2);max-width:66ch}
+.card{background:var(--surface);border:1px solid var(--rule-soft);border-radius:10px;padding:19px 20px;box-shadow:var(--shadow)}
+.cards{display:grid;gap:14px}
+@media(min-width:820px){.cards.two{grid-template-columns:1fr 1fr}}
+.card h3{margin-bottom:4px}
+.card .why{color:var(--muted);font-size:.9rem;margin-top:2px}
+.card ul{margin:11px 0 0;padding-left:1.05em;display:flex;flex-direction:column;gap:5px;font-size:.925rem;color:var(--ink-2)}
+.card li::marker{color:var(--brand)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.chip--live{background:var(--live-wash);color:var(--live)}
+.chip--wired{background:var(--wired-wash);color:var(--wired)}
+.chip--hold{background:var(--hold-wash);color:var(--hold)}
+.cardtop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+
+.ranked{display:flex;flex-direction:column;gap:14px}
+.rank{background:var(--surface);border:1px solid var(--rule-soft);border-left:3px solid var(--brand);border-radius:10px;padding:18px 20px;display:grid;gap:12px;box-shadow:var(--shadow)}
+@media(min-width:760px){.rank{grid-template-columns:44px minmax(0,1fr)}}
+.rank .n{font-family:Charter,Georgia,serif;font-size:1.7rem;line-height:1;color:var(--brand);font-variant-numeric:tabular-nums;opacity:.9}
+.rank dl{margin:12px 0 0;display:grid;gap:8px;font-size:.92rem}
+@media(min-width:620px){.rank dl{grid-template-columns:88px minmax(0,1fr);gap:8px 16px}}
+.rank dt{font-size:.68rem;text-transform:uppercase;letter-spacing:.11em;font-weight:700;color:var(--muted);padding-top:3px}
+.rank dd{margin:0;color:var(--ink-2)}
+
+.flow{display:flex;flex-direction:column;border:1px solid var(--rule-soft);border-radius:10px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.flow-row{display:grid;gap:6px;padding:17px 20px;border-bottom:1px solid var(--rule-soft)}
+@media(min-width:720px){.flow-row{grid-template-columns:56px minmax(0,1fr);gap:6px 18px}}
+.flow-row:last-child{border-bottom:0}
+.flow-row .step{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums;padding-top:3px}
+.flow-row h4{margin-bottom:3px}
+.flow-row .copy{background:var(--surface-2);border-left:2px solid var(--brand);padding:9px 13px;border-radius:0 6px 6px 0;margin-top:9px;font-family:Charter,Georgia,serif;font-size:1.02rem;color:var(--ink)}
+.flow-row .note{font-size:.88rem;color:var(--muted);margin-top:6px}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--rule-soft);border-radius:10px;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.92rem}
+th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+th{font-size:.68rem;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);font-weight:700;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;font-weight:600;color:var(--brand-ink);white-space:nowrap}
+
+.callout{background:var(--brand-wash);border:1px solid var(--rule-soft);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.callout h3{color:var(--brand-ink)}
+.footnote{color:var(--muted);font-size:.85rem;max-width:70ch}
+</style>
+
+<div class="wrap">
+<div class="grid-shell">
+
+<nav class="rail" aria-label="Contents">
+  <div class="rail-hd">Contents</div>
+  <ol>
+    <li><a href="#audit">What the app is today</a></li>
+    <li><a href="#inventory">Functionality inventory</a></li>
+    <li><a href="#show">What the site must show</a></li>
+    <li><a href="#homepage">Homepage, section by section</a></li>
+    <li><a href="#numbers">Numbers worth printing</a></li>
+    <li><a href="#objections">Objections and answers</a></li>
+    <li><a href="#shotlist">Asset shot list</a></li>
+    <li><a href="#gates">Don't claim this yet</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 18c0-3.3 2.7-6 6-6h4c2.2 0 4-1.8 4-4s-1.8-4-4-4c-2 0-3.4 1.2-4 3" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+      <circle cx="6.4" cy="18.6" r="2.4" fill="currentColor"/>
+    </svg>
+    Serpentora &middot; public site content plan
+  </div>
+  <h1>Everything the app already does, and what the website has to say about it</h1>
+  <p class="lede">A fresh audit of the codebase, turned into site content. The app is much bigger than the current pitch suggests &mdash; the job of the website is to prove that in about forty seconds. Every claim below is traced to something that exists in the product, and the last section lists what must <em>not</em> be claimed yet.</p>
+  <div class="scales" aria-hidden="true"></div>
+  <div class="statstrip">
+    <div><b class="tnum">635</b><span>curated genes</span></div>
+    <div><b class="tnum">21</b><span>species</span></div>
+    <div><b class="tnum">10</b><span>languages</span></div>
+    <div><b class="tnum">4</b><span>platforms</span></div>
+  </div>
+</header>
+
+<section id="audit">
+  <div class="sec-hd">
+    <span class="kicker">The read</span>
+    <h2>What the app is today</h2>
+    <p>Serpentora is not a morph calculator with records bolted on. It is a full breeding operations system with four connected surfaces, and the genetics engine is only the front door.</p>
+  </div>
+  <div class="cards two">
+    <div class="card">
+      <h3>Breeder app</h3>
+      <p class="why">The flagship. Animals, genetics, pairings, clutches, incubation, pedigree, quarantine, racks, calendar, exports, backups.</p>
+      <ul><li>Runs in a browser, as a Windows desktop app, and as Android and iOS builds from the same code</li><li>Local-first: it keeps working with no connection</li></ul>
+    </div>
+    <div class="card">
+      <h3>Lab portal</h3>
+      <p class="why">Partner labs receive orders, log samples, enter results and issue verifiable certificates that land back in the breeder's records.</p>
+      <ul><li>Order a test from inside the animal's own record</li><li>Certificates carry a number and a verification code</li></ul>
+    </div>
+    <div class="card">
+      <h3>Marketplace</h3>
+      <p class="why">Stores, listings, inquiries, favourites, saved searches, reviews and sales &mdash; attached to animals you already track.</p>
+      <ul><li>Spinning out as its own product; mention it as a direction, not a feature</li></ul>
+    </div>
+    <div class="card">
+      <h3>Admin back office</h3>
+      <p class="why">Users, verification, subscription tiers, reports, lab accounts, announcements, GDPR tooling.</p>
+      <ul><li>Invisible to buyers, but it is why the trust claims on the site are honest</li></ul>
+    </div>
+  </div>
+</section>
+
+<section id="inventory">
+  <div class="sec-hd">
+    <span class="kicker">The audit</span>
+    <h2>Functionality inventory</h2>
+    <p>Twelve capability groups found in the code. The chip on each says how far you can push it publicly: <span class="chip chip--live">In the app</span> means a breeder can use it now, <span class="chip chip--wired">Built, unsurfaced</span> means it exists but needs a screen or the site to make it visible, <span class="chip chip--hold">Hold</span> means don't put it on the site yet.</p>
+  </div>
+  <div class="cards two">
+
+    <div class="card">
+      <div class="cardtop"><h3>Animal records</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The database underneath everything else.</p>
+      <ul>
+        <li>Paste a messy animal description and the quick-add parser pulls out ID, sex, genetics, weight, birth date and feeding notes</li>
+        <li>Nine log types &mdash; feed, weight, shed, cleaning, medication, water, health, notes, other &mdash; logged in one tap from the animal card</li>
+        <li>Photos with camera capture, an ID wizard that builds your own ID format, custom status tags, groups, import with a parse preview</li>
+        <li>Exports as PDF, Excel and CSV with your own field selection</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Genetics engine</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The wedge feature. This is what people screenshot.</p>
+      <ul>
+        <li>635 curated genes across 21 species &mdash; 233 for ball pythons alone &mdash; with type, complex, super form, aliases and shorthand</li>
+        <li>Handles recessive, dominant, incomplete dominant, complexes and super forms; flags genes carrying wobble, kinking, infertility or a lethal super</li>
+        <li>Punnett engine gives per-gene odds, combined odds, projected visuals and projected hets</li>
+        <li>Understands how breeders actually write genetics: <span class="mono">66% Het Pied</span>, slashes, commas, combo nicknames and shorthand, with your own alias tables</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Breeding projects</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">Season-long tracking, not a single calculation.</p>
+      <ul>
+        <li>Pairings with generated five-month appointment schedules, recorded locks and per-appointment notes</li>
+        <li>Lifecycle milestones: ovulation, pre-lay shed, clutch date, fertile eggs, slugs, hatch</li>
+        <li>Incubator view builds egg boxes with due dates and remaining time</li>
+        <li>Printable clutch cards and pairing QR labels; completed projects archived by year</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Breeding Advisor</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The most demo-able screen in the product.</p>
+      <ul>
+        <li>Type the goal in plain language &mdash; <em>"clown desert ghost with pastel and possible het pied"</em></li>
+        <li>Set required, optional and avoid traits, a minimum probability and weighting</li>
+        <li>Returns your own animals ranked by chance of hitting the goal, with projected visuals, hets and holdback hints</li>
+        <li>Turn a suggestion into a multi-generation breeding plan, or export the shortlist</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Family tree</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The professionalism pillar. Sells to anyone who has to prove lineage.</p>
+      <ul>
+        <li>Pedigree canvas with animal, clutch and junction nodes, opened straight from any animal</li>
+        <li>Pedigree passport panel for a single animal's ancestry</li>
+        <li>Privacy filters control what is exposed when a tree is shared with a buyer</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Reproductive intelligence</h3><span class="chip chip--wired">Built, unsurfaced</span></div>
+      <p class="why">Nothing else on the market does this. It deserves its own site section.</p>
+      <ul>
+        <li>Builds a reproductive profile per female from her own logged history</li>
+        <li>Tags her pattern: early or late ovulator, frequent or infrequent locker, consistent or variable timing</li>
+        <li>Predicts the next ovulation and clutch as a date window, labelled with a confidence level so the app never bluffs on thin data</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Quarantine module</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">Genuinely differentiated and completely absent from competitors.</p>
+      <ul>
+        <li>Phase-based quarantine timeline per new arrival, with the next due action surfaced</li>
+        <li>A clearance checklist that will not tick itself: minimum days served, clean recent checks, accepted feeding</li>
+        <li>Reference library of the real diagnostics &mdash; what a faecal float or a cloacal swab does and does not rule out, sample type, turnaround, limitations</li>
+        <li>Information only. No prices, no orders, no medical advice &mdash; it makes the conversation with your vet better</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Racks and spaces</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The "where is this animal physically" answer.</p>
+      <ul>
+        <li>Rooms containing heat racks and terrariums, with slot-level assignment</li>
+        <li>Occupancy and empty-slot summaries per room</li>
+        <li>Guards against placing the same animal in two slots at once</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Calendar and exports</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">Feeds, weights, cleanings, sheds, meds, appointments and clutch actions in one month view.</p>
+      <ul>
+        <li>Filter by event type or by sire to isolate one project</li>
+        <li>Near-term breeding reminders built from the appointment schedule</li>
+        <li>Export to Google Calendar (<span class="mono">.ics</span>), a full-range calendar file, or an appointment spreadsheet</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Lab testing pipeline</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The differentiator no spreadsheet and no competitor has.</p>
+      <ul>
+        <li>Order a genetic test from the animal's own record &mdash; over 40 morph tests plus sex determination</li>
+        <li>Printable sample labels, live order and payment status, result count on the animal</li>
+        <li>Completed results produce a certificate with a number and a verification code a buyer can check</li>
+        <li>Partner labs work the queue in their own portal: intake, result entry, completed tests, their own catalog and pricing</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Mobile and terminal mode</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The rack-side story. Show it as video, not as a feature bullet.</p>
+      <ul>
+        <li>QR labels on tubs: scan one and the animal opens on your phone</li>
+        <li>Terminal mode for fast rounds &mdash; scan, log a feed or weight, take a photo, move on</li>
+        <li>Full mobile record: overview, feed cycle, details, logs, photos and breeding, plus a mobile rack view</li>
+        <li>Actions queue while offline and sync when you are back on a connection</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="cardtop"><h3>Your data, your control</h3><span class="chip chip--live">In the app</span></div>
+      <p class="why">The trust section. Under-sold today, and it costs signups.</p>
+      <ul>
+        <li>Local-first: your collection works with no connection and no account</li>
+        <li>Manual backups, scheduled nightly / weekly / monthly backups, and a backup vault with named restore points and retention limits</li>
+        <li>Ten languages including right-to-left Hebrew; theme, palette and font presets</li>
+        <li>Account email verification and recovery, notification preferences, GDPR tooling in the back office</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<section id="show">
+  <div class="sec-hd">
+    <span class="kicker">The pitch</span>
+    <h2>What the site must show, in order of persuasive power</h2>
+    <p>Ranked. The order matters &mdash; this is the sequence that converts a sceptical breeder, and it is not the order the features were built in. Show the product working before explaining what it is.</p>
+  </div>
+  <div class="ranked">
+
+    <article class="rank">
+      <div class="n tnum">1</div>
+      <div>
+        <h3>A live genetics calculator, no signup</h3>
+        <dl>
+          <dt>Show</dt><dd>A working cross on the page itself: pick a male, pick a female, get real odds. Not a screenshot, not a video &mdash; the actual calculation, running on the marketing site.</dd>
+          <dt>Why</dt><dd>It is the only feature that proves competence in three seconds, and it is the one thing this community already screenshots into arguments. Every shared result is a link back.</dd>
+          <dt>Proof</dt><dd>The Punnett engine and the 635-gene database are self-contained and run entirely in the browser.</dd>
+          <dt>Build</dt><dd>Embed the engine with a curated set of morphs. Give every result a shareable link and an image sized for Facebook and Instagram Stories.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">2</div>
+      <div>
+        <h3>The Breeding Advisor answering a real question</h3>
+        <dl>
+          <dt>Show</dt><dd>A twelve-second loop: someone types <em>"I want clown desert ghost with pastel and possible het pied"</em> and their own animals come back ranked by odds.</dd>
+          <dt>Why</dt><dd>Every competitor stops at "here is what this pairing makes". Only this answers "which of my animals should I pair". That gap is the product.</dd>
+          <dt>Proof</dt><dd>Goal parsing, trait weighting, ranked suggestions with success chance and projected hets, all shipping.</dd>
+          <dt>Build</dt><dd>Screen capture against a demo collection. Show the typing &mdash; the plain-language input is half the magic.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">3</div>
+      <div>
+        <h3>Lab-confirmed genetics landing in the record</h3>
+        <dl>
+          <dt>Show</dt><dd>The chain in four frames: order a test from the animal, print the sample label, the lab enters the result, a certificate with a verification code appears on the animal.</dd>
+          <dt>Why</dt><dd>Nobody else in this category has it. It converts the semi-pro and pro segment, where a disputed het claim is a money and reputation problem.</dd>
+          <dt>Proof</dt><dd>Over 40 orderable morph tests, label PDFs, status tracking, certificates with verification codes, a full partner-lab portal.</dd>
+          <dt>Build</dt><dd>A four-panel diagram plus one real certificate image with the numbers blurred.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">4</div>
+      <div>
+        <h3>Pedigree you can hand to a buyer</h3>
+        <dl>
+          <dt>Show</dt><dd>A real family tree, three generations deep, with the privacy filter visibly on &mdash; proving you can share lineage without exposing your whole collection.</dd>
+          <dt>Why</dt><dd>"Proven pair" and "line-bred" claims are currently backed by nothing but a seller's word. This is the professionalism argument.</dd>
+          <dt>Proof</dt><dd>Pedigree canvas with clutch nodes, a per-animal passport panel and privacy filters.</dd>
+          <dt>Build</dt><dd>One wide screenshot. Let it be big &mdash; this feature photographs well and small thumbnails waste it.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">5</div>
+      <div>
+        <h3>Predictions for each female, with honest confidence</h3>
+        <dl>
+          <dt>Show</dt><dd>One female's panel: her pattern tags, her predicted ovulation window, and the confidence badge sitting next to it.</dd>
+          <dt>Why</dt><dd>It is the most advanced thing in the product and it is currently invisible. The confidence badge is the selling point, not a caveat &mdash; it says the software will tell you when it does not know.</dd>
+          <dt>Proof</dt><dd>Reproductive profiles built from logged cycles and lock events, pattern classification, date-window predictions with confidence levels.</dd>
+          <dt>Build</dt><dd>Screenshot plus one line: "It learns from her history, and tells you how sure it is."</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">6</div>
+      <div>
+        <h3>The phone at the rack</h3>
+        <dl>
+          <dt>Show</dt><dd>Filmed hands: scan the QR label on a tub, the animal opens, log the feed, next tub. Fifteen seconds, no narration.</dd>
+          <dt>Why</dt><dd>It answers the real objection to every record-keeping tool &mdash; "I will never actually keep it updated."</dd>
+          <dt>Proof</dt><dd>QR label export and scanning, terminal mode, one-tap logging, offline queue and sync.</dd>
+          <dt>Build</dt><dd>A phone-held video. This is the single highest-value asset to film and it needs no design work.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">7</div>
+      <div>
+        <h3>Quarantine done properly</h3>
+        <dl>
+          <dt>Show</dt><dd>The clearance checklist mid-quarantine, with one item not yet met.</dd>
+          <dt>Why</dt><dd>Unclaimed territory, and it speaks to the part of the audience that takes biosecurity seriously &mdash; exactly the people other keepers listen to.</dd>
+          <dt>Proof</dt><dd>Phase timeline, next-action prompts, a clearance checklist that will not pass early, and a reference library of what each diagnostic actually rules out.</dd>
+          <dt>Build</dt><dd>Screenshot plus the honest framing: it is information, not medical advice.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">8</div>
+      <div>
+        <h3>Your data stays yours</h3>
+        <dl>
+          <dt>Show</dt><dd>Three plain lines: works offline, exports to PDF, Excel and CSV whenever you want, backup vault with restore points.</dd>
+          <dt>Why</dt><dd>This audience has watched tools die. "You can leave with everything" removes the biggest silent objection to starting.</dd>
+          <dt>Proof</dt><dd>Local-first storage, scheduled backups, a named-restore-point vault, and exports across every major record type.</dd>
+          <dt>Build</dt><dd>Text only. No illustration needed; a lock icon would weaken it.</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="rank">
+      <div class="n tnum">9</div>
+      <div>
+        <h3>The breadth, once &mdash; as a number, not a grid</h3>
+        <dl>
+          <dt>Show</dt><dd>One strip: 635 genes, 21 species, 9 log types, 10 languages, and web, desktop, iPhone and Android.</dd>
+          <dt>Why</dt><dd>Breadth is the reason to pay, but leading with it reads as a feature dump. Placed late, it turns interest into confidence.</dd>
+          <dt>Proof</dt><dd>All of those numbers are counted from the shipping code.</dd>
+          <dt>Build</dt><dd>Resist the icon grid. Numbers and words.</dd>
+        </dl>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section id="homepage">
+  <div class="sec-hd">
+    <span class="kicker">The build</span>
+    <h2>Homepage, section by section</h2>
+    <p>Top to bottom, with draft copy in the quoted lines. The numbering here is the actual scroll order.</p>
+  </div>
+  <div class="flow">
+    <div class="flow-row"><div class="step">01</div><div>
+      <h4>Honesty banner</h4>
+      <p class="note">Small, persistent, top of page. It is what keeps every campaign below safe until billing and legal pages are live.</p>
+      <p class="copy">Serpentora is in active development. Join the waitlist to help shape it and get early access.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">02</div><div>
+      <h4>Hero</h4>
+      <p class="note">Headline, one subhead, one primary action. Three candidates, in order of preference.</p>
+      <p class="copy">Stop settling het arguments in the comments.</p>
+      <p class="copy">Your collection knows more than your spreadsheet does.</p>
+      <p class="copy">Every pairing, every clutch, every het &mdash; in one place that understands the genetics.</p>
+      <p class="note">Subhead: "Serpentora tracks genetics, pairings, pedigree and lab results for reptile breeders. Works offline, on your phone at the rack, in ten languages."</p>
+    </div></div>
+    <div class="flow-row"><div class="step">03</div><div>
+      <h4>The live calculator</h4>
+      <p class="note">Immediately under the hero, above any explanation. Pick two animals, see real odds, share the result. This is the page's thesis.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">04</div><div>
+      <h4>"It doesn't stop at the odds"</h4>
+      <p class="note">The Advisor loop. The turn from calculator to system.</p>
+      <p class="copy">Anyone can tell you what a pairing makes. Serpentora tells you which pairing to make.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">05</div><div>
+      <h4>The season, end to end</h4>
+      <p class="note">Pairing, appointments, lock, ovulation, clutch, incubator, hatchlings on the tree. A horizontal timeline with a real screenshot at each stop. This is where breadth becomes a story instead of a list.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">06</div><div>
+      <h4>Lab results, in your records</h4>
+      <p class="note">The four-frame chain, ending on the certificate.</p>
+      <p class="copy">Send the shed. Get the answer back where it belongs &mdash; on the animal.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">07</div><div>
+      <h4>Pedigree and the passport</h4>
+      <p class="copy">Your pedigree, not your spreadsheet's.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">08</div><div>
+      <h4>At the rack</h4>
+      <p class="note">The phone video, the quarantine checklist and rack occupancy, grouped as the daily-work block.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">09</div><div>
+      <h4>Why not a spreadsheet</h4>
+      <p class="note">Three lines, confident, never condescending. Spreadsheets do not know that Lesser and Butter are the same complex, do not warn you about a lethal super, and do not remind you a pairing is due.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">10</div><div>
+      <h4>Your data stays yours</h4>
+      <p class="note">Offline, exports, backup vault. Three lines, no illustration.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">11</div><div>
+      <h4>The numbers</h4>
+      <p class="note">The single breadth strip. Late, brief, then move on.</p>
+    </div></div>
+    <div class="flow-row"><div class="step">12</div><div>
+      <h4>Closing action</h4>
+      <p class="note">Repeat the hero's action with the founding-member reason to act today, and link to the guide pages so a curious visitor has somewhere to go that is not a signup form.</p>
+    </div></div>
+  </div>
+</section>
+
+<section id="numbers">
+  <div class="sec-hd">
+    <span class="kicker">Evidence</span>
+    <h2>Numbers worth printing</h2>
+    <p>All counted from the shipping code during this audit, so they can go on the site as stated.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Claim</th><th>Figure</th><th>Where it comes from</th></tr></thead>
+      <tbody>
+        <tr><td>Curated genes across all species</td><td class="num">635</td><td>Per-species gene tables compiled for the app</td></tr>
+        <tr><td>Ball python genes alone</td><td class="num">233</td><td>The deepest table in the set</td></tr>
+        <tr><td>Species supported</td><td class="num">21</td><td>Pythons, boas, colubrids, geckos, bearded dragons, axolotls</td></tr>
+        <tr><td>Interface languages</td><td class="num">10</td><td>English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Czech, Hebrew</td></tr>
+        <tr><td>Log types per animal</td><td class="num">9</td><td>Feed, weight, shed, cleaning, medication, water, health, note, other</td></tr>
+        <tr><td>Orderable lab tests</td><td class="num">40+</td><td>Morph tests plus sex determination</td></tr>
+        <tr><td>Platforms from one codebase</td><td class="num">4</td><td>Browser, Windows desktop, Android, iOS</td></tr>
+        <tr><td>Export formats</td><td class="num">4</td><td>PDF, Excel, CSV and calendar files</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote" style="margin-top:12px">Recount these before launch if the gene tables are rebuilt &mdash; they are generated from a source file, so the totals move.</p>
+</section>
+
+<section id="objections">
+  <div class="sec-hd">
+    <span class="kicker">Friction</span>
+    <h2>Objections, and where the site answers them</h2>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What they think</th><th>The answer on the page</th></tr></thead>
+      <tbody>
+        <tr><td>"My spreadsheet is fine."</td><td>Section 09. It is fine until you need to know whether two of your animals share a complex, or which of forty possible pairings gets you closest to a goal.</td></tr>
+        <tr><td>"I'll never keep it updated."</td><td>Section 08. Scan the tub, log the feed, done. The video answers this better than any sentence.</td></tr>
+        <tr><td>"I don't want my collection on someone's server."</td><td>Section 10. It is local-first &mdash; it works with no connection, and everything exports.</td></tr>
+        <tr><td>"What happens when this shuts down?"</td><td>Section 10, same block. Exports and backup files you hold yourself, in formats you can open elsewhere.</td></tr>
+        <tr><td>"Another calculator."</td><td>Sections 03 and 04, back to back. The calculator is the door, not the room.</td></tr>
+        <tr><td>"I don't keep ball pythons."</td><td>Say the species list out loud in section 11 rather than leaving it implied &mdash; geckos, boas, colubrids and bearded dragons are all in there.</td></tr>
+        <tr><td>"Is this a marketplace trying to take a cut?"</td><td>Answer it directly in the closing block. The incentive is breeders succeeding, not transaction fees.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="shotlist">
+  <div class="sec-hd">
+    <span class="kicker">Production</span>
+    <h2>Asset shot list</h2>
+    <p>Nothing on the site should be a stock illustration or an icon grid. Every visual is the real product. Capture these against a seeded demo collection so no real animal data ships.</p>
+  </div>
+  <div class="cards two">
+    <div class="card">
+      <h3>Video, four clips</h3>
+      <ul>
+        <li>Advisor: typing a goal, results ranking &mdash; 12s</li>
+        <li>Rack round on a phone: scan, log, next &mdash; 15s, filmed hands</li>
+        <li>Calculator: two animals in, odds out &mdash; 6s, loops</li>
+        <li>Family tree: expanding a generation &mdash; 8s</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Stills, seven</h3>
+      <ul>
+        <li>Family tree, three generations, wide</li>
+        <li>Reproductive panel with a confidence badge visible</li>
+        <li>Quarantine clearance checklist, one item unmet</li>
+        <li>Incubator view with live due dates</li>
+        <li>Certificate with the code visible, numbers blurred</li>
+        <li>Rack occupancy grid</li>
+        <li>Animal card with the log blocks</li>
+      </ul>
+    </div>
+  </div>
+  <p class="footnote" style="margin-top:14px">Screenshots need somewhere to live. Uploaded files are currently stored on local disk, which does not survive a redeploy &mdash; commit the launch screenshots into the site repo rather than uploading them, until object storage is in place.</p>
+</section>
+
+<section id="gates">
+  <div class="sec-hd">
+    <span class="kicker">Discipline</span>
+    <h2>Don't claim this yet</h2>
+    <p>Everything above is honest today. These are not.</p>
+  </div>
+  <div class="stack" style="gap:14px">
+    <div class="callout">
+      <h3>No prices, no trials, no "upgrade"</h3>
+      <p>Payment processing is not live, so the pricing page can describe plans but must not promise a purchase. Until it is, the only action on the site is the waitlist &mdash; and the founding-member pricing lock is what makes joining today worth something.</p>
+    </div>
+    <div class="callout">
+      <h3>No signup promising stored data until the legal pages exist</h3>
+      <p>The app already links to <span class="mono">/terms</span> and <span class="mono">/privacy</span> on the public domain and those links are currently broken. They have to exist before any campaign points at a signup form &mdash; and shipping them fixes a live bug at the same time.</p>
+    </div>
+    <div class="callout">
+      <h3>Don't split the domain before redirecting the account emails</h3>
+      <p>Verification, password reset and email-change links are matched on exact paths. Moving the app to a subdomain without redirecting those three paths from the apex breaks every email already sitting in someone's inbox.</p>
+    </div>
+    <div class="callout">
+      <h3>One name, everywhere, before anything public</h3>
+      <p>Parts of the product still say "Breeding Planner". Someone who arrives from a Serpentora ad and sees the old name in the app has a bad first impression in a market that already distrusts new tools. Finish the rename first.</p>
+    </div>
+    <div class="callout">
+      <h3>Say "syncs across your devices" carefully</h3>
+      <p>Cloud sync exists and is in daily use, but has open reliability work. Lead with local-first and offline &mdash; which is true, differentiating and reassuring &mdash; and treat multi-device sync as a supporting line rather than a headline promise.</p>
+    </div>
+    <div class="callout">
+      <h3>Marketplace is a direction, not a feature</h3>
+      <p>It is spinning out as its own product. Mentioning it as something coming is fine; putting it in the feature list invites questions the site cannot answer yet.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+</div>

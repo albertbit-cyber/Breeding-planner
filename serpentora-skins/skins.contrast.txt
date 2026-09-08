@@ -1,0 +1,18 @@
+skins.css contrast report — generated 2026-08-23
+WCAG ratios, computed at generation time.
+
+skin                 txt mut sec onA fSf fPr bdr lnk suc wrn dng inf
+jungle-glass        13.4 6.9 8.6 6.411.5 5.0 1.9 8.6 8.8 8.6 8.6 8.7
+moss-mist           13.4 6.8 8.6 6.411.4 5.0 1.9 8.6 8.8 8.6 8.6 8.7
+rainforest-night    13.3 6.8 8.6 6.411.5 5.0 1.9 8.6 8.8 8.6 8.6 8.7
+fern-clay           13.4 6.8 8.6 6.611.2 5.0 1.9 8.4 8.8 8.6 8.6 8.7
+bamboo-daylight     14.1 6.7 8.112.3 3.5 3.5 1.6 8.1 7.5 7.8 8.2 7.6
+emerald-brass       13.4 6.9 8.6 6.311.6 4.9 1.9 8.6 8.8 8.6 8.6 8.7
+marsh-dusk          13.5 6.8 8.6 6.511.5 5.0 1.9 8.6 8.8 8.6 8.6 8.7
+sandstone-vivarium  14.1 6.7 8.212.5 3.5 3.5 1.6 8.1 7.5 7.8 8.2 7.6
+copper-canopy       13.4 6.8 8.6 6.511.3 5.0 1.9 8.5 8.8 8.6 8.6 8.7
+slate-botanical     13.4 6.8 8.6 6.511.3 5.0 1.9 8.5 8.8 8.6 8.6 8.7
+deep-canopy         13.4 6.8 8.5 6.411.5 5.0 1.9 8.6 8.8 8.6 8.6 8.7
+
+thresholds: 4.5 for all text pairs · 3.0 for focus/surface + focus/primary · 1.5 for border/surface
+failures: none

@@ -1,0 +1,521 @@
+/* ============================================================================
+   skins.css — the single source of truth for color across the suite.
+   Belongs in breeding-app-shared/src/styles/, imported by all five frontends.
+
+   A skin is one flat block of semantic --sk-* roles under [data-skin="…"] on
+   <html>. Adding a skin = adding one block. No JS, no build-time logic.
+
+   INVARIANT: a hex literal outside this file is a bug.
+
+   Jungle skins below were generated in OKLCH from a per-skin hue/chroma intent,
+   so the neutral ramp, status set, and data series stay perceptually even. All
+   pass the review checklist (see skins.contrast.txt for the measured ratios):
+     text/surface >= 4.5 · muted/surface >= 4.5 · secondary/surface-2 >= 4.5
+     text-on-accent/primary >= 4.5 · focus >= 3 vs BOTH surface and primary
+     status text/bg >= 4.5 · border/surface >= 1.5 · series mutually distinct
+   ============================================================================ */
+
+:root,
+[data-skin="default"] {
+  /* Default — reproduces today's shipped appearance (ships as a visual no-op). */
+  color-scheme: light;
+
+  --sk-bg:             #f6f7f9;
+  --sk-bg-2:           #f6f7f9;
+  --sk-surface:        #ffffff;
+  --sk-surface-2:      #fafafa;
+  --sk-surface-3:      #f5f5f5;
+  --sk-surface-raised: #ffffff;
+  --sk-scrim:          15 23 42;
+
+  --sk-border:         #e5e5e5;
+  --sk-border-strong:  #d4d4d4;
+
+  --sk-text:           #171717;
+  --sk-text-secondary: #404040;
+  --sk-text-muted:     #737373;
+  --sk-text-subtle:    #a3a3a3;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #0ea5e9;
+  --sk-primary-hover:  #0284c7;
+  --sk-accent:         #f59e0b;
+  --sk-link:           #0284c7;
+  --sk-focus:          #38bdf8;
+
+  --sk-success-bg: #f0fdf4;  --sk-success-border: #bbf7d0;  --sk-success-text: #166534;
+  --sk-warning-bg: #fffbeb;  --sk-warning-border: #fde68a;  --sk-warning-text: #92400e;
+  --sk-danger-bg:  #fee2e2;  --sk-danger-border:  #fca5a5;  --sk-danger-text:  #991b1b;
+  --sk-info-bg:    #eff6ff;  --sk-info-border:    #bfdbfe;  --sk-info-text:    #1e40af;
+
+  --sk-shadow-color: 15 23 42;
+
+  --sk-series-1: #0ea5e9;  --sk-series-2: #ec4899;  --sk-series-3: #10b981;
+  --sk-series-4: #7c3aed;  --sk-series-5: #f59e0b;  --sk-series-6: #6366f1;
+}
+
+/* ══ Jungle skins ═════════════════════════════════════════════════════════ */
+
+[data-skin="jungle-glass"] {
+  /* Jungle Glass (current) — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #16211c;
+  --sk-bg-2:           #152325;
+  --sk-surface:        #202a26;
+  --sk-surface-2:      #2a3430;
+  --sk-surface-3:      #343f3a;
+  --sk-surface-raised: #252f2b;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #455750;
+  --sk-border-strong:  #5b6e66;
+
+  --sk-text:           #ebf7f1;
+  --sk-text-secondary: #c7d7d0;
+  --sk-text-muted:     #a2b5ad;
+  --sk-text-subtle:    #7b8c85;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #396a2e;
+  --sk-primary-hover:  #4a7c3f;
+  --sk-accent:         #c4b86e;
+  --sk-link:           #a0d2a1;
+  --sk-focus:          #c2f0a9;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #81c583;  --sk-series-2: #c2b356;  --sk-series-3: #40c8c1;
+  --sk-series-4: #e99d67;  --sk-series-5: #bca0ef;  --sk-series-6: #58beec;
+}
+
+[data-skin="moss-mist"] {
+  /* Moss & Mist — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #1b201a;
+  --sk-bg-2:           #1d221d;
+  --sk-surface:        #252924;
+  --sk-surface-2:      #2f332e;
+  --sk-surface-3:      #393d38;
+  --sk-surface-raised: #2a2e29;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #4e554c;
+  --sk-border-strong:  #646b62;
+
+  --sk-text:           #f0f5ef;
+  --sk-text-secondary: #ced5cd;
+  --sk-text-muted:     #aab2a9;
+  --sk-text-subtle:    #838a81;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #416927;
+  --sk-primary-hover:  #527b39;
+  --sk-accent:         #bfba70;
+  --sk-link:           #a6d19c;
+  --sk-focus:          #c9eea4;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #89c37c;  --sk-series-2: #bcb559;  --sk-series-3: #45c9bb;
+  --sk-series-4: #ec9b6d;  --sk-series-5: #bca0ef;  --sk-series-6: #58beec;
+}
+
+[data-skin="rainforest-night"] {
+  /* Rainforest Night — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #112121;
+  --sk-bg-2:           #122426;
+  --sk-surface:        #1c2b2b;
+  --sk-surface-2:      #263535;
+  --sk-surface-3:      #303f3f;
+  --sk-surface-raised: #213030;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #3e5858;
+  --sk-border-strong:  #546f6f;
+
+  --sk-text:           #e7f7f7;
+  --sk-text-secondary: #c1d8d8;
+  --sk-text-muted:     #9bb6b5;
+  --sk-text-subtle:    #748d8d;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #036b62;
+  --sk-primary-hover:  #067e74;
+  --sk-accent:         #a8c17d;
+  --sk-link:           #7dd5cf;
+  --sk-focus:          #87f7e9;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #45c9bb;  --sk-series-2: #a0be6a;  --sk-series-3: #c8b055;
+  --sk-series-4: #ee9972;  --sk-series-5: #bca0ef;  --sk-series-6: #67bbf3;
+}
+
+[data-skin="fern-clay"] {
+  /* Fern & Clay — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #211e14;
+  --sk-bg-2:           #271f16;
+  --sk-surface:        #2a281f;
+  --sk-surface-2:      #343228;
+  --sk-surface-3:      #3e3c32;
+  --sk-surface-raised: #2f2d24;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #565343;
+  --sk-border-strong:  #6d6959;
+
+  --sk-text:           #f6f4e9;
+  --sk-text-secondary: #d6d3c4;
+  --sk-text-muted:     #b4b09f;
+  --sk-text-subtle:    #8c8878;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #655f00;
+  --sk-primary-hover:  #777017;
+  --sk-accent:         #e9a383;
+  --sk-link:           #c5c887;
+  --sk-focus:          #f0e28e;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #bcb559;  --sk-series-2: #ee9972;  --sk-series-3: #69c898;
+  --sk-series-4: #f19293;  --sk-series-5: #b0a4f5;  --sk-series-6: #5fbdf0;
+}
+
+[data-skin="bamboo-daylight"] {
+  /* Bamboo Daylight — light */
+  color-scheme: light;
+
+  --sk-bg:             #f3f5ea;
+  --sk-bg-2:           #f2f1e5;
+  --sk-surface:        #fdfef5;
+  --sk-surface-2:      #f3f4eb;
+  --sk-surface-3:      #e9eae1;
+  --sk-surface-raised: #ffffff;
+  --sk-scrim:          29 29 28;
+
+  --sk-border:         #cecfc1;
+  --sk-border-strong:  #b7b9ab;
+
+  --sk-text:           #2a2b24;
+  --sk-text-secondary: #494a41;
+  --sk-text-muted:     #5b5c50;
+  --sk-text-subtle:    #808175;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #1b3d00;
+  --sk-primary-hover:  #122d00;
+  --sk-accent:         #7a681c;
+  --sk-link:           #32582a;
+  --sk-focus:          #71934c;
+
+  --sk-success-bg: #e0f7e5;  --sk-success-border: #aeddb9;  --sk-success-text: #0f592e;
+  --sk-warning-bg: #fdefd1;  --sk-warning-border: #e9cc8f;  --sk-warning-text: #5f4600;
+  --sk-danger-bg:  #feebe9;  --sk-danger-border:  #febcb6;  --sk-danger-text:  #832323;
+  --sk-info-bg:    #e0f4fe;  --sk-info-border:    #a0d9f5;  --sk-info-text:    #00526e;
+
+  --sk-shadow-color: 46 47 31;
+
+  --sk-series-1: #477f3b;  --sk-series-2: #836d00;  --sk-series-3: #067f7f;
+  --sk-series-4: #a45631;  --sk-series-5: #795ea7;  --sk-series-6: #0678a6;
+}
+
+[data-skin="emerald-brass"] {
+  /* Emerald & Brass — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #16211a;
+  --sk-bg-2:           #19231b;
+  --sk-surface:        #212a24;
+  --sk-surface-2:      #2a342e;
+  --sk-surface-3:      #343f38;
+  --sk-surface-raised: #252f29;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #46574c;
+  --sk-border-strong:  #5c6e62;
+
+  --sk-text:           #ebf7ef;
+  --sk-text-secondary: #c8d7cd;
+  --sk-text-muted:     #a3b5a9;
+  --sk-text-subtle:    #7c8d81;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #086e47;
+  --sk-primary-hover:  #268058;
+  --sk-accent:         #d2b16d;
+  --sk-link:           #91d4b0;
+  --sk-focus:          #a6f5c1;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #69c898;  --sk-series-2: #d3ab54;  --sk-series-3: #3cc7ce;
+  --sk-series-4: #f0967f;  --sk-series-5: #bca0ef;  --sk-series-6: #67bbf3;
+}
+
+[data-skin="marsh-dusk"] {
+  /* Marsh Dusk — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #201d22;
+  --sk-bg-2:           #1e221c;
+  --sk-surface:        #29262c;
+  --sk-surface-2:      #333036;
+  --sk-surface-3:      #3d3a40;
+  --sk-surface-raised: #2e2b31;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #55505a;
+  --sk-border-strong:  #6c6670;
+
+  --sk-text:           #f5f2f8;
+  --sk-text-secondary: #d5d0d9;
+  --sk-text-muted:     #b2adb7;
+  --sk-text-subtle:    #8a858f;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #4f6619;
+  --sk-primary-hover:  #5f772d;
+  --sk-accent:         #c4a7e7;
+  --sk-link:           #b0ce94;
+  --sk-focus:          #d0ec9f;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #a0be6a;  --sk-series-2: #c29eec;  --sk-series-3: #40c8c1;
+  --sk-series-4: #e99d67;  --sk-series-5: #f1938c;  --sk-series-6: #67bbf3;
+}
+
+[data-skin="sandstone-vivarium"] {
+  /* Sandstone Vivarium — light */
+  color-scheme: light;
+
+  --sk-bg:             #faf3e6;
+  --sk-bg-2:           #f9eee2;
+  --sk-surface:        #fffdfa;
+  --sk-surface-2:      #f9f3e8;
+  --sk-surface-3:      #efe9de;
+  --sk-surface-raised: #feffff;
+  --sk-scrim:          30 29 28;
+
+  --sk-border:         #d6cdbc;
+  --sk-border-strong:  #c0b6a6;
+
+  --sk-text:           #2e2a22;
+  --sk-text-secondary: #4e483d;
+  --sk-text-muted:     #615a4c;
+  --sk-text-subtle:    #877f71;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #323700;
+  --sk-primary-hover:  #252800;
+  --sk-accent:         #905b2a;
+  --sk-link:           #475417;
+  --sk-focus:          #848d3d;
+
+  --sk-success-bg: #e0f7e5;  --sk-success-border: #aeddb9;  --sk-success-text: #0f592e;
+  --sk-warning-bg: #fdefd1;  --sk-warning-border: #e9cc8f;  --sk-warning-text: #5f4600;
+  --sk-danger-bg:  #feebe9;  --sk-danger-border:  #febcb6;  --sk-danger-text:  #832323;
+  --sk-info-bg:    #e0f4fe;  --sk-info-border:    #a0d9f5;  --sk-info-text:    #00526e;
+
+  --sk-shadow-color: 55 44 24;
+
+  --sk-series-1: #6d7614;  --sk-series-2: #9e5c1a;  --sk-series-3: #047e83;
+  --sk-series-4: #a75245;  --sk-series-5: #6e61ac;  --sk-series-6: #0678a6;
+}
+
+[data-skin="copper-canopy"] {
+  /* Copper Canopy — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #201e16;
+  --sk-bg-2:           #271f18;
+  --sk-surface:        #292820;
+  --sk-surface-2:      #33322a;
+  --sk-surface-3:      #3d3c34;
+  --sk-surface-raised: #2e2d25;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #555345;
+  --sk-border-strong:  #6c695b;
+
+  --sk-text:           #f5f4ea;
+  --sk-text-secondary: #d5d3c6;
+  --sk-text-muted:     #b2b0a1;
+  --sk-text-subtle:    #8a887a;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #57640d;
+  --sk-primary-hover:  #687525;
+  --sk-accent:         #e7a47f;
+  --sk-link:           #bbcb8d;
+  --sk-focus:          #dde897;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #aabb63;  --sk-series-2: #ec9b6d;  --sk-series-3: #45c9bb;
+  --sk-series-4: #f1938c;  --sk-series-5: #b6a2f3;  --sk-series-6: #5fbdf0;
+}
+
+[data-skin="slate-botanical"] {
+  /* Slate Botanical — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #182021;
+  --sk-bg-2:           #192323;
+  --sk-surface:        #22292b;
+  --sk-surface-2:      #2c3335;
+  --sk-surface-3:      #363d3f;
+  --sk-surface-raised: #272e30;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #485558;
+  --sk-border-strong:  #5e6c6f;
+
+  --sk-text:           #edf5f7;
+  --sk-text-secondary: #c9d5d8;
+  --sk-text-muted:     #a5b2b5;
+  --sk-text-subtle:    #7d8a8d;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #536514;
+  --sk-primary-hover:  #637629;
+  --sk-accent:         #bfba70;
+  --sk-link:           #b6cd90;
+  --sk-focus:          #d6ea9a;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #a5bd67;  --sk-series-2: #bcb559;  --sk-series-3: #3dc8c8;
+  --sk-series-4: #ec9b6d;  --sk-series-5: #bca0ef;  --sk-series-6: #67bbf3;
+}
+
+[data-skin="deep-canopy"] {
+  /* Deep Canopy — dark */
+  color-scheme: dark;
+
+  --sk-bg:             #172119;
+  --sk-bg-2:           #18241c;
+  --sk-surface:        #212a23;
+  --sk-surface-2:      #2b352c;
+  --sk-surface-3:      #353f36;
+  --sk-surface-raised: #262f27;
+  --sk-scrim:          0 0 0;
+
+  --sk-border:         #47584a;
+  --sk-border-strong:  #5d6e60;
+
+  --sk-text:           #ecf7ed;
+  --sk-text-secondary: #c8d7ca;
+  --sk-text-muted:     #a3b5a6;
+  --sk-text-subtle:    #7c8d7f;
+  --sk-text-on-accent: #ffffff;
+
+  --sk-primary:        #316b35;
+  --sk-primary-hover:  #427d45;
+  --sk-accent:         #bfba70;
+  --sk-link:           #9dd2a4;
+  --sk-focus:          #b8f2b1;
+
+  --sk-success-bg: #1a3622;  --sk-success-border: #325e3f;  --sk-success-text: #9de3af;
+  --sk-warning-bg: #3d2c03;  --sk-warning-border: #684e0e;  --sk-warning-text: #f3c96e;
+  --sk-danger-bg:  #4b201e;  --sk-danger-border:  #7d3c38;  --sk-danger-text:  #ffbcb6;
+  --sk-info-bg:    #0e3443;  --sk-info-border:    #225972;  --sk-info-text:    #91dbfe;
+
+  --sk-shadow-color: 0 0 0;
+
+  --sk-series-1: #81c583;  --sk-series-2: #bcb559;  --sk-series-3: #40c8c1;
+  --sk-series-4: #e99d67;  --sk-series-5: #bca0ef;  --sk-series-6: #5fbdf0;
+}
+
+/* ── shared, skin-independent ───────────────────────────────────────────────
+   Elevation and scrim are expressed through each skin's channel triples, so a
+   new skin gets correct shadows without authoring any.                       */
+:root {
+  --sk-shadow-1: 0 1px 2px rgb(var(--sk-shadow-color) / 0.06);
+  --sk-shadow-2: 0 4px 12px rgb(var(--sk-shadow-color) / 0.10);
+  --sk-shadow-3: 0 24px 72px rgb(var(--sk-shadow-color) / 0.32);
+}
+
+/* The one class that replaces the ~12 hardcoded bg-black/NN modal backdrops. */
+.sk-scrim { background: rgb(var(--sk-scrim) / 0.45); backdrop-filter: blur(12px); }
+
+/* Focus: ring in --sk-focus with an offset in the underlying surface, so the
+   indicator reads on both plain surfaces and primary-filled buttons. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sk-focus);
+  outline-offset: 2px;
+}
+
+/* Density / radius / motion — wires up the three <html> attributes the provider
+   already writes and that no CSS ever read. */
+[data-appearance-density="compact"]     { --sk-card-pad: .75rem;  --sk-row-h: 2.25rem; --sk-list-gap: .40rem; --sk-btn-y: .35rem; --sk-btn-x: .85rem; }
+[data-appearance-density="comfortable"] { --sk-card-pad: 1.15rem; --sk-row-h: 2.65rem; --sk-list-gap: .65rem; --sk-btn-y: .55rem; --sk-btn-x: 1rem; }
+[data-appearance-density="spacious"]    { --sk-card-pad: 1.50rem; --sk-row-h: 3.10rem; --sk-list-gap: .90rem; --sk-btn-y: .75rem; --sk-btn-x: 1.35rem; }
+
+[data-appearance-radius="sharp"]   { --sk-radius: 2px; }
+[data-appearance-radius="soft"]    { --sk-radius: 8px; }
+[data-appearance-radius="rounded"] { --sk-radius: 16px; }
+
+[data-motion-preference="reduced"] *,
+[data-motion-preference="reduced"] *::before,
+[data-motion-preference="reduced"] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}
+
+/* Optional: the Living Glass shell. Only the skins that want atmospheric depth
+   need this; every skin supplies --sk-bg / --sk-bg-2 either way. */
+.sk-canvas { background: linear-gradient(165deg, var(--sk-bg-2), var(--sk-bg) 55%, var(--sk-bg-2)); }
+.sk-glass {
+  background: color-mix(in oklab, var(--sk-surface) 78%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sk-border) 70%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--sk-shadow-2);
+}
