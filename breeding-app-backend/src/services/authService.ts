@@ -192,15 +192,24 @@ export const registerUser = async (input: {
   });
 
   await recordSecurityEvent({ type: "auth.registered", actorUserId: user.id, outcome: "success", metadata: { email } });
-  const job = await queueVerificationEmail(user);
+
+  // The account (and its organization) is already committed. A failure to queue
+  // the verification mail must not surface as a failed registration: the caller
+  // would retry, hit the duplicate-email path, and be told an account they
+  // cannot see already exists. Report the account, and let them use the resend
+  // action that already exists in the UI.
+  const job = await queueEmailWithoutLeakingFailure(() => queueVerificationEmail(user), {
+    recipient: user.email,
+    template: ACCOUNT_EMAIL_VERIFICATION_TEMPLATE_KEY,
+  });
   await recordSecurityEvent({
     type: "auth.verification_email_queued",
     actorUserId: user.id,
-    outcome: "success",
+    outcome: job ? "success" : "failure",
     metadata: { jobId: job?.id },
   });
 
-  return publicUser(user);
+  return { ...publicUser(user), verificationEmailQueued: Boolean(job) };
 };
 
 export const loginUser = async (email: string, password: string) => {
@@ -593,18 +602,25 @@ export const resetPassword = async (input: { token: string; newPassword: string 
   await revokeRefreshSessionsForUser(user.id);
   await recordSecurityEvent({ type: "auth.password_reset.success", actorUserId: user.id, outcome: "success" });
 
-  await enqueueEmail({
-    ownerId: user.id,
-    recipientEmail: user.email,
-    category: "account_and_security",
-    templateKey: ACCOUNT_PASSWORD_CHANGED_TEMPLATE_KEY,
-    templateVersion: ACCOUNT_PASSWORD_CHANGED_TEMPLATE_VERSION,
-    templatePayload: { fullName: user.fullName, changedAtDisplay: new Date().toUTCString() },
-    subject: "Your Breeding Planner password was changed",
-    idempotencyKey: passwordChangedIdempotencyKey(user.id),
-    relatedEntityType: "user",
-    relatedEntityId: user.id,
-  });
+  // Advisory notice, sent after the password has already changed. Failing to
+  // queue it must not tell the caller the reset failed — they would try the
+  // now-consumed link again and be told it was already used.
+  await queueEmailWithoutLeakingFailure(
+    () =>
+      enqueueEmail({
+        ownerId: user.id,
+        recipientEmail: user.email,
+        category: "account_and_security",
+        templateKey: ACCOUNT_PASSWORD_CHANGED_TEMPLATE_KEY,
+        templateVersion: ACCOUNT_PASSWORD_CHANGED_TEMPLATE_VERSION,
+        templatePayload: { fullName: user.fullName, changedAtDisplay: new Date().toUTCString() },
+        subject: "Your Breeding Planner password was changed",
+        idempotencyKey: passwordChangedIdempotencyKey(user.id),
+        relatedEntityType: "user",
+        relatedEntityId: user.id,
+      }),
+    { recipient: user.email, template: ACCOUNT_PASSWORD_CHANGED_TEMPLATE_KEY }
+  );
 
   return { message: "Password updated. You can now sign in with your new password." };
 };

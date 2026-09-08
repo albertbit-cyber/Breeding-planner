@@ -127,6 +127,30 @@ describe("resend-verification when the mailer fails", () => {
   });
 });
 
+describe("registration when the mailer fails", () => {
+  it("still reports the created account instead of a 500", async () => {
+    // No existing account, so registration proceeds and commits the user.
+    db.user.findUnique.mockResolvedValue(null);
+    db.user.create = vi.fn().mockResolvedValue(mockUser);
+    db.$transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
+      callback({ user: { create: db.user.create }, accountToken: db.accountToken })
+    );
+    (enqueueEmail as any).mockRejectedValue(new Error("queue is down"));
+
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ email: "test@example.com", password: "SuperSecret123!", fullName: "Test User", role: "buyer" });
+
+    // The account exists. Answering 500 would send the caller back through
+    // registration, where they would be told the address is already taken.
+    expect(res.status).toBe(201);
+    expect(res.body.user.email).toBe("test@example.com");
+    // The response says the mail did not go out, so the UI can point at resend.
+    expect(res.body.user.verificationEmailQueued).toBe(false);
+    expect(loggedText(errorSpy)).toContain("[mail] send failed");
+  });
+});
+
 describe("user lookup normalization", () => {
   it("matches an email that differs only in case and surrounding whitespace", async () => {
     db.user.findUnique.mockResolvedValue(mockUser);

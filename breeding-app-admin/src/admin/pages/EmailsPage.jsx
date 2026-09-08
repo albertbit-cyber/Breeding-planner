@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AdminLayout from "../components/AdminLayout.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Spinner from "../components/Spinner.jsx";
+import MailDiagnosticsPanel from "../components/MailDiagnosticsPanel.jsx";
 import { useToast } from "../hooks/useToast.jsx";
 import { formatDate } from "../constants.js";
 import {
@@ -90,6 +91,8 @@ export default function EmailsPage() {
             <button type="button" onClick={() => load()}>Refresh</button>
           </div>
         </div>
+
+        <MailDiagnosticsPanel />
 
         <div className="admin-filters">
           <select value={status} onChange={(e) => { setStatus(e.target.value); load(e.target.value); }}>

@@ -1340,6 +1340,72 @@ export const releaseAdminEmailSuppression = async (email: string, payload: { rea
     body: JSON.stringify(payload),
   });
 
+export type AdminMailDiagnosticsProblem = {
+  code: string;
+  severity: "critical" | "warning";
+  summary: string;
+  remedy: string;
+};
+
+export type AdminMailDiagnostics = {
+  checkedAt: string;
+  environment: string;
+  transport: { transport: string; configured: boolean; detail: string; reason?: string };
+  sender: { fromName: string; fromAddress: string; fromDomain: string; replyTo: string | null };
+  links: { publicAppUrl: string; verifyEmailExample: string; resetPasswordExample: string };
+  worker: {
+    enabled: boolean;
+    pollIntervalMs: number;
+    batchSize: number;
+    stuckJobMinutes: number;
+    heartbeat: {
+      started: boolean;
+      lastTickAt: string | null;
+      lastTickClaimed: number | null;
+      lastTickError: string | null;
+      ticks: number;
+    };
+    secondsSinceLastTick: number | null;
+  };
+  queue: {
+    countsByStatus: Record<string, number>;
+    totalUnsent: number;
+    oldestPendingAgeSeconds: number | null;
+    recentFailures: Array<{
+      id: string;
+      templateKey: string;
+      recipient: string;
+      status: string;
+      attemptCount: number;
+      lastErrorCode: string | null;
+      lastErrorMessage: string | null;
+      failedAt: string | null;
+      createdAt: string;
+    }>;
+  };
+  problems: AdminMailDiagnosticsProblem[];
+  verdict: string;
+};
+
+export const fetchAdminMailDiagnostics = async () => request<AdminMailDiagnostics>("/admin/email-diagnostics");
+
+export type AdminMailTestSendResult = {
+  ok: boolean;
+  transport: string;
+  recipient: string;
+  providerMessageId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  retryable?: boolean;
+  interpretation: string;
+};
+
+export const sendAdminMailTest = async (payload: { recipient: string }) =>
+  request<AdminMailTestSendResult>("/admin/email-test-send", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchOrderById = async (id: string) =>
   request<{ order: unknown }>(`/lab/orders/${encodeURIComponent(id)}`);
 
