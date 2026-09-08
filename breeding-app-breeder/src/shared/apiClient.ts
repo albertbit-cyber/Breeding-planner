@@ -586,8 +586,24 @@ export const login = async (payload: { email: string; password: string }, authSc
   return data;
 };
 
-export const register = async (payload: { email: string; password: string; fullName: string }) =>
-  request<{ user: unknown }>("/auth/register", {
+export const register = async (payload: {
+  email: string;
+  password: string;
+  fullName: string;
+  role?: "breeder" | "buyer";
+}) =>
+  request<{
+    user: {
+      email: string;
+      /**
+       * False when the account was created but the verification mail could not
+       * be queued. Absent on older backends — treat only an explicit false as
+       * a failure.
+       */
+      verificationEmailQueued?: boolean;
+      [key: string]: unknown;
+    };
+  }>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,

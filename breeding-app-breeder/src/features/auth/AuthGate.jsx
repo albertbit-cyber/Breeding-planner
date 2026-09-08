@@ -570,6 +570,10 @@ export default function AuthGate({ children }) {
   // Set right after a successful registration, before any session exists — registration isn't
   // "done" until the user clicks the emailed link, so no login/persistAuth happens until then.
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  // False when the account was created but the backend could not queue the
+  // verification mail. Telling the user to check an inbox that will stay empty
+  // is the difference between a 10-second retry and a lost signup.
+  const [verificationEmailQueued, setVerificationEmailQueued] = useState(true);
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
@@ -907,7 +911,7 @@ export default function AuthGate({ children }) {
       const desiredFullName = registrationData.fullName.trim();
 
       try {
-        await registerApi({
+        const registration = await registerApi({
           fullName: desiredFullName || registrationData.fullName,
           email: desiredEmail,
           password: registrationData.password,
@@ -918,6 +922,8 @@ export default function AuthGate({ children }) {
         // created here. Show the "check your inbox" card instead of logging the user in.
         setResendVerificationSent(false);
         setResendVerificationError("");
+        // Older backends do not report this; absence means "assume it was sent".
+        setVerificationEmailQueued(registration?.user?.verificationEmailQueued !== false);
         setPendingVerificationEmail(desiredEmail);
       } catch (error) {
         setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
@@ -1381,10 +1387,16 @@ export default function AuthGate({ children }) {
         <h1 className="auth-card-title">{t("auth.pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
       </div>
       <p className="auth-subtitle">
-        {t("auth.pendingVerification.description", {
-          defaultValue: "We sent a verification link to {{email}}. Click it to finish creating your account, then sign in below.",
-          email: maskEmailForDisplay(pendingVerificationEmail),
-        })}
+        {verificationEmailQueued
+          ? t("auth.pendingVerification.description", {
+              defaultValue: "We sent a verification link to {{email}}. Click it to finish creating your account, then sign in below.",
+              email: maskEmailForDisplay(pendingVerificationEmail),
+            })
+          : t("auth.pendingVerification.notSent", {
+              defaultValue:
+                "Your account was created, but we could not send the verification link to {{email}} just now. Use the button below to try again.",
+              email: maskEmailForDisplay(pendingVerificationEmail),
+            })}
       </p>
       {resendVerificationSent ? (
         <p className="auth-helper-copy">

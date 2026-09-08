@@ -137,6 +137,39 @@ export const runWorkerTick = async (provider: EmailProvider, batchSize: number, 
 let timer: ReturnType<typeof setInterval> | null = null;
 let inFlightTick: Promise<number> = Promise.resolve(0);
 
+/**
+ * Last observed state of the polling loop, read by the mail diagnostics
+ * endpoint. Without this, "no mail arrived" cannot distinguish a worker that
+ * never started from one that is running and failing every job — the two have
+ * completely different fixes.
+ */
+export type EmailWorkerHeartbeat = {
+  started: boolean;
+  lastTickAt: Date | null;
+  lastTickClaimed: number | null;
+  lastTickError: string | null;
+  ticks: number;
+};
+
+const heartbeat: EmailWorkerHeartbeat = {
+  started: false,
+  lastTickAt: null,
+  lastTickClaimed: null,
+  lastTickError: null,
+  ticks: 0,
+};
+
+export const getEmailWorkerHeartbeat = (): EmailWorkerHeartbeat => ({ ...heartbeat });
+
+/** Test seam: resets the heartbeat between cases. */
+export const resetEmailWorkerHeartbeat = (): void => {
+  heartbeat.started = false;
+  heartbeat.lastTickAt = null;
+  heartbeat.lastTickClaimed = null;
+  heartbeat.lastTickError = null;
+  heartbeat.ticks = 0;
+};
+
 export const startEmailWorker = (): void => {
   if (timer) return;
 
@@ -150,12 +183,26 @@ export const startEmailWorker = (): void => {
     return;
   }
   const provider = getEmailProvider();
+  heartbeat.started = true;
   timer = setInterval(() => {
     inFlightTick = inFlightTick.then(() =>
-      runWorkerTick(provider, env.email.workerBatchSize, env.email.workerStuckJobMinutes).catch((error) => {
-        console.error("[email-worker] tick failed", error instanceof Error ? error.message : error);
-        return 0;
-      })
+      runWorkerTick(provider, env.email.workerBatchSize, env.email.workerStuckJobMinutes)
+        .then((claimed) => {
+          heartbeat.lastTickAt = new Date();
+          heartbeat.lastTickClaimed = claimed;
+          heartbeat.lastTickError = null;
+          heartbeat.ticks += 1;
+          return claimed;
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("[email-worker] tick failed", message);
+          heartbeat.lastTickAt = new Date();
+          heartbeat.lastTickClaimed = null;
+          heartbeat.lastTickError = message;
+          heartbeat.ticks += 1;
+          return 0;
+        })
     );
   }, env.email.workerPollIntervalMs);
   timer.unref?.();
@@ -167,5 +214,6 @@ export const stopEmailWorker = async (): Promise<void> => {
     clearInterval(timer);
     timer = null;
   }
+  heartbeat.started = false;
   await inFlightTick;
 };

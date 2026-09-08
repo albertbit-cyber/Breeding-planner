@@ -42,6 +42,8 @@ import {
 } from "../controllers/adminController";
 import {
   adminEmailHistory,
+  adminMailDiagnostics,
+  adminSendTestEmail,
   adminRetryEmailJob,
   adminEmailSuppressions,
   adminReleaseEmailSuppression,
@@ -115,5 +117,7 @@ adminRoutes.patch("/users/:id/subscription", asyncHandler(changeUserSubscription
 adminRoutes.patch("/users/:id/verification", asyncHandler(changeUserVerification));
 adminRoutes.get("/emails", asyncHandler(adminEmailHistory));
 adminRoutes.post("/emails/:id/retry", asyncHandler(adminRetryEmailJob));
+adminRoutes.get("/email-diagnostics", asyncHandler(adminMailDiagnostics));
+adminRoutes.post("/email-test-send", asyncHandler(adminSendTestEmail));
 adminRoutes.get("/email-suppressions", asyncHandler(adminEmailSuppressions));
 adminRoutes.post("/email-suppressions/:email/release", asyncHandler(adminReleaseEmailSuppression));
