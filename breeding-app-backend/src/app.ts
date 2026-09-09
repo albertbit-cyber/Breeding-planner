@@ -60,6 +60,18 @@ if (env.nodeEnv === "production" && !process.env.LAB_PORTAL_URL) {
   );
 }
 
+// Marketplace listing photos are written by LocalUploadStorage to
+// UPLOAD_STORAGE_DIR, which defaults to a path inside the working directory.
+// On a container host that directory lives and dies with the container, so the
+// upload succeeds, the MarketplaceMedia row persists, and the file is gone at
+// the next deploy — leaving listings with broken images and no error anywhere.
+// Point this at a mounted volume, or swap uploadStorage for object storage.
+if (env.nodeEnv === "production" && !process.env.UPLOAD_STORAGE_DIR) {
+  console.warn(
+    "[server] UPLOAD_STORAGE_DIR is not set; marketplace listing photos are being written to the container filesystem and will be lost on the next deploy."
+  );
+}
+
 app.use(
   cors({
     origin(origin, callback) {
