@@ -555,7 +555,10 @@ export const getHealth = async () =>
     return data;
   };
 
-export const login = async (payload: { email: string; password: string }, authScope?: AuthScope) => {
+export const login = async (
+  payload: { email: string; password: string; portal?: string },
+  authScope?: AuthScope
+) => {
   const scope = normalizeAuthScope(authScope);
   const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
     method: "POST",
@@ -1018,6 +1021,31 @@ export const fetchAdminUsers = async (params: Record<string, string | number | u
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return request<{ users: unknown[]; total: number; page: number; pageSize: number }>(`/admin/users${suffix}`);
 };
+
+export const fetchAdminEscalations = async (status?: string) =>
+  request<{ escalations: unknown[]; openCount: number }>(
+    `/admin/escalations${status ? `?status=${encodeURIComponent(status)}` : ""}`
+  );
+
+export const createAdminEscalation = async (payload: {
+  subject: string;
+  note: string;
+  subjectUserId?: string;
+  relatedReportId?: string;
+}) =>
+  request<{ escalation: unknown }>("/admin/escalations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const reviewAdminEscalation = async (
+  id: string,
+  payload: { status: string; resolutionNote?: string }
+) =>
+  request<{ escalation: unknown }>(`/admin/escalations/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 
 export const fetchAdminAccountPanel = async () =>
   request<{ account: unknown; team: unknown[] }>("/admin/account");

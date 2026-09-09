@@ -4,7 +4,7 @@ import type { AuthenticatedUser } from "../types/auth";
 import { canAccessFeature } from "./subscriptionService";
 import { createNotification } from "./notificationService";
 import { toMarketplaceListingDto, toMarketplaceStoreDto } from "./marketplaceDtos";
-import { assertAdminActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
+import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 
 const db = prisma as any;
 
@@ -60,6 +60,15 @@ const assertSeller = async (actor: AuthenticatedUser) => {
     assertSellerActor(actor);
   } catch {
     throw new HttpError(403, "Only breeder or admin users can manage marketplace listings.");
+  }
+};
+
+/** Read side of the console: moderators see it, and change nothing. */
+const assertStaff = (actor: AuthenticatedUser) => {
+  try {
+    assertStaffActor(actor);
+  } catch {
+    throw new HttpError(403, "Only admin users can perform this action.");
   }
 };
 
@@ -400,7 +409,7 @@ export const createMarketplaceReview = async (actor: AuthenticatedUser, payload:
 };
 
 export const listAdminMarketplace = async (actor: AuthenticatedUser) => {
-  assertAdmin(actor);
+  assertStaff(actor);
   const [listings, stores, conversations] = await Promise.all([
     db.marketplaceListing.findMany({ include: LISTING_INCLUDE, orderBy: { updatedAt: "desc" }, take: 200 }),
     db.marketplaceStore.findMany({ include: STORE_INCLUDE, orderBy: { updatedAt: "desc" }, take: 100 }),

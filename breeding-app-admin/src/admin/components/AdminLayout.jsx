@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import useAdminActor from "../hooks/useAdminActor";
 
 const logoSrc = `${typeof process !== "undefined" ? (process.env.PUBLIC_URL || "") : ""}/app-icons/icon_512x512.png`;
 
@@ -23,6 +24,7 @@ const NAV = [
     label: "Content & Safety",
     items: [
       { href: "/admin/reports", label: "Reports", icon: "⚑" },
+      { href: "/admin/escalations", label: "Escalations", icon: "▲" },
       { href: "/admin/marketplace", label: "Marketplace", icon: "⊕" },
     ],
   },
@@ -38,7 +40,7 @@ const NAV = [
       { href: "/admin/notifications", label: "Announcements", icon: "◎" },
       { href: "/admin/emails", label: "Emails", icon: "✉" },
       { href: "/admin/gdpr", label: "GDPR Tools", icon: "⊗" },
-      { href: "/admin/team", label: "Team & Account", icon: "⊙" },
+      { href: "/admin/team", label: "Team & Account", icon: "⊙", ownerOnly: true },
     ],
   },
 ];
@@ -52,6 +54,7 @@ export default function AdminLayout({ children, breadcrumbs }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const actor = useAdminActor();
 
   const go = (href) => {
     navigate(href);
@@ -84,7 +87,7 @@ export default function AdminLayout({ children, breadcrumbs }) {
           {NAV.map((group) => (
             <div key={group.label} className="admin-nav-group">
               <div className="admin-nav-group-label">{group.label}</div>
-              {group.items.map((item) => (
+              {group.items.filter((item) => !item.ownerOnly || actor.isOwner).map((item) => (
                 <button
                   key={item.href}
                   type="button"
@@ -143,6 +146,16 @@ export default function AdminLayout({ children, breadcrumbs }) {
             <button type="button" onClick={() => go("/breeder")}>Breeder App</button>
           </div>
         </div>
+
+        {actor.isModerator && (
+          <div className="admin-readonly-banner">
+            <strong>Read-only.</strong> You can see everything here and change nothing. Use{" "}
+            <button type="button" className="admin-breadcrumb-link" onClick={() => go("/admin/escalations")}>
+              Escalations
+            </button>{" "}
+            to put something in front of the account owner.
+          </div>
+        )}
 
         <div className="admin-content">{children}</div>
       </main>

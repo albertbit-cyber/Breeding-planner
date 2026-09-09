@@ -1,14 +1,30 @@
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
 
+/**
+ * Full administrative authority. Deliberately excludes moderators: every
+ * cross-tenant *bypass* below hangs off this predicate, and a read-only
+ * moderator must not acquire one — their oversight runs through the admin
+ * console's own endpoints, which are already scoped and already refuse their
+ * writes.
+ */
 export const isAdminActor = (actor?: Pick<AuthenticatedUser, "role"> | null): boolean =>
   actor?.role === "admin" || actor?.role === "super_admin";
 
+/** Owner or moderator — anyone entitled to *look* at the admin console. */
+export const isStaffActor = (actor?: Pick<AuthenticatedUser, "role"> | null): boolean =>
+  isAdminActor(actor) || actor?.role === "moderator";
+
+/** Guards an admin-console read that a moderator is also entitled to see. */
+export const assertStaffActor = (actor?: Pick<AuthenticatedUser, "role"> | null): void => {
+  if (!isStaffActor(actor)) throw new HttpError(403, "Only admin users can perform this action.");
+};
+
 export const isLabActor = (actor?: Pick<AuthenticatedUser, "role"> | null): boolean =>
-  isAdminActor(actor) || actor?.role === "lab_owner" || actor?.role === "lab_staff";
+  isStaffActor(actor) || actor?.role === "lab_owner" || actor?.role === "lab_staff";
 
 export const isBreederActor = (actor?: Pick<AuthenticatedUser, "role"> | null): boolean =>
-  isAdminActor(actor) || actor?.role === "breeder";
+  isStaffActor(actor) || actor?.role === "breeder";
 
 export const assertAdminActor = (actor?: Pick<AuthenticatedUser, "role"> | null): void => {
   if (!isAdminActor(actor)) throw new HttpError(403, "Only admin users can perform this action.");

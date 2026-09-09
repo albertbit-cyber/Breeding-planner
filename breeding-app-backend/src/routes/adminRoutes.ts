@@ -26,7 +26,6 @@ import {
   gdprRequests,
   labAccounts,
   marketplacePermission,
-  reportAction,
   reportDetail,
   reports,
   rejectVerificationRequest,
@@ -54,18 +53,32 @@ import {
 } from "../controllers/partnerController";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth } from "../middleware/auth";
+import { requirePortal } from "../middleware/portal";
 import { requireRole } from "../middleware/roles";
 
 export const adminRoutes = Router();
 
-adminRoutes.use(requireAuth, requireRole("admin"));
+/**
+ * Three gates, each answering a different question: who are you, which app did
+ * you sign in to, and what may that role do here. The portal check is what
+ * stops a token legitimately held for the breeder app from driving the console
+ * — signing in with a breeder's password already fails, but a token can arrive
+ * without ever visiting this app's login screen.
+ *
+ * `requireRole("admin")` admits moderators to reads and refuses their writes on
+ * its own, so no route below needs to remember a second guard. The handful of
+ * writes a moderator *is* allowed live in adminModeratorRoutes, mounted ahead
+ * of this router.
+ */
+adminRoutes.use(requireAuth, requirePortal("admin"), requireRole("admin"));
 
 adminRoutes.get("/dashboard", asyncHandler(dashboard));
 adminRoutes.get("/account", asyncHandler(account));
 adminRoutes.get("/reports", asyncHandler(reports));
 adminRoutes.get("/reports/:id", asyncHandler(reportDetail));
 adminRoutes.patch("/reports/:id/status", asyncHandler(changeReportStatus));
-adminRoutes.post("/reports/:id/action", asyncHandler(reportAction));
+// POST /reports/:id/action is mounted in adminModeratorRoutes: a moderator may
+// escalate a report, so it needs the exception that this router does not grant.
 adminRoutes.get("/audit-logs", asyncHandler(auditLogs));
 adminRoutes.get("/verification-requests", asyncHandler(verificationRequests));
 adminRoutes.get("/verification-requests/:id", asyncHandler(verificationRequestDetail));

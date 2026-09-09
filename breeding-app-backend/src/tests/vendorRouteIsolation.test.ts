@@ -58,6 +58,7 @@ const tokenForLab = (suffix: string) =>
     email: `lab-${suffix}@example.com`,
     role: "lab_staff",
     persistedRole: "lab",
+    portal: "lab",
   });
 
 /** Puts the acting user inside one laboratory, the way `withOrgContext` would. */

@@ -8,6 +8,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import UsersPage from "./pages/UsersPage.jsx";
 import UserDetailPage from "./pages/UserDetailPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
+import EscalationsPage from "./pages/EscalationsPage.jsx";
 import VerificationPage from "./pages/VerificationPage.jsx";
 import LabsPage from "./pages/LabsPage.jsx";
 import GeneSubmissionsPage from "./pages/GeneSubmissionsPage.jsx";
@@ -29,6 +30,7 @@ export default function AdminApp() {
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/users/:id" element={<UserDetailPage />} />
             <Route path="/admin/reports" element={<ReportsPage />} />
+            <Route path="/admin/escalations" element={<EscalationsPage />} />
             <Route path="/admin/verification" element={<VerificationPage />} />
             <Route path="/admin/labs" element={<LabsPage />} />
             <Route path="/admin/gene-submissions" element={<GeneSubmissionsPage />} />

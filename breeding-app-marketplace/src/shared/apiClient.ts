@@ -516,7 +516,12 @@ export const getHealth = async () =>
     return data;
   };
 
-export const login = async (payload: { email: string; password: string }, authScope?: AuthScope) => {
+export const login = async (
+  // `portal` names the app this sign-in came from; the backend refuses
+  // credentials that do not belong to it.
+  payload: { email: string; password: string; portal?: string },
+  authScope?: AuthScope
+) => {
   const scope = normalizeAuthScope(authScope);
   const data = await request<{ token: string; refreshToken: string; user: unknown }>("/auth/login", {
     method: "POST",

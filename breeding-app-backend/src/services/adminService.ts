@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AppRole, AuthenticatedUser } from "../types/auth";
+import { isModeratorRole, isOwnerRole } from "../auth/identity";
 import bcrypt from "bcryptjs";
 import { sendEmail } from "./emailService";
 import { issueToken } from "./accountTokenService";
@@ -41,6 +42,12 @@ const USER_SELECT = {
 };
 
 const ADMIN_ROLES = new Set(["admin", "lab", "breeder", "buyer", "moderator", "support"]);
+/**
+ * What an owner may actually set someone to. `admin` and `super_admin` are
+ * absent on purpose — see updateAdminUserRole — and `support` is retired in
+ * favour of `moderator`, which is what it always meant.
+ */
+const ASSIGNABLE_ROLES = new Set(["lab", "breeder", "buyer", "moderator"]);
 const USER_STATUSES = new Set(["active", "pending", "restricted", "suspended", "banned", "deleted"]);
 const SUBSCRIPTION_PLANS = new Set(["free", "hobby", "breeder", "professional", "enterprise"]);
 const SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "trialing", "past_due", "expired", "cancelled", "lifetime"]);
@@ -393,13 +400,23 @@ const verificationLinkFor = async (user: { id: string; email: string }, createdB
 export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
   const email = String(payload.email || "").trim().toLowerCase();
   const fullName = String(payload.fullName || "").trim();
-  const role = String(payload.role || "support").trim().toLowerCase();
+  const role = String(payload.role || "moderator").trim().toLowerCase();
   const status = String(payload.status || "active").trim().toLowerCase();
   const sendInvite = payload.sendInvite !== false;
   const reason = assertReason(payload.reason || "Create team user");
   if (!email || !email.includes("@")) throw new HttpError(400, "A valid email is required.");
   if (!fullName) throw new HttpError(400, "fullName is required.");
-  if (!["admin", "moderator", "support", "lab"].includes(role)) throw new HttpError(400, "Unsupported team role.");
+  // Only the owner may bring someone onto the team, and the only seat on offer
+  // is `moderator`. `admin` is deliberately absent: with no API able to mint
+  // one, the owner account stays singular by construction rather than by
+  // policy. Laboratory accounts come through the vendor invite flow instead
+  // (createVendorInvite), which also creates the organization they belong to.
+  if (!isOwnerRole(actor.role)) {
+    throw new HttpError(403, "Only the account owner can add team members.");
+  }
+  if (role !== "moderator") {
+    throw new HttpError(400, "Team members can only be created as moderators.");
+  }
   if (!USER_STATUSES.has(status)) throw new HttpError(400, "Unsupported status.");
   const exists = await db.user.findUnique({ where: { email } });
   if (exists) throw new HttpError(409, "Email already exists.");
@@ -1213,6 +1230,12 @@ export const applyAdminReportAction = async (
   const action = String(payload.action || "").trim().toLowerCase();
   const allowed = new Set(["warn_user", "restrict_messaging", "remove_listing", "suspend_account", "ban_account", "escalate_report"]);
   if (!allowed.has(action)) throw new HttpError(400, "Unsupported report action.");
+  // This endpoint is one of two that accept a moderator write, because raising
+  // a report to the owner is the whole point of the role. The other five
+  // actions here suspend, ban or delete things, and stay with the owner.
+  if (isModeratorRole(actor.role) && action !== "escalate_report") {
+    throw new HttpError(403, "Moderators can escalate a report, but not act on it. Escalate it for the account owner.");
+  }
   const reason = assertReason(payload.reason);
   const report = await db.report.findUnique({ where: { id: reportId }, include: REPORT_INCLUDE });
   if (!report) throw new HttpError(404, "Report not found.");
@@ -1264,9 +1287,23 @@ export const updateAdminUserRole = async (
 ) => {
   const role = String(payload.role || "").trim().toLowerCase();
   if (!ADMIN_ROLES.has(role)) throw new HttpError(400, "Unsupported role.");
+  if (!isOwnerRole(actor.role)) {
+    throw new HttpError(403, "Only the account owner can change a user's role.");
+  }
+  // The same rule as team creation, enforced on the other door into it:
+  // promoting an existing account is otherwise an equivalent way to mint a
+  // second owner.
+  if (!ASSIGNABLE_ROLES.has(role)) {
+    throw new HttpError(400, "That role cannot be assigned. Moderators are the only staff role available.");
+  }
   const reason = assertReason(payload.reason);
   const before = await db.user.findUnique({ where: { id: userId }, select: USER_SELECT });
   if (!before) throw new HttpError(404, "User not found.");
+  if (isOwnerRole(before.role as AppRole)) {
+    // Including the actor themselves: demoting the only owner would leave the
+    // console with nobody able to act in it.
+    throw new HttpError(403, "The account owner's role cannot be changed here.");
+  }
 
   const updated = await db.user.update({
     where: { id: userId },

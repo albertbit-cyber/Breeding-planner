@@ -28,6 +28,7 @@ import {
 } from "../controllers/labController";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/roles";
+import { requirePortal } from "../middleware/portal";
 import { requireOrgAdmin, requireOrgMember, requireOrgRole, withOrgContext } from "../middleware/orgContext";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -67,7 +68,10 @@ labRoutes.patch("/tests/catalog/:id", requireAuth, requireRole("admin"), asyncHa
 // membership. No handler here reads an organization id from the request, so
 // there is no parameter to point at another vendor.
 const vendor = Router();
-vendor.use(requireAuth, requireRole("admin", "lab"), asyncHandler(withOrgContext));
+// Portal-bound like the admin console: a laboratory's own data is reachable
+// only from a session opened in the Laboratory portal, so a breeder-app token
+// cannot be pointed at it even though the role check would pass for staff.
+vendor.use(requireAuth, requirePortal("lab", "admin"), requireRole("admin", "lab"), asyncHandler(withOrgContext));
 
 vendor.get("/library", requireOrgMember, asyncHandler(getSeedLibrary));
 

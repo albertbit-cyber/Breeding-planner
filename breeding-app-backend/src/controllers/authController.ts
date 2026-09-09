@@ -59,8 +59,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.status(400).json({ message: "Validation failed.", errors: parsed.error.flatten().fieldErrors });
     return;
   }
-  const { email, password } = parsed.data;
-  const result = await loginUser(email, password);
+  const { email, password, portal } = parsed.data;
+  const result = await loginUser(email, password, portal);
   setAuthCookies(res, result);
   const csrfToken = createCsrfToken();
   setCsrfCookie(res, csrfToken);
