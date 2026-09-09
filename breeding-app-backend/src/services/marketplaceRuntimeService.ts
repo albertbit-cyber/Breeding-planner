@@ -43,7 +43,12 @@ const toMarketplaceMediaDto = (media: any) => ({
   checksum: media.checksum,
   status: media.status,
   scanStatus: media.scanStatus,
-  publicUrl: media.publicUrl,
+  // Uploads used to be written to storage and then left unreachable: publicUrl
+  // was always null and no route served the bytes back, so the listing editor
+  // could not show what a breeder had just uploaded. The read path is derived
+  // from the media id rather than stored, which leaves the column free for a
+  // CDN URL later without a migration or a second write on every upload.
+  publicUrl: media.publicUrl || `/marketplace/media/${media.id}`,
   createdAt: media.createdAt,
   updatedAt: media.updatedAt,
 });
@@ -91,6 +96,7 @@ export const createMarketplaceMediaUpload = async (actor: AuthenticatedUser, pay
     },
   });
 
+
   await recordSecurityEvent({
     type: "marketplace_upload_created",
     actorUserId: actor.id,
@@ -99,6 +105,35 @@ export const createMarketplaceMediaUpload = async (actor: AuthenticatedUser, pay
   });
 
   return { media: toMarketplaceMediaDto(media) };
+};
+
+/**
+ * Serves an uploaded image. Media attached to a published listing is public --
+ * a buyer has to be able to see the photos without an account. Anything else
+ * is readable only by its owner or an admin.
+ */
+export const readMarketplaceMediaObject = async (
+  mediaId: string,
+  actor: AuthenticatedUser | null
+): Promise<{ buffer: Buffer; mimeType: string }> => {
+  const media = await db.marketplaceMedia.findUnique({
+    where: { id: mediaId },
+    include: { listing: { select: { status: true, archivedAt: true } } },
+  });
+  if (!media) throw new HttpError(404, "Marketplace media not found.");
+
+  const listingIsPublic = Boolean(
+    media.listing && media.listing.archivedAt === null && media.listing.status !== "draft"
+  );
+  const isOwner = Boolean(actor && (actor.id === media.ownerUserId || actor.role === "admin"));
+  if (!listingIsPublic && !isOwner) throw new HttpError(404, "Marketplace media not found.");
+  if (media.status !== "ready" || media.scanStatus === "infected") {
+    throw new HttpError(404, "Marketplace media not found.");
+  }
+
+  const buffer = await uploadStorage.getObject(media.storageKey).catch(() => null);
+  if (!buffer) throw new HttpError(404, "Marketplace media not found.");
+  return { buffer, mimeType: media.mimeType || "application/octet-stream" };
 };
 
 export const listMyMarketplaceMedia = async (actor: AuthenticatedUser) => {

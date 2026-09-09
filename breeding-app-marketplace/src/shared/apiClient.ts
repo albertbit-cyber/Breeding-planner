@@ -651,11 +651,20 @@ export const fetchMarketplaceCatalog = async (params: Record<string, string | nu
     if (value !== undefined && value !== "") query.set(key, String(value));
   });
   const suffix = query.toString() ? `?${query.toString()}` : "";
-  return request<{ listings: unknown[] }>(`/marketplace/listings${suffix}`);
+  return request<{
+    listings: unknown[];
+    total: number;
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    hasMore: boolean;
+  }>(`/marketplace/listings${suffix}`, { requiresAuth: false });
 };
 
 export const fetchMarketplaceListingDetail = async (id: string) =>
-  request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}`);
+  request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}`, {
+    requiresAuth: false,
+  });
 
 export const createMarketplaceListing = async (payload: Record<string, unknown>) =>
   request<{ listing: unknown }>("/marketplace/listings", {
@@ -690,7 +699,9 @@ export const saveMarketplaceStore = async (payload: Record<string, unknown>) =>
   });
 
 export const fetchMarketplaceStore = async (userId: string) =>
-  request<{ store: unknown }>(`/marketplace/stores/${encodeURIComponent(userId)}`);
+  request<{ store: unknown }>(`/marketplace/stores/${encodeURIComponent(userId)}`, {
+    requiresAuth: false,
+  });
 
 export const createMarketplaceConversation = async (payload: Record<string, unknown>) =>
   request<{ conversation: unknown }>("/marketplace/conversations", {
@@ -718,6 +729,74 @@ export const createMarketplaceReview = async (payload: Record<string, unknown>) 
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const fetchMarketplaceFavorites = async () =>
+  request<{ listings: unknown[] }>("/marketplace/favorites");
+
+export const fetchMarketplaceComparables = async (id: string) =>
+  request<{ comparables: Record<string, unknown> }>(
+    `/marketplace/listings/${encodeURIComponent(id)}/comparables`,
+    { requiresAuth: false }
+  );
+
+export const fetchMarketplaceStoreReviews = async (userId: string) =>
+  request<{ reviews: unknown[]; ratingAverage: number; reviewCount: number }>(
+    `/marketplace/stores/${encodeURIComponent(userId)}/reviews`,
+    { requiresAuth: false }
+  );
+
+export const fetchMarketplaceConversation = async (id: string) =>
+  request<{ conversation: unknown }>(`/marketplace/conversations/${encodeURIComponent(id)}`);
+
+export const markMarketplaceConversationRead = async (id: string) =>
+  request<{ read: number }>(`/marketplace/conversations/${encodeURIComponent(id)}/read`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+export const acceptMarketplaceOffer = async (id: string, payload: Record<string, unknown> = {}) =>
+  request<{ sale: unknown; conversationId: string }>(
+    `/marketplace/conversations/${encodeURIComponent(id)}/accept-offer`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+
+export const uploadMarketplaceMedia = async (payload: Record<string, unknown>) =>
+  request<{ media: { id: string; publicUrl: string; mimeType: string; sizeBytes: number } }>(
+    "/marketplace/uploads",
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+
+export const fetchMarketplaceReviewableSales = async () =>
+  request<{ sales: unknown[] }>("/marketplace/reviews/pending");
+
+export const reportMarketplaceMessage = async (id: string, payload: Record<string, unknown>) =>
+  request<{ report: unknown }>(`/marketplace/messages/${encodeURIComponent(id)}/report`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const blockMarketplaceUser = async (payload: Record<string, unknown>) =>
+  request<{ block: unknown }>("/marketplace/blocks", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchMarketplaceBlocks = async () =>
+  request<{ blocks: unknown[] }>("/marketplace/blocks");
+
+export const unblockMarketplaceUser = async (blockedUserId: string) =>
+  request<{ deleted: number }>(`/marketplace/blocks/${encodeURIComponent(blockedUserId)}`, {
+    method: "DELETE",
+  });
+
+/**
+ * The breeder's own animals, for listing straight from the collection. A
+ * purpose-built projection rather than the whole sync snapshot -- the sell
+ * picker needs a photo, the genetics and what is already listed, not the
+ * entire husbandry log of every animal the breeder owns.
+ */
+export const fetchSellableAnimals = async () =>
+  request<{ animals: unknown[] }>("/marketplace/seller/animals");
 
 export const fetchAdminMarketplace = async () =>
   request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");

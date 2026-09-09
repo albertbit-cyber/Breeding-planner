@@ -21,14 +21,42 @@ const asRecord = (value: unknown): JsonRecord => {
   return value as JsonRecord;
 };
 
+/**
+ * The marketplace's real filter set. This used to keep only four keys, so a
+ * saved search silently dropped everything the browse page could actually
+ * filter on -- genes above all, which is what people search for here.
+ */
+const SAVED_FILTER_KEYS: Array<[string, number]> = [
+  ["search", 160],
+  ["species", 120],
+  ["sex", 40],
+  ["category", 120],
+  ["country", 160],
+  ["location", 160],
+  ["includeGenes", 400],
+  ["excludeGenes", 400],
+  ["minPrice", 40],
+  ["maxPrice", 40],
+  ["minWeight", 40],
+  ["maxWeight", 40],
+  ["minProvenance", 8],
+  ["shippingAvailable", 8],
+  ["pickupAvailable", 8],
+  ["verifiedOnly", 8],
+  ["availability", 40],
+  ["sort", 40],
+];
+
 const sanitizeFilters = (value: unknown): JsonRecord => {
   const input = asRecord(value);
-  return {
-    search: textValue(input.search, 160),
-    sex: textValue(input.sex, 40),
-    location: textValue(input.location, 160),
-    maxPrice: textValue(input.maxPrice, 40),
-  };
+  const out: JsonRecord = {};
+  SAVED_FILTER_KEYS.forEach(([key, max]) => {
+    const value = textValue(input[key], max);
+    // Only keep what was actually set. Storing eighteen empty strings per saved
+    // search would bloat the JSON and make two identical searches compare unequal.
+    if (value) out[key] = value;
+  });
+  return out;
 };
 
 const toPublicSavedSearch = (row: any) => ({

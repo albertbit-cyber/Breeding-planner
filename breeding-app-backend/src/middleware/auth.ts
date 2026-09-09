@@ -37,6 +37,38 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
 };
 
 /**
+ * Populates `req.user` when a valid token is present and continues either way.
+ *
+ * For routes that serve public content but widen it for the owner — a
+ * marketplace photo is readable by anyone once its listing is published, and by
+ * its owner while the listing is still a draft. Never use this to protect a
+ * write: it does not reject anything.
+ */
+export const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization || "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const token = bearerToken || getCookieValue(req, AUTH_ACCESS_COOKIE);
+  if (!token) {
+    next();
+    return;
+  }
+  try {
+    const payload = verifyAuthToken(token);
+    const persistedRole = payload.persistedRole || payload.role;
+    req.user = {
+      id: payload.sub,
+      email: payload.email,
+      role: normalizePersistedRole(persistedRole),
+      persistedRole,
+    };
+    req.authSource = bearerToken ? "bearer" : "cookie";
+  } catch {
+    // An expired token on a public read is not an error; serve the public view.
+  }
+  next();
+};
+
+/**
  * Gates a short, explicit allowlist of sensitive write routes behind email
  * verification. Requires a DB read (the access JWT deliberately doesn't
  * carry `emailVerified`, to keep its payload minimal/stable) — only applied

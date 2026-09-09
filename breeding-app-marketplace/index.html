@@ -5,10 +5,10 @@
     <link rel="icon" type="image/png" sizes="256x256" href="app-icons/icon_256x256.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f7f9" />
-    <meta name="description" content="Breeding planner advisor" />
+    <meta name="description" content="Buy and sell ball pythons with their record — weights, feeding history, lineage and lab-verified genetics." />
     <link rel="apple-touch-icon" href="logo192.png" />
     <link rel="manifest" href="manifest.json" />
-    <title>Breeding Planner</title>
+    <title>Serpentora Market</title>
     <script src="https://cdn.tailwindcss.com"></script>
       <script>
       /* Pre-paint skin stamp. Must stay inline and blocking: anything async
@@ -22,10 +22,15 @@
           /* Audit R9: the retired "high-contrast" mode maps to the AAA skin. */
           var skin = (mode === "high-contrast") ? "high-contrast-forest"
                    : (a.preset && a.preset !== "default") ? a.preset
-                   : (mode === "dark" ? "deep-canopy" : "default");
+                   : (mode === "dark" ? "moss-mist" : "default");
           if (mode === "high-contrast") mode = "dark";
-          r.dataset.material = a.material || "flat";
           var r = document.documentElement;
+          /* `var r` was declared on the line below this assignment, so `r` was
+             hoisted-undefined and `r.dataset` threw straight into the catch --
+             meaning the pre-paint stamp this whole block exists for never ran
+             in any of the four apps, and every first paint used the fallback
+             skin until React re-stamped it. */
+          r.dataset.material = a.material || "flat";
           r.dataset.skin = skin;
           r.dataset.themeMode = mode;
           r.dataset.appearanceDensity = a.layoutDensity || "comfortable";

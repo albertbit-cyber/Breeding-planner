@@ -8,60 +8,70 @@ import enAnimals from "../locales/en/animals.json";
 import enAdvisor from "../locales/en/advisor.json";
 import enAuth from "../locales/en/auth.json";
 import enElectron from "../locales/en/electron.json";
+import enMarketplace from "../locales/en/marketplace.json";
 
 import esCommon from "../locales/es/common.json";
 import esAnimals from "../locales/es/animals.json";
 import esAdvisor from "../locales/es/advisor.json";
 import esAuth from "../locales/es/auth.json";
 import esElectron from "../locales/es/electron.json";
+import esMarketplace from "../locales/es/marketplace.json";
 
 import frCommon from "../locales/fr/common.json";
 import frAnimals from "../locales/fr/animals.json";
 import frAdvisor from "../locales/fr/advisor.json";
 import frAuth from "../locales/fr/auth.json";
 import frElectron from "../locales/fr/electron.json";
+import frMarketplace from "../locales/fr/marketplace.json";
 
 import itCommon from "../locales/it/common.json";
 import itAnimals from "../locales/it/animals.json";
 import itAdvisor from "../locales/it/advisor.json";
 import itAuth from "../locales/it/auth.json";
 import itElectron from "../locales/it/electron.json";
+import itMarketplace from "../locales/it/marketplace.json";
 
 import deCommon from "../locales/de/common.json";
 import deAnimals from "../locales/de/animals.json";
 import deAdvisor from "../locales/de/advisor.json";
 import deAuth from "../locales/de/auth.json";
 import deElectron from "../locales/de/electron.json";
+import deMarketplace from "../locales/de/marketplace.json";
 
 import nlCommon from "../locales/nl/common.json";
 import nlAnimals from "../locales/nl/animals.json";
 import nlAdvisor from "../locales/nl/advisor.json";
 import nlAuth from "../locales/nl/auth.json";
 import nlElectron from "../locales/nl/electron.json";
+import nlMarketplace from "../locales/nl/marketplace.json";
 
 import plCommon from "../locales/pl/common.json";
 import plAnimals from "../locales/pl/animals.json";
 import plAdvisor from "../locales/pl/advisor.json";
 import plAuth from "../locales/pl/auth.json";
 import plElectron from "../locales/pl/electron.json";
+import plMarketplace from "../locales/pl/marketplace.json";
 
 import ptCommon from "../locales/pt/common.json";
 import ptAnimals from "../locales/pt/animals.json";
 import ptAdvisor from "../locales/pt/advisor.json";
 import ptAuth from "../locales/pt/auth.json";
 import ptElectron from "../locales/pt/electron.json";
+import ptMarketplace from "../locales/pt/marketplace.json";
 
 import csCommon from "../locales/cs/common.json";
 import csAnimals from "../locales/cs/animals.json";
 import csAdvisor from "../locales/cs/advisor.json";
 import csAuth from "../locales/cs/auth.json";
 import csElectron from "../locales/cs/electron.json";
+import csMarketplace from "../locales/cs/marketplace.json";
 
 import heCommon from "../locales/he/common.json";
 import heAnimals from "../locales/he/animals.json";
 import heAdvisor from "../locales/he/advisor.json";
 import heAuth from "../locales/he/auth.json";
 import heElectron from "../locales/he/electron.json";
+import heMarketplace from "../locales/he/marketplace.json";
 
 const {
   supportedLangs: SUPPORTED_LANGS = ["en"],
@@ -77,6 +87,7 @@ const resources = {
     advisor: enAdvisor,
     auth: enAuth,
     electron: enElectron,
+    marketplace: enMarketplace,
   },
   es: {
     common: esCommon,
@@ -84,6 +95,7 @@ const resources = {
     advisor: esAdvisor,
     auth: esAuth,
     electron: esElectron,
+    marketplace: esMarketplace,
   },
   fr: {
     common: frCommon,
@@ -91,6 +103,7 @@ const resources = {
     advisor: frAdvisor,
     auth: frAuth,
     electron: frElectron,
+    marketplace: frMarketplace,
   },
   it: {
     common: itCommon,
@@ -98,6 +111,7 @@ const resources = {
     advisor: itAdvisor,
     auth: itAuth,
     electron: itElectron,
+    marketplace: itMarketplace,
   },
   de: {
     common: deCommon,
@@ -105,6 +119,7 @@ const resources = {
     advisor: deAdvisor,
     auth: deAuth,
     electron: deElectron,
+    marketplace: deMarketplace,
   },
   nl: {
     common: nlCommon,
@@ -112,6 +127,7 @@ const resources = {
     advisor: nlAdvisor,
     auth: nlAuth,
     electron: nlElectron,
+    marketplace: nlMarketplace,
   },
   pl: {
     common: plCommon,
@@ -119,6 +135,7 @@ const resources = {
     advisor: plAdvisor,
     auth: plAuth,
     electron: plElectron,
+    marketplace: plMarketplace,
   },
   pt: {
     common: ptCommon,
@@ -126,6 +143,7 @@ const resources = {
     advisor: ptAdvisor,
     auth: ptAuth,
     electron: ptElectron,
+    marketplace: ptMarketplace,
   },
   cs: {
     common: csCommon,
@@ -133,6 +151,7 @@ const resources = {
     advisor: csAdvisor,
     auth: csAuth,
     electron: csElectron,
+    marketplace: csMarketplace,
   },
   he: {
     common: heCommon,
@@ -140,6 +159,7 @@ const resources = {
     advisor: heAdvisor,
     auth: heAuth,
     electron: heElectron,
+    marketplace: heMarketplace,
   },
 };
 

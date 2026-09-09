@@ -52,11 +52,20 @@ export const toLegacyModerationListingDto = (row: any) => {
   });
 };
 
-export const toMarketplaceListingDto = (row: any) => {
+export const toMarketplaceListingDto = (row: any, record?: any) => {
   if (!row) return null;
   const store = row.seller?.marketplaceStores?.[0] || null;
   const profile = row.seller?.profile || {};
   return compactObject({
+    provenance: record?.provenance || { photos: false, weights: false, lineage: false, verifiedGenetics: false, filled: 0 },
+    record: record
+      ? {
+          weights: record.weights || [],
+          feeding: record.feeding || null,
+          lineage: record.lineage || null,
+          certificate: record.certificate || null,
+        }
+      : undefined,
     id: row.id,
     sellerUserId: row.sellerUserId,
     animalId: row.animalId,
@@ -108,7 +117,90 @@ export const toMarketplaceListingDto = (row: any) => {
   });
 };
 
-export const toMarketplaceStoreDto = (row: any, listings: any[] = [], reviews: any[] = []) => ({
+/**
+ * Conversations used to be returned as raw Prisma rows, which handed each side
+ * the other party's e-mail address. The thread only ever needs a display name.
+ */
+export const toMarketplaceMessageDto = (row: any, viewerId?: string) => {
+  if (!row) return null;
+  return compactObject({
+    id: row.id,
+    conversationId: row.conversationId,
+    senderUserId: row.senderUserId,
+    mine: Boolean(viewerId && row.senderUserId === viewerId),
+    messageText: row.messageText,
+    offerAmount: row.offerAmount === null || row.offerAmount === undefined ? null : Number(row.offerAmount),
+    createdAt: row.createdAt,
+    readAt: row.readAt,
+  });
+};
+
+export const toMarketplaceConversationDto = (row: any, viewerId?: string) => {
+  if (!row) return null;
+  const isSeller = viewerId ? row.sellerUserId === viewerId : false;
+  const counterparty = isSeller ? row.buyer : row.seller;
+  const messages = (row.messages || []).map((message: any) => toMarketplaceMessageDto(message, viewerId));
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const offers = messages.filter((message: any) => message && message.offerAmount !== null);
+  return compactObject({
+    id: row.id,
+    listingId: row.listingId,
+    status: row.status,
+    role: isSeller ? "seller" : "buyer",
+    listing: row.listing
+      ? {
+          id: row.listing.id,
+          title: row.listing.title,
+          price: row.listing.price === null || row.listing.price === undefined ? null : Number(row.listing.price),
+          currency: row.listing.currency,
+          availability: row.listing.availability,
+          status: row.listing.status,
+          imageUrl: row.listing.images?.[0]?.imageUrl || "",
+        }
+      : null,
+    counterparty: counterparty
+      ? { id: counterparty.id, name: counterparty.fullName || "Marketplace user" }
+      : null,
+    messages,
+    lastMessage,
+    latestOffer: offers.length ? offers[offers.length - 1] : null,
+    unreadCount: messages.filter(
+      (message: any) => message && !message.mine && !message.readAt
+    ).length,
+    sale: row.sale
+      ? {
+          id: row.sale.id,
+          saleStatus: row.sale.saleStatus,
+          paymentStatus: row.sale.paymentStatus,
+          salePrice: row.sale.salePrice === null || row.sale.salePrice === undefined ? null : Number(row.sale.salePrice),
+          depositAmount:
+            row.sale.depositAmount === null || row.sale.depositAmount === undefined ? null : Number(row.sale.depositAmount),
+          handoverMethod: row.sale.handoverMethod,
+          handoverDate: row.sale.handoverDate,
+        }
+      : null,
+    lastMessageAt: row.lastMessageAt,
+    updatedAt: row.updatedAt,
+  });
+};
+
+export const toMarketplaceReviewDto = (row: any) => {
+  if (!row) return null;
+  return compactObject({
+    id: row.id,
+    rating: row.rating,
+    communicationRating: row.communicationRating,
+    accuracyRating: row.accuracyRating,
+    shippingRating: row.shippingRating,
+    healthRating: row.healthRating,
+    reviewText: row.reviewText || "",
+    reviewerName: row.reviewer?.fullName || "Verified buyer",
+    listingTitle: row.sale?.listing?.title || "",
+    createdAt: row.createdAt,
+  });
+};
+
+export const toMarketplaceStoreDto = (row: any, listings: any[] = [], reviews: any[] = [], records?: Map<string, any>) => ({
   id: row.id,
   userId: row.userId,
   storeName: row.storeName,
@@ -132,8 +224,8 @@ export const toMarketplaceStoreDto = (row: any, listings: any[] = [], reviews: a
         verificationStatus: row.user.verificationStatus,
       }
     : null,
-  listings: listings.map(toMarketplaceListingDto).filter(Boolean),
-  reviews,
+  listings: listings.map((listing) => toMarketplaceListingDto(listing, records?.get(listing?.id))).filter(Boolean),
+  reviews: reviews.map(toMarketplaceReviewDto).filter(Boolean),
 });
 
 export const assertNoPrivateListingFields = (value: unknown): boolean => {

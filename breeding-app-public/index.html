@@ -20,10 +20,15 @@
           /* Audit R9: the retired "high-contrast" mode maps to the AAA skin. */
           var skin = (mode === "high-contrast") ? "high-contrast-forest"
                    : (a.preset && a.preset !== "default") ? a.preset
-                   : (mode === "dark" ? "deep-canopy" : "default");
+                   : (mode === "dark" ? "moss-mist" : "default");
           if (mode === "high-contrast") mode = "dark";
-          r.dataset.material = a.material || "flat";
           var r = document.documentElement;
+          /* `var r` was declared on the line below this assignment, so `r` was
+             hoisted-undefined and `r.dataset` threw straight into the catch --
+             meaning the pre-paint stamp this whole block exists for never ran
+             in any of the five apps, and every first paint used the fallback
+             skin until React re-stamped it. */
+          r.dataset.material = a.material || "flat";
           r.dataset.skin = skin;
           r.dataset.themeMode = mode;
           r.dataset.appearanceDensity = a.layoutDensity || "comfortable";

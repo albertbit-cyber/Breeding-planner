@@ -1,17 +1,25 @@
 import type { Request, Response } from "express";
 import { HttpError } from "../utils/errors";
 import {
+  acceptMarketplaceOffer,
   addMarketplaceMessage,
   adminUpdateStore,
   createMarketplaceConversation,
   createMarketplaceListing,
   createMarketplaceReview,
+  getMarketplaceComparables,
+  getMarketplaceConversation,
   getMarketplaceListing,
   getMarketplaceStore,
   listAdminMarketplace,
   listMarketplaceConversations,
   listMarketplaceListings,
+  listMarketplaceFavorites,
+  listMarketplaceReviews,
+  listReviewableSales,
+  listSellableAnimals,
   listSellerDashboard,
+  markMarketplaceConversationRead,
   toggleMarketplaceFavorite,
   updateMarketplaceListing,
   updateMarketplaceListingStatus,
@@ -23,16 +31,17 @@ import {
   createMarketplaceMediaUpload,
   listMyMarketplaceBlocks,
   listMyMarketplaceMedia,
+  readMarketplaceMediaObject,
   reportMarketplaceMessage,
   unblockMarketplaceUser,
 } from "../services/marketplaceRuntimeService";
 
 export const browseListings = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await listMarketplaceListings(req.query));
+  res.status(200).json(await listMarketplaceListings(req.query, req.user || null));
 };
 
 export const listingDetail = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await getMarketplaceListing(req.params.id));
+  res.status(200).json(await getMarketplaceListing(req.params.id, req.user || null));
 };
 
 export const sellerDashboard = async (req: Request, res: Response): Promise<void> => {
@@ -132,4 +141,51 @@ export const adminMarketplace = async (req: Request, res: Response): Promise<voi
 export const adminStore = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   res.status(200).json(await adminUpdateStore(req.user, req.params.userId, req.body || {}));
+};
+
+export const listingComparables = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getMarketplaceComparables(req.params.id));
+};
+
+export const conversationDetail = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await getMarketplaceConversation(req.user, req.params.id));
+};
+
+export const conversationRead = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await markMarketplaceConversationRead(req.user, req.params.id));
+};
+
+export const acceptOffer = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await acceptMarketplaceOffer(req.user, req.params.id, req.body || {}));
+};
+
+export const storeReviews = async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listMarketplaceReviews(req.params.userId));
+};
+
+export const reviewableSales = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listReviewableSales(req.user));
+};
+
+export const mediaObject = async (req: Request, res: Response): Promise<void> => {
+  const { buffer, mimeType } = await readMarketplaceMediaObject(req.params.id, req.user || null);
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+  res.setHeader("Content-Length", String(buffer.length));
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.status(200).end(buffer);
+};
+
+export const sellerAnimals = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listSellableAnimals(req.user));
+};
+
+export const myFavorites = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listMarketplaceFavorites(req.user));
 };

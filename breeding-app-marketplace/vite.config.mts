@@ -54,13 +54,24 @@ function patchImportMetaEnv(): Plugin {
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
+/**
+ * The marketplace serves real paths (`/a/:id`, `/s/:userId`, `/inbox/:id`), so
+ * the asset base has to be absolute. A relative `./` base resolves
+ * `assets/index.js` against the *current* path, so a deep link like `/a/l1`
+ * asks the server for `/a/assets/index.js`, gets a 404, and renders a blank
+ * page — the app only ever worked from the root while it was one page.
+ *
+ * `PUBLIC_URL` still wins when the app is mounted under a sub-path, and the
+ * Electron build keeps the relative base it needs to load over `file://`.
+ */
 const resolveBase = (publicUrl: string | undefined): string => {
   const ensureTrailingSlash = (value: string): string =>
     value.endsWith("/") ? value : `${value}/`;
-  if (!publicUrl || publicUrl === "/") return "./";
+  if (process.env.ELECTRON_BUILD === "true") return "./";
+  if (!publicUrl || publicUrl === "/") return "/";
   try {
     const { pathname } = new URL(publicUrl, "http://localhost");
-    if (!pathname || pathname === "/") return "./";
+    if (!pathname || pathname === "/") return "/";
     return ensureTrailingSlash(pathname);
   } catch {
     return ensureTrailingSlash(publicUrl);

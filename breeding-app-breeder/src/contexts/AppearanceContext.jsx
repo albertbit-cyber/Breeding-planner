@@ -163,7 +163,15 @@ export function materialStatus(materialId, skinId) {
 
 /** Used when themeMode resolves the palette instead of an explicit skin. */
 const SYSTEM_LIGHT_SKIN = "default";
-const SYSTEM_DARK_SKIN = "deep-canopy";
+/**
+ * `RETIRED_SKINS` below already maps `deep-canopy` to `moss-mist`, but that
+ * map only rewrites a *stored* preset — and this constant is the one path that
+ * never passes through it, because it is what a user with no preset at all
+ * gets. So every dark-mode user who never opened the appearance panel was
+ * stamped `data-skin="deep-canopy"`, which `skins.css` has no block for: no
+ * --sk-* token resolved and the app silently rendered its light fallbacks.
+ */
+const SYSTEM_DARK_SKIN = "moss-mist";
 
 /* ── Non-color settings (still genuinely dynamic) ───────────────────────── */
 

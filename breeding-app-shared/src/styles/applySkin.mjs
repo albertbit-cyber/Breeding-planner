@@ -14,7 +14,16 @@ export const APPEARANCE_STORAGE_KEY = 'breedingPlannerAppearance.v1';
 
 /** Skins that themeMode picks when the user has never chosen one explicitly. */
 export const SYSTEM_LIGHT_SKIN = 'default';
-export const SYSTEM_DARK_SKIN = 'deep-canopy';
+/**
+ * `deep-canopy` was retired on 2026-09-01 and migrated to `moss-mist`
+ * (docs/skins/MATERIALS.md), but this constant and the four inline pre-paint
+ * stamps in index.html kept naming the old id. `skins.css` has no
+ * `[data-skin="deep-canopy"]` block, so every dark-mode visitor was stamped
+ * with a skin that matched nothing: no --sk-* token resolved, and every
+ * component silently fell through to its light literal fallback. Dark mode
+ * has therefore not worked in any of the five apps since the rename.
+ */
+export const SYSTEM_DARK_SKIN = 'moss-mist';
 
 // Audit R9: 'high-contrast' is a skin (high-contrast-forest), not a mode.
 export const THEME_MODES = ['system', 'light', 'dark'];

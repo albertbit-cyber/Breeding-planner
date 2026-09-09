@@ -490,10 +490,17 @@ const hasValue = (value) => {
 
 const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
-export default function AuthGate({ children }) {
+/**
+ * `scope` pins which surface is being protected. Without it the scope is read
+ * from the URL hash, which is how this component worked when the marketplace
+ * was one hash-routed page. The marketplace now uses real paths, so the routes
+ * that need an account pass their scope explicitly and the rest of the app --
+ * browse, a listing, a store -- renders with no gate at all.
+ */
+export default function AuthGate({ children, scope }) {
   const { t, i18n } = useTranslation();
   const { snapshot, retry } = useSharedBackend();
-  const [authScope, setAuthScope] = useState(() => getAuthSurfaceForHash(window?.location?.hash));
+  const [authScope, setAuthScope] = useState(() => scope || getAuthSurfaceForHash(window?.location?.hash));
   const [authState, setAuthState] = useState(() => loadStoredAuth(authScope));
   const [view, setView] = useState("chooser");
   const [loginValues, setLoginValues] = useState({ username: "", password: "" });
@@ -544,12 +551,16 @@ export default function AuthGate({ children }) {
   const totalSteps = registrationSteps.length || 1;
 
   useEffect(() => {
+    if (scope) {
+      setAuthScope(scope);
+      return undefined;
+    }
     const onHashChange = () => {
       setAuthScope(getAuthSurfaceForHash(window.location.hash));
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     setAuthState(loadStoredAuth(authScope));
@@ -567,6 +578,13 @@ export default function AuthGate({ children }) {
       localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
       // ignore write errors
+    }
+    // `storage` only fires in other tabs, so a sign-in here has to announce
+    // itself for the marketplace nav and its action gates to notice.
+    try {
+      window.dispatchEvent(new Event("serpentora:session"));
+    } catch {
+      // Browsers without the Event constructor simply miss the nudge.
     }
   }, [authScope]);
 

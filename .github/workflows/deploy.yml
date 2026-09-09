@@ -34,7 +34,20 @@ jobs:
       - name: Build marketplace
         env:
           PUBLIC_URL: /${{ github.event.repository.name }}/
+          # The build had no VITE_API_URL, so every deploy shipped an app that
+          # booted straight into "Backend not configured - running in local
+          # mode" and could not list a single animal. Set the repository
+          # variable to point somewhere else; this is the fallback.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://breeding-planner-production.up.railway.app/api' }}
         run: npm run build
+        working-directory: breeding-app-marketplace
+
+      # GitHub Pages serves 404.html for any path it has no file for, and it is
+      # the only SPA fallback Pages offers. Without this, every deep link and
+      # every refresh away from the index 404s -- which is most of the point of
+      # the marketplace having real URLs.
+      - name: Add SPA fallback for deep links
+        run: cp build/index.html build/404.html
         working-directory: breeding-app-marketplace
 
       - name: Upload static site
