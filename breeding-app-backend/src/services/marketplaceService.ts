@@ -242,7 +242,17 @@ export const listMarketplaceListings = async (
     }),
   ]);
 
-  const records = await buildListingRecords(rows);
+  /**
+   * The record layer decorates the catalogue; it must never be able to empty
+   * it. A missing lab module already turned every browse into a 500 once, so a
+   * failure here degrades to cards without provenance rather than no cards.
+   */
+  let records = new Map<string, any>();
+  try {
+    records = await buildListingRecords(rows);
+  } catch (error) {
+    console.error("[marketplace] provenance unavailable for this page:", error);
+  }
 
   // Which of these the viewer has already saved. One query for the page, and
   // nothing at all for a signed-out visitor.

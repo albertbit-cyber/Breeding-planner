@@ -71,6 +71,33 @@ const countFilled = (flags: ProvenanceFlags): number =>
   Number(flags.photos) + Number(flags.weights) + Number(flags.lineage) + Number(flags.verifiedGenetics);
 
 /**
+ * Shed-test certificates come from the laboratory module, which is not in every
+ * deployment: `ShedTestCertificate` exists on the lab branch and not yet on
+ * main, so `prisma.shedTestCertificate` is simply undefined there. Reaching for
+ * it unguarded threw on every browse and took the whole catalogue down with a
+ * 500 -- `prisma as any` hid that from the compiler, and the mocked tests hid
+ * it from CI.
+ *
+ * Where the module is absent there are no certificates to publish, so the
+ * verified-genetics segment stays unfilled and nothing else changes.
+ */
+const readCertificates = async (owners: string[], appIds: string[]): Promise<any[]> => {
+  if (!db.shedTestCertificate?.findMany) return [];
+  return db.shedTestCertificate.findMany({
+    where: { breederId: { in: owners }, animalAppId: { in: appIds } },
+    orderBy: { issuedAt: "desc" },
+    select: {
+      breederId: true,
+      animalAppId: true,
+      certificateNumber: true,
+      verificationCode: true,
+      issuedAt: true,
+      labOrganization: { select: { name: true } },
+    },
+  });
+};
+
+/**
  * Batch-resolve the record for a page of listings. One animal query and one
  * certificate query for the whole page rather than two per row -- browse renders
  * 24 cards and each one shows a provenance meter.
@@ -104,18 +131,7 @@ export const buildListingRecords = async (
       where: { ownerId: { in: owners }, appAnimalId: { in: appIds }, deletedAt: null },
       select: { id: true, ownerId: true, appAnimalId: true, payload: true },
     }),
-    db.shedTestCertificate.findMany({
-      where: { breederId: { in: owners }, animalAppId: { in: appIds } },
-      orderBy: { issuedAt: "desc" },
-      select: {
-        breederId: true,
-        animalAppId: true,
-        certificateNumber: true,
-        verificationCode: true,
-        issuedAt: true,
-        labOrganization: { select: { name: true } },
-      },
-    }),
+    readCertificates(owners, appIds),
   ]);
 
   const animalByKey = new Map<string, any>();
@@ -225,11 +241,13 @@ export const findUnpublishedEvidence = async (listing: any): Promise<string[]> =
       where: { ownerId: listing.sellerUserId, appAnimalId: String(listing.animalId), deletedAt: null },
       select: { id: true, payload: true },
     }),
-    db.shedTestCertificate.findFirst({
-      where: { breederId: listing.sellerUserId, animalAppId: String(listing.animalId) },
-      orderBy: { issuedAt: "desc" },
-      select: { certificateNumber: true },
-    }),
+    db.shedTestCertificate?.findFirst
+      ? db.shedTestCertificate.findFirst({
+          where: { breederId: listing.sellerUserId, animalAppId: String(listing.animalId) },
+          orderBy: { issuedAt: "desc" },
+          select: { certificateNumber: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const missing: string[] = [];

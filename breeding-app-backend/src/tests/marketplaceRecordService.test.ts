@@ -143,6 +143,29 @@ describe("marketplaceRecordService", () => {
     expect(db.animal.findMany.mock.calls[0][0].where.appAnimalId.in).toEqual(["26-F-148", "26-M-091"]);
   });
 
+  it("survives a deployment with no laboratory module", async () => {
+    // `ShedTestCertificate` ships with the lab work and is absent on main, so
+    // `prisma.shedTestCertificate` is undefined there. Reaching for it threw on
+    // every browse and 500ed the whole catalogue in production; the mocked
+    // client in the tests above always had the model, which is exactly why the
+    // suite stayed green. This test removes it.
+    const saved = db.shedTestCertificate;
+    delete db.shedTestCertificate;
+    try {
+      const records = await buildListingRecords([listing()]);
+      const record = records.get("listing-1")!;
+
+      expect(record.provenance.verifiedGenetics).toBe(false);
+      expect(record.certificate).toBeNull();
+      // Everything that does not depend on the lab still resolves.
+      expect(record.provenance.weights).toBe(true);
+      expect(record.provenance.lineage).toBe(true);
+      expect(record.provenance.filled).toBe(3);
+    } finally {
+      db.shedTestCertificate = saved;
+    }
+  });
+
   it("does not leak one seller's animal into another seller's listing", async () => {
     // Same appAnimalId, different owner: keying on the id alone would hand a
     // rival breeder's husbandry record to this listing.
@@ -170,6 +193,18 @@ describe("findUnpublishedEvidence", () => {
 
   it("stays quiet when everything on file is already published", async () => {
     expect(await findUnpublishedEvidence(listing())).toEqual([]);
+  });
+
+  it("does not throw when the laboratory module is absent", async () => {
+    const saved = db.shedTestCertificate;
+    delete db.shedTestCertificate;
+    try {
+      const missing = await findUnpublishedEvidence(listing({ publicDataSettingsJson: {} }));
+      expect(missing).not.toContain("geneticTest");
+      expect(missing).toContain("weightHistory");
+    } finally {
+      db.shedTestCertificate = saved;
+    }
   });
 
   it("stays quiet when there is nothing on file to publish", async () => {
