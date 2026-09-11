@@ -57,6 +57,9 @@ ALTER TABLE "ShedTestCertificate"
 
 -- Restrict, not Cascade: retiring a laboratory organization must not erase the
 -- certificates it issued while it was operating.
+-- The referenced table is "organizations", not the model name: the Prisma model
+-- carries an @@map, and only the mapped name exists in the database. Naming the
+-- model here made the whole migration fail on first apply.
 ALTER TABLE "ShedTestCertificate"
   ADD CONSTRAINT "ShedTestCertificate_lab_organization_id_fkey"
-  FOREIGN KEY ("lab_organization_id") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  FOREIGN KEY ("lab_organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

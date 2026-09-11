@@ -39,19 +39,23 @@ const main = async () => {
 
   for (const order of orders) {
     const completed = order.results.filter((result) => result.status === "completed");
+    // A certificate covers an animal, not a test code, and one animal commonly
+    // has several completed results on the same order. Counting results here
+    // instead of animals made the script think work remained on every re-run.
+    const animalCount = new Set(completed.map((result) => result.animalId)).size;
     const existing = await prisma.shedTestCertificate.count({ where: { orderId: order.id } });
 
-    if (existing >= completed.length) {
+    if (existing >= animalCount) {
       alreadyStored += 1;
       continue;
     }
 
     if (!APPLY) {
       console.log(
-        `[backfill] would write ${completed.length - existing} certificate(s) for order ` +
+        `[backfill] would write ${animalCount - existing} certificate(s) for order ` +
           `${order.orderNumber || order.id}`
       );
-      written += completed.length - existing;
+      written += animalCount - existing;
       continue;
     }
 
