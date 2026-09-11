@@ -42,6 +42,7 @@ import {
   changeMySubscription,
   checkFeatureAccess,
   clearAuthToken,
+  createMarketplaceListing,
   fetchBreederSnapshot,
   fetchMySubscription,
   fetchMyListings,
@@ -107,6 +108,7 @@ import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/im
 import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
+import { buildMarketplaceListingPayload } from "./features/marketplace/listingPayload";
 import {
   DEFAULT_ANIMAL_EXPORT_SCOPE,
   collectAnimalScopeOptions,
@@ -10011,40 +10013,63 @@ export default function BreedingPlannerApp() {
     }
   }, [returnToGroupsAfterEdit]);
 
+  /**
+   * The one write that actually puts a snake in front of buyers.
+   *
+   * `POST /marketplace/listings` is upsert-by-animal on the server, so this is
+   * safe to call on every save: the first call creates the card, the rest keep
+   * its price, genetics and description in step with the animal record.
+   */
+  const syncSnakeToMarketplace = useCallback(async (snake, { published = true } = {}) => {
+    const tokens = getDisplayedSnakeGeneticsTokens(snake);
+    const genetics = tokens.map((tok) =>
+      typeof tok === 'string' ? tok : tok?.label || tok?.gene || tok?.name || ''
+    ).filter(Boolean).join(', ');
+    const speciesName = getSpeciesById(resolveSpeciesId(snake?.species))?.name || '';
+
+    const payload = buildMarketplaceListingPayload(snake, { genetics, species: speciesName, published });
+    if (!payload) return;
+    await createMarketplaceListing(payload);
+
+    // The breeder's own public profile page still reads the older listings
+    // table, so it is kept in step too. It is not what the marketplace shows.
+    try {
+      const data = await fetchMyListings();
+      const existing = Array.isArray(data?.listings) ? data.listings : [];
+      const coverUrl = snake.imageUrl
+        || (Array.isArray(snake.photos) && snake.photos.length
+          ? snake.photos[snake.photos.length - 1]?.url || ''
+          : '');
+      const legacy = {
+        id: existing.find((l) => l.animalAppId === snake.id)?.id || `listing-${Date.now()}`,
+        animalAppId: snake.id,
+        title: payload.title,
+        status: published ? 'available' : 'draft',
+        price: String(snake.price ?? ''),
+        currency: payload.currency,
+        description: payload.description,
+        imageUrl: coverUrl,
+        sex: payload.sex,
+        hatchDate: snake.birthDate || '',
+        genetics,
+      };
+      await saveMyListings([
+        ...existing.filter((l) => l.animalAppId !== snake.id),
+        legacy,
+      ]);
+    } catch (err) {
+      // The marketplace write is the one that matters; the profile page catching
+      // up on the next save is not worth failing the publish over.
+      console.warn('Profile listing mirror failed', err);
+    }
+  }, []);
+
   const publishEditSnakeToMarketplace = useCallback(async () => {
     if (!editSnakeDraft || editForSalePublishing) return;
     setEditForSalePublishing(true);
     setEditForSalePublishError('');
     try {
-      let existing = [];
-      try {
-        const data = await fetchMyListings();
-        existing = Array.isArray(data?.listings) ? data.listings : [];
-      } catch (_) {}
-      if (!existing.some((l) => l.animalAppId === editSnakeDraft.id)) {
-        const coverUrl = editSnakeDraft.imageUrl
-          || (Array.isArray(editSnakeDraft.photos) && editSnakeDraft.photos.length
-            ? editSnakeDraft.photos[editSnakeDraft.photos.length - 1]?.url || ''
-            : '');
-        const tokens = getDisplayedSnakeGeneticsTokens(editSnakeDraft);
-        const geneticsStr = tokens.map((tok) =>
-          typeof tok === 'string' ? tok : tok?.label || tok?.gene || tok?.name || ''
-        ).filter(Boolean).join(', ');
-        const newListing = {
-          id: `listing-${Date.now()}`,
-          animalAppId: editSnakeDraft.id,
-          title: editSnakeDraft.name || 'Snake for sale',
-          status: 'available',
-          price: String(editSnakeDraft.price ?? ''),
-          currency: editSnakeDraft.currency || 'EUR',
-          description: editSnakeDraft.saleDescription || '',
-          imageUrl: coverUrl,
-          sex: editSnakeDraft.sex || '',
-          hatchDate: editSnakeDraft.birthDate || '',
-          genetics: geneticsStr,
-        };
-        await saveMyListings([...existing, newListing]);
-      }
+      await syncSnakeToMarketplace(editSnakeDraft);
       const publishedAt = new Date().toISOString();
       setEditSnakeDraft(d => ({
         ...d,
@@ -10065,7 +10090,7 @@ export default function BreedingPlannerApp() {
     } finally {
       setEditForSalePublishing(false);
     }
-  }, [editSnakeDraft, editForSalePublishing]);
+  }, [editSnakeDraft, editForSalePublishing, syncSnakeToMarketplace]);
 
   const requestDeleteSnake = useCallback((snake) => {
     if (!snake) return;
@@ -13130,7 +13155,7 @@ export default function BreedingPlannerApp() {
                                     .map(h => String(h).trim()).filter(Boolean)
                                 ),
                               };
-                              setSnakes(prev => prev.map(s => s.id === oldId ? reconcileQuarantineWithStatus({
+                              const savedSnake = reconcileQuarantineWithStatus({
                                 ...editSnakeDraft,
                                 id: newId,
                                 species: resolveSpeciesId(editSnakeDraft.species),
@@ -13140,7 +13165,8 @@ export default function BreedingPlannerApp() {
                                 morphs: normalizedGenetics.morphs,
                                 hets: normalizedGenetics.hets,
                                 feederProfile: normalizedFeederProfile,
-                              }, { today: quarantineTodayYmd() }) : (
+                              }, { today: quarantineTodayYmd() });
+                              setSnakes(prev => prev.map(s => s.id === oldId ? savedSnake : (
                                 // Every offspring names its parents by ID, and that is what the
                                 // family tree draws its edges from. Rename a breeder without
                                 // carrying this across and its whole clutch comes loose from it.
@@ -13184,6 +13210,35 @@ export default function BreedingPlannerApp() {
                                 };
                               }),
                             }));
+                          }
+                          // Saving is the publish. A snake marked for sale reaches the
+                          // marketplace here, and one taken off sale is pulled back to a
+                          // draft, so the card a buyer sees is never staler than the record.
+                          // A publish that quietly fails is worse than no publish at all:
+                          // the animal reads as listed here and is nowhere on the site.
+                          const reportSyncFailure = (err, fallback) => {
+                            console.warn(fallback, err);
+                            showAppAlert(err instanceof Error ? err.message : fallback, {
+                              title: t('marketplace.syncFailedTitle', { defaultValue: 'Marketplace not updated' }),
+                              tone: 'danger',
+                            });
+                          };
+                          if (savedSnake.forSale) {
+                            syncSnakeToMarketplace(savedSnake)
+                              .then(() => setSnakes(prev => prev.map(x => x.id === newId
+                                ? { ...x, marketplacePublished: true, marketplacePublishedAt: x.marketplacePublishedAt || new Date().toISOString() }
+                                : x)))
+                              .catch(err => reportSyncFailure(err, t('marketplace.publishFailed', {
+                                defaultValue: 'The animal was saved, but could not be published to the Marketplace.',
+                              })));
+                          } else if (savedSnake.marketplacePublished) {
+                            syncSnakeToMarketplace(savedSnake, { published: false })
+                              .then(() => setSnakes(prev => prev.map(x => x.id === newId
+                                ? { ...x, marketplacePublished: false }
+                                : x)))
+                              .catch(err => reportSyncFailure(err, t('marketplace.unpublishFailed', {
+                                defaultValue: 'The animal was saved, but is still showing on the Marketplace.',
+                              })));
                           }
                           closeSnakeEditor();
                             }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>

@@ -345,6 +345,28 @@ export const canAccessFeature = async (user: AuthenticatedUser | { id: string; r
   const tier = subscription?.tier;
   const tierFeature = tier?.features?.find((entry: any) => entry.featureKey === featureKey);
   if (!tier || !tierFeature?.enabled) {
+    /**
+     * The unconfigured escape hatch above asks whether the Prisma models exist.
+     * They always do. What it was reaching for is whether the subscription
+     * system is actually in use, and on a database where the tier catalogue was
+     * never seeded the models are present and empty -- so every gated feature
+     * failed closed with "Feature is not included in the current tier".
+     * Marketplace publishing was one of them: a breeder could mark a snake for
+     * sale, press publish, and be refused by a paywall that sells nothing.
+     *
+     * An empty catalogue means nobody can hold a subscription at all, so it is
+     * the absence of a subscription system rather than a denial by one. Checked
+     * here rather than higher up so a configured deployment pays for the query
+     * only on the path that was going to deny anyway, and so an explicit admin
+     * override still wins.
+     */
+    const configuredTiers = await db.subscriptionTier.count({
+      where: { isActive: true, archivedAt: null },
+    });
+    if (!configuredTiers) {
+      return { allowed: true, featureKey, source: "unconfigured", tier: "Unconfigured" };
+    }
+
     const requiredTier = await db.subscriptionTier.findFirst({
       where: { isActive: true, archivedAt: null, features: { some: { featureKey, enabled: true } } },
       orderBy: [{ sortOrder: "asc" }, { monthlyPrice: "asc" }],
