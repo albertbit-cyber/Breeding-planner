@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   clearAuthToken,
@@ -6,12 +6,12 @@ import {
   forgotPassword as forgotPasswordApi,
   hasStoredAuthSession,
   login as loginApi,
-  register as registerApi,
   resendVerification as resendVerificationApi,
   resetPassword as resetPasswordApi,
   verifyEmail as verifyEmailApi,
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
+import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
 
 const ADMIN_APP_AUTH_SCOPE = "admin";
 
@@ -53,448 +53,7 @@ const getAuthSurfaceForHash = (hashValue) => {
   if (path.startsWith("/pricing")) return "public";
   return ADMIN_APP_AUTH_SCOPE;
 };
-const COUNTRY_OPTIONS_FALLBACK = [
-  "Afghanistan",
-  "Albania",
-  "Algeria",
-  "Andorra",
-  "Angola",
-  "Antigua and Barbuda",
-  "Argentina",
-  "Armenia",
-  "Australia",
-  "Austria",
-  "Azerbaijan",
-  "Bahamas",
-  "Bahrain",
-  "Bangladesh",
-  "Barbados",
-  "Belarus",
-  "Belgium",
-  "Belize",
-  "Benin",
-  "Bhutan",
-  "Bolivia",
-  "Bosnia and Herzegovina",
-  "Botswana",
-  "Brazil",
-  "Brunei",
-  "Bulgaria",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cambodia",
-  "Cameroon",
-  "Canada",
-  "Central African Republic",
-  "Chad",
-  "Chile",
-  "China",
-  "Colombia",
-  "Comoros",
-  "Congo (Congo-Brazzaville)",
-  "Costa Rica",
-  "Cote d'Ivoire",
-  "Croatia",
-  "Cuba",
-  "Cyprus",
-  "Czechia",
-  "Democratic Republic of the Congo",
-  "Denmark",
-  "Djibouti",
-  "Dominica",
-  "Dominican Republic",
-  "Ecuador",
-  "Egypt",
-  "El Salvador",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Estonia",
-  "Eswatini",
-  "Ethiopia",
-  "Fiji",
-  "Finland",
-  "France",
-  "Gabon",
-  "Gambia",
-  "Georgia",
-  "Germany",
-  "Ghana",
-  "Greece",
-  "Grenada",
-  "Guatemala",
-  "Guinea",
-  "Guinea-Bissau",
-  "Guyana",
-  "Haiti",
-  "Holy See",
-  "Honduras",
-  "Hungary",
-  "Iceland",
-  "India",
-  "Indonesia",
-  "Iran",
-  "Iraq",
-  "Ireland",
-  "Israel",
-  "Italy",
-  "Jamaica",
-  "Japan",
-  "Jordan",
-  "Kazakhstan",
-  "Kenya",
-  "Kiribati",
-  "Kuwait",
-  "Kyrgyzstan",
-  "Laos",
-  "Latvia",
-  "Lebanon",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Liechtenstein",
-  "Lithuania",
-  "Luxembourg",
-  "Madagascar",
-  "Malawi",
-  "Malaysia",
-  "Maldives",
-  "Mali",
-  "Malta",
-  "Marshall Islands",
-  "Mauritania",
-  "Mauritius",
-  "Mexico",
-  "Micronesia",
-  "Moldova",
-  "Monaco",
-  "Mongolia",
-  "Montenegro",
-  "Morocco",
-  "Mozambique",
-  "Myanmar",
-  "Namibia",
-  "Nauru",
-  "Nepal",
-  "Netherlands",
-  "New Zealand",
-  "Nicaragua",
-  "Niger",
-  "Nigeria",
-  "North Korea",
-  "North Macedonia",
-  "Norway",
-  "Oman",
-  "Pakistan",
-  "Palau",
-  "Panama",
-  "Papua New Guinea",
-  "Paraguay",
-  "Peru",
-  "Philippines",
-  "Poland",
-  "Portugal",
-  "Qatar",
-  "Romania",
-  "Russia",
-  "Rwanda",
-  "Saint Kitts and Nevis",
-  "Saint Lucia",
-  "Saint Vincent and the Grenadines",
-  "Samoa",
-  "San Marino",
-  "Sao Tome and Principe",
-  "Saudi Arabia",
-  "Senegal",
-  "Serbia",
-  "Seychelles",
-  "Sierra Leone",
-  "Singapore",
-  "Slovakia",
-  "Slovenia",
-  "Solomon Islands",
-  "Somalia",
-  "South Africa",
-  "South Korea",
-  "South Sudan",
-  "Spain",
-  "Sri Lanka",
-  "Sudan",
-  "Suriname",
-  "Sweden",
-  "Switzerland",
-  "Syria",
-  "Tajikistan",
-  "Tanzania",
-  "Thailand",
-  "Timor-Leste",
-  "Togo",
-  "Tonga",
-  "Trinidad and Tobago",
-  "Tunisia",
-  "Turkey",
-  "Turkmenistan",
-  "Tuvalu",
-  "Uganda",
-  "Ukraine",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Uruguay",
-  "Uzbekistan",
-  "Vanuatu",
-  "Venezuela",
-  "Vietnam",
-  "Yemen",
-  "Zambia",
-  "Zimbabwe",
-];
-const DEVICE_OPTIONS_FALLBACK = [
-  { value: "desktop", label: "Desktop only" },
-  { value: "mobile", label: "Mobile only" },
-  { value: "both", label: "Both desktop and mobile" },
-];
-const DATA_BACKUP_OPTIONS_FALLBACK = [
-  { value: "automatic", label: "Automatic" },
-  { value: "manual", label: "Manual" },
-];
-const EXPERIENCE_OPTIONS_FALLBACK = [
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced breeder" },
-  { value: "professional", label: "Professional" },
-];
-const ROLE_OPTIONS_FALLBACK = [
-  { value: "breeder", label: "Breeder" },
-  { value: "buyer", label: "Buyer" },
-];
-
-const DEFAULT_REGISTRATION_TEMPLATE = {
-  fullName: "",
-  displayName: "",
-  email: "",
-  phone: "",
-  password: "",
-  confirmPassword: "",
-  country: "",
-  enableCloudSync: true,
-  devicePreference: "both",
-  dataBackupPreference: "automatic",
-  reptileCount: "",
-  experienceLevel: "intermediate",
-  enableAutomaticReptileSync: true,
-  consentDataProcessing: false,
-  acceptTerms: false,
-  role: "breeder",
-};
-
-const createDefaultRegistrationData = () =>
-  JSON.parse(JSON.stringify(DEFAULT_REGISTRATION_TEMPLATE));
-
 const createDefaultPasswordRecoveryData = (email = "") => ({ email });
-
-const buildRegistrationSteps = (t, optionSets = {}) => {
-  const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
-    ? optionSets.countries
-    : COUNTRY_OPTIONS_FALLBACK;
-  const devicePreferences = Array.isArray(optionSets.devicePreferences) && optionSets.devicePreferences.length
-    ? optionSets.devicePreferences
-    : DEVICE_OPTIONS_FALLBACK;
-  const dataBackup = Array.isArray(optionSets.dataBackup) && optionSets.dataBackup.length
-    ? optionSets.dataBackup
-    : DATA_BACKUP_OPTIONS_FALLBACK;
-  const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
-    ? optionSets.experienceLevels
-    : EXPERIENCE_OPTIONS_FALLBACK;
-  const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
-    ? optionSets.roleOptions
-    : ROLE_OPTIONS_FALLBACK
-  ).filter((option) => ["breeder", "buyer"].includes(String(option?.value || option || "").trim().toLowerCase()));
-  const roleOptionValues = new Set(roleOptions.map((option) => String(option?.value || option || "").trim().toLowerCase()));
-  if (!roleOptionValues.has("buyer")) {
-    roleOptions.push({ value: "buyer", label: "Buyer" });
-  }
-  if (!roleOptionValues.has("breeder")) {
-    roleOptions.unshift({ value: "breeder", label: "Breeder" });
-  }
-
-  return [
-    {
-      key: "account",
-      title: t("auth.steps.account.title", { defaultValue: "Account basics" }),
-      description: t("auth.steps.account.description", {
-        defaultValue: "Create your keeper profile and secure your login.",
-      }),
-      fields: [
-        {
-          name: "fullName",
-          label: t("auth.fields.fullName", { defaultValue: "Full name" }),
-          type: "text",
-          required: true,
-        },
-        {
-          name: "displayName",
-          label: t("auth.fields.displayName", {
-            defaultValue: "Preferred username / display name",
-          }),
-          type: "text",
-          required: true,
-        },
-        {
-          name: "email",
-          label: t("auth.fields.email", { defaultValue: "Email address" }),
-          type: "email",
-          required: true,
-        },
-        {
-          name: "phone",
-          label: t("auth.fields.phone", { defaultValue: "Phone number (optional)" }),
-          type: "tel",
-        },
-        {
-          name: "password",
-          label: t("auth.fields.password", { defaultValue: "Password" }),
-          type: "password",
-          required: true,
-        },
-        {
-          name: "confirmPassword",
-          label: t("auth.fields.confirmPassword", { defaultValue: "Confirm password" }),
-          type: "password",
-          required: true,
-        },
-      ],
-      validate: (data) => {
-        if (data.password.trim().length < 8) {
-          return t("auth.errors.passwordLength", {
-            defaultValue: "Choose a password with at least 8 characters.",
-          });
-        }
-        if (data.password !== data.confirmPassword) {
-          return t("auth.errors.passwordMismatch", {
-            defaultValue: "Passwords do not match.",
-          });
-        }
-        return null;
-      },
-    },
-    {
-      key: "preferences",
-      title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
-      description: t("auth.steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Breeding Planner.",
-      }),
-      fields: [
-        {
-          name: "country",
-          label: t("auth.fields.country", { defaultValue: "Country" }),
-          type: "select",
-          options: countries,
-          required: true,
-        },
-        {
-          name: "enableCloudSync",
-          label: t("auth.fields.enableCloudSync", { defaultValue: "Enable cloud sync" }),
-          type: "checkbox",
-        },
-        {
-          name: "devicePreference",
-          label: t("auth.fields.devicePreference", { defaultValue: "Device preference" }),
-          type: "select",
-          options: devicePreferences,
-          required: true,
-        },
-        {
-          name: "dataBackupPreference",
-          label: t("auth.fields.dataBackupPreference", {
-            defaultValue: "Data backup preference",
-          }),
-          type: "select",
-          options: dataBackup,
-          required: true,
-        },
-      ],
-    },
-    {
-      key: "keeper",
-      title: t("auth.steps.keeper.title", { defaultValue: "Reptile keeper profile" }),
-      description: t("auth.steps.keeper.description", {
-        defaultValue: "Share a bit about your collection and processes.",
-      }),
-      fields: [
-        {
-          name: "role",
-          label: t("auth.fields.userRole", { defaultValue: "User role" }),
-          type: "select",
-          options: roleOptions,
-          required: true,
-        },
-        {
-          name: "reptileCount",
-          label: t("auth.fields.reptileCount", {
-            defaultValue: "How many reptiles do you currently keep?",
-          }),
-          type: "number",
-          required: true,
-        },
-        {
-          name: "experienceLevel",
-          label: t("auth.fields.experienceLevel", { defaultValue: "Experience level" }),
-          type: "select",
-          options: experienceLevels,
-          required: true,
-        },
-        {
-          name: "enableAutomaticReptileSync",
-          label: t("auth.fields.enableAutomaticReptileSync", {
-            defaultValue: "Enable automatic reptile-data syncing",
-          }),
-          type: "checkbox",
-        },
-      ],
-    },
-    {
-      key: "consent",
-      title: t("auth.steps.consent.title", { defaultValue: "Consent & finish" }),
-      description: t("auth.steps.consent.description", {
-        defaultValue: "Review the legal bits so we can activate your account.",
-      }),
-      fields: [
-        {
-          name: "consentDataProcessing",
-          label: t("auth.fields.consentDataProcessing", {
-            defaultValue: "I consent to data processing for sync & backup services.",
-          }),
-          type: "checkbox",
-          required: true,
-        },
-        {
-          name: "acceptTerms",
-          label: t("auth.fields.acceptTerms", {
-            defaultValue: "I agree to the Terms of Service and keeper guidelines.",
-          }),
-          type: "checkbox",
-          required: true,
-        },
-      ],
-    },
-  ];
-};
-
-const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
-
-const LANGUAGE_OPTIONS = [
-  { code: "en", label: "English" },
-  { code: "he", label: "עברית" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "de", label: "Deutsch" },
-  { code: "it", label: "Italiano" },
-  { code: "nl", label: "Nederlands" },
-  { code: "pl", label: "Polski" },
-  { code: "pt", label: "Português" },
-  { code: "cs", label: "Čeština" },
-];
 
 const loadStoredAuth = (scope = "breeder") => {
   if (scope === "public") return { isAuthenticated: false };
@@ -504,6 +63,16 @@ const loadStoredAuth = (scope = "breeder") => {
     if (!raw) return { isAuthenticated: false };
     const parsed = JSON.parse(raw);
     if (parsed?.isAuthenticated) {
+      // A session stored by an older build could hold any role. Evicting it on
+      // boot is what stops a reload from restoring the empty console shell that
+      // a breeder sign-in used to produce.
+      if (!canRoleUsePortal(parsed?.role || parsed?.profile?.role, ADMIN_APP_AUTH_SCOPE)) {
+        try {
+          localStorage.removeItem(storageKey);
+          clearAuthToken(scope);
+        } catch {}
+        return { isAuthenticated: false };
+      }
       // Keep the session only if either the access token or refresh token is still
       // available. This lets the app silently restore auth after a reload.
       if (!hasStoredAuthSession(scope)) {
@@ -521,17 +90,6 @@ const loadStoredAuth = (scope = "breeder") => {
   }
 };
 
-const hasValue = (value) => {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (value === 0) return true;
-  return Boolean(String(value ?? "").trim());
-};
-
 const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
 export default function AuthGate({ children }) {
@@ -539,7 +97,7 @@ export default function AuthGate({ children }) {
   const { snapshot, retry } = useSharedBackend();
   const [authScope, setAuthScope] = useState(() => getAuthSurfaceForHash(window?.location?.hash));
   const [authState, setAuthState] = useState(() => loadStoredAuth(authScope));
-  const [view, setView] = useState("chooser");
+  const [view, setView] = useState("login");
   const [loginValues, setLoginValues] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
@@ -562,45 +120,6 @@ export default function AuthGate({ children }) {
   // Set right after a successful registration, before any session exists — registration isn't
   // "done" until the user clicks the emailed link, so no login/persistAuth happens until then.
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
-  const [registrationData, setRegistrationData] = useState(
-    createDefaultRegistrationData(),
-  );
-  const [registerStep, setRegisterStep] = useState(0);
-  const [registrationError, setRegistrationError] = useState("");
-  const registrationSteps = useMemo(() => {
-    const countries = t("auth.options.countries", {
-      returnObjects: true,
-      defaultValue: COUNTRY_OPTIONS_FALLBACK,
-    });
-    const devicePreferences = t("auth.options.devicePreferences", {
-      returnObjects: true,
-      defaultValue: DEVICE_OPTIONS_FALLBACK,
-    });
-    const dataBackup = t("auth.options.dataBackup", {
-      returnObjects: true,
-      defaultValue: DATA_BACKUP_OPTIONS_FALLBACK,
-    });
-    const experienceLevels = t("auth.options.experienceLevels", {
-      returnObjects: true,
-      defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
-    });
-    const roleOptions = t("auth.options.roles", {
-      returnObjects: true,
-      defaultValue: ROLE_OPTIONS_FALLBACK,
-    });
-
-    return buildRegistrationSteps(t, {
-      countries,
-      devicePreferences,
-      dataBackup,
-      experienceLevels,
-      roleOptions,
-    });
-  }, [t, i18n.language]);
-
-  const currentStep = registrationSteps[registerStep] || registrationSteps[0];
-  const totalSteps = registrationSteps.length || 1;
-
   useEffect(() => {
     const onHashChange = () => {
       setAuthScope(getAuthSurfaceForHash(window.location.hash));
@@ -671,7 +190,7 @@ export default function AuthGate({ children }) {
   const handleLogout = useCallback(() => {
     if (authScope !== "public") clearAuthToken(authScope);
     persistAuth({ isAuthenticated: false });
-    setView("chooser");
+    setView("login");
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
@@ -679,8 +198,6 @@ export default function AuthGate({ children }) {
     setPendingVerificationEmail("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
-    setRegisterStep(0);
-    setRegistrationData(createDefaultRegistrationData());
   }, [authScope, persistAuth]);
 
   useEffect(() => {
@@ -705,9 +222,6 @@ export default function AuthGate({ children }) {
     setLoginMessage("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData(authState.profile?.email || ""));
-    setRegisterStep(0);
-    setRegistrationData(createDefaultRegistrationData());
-    setRegistrationError("");
   }, [authScope, authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
 
   const handleLoginSubmit = async (event) => {
@@ -728,10 +242,22 @@ export default function AuthGate({ children }) {
         return;
       }
 
-      const response = await loginApi({ email: loginEmail, password: String(password || "") }, authScope === "public" ? "breeder" : authScope);
+      const response = await loginApi(
+        { email: loginEmail, password: String(password || ""), portal: ADMIN_APP_AUTH_SCOPE },
+        authScope === "public" ? "breeder" : authScope
+      );
       const backendUser = response?.user || {};
       const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
+      const appRole = normalizeRole(backendRole) || "breeder";
+
+      // The backend already refuses these credentials, so reaching here means
+      // an older API. Checked anyway rather than trusted: the whole defect was
+      // a session that existed on the client and nowhere else.
+      if (!canRoleUsePortal(appRole, ADMIN_APP_AUTH_SCOPE)) {
+        clearAuthToken(authScope);
+        setLoginError(portalRejectionMessage(appRole, ADMIN_APP_AUTH_SCOPE));
+        return;
+      }
 
       persistAuth({
         isAuthenticated: true,
@@ -858,153 +384,6 @@ export default function AuthGate({ children }) {
     }
   };
 
-  const handleRegistrationChange = (name, value) => {
-    setRegistrationData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleRegistrationStepSubmit = async (event) => {
-    event.preventDefault();
-    setRegistrationError("");
-    const missingField = currentStep.fields.find((field) => {
-      if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
-        return false;
-      }
-      const required =
-        typeof field.required === "function"
-          ? field.required(registrationData)
-          : field.required;
-      if (!required) return false;
-      const value = registrationData[field.name];
-      return !hasValue(value);
-    });
-
-    if (missingField) {
-      setRegistrationError(t("auth.errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
-      return;
-    }
-
-    if (currentStep.validate) {
-      const error = currentStep.validate(registrationData);
-      if (error) {
-        setRegistrationError(error);
-        return;
-      }
-    }
-
-    if (registerStep === totalSteps - 1) {
-      const desiredEmail = registrationData.email.trim();
-      const desiredFullName = registrationData.fullName.trim();
-
-      try {
-        await registerApi({
-          fullName: desiredFullName || registrationData.fullName,
-          email: desiredEmail,
-          password: registrationData.password,
-          role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
-        });
-
-        // Registration isn't complete until the emailed link is clicked — no session is
-        // created here. Show the "check your inbox" card instead of logging the user in.
-        setResendVerificationSent(false);
-        setResendVerificationError("");
-        setPendingVerificationEmail(desiredEmail);
-      } catch (error) {
-        setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
-      }
-      return;
-    }
-
-    setRegisterStep((prev) => Math.min(prev + 1, totalSteps - 1));
-  };
-
-  const resetRegistration = () => {
-    setRegisterStep(0);
-    setRegistrationError("");
-    setRegistrationData(createDefaultRegistrationData());
-  };
-
-  const renderField = (field) => {
-    if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
-      return null;
-    }
-    const value = registrationData[field.name];
-    const label = (
-      <span className="auth-field-label">
-        {field.label}
-        {typeof field.required === "function"
-          ? field.required(registrationData) && <span className="required">*</span>
-          : field.required && <span className="required">*</span>}
-      </span>
-    );
-
-    switch (field.type) {
-      case "checkbox":
-        return (
-          <label key={field.name} className="auth-field auth-field-checkbox">
-            <input
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.checked)
-              }
-            />
-            <span>{field.label}</span>
-          </label>
-        );
-      case "textarea":
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <textarea
-              value={value}
-              rows={3}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            />
-          </label>
-        );
-      case "select":
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <select
-              value={value}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            >
-              <option value="">{t("common.selectOption", { defaultValue: "Select an option" })}</option>
-              {field.options.map((option) => (
-                <option
-                  key={option.value || option}
-                  value={option.value || option}
-                >
-                  {option.label || option}
-                </option>
-              ))}
-            </select>
-          </label>
-        );
-      default:
-        return (
-          <label key={field.name} className="auth-field">
-            {label}
-            <input
-              type={field.type || "text"}
-              value={value}
-              onChange={(e) =>
-                handleRegistrationChange(field.name, e.target.value)
-              }
-            />
-          </label>
-        );
-    }
-  };
-
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
@@ -1017,32 +396,17 @@ export default function AuthGate({ children }) {
             "Keep your reptiles synced across desktop and mobile with one secure account.",
         })}
       </p>
-      <div className="auth-primary-actions">
-        <button
-          type="button"
-          className={`primary ${view === "register" ? "is-active" : ""}`}
-          onClick={() => {
-            setView("register");
-            setIsRecoveringPassword(false);
-            setIsResendingVerification(false);
-            resetRegistration();
-          }}
-        >
-          {t("auth.actions.register", { defaultValue: "Register" })}
-        </button>
-        <button
-          type="button"
-          className={`ghost ${view === "login" ? "is-active" : ""}`}
-          onClick={() => {
-            setView("login");
-            setIsRecoveringPassword(false);
-            setIsResendingVerification(false);
-            setPasswordRecoveryError("");
-          }}
-        >
-          {t("auth.actions.login", { defaultValue: "Log in" })}
-        </button>
-      </div>
+      {/*
+        No registration here, by design. This console used to carry the public
+        breeder signup form, which meant anyone who found its URL could create
+        an account from the admin login screen. Team members are invited by the
+        account owner instead.
+      */}
+      <p className="auth-helper-copy">
+        {t("auth.admin.inviteOnly", {
+          defaultValue: "The admin console is invite-only. Ask the account owner for access.",
+        })}
+      </p>
       {view === "login" && (
           isRecoveringPassword ? (
             <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
@@ -1185,42 +549,6 @@ export default function AuthGate({ children }) {
             </form>
           )
         )}
-    </div>
-  );
-
-  const registrationCard = (
-    <div className="auth-card registration-card">
-      <div className="auth-card-header">
-        <button type="button" className="text-button" onClick={() => setView("chooser")}>
-          {t("common.back", { defaultValue: "Back" })}
-        </button>
-        <div>
-          {t("auth.steps.progress", { defaultValue: "Step {{current}} of {{total}}", current: registerStep + 1, total: totalSteps, })}
-        </div>
-      </div>
-      <h2>{currentStep.title}</h2>
-      <p className="auth-subtitle">{currentStep.description}</p>
-      <form className="auth-registration-form" onSubmit={handleRegistrationStepSubmit}>
-        {currentStep.fields.map((field) => renderField(field))}
-        {registrationError && <p className="auth-error">{registrationError}</p>}
-        <div className="auth-registration-actions">
-          <button
-            type="button"
-            className="ghost"
-            disabled={registerStep === 0}
-            onClick={() =>
-              setRegisterStep((prev) => Math.max(0, prev - 1))
-            }
-          >
-            {t("common.previous", { defaultValue: "Previous" })}
-          </button>
-          <button type="submit" className="primary">
-            {registerStep === totalSteps - 1
-              ? t("auth.actions.createAccount", { defaultValue: "Create account" })
-              : t("common.next", { defaultValue: "Next" })}
-          </button>
-        </div>
-      </form>
     </div>
   );
 
@@ -1476,7 +804,7 @@ export default function AuthGate({ children }) {
                 </button>
               </div>
             </div>
-          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : pendingVerificationEmail ? pendingVerificationCard : view === "register" ? registrationCard : loginCard}
+          ) : linkFlow ? linkFlowCard : unverifiedGateActive ? unverifiedGateCard : pendingVerificationEmail ? pendingVerificationCard : loginCard}
         </div>
       )}
     </div>

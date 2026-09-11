@@ -4,7 +4,8 @@ import { HttpError } from "../utils/errors";
 import { signAuthToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { env } from "../config/env";
 import { normalizePersistedRole } from "../auth/identity";
-import type { AppRole, PersistedAppRole } from "../types/auth";
+import type { AppRole, AuthPortal, PersistedAppRole } from "../types/auth";
+import { canRoleUsePortal, normalizePortal, portalRejectionMessage } from "../auth/portals";
 import {
   createRefreshSession,
   hashRefreshToken,
@@ -212,7 +213,7 @@ export const registerUser = async (input: {
   return { ...publicUser(user), verificationEmailQueued: Boolean(job) };
 };
 
-export const loginUser = async (email: string, password: string) => {
+export const loginUser = async (email: string, password: string, requestedPortal?: AuthPortal) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.isActive) {
     throw new HttpError(401, "Invalid credentials.");
@@ -223,6 +224,23 @@ export const loginUser = async (email: string, password: string) => {
     throw new HttpError(401, "Invalid credentials.");
   }
 
+  // The portal check sits after the password check on purpose: answering it
+  // first would turn the login form into an oracle for which addresses hold
+  // staff or laboratory accounts.
+  const portal = normalizePortal(requestedPortal);
+  const role = normalizePersistedRole(user.role);
+  if (!canRoleUsePortal(role, portal)) {
+    await recordSecurityEvent({
+      type: "auth.login.blocked_portal",
+      actorUserId: user.id,
+      outcome: "blocked",
+      reason: `role ${role} is not permitted on the ${portal} portal`,
+      metadata: { email: user.email, role: user.role, portal },
+    });
+    // No token, no cookies, no session row — the request stops here.
+    throw new HttpError(403, portalRejectionMessage(role, portal));
+  }
+
   // Signing in is what cancels a pending deletion, so this has to be read
   // before the update below resets `status` to active.
   const hadPendingDeletion = user.status === PENDING_DELETION_STATUS;
@@ -230,8 +248,9 @@ export const loginUser = async (email: string, password: string) => {
   const tokenPayload = {
     sub: user.id,
     email: user.email,
-    role: normalizePersistedRole(user.role),
+    role,
     persistedRole: user.role,
+    portal,
   };
   const token = signAuthToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
@@ -310,11 +329,30 @@ export const refreshAuthToken = async (incomingRefreshToken: string) => {
     throw new HttpError(401, "Refresh token has been revoked.");
   }
 
+  // The portal travels with the session rather than being re-chosen here, and
+  // the role is re-checked against it on every renewal: an account demoted out
+  // of a portal loses it at the next refresh instead of keeping access for the
+  // remaining week of its refresh token.
+  const portal = normalizePortal(payload.portal);
+  const role = normalizePersistedRole(user.role);
+  if (!canRoleUsePortal(role, portal)) {
+    await recordSecurityEvent({
+      type: "auth.refresh.blocked_portal",
+      actorUserId: user.id,
+      outcome: "blocked",
+      reason: `role ${role} is no longer permitted on the ${portal} portal`,
+      metadata: { role: user.role, portal },
+    });
+    await revokeRefreshSessionsForUser(user.id);
+    throw new HttpError(403, portalRejectionMessage(role, portal));
+  }
+
   const tokenPayload = {
     sub: user.id,
     email: user.email,
-    role: normalizePersistedRole(user.role),
+    role,
     persistedRole: user.role,
+    portal,
   };
   const token = signAuthToken(tokenPayload);
   const newRefreshToken = signRefreshToken(tokenPayload);

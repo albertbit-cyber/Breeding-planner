@@ -15,6 +15,7 @@ import { inquiryRoutes } from "./routes/inquiryRoutes";
 import { savedSearchRoutes } from "./routes/savedSearchRoutes";
 import { notificationRoutes } from "./routes/notificationRoutes";
 import { adminRoutes } from "./routes/adminRoutes";
+import { adminModeratorRoutes } from "./routes/adminModeratorRoutes";
 import { subscriptionRoutes } from "./routes/subscriptionRoutes";
 import { marketplaceRoutes } from "./routes/marketplaceRoutes";
 import { mobileRoutes } from "./routes/mobileRoutes";
@@ -145,6 +146,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/mobile", mobileRoutes);
+// Ahead of adminRoutes on purpose: these are the endpoints a read-only
+// moderator may write to, and the router below refuses moderator writes
+// unconditionally. Express falls through to it for everything unmatched here.
+app.use("/api/admin", adminModeratorRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/lab/orders", orderRoutes);

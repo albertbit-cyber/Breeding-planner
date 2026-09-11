@@ -80,7 +80,7 @@ export default function CompletedTestsPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold text-neutral-900">Completed Tests</h1>
-      <p className="text-sm text-neutral-600">Archive of completed and certificate-issued shed test orders for follow-up and audit.</p>
+      <p className="text-sm text-neutral-600">Completed and certificate-issued shed test orders, for follow-up and audit. Orders filed away live under Archive.</p>
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <label className="text-sm">

@@ -7,7 +7,7 @@ import {
   toLegacyModerationListingDto,
   toLegacyPublicListingDto,
 } from "./marketplaceDtos";
-import { assertAdminActor } from "./permissionHelpers";
+import { assertAdminActor, assertStaffActor } from "./permissionHelpers";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -53,6 +53,15 @@ const assertCanManageListings = async (ownerId: string) => {
   }
   const access = await canAccessFeature({ id: user.id, role: user.role }, "marketplace.create_listing");
   if (!access.allowed) throw new HttpError(403, access.reason || "Your subscription tier does not include marketplace selling.");
+};
+
+/** Read side of the console: moderators see it, and change nothing. */
+const assertStaff = (actor: { role: string }) => {
+  try {
+    assertStaffActor(actor as any);
+  } catch {
+    throw new HttpError(403, "Only admin users can moderate marketplace listings.");
+  }
 };
 
 const assertAdmin = (actor: { role: string }) => {
@@ -136,7 +145,7 @@ export const listPublicMarketplaceListings = async () => {
 };
 
 export const listModerationListings = async (actor: { role: string }) => {
-  assertAdmin(actor);
+  assertStaff(actor);
   const rows = await db.listing.findMany({
     include: {
       owner: {
@@ -156,7 +165,7 @@ export const listModerationListings = async (actor: { role: string }) => {
 };
 
 export const listModerationAudit = async (actor: { role: string }) => {
-  assertAdmin(actor);
+  assertStaff(actor);
   const rows = await db.listingModerationAudit.findMany({
     include: {
       listing: {

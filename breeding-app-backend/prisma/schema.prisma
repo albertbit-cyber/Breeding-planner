@@ -68,97 +68,101 @@ enum ShedResultStatus {
 }
 
 model User {
-  id               String         @id @default(cuid())
-  email            String         @unique
-  passwordHash     String
-  fullName         String
-  role             UserRole
-  isActive         Boolean        @default(true)
-  emailVerified    Boolean        @default(false)
-  emailVerifiedAt  DateTime?
-  pendingEmail     String?
-  pendingEmailRequestedAt DateTime?
-  passwordChangedAt DateTime?
-  status           String         @default("active")
-  verificationStatus String       @default("not_applied")
-  subscriptionPlan String         @default("free")
-  subscriptionStatus String         @default("inactive")
-  subscriptionStartedAt DateTime?
-  subscriptionRenewalAt DateTime?
-  subscriptionTrialEndsAt DateTime?
-  subscriptionPaymentStatus String @default("none")
-  lastLoginAt           DateTime?
+  id                             String                     @id @default(cuid())
+  email                          String                     @unique
+  passwordHash                   String
+  fullName                       String
+  role                           UserRole
+  isActive                       Boolean                    @default(true)
+  emailVerified                  Boolean                    @default(false)
+  emailVerifiedAt                DateTime?
+  pendingEmail                   String?
+  pendingEmailRequestedAt        DateTime?
+  passwordChangedAt              DateTime?
+  status                         String                     @default("active")
+  verificationStatus             String                     @default("not_applied")
+  subscriptionPlan               String                     @default("free")
+  subscriptionStatus             String                     @default("inactive")
+  subscriptionStartedAt          DateTime?
+  subscriptionRenewalAt          DateTime?
+  subscriptionTrialEndsAt        DateTime?
+  subscriptionPaymentStatus      String                     @default("none")
+  lastLoginAt                    DateTime?
   // Right-to-erasure grace period. `status` becomes "pending_deletion" and the
   // account is locked immediately; the purge job hard-deletes once
   // deletionScheduledAt passes. Signing in during the window cancels it and
   // clears both columns.
-  deletionRequestedAt   DateTime?      @map("deletion_requested_at")
-  deletionScheduledAt   DateTime?      @map("deletion_scheduled_at")
-  refreshToken          String?        @db.Text
+  deletionRequestedAt            DateTime?                  @map("deletion_requested_at")
+  deletionScheduledAt            DateTime?                  @map("deletion_scheduled_at")
+  refreshToken                   String?                    @db.Text
   // Deprecated: superseded by AccountToken (purpose "reset_password"). Columns kept, no longer written.
-  passwordResetToken    String?        @unique
-  passwordResetExpiry   DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  profile          Profile?
-  orders           ShedTestOrder[]
-  pendingShedTests PendingShedTest[]
-  animals          Animal[]
-  pairings         Pairing[]
-  clutches         Clutch[]
-  plannerState     BreederPlannerState?
-  listings         Listing[]
-  inquiriesSent    ListingInquiry[] @relation("ListingInquiryBuyer")
-  inquiriesReceived ListingInquiry[] @relation("ListingInquiryBreeder")
-  savedSearches    SavedSearch[]
-  notifications     Notification[] @relation("NotificationRecipient")
-  notificationsSent Notification[] @relation("NotificationActor")
-  listingModerationAudits ListingModerationAudit[]
-  adminAuditActions AdminAuditLog[] @relation("AdminAuditActor")
-  targetAuditActions AdminAuditLog[] @relation("AdminAuditTarget")
-  reportsFiled     Report[] @relation("ReportReporter")
-  reportsReceived  Report[] @relation("ReportReportedUser")
-  reportsAssigned  Report[] @relation("ReportAssignedAdmin")
-  verificationRequests VerificationRequest[] @relation("VerificationRequestUser")
-  verificationReviews  VerificationRequest[] @relation("VerificationRequestReviewer")
-  marketplacePermission MarketplacePermission?
-  labAccount       LabAccount?
-  reviewedPartnerApplications PartnerApplication[] @relation("PartnerApplicationReviewer")
-  reviewedGeneSubmissions     LabGeneSubmission[]  @relation("LabGeneSubmissionReviewer")
-  gdprRequests     GdprRequest[] @relation("GdprRequestUser")
-  gdprReviews      GdprRequest[] @relation("GdprRequestReviewer")
-  subscriptions     UserSubscription[] @relation("UserSubscriptionUser")
-  featureOverrides  UserFeatureOverride[] @relation("UserFeatureOverrideUser")
-  featureOverridesCreated UserFeatureOverride[] @relation("UserFeatureOverrideAdmin")
-  usageTracking     UsageTracking[]
-  marketplaceListings MarketplaceListing[] @relation("MarketplaceListingSeller")
-  marketplaceStores MarketplaceStore[]
-  marketplaceMessages MarketplaceMessage[] @relation("MarketplaceMessageSender")
-  marketplaceBuyerConversations MarketplaceConversation[] @relation("MarketplaceConversationBuyer")
-  marketplaceSellerConversations MarketplaceConversation[] @relation("MarketplaceConversationSeller")
-  marketplaceFavorites MarketplaceFavorite[]
-  marketplaceBuyerSales MarketplaceSale[] @relation("MarketplaceSaleBuyer")
-  marketplaceSellerSales MarketplaceSale[] @relation("MarketplaceSaleSeller")
-  marketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewReviewer")
-  marketplaceSellerReviews MarketplaceReview[] @relation("MarketplaceReviewSeller")
-  mobileScanLogs   MobileScanLog[]
-  mobileSyncQueue  MobileSyncQueue[]
-  deviceSessions   UserDeviceSession[]
-  refreshSessions  RefreshSession[]
-  securityEvents   SecurityEvent[]
-  reproductiveCycles ReproductiveCycle[]
-  marketplaceMedia MarketplaceMedia[] @relation("MarketplaceMediaOwner")
-  marketplaceMessageReports MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
-  marketplaceBlocks MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocker")
-  marketplaceBlockedBy MarketplaceUserBlock[] @relation("MarketplaceUserBlockBlocked")
-  emailJobs          EmailJob[]
-  notificationPreferences NotificationPreference[]
-  accountTokens      AccountToken[]
+  passwordResetToken             String?                    @unique
+  passwordResetExpiry            DateTime?
+  createdAt                      DateTime                   @default(now())
+  updatedAt                      DateTime                   @updatedAt
+  profile                        Profile?
+  orders                         ShedTestOrder[]
+  labCertificates                ShedTestCertificate[]
+  pendingShedTests               PendingShedTest[]
+  animals                        Animal[]
+  pairings                       Pairing[]
+  clutches                       Clutch[]
+  plannerState                   BreederPlannerState?
+  listings                       Listing[]
+  inquiriesSent                  ListingInquiry[]           @relation("ListingInquiryBuyer")
+  inquiriesReceived              ListingInquiry[]           @relation("ListingInquiryBreeder")
+  savedSearches                  SavedSearch[]
+  notifications                  Notification[]             @relation("NotificationRecipient")
+  notificationsSent              Notification[]             @relation("NotificationActor")
+  listingModerationAudits        ListingModerationAudit[]
+  adminAuditActions              AdminAuditLog[]            @relation("AdminAuditActor")
+  targetAuditActions             AdminAuditLog[]            @relation("AdminAuditTarget")
+  reportsFiled                   Report[]                   @relation("ReportReporter")
+  reportsReceived                Report[]                   @relation("ReportReportedUser")
+  reportsAssigned                Report[]                   @relation("ReportAssignedAdmin")
+  escalationsRaised              AdminEscalation[]          @relation("AdminEscalationRaisedBy")
+  escalationsAbout               AdminEscalation[]          @relation("AdminEscalationSubjectUser")
+  escalationsResolved            AdminEscalation[]          @relation("AdminEscalationResolvedBy")
+  verificationRequests           VerificationRequest[]      @relation("VerificationRequestUser")
+  verificationReviews            VerificationRequest[]      @relation("VerificationRequestReviewer")
+  marketplacePermission          MarketplacePermission?
+  labAccount                     LabAccount?
+  reviewedPartnerApplications    PartnerApplication[]       @relation("PartnerApplicationReviewer")
+  reviewedGeneSubmissions        LabGeneSubmission[]        @relation("LabGeneSubmissionReviewer")
+  gdprRequests                   GdprRequest[]              @relation("GdprRequestUser")
+  gdprReviews                    GdprRequest[]              @relation("GdprRequestReviewer")
+  subscriptions                  UserSubscription[]         @relation("UserSubscriptionUser")
+  featureOverrides               UserFeatureOverride[]      @relation("UserFeatureOverrideUser")
+  featureOverridesCreated        UserFeatureOverride[]      @relation("UserFeatureOverrideAdmin")
+  usageTracking                  UsageTracking[]
+  marketplaceListings            MarketplaceListing[]       @relation("MarketplaceListingSeller")
+  marketplaceStores              MarketplaceStore[]
+  marketplaceMessages            MarketplaceMessage[]       @relation("MarketplaceMessageSender")
+  marketplaceBuyerConversations  MarketplaceConversation[]  @relation("MarketplaceConversationBuyer")
+  marketplaceSellerConversations MarketplaceConversation[]  @relation("MarketplaceConversationSeller")
+  marketplaceFavorites           MarketplaceFavorite[]
+  marketplaceBuyerSales          MarketplaceSale[]          @relation("MarketplaceSaleBuyer")
+  marketplaceSellerSales         MarketplaceSale[]          @relation("MarketplaceSaleSeller")
+  marketplaceReviews             MarketplaceReview[]        @relation("MarketplaceReviewReviewer")
+  marketplaceSellerReviews       MarketplaceReview[]        @relation("MarketplaceReviewSeller")
+  mobileScanLogs                 MobileScanLog[]
+  mobileSyncQueue                MobileSyncQueue[]
+  deviceSessions                 UserDeviceSession[]
+  refreshSessions                RefreshSession[]
+  securityEvents                 SecurityEvent[]
+  reproductiveCycles             ReproductiveCycle[]
+  marketplaceMedia               MarketplaceMedia[]         @relation("MarketplaceMediaOwner")
+  marketplaceMessageReports      MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
+  marketplaceBlocks              MarketplaceUserBlock[]     @relation("MarketplaceUserBlockBlocker")
+  marketplaceBlockedBy           MarketplaceUserBlock[]     @relation("MarketplaceUserBlockBlocked")
+  emailJobs                      EmailJob[]
+  notificationPreferences        NotificationPreference[]
+  accountTokens                  AccountToken[]
   // Singular, not a list: one organization per user is a hard rule enforced by
   // Membership.userId @unique (see the Membership model).
-  membership         Membership?
-  organizationInvitesSent     OrganizationInvite[] @relation("OrganizationInviteInviter")
-  organizationInvitesAccepted OrganizationInvite[] @relation("OrganizationInviteAcceptedBy")
+  membership                     Membership?
+  organizationInvitesSent        OrganizationInvite[]       @relation("OrganizationInviteInviter")
+  organizationInvitesAccepted    OrganizationInvite[]       @relation("OrganizationInviteAcceptedBy")
 
   @@index([deletionScheduledAt])
 }
@@ -183,13 +187,14 @@ model Organization {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  memberships   Membership[]
-  invites       OrganizationInvite[]
-  labAccount    LabAccount?
-  testOfferings LabTestOffering[]
-  geneSubmissions LabGeneSubmission[]
-  pricingConfig PricingConfig?
-  labOrders     ShedTestOrder[]
+  memberships      Membership[]
+  invites          OrganizationInvite[]
+  labAccount       LabAccount?
+  testOfferings    LabTestOffering[]
+  geneSubmissions  LabGeneSubmission[]
+  pricingConfig    PricingConfig?
+  labOrders        ShedTestOrder[]
+  labCertificates  ShedTestCertificate[]
   pendingShedTests PendingShedTest[]
 
   @@index([kind])
@@ -244,31 +249,37 @@ model Membership {
 // deliberate: a wrong inheritance type would silently corrupt breeding advice for
 // everyone keeping that species, including people who never deal with that lab.
 model LabGeneSubmission {
-  id             String   @id @default(cuid())
-  organizationId String   @map("organization_id")
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  /** Species id from the platform taxonomy. */
-  speciesId      String   @map("species_id")
-  geneName       String   @map("gene_name")
-  /** recessive | incomplete_dominant | dominant — the generated tables' vocabulary. */
-  geneType       String   @map("gene_type")
-  aliases        String[] @default([])
-  /** Allelic complex this gene belongs to, when the laboratory knows it. */
-  complex        String?
-  hasSuperForm   Boolean  @default(false) @map("has_super_form")
-  superGeneName  String?  @map("super_gene_name")
-  notes          String?  @db.Text
+  /**
+   * Species id from the platform taxonomy.
+   */
+  speciesId     String   @map("species_id")
+  geneName      String   @map("gene_name")
+  /**
+   * recessive | incomplete_dominant | dominant — the generated tables' vocabulary.
+   */
+  geneType      String   @map("gene_type")
+  aliases       String[] @default([])
+  /**
+   * Allelic complex this gene belongs to, when the laboratory knows it.
+   */
+  complex       String?
+  hasSuperForm  Boolean  @default(false) @map("has_super_form")
+  superGeneName String?  @map("super_gene_name")
+  notes         String?  @db.Text
 
   // pending | approved | rejected
-  status         String   @default("pending")
-  reviewedBy     String?  @map("reviewed_by")
-  reviewer       User?    @relation("LabGeneSubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  reviewedAt     DateTime? @map("reviewed_at")
-  reviewNote     String?  @map("review_note") @db.Text
+  status     String    @default("pending")
+  reviewedBy String?   @map("reviewed_by")
+  reviewer   User?     @relation("LabGeneSubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt DateTime? @map("reviewed_at")
+  reviewNote String?   @map("review_note") @db.Text
 
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // One live submission per gene per species: two laboratories naming the same
   // gene is one fact to review, not two.
@@ -287,26 +298,30 @@ model LabGeneSubmission {
 // raise its hand at all, which is a gap in the journey rather than a hole in
 // the rule.
 model PartnerApplication {
-  id             String    @id @default(cuid())
-  labName        String    @map("lab_name")
-  contactName    String    @map("contact_name")
-  email          String
-  phone          String?
-  country        String?
-  website        String?
-  /** Free text: what they test, their capacity, why they want to join. */
-  message        String?   @db.Text
+  id          String  @id @default(cuid())
+  labName     String  @map("lab_name")
+  contactName String  @map("contact_name")
+  email       String
+  phone       String?
+  country     String?
+  website     String?
+  /**
+   * Free text: what they test, their capacity, why they want to join.
+   */
+  message     String? @db.Text
 
   // pending | invited | declined
-  status         String    @default("pending")
-  reviewedBy     String?   @map("reviewed_by")
-  reviewer       User?     @relation("PartnerApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  reviewedAt     DateTime? @map("reviewed_at")
-  /** Why it was declined, or which invitation it became. Admin-only. */
-  reviewNote     String?   @map("review_note") @db.Text
+  status     String    @default("pending")
+  reviewedBy String?   @map("reviewed_by")
+  reviewer   User?     @relation("PartnerApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt DateTime? @map("reviewed_at")
+  /**
+   * Why it was declined, or which invitation it became. Admin-only.
+   */
+  reviewNote String?   @map("review_note") @db.Text
 
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([email])
@@ -317,32 +332,32 @@ model PartnerApplication {
 // and from the existing internal-staff invite flow, which stays scoped to
 // internal ops accounts and does not create tenant orgs.
 model OrganizationInvite {
-  id             String            @id @default(cuid())
-  email          String
+  id                 String            @id @default(cuid())
+  email              String
   // sha256 of the raw token, never the token itself — same scheme as
   // AccountToken/RefreshSession (see accountTokenService.hashToken).
-  tokenHash      String            @unique @map("token_hash")
-  organizationId String?           @map("organization_id")
-  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tokenHash          String            @unique @map("token_hash")
+  organizationId     String?           @map("organization_id")
+  organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Set only for trigger 2 above; the org to create on acceptance.
-  createsOrgKind OrganizationKind? @map("creates_org_kind")
-  createsOrgName String?           @map("creates_org_name")
+  createsOrgKind     OrganizationKind? @map("creates_org_kind")
+  createsOrgName     String?           @map("creates_org_name")
   // Prefill for the LabAccount created on acceptance, so a vendor does not have
   // to retype details the inviting admin already supplied. Vendor-editable after.
-  createsOrgLocation String?       @map("creates_org_location")
-  createsOrgContact  String?       @map("creates_org_contact")
+  createsOrgLocation String?           @map("creates_org_location")
+  createsOrgContact  String?           @map("creates_org_contact")
   // Role the invitee receives. Trigger 2 always grants `owner`.
-  role           OrgRole           @default(member)
-  invitedBy      String?           @map("invited_by")
-  inviter        User?             @relation("OrganizationInviteInviter", fields: [invitedBy], references: [id], onDelete: SetNull)
+  role               OrgRole           @default(member)
+  invitedBy          String?           @map("invited_by")
+  inviter            User?             @relation("OrganizationInviteInviter", fields: [invitedBy], references: [id], onDelete: SetNull)
   // pending | accepted | revoked
-  status         String            @default("pending")
-  expiresAt      DateTime          @map("expires_at")
-  acceptedAt     DateTime?         @map("accepted_at")
-  acceptedByUserId String?         @map("accepted_by_user_id")
-  acceptedBy     User?             @relation("OrganizationInviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  status             String            @default("pending")
+  expiresAt          DateTime          @map("expires_at")
+  acceptedAt         DateTime?         @map("accepted_at")
+  acceptedByUserId   String?           @map("accepted_by_user_id")
+  acceptedBy         User?             @relation("OrganizationInviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
 
   @@index([organizationId])
   @@index([email])
@@ -407,49 +422,49 @@ model SecurityEvent {
 }
 
 model Profile {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  breederName          String?
-  logoUrl              String?
-  profileImageUrl      String?
-  location             String?
-  country              String?
-  city                 String?
-  language             String?
-  bio                  String?  @db.Text
-  websiteUrl           String?
-  instagramHandle      String?
-  facebookHandle       String?
-  telegramHandle       String?
-  socialLinks          Json?
-  publicContactEmail   String?
-  publicContactPhone   String?
-  contactPreference    String?  @default("email")
-  isPublic             Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  breederName        String?
+  logoUrl            String?
+  profileImageUrl    String?
+  location           String?
+  country            String?
+  city               String?
+  language           String?
+  bio                String?  @db.Text
+  websiteUrl         String?
+  instagramHandle    String?
+  facebookHandle     String?
+  telegramHandle     String?
+  socialLinks        Json?
+  publicContactEmail String?
+  publicContactPhone String?
+  contactPreference  String?  @default("email")
+  isPublic           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([userId])
 }
 
 model Animal {
-  id           String    @id @default(cuid())
-  ownerId      String
-  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  appAnimalId  String
-  name         String?
-  sex          String?
-  status       String?
-  species      String?
-  payload      Json
-  globalId     String?
-  privacyLevel String    @default("private")
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  asChild      ParentRelationship[] @relation("ChildOf")
-  asParent     ParentRelationship[] @relation("ParentOf")
+  id               String               @id @default(cuid())
+  ownerId          String
+  owner            User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appAnimalId      String
+  name             String?
+  sex              String?
+  status           String?
+  species          String?
+  payload          Json
+  globalId         String?
+  privacyLevel     String               @default("private")
+  deletedAt        DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  asChild          ParentRelationship[] @relation("ChildOf")
+  asParent         ParentRelationship[] @relation("ParentOf")
   ownershipHistory OwnershipHistory[]
 
   @@unique([ownerId, appAnimalId])
@@ -493,19 +508,19 @@ model Pairing {
 }
 
 model Clutch {
-  id            String    @id @default(cuid())
-  ownerId       String
-  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  pairingId     String?
-  pairing       Pairing?  @relation(fields: [pairingId], references: [id], onDelete: SetNull)
-  appClutchId   String
-  clutchNumber  Int?
-  seasonYear    Int?
-  laidDate      String?
-  payload       Json
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pairingId    String?
+  pairing      Pairing?  @relation(fields: [pairingId], references: [id], onDelete: SetNull)
+  appClutchId  String
+  clutchNumber Int?
+  seasonYear   Int?
+  laidDate     String?
+  payload      Json
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([ownerId, appClutchId])
   @@index([ownerId])
@@ -526,21 +541,21 @@ model BreederPlannerState {
 }
 
 model Listing {
-  id           String   @id @default(cuid())
-  ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  appListingId String
-  animalAppId  String?
-  title        String?
-  status       String   @default("draft")
-  priceCents   Int?
-  currency     String   @default("EUR")
-  payload      Json
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  inquiries    ListingInquiry[]
+  id               String                   @id @default(cuid())
+  ownerId          String
+  owner            User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appListingId     String
+  animalAppId      String?
+  title            String?
+  status           String                   @default("draft")
+  priceCents       Int?
+  currency         String                   @default("EUR")
+  payload          Json
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  inquiries        ListingInquiry[]
   moderationAudits ListingModerationAudit[]
-  reports      Report[]
+  reports          Report[]
 
   @@unique([ownerId, appListingId])
   @@index([ownerId])
@@ -549,21 +564,21 @@ model Listing {
 }
 
 model ListingInquiry {
-  id            String   @id @default(cuid())
-  listingId     String
-  listing       Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  breederId     String
-  breeder       User     @relation("ListingInquiryBreeder", fields: [breederId], references: [id], onDelete: Cascade)
-  buyerId       String?
-  buyer         User?    @relation("ListingInquiryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
-  buyerName     String
-  buyerEmail    String
-  message       String   @db.Text
-  status        String   @default("new")
-  breederResponseNote String?  @db.Text
-  respondedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  listingId           String
+  listing             Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  breederId           String
+  breeder             User      @relation("ListingInquiryBreeder", fields: [breederId], references: [id], onDelete: Cascade)
+  buyerId             String?
+  buyer               User?     @relation("ListingInquiryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  buyerName           String
+  buyerEmail          String
+  message             String    @db.Text
+  status              String    @default("new")
+  breederResponseNote String?   @db.Text
+  respondedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([listingId])
   @@index([breederId])
@@ -619,17 +634,17 @@ model ListingModerationAudit {
 }
 
 model AdminAuditLog {
-  id            String   @id @default(cuid())
-  adminUserId   String?
-  adminUser     User?    @relation("AdminAuditActor", fields: [adminUserId], references: [id], onDelete: SetNull)
-  targetUserId  String?
-  targetUser    User?    @relation("AdminAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
-  action        String
-  beforeJson    Json?
-  afterJson     Json?
-  reason        String
-  internalNote  String?  @db.Text
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  adminUserId  String?
+  adminUser    User?    @relation("AdminAuditActor", fields: [adminUserId], references: [id], onDelete: SetNull)
+  targetUserId String?
+  targetUser   User?    @relation("AdminAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  action       String
+  beforeJson   Json?
+  afterJson    Json?
+  reason       String
+  internalNote String?  @db.Text
+  createdAt    DateTime @default(now())
 
   @@index([adminUserId])
   @@index([targetUserId])
@@ -638,22 +653,23 @@ model AdminAuditLog {
 }
 
 model Report {
-  id               String   @id @default(cuid())
+  id               String            @id @default(cuid())
   reporterUserId   String?
-  reporterUser     User?    @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reporterUser     User?             @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
   reportedUserId   String?
-  reportedUser     User?    @relation("ReportReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  reportedUser     User?             @relation("ReportReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
   relatedListingId String?
-  relatedListing   Listing? @relation(fields: [relatedListingId], references: [id], onDelete: SetNull)
+  relatedListing   Listing?          @relation(fields: [relatedListingId], references: [id], onDelete: SetNull)
   relatedMessageId String?
   type             String
-  status           String   @default("open")
-  description      String   @db.Text
+  status           String            @default("open")
+  description      String            @db.Text
   assignedAdminId  String?
-  assignedAdmin    User?    @relation("ReportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  resolutionNote   String?  @db.Text
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  assignedAdmin    User?             @relation("ReportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  escalations      AdminEscalation[]
+  resolutionNote   String?           @db.Text
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([reporterUserId])
   @@index([reportedUserId])
@@ -665,18 +681,18 @@ model Report {
 }
 
 model VerificationRequest {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   userId            String
-  user              User     @relation("VerificationRequestUser", fields: [userId], references: [id], onDelete: Cascade)
-  type              String   @default("breeder")
-  status            String   @default("pending_review")
+  user              User      @relation("VerificationRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  type              String    @default("breeder")
+  status            String    @default("pending_review")
   submittedDataJson Json
-  adminNote         String?  @db.Text
+  adminNote         String?   @db.Text
   reviewedBy        String?
-  reviewer          User?    @relation("VerificationRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewer          User?     @relation("VerificationRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
   reviewedAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([userId])
   @@index([reviewedBy])
@@ -686,16 +702,16 @@ model VerificationRequest {
 }
 
 model MarketplacePermission {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  canAccess         Boolean  @default(true)
-  activeListingLimit Int     @default(25)
-  requireApproval   Boolean @default(false)
-  featuredBreeder   Boolean @default(false)
-  disabledReason    String?  @db.Text
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canAccess          Boolean  @default(true)
+  activeListingLimit Int      @default(25)
+  requireApproval    Boolean  @default(false)
+  featuredBreeder    Boolean  @default(false)
+  disabledReason     String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([canAccess])
   @@index([featuredBreeder])
@@ -713,18 +729,18 @@ model MarketplacePermission {
 // Given one-org-per-user plus one-LabAccount-per-org, userId being unique is
 // implied anyway, so the constraint costs nothing and avoids needless churn.
 model LabAccount {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId    String   @unique @map("organization_id")
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  labName           String
-  contactPerson     String?
-  location          String?
-  status            String   @default("pending")
-  permissionsJson   Json
+  id                 String       @id @default(cuid())
+  userId             String       @unique
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId     String       @unique @map("organization_id")
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  labName            String
+  contactPerson      String?
+  location           String?
+  status             String       @default("pending")
+  permissionsJson    Json
   availableTestsJson Json
-  pricingJson       Json
+  pricingJson        Json
 
   // ── Per-tenant identity ──────────────────────────────────────
   //
@@ -740,11 +756,17 @@ model LabAccount {
   city              String?
   postalCode        String?  @map("postal_code")
   country           String?
-  /** Data URI or hosted URL, rendered onto certificates. */
+  /**
+   * Data URI or hosted URL, rendered onto certificates.
+   */
   logoUrl           String?  @map("logo_url") @db.Text
-  /** Free text shown to breeders choosing a lab. */
+  /**
+   * Free text shown to breeders choosing a lab.
+   */
   publicDescription String?  @map("public_description") @db.Text
-  /** Typical turnaround in days, shown in the lab directory. */
+  /**
+   * Typical turnaround in days, shown in the lab directory.
+   */
   turnaroundDays    Int?     @map("turnaround_days")
   /**
    * Payment details printed on the certificates this laboratory issues. Held
@@ -767,10 +789,10 @@ model LabAccount {
    * a lab closing for holidays hides itself without an admin round-trip. An
    * admin suspending the Organization overrides this independently.
    */
-  listedInDirectory Boolean  @default(true) @map("listed_in_directory")
+  listedInDirectory Boolean @default(true) @map("listed_in_directory")
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([listedInDirectory])
@@ -783,17 +805,17 @@ model LabAccount {
 }
 
 model GdprRequest {
-  id                String   @id @default(cuid())
-  userId            String
-  user              User     @relation("GdprRequestUser", fields: [userId], references: [id], onDelete: Cascade)
-  type              String
-  status            String   @default("data_export_requested")
-  adminNote         String?  @db.Text
-  reviewedBy        String?
-  reviewer          User?    @relation("GdprRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  reviewedAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation("GdprRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  status     String    @default("data_export_requested")
+  adminNote  String?   @db.Text
+  reviewedBy String?
+  reviewer   User?     @relation("GdprRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId])
   @@index([reviewedBy])
@@ -803,26 +825,26 @@ model GdprRequest {
 }
 
 model SubscriptionTier {
-  id               String   @id @default(cuid())
+  id               String             @id @default(cuid())
   name             String
-  key              String   @unique
-  shortDescription String?  @map("short_description") @db.Text
-  longDescription  String?  @map("long_description") @db.Text
-  badgeText        String?  @map("badge_text")
-  monthlyPrice     Decimal  @default(0) @map("monthly_price") @db.Decimal(10, 2)
-  yearlyPrice      Decimal  @default(0) @map("yearly_price") @db.Decimal(10, 2)
-  currency         String   @default("EUR")
-  trialDays        Int      @default(0) @map("trial_days")
-  setupFee         Decimal? @map("setup_fee") @db.Decimal(10, 2)
-  discountLabel    String?  @map("discount_label")
-  customPrice      Boolean  @default(false) @map("custom_price")
-  isActive         Boolean  @default(true) @map("is_active")
-  isPublic         Boolean  @default(true) @map("is_public")
-  isRecommended    Boolean  @default(false) @map("is_recommended")
-  sortOrder        Int      @default(0) @map("sort_order")
-  archivedAt       DateTime? @map("archived_at")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  key              String             @unique
+  shortDescription String?            @map("short_description") @db.Text
+  longDescription  String?            @map("long_description") @db.Text
+  badgeText        String?            @map("badge_text")
+  monthlyPrice     Decimal            @default(0) @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice      Decimal            @default(0) @map("yearly_price") @db.Decimal(10, 2)
+  currency         String             @default("EUR")
+  trialDays        Int                @default(0) @map("trial_days")
+  setupFee         Decimal?           @map("setup_fee") @db.Decimal(10, 2)
+  discountLabel    String?            @map("discount_label")
+  customPrice      Boolean            @default(false) @map("custom_price")
+  isActive         Boolean            @default(true) @map("is_active")
+  isPublic         Boolean            @default(true) @map("is_public")
+  isRecommended    Boolean            @default(false) @map("is_recommended")
+  sortOrder        Int                @default(0) @map("sort_order")
+  archivedAt       DateTime?          @map("archived_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
   features         TierFeature[]
   subscriptions    UserSubscription[]
 
@@ -833,15 +855,15 @@ model SubscriptionTier {
 }
 
 model FeatureCatalog {
-  id               String   @id @default(cuid())
-  featureKey       String   @unique @map("feature_key")
-  featureName      String   @map("feature_name")
-  featureGroup     String   @map("feature_group")
-  description      String?  @db.Text
-  defaultLimitType String?  @map("default_limit_type")
-  sortOrder        Int      @default(0) @map("sort_order")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id               String        @id @default(cuid())
+  featureKey       String        @unique @map("feature_key")
+  featureName      String        @map("feature_name")
+  featureGroup     String        @map("feature_group")
+  description      String?       @db.Text
+  defaultLimitType String?       @map("default_limit_type")
+  sortOrder        Int           @default(0) @map("sort_order")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
   tierFeatures     TierFeature[]
 
   @@index([featureGroup])
@@ -849,15 +871,15 @@ model FeatureCatalog {
 }
 
 model TierFeature {
-  id         String   @id @default(cuid())
-  tierId     String   @map("tier_id")
+  id         String           @id @default(cuid())
+  tierId     String           @map("tier_id")
   tier       SubscriptionTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
-  featureKey String   @map("feature_key")
-  feature    FeatureCatalog @relation(fields: [featureKey], references: [featureKey], onDelete: Cascade)
-  enabled    Boolean  @default(false)
-  limitValue Int?     @map("limit_value")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  featureKey String           @map("feature_key")
+  feature    FeatureCatalog   @relation(fields: [featureKey], references: [featureKey], onDelete: Cascade)
+  enabled    Boolean          @default(false)
+  limitValue Int?             @map("limit_value")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
   @@unique([tierId, featureKey])
   @@index([featureKey])
@@ -865,23 +887,23 @@ model TierFeature {
 }
 
 model UserSubscription {
-  id                    String   @id @default(cuid())
-  userId                String   @map("user_id")
-  user                  User     @relation("UserSubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
-  tierId                String?  @map("tier_id")
+  id                    String            @id @default(cuid())
+  userId                String            @map("user_id")
+  user                  User              @relation("UserSubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  tierId                String?           @map("tier_id")
   tier                  SubscriptionTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
-  status                String   @default("active")
-  paymentStatus         String   @default("none") @map("payment_status")
-  startedAt             DateTime @default(now()) @map("started_at")
-  trialEndsAt           DateTime? @map("trial_ends_at")
-  renewsAt              DateTime? @map("renews_at")
-  cancelledAt           DateTime? @map("cancelled_at")
-  paymentProvider       String?  @map("payment_provider")
-  paymentCustomerId     String?  @map("payment_customer_id")
-  paymentSubscriptionId String?  @map("payment_subscription_id")
-  internalNote          String?  @map("internal_note") @db.Text
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  status                String            @default("active")
+  paymentStatus         String            @default("none") @map("payment_status")
+  startedAt             DateTime          @default(now()) @map("started_at")
+  trialEndsAt           DateTime?         @map("trial_ends_at")
+  renewsAt              DateTime?         @map("renews_at")
+  cancelledAt           DateTime?         @map("cancelled_at")
+  paymentProvider       String?           @map("payment_provider")
+  paymentCustomerId     String?           @map("payment_customer_id")
+  paymentSubscriptionId String?           @map("payment_subscription_id")
+  internalNote          String?           @map("internal_note") @db.Text
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([tierId])
@@ -890,18 +912,18 @@ model UserSubscription {
 }
 
 model UserFeatureOverride {
-  id               String   @id @default(cuid())
-  userId           String   @map("user_id")
-  user             User     @relation("UserFeatureOverrideUser", fields: [userId], references: [id], onDelete: Cascade)
-  featureKey       String   @map("feature_key")
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  user             User      @relation("UserFeatureOverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  featureKey       String    @map("feature_key")
   enabled          Boolean
-  limitOverride    Int?     @map("limit_override")
-  reason           String   @db.Text
+  limitOverride    Int?      @map("limit_override")
+  reason           String    @db.Text
   expiresAt        DateTime? @map("expires_at")
-  createdByAdminId String?  @map("created_by_admin_id")
-  createdByAdmin   User?    @relation("UserFeatureOverrideAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  createdByAdminId String?   @map("created_by_admin_id")
+  createdByAdmin   User?     @relation("UserFeatureOverrideAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([featureKey])
@@ -928,15 +950,15 @@ model UsageTracking {
 }
 
 model MobileScanLog {
-  id             String   @id @default(cuid())
-  userId         String   @map("user_id")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  animalId       String?  @map("animal_id")
-  qrCode         String   @map("qr_code") @db.Text
-  targetType     String   @default("animal") @map("target_type")
-  resultStatus   String   @default("opened") @map("result_status")
-  metadataJson   Json?    @map("metadata_json")
-  createdAt      DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animalId     String?  @map("animal_id")
+  qrCode       String   @map("qr_code") @db.Text
+  targetType   String   @default("animal") @map("target_type")
+  resultStatus String   @default("opened") @map("result_status")
+  metadataJson Json?    @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([animalId])
@@ -946,17 +968,17 @@ model MobileScanLog {
 }
 
 model MobileSyncQueue {
-  id            String   @id @default(cuid())
-  userId        String   @map("user_id")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId      String?  @map("device_id")
-  actionType    String   @map("action_type")
-  payloadJson   Json     @map("payload_json")
-  status        String   @default("queued")
-  errorMessage  String?  @map("error_message") @db.Text
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  processedAt   DateTime? @map("processed_at")
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String?   @map("device_id")
+  actionType   String    @map("action_type")
+  payloadJson  Json      @map("payload_json")
+  status       String    @default("queued")
+  errorMessage String?   @map("error_message") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  processedAt  DateTime? @map("processed_at")
 
   @@index([userId])
   @@index([deviceId])
@@ -966,16 +988,16 @@ model MobileSyncQueue {
 }
 
 model UserDeviceSession {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId    String   @map("device_id")
-  deviceName  String?  @map("device_name")
-  platform    String?
-  pushToken   String?  @map("push_token") @db.Text
-  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId   String   @map("device_id")
+  deviceName String?  @map("device_name")
+  platform   String?
+  pushToken  String?  @map("push_token") @db.Text
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, deviceId])
   @@index([userId])
@@ -984,37 +1006,37 @@ model UserDeviceSession {
 }
 
 model MarketplaceListing {
-  id                     String   @id @default(cuid())
-  sellerUserId           String   @map("seller_user_id")
-  seller                 User     @relation("MarketplaceListingSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
-  animalId               String?  @map("animal_id")
+  id                     String                    @id @default(cuid())
+  sellerUserId           String                    @map("seller_user_id")
+  seller                 User                      @relation("MarketplaceListingSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  animalId               String?                   @map("animal_id")
   title                  String
   species                String?
   category               String?
-  genetics               String?  @db.Text
+  genetics               String?                   @db.Text
   sex                    String?
-  birthDate              DateTime? @map("birth_date")
+  birthDate              DateTime?                 @map("birth_date")
   year                   Int?
-  weight                 Decimal? @db.Decimal(10, 2)
-  price                  Decimal? @db.Decimal(12, 2)
-  currency               String   @default("EUR")
-  status                 String   @default("draft")
-  availability           String   @default("available")
+  weight                 Decimal?                  @db.Decimal(10, 2)
+  price                  Decimal?                  @db.Decimal(12, 2)
+  currency               String                    @default("EUR")
+  status                 String                    @default("draft")
+  availability           String                    @default("available")
   country                String?
   city                   String?
-  shippingAvailable      Boolean  @default(false) @map("shipping_available")
-  pickupAvailable        Boolean  @default(false) @map("pickup_available")
-  description            String?  @db.Text
-  feedingNotes           String?  @map("feeding_notes") @db.Text
-  temperamentNotes       String?  @map("temperament_notes") @db.Text
-  publicDataSettingsJson Json?    @map("public_data_settings_json")
-  viewsCount             Int      @default(0) @map("views_count")
-  favoritesCount         Int      @default(0) @map("favorites_count")
-  isFeatured             Boolean  @default(false) @map("is_featured")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-  publishedAt            DateTime? @map("published_at")
-  archivedAt             DateTime? @map("archived_at")
+  shippingAvailable      Boolean                   @default(false) @map("shipping_available")
+  pickupAvailable        Boolean                   @default(false) @map("pickup_available")
+  description            String?                   @db.Text
+  feedingNotes           String?                   @map("feeding_notes") @db.Text
+  temperamentNotes       String?                   @map("temperament_notes") @db.Text
+  publicDataSettingsJson Json?                     @map("public_data_settings_json")
+  viewsCount             Int                       @default(0) @map("views_count")
+  favoritesCount         Int                       @default(0) @map("favorites_count")
+  isFeatured             Boolean                   @default(false) @map("is_featured")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+  publishedAt            DateTime?                 @map("published_at")
+  archivedAt             DateTime?                 @map("archived_at")
   images                 MarketplaceListingImage[]
   media                  MarketplaceMedia[]
   conversations          MarketplaceConversation[]
@@ -1031,21 +1053,21 @@ model MarketplaceListing {
 }
 
 model MarketplaceMedia {
-  id           String   @id @default(cuid())
-  ownerUserId  String   @map("owner_user_id")
-  owner        User     @relation("MarketplaceMediaOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  listingId    String?  @map("listing_id")
+  id           String              @id @default(cuid())
+  ownerUserId  String              @map("owner_user_id")
+  owner        User                @relation("MarketplaceMediaOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  listingId    String?             @map("listing_id")
   listing      MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  storageKey   String   @unique @map("storage_key") @db.Text
-  originalName String?  @map("original_name") @db.Text
-  mimeType     String   @map("mime_type")
-  sizeBytes    Int      @map("size_bytes")
+  storageKey   String              @unique @map("storage_key") @db.Text
+  originalName String?             @map("original_name") @db.Text
+  mimeType     String              @map("mime_type")
+  sizeBytes    Int                 @map("size_bytes")
   checksum     String?
-  status       String   @default("pending_validation")
-  scanStatus   String   @default("not_scanned") @map("scan_status")
-  publicUrl    String?  @map("public_url") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  status       String              @default("pending_validation")
+  scanStatus   String              @default("not_scanned") @map("scan_status")
+  publicUrl    String?             @map("public_url") @db.Text
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
 
   @@index([ownerUserId])
   @@index([listingId])
@@ -1055,13 +1077,13 @@ model MarketplaceMedia {
 }
 
 model MarketplaceListingImage {
-  id         String   @id @default(cuid())
-  listingId  String   @map("listing_id")
-  listing    MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  imageUrl   String   @map("image_url") @db.Text
-  sortOrder  Int      @default(0) @map("sort_order")
-  isPrimary  Boolean  @default(false) @map("is_primary")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        String             @id @default(cuid())
+  listingId String             @map("listing_id")
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  imageUrl  String             @map("image_url") @db.Text
+  sortOrder Int                @default(0) @map("sort_order")
+  isPrimary Boolean            @default(false) @map("is_primary")
+  createdAt DateTime           @default(now()) @map("created_at")
 
   @@index([listingId])
   @@map("marketplace_listing_images")
@@ -1093,17 +1115,17 @@ model MarketplaceStore {
 }
 
 model MarketplaceConversation {
-  id            String   @id @default(cuid())
-  listingId     String   @map("listing_id")
-  listing       MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  buyerUserId   String?  @map("buyer_user_id")
-  buyer         User?    @relation("MarketplaceConversationBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
-  sellerUserId  String   @map("seller_user_id")
-  seller        User     @relation("MarketplaceConversationSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
-  status        String   @default("open")
-  lastMessageAt DateTime? @map("last_message_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id            String               @id @default(cuid())
+  listingId     String               @map("listing_id")
+  listing       MarketplaceListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerUserId   String?              @map("buyer_user_id")
+  buyer         User?                @relation("MarketplaceConversationBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  sellerUserId  String               @map("seller_user_id")
+  seller        User                 @relation("MarketplaceConversationSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  status        String               @default("open")
+  lastMessageAt DateTime?            @map("last_message_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
   messages      MarketplaceMessage[]
 
   @@index([listingId])
@@ -1114,15 +1136,15 @@ model MarketplaceConversation {
 }
 
 model MarketplaceMessage {
-  id             String   @id @default(cuid())
-  conversationId String   @map("conversation_id")
-  conversation   MarketplaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderUserId   String?  @map("sender_user_id")
-  sender         User?    @relation("MarketplaceMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
-  messageText    String   @map("message_text") @db.Text
-  offerAmount    Decimal? @map("offer_amount") @db.Decimal(12, 2)
-  createdAt      DateTime @default(now()) @map("created_at")
-  readAt         DateTime? @map("read_at")
+  id             String                     @id @default(cuid())
+  conversationId String                     @map("conversation_id")
+  conversation   MarketplaceConversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUserId   String?                    @map("sender_user_id")
+  sender         User?                      @relation("MarketplaceMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  messageText    String                     @map("message_text") @db.Text
+  offerAmount    Decimal?                   @map("offer_amount") @db.Decimal(12, 2)
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  readAt         DateTime?                  @map("read_at")
   reports        MarketplaceMessageReport[]
 
   @@index([conversationId])
@@ -1131,16 +1153,16 @@ model MarketplaceMessage {
 }
 
 model MarketplaceMessageReport {
-  id             String   @id @default(cuid())
-  messageId      String   @map("message_id")
+  id             String             @id @default(cuid())
+  messageId      String             @map("message_id")
   message        MarketplaceMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  reporterUserId String?  @map("reporter_user_id")
-  reporter       User?    @relation("MarketplaceMessageReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reporterUserId String?            @map("reporter_user_id")
+  reporter       User?              @relation("MarketplaceMessageReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
   reason         String
-  status         String   @default("open")
-  note           String?  @db.Text
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  status         String             @default("open")
+  note           String?            @db.Text
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
 
   @@index([messageId])
   @@index([reporterUserId])
@@ -1164,12 +1186,12 @@ model MarketplaceUserBlock {
 }
 
 model MarketplaceFavorite {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listingId String   @map("listing_id")
+  id        String             @id @default(cuid())
+  userId    String             @map("user_id")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String             @map("listing_id")
   listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime           @default(now()) @map("created_at")
 
   @@unique([userId, listingId])
   @@index([listingId])
@@ -1177,28 +1199,28 @@ model MarketplaceFavorite {
 }
 
 model MarketplaceSale {
-  id              String   @id @default(cuid())
-  listingId       String   @map("listing_id")
-  listing         MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  sellerUserId    String   @map("seller_user_id")
-  seller          User     @relation("MarketplaceSaleSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
-  buyerUserId     String?  @map("buyer_user_id")
-  buyer           User?    @relation("MarketplaceSaleBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
-  buyerName       String?  @map("buyer_name")
-  buyerEmail      String?  @map("buyer_email")
-  buyerPhone      String?  @map("buyer_phone")
-  buyerCountry    String?  @map("buyer_country")
-  salePrice       Decimal? @map("sale_price") @db.Decimal(12, 2)
-  currency        String   @default("EUR")
-  depositAmount   Decimal? @map("deposit_amount") @db.Decimal(12, 2)
-  paymentStatus   String   @default("pending") @map("payment_status")
-  saleStatus      String   @default("inquiry") @map("sale_status")
-  handoverMethod  String?  @map("handover_method")
-  handoverDate    DateTime? @map("handover_date")
-  notes           String?  @db.Text
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  reviews         MarketplaceReview[]
+  id             String              @id @default(cuid())
+  listingId      String              @map("listing_id")
+  listing        MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sellerUserId   String              @map("seller_user_id")
+  seller         User                @relation("MarketplaceSaleSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  buyerUserId    String?             @map("buyer_user_id")
+  buyer          User?               @relation("MarketplaceSaleBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  buyerName      String?             @map("buyer_name")
+  buyerEmail     String?             @map("buyer_email")
+  buyerPhone     String?             @map("buyer_phone")
+  buyerCountry   String?             @map("buyer_country")
+  salePrice      Decimal?            @map("sale_price") @db.Decimal(12, 2)
+  currency       String              @default("EUR")
+  depositAmount  Decimal?            @map("deposit_amount") @db.Decimal(12, 2)
+  paymentStatus  String              @default("pending") @map("payment_status")
+  saleStatus     String              @default("inquiry") @map("sale_status")
+  handoverMethod String?             @map("handover_method")
+  handoverDate   DateTime?           @map("handover_date")
+  notes          String?             @db.Text
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  reviews        MarketplaceReview[]
 
   @@index([listingId])
   @@index([sellerUserId])
@@ -1208,20 +1230,20 @@ model MarketplaceSale {
 }
 
 model MarketplaceReview {
-  id                  String   @id @default(cuid())
-  saleId              String   @map("sale_id")
+  id                  String          @id @default(cuid())
+  saleId              String          @map("sale_id")
   sale                MarketplaceSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  reviewerUserId      String?  @map("reviewer_user_id")
-  reviewer            User?    @relation("MarketplaceReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
-  sellerUserId        String   @map("seller_user_id")
-  seller              User     @relation("MarketplaceReviewSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  reviewerUserId      String?         @map("reviewer_user_id")
+  reviewer            User?           @relation("MarketplaceReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+  sellerUserId        String          @map("seller_user_id")
+  seller              User            @relation("MarketplaceReviewSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
   rating              Int
-  communicationRating Int?     @map("communication_rating")
-  accuracyRating      Int?     @map("accuracy_rating")
-  shippingRating      Int?     @map("shipping_rating")
-  healthRating        Int?     @map("health_rating")
-  reviewText          String?  @map("review_text") @db.Text
-  createdAt           DateTime @default(now()) @map("created_at")
+  communicationRating Int?            @map("communication_rating")
+  accuracyRating      Int?            @map("accuracy_rating")
+  shippingRating      Int?            @map("shipping_rating")
+  healthRating        Int?            @map("health_rating")
+  reviewText          String?         @map("review_text") @db.Text
+  createdAt           DateTime        @default(now()) @map("created_at")
 
   @@index([saleId])
   @@index([sellerUserId])
@@ -1230,21 +1252,21 @@ model MarketplaceReview {
 }
 
 model ShedTestCatalog {
-  id                  String          @id
+  id                  String            @id
   name                String
   shortLabel          String?
   geneTarget          String?
   category            String
   pricingType         TestPricingType
   priceCents          Int?
-  currency            String          @default("EUR")
-  allowedPriorities   String[]        @default(["routine", "priority", "urgent"])
-  active              Boolean         @default(true)
-  visibleInBreederApp Boolean         @default(true)
+  currency            String            @default("EUR")
+  allowedPriorities   String[]          @default(["routine", "priority", "urgent"])
+  active              Boolean           @default(true)
+  visibleInBreederApp Boolean           @default(true)
   description         String?
-  sortOrder           Int             @default(0)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  sortOrder           Int               @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
   offerings           LabTestOffering[]
 }
 
@@ -1258,33 +1280,34 @@ model ShedTestCatalog {
 // map the gene — but a lab may equally invent a test that exists in no catalog.
 // The library never gates what a lab is allowed to offer.
 model LabTestOffering {
-  id                  String          @id @default(cuid())
-  organizationId      String          @map("organization_id")
-  organization        Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  name                String
-  shortLabel          String?         @map("short_label")
-  category            String
-  pricingType         TestPricingType @map("pricing_type")
+  name        String
+  shortLabel  String?         @map("short_label")
+  category    String
+  pricingType TestPricingType @map("pricing_type")
 
   /**
    * What kind of product this is: `morph`, `sex`, or `panel`.
-   *
    * Distinct from `pricingType`, which is only the morph/sex bucket the tier
    * table understands. A panel is a bundle sold at one flat price and belongs in
    * neither bucket, which is why it needed its own dimension.
    */
-  testKind            String          @default("morph") @map("test_kind")
+  testKind String @default("morph") @map("test_kind")
 
   /**
    * `tier` prices from the laboratory's tier table; `flat` uses `priceCents`
    * regardless of order size. Panels are flat. Real catalogues turned out to
    * contain both, so this cannot be inferred from the kind alone.
    */
-  priceModel          String          @default("tier") @map("price_model")
+  priceModel String @default("tier") @map("price_model")
 
-  /** The flat price, in cents, when `priceModel` is `flat`. */
-  priceCents          Int?            @map("price_cents")
+  /**
+   * The flat price, in cents, when `priceModel` is `flat`.
+   */
+  priceCents Int? @map("price_cents")
 
   /**
    * Per-offering tier prices in cents, `{ "t1": 6500, "t2": 6000, "t3": 5500 }`,
@@ -1292,71 +1315,74 @@ model LabTestOffering {
    * laboratory may price one test on a different scale from the rest — a green
    * tree python sex test costs roughly double a colubrid one.
    */
-  tierPricesJson      Json?           @map("tier_prices_json")
+  tierPricesJson Json? @map("tier_prices_json")
 
   /**
    * Price when this test is added to a morph test on the same animal, rather
    * than ordered on its own. Sex determination is commonly sold this way.
    */
-  addonPriceCents     Int?            @map("addon_price_cents")
+  addonPriceCents Int? @map("addon_price_cents")
 
-  currency            String          @default("EUR")
+  currency     String           @default("EUR")
   /**
    * Gene this test reads, when the lab has mapped it. Drives the automatic
    * genetics update on a confirmed result; a custom test may leave it null and
    * simply reports a finding.
    */
-  geneTarget          String?         @map("gene_target")
-  /** Optional provenance link to the shared seed library. Never a constraint. */
-  catalogRefId        String?         @map("catalog_ref_id")
-  catalogRef          ShedTestCatalog? @relation(fields: [catalogRefId], references: [id], onDelete: SetNull)
+  geneTarget   String?          @map("gene_target")
+  /**
+   * Optional provenance link to the shared seed library. Never a constraint.
+   */
+  catalogRefId String?          @map("catalog_ref_id")
+  catalogRef   ShedTestCatalog? @relation(fields: [catalogRefId], references: [id], onDelete: SetNull)
 
   /**
    * Which animals this test is for, as ids from the platform species taxonomy
    * (breeding-app-backend/src/config/speciesIndex.json, generated alongside the
    * breeder app's gene tables so the two can never disagree).
-   *
    * A list rather than a single value because one test genuinely can cover
    * several species — a colubrid sex determination test covers corn snake,
    * hognose, kingsnake, rat snake, bullsnake and garter snake at once. Empty
    * means the laboratory has not said, and the test matches no animal.
    */
-  speciesIds          String[]        @default([]) @map("species_ids")
+  speciesIds String[] @default([]) @map("species_ids")
 
   /**
    * Other names the same test is sold or asked for under ("Yb", "HGW",
    * "Migraine"). Used to match what a breeder has recorded on an animal against
    * what a laboratory offers, which rarely agree on spelling.
    */
-  aliases             String[]        @default([])
+  aliases String[] @default([])
 
   /**
    * `available` or `coming_soon`. Separate from `active`: a coming-soon test is
    * published so breeders can see it is on the way, but cannot be ordered, while
    * an inactive one has been withdrawn.
    */
-  availability        String          @default("available")
+  availability String @default("available")
 
-  /** For panels: what the bundle covers, in the laboratory's own words. */
-  panelScope          String?         @map("panel_scope") @db.Text
+  /**
+   * For panels: what the bundle covers, in the laboratory's own words.
+   */
+  panelScope String? @map("panel_scope") @db.Text
 
   /**
    * For panels: the offerings this bundle includes. Empty means the laboratory
    * has not told us, which is deliberately distinguishable from "includes
    * nothing" — an unresolved panel must not be silently priced as empty.
    */
-  panelMemberIds      String[]        @default([]) @map("panel_member_ids")
+  panelMemberIds String[] @default([]) @map("panel_member_ids")
 
-  allowedPriorities   String[]        @default(["routine", "priority", "urgent"]) @map("allowed_priorities")
-  turnaroundDays      Int?            @map("turnaround_days")
-  active              Boolean         @default(true)
-  visibleInBreederApp Boolean         @default(true) @map("visible_in_breeder_app")
-  description         String?         @db.Text
-  sortOrder           Int             @default(0) @map("sort_order")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
+  allowedPriorities   String[] @default(["routine", "priority", "urgent"]) @map("allowed_priorities")
+  turnaroundDays      Int?     @map("turnaround_days")
+  active              Boolean  @default(true)
+  visibleInBreederApp Boolean  @default(true) @map("visible_in_breeder_app")
+  description         String?  @db.Text
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  orderAnimalTests    ShedTestOrderAnimalTest[]
+  orderAnimalTests ShedTestOrderAnimalTest[]
 
   // A lab cannot list the same name twice; across labs, duplicates are expected
   // and correct — two labs both offering "Albino" are two distinct products.
@@ -1380,32 +1406,30 @@ model LabTestOffering {
 // missing, so a missing config can never silently fall back to someone else's
 // prices.
 model PricingConfig {
-  id                             String   @id @default(cuid())
-  organizationId                 String?  @unique @map("organization_id")
-  organization                   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  currency                       String   @default("EUR")
-  morphTier1to9FirstTest         Decimal  @db.Decimal(10, 2)
-  morphTier1to9AdditionalTest    Decimal  @db.Decimal(10, 2)
-  morphTier10to49FirstTest       Decimal  @db.Decimal(10, 2)
-  morphTier10to49AdditionalTest  Decimal  @db.Decimal(10, 2)
-  morphTier50PlusFirstTest       Decimal  @db.Decimal(10, 2)
-  morphTier50PlusAdditionalTest  Decimal  @db.Decimal(10, 2)
-  sexTier1to9                    Decimal  @db.Decimal(10, 2)
-  sexTier10to49                  Decimal  @db.Decimal(10, 2)
-  sexTier50Plus                  Decimal  @db.Decimal(10, 2)
-  isActive                       Boolean  @default(true)
-  createdAt                      DateTime @default(now())
-  updatedAt                      DateTime @updatedAt
+  id                            String        @id @default(cuid())
+  organizationId                String?       @unique @map("organization_id")
+  organization                  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  currency                      String        @default("EUR")
+  morphTier1to9FirstTest        Decimal       @db.Decimal(10, 2)
+  morphTier1to9AdditionalTest   Decimal       @db.Decimal(10, 2)
+  morphTier10to49FirstTest      Decimal       @db.Decimal(10, 2)
+  morphTier10to49AdditionalTest Decimal       @db.Decimal(10, 2)
+  morphTier50PlusFirstTest      Decimal       @db.Decimal(10, 2)
+  morphTier50PlusAdditionalTest Decimal       @db.Decimal(10, 2)
+  sexTier1to9                   Decimal       @db.Decimal(10, 2)
+  sexTier10to49                 Decimal       @db.Decimal(10, 2)
+  sexTier50Plus                 Decimal       @db.Decimal(10, 2)
+  isActive                      Boolean       @default(true)
+  createdAt                     DateTime      @default(now())
+  updatedAt                     DateTime      @updatedAt
 }
 
 /**
  * A shed test a breeder has saved but not yet ordered.
- *
  * Sheds arrive one animal at a time over a season, so the queue is the thing a keeper builds
  * up between orders. It lives here rather than in the browser because it is accumulated over
  * months: in localStorage a cleared cache would silently discard a season's collecting, and it
  * would never follow the keeper from their phone to their desk.
- *
  * Rows are deleted once submitted -- the resulting ShedTestOrder is the durable record, and
  * keeping a copy here would leave two answers to "what did I send?".
  */
@@ -1431,7 +1455,9 @@ model PendingShedTest {
   priority          String       @default("routine")
   sampleType        String       @default("shed") @map("sample_type")
   notes             String?
-  /** Whether this row is ticked for the next submission. The keeper may bank some and send others. */
+  /**
+   * Whether this row is ticked for the next submission. The keeper may bank some and send others.
+   */
   selected          Boolean      @default(true)
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
@@ -1442,17 +1468,16 @@ model PendingShedTest {
 }
 
 model ShedTestOrder {
-  id                String                @id @default(cuid())
+  id                 String                @id @default(cuid())
   /**
    * Sequential per laboratory, and unique per laboratory rather than globally.
-   *
    * The sequence is deliberately scoped to the receiving lab so no vendor can
    * infer another's order volume from gaps in its own numbering. A global unique
    * index contradicted that: two laboratories each numbering their first order of
    * the month 09AA00001 collided, and order creation failed outright the moment a
    * second laboratory took an order.
    */
-  orderNumber       String?
+  orderNumber        String?
   /**
    * The lab the breeder chose at order time. Nullable only so the migration
    * could land against existing rows predating lab selection; every new order
@@ -1460,57 +1485,113 @@ model ShedTestOrder {
    * Cascade: deleting an organization must never silently delete a breeder's
    * order history.
    */
-  labOrganizationId String?               @map("lab_organization_id")
-  labOrganization   Organization?         @relation(fields: [labOrganizationId], references: [id], onDelete: Restrict)
-  breederId         String
+  labOrganizationId  String?               @map("lab_organization_id")
+  labOrganization    Organization?         @relation(fields: [labOrganizationId], references: [id], onDelete: Restrict)
+  breederId          String
   // Cascade, not the Prisma default of Restrict: without this, deleting a user
   // who ever placed a lab order fails outright, which silently broke the
   // right-to-erasure flow. The order's own rows cascade from here.
-  breeder           User                  @relation(fields: [breederId], references: [id], onDelete: Cascade)
-  totalAnimals      Int
-  pricingTier       PricingTier
-  totalPrice        Decimal               @db.Decimal(12, 2)
-  currency          String
-  priceSnapshotJson Json
-  status                ShedOrderStatus       @default(submitted)
-  paymentStatus         ShedPaymentStatus     @default(pending)
-  paymentRequestedAt    DateTime?
-  paidAt                DateTime?
-  paymentRef            String?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  animals               ShedTestOrderAnimal[]
-  results               ShedTestOrderResult[]
+  breeder            User                  @relation(fields: [breederId], references: [id], onDelete: Cascade)
+  totalAnimals       Int
+  pricingTier        PricingTier
+  totalPrice         Decimal               @db.Decimal(12, 2)
+  currency           String
+  priceSnapshotJson  Json
+  status             ShedOrderStatus       @default(submitted)
+  paymentStatus      ShedPaymentStatus     @default(pending)
+  paymentRequestedAt DateTime?
+  paidAt             DateTime?
+  paymentRef         String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  /**
+   * Set when the laboratory files the order away. An archived order keeps every
+   * row it had -- it is simply out of the working queues, which is the whole
+   * difference between archiving and deleting.
+   */
+  archivedAt         DateTime?             @map("archived_at")
+  archivedById       String?               @map("archived_by_id")
+  animals            ShedTestOrderAnimal[]
+  results            ShedTestOrderResult[]
+  certificates       ShedTestCertificate[]
 
   @@unique([labOrganizationId, orderNumber])
   @@index([breederId])
   @@index([status])
   @@index([labOrganizationId, status])
+  @@index([labOrganizationId, archivedAt])
+}
+
+/**
+ * A certificate the breeder keeps, whatever the laboratory later does with its
+ * own records.
+ * A certificate used to have no row anywhere. It was re-derived from the live
+ * order every time someone opened it, so the laboratory deleting an order took
+ * the breeder's certificate with it -- the confirmed genetics stayed on the
+ * animal, but the document proving it vanished. Issuing is the point of no
+ * return: from then on the certificate is the breeder's, and `orderId` is
+ * SetNull rather than Cascade precisely so removing the order cannot remove it.
+ * `snapshotJson` holds the order and result exactly as the breeder app reads
+ * them from `/orders/:id`, so the app renders the same PDF from a deleted
+ * order's snapshot as it does from a live one, with no second copy of the
+ * certificate layout to keep in step.
+ */
+model ShedTestCertificate {
+  id                String         @id @default(cuid())
+  orderId           String?        @map("order_id")
+  order             ShedTestOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  breederId         String         @map("breeder_id")
+  breeder           User           @relation(fields: [breederId], references: [id], onDelete: Cascade)
+  /**
+   * The issuing laboratory. Restrict, so retiring a lab cannot erase what it certified.
+   */
+  labOrganizationId String?        @map("lab_organization_id")
+  labOrganization   Organization?  @relation(fields: [labOrganizationId], references: [id], onDelete: Restrict)
+  /**
+   * The breeder's own animal id, which outlives the order rows.
+   */
+  animalAppId       String         @map("animal_app_id")
+  resultId          String?        @map("result_id")
+  orderNumber       String?        @map("order_number")
+  certificateNumber String         @unique @map("certificate_number")
+  verificationCode  String         @unique @map("verification_code")
+  issuedAt          DateTime       @map("issued_at")
+  snapshotJson      Json           @map("snapshot_json")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([breederId, animalAppId, certificateNumber])
+  @@index([breederId])
+  @@index([animalAppId])
+  @@index([labOrganizationId])
+  @@index([orderId])
 }
 
 model ShedTestOrderAnimal {
-  id                 String                  @id @default(cuid())
-  orderId            String
-  order              ShedTestOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  animalId           String
-  animalName         String?
-  morphBaseCost      Decimal                 @db.Decimal(10, 2)
-  additionalMorphCost Decimal                @db.Decimal(10, 2)
-  sexCost            Decimal                 @db.Decimal(10, 2)
-  /** Flat-priced items on this animal (panels), which no tier applies to. */
-  panelCost          Decimal                 @default(0) @db.Decimal(10, 2) @map("panel_cost")
-  total              Decimal                 @db.Decimal(10, 2)
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  tests              ShedTestOrderAnimalTest[]
+  id                  String                    @id @default(cuid())
+  orderId             String
+  order               ShedTestOrder             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  animalId            String
+  animalName          String?
+  morphBaseCost       Decimal                   @db.Decimal(10, 2)
+  additionalMorphCost Decimal                   @db.Decimal(10, 2)
+  sexCost             Decimal                   @db.Decimal(10, 2)
+  /**
+   * Flat-priced items on this animal (panels), which no tier applies to.
+   */
+  panelCost           Decimal                   @default(0) @map("panel_cost") @db.Decimal(10, 2)
+  total               Decimal                   @db.Decimal(10, 2)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  tests               ShedTestOrderAnimalTest[]
 
   @@index([orderId])
 }
 
 model ShedTestOrderAnimalTest {
-  id                  String             @id @default(cuid())
-  orderAnimalId       String
-  orderAnimal         ShedTestOrderAnimal @relation(fields: [orderAnimalId], references: [id], onDelete: Cascade)
+  id            String              @id @default(cuid())
+  orderAnimalId String
+  orderAnimal   ShedTestOrderAnimal @relation(fields: [orderAnimalId], references: [id], onDelete: Cascade)
 
   /**
    * The lab offering this line was bought from. Nullable and SetNull because a
@@ -1518,8 +1599,8 @@ model ShedTestOrderAnimalTest {
    * order line with it would be data loss — the snapshot columns below are what
    * make the historical record self-contained regardless.
    */
-  offeringId          String?            @map("offering_id")
-  offering            LabTestOffering?   @relation(fields: [offeringId], references: [id], onDelete: SetNull)
+  offeringId String?          @map("offering_id")
+  offering   LabTestOffering? @relation(fields: [offeringId], references: [id], onDelete: SetNull)
 
   /**
    * Legacy provenance: the global-catalog id this line used before tests became
@@ -1529,8 +1610,8 @@ model ShedTestOrderAnimalTest {
   testId              String?
   testNameSnapshot    String
   pricingTypeSnapshot TestPricingType
-  priceApplied        Decimal            @db.Decimal(10, 2)
-  createdAt           DateTime           @default(now())
+  priceApplied        Decimal         @db.Decimal(10, 2)
+  createdAt           DateTime        @default(now())
 
   @@index([orderAnimalId])
   @@index([offeringId])
@@ -1564,44 +1645,44 @@ model ShedTestOrderResult {
 // One row per female per breeding season pairing.
 // Ingested automatically from Pairing.payload on every snapshot save.
 model ReproductiveCycle {
-  id             String  @id @default(cuid())
-  ownerId        String
-  owner          User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   // Female identity (both DB id and app-local id for fast lookup)
   femaleAnimalId String
   femaleAppId    String
 
   // Male used this cycle (optional)
-  maleAnimalId   String?
-  maleAppId      String?
+  maleAnimalId String?
+  maleAppId    String?
 
   // Source pairing
-  pairingId      String?
-  pairingAppId   String?
+  pairingId    String?
+  pairingAppId String?
 
-  season         Int    // year the pairing started
-  cycleIndex     Int    // 1st, 2nd... cycle for this female in this season
+  season     Int // year the pairing started
+  cycleIndex Int // 1st, 2nd... cycle for this female in this season
 
   // Key reproductive dates (YYYY-MM-DD strings, matching existing payload convention)
-  pairingStartDate  String?
-  pairingEndDate    String?
-  ovulationDate     String?
-  preLayShedDate    String?
-  eggLayingDate     String?
+  pairingStartDate String?
+  pairingEndDate   String?
+  ovulationDate    String?
+  preLayShedDate   String?
+  eggLayingDate    String?
 
   // Clutch outcome
-  eggCount       Int?
-  fertileCount   Int?
-  slugCount      Int?
+  eggCount     Int?
+  fertileCount Int?
+  slugCount    Int?
 
-  notes          String?  @db.Text
-  payload        Json?    // extensible: follicle data, weight, future fields
+  notes   String? @db.Text
+  payload Json? // extensible: follicle data, weight, future fields
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  locks          LockEvent[]
+  locks LockEvent[]
 
   @@unique([femaleAnimalId, season, cycleIndex])
   @@index([femaleAnimalId])
@@ -1614,23 +1695,23 @@ model ReproductiveCycle {
 // Natural dedup key: (femaleAnimalId, lockDate) — prevents double-entry from
 // calendar, log, snake card, etc.
 model LockEvent {
-  id             String  @id @default(cuid())
+  id             String @id @default(cuid())
   ownerId        String
-  femaleAnimalId String  // Animal.id (DB UUID)
-  femaleAppId    String  // appAnimalId (frontend id)
+  femaleAnimalId String // Animal.id (DB UUID)
+  femaleAppId    String // appAnimalId (frontend id)
 
-  cycleId        String?
-  cycle          ReproductiveCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  cycleId String?
+  cycle   ReproductiveCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
 
-  lockDate       String  // YYYY-MM-DD
-  notes          String? @db.Text
+  lockDate String // YYYY-MM-DD
+  notes    String? @db.Text
 
   // Source attribution: where did this lock come from?
-  sourceType     String  // 'pairing_calendar' | 'log' | 'snake_card' | 'import' | 'manual'
-  sourceId       String? // appPairingId or other originating record id
+  sourceType String // 'pairing_calendar' | 'log' | 'snake_card' | 'import' | 'manual'
+  sourceId   String? // appPairingId or other originating record id
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([femaleAnimalId, lockDate])
   @@index([femaleAnimalId])
@@ -1642,10 +1723,10 @@ model LockEvent {
 // Computed analytics cache — rebuilt after every cycle/lock write.
 // Raw cycle + lock rows are source of truth; this is a read-optimization.
 model ReproductiveAnalyticsCache {
-  id                       String   @id @default(cuid())
-  femaleAnimalId           String   @unique
-  femaleAppId              String
-  ownerId                  String
+  id             String @id @default(cuid())
+  femaleAnimalId String @unique
+  femaleAppId    String
+  ownerId        String
 
   totalCycles              Int      @default(0)
   avgLocksPerCycle         Decimal? @db.Decimal(6, 2)
@@ -1658,12 +1739,12 @@ model ReproductiveAnalyticsCache {
   avgFertilityRate         Decimal? @db.Decimal(5, 4)
 
   // 'none' | 'low' | 'medium' | 'high'
-  confidenceLevel          String   @default("none")
+  confidenceLevel String @default("none")
   // JSON string[] e.g. ["early_ovulator", "frequent_locker", "consistent"]
-  patternTagsJson          Json?
+  patternTagsJson Json?
 
-  lastCalculatedAt         DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  lastCalculatedAt DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([ownerId])
   @@map("reproductive_analytics_cache")
@@ -1676,9 +1757,9 @@ model ReproductiveAnalyticsCache {
 model ParentRelationship {
   id          String   @id @default(cuid())
   childId     String
-  child       Animal   @relation("ChildOf",   fields: [childId],  references: [id], onDelete: Cascade)
+  child       Animal   @relation("ChildOf", fields: [childId], references: [id], onDelete: Cascade)
   parentId    String
-  parent      Animal   @relation("ParentOf",  fields: [parentId], references: [id], onDelete: Cascade)
+  parent      Animal   @relation("ParentOf", fields: [parentId], references: [id], onDelete: Cascade)
   role        String
   confidence  String   @default("confirmed")
   createdById String?
@@ -1742,7 +1823,7 @@ model EmailJob {
   cancelledAt         DateTime? @map("cancelled_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  events              EmailEvent[]
+  events EmailEvent[]
 
   @@index([ownerId])
   @@index([status, nextAttemptAt])
@@ -1796,4 +1877,40 @@ model EmailSuppression {
   releasedBy   String?   @map("released_by")
 
   @@map("email_suppressions")
+}
+
+/**
+ * A moderator's way of saying "look at this". Moderators are read-only in the
+ * admin console, so without somewhere to write, their oversight would have no
+ * outlet at all. This is that outlet — and it is deliberately inert: raising
+ * one changes nothing about the user, listing or report it points at, it only
+ * puts the item in front of the owner.
+ */
+model AdminEscalation {
+  id               String    @id @default(cuid())
+  raisedByUserId   String    @map("raised_by_user_id")
+  raisedBy         User      @relation("AdminEscalationRaisedBy", fields: [raisedByUserId], references: [id], onDelete: Cascade)
+  subject          String
+  note             String    @db.Text
+  // Optional pointers to whatever prompted it. Nullable and SetNull rather than
+  // required, so purging a user never deletes the record of a concern raised
+  // about them.
+  subjectUserId    String?   @map("subject_user_id")
+  subjectUser      User?     @relation("AdminEscalationSubjectUser", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  relatedReportId  String?   @map("related_report_id")
+  relatedReport    Report?   @relation(fields: [relatedReportId], references: [id], onDelete: SetNull)
+  // open | acknowledged | resolved
+  status           String    @default("open")
+  resolutionNote   String?   @map("resolution_note") @db.Text
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedByUserId String?   @map("resolved_by_user_id")
+  resolvedBy       User?     @relation("AdminEscalationResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([raisedByUserId])
+  @@index([subjectUserId])
+  @@index([createdAt])
+  @@map("admin_escalations")
 }

@@ -7,6 +7,7 @@ import SampleIntakePage from "./pages/SampleIntakePage.jsx";
 import OrderDetailsPage from "./pages/OrderDetailsPage.jsx";
 import ResultEntryPage from "./pages/ResultEntryPage.jsx";
 import CompletedTestsPage from "./pages/CompletedTestsPage.jsx";
+import OrderArchivePage from "./pages/OrderArchivePage.jsx";
 import { createLabApiClient } from "./api/client";
 import TestCatalogPage from "./pages/TestCatalogPage.jsx";
 import PricingLogicPage from "./pages/PricingLogicPage.jsx";
@@ -150,6 +151,7 @@ const parseRoute = (path) => {
     return { route: "/lab/result-entry", presetOrderId: params.get("orderId") || undefined };
   }
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
+  if (normalized === "/lab/archive") return { route: "/lab/archive" };
   if (normalized === "/lab/test-catalog") return { route: "/lab/test-catalog" };
   if (normalized === "/lab/pricing-logic") return { route: "/lab/pricing-logic" };
   if (normalized === "/lab/settings") return { route: "/lab/settings" };
@@ -169,6 +171,7 @@ const navItems = [
   { path: "/lab/sample-intake", label: "Sample Intake" },
   { path: "/lab/result-entry", label: "Result Entry" },
   { path: "/lab/completed-tests", label: "Completed Tests" },
+  { path: "/lab/archive", label: "Archive" },
   { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
   { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
   { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
@@ -194,6 +197,8 @@ const pageForRoute = (parsedRoute, role) => {
       return <ResultEntryPage presetOrderId={parsedRoute.presetOrderId} />;
     case "/lab/completed-tests":
       return <CompletedTestsPage />;
+    case "/lab/archive":
+      return <OrderArchivePage />;
     case "/lab/test-catalog":
       if (role !== "lab_staff" && role !== "admin") {
         return (

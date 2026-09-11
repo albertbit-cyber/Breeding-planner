@@ -154,6 +154,8 @@ const toLegacyOrder = (order: any): TestOrder => {
     paymentRef: String(order?.paymentRef || "").trim() || undefined,
     createdAt: String(order?.createdAt || ""),
     updatedAt: String(order?.updatedAt || ""),
+    archivedAt: String(order?.archivedAt || "").trim() || undefined,
+    archivedById: String(order?.archivedById || "").trim() || undefined,
   };
 };
 
@@ -626,12 +628,16 @@ const buildSharedResultEntryTemplate = (order: any): LabResultEntryTemplate => {
 
 const buildSharedCertificateNumber = (order: any, issuedAt: string): string => {
   const parsed = new Date(issuedAt || "");
+  // UTC, not local time. The same number is derived here, in the lab portal and
+  // on the server when the certificate is stored; a local-time stamp made it
+  // depend on whose clock asked, so a result reported at 23:30 UTC produced one
+  // number for a browser in Amsterdam and another for the server.
   const stamp = Number.isNaN(parsed.getTime())
     ? String(issuedAt || "").replace(/[^0-9]/g, "").slice(0, 8)
     : [
-        parsed.getFullYear(),
-        String(parsed.getMonth() + 1).padStart(2, "0"),
-        String(parsed.getDate()).padStart(2, "0"),
+        parsed.getUTCFullYear(),
+        String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+        String(parsed.getUTCDate()).padStart(2, "0"),
       ].join("");
   const suffix = String(order?.id || "").replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase() || "GEN";
   return `PH-GC-${stamp || "00000000"}-${suffix}`;
@@ -788,8 +794,16 @@ const toSharedBreederSummary = (order: any) => {
   };
 };
 
-const listSharedOrdersRaw = async (): Promise<any[]> => {
-  const data = await apiRequest<{ orders: any[] }>("/lab/orders");
+/**
+ * Which side of the archive to list. The server defaults to "active", so every
+ * existing caller keeps asking about work in hand and archived orders drop out
+ * of the queues without any of them having to opt in.
+ */
+export type OrderArchiveScope = "active" | "archived" | "all";
+
+const listSharedOrdersRaw = async (scope?: OrderArchiveScope): Promise<any[]> => {
+  const query = scope && scope !== "active" ? `?archive=${encodeURIComponent(scope)}` : "";
+  const data = await apiRequest<{ orders: any[] }>(`/lab/orders${query}`);
   return Array.isArray(data?.orders) ? data.orders : [];
 };
 
@@ -1088,11 +1102,35 @@ export const createLabApiClient = () => {
     };
   };
 
-  const listLabTestOrders = async (): Promise<TestOrder[]> => {
+  const listLabTestOrders = async (scope?: OrderArchiveScope): Promise<TestOrder[]> => {
     requireSessionRole("admin", "lab_staff", "breeder");
-    const orders = await listSharedOrdersRaw();
+    const orders = await listSharedOrdersRaw(scope);
     return orders.map(toLegacyOrder);
   };
+
+  /**
+   * Files an order away, or brings it back.
+   *
+   * Distinct from `deleteLabOrder` in the one way that matters: nothing is
+   * removed. The order keeps its animals, tests, results and certificate, and
+   * simply stops appearing in the working queues. Reversible, which deletion is
+   * not.
+   */
+  const setLabOrderArchived = async (orderId: string, archived: boolean): Promise<TestOrder> => {
+    requireSessionRole("admin", "lab_staff");
+    const normalized = String(orderId || "").trim();
+    if (!normalized) {
+      throw new Error("orderId is required.");
+    }
+    const data = await apiRequest<{ order: any }>(
+      `/lab/orders/${encodeURIComponent(normalized)}/${archived ? "archive" : "unarchive"}`,
+      { method: "POST" }
+    );
+    return toLegacyOrder(data?.order);
+  };
+
+  const archiveLabOrder = (orderId: string) => setLabOrderArchived(orderId, true);
+  const unarchiveLabOrder = (orderId: string) => setLabOrderArchived(orderId, false);
 
   const getLabOrderOutcome = async (orderId: string) => {
     const role = requireSessionRole("admin", "lab_staff", "breeder");
@@ -1553,6 +1591,8 @@ export const createLabApiClient = () => {
     getBreederOrderOutcome,
     getBreederCertificateArtifact,
     listLabTestOrders,
+    archiveLabOrder,
+    unarchiveLabOrder,
     getLabOrderOutcome,
     resolveLabSampleByQrToken,
     resolveLabSampleBySampleId,

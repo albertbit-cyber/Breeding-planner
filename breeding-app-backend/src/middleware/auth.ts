@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { verifyAuthToken } from "../utils/jwt";
 import { normalizePersistedRole } from "../auth/identity";
+import { normalizePortal } from "../auth/portals";
 import { validateCsrfForCookieAuth } from "./csrf";
 import { AUTH_ACCESS_COOKIE, getCookieValue } from "../utils/authCookies";
 import { prisma } from "../lib/prisma";
@@ -25,6 +26,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
       email: payload.email,
       role: normalizePersistedRole(persistedRole),
       persistedRole,
+      portal: normalizePortal(payload.portal),
     };
     req.authSource = authSource;
 

@@ -17,5 +17,7 @@ export const verifyRefreshToken = (token: string): AuthTokenPayload => {
   if (decoded.type !== "refresh") {
     throw new Error("Invalid token type");
   }
-  return { sub: decoded.sub, email: decoded.email, role: decoded.role };
+  // `portal` is carried through deliberately: a refresh must renew the session
+  // it was given, not silently upgrade it to a different surface.
+  return { sub: decoded.sub, email: decoded.email, role: decoded.role, portal: decoded.portal };
 };

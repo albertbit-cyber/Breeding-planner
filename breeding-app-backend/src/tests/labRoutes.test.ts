@@ -29,11 +29,14 @@ vi.mock("../lib/prisma", () => ({
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
 
+// Vendor routes are portal-bound, so a token has to say it came from the
+// Laboratory portal — the same thing the real sign-in stamps on it.
 const tokenFor = (role: "admin" | "breeder" | "lab_staff" = "breeder") =>
   signAuthToken({
     sub: `${role}-1`,
     email: `${role}@example.com`,
     role,
+    portal: role === "breeder" ? "breeder" : "lab",
   });
 
 /** Puts the acting user inside a vendor lab, the way `withOrgContext` would. */

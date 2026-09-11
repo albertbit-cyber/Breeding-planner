@@ -1539,3 +1539,22 @@
   border-color: var(--a-accent) !important;
   box-shadow: 0 0 0 2px rgba(99,102,241,0.12) !important;
 }
+
+/* Moderators see the console in full and change nothing in it. Stated once at
+   the top of every page, so the reason a control is missing is never a
+   mystery. */
+.admin-readonly-banner {
+  margin: 0 0 1rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--admin-warning-border, #f0d38a);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--admin-warning-bg, #fdf7e6);
+  color: var(--admin-warning-text, #6b5312);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.admin-readonly-banner strong {
+  font-weight: 600;
+}

@@ -30,6 +30,9 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(1, "password is required."),
+  // Which app the sign-in came from. Optional so older clients keep working;
+  // omitting it means the least privileged portal, never a wildcard.
+  portal: z.enum(["breeder", "lab", "admin", "marketplace"]).optional(),
 });
 
 export const forgotPasswordSchema = z.object({

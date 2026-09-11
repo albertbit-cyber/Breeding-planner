@@ -2,6 +2,14 @@
 import { useTranslation } from "react-i18next";
 import { clearAuthToken, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
+import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
+
+/**
+ * The marketplace admits buyers as well as breeders, which is why it names its
+ * own portal rather than reusing the breeder one — a buyer has no breeder app
+ * to be sent to.
+ */
+const MARKETPLACE_PORTAL = "marketplace";
 
 const AUTH_SESSION_STORAGE_KEYS = {
   breeder: "breedingPlannerBreederAuthSession",
@@ -460,6 +468,16 @@ const loadStoredAuth = (scope = "breeder") => {
     if (!raw) return { isAuthenticated: false };
     const parsed = JSON.parse(raw);
     if (parsed?.isAuthenticated) {
+      // A session stored by an older build could hold a laboratory or staff role
+      // this app has nothing to show. Evicting it here stops a reload from
+      // restoring it.
+      if (!canRoleUsePortal(parsed?.role || parsed?.profile?.role, MARKETPLACE_PORTAL)) {
+        try {
+          localStorage.removeItem(storageKey);
+          if (scope === "breeder") localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+        } catch {}
+        return { isAuthenticated: false };
+      }
       // Keep the session only if either the access token or refresh token is still
       // available. This lets the app silently restore auth after a reload.
       if (!hasStoredAuthSession(scope)) {
@@ -645,10 +663,21 @@ export default function AuthGate({ children, scope }) {
         return;
       }
 
-      const response = await loginApi({ email: loginEmail, password: String(password || "") }, authScope === "public" ? "breeder" : authScope);
+      const response = await loginApi(
+        { email: loginEmail, password: String(password || ""), portal: MARKETPLACE_PORTAL },
+        authScope === "public" ? "breeder" : authScope
+      );
       const backendUser = response?.user || {};
       const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
+      const appRole = normalizeRole(backendRole) || "breeder";
+
+      // The backend already refuses these credentials; checked again because the
+      // whole defect this fixes was a session that existed on the client alone.
+      if (!canRoleUsePortal(appRole, MARKETPLACE_PORTAL)) {
+        clearAuthToken(authScope === "public" ? "breeder" : authScope);
+        setLoginError(portalRejectionMessage(appRole, MARKETPLACE_PORTAL));
+        return;
+      }
 
       persistAuth({
         isAuthenticated: true,
@@ -809,11 +838,12 @@ export default function AuthGate({ children, scope }) {
         const loginResponse = await loginApi({
           email: desiredEmail,
           password: registrationData.password,
+          portal: MARKETPLACE_PORTAL,
         }, authScope === "public" ? "breeder" : authScope);
 
         const backendUser = loginResponse?.user || {};
         const backendRole = String((backendUser && backendUser.role) || "breeder").trim().toLowerCase();
-        const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "breeder";
+        const appRole = normalizeRole(backendRole) || "breeder";
 
         persistAuth({
           isAuthenticated: true,

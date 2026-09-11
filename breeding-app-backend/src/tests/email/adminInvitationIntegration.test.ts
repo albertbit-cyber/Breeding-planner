@@ -54,15 +54,15 @@ describe("createAdminUser invitation integration", () => {
       id: "invited-1",
       email: "invited@example.com",
       fullName: "Invited Person",
-      role: "lab",
+      role: "moderator",
       status: "active",
     });
 
     const result = await createAdminUser(actor, {
       email: "invited@example.com",
       fullName: "Invited Person",
-      role: "lab",
-      reason: "Onboarding new lab partner",
+      role: "moderator",
+      reason: "Onboarding a moderator",
     });
 
     expect(sendEmail).not.toHaveBeenCalled();
@@ -85,14 +85,14 @@ describe("createAdminUser invitation integration", () => {
       id: "invited-2",
       email: "invited2@example.com",
       fullName: "Invited Person",
-      role: "support",
+      role: "moderator",
       status: "active",
     });
 
     const result = await createAdminUser(actor, {
       email: "invited2@example.com",
       fullName: "Invited Person",
-      role: "support",
+      role: "moderator",
       reason: "Support hire",
     });
 

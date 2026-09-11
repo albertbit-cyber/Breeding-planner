@@ -9,6 +9,7 @@ import {
   submitPartnerApplication as submitPartnerApplicationApi,
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
+import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
 
 /**
  * The Lab Portal's authentication gate.
@@ -34,7 +35,17 @@ const readStoredAuth = () => {
   try {
     const raw = localStorage.getItem(LAB_AUTH_SESSION_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    if (parsed && typeof parsed === "object") return parsed;
+    if (parsed && typeof parsed === "object") {
+      // A session stored by an older build could hold any role. Evicting it here
+      // is what stops a reload from restoring a portal this account cannot use.
+      if (parsed.isAuthenticated && !canRoleUsePortal(parsed.role || parsed.profile?.role, AUTH_SCOPE)) {
+        try {
+          localStorage.removeItem(LAB_AUTH_SESSION_STORAGE_KEY);
+        } catch {}
+        return { isAuthenticated: false };
+      }
+      return parsed;
+    }
   } catch {
     // unreadable session; fall through to signed-out
   }
@@ -108,7 +119,7 @@ export default function AuthGate({ children }) {
   const signedInAs = useCallback(
     (backendUser, fallbackEmail) => {
       const backendRole = String(backendUser?.role || "").trim().toLowerCase();
-      const appRole = backendRole === "lab" ? "lab_staff" : backendRole || "lab_staff";
+      const appRole = normalizeRole(backendRole) || "lab_staff";
       persistAuth({
         isAuthenticated: true,
         mode: "login",
@@ -192,7 +203,15 @@ export default function AuthGate({ children }) {
     }
     setBusy(true);
     try {
-      const response = await loginApi({ email, password }, AUTH_SCOPE);
+      const response = await loginApi({ email, password, portal: AUTH_SCOPE }, AUTH_SCOPE);
+      // The backend already refuses these credentials; checked again because the
+      // whole defect this fixes was a session that existed on the client alone.
+      const role = normalizeRole(response?.user?.role);
+      if (!canRoleUsePortal(role, AUTH_SCOPE)) {
+        clearAuthToken(AUTH_SCOPE);
+        setLoginError(portalRejectionMessage(role, AUTH_SCOPE));
+        return;
+      }
       signedInAs(response?.user, email);
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "Sign in failed.");

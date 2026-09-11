@@ -58,6 +58,7 @@ const tokenForLab = (suffix: string) =>
     email: `lab-${suffix}@example.com`,
     role: "lab_staff",
     persistedRole: "lab",
+    portal: "lab",
   });
 
 /** Puts the acting user inside one laboratory, the way `withOrgContext` would. */
@@ -97,7 +98,8 @@ describe("one laboratory cannot reach another's orders", () => {
 
     expect(res.status).toBe(200);
     expect(db.shedTestOrder.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { labOrganizationId: ORG_B } })
+      // Scoped to this lab, and to the orders it has not archived.
+      expect.objectContaining({ where: { labOrganizationId: ORG_B, archivedAt: null } })
     );
   });
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import AdminLayout from "../components/AdminLayout.jsx";
 import Spinner from "../components/Spinner.jsx";
 import { useToast } from "../hooks/useToast.jsx";
+import useAdminActor from "../hooks/useAdminActor";
 import { useNavigate } from "react-router-dom";
 import {
   fetchAdminAccountPanel,
@@ -15,12 +16,13 @@ import {
 
 export default function TeamPage() {
   const toast = useToast();
+  const actor = useAdminActor();
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
   const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [createForm, setCreateForm] = useState({ fullName: "", email: "", role: "support", sendInvite: true, temporaryPassword: "" });
+  const [createForm, setCreateForm] = useState({ fullName: "", email: "", role: "moderator", sendInvite: true, temporaryPassword: "" });
   const [emailForm, setEmailForm] = useState({ userId: "", subject: "", message: "" });
   const [ownerEmailForm, setOwnerEmailForm] = useState({ email: "", currentPassword: "" });
   const [ownerPasswordForm, setOwnerPasswordForm] = useState({ currentPassword: "", newPassword: "" });
@@ -45,7 +47,7 @@ export default function TeamPage() {
     try {
       const result = await createAdminUser({ ...createForm, reason: "Create admin team user" });
       toast(`Created ${result.user?.email || createForm.email}.`);
-      setCreateForm({ fullName: "", email: "", role: "support", sendInvite: true, temporaryPassword: "" });
+      setCreateForm({ fullName: "", email: "", role: "moderator", sendInvite: true, temporaryPassword: "" });
       load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to create team user.", "error");
@@ -157,25 +159,28 @@ export default function TeamPage() {
               </div>
             </div>
 
-            <div className="admin-panel">
-              <h3>Create Team User</h3>
-              <form className="admin-form-grid" onSubmit={createTeamUser} style={{ gridTemplateColumns: "1fr" }}>
-                <input value={createForm.fullName} onChange={(e) => setCreateForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Full name" required />
-                <input value={createForm.email} onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))} placeholder="Email" type="email" required />
-                <select value={createForm.role} onChange={(e) => setCreateForm((p) => ({ ...p, role: e.target.value }))}>
-                  <option value="support">Support</option>
-                  <option value="moderator">Moderator</option>
-                  <option value="admin">Admin</option>
-                  <option value="lab">Lab staff</option>
-                </select>
-                <input value={createForm.temporaryPassword} onChange={(e) => setCreateForm((p) => ({ ...p, temporaryPassword: e.target.value }))} placeholder="Temporary password (optional)" />
-                <label className="admin-checkbox-row">
-                  <input type="checkbox" checked={createForm.sendInvite} onChange={(e) => setCreateForm((p) => ({ ...p, sendInvite: e.target.checked }))} />
-                  Send invite & verification email
-                </label>
-                <button type="submit">Create user</button>
-              </form>
-            </div>
+            {actor.isOwner && (
+              <div className="admin-panel">
+                <h3>Invite a moderator</h3>
+                <p className="admin-muted">
+                  Moderators see everything in this console and change nothing in it. They can
+                  escalate anything that needs a decision to you. Moderator is the only seat this
+                  form offers — a second owner account cannot be created, here or anywhere else.
+                  Laboratories are onboarded from Vendor Labs instead, which also creates the
+                  organization they belong to.
+                </p>
+                <form className="admin-form-grid" onSubmit={createTeamUser} style={{ gridTemplateColumns: "1fr" }}>
+                  <input value={createForm.fullName} onChange={(e) => setCreateForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Full name" required />
+                  <input value={createForm.email} onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))} placeholder="Email" type="email" required />
+                  <input value={createForm.temporaryPassword} onChange={(e) => setCreateForm((p) => ({ ...p, temporaryPassword: e.target.value }))} placeholder="Temporary password (optional)" />
+                  <label className="admin-checkbox-row">
+                    <input type="checkbox" checked={createForm.sendInvite} onChange={(e) => setCreateForm((p) => ({ ...p, sendInvite: e.target.checked }))} />
+                    Send invite & verification email
+                  </label>
+                  <button type="submit">Invite moderator</button>
+                </form>
+              </div>
+            )}
 
             <div className="admin-panel admin-panel-wide">
               <h3>Team Members</h3>

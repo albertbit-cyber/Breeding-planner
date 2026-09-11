@@ -8,9 +8,12 @@ export interface CertificatePdfRenderOptions {
 const PAGE_BOTTOM_MM = 282;
 const PAGE_WIDTH_MM = 210;
 const HEADER_CENTER_X = PAGE_WIDTH_MM / 2;
-const LOGO_WIDTH_MM = 58;
-const LOGO_HEIGHT_MM = 34;
-const LOGO_X_MM = HEADER_CENTER_X - (LOGO_WIDTH_MM / 2);
+// The box the header logo is fitted inside. The image is scaled to fit within
+// it and centred, never stretched to fill it -- a laboratory's wordmark is
+// typically far wider than it is tall, and forcing one into a fixed 58x34 box
+// distorted the mark on every certificate it issued.
+const LOGO_MAX_WIDTH_MM = 58;
+const LOGO_MAX_HEIGHT_MM = 34;
 const LOGO_Y_MM = 7;
 
 const digestHex = async (buffer: ArrayBuffer): Promise<string> => {
@@ -94,6 +97,55 @@ const drawWrappedLines = (
     cursorY += Math.max(lineHeight, wrapped.length * lineHeight);
   });
   return cursorY;
+};
+
+/**
+ * The box to draw a logo in, at the image's own aspect ratio, centred in the
+ * header. Falls back to the full box when the image's intrinsic size cannot be
+ * read -- which is the old stretch-to-fill behaviour, and only reachable where
+ * there is no DOM to measure with.
+ */
+export const fitLogoBox = (
+  naturalWidth: number,
+  naturalHeight: number,
+  maxWidthMm = LOGO_MAX_WIDTH_MM,
+  maxHeightMm = LOGO_MAX_HEIGHT_MM,
+  centerXMm = HEADER_CENTER_X,
+  topYMm = LOGO_Y_MM
+): { x: number; y: number; width: number; height: number } => {
+  const width = Number(naturalWidth) || 0;
+  const height = Number(naturalHeight) || 0;
+  if (width <= 0 || height <= 0) {
+    return {
+      x: centerXMm - (maxWidthMm / 2),
+      y: topYMm,
+      width: maxWidthMm,
+      height: maxHeightMm,
+    };
+  }
+
+  const scale = Math.min(maxWidthMm / width, maxHeightMm / height);
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  return {
+    x: centerXMm - (drawWidth / 2),
+    // Bottom-aligned inside the box, so a short wide mark and a tall one both
+    // sit on the same baseline as the issuer details printed beside them.
+    y: topYMm + (maxHeightMm - drawHeight),
+    width: drawWidth,
+    height: drawHeight,
+  };
+};
+
+const measureImageSize = async (url: string): Promise<{ width: number; height: number } | null> => {
+  try {
+    const image = await loadImageElement(url);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    return width && height ? { width, height } : null;
+  } catch {
+    return null;
+  }
 };
 
 const loadImageElement = (url: string): Promise<HTMLImageElement> =>
@@ -369,7 +421,9 @@ export const renderLabCertificatePdf = async (
   if (logoDataUrl) {
     try {
       const format = /^data:image\/jpe?g/i.test(logoDataUrl) ? "JPEG" : "PNG";
-      doc.addImage(logoDataUrl, format, LOGO_X_MM, LOGO_Y_MM, LOGO_WIDTH_MM, LOGO_HEIGHT_MM);
+      const measured = await measureImageSize(logoDataUrl);
+      const box = fitLogoBox(measured?.width || 0, measured?.height || 0);
+      doc.addImage(logoDataUrl, format, box.x, box.y, box.width, box.height);
     } catch {
       // A lab may upload something jsPDF cannot decode; its name still has to
       // appear, so fall back to a wordmark rather than an empty header.

@@ -17,6 +17,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
     "dev:verify-user": "tsx scripts/devVerifyUser.ts",
+    "audit:staff": "tsx scripts/auditStaffAccounts.ts",
     "e2e:reset": "tsx prisma/e2eReset.ts",
     "e2e:reset:local": "cross-env E2E_RESET_CONFIRM=local tsx prisma/e2eReset.ts"
   },

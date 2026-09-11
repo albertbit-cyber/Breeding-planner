@@ -83,6 +83,12 @@ export interface TestOrder extends AuditedEntity {
   pricingSnapshot?: PricingSnapshot;
   externalReference?: string;
   notes?: string;
+  /**
+   * When the laboratory filed this order away. Set means it is out of the lab's
+   * working queues and lives in the archive; every row it owns is untouched.
+   */
+  archivedAt?: IsoDateString;
+  archivedById?: UserId;
 }
 
 export type SampleType = "shed" | "bellyScaleClip";

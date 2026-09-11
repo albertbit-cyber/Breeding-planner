@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-import { calculatePrice, cancelOwnOrderById, createOrder, deleteAllOrders, deleteOrderById, getOrderByIdForUser, listOrdersForUser, updateOrderStatus, updateOrderPayment } from "../services/orderService";
+import { calculatePrice, cancelOwnOrderById, createOrder, deleteAllOrders, deleteOrderById, getOrderByIdForUser, listOrdersForUser, setOrderArchived, updateOrderStatus, updateOrderPayment, type OrderArchiveScope } from "../services/orderService";
+import { getCertificateSnapshotForUser, listCertificatesForBreeder } from "../services/labCertificateService";
 import { saveOrderResult } from "../services/orderResultService";
 import { ensureAnimalsPayload } from "../utils/validators";
 import { HttpError } from "../utils/errors";
@@ -23,10 +24,57 @@ export const createLabOrder = async (req: Request, res: Response): Promise<void>
   res.status(201).json({ order });
 };
 
+const ARCHIVE_SCOPES = ["active", "archived", "all"] as const;
+
+/**
+ * `?archive=` selects which side of the archive to list, defaulting to the work
+ * in hand. An unrecognised value is rejected rather than quietly treated as the
+ * default, so a typo cannot silently show a laboratory its active queue while it
+ * believes it is looking at the archive.
+ */
+const readArchiveScope = (raw: unknown): OrderArchiveScope => {
+  const normalized = String(raw ?? "").trim();
+  if (!normalized) return "active";
+  if (!(ARCHIVE_SCOPES as readonly string[]).includes(normalized)) {
+    throw new HttpError(400, `Invalid archive scope. Allowed: ${ARCHIVE_SCOPES.join(", ")}`);
+  }
+  return normalized as OrderArchiveScope;
+};
+
 export const listOrders = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
-  const orders = await listOrdersForUser(req.user, req.membership);
+  const archiveScope = readArchiveScope(req.query["archive"]);
+  const orders = await listOrdersForUser(req.user, req.membership, { archiveScope });
   res.status(200).json({ orders });
+};
+
+export const archiveOrder = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const order = await setOrderArchived(req.params.id, true, req.user, req.membership);
+  res.status(200).json({ order });
+};
+
+export const unarchiveOrder = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const order = await setOrderArchived(req.params.id, false, req.user, req.membership);
+  res.status(200).json({ order });
+};
+
+/**
+ * The breeder's certificates, listed independently of the orders they came
+ * from — which is the point, since a laboratory may since have removed its copy
+ * of the order.
+ */
+export const listMyCertificates = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const certificates = await listCertificatesForBreeder(req.user);
+  res.status(200).json({ certificates });
+};
+
+export const getCertificateById = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const payload = await getCertificateSnapshotForUser(req.params.id, req.user, req.membership);
+  res.status(200).json(payload);
 };
 
 export const getOrderById = async (req: Request, res: Response): Promise<void> => {
