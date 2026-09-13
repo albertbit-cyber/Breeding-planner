@@ -65,9 +65,22 @@ export const errorHandler = (error: unknown, req: Request, res: Response, _next:
   }
 
   const prismaCode = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+
+  // The code is asking for a table (P2021) or column (P2022) the database doesn't have,
+  // so a migration that should have run hasn't. Like P2028 below, this used to name cloud
+  // sync whatever route hit it, which sent everyone reading sync code while a lab dashboard
+  // was down. Name the route instead, and log what is actually missing so the migration is
+  // identifiable from the log line alone.
   if (prismaCode === "P2021" || prismaCode === "P2022") {
-    console.error("Database schema error:", error);
-    res.status(503).json({ message: "Server database needs an update before cloud sync can run. Please run backend migrations and try again." });
+    const route = req.originalUrl || req.path;
+    const meta = (error as { meta?: { table?: unknown; column?: unknown } }).meta;
+    const missing = meta?.column ?? meta?.table ?? "unknown";
+    console.error(`[schema-drift] ${req.method} ${route} needs an unapplied migration, missing=${String(missing)}:`, error);
+    captureException(error, { path: req.path, method: req.method });
+    const subject = route.startsWith("/api/breeder/snapshot") ? "Cloud sync" : "This page";
+    res.status(503).json({
+      message: `${subject} needs a server update that hasn't been applied to the database yet. Nothing was lost — please try again once the update is deployed.`,
+    });
     return;
   }
 

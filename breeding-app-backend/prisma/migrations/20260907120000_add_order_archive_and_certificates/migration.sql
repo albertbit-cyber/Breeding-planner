@@ -59,4 +59,4 @@ ALTER TABLE "ShedTestCertificate"
 -- certificates it issued while it was operating.
 ALTER TABLE "ShedTestCertificate"
   ADD CONSTRAINT "ShedTestCertificate_lab_organization_id_fkey"
-  FOREIGN KEY ("lab_organization_id") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  FOREIGN KEY ("lab_organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
