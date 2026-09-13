@@ -542,12 +542,28 @@ export const getMarketplaceStore = async (userId: string) => {
   return { store: toMarketplaceStoreDto(store, listings, reviews, records) };
 };
 
+/**
+ * Publishing the same animal twice is a re-publish, not a second animal. The
+ * breeder app re-sends a listing every time the seller saves the animal, so an
+ * unarchived listing for this seller and animal is updated in place; without
+ * that the catalogue fills with duplicate cards for one snake.
+ */
 export const createMarketplaceListing = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
   await assertSeller(actor);
   const access = await canAccessFeature(actor, "marketplace.create_listing");
   if (!access.allowed) throw new HttpError(403, access.reason || "Your tier does not include marketplace listings.");
   const data = listingData(payload);
   const images = imageInputs(payload);
+
+  if (data.animalId) {
+    const existing = await db.marketplaceListing.findFirst({
+      where: { sellerUserId: actor.id, animalId: data.animalId, archivedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (existing) return updateMarketplaceListing(actor, existing.id, payload);
+  }
+
   const listing = await db.$transaction(async (tx: any) => {
     const row = await tx.marketplaceListing.create({
       data: {

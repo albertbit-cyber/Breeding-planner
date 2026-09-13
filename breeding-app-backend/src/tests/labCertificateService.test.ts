@@ -66,6 +66,42 @@ describe("recording a certificate when a result is submitted", () => {
     expect(data.labOrganizationId).toBe("org_lab_a");
   });
 
+  it("writes one certificate per animal, not one per test code", async () => {
+    // A single animal routinely carries several completed results on one order,
+    // one per test code. The breeder gets one certificate covering the animal;
+    // writing one per result had four upserts fighting over the same row.
+    const written = await recordCertificatesForSubmittedResults({
+      order,
+      results: [
+        { ...completedResult, id: "result-newest", testCode: "PW-A" },
+        { ...completedResult, id: "result-older", testCode: "PW-B" },
+        { ...completedResult, id: "result-oldest", testCode: "PW-C" },
+      ],
+    });
+
+    expect(written).toBe(1);
+    expect(db.shedTestCertificate.create).toHaveBeenCalledTimes(1);
+    // Callers pass results newest-first, and that is the one the breeder app
+    // renders from, so it is the one named on the certificate.
+    expect(db.shedTestCertificate.create.mock.calls[0][0].data.resultId).toBe("result-newest");
+  });
+
+  it("writes a separate certificate for each animal on the order", async () => {
+    const written = await recordCertificatesForSubmittedResults({
+      order,
+      results: [
+        { ...completedResult, id: "r1", animalId: "snake-1" },
+        { ...completedResult, id: "r2", animalId: "snake-2" },
+      ],
+    });
+
+    expect(written).toBe(2);
+    expect(db.shedTestCertificate.create.mock.calls.map((c: any) => c[0].data.animalAppId)).toEqual([
+      "snake-1",
+      "snake-2",
+    ]);
+  });
+
   it("ignores drafts, which say nothing final", async () => {
     const written = await recordCertificatesForSubmittedResults({
       order,
@@ -97,6 +133,44 @@ describe("recording a certificate when a result is submitted", () => {
     expect(db.shedTestCertificate.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "cert-1" } })
     );
+  });
+
+  it("serialises a Prisma Decimal instead of choking on it", async () => {
+    // The shape that actually broke the backfill: Prisma's Decimal carries
+    // `constructor` as an own *enumerable* property, and its class name is
+    // minified in the published client, so neither Object.entries nor a
+    // constructor.name check can be trusted. It does carry a real toJSON.
+    const decimal: any = Object.create({});
+    Object.assign(decimal, { constructor: function Minified() {}, s: 1, e: 1, d: [35] });
+    decimal.toJSON = () => "35.00";
+
+    await recordCertificatesForSubmittedResults({
+      order: { ...order, totalPrice: decimal },
+      results: [completedResult],
+    });
+
+    const { data } = db.shedTestCertificate.create.mock.calls[0][0];
+    expect(data.snapshotJson.totalPrice).toBe("35.00");
+    expect(data.snapshotJson).not.toHaveProperty("constructor.name");
+    // Nothing anywhere in the snapshot may still be a function.
+    const walk = (node: any): void => {
+      if (!node || typeof node !== "object") {
+        expect(typeof node).not.toBe("function");
+        return;
+      }
+      Object.values(node).forEach(walk);
+    };
+    walk(data.snapshotJson);
+  });
+
+  it("keeps a BigInt rather than throwing on it", async () => {
+    await recordCertificatesForSubmittedResults({
+      order: { ...order, someCount: BigInt(9007199254740993n) } as any,
+      results: [completedResult],
+    });
+
+    const { data } = db.shedTestCertificate.create.mock.calls[0][0];
+    expect(data.snapshotJson.someCount).toBe("9007199254740993");
   });
 
   it("stores a snapshot the breeder app can render without the order", async () => {

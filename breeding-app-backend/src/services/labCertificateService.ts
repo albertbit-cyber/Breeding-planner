@@ -92,30 +92,42 @@ const toIsoString = (value: unknown): string => {
 };
 
 /**
- * Prisma hands back `Decimal` and `Date` instances, which `JSON.stringify` turns
- * into shapes the breeder app does not read back the same way. Normalising here
- * means the snapshot deserialises into exactly the object the app would have
- * received over the wire.
+ * Normalises a Prisma row into exactly the JSON the breeder app receives over
+ * the wire, so the snapshot deserialises into the object the app already knows
+ * how to render.
+ *
+ * This is `JSON.stringify` rather than a hand-written walk of the object,
+ * because the hand-written one was wrong in a way worth remembering. Prisma's
+ * `Decimal` carries `constructor` as an *own enumerable* property, so
+ * `Object.entries` handed it back and the walk recursed into a Function, which
+ * Prisma then refused to store. The class name is no defence either: it is
+ * minified in the published client, so a `constructor.name === "Decimal"` guard
+ * matches nothing. `JSON.stringify` sidesteps both -- Decimal and Date each
+ * carry their own `toJSON`, and it only ever visits enumerable data.
  */
-const toJsonSafe = (value: unknown): unknown => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(toJsonSafe);
-  if (typeof value === "object") {
-    // Prisma Decimal and anything else carrying its own toJSON.
-    const maybeDecimal = value as { toJSON?: () => unknown; constructor?: { name?: string } };
-    if (typeof maybeDecimal.toJSON === "function" && maybeDecimal.constructor?.name === "Decimal") {
-      return String(value);
-    }
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, toJsonSafe(entry)])
-    );
-  }
-  return value;
-};
+const toJsonSafe = (value: unknown): unknown =>
+  JSON.parse(
+    JSON.stringify(value, (_key, entry) =>
+      // JSON.stringify throws outright on a BigInt rather than skipping it, and
+      // an order carrying one must not cost the breeder their certificate.
+      (typeof entry === "bigint" ? entry.toString() : entry)
+    ) ?? "null"
+  );
 
 /**
- * Records a certificate for every completed result on the order.
+ * Records one certificate per animal tested on the order.
+ *
+ * Per *animal*, not per result. One animal routinely carries several completed
+ * results on a single order -- one per test code -- and the breeder app renders
+ * a single certificate covering the animal, so writing one row per result meant
+ * four upserts fighting over the same row and a count that claimed four
+ * certificates where one existed.
+ *
+ * Where an animal has several completed results, the first in the given order is
+ * the one recorded against the certificate. Callers hand these over sorted by
+ * `updatedAt` descending, which is the same result the breeder app picks to
+ * render from, so the stored `resultId` names the result the document actually
+ * shows.
  *
  * Runs *after* the result transaction rather than inside it, on purpose: a
  * laboratory's completed work must not roll back because the certificate row hit
@@ -137,10 +149,19 @@ export const recordCertificatesForSubmittedResults = async (params: {
   );
   if (!completed.length) return 0;
 
+  // One certificate per animal. A Map keyed on the animal keeps the first
+  // result seen for it and drops the rest.
+  const byAnimal = new Map<string, IssuingResult>();
+  completed.forEach((result) => {
+    const animalAppId = String(result?.animalId || "").trim();
+    if (!animalAppId || byAnimal.has(animalAppId)) return;
+    byAnimal.set(animalAppId, result);
+  });
+
   const snapshotOrder = toJsonSafe(order) as Record<string, unknown>;
   let written = 0;
 
-  for (const result of completed) {
+  for (const result of byAnimal.values()) {
     const resultId = String(result?.id || "").trim();
     const animalAppId = String(result?.animalId || "").trim();
     if (!resultId || !animalAppId) continue;
