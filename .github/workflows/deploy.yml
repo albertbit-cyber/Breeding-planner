@@ -46,7 +46,7 @@ jobs:
           # marketplace read another. Nothing published could ever appear.
           #
           # Staging is the fuller database of the two, not the emptier one:
-          # 162 animals against 151, and five weeks newer. The tidy-looking fix
+          # 297 animals against 151, and weeks newer. The tidy-looking fix
           # -- move everything to the environment called "production" -- is the
           # one that loses data. Promoting staging's data into production and
           # moving all five apps across is the real cleanup; until then every
