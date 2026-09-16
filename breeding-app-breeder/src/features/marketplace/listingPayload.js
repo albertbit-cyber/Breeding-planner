@@ -56,3 +56,37 @@ export function buildMarketplaceListingPayload(snake, options = {}) {
     status: published ? PUBLISHED_STATUS : UNPUBLISHED_STATUS,
   };
 }
+
+const isFilled = (value) =>
+  value !== undefined && value !== null && String(value).replace(/\s+/g, ' ').trim() !== '';
+
+/**
+ * An animal can be put up for sale from two places: the For Sale panel in the
+ * breeder app, and the marketplace's own Sell page. Only the first writes
+ * anything back to the animal record, so an animal listed from the Sell page
+ * opened in the breeder app looking as though it were not for sale at all --
+ * no price, no currency, the toggle off, while a live card sat on the website.
+ *
+ * Reconciling here rather than writing the sale facts onto the animal from the
+ * server is deliberate. `shouldApplyIncomingPayload` compares an incoming
+ * payload's own timestamp against the animal ROW's timestamp, and a good number
+ * of animals carry no payload timestamp at all -- for those, any server write
+ * to the row would make every later sync from the breeder fail the comparison
+ * and be dropped on the floor. Reading the listing is free of that hazard.
+ *
+ * The animal record wins wherever it has something to say; the listing only
+ * fills the silences.
+ */
+export function reconcileDraftWithListing(draft, listing) {
+  if (!draft || !listing) return draft;
+
+  const next = { ...draft, forSale: true, marketplacePublished: true };
+  if (!isFilled(next.price) && listing.price !== null && listing.price !== undefined) {
+    next.price = String(listing.price);
+  }
+  if (!isFilled(next.currency) && isFilled(listing.currency)) next.currency = listing.currency;
+  if (!isFilled(next.saleDescription) && isFilled(listing.description)) {
+    next.saleDescription = listing.description;
+  }
+  return next;
+}

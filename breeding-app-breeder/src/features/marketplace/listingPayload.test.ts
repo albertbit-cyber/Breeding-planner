@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildMarketplaceListingPayload, parseListingPrice } from './listingPayload';
+import {
+  buildMarketplaceListingPayload,
+  parseListingPrice,
+  reconcileDraftWithListing,
+} from './listingPayload';
 
 const snake = {
   id: '26-M-004',
@@ -67,5 +71,73 @@ describe('parseListingPrice', () => {
     expect(parseListingPrice('ask me')).toBeNull();
     expect(parseListingPrice(undefined)).toBeNull();
     expect(parseListingPrice(-5)).toBeNull();
+  });
+});
+
+/**
+ * The description was suspected of never persisting, because no animal in the
+ * live account had one saved. Nothing in the chain strips it -- the sync only
+ * removes `data:` media, and the server merge is a plain spread -- so these
+ * pin the leg that was actually in doubt: a description typed in the editor
+ * reaches the listing body unaltered.
+ */
+describe('the buyer description survives the trip', () => {
+  const typed = 'Feeding on frozen-thawed rats every 10 days. Never refused, calm to handle.';
+
+  it('carries what the breeder typed through to the listing', () => {
+    const payload = buildMarketplaceListingPayload(
+      { ...snake, saleDescription: typed }, opts,
+    );
+    expect(payload.description).toBe(typed);
+  });
+
+  it('does not invent one when the box is left empty', () => {
+    expect(buildMarketplaceListingPayload({ ...snake, saleDescription: '' }, opts).description).toBe('');
+    expect(buildMarketplaceListingPayload({ ...snake, saleDescription: undefined }, opts).description).toBe('');
+  });
+
+  it('keeps a description when the animal is taken off sale, so it comes back with it', () => {
+    const payload = buildMarketplaceListingPayload(
+      { ...snake, saleDescription: typed }, { ...opts, published: false },
+    );
+    expect(payload.status).toBe('draft');
+    expect(payload.description).toBe(typed);
+  });
+});
+
+/** An animal listed from the marketplace's Sell page writes nothing to the animal record. */
+describe('reconcileDraftWithListing', () => {
+  const listing = { price: 1000, currency: 'GBP', description: 'From the Sell page.' };
+
+  it('shows an animal listed elsewhere as for sale, with the listing behind it', () => {
+    const draft = reconcileDraftWithListing({ id: '26-M-239' }, listing);
+    expect(draft).toMatchObject({
+      forSale: true,
+      marketplacePublished: true,
+      price: '1000',
+      currency: 'GBP',
+      saleDescription: 'From the Sell page.',
+    });
+  });
+
+  it('never overwrites what the breeder has already put on the animal', () => {
+    const draft = reconcileDraftWithListing(
+      { id: '26-M-239', price: '450', currency: 'EUR', saleDescription: 'Mine.' }, listing,
+    );
+    expect(draft.price).toBe('450');
+    expect(draft.currency).toBe('EUR');
+    expect(draft.saleDescription).toBe('Mine.');
+  });
+
+  it('treats a blank field on the animal as a silence the listing may fill', () => {
+    const draft = reconcileDraftWithListing({ id: 'x', price: '', saleDescription: '   ' }, listing);
+    expect(draft.price).toBe('1000');
+    expect(draft.saleDescription).toBe('From the Sell page.');
+  });
+
+  it('leaves an unlisted animal exactly as it was', () => {
+    const draft = { id: '26-F-011', forSale: false };
+    expect(reconcileDraftWithListing(draft, undefined)).toBe(draft);
+    expect(reconcileDraftWithListing(draft, null)).toBe(draft);
   });
 });
