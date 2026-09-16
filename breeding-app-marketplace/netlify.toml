@@ -2,6 +2,21 @@
   command = "npm install && npm run build"
   publish = "build"
 
+# Which backend the marketplace reads is baked in at build time by Vite, so it
+# cannot be changed at runtime -- and for months nothing in this repository
+# recorded what it was. The breeder, admin, lab and marketing apps all talked to
+# the staging backend while every marketplace deployment talked to production,
+# which are two different databases. An animal published from the breeder went
+# into one and the marketplace read the other, so nothing published could ever
+# appear, and the only way to find out was to download each site's bundle.
+#
+# Staging is the side holding the live data -- 297 animals against production's
+# 151, and weeks newer -- so the marketplace is what moves. Pinned here rather
+# than left to a dashboard variable so the wiring is visible in the repository
+# and cannot drift again unnoticed.
+[context.production.environment]
+  VITE_API_URL = "https://breeding-planner-staging.up.railway.app/api"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

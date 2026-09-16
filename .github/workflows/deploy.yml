@@ -38,7 +38,20 @@ jobs:
           # booted straight into "Backend not configured - running in local
           # mode" and could not list a single animal. Set the repository
           # variable to point somewhere else; this is the fallback.
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://breeding-planner-production.up.railway.app/api' }}
+          #
+          # It points at `staging` because that is where the live data is. The
+          # four Netlify apps -- breeder, admin, lab, marketing -- all talk to
+          # the staging backend, and only this one talked to production, so an
+          # animal published from the breeder went into one database and the
+          # marketplace read another. Nothing published could ever appear.
+          #
+          # Staging is the fuller database of the two, not the emptier one:
+          # 162 animals against 151, and five weeks newer. The tidy-looking fix
+          # -- move everything to the environment called "production" -- is the
+          # one that loses data. Promoting staging's data into production and
+          # moving all five apps across is the real cleanup; until then every
+          # app must agree, and this is the side they agree on.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://breeding-planner-staging.up.railway.app/api' }}
         run: npm run build
         working-directory: breeding-app-marketplace
 
