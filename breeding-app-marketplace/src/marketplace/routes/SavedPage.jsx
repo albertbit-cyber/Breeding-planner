@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { favorites as fetchFavorites, removeSearch, reviewableSales, savedSearches, submitReview } from "../api";
+import {
+  addWishlist,
+  favorites as fetchFavorites,
+  removeSearch,
+  removeWishlist,
+  reviewableSales,
+  savedSearches,
+  submitReview,
+  wishlistMatches,
+  wishlists as fetchWishlists,
+} from "../api";
+import WishlistPanel from "../ui/WishlistPanel";
 import { activeChips, toSearchParams } from "../filters";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
@@ -31,6 +42,8 @@ export default function SavedPage() {
   const [reviewFor, setReviewFor] = useState(null);
   const [rating, setRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
+  const [wishes, setWishes] = useState(null);
+  const [matches, setMatches] = useState([]);
 
   const load = useCallback(() => {
     fetchFavorites()
@@ -41,6 +54,8 @@ export default function SavedPage() {
       });
     savedSearches().then(setSearches).catch(() => setSearches([]));
     reviewableSales().then(setPending).catch(() => setPending([]));
+    fetchWishlists().then(setWishes).catch(() => setWishes([]));
+    wishlistMatches().then(setMatches).catch(() => setMatches([]));
   }, []);
 
   useEffect(load, [load]);
@@ -80,6 +95,7 @@ export default function SavedPage() {
         {[
           ["animals", t("saved.animals", { defaultValue: "Animals" })],
           ["searches", t("saved.searches", { defaultValue: "Searches" })],
+          ["wishlist", t("saved.wishlist", { defaultValue: "Wishlist" })],
           ["reviews", t("saved.reviews", { defaultValue: "Reviews to write" })],
         ].map(([value, label]) => (
           <button
@@ -90,6 +106,7 @@ export default function SavedPage() {
           >
             {label}
             {value === "searches" && searches?.length ? ` (${searches.length})` : ""}
+            {value === "wishlist" && matches.length ? ` (${matches.length})` : ""}
             {value === "reviews" && pending.length ? ` (${pending.length})` : ""}
           </button>
         ))}
@@ -120,6 +137,25 @@ export default function SavedPage() {
             }
           />
         )
+      ) : null}
+
+      {tab === "wishlist" ? (
+        <WishlistPanel
+          wishlists={wishes}
+          matches={matches}
+          onCreate={async (payload) => {
+            const created = await addWishlist(payload);
+            setWishes((current) => [created.wishlist, ...(current || [])]);
+            notify(t("wishlist.added", { defaultValue: "Added. We will tell you when one is listed." }));
+          }}
+          onRemove={async (entry) => {
+            await removeWishlist(entry.id);
+            setWishes((current) => (current || []).filter((item) => item.id !== entry.id));
+            setMatches((current) => current.filter((match) => match.wishlist?.id !== entry.id));
+            notify(t("wishlist.removed", { defaultValue: "Wishlist entry removed." }));
+          }}
+          onError={(message) => notify(message, { tone: "bad" })}
+        />
       ) : null}
 
       {tab === "searches" ? (
