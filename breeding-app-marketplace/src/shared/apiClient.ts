@@ -703,6 +703,33 @@ export const saveMarketplaceStore = async (payload: Record<string, unknown>) =>
     body: JSON.stringify(payload),
   });
 
+/**
+ * A buyer's standing requests -- "tell me when an animal like this is listed" --
+ * and the animals they have turned up.
+ */
+export const fetchWishlists = async () =>
+  request<{ wishlists: unknown[] }>("/marketplace/wishlists");
+
+export const createWishlistEntry = async (payload: Record<string, unknown>) =>
+  request<{ wishlist: unknown }>("/marketplace/wishlists", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateWishlistEntry = async (id: string, payload: Record<string, unknown>) =>
+  request<{ wishlist: unknown }>(`/marketplace/wishlists/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteWishlistEntry = async (id: string) =>
+  request<{ deleted: boolean }>(`/marketplace/wishlists/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+
+export const fetchWishlistMatches = async () =>
+  request<{ matches: unknown[] }>("/marketplace/wishlists/matches");
+
 export const fetchMarketplaceStore = async (userId: string) =>
   request<{ store: unknown }>(`/marketplace/stores/${encodeURIComponent(userId)}`, {
     requiresAuth: false,

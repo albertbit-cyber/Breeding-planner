@@ -11,6 +11,7 @@ import {
   toMarketplaceStoreDto,
 } from "./marketplaceDtos";
 import { buildListingRecord, buildListingRecords, findUnpublishedEvidence } from "./marketplaceRecordService";
+import { notifyWishlistMatches } from "./wishlistService";
 import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 
 const db = prisma as any;
@@ -575,6 +576,9 @@ export const createMarketplaceListing = async (actor: AuthenticatedUser, payload
     });
     return tx.marketplaceListing.findUnique({ where: { id: row.id }, include: LISTING_INCLUDE });
   });
+  // Outside the transaction on purpose: a wishlist that cannot be notified must
+  // never be the reason a breeder's listing fails to save.
+  await notifyWishlistMatches(listing);
   return { listing: toMarketplaceListingDto(listing) };
 };
 
@@ -595,6 +599,7 @@ export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: str
     }
     return tx.marketplaceListing.findUnique({ where: { id }, include: LISTING_INCLUDE });
   });
+  await notifyWishlistMatches(listing);
   return { listing: toMarketplaceListingDto(listing) };
 };
 
@@ -614,6 +619,7 @@ export const updateMarketplaceListingStatus = async (actor: AuthenticatedUser, i
     },
     include: LISTING_INCLUDE,
   });
+  await notifyWishlistMatches(listing);
   return { listing: toMarketplaceListingDto(listing) };
 };
 

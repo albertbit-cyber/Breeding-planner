@@ -32,6 +32,13 @@ import {
   unblockUser,
   uploadMedia,
 } from "../controllers/marketplaceController";
+import {
+  getMyWishlistMatches,
+  getMyWishlists,
+  patchWishlist,
+  postWishlist,
+  removeWishlist,
+} from "../controllers/wishlistController";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { optionalAuth, requireAuth } from "../middleware/auth";
 import { marketplaceMessageLimiter, marketplaceMutationLimiter, marketplaceUploadLimiter } from "../middleware/rateLimiters";
@@ -49,6 +56,14 @@ marketplaceRoutes.post("/listings", marketplaceMutationLimiter, requireAuth, req
 marketplaceRoutes.patch("/listings/:id", marketplaceMutationLimiter, requireAuth, asyncHandler(editListing));
 marketplaceRoutes.patch("/listings/:id/status", marketplaceMutationLimiter, requireAuth, asyncHandler(listingStatus));
 marketplaceRoutes.post("/listings/:id/favorite", marketplaceMutationLimiter, requireAuth, asyncHandler(favoriteListing));
+
+// A buyer's standing requests, and what they have turned up. Above the
+// `/stores/:userId` routes only for readability -- the paths do not overlap.
+marketplaceRoutes.get("/wishlists", requireAuth, asyncHandler(getMyWishlists));
+marketplaceRoutes.post("/wishlists", marketplaceMutationLimiter, requireAuth, asyncHandler(postWishlist));
+marketplaceRoutes.patch("/wishlists/:id", marketplaceMutationLimiter, requireAuth, asyncHandler(patchWishlist));
+marketplaceRoutes.delete("/wishlists/:id", marketplaceMutationLimiter, requireAuth, asyncHandler(removeWishlist));
+marketplaceRoutes.get("/wishlists/matches", requireAuth, asyncHandler(getMyWishlistMatches));
 
 marketplaceRoutes.get("/stores/:userId", asyncHandler(storeDetail));
 marketplaceRoutes.get("/stores/:userId/reviews", asyncHandler(storeReviews));

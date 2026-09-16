@@ -17,6 +17,11 @@ import {
   fetchMarketplaceListingDetail,
   fetchMarketplaceReviewableSales,
   fetchMarketplaceStore,
+  fetchWishlists,
+  fetchWishlistMatches,
+  createWishlistEntry,
+  updateWishlistEntry,
+  deleteWishlistEntry,
   fetchMarketplaceStoreReviews,
   fetchSavedSearches,
   fetchSellableAnimals,
@@ -119,3 +124,14 @@ export const removeSearch = (id) => deleteSavedSearch(id);
 
 export const reviewableSales = async () => (await fetchMarketplaceReviewableSales()).sales || [];
 export const submitReview = (payload) => createMarketplaceReview(payload);
+
+/** Wishlist: what a buyer is hunting for, and what has turned up since. */
+export const wishlists = async () => (await fetchWishlists()).wishlists || [];
+export const addWishlist = (payload) => createWishlistEntry(payload);
+export const editWishlist = (id, payload) => updateWishlistEntry(id, payload);
+export const removeWishlist = (id) => deleteWishlistEntry(id);
+export const wishlistMatches = async () =>
+  ((await fetchWishlistMatches()).matches || []).map((match) => ({
+    ...match,
+    listing: match.listing ? { ...match.listing, imageUrl: resolveMediaUrl(match.listing.imageUrl) } : match.listing,
+  }));
