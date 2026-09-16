@@ -44,6 +44,7 @@ import {
   clearAuthToken,
   createMarketplaceListing,
   fetchBreederSnapshot,
+  fetchSellerDashboard,
   fetchMySubscription,
   fetchMyListings,
   fetchPublicSubscriptionTiers,
@@ -108,7 +109,7 @@ import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/im
 import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
-import { buildMarketplaceListingPayload } from "./features/marketplace/listingPayload";
+import { buildMarketplaceListingPayload, reconcileDraftWithListing } from "./features/marketplace/listingPayload";
 import {
   DEFAULT_ANIMAL_EXPORT_SCOPE,
   collectAnimalScopeOptions,
@@ -9957,11 +9958,37 @@ export default function BreedingPlannerApp() {
    * the keeper's own edits to the name field. Only empty slots are filled: a parent the hatch
    * wizard recorded, or one the keeper picked, is never overwritten by a guess.
    */
+  /**
+   * Which animals the marketplace currently has a live card for, keyed by animal
+   * ID. The Sell page on the marketplace can list an animal without touching the
+   * animal record, so this is the only way the breeder app can know.
+   */
+  const [marketplaceListingsByAnimal, setMarketplaceListingsByAnimal] = useState({});
+
+  const refreshMarketplaceListings = useCallback(async () => {
+    try {
+      const data = await fetchSellerDashboard();
+      const rows = Array.isArray(data?.listings) ? data.listings : [];
+      const next = {};
+      rows.forEach((listing) => {
+        if (!listing?.animalId || listing.status === 'draft') return;
+        next[listing.animalId] = listing;
+      });
+      setMarketplaceListingsByAnimal(next);
+    } catch (_) {
+      // Not a seller, not signed in, or offline. The editor simply falls back to
+      // whatever the animal record itself says.
+    }
+  }, []);
+
+  useEffect(() => { refreshMarketplaceListings(); }, [refreshMarketplaceListings]);
+
   const openSnakeEditor = useCallback((snake) => {
     if (!snake) return;
     setEditSnake(snake);
-    setEditSnakeDraft(withParentsDetectedFromName(initSnakeDraft(snake), snakes));
-  }, [snakes]);
+    const draft = withParentsDetectedFromName(initSnakeDraft(snake), snakes);
+    setEditSnakeDraft(reconcileDraftWithListing(draft, marketplaceListingsByAnimal[snake.id]));
+  }, [snakes, marketplaceListingsByAnimal]);
 
   const openSnakeCard = useCallback((snake) => {
     if (!snake) return;
@@ -10030,6 +10057,8 @@ export default function BreedingPlannerApp() {
     const payload = buildMarketplaceListingPayload(snake, { genetics, species: speciesName, published });
     if (!payload) return;
     await createMarketplaceListing(payload);
+    // Keep the editor's view of what is listed in step with what was just written.
+    refreshMarketplaceListings();
 
     // The breeder's own public profile page still reads the older listings
     // table, so it is kept in step too. It is not what the marketplace shows.
@@ -10062,7 +10091,7 @@ export default function BreedingPlannerApp() {
       // up on the next save is not worth failing the publish over.
       console.warn('Profile listing mirror failed', err);
     }
-  }, []);
+  }, [refreshMarketplaceListings]);
 
   const publishEditSnakeToMarketplace = useCallback(async () => {
     if (!editSnakeDraft || editForSalePublishing) return;
@@ -13537,7 +13566,14 @@ export default function BreedingPlannerApp() {
                       type="button"
                       role="switch"
                       aria-checked={!!editSnakeDraft.forSale}
-                      onClick={() => setEditSnakeDraft(d => ({ ...d, forSale: !d.forSale }))}
+                      onClick={() => setEditSnakeDraft(d => ({
+                        ...d,
+                        forSale: !d.forSale,
+                        // The select renders `currency || 'EUR'`, so leaving it unset
+                        // showed EUR while storing nothing and the listing took EUR
+                        // from a server default instead. Store what is on screen.
+                        currency: d.currency || 'EUR',
+                      }))}
                       className={cx(
                         'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none',
                         editSnakeDraft.forSale ? 'bg-emerald-500' : 'bg-neutral-300'
