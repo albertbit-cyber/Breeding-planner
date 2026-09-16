@@ -111,7 +111,12 @@ import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/im
 import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
-import { buildMarketplaceListingPayload, reconcileDraftWithListing } from "./features/marketplace/listingPayload";
+import {
+  buildMarketplaceListingPayload,
+  listingNeedsPhoto,
+  listingUpdatePayloadFromListing,
+  reconcileDraftWithListing,
+} from "./features/marketplace/listingPayload";
 import {
   extensionFor,
   planPhotoUpload,
@@ -9991,6 +9996,48 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => { refreshMarketplaceListings(); }, [refreshMarketplaceListings]);
 
+  /**
+   * Catch-up for animals listed before photos worked at all.
+   *
+   * Their cards went up with nothing on them, and the pictures cannot be
+   * recovered from the server -- a breeder's photos never leave the device, so
+   * there is no stored copy to point the listing at. This is the only place the
+   * two halves are ever in the same room, so the app does it here rather than
+   * asking the keeper to re-save every animal by hand.
+   *
+   * One attempt per animal per session: a failure that repeats on every render
+   * would be a loop, and the upload is measured in megabytes.
+   */
+  const photoBackfillTried = useRef(new Set());
+
+  useEffect(() => {
+    const pending = Object.entries(marketplaceListingsByAnimal)
+      .filter(([animalId, listing]) => listingNeedsPhoto(listing) && !photoBackfillTried.current.has(animalId));
+    if (!pending.length || !snakes.length) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const [animalId, listing] of pending) {
+        if (cancelled) return;
+        photoBackfillTried.current.add(animalId);
+        const snake = snakes.find((item) => item.id === animalId);
+        if (!snake) continue;
+        const payload = listingUpdatePayloadFromListing(listing);
+        if (!payload) continue;
+        const record = await attachListingPhoto(snake, listing.id, payload);
+        if (cancelled || !record) continue;
+        setSnakes(prev => prev.map(item => item.id === animalId ? {
+          ...item,
+          marketplaceImageUrl: record.imageUrl,
+          marketplaceImageFingerprint: record.fingerprint,
+        } : item));
+      }
+      if (!cancelled) refreshMarketplaceListings();
+    })();
+
+    return () => { cancelled = true; };
+  }, [marketplaceListingsByAnimal, snakes, attachListingPhoto, refreshMarketplaceListings]);
+
   const openSnakeEditor = useCallback((snake) => {
     if (!snake) return;
     setEditSnake(snake);
@@ -10055,6 +10102,51 @@ export default function BreedingPlannerApp() {
    * safe to call on every save: the first call creates the card, the rest keep
    * its price, genetics and description in step with the animal record.
    */
+  /**
+   * Gets one animal's photo onto one listing.
+   *
+   * Shared by publishing and by the catch-up pass below, because both need the
+   * same two things right: the upload has to name its listing, since media is
+   * only served to a signed-out visitor when it belongs to a published listing;
+   * and the whole listing body has to go back alongside the images, because the
+   * update rebuilds every column from what it is sent.
+   */
+  const attachListingPhoto = useCallback(async (snake, listingId, payload) => {
+    if (!snake || !listingId || !payload) return null;
+    try {
+      const plan = planPhotoUpload(snake);
+      if (plan.action === 'none') return null;
+
+      let imageUrl = plan.action === 'link' || plan.action === 'reuse' ? plan.imageUrl : '';
+      let record = null;
+
+      if (plan.action === 'upload') {
+        const parts = splitDataUri(await shrinkToFit(plan.dataUri));
+        if (parts) {
+          const uploaded = await uploadMarketplaceMedia({
+            dataBase64: parts.dataBase64,
+            originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
+            listingId,
+          });
+          imageUrl = uploaded?.media?.publicUrl || '';
+          if (imageUrl) record = { imageUrl, fingerprint: plan.fingerprint };
+        }
+      }
+
+      if (imageUrl) {
+        await updateMarketplaceListing(listingId, {
+          ...payload,
+          images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
+        });
+      }
+      return record;
+    } catch (err) {
+      // A listing without its photo still sells; a failed publish sells nothing.
+      console.warn('Listing photo could not be attached', err);
+      return null;
+    }
+  }, []);
+
   const syncSnakeToMarketplace = useCallback(async (snake, { published = true } = {}) => {
     const tokens = getDisplayedSnakeGeneticsTokens(snake);
     const genetics = tokens.map((tok) =>
@@ -10079,33 +10171,7 @@ export default function BreedingPlannerApp() {
      */
     let photoRecord = null;
     if (listingId) {
-      try {
-        const plan = planPhotoUpload(snake);
-        let imageUrl = plan.action === 'link' || plan.action === 'reuse' ? plan.imageUrl : '';
-
-        if (plan.action === 'upload') {
-          const parts = splitDataUri(await shrinkToFit(plan.dataUri));
-          if (parts) {
-            const uploaded = await uploadMarketplaceMedia({
-              dataBase64: parts.dataBase64,
-              originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
-              listingId,
-            });
-            imageUrl = uploaded?.media?.publicUrl || '';
-            if (imageUrl) photoRecord = { imageUrl, fingerprint: plan.fingerprint };
-          }
-        }
-
-        if (imageUrl) {
-          await updateMarketplaceListing(listingId, {
-            ...payload,
-            images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
-          });
-        }
-      } catch (err) {
-        // A listing without its photo still sells; a failed publish sells nothing.
-        console.warn('Listing photo could not be attached', err);
-      }
+      photoRecord = await attachListingPhoto(snake, listingId, payload);
     }
 
     // Keep the editor's view of what is listed in step with what was just written.

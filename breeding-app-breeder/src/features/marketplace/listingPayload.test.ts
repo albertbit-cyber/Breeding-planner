@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMarketplaceListingPayload,
+  listingNeedsPhoto,
+  listingUpdatePayloadFromListing,
   parseListingPrice,
   reconcileDraftWithListing,
 } from './listingPayload';
@@ -139,5 +141,72 @@ describe('reconcileDraftWithListing', () => {
     const draft = { id: '26-F-011', forSale: false };
     expect(reconcileDraftWithListing(draft, undefined)).toBe(draft);
     expect(reconcileDraftWithListing(draft, null)).toBe(draft);
+  });
+});
+
+/**
+ * Backfilling a photo onto a card that already exists. The update rebuilds every
+ * column from what it is sent, so the danger here is not a missing photo -- it
+ * is silently blanking a live listing while adding one.
+ */
+describe('listingUpdatePayloadFromListing', () => {
+  const listing = {
+    id: 'l1',
+    animalId: '26-M-239',
+    title: 'Mojave Ultramel × Frank - 5',
+    species: 'Ball python',
+    genetics: 'Phantom, Het Ultramel, 50% Het Sunset, 50% Het Hypo',
+    sex: 'Male',
+    price: 1000,
+    currency: 'EUR',
+    description: 'Feeding well.',
+    status: 'available',
+    availability: 'available',
+  };
+
+  it('hands back everything the card is already showing', () => {
+    expect(listingUpdatePayloadFromListing(listing)).toMatchObject({
+      title: 'Mojave Ultramel × Frank - 5',
+      genetics: 'Phantom, Het Ultramel, 50% Het Sunset, 50% Het Hypo',
+      price: 1000,
+      currency: 'EUR',
+      description: 'Feeding well.',
+      status: 'available',
+    });
+  });
+
+  it('keeps a published listing published, and its own availability', () => {
+    expect(listingUpdatePayloadFromListing(listing).status).toBe('available');
+    // Availability is its own column, not a shadow of status: a reserved animal
+    // can still be listed as available to browse. The listing's value stands.
+    expect(listingUpdatePayloadFromListing({ ...listing, availability: 'reserved' }).availability).toBe('reserved');
+    // Only when the listing has none of its own does status stand in for it.
+    const { availability, ...withoutAvailability } = listing;
+    expect(listingUpdatePayloadFromListing({ ...withoutAvailability, status: 'reserved' }).availability).toBe('reserved');
+  });
+
+  it('does not turn a missing price into a free animal', () => {
+    expect(listingUpdatePayloadFromListing({ ...listing, price: null }).price).toBe('');
+  });
+
+  it('refuses a listing with no id, which could not be updated anyway', () => {
+    expect(listingUpdatePayloadFromListing({ title: 'x' })).toBeNull();
+    expect(listingUpdatePayloadFromListing(null)).toBeNull();
+  });
+});
+
+describe('listingNeedsPhoto', () => {
+  it('spots a card the marketplace is showing with nothing on it', () => {
+    expect(listingNeedsPhoto({ id: 'l1', images: [] })).toBe(true);
+    expect(listingNeedsPhoto({ id: 'l1' })).toBe(true);
+  });
+
+  it('leaves a card that already has a picture alone', () => {
+    expect(listingNeedsPhoto({ id: 'l1', imageUrl: '/marketplace/media/abc' })).toBe(false);
+    expect(listingNeedsPhoto({ id: 'l1', images: [{ imageUrl: '/marketplace/media/abc' }] })).toBe(false);
+  });
+
+  it('is false for nothing at all', () => {
+    expect(listingNeedsPhoto(undefined)).toBe(false);
   });
 });

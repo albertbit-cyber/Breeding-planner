@@ -90,3 +90,39 @@ export function reconcileDraftWithListing(draft, listing) {
   }
   return next;
 }
+
+/**
+ * Rebuilds the body for an update from the listing the marketplace already
+ * holds. Needed because the update rebuilds every column from what it is sent:
+ * to add a photo to an existing card you have to hand back everything else that
+ * was on it, or the title, genetics and price are blanked in the process.
+ */
+export function listingUpdatePayloadFromListing(listing) {
+  if (!listing?.id) return null;
+  return {
+    animalId: listing.animalId || undefined,
+    title: listing.title || 'Snake for sale',
+    species: listing.species || undefined,
+    category: listing.category || undefined,
+    genetics: listing.genetics || '',
+    sex: listing.sex || '',
+    birthDate: listing.birthDate || undefined,
+    weight: listing.weight ?? undefined,
+    price: listing.price === null || listing.price === undefined ? '' : listing.price,
+    currency: listing.currency || 'EUR',
+    status: listing.status || 'available',
+    availability: listing.availability || listing.status || 'available',
+    country: listing.country || undefined,
+    city: listing.city || undefined,
+    description: listing.description || '',
+    feedingNotes: listing.feedingNotes || '',
+    temperamentNotes: listing.temperamentNotes || '',
+  };
+}
+
+/** A listing the marketplace is showing without any picture on it. */
+export function listingNeedsPhoto(listing) {
+  if (!listing) return false;
+  if (listing.imageUrl) return false;
+  return !(Array.isArray(listing.images) && listing.images.length > 0);
+}
