@@ -45,6 +45,8 @@ import {
   createMarketplaceListing,
   fetchBreederSnapshot,
   fetchSellerDashboard,
+  updateMarketplaceListing,
+  uploadMarketplaceMedia,
   fetchMySubscription,
   fetchMyListings,
   fetchPublicSubscriptionTiers,
@@ -110,6 +112,12 @@ import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/anima
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import { buildMarketplaceListingPayload, reconcileDraftWithListing } from "./features/marketplace/listingPayload";
+import {
+  extensionFor,
+  planPhotoUpload,
+  shrinkToFit,
+  splitDataUri,
+} from "./features/marketplace/listingPhoto";
 import {
   DEFAULT_ANIMAL_EXPORT_SCOPE,
   collectAnimalScopeOptions,
@@ -10056,7 +10064,50 @@ export default function BreedingPlannerApp() {
 
     const payload = buildMarketplaceListingPayload(snake, { genetics, species: speciesName, published });
     if (!payload) return;
-    await createMarketplaceListing(payload);
+    const created = await createMarketplaceListing(payload);
+    const listingId = created?.listing?.id || '';
+
+    /**
+     * The photo. A breeder's pictures live on this device as data URIs and are
+     * stripped out of every snapshot sync, so the marketplace has never had one
+     * to show. Upload it against the listing -- media is only public when it
+     * belongs to a published listing -- and then attach it.
+     *
+     * The whole payload goes back with the images because the update rebuilds
+     * every column from what it is sent: a patch carrying images alone would
+     * blank the title, the genetics and the price.
+     */
+    let photoRecord = null;
+    if (listingId) {
+      try {
+        const plan = planPhotoUpload(snake);
+        let imageUrl = plan.action === 'link' || plan.action === 'reuse' ? plan.imageUrl : '';
+
+        if (plan.action === 'upload') {
+          const parts = splitDataUri(await shrinkToFit(plan.dataUri));
+          if (parts) {
+            const uploaded = await uploadMarketplaceMedia({
+              dataBase64: parts.dataBase64,
+              originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
+              listingId,
+            });
+            imageUrl = uploaded?.media?.publicUrl || '';
+            if (imageUrl) photoRecord = { imageUrl, fingerprint: plan.fingerprint };
+          }
+        }
+
+        if (imageUrl) {
+          await updateMarketplaceListing(listingId, {
+            ...payload,
+            images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
+          });
+        }
+      } catch (err) {
+        // A listing without its photo still sells; a failed publish sells nothing.
+        console.warn('Listing photo could not be attached', err);
+      }
+    }
+
     // Keep the editor's view of what is listed in step with what was just written.
     refreshMarketplaceListings();
 
@@ -10091,6 +10142,8 @@ export default function BreedingPlannerApp() {
       // up on the next save is not worth failing the publish over.
       console.warn('Profile listing mirror failed', err);
     }
+
+    return photoRecord;
   }, [refreshMarketplaceListings]);
 
   const publishEditSnakeToMarketplace = useCallback(async () => {
@@ -10098,16 +10151,23 @@ export default function BreedingPlannerApp() {
     setEditForSalePublishing(true);
     setEditForSalePublishError('');
     try {
-      await syncSnakeToMarketplace(editSnakeDraft);
+      const photo = await syncSnakeToMarketplace(editSnakeDraft);
       const publishedAt = new Date().toISOString();
+      // Remembering which picture went up is what stops the next save uploading
+      // the same few megabytes again.
+      const photoFields = photo
+        ? { marketplaceImageUrl: photo.imageUrl, marketplaceImageFingerprint: photo.fingerprint }
+        : {};
       setEditSnakeDraft(d => ({
         ...d,
+        ...photoFields,
         forSale: true,
         marketplacePublished: true,
         marketplacePublishedAt: d.marketplacePublishedAt || publishedAt,
       }));
       setSnakes(prev => prev.map(x => x.id === editSnakeDraft.id ? {
         ...x,
+        ...photoFields,
         forSale: true,
         marketplacePublished: true,
         marketplacePublishedAt: x.marketplacePublishedAt || publishedAt,
@@ -13254,8 +13314,16 @@ export default function BreedingPlannerApp() {
                           };
                           if (savedSnake.forSale) {
                             syncSnakeToMarketplace(savedSnake)
-                              .then(() => setSnakes(prev => prev.map(x => x.id === newId
-                                ? { ...x, marketplacePublished: true, marketplacePublishedAt: x.marketplacePublishedAt || new Date().toISOString() }
+                              .then((photo) => setSnakes(prev => prev.map(x => x.id === newId
+                                ? {
+                                    ...x,
+                                    ...(photo ? {
+                                      marketplaceImageUrl: photo.imageUrl,
+                                      marketplaceImageFingerprint: photo.fingerprint,
+                                    } : {}),
+                                    marketplacePublished: true,
+                                    marketplacePublishedAt: x.marketplacePublishedAt || new Date().toISOString(),
+                                  }
                                 : x)))
                               .catch(err => reportSyncFailure(err, t('marketplace.publishFailed', {
                                 defaultValue: 'The animal was saved, but could not be published to the Marketplace.',
