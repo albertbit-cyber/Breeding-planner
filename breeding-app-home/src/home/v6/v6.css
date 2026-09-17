@@ -1,0 +1,1085 @@
+/* Serpentora marketing site - "v6 / Jungle Glass".
+ *
+ * Ported from the Claude Design file `Serpentora Site v6.dc.html`, which styles
+ * everything inline. The token values, radii, type sizes and keyframes below are
+ * copied from it verbatim; only the delivery changed - repeated inline blocks
+ * became the classes the design was obviously already thinking in.
+ *
+ * Everything is scoped under `.v6` rather than `:root`/`html[data-look]`, because
+ * AppearanceContext also writes custom properties onto <html> for the rest of the
+ * site. Scoping keeps the two palettes from reaching into each other. */
+
+.v6 {
+  --pg: #04100e;
+  --band: #062019;
+  --panel: rgba(255, 255, 255, 0.055);
+  --panel-2: rgba(3, 20, 17, 0.6);
+  --ink: #e8fff6;
+  --ink-2: #a9d3c6;
+  --ink-3: #8fc4b4;
+  --rule: rgba(255, 255, 255, 0.12);
+  --rule-strong: rgba(255, 255, 255, 0.22);
+  --accent: #7cf5c6;
+  --accent-strong: #38e8a0;
+  --accent-quiet: rgba(56, 232, 160, 0.18);
+  --accent-2: #4cc9f0;
+  --on-accent: #03231c;
+  --warn: #ffd166;
+  --r-lg: 34px;
+  --r-md: 24px;
+  --r-sm: 16px;
+  --pill: 999px;
+  --bw: 1px;
+  --border: 1px solid rgba(255, 255, 255, 0.13);
+  --shadow: 0 40px 90px -50px #000;
+  --shadow-sm: 0 24px 50px -34px #000;
+  --display: 'Sora', sans-serif;
+  --body: 'Outfit', system-ui, sans-serif;
+  --mono: 'DM Mono', ui-monospace, monospace;
+  --dw: 400;
+  --dwb: 700;
+  --tight: -0.03em;
+  --blur: blur(16px);
+  --cta-bg: linear-gradient(135deg, #38e8a0, #4cc9f0);
+  --cta-fg: #03231c;
+  --cta-shadow: 0 18px 44px -18px rgba(56, 232, 160, 0.85);
+  --chip-bg: rgba(255, 255, 255, 0.06);
+}
+
+.v6[data-look='light'] {
+  --pg: #fffaf0;
+  --band: #f2ecff;
+  --panel: #ffffff;
+  --panel-2: #fff6e3;
+  --ink: #1b1430;
+  --ink-2: #4b4166;
+  --ink-3: #6b6382;
+  --rule: #e2dbf5;
+  --rule-strong: #1b1430;
+  --accent: #5a37e0;
+  --accent-strong: #6c4cf5;
+  --accent-quiet: #efe9ff;
+  --accent-2: #0d80b8;
+  --on-accent: #ffffff;
+  --warn: #c2410c;
+  --r-lg: 36px;
+  --r-md: 26px;
+  --r-sm: 16px;
+  --bw: 2px;
+  --border: 2px solid #1b1430;
+  --shadow: 0 12px 0 #1b1430;
+  --shadow-sm: 0 6px 0 #1b1430;
+  --display: 'Bricolage Grotesque', sans-serif;
+  --dw: 600;
+  --dwb: 800;
+  --tight: -0.035em;
+  --blur: none;
+  --cta-bg: #6c4cf5;
+  --cta-fg: #ffffff;
+  --cta-shadow: 0 6px 0 #1b1430;
+  --chip-bg: #f6f2ff;
+}
+
+/* --- Shell ---------------------------------------------------------------- */
+
+.v6 {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--pg);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.v6 *,
+.v6 *::before,
+.v6 *::after {
+  box-sizing: border-box;
+}
+
+.v6 a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.v6 a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.v6 :focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* The two drifting radial glows behind the page. Position comes from the call
+ * site; everything else is shared. */
+.v6-glow {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, var(--accent-quiet), transparent 66%);
+  animation: v6-drift 26s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes v6-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.07);
+  }
+}
+
+@keyframes v6-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-13px);
+  }
+}
+
+@keyframes v6-float-center {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-13px);
+  }
+}
+
+@keyframes v6-float-tilt-l {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-13px);
+  }
+}
+
+@keyframes v6-float-tilt-r {
+  0%,
+  100% {
+    transform: rotate(3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(3deg) translateY(-13px);
+  }
+}
+
+@keyframes v6-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes v6-flow {
+  to {
+    stroke-dashoffset: -320;
+  }
+}
+
+/* --- Layout --------------------------------------------------------------- */
+
+.v6-wrap {
+  position: relative;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.v6-section {
+  padding-bottom: 70px;
+}
+
+.v6-band {
+  position: relative;
+  background: var(--band);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 70px 0;
+  margin-bottom: 70px;
+}
+
+.v6-band .v6-section:last-child {
+  padding-bottom: 0;
+}
+
+/* Every grid in the design is the same auto-fit shape with a different minimum,
+ * so the minimum is a variable rather than a new rule each time. */
+.v6-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--min, 260px), 1fr));
+  gap: var(--gap, 14px);
+}
+
+.v6-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap, 12px);
+}
+
+.v6-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap, 10px);
+}
+
+.v6-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* Section header: title block left, supporting sentence right. */
+.v6-sechead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+/* The design caps this block at `30ch`, but `ch` resolves against the wrapper's
+ * inherited body size rather than the 46px display type inside it, which leaves
+ * section headlines about six characters wide. Capped in rem instead, so the
+ * measure is the three-to-five words per line the design is drawn at. */
+.v6-sechead__title {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 340px;
+  max-width: min(100%, 34rem);
+}
+
+.v6-sechead__aside {
+  margin: 0;
+  font-size: 17.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  text-wrap: pretty;
+  max-width: 44ch;
+}
+
+/* --- Type ----------------------------------------------------------------- */
+
+.v6-eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.v6-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--ink-3);
+}
+
+.v6-label--tight {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+}
+
+.v6-label--ink {
+  color: var(--ink);
+}
+
+.v6-label--accent {
+  color: var(--accent);
+}
+
+.v6-mono {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.v6-h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: clamp(44px, 7vw, 82px);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  max-width: 19ch;
+  text-wrap: balance;
+}
+
+.v6-h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: clamp(32px, 4.4vw, 46px);
+  line-height: 1.03;
+  letter-spacing: var(--tight);
+}
+
+.v6-h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.06;
+  letter-spacing: var(--tight);
+}
+
+.v6-h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: clamp(22px, 2.4vw, 26px);
+  line-height: 1.1;
+  letter-spacing: var(--tight);
+}
+
+.v6-lead {
+  margin: 0;
+  font-size: 20.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 58ch;
+  text-wrap: pretty;
+}
+
+.v6-copy {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.v6-copy--lg {
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.v6-note {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* The accented one-line summary that closes several blocks, sat under a rule. */
+.v6-angle {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  line-height: 1.6;
+  border-top: 1px solid var(--rule);
+  padding-top: 9px;
+}
+
+.v6-figure {
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: 46px;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+/* --- Surfaces ------------------------------------------------------------- */
+
+.v6-panel {
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--r-md);
+  padding: 22px;
+  backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-sm);
+}
+
+.v6-panel--lg {
+  border-radius: var(--r-lg);
+  padding: 30px;
+  box-shadow: var(--shadow);
+}
+
+.v6-panel--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.v6-panel--deep {
+  background: var(--panel-2);
+}
+
+/* Dashed placeholder standing in for photography that has not been shot yet. */
+.v6-plate {
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--r-sm);
+  background: repeating-linear-gradient(135deg, var(--chip-bg) 0 9px, transparent 9px 18px);
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.6;
+}
+
+.v6-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.v6-rows > * {
+  border-bottom: 1px solid var(--rule);
+}
+
+.v6-rows > *:last-child {
+  border-bottom: 0;
+}
+
+.v6-rows--ruled > *:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.v6-foot {
+  padding: 11px 18px;
+  background: var(--panel-2);
+  font-size: 14.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* --- Chips, pills, buttons ------------------------------------------------ */
+
+.v6-chip {
+  border-radius: var(--pill);
+  border: 1px solid var(--rule-strong);
+  background: var(--chip-bg);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 6px 11px;
+}
+
+.v6-chip--on {
+  background: var(--accent-quiet);
+  border-color: var(--accent-strong);
+  color: var(--accent);
+}
+
+.v6-chip--quiet {
+  background: transparent;
+}
+
+.v6-chip--warn {
+  background: transparent;
+  border-color: var(--warn);
+  color: var(--warn);
+  padding: 7px 12px;
+}
+
+.v6-chip--dashed {
+  background: transparent;
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+.v6-chip--lg {
+  font-family: var(--body);
+  font-size: 16px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+/* Scoped with `.v6` so that these win over the `.v6 a` colour rule above -
+ * several of the buttons are anchors, and without this the CTA text picks up
+ * the accent colour and sits on the accent fill with almost no contrast. */
+.v6 .v6-btn {
+  border: var(--border);
+  border-radius: var(--pill);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  padding: 16px 26px;
+  cursor: pointer;
+  backdrop-filter: var(--blur);
+  text-align: center;
+}
+
+.v6 .v6-btn--cta {
+  border: 0;
+  padding: 16px 30px;
+  background: var(--cta-bg);
+  color: var(--cta-fg);
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  box-shadow: var(--cta-shadow);
+}
+
+.v6 .v6-btn--sm {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 12px 20px;
+}
+
+.v6 .v6-btn--quiet {
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 7px 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.v6 .v6-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- Masthead ------------------------------------------------------------- */
+
+.v6-mast {
+  position: relative;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px 28px 0;
+}
+
+.v6-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--pill);
+  padding: 12px 14px 12px 22px;
+  backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-sm);
+}
+
+.v6-nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--ink);
+}
+
+.v6-nav__brand:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.v6-nav__mark {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
+}
+
+.v6-nav__word {
+  font-family: var(--display);
+  font-weight: var(--dwb);
+  font-size: 20px;
+  letter-spacing: var(--tight);
+}
+
+/* Centred and allowed to shrink, so the row reads as one bar at desktop width
+ * and still wraps tidily once the eight anchors no longer fit. */
+.v6-nav__links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  margin-inline: auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  font-size: 15.5px;
+  color: var(--ink-2);
+}
+
+.v6-nav__links a {
+  padding: 8px 9px;
+  border-radius: var(--pill);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.v6-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.v6 .v6-nav__signin {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 10px 4px;
+  white-space: nowrap;
+}
+
+/* --- Hero ----------------------------------------------------------------- */
+
+.v6-hero {
+  position: relative;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 68px 28px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+}
+
+.v6-hero__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--accent-quiet);
+  border: 1px solid var(--accent-strong);
+  border-radius: var(--pill);
+  padding: 8px 16px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.v6-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  animation: v6-pulse 2.6s ease-in-out infinite;
+}
+
+.v6-hero__stage {
+  position: relative;
+  width: 100%;
+  height: 470px;
+  margin-top: 10px;
+}
+
+.v6-hero__web {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.v6-hero__mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 190px;
+  height: 190px;
+  object-fit: contain;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.v6-hero__card {
+  position: absolute;
+  width: 262px;
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--r-md);
+  padding: 18px;
+  text-align: left;
+  box-shadow: var(--shadow);
+  backdrop-filter: var(--blur);
+}
+
+.v6-hero__card--sire {
+  left: 2%;
+  top: 70px;
+  animation: v6-float-tilt-l 9s ease-in-out infinite;
+}
+
+.v6-hero__card--dam {
+  right: 2%;
+  top: 120px;
+  animation: v6-float-tilt-r 11s ease-in-out infinite reverse;
+}
+
+.v6-hero__clutch {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(560px, 88%);
+  max-width: calc(100% - 24px);
+  background: var(--panel-2);
+  border: var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: var(--blur);
+  text-align: left;
+  animation: v6-float-center 13s ease-in-out infinite;
+}
+
+.v6-swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  flex: none;
+}
+
+/* --- Eggs ----------------------------------------------------------------- */
+
+.v6-egg {
+  width: 32px;
+  height: 41px;
+  border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%;
+  flex: none;
+}
+
+.v6-egg--sm {
+  width: 30px;
+  height: 39px;
+}
+
+.v6-egg--xs {
+  width: 24px;
+  height: 31px;
+}
+
+.v6-egg--xxs {
+  width: 16px;
+  height: 21px;
+}
+
+/* --- Bars ----------------------------------------------------------------- */
+
+.v6-bar {
+  height: 6px;
+  border-radius: var(--pill);
+  background: var(--chip-bg);
+  overflow: hidden;
+}
+
+.v6-bar > span {
+  display: block;
+  height: 6px;
+  border-radius: var(--pill);
+  background: var(--accent-strong);
+}
+
+/* --- Calculator ----------------------------------------------------------- */
+
+.v6-calc {
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+}
+
+.v6-calc__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.v6-calc__col {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+/* Row-safe: a border-top per cell survives grid wrapping, where a border-left
+ * would strand a divider at the row edge. */
+.v6-calc__cols > .v6-calc__col:first-child {
+  border-top: 0;
+}
+
+@media (min-width: 900px) {
+  .v6-calc__col {
+    border-top: 0;
+    border-right: 1px solid var(--rule);
+  }
+  .v6-calc__col:last-child {
+    border-right: 0;
+  }
+}
+
+.v6-calc__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 9px;
+}
+
+.v6-calc__summary {
+  font-size: 15px;
+  color: var(--accent);
+  text-align: right;
+}
+
+.v6-gene {
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 8px 11px;
+  cursor: pointer;
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+
+.v6-gene__tag {
+  font-size: 9.5px;
+  opacity: 0.85;
+}
+
+.v6-calc__block {
+  border-top: 1px solid var(--rule);
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.v6-pergene {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v6-explain {
+  border-top: 1px solid var(--rule);
+  background: var(--panel-2);
+  padding: 24px 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.v6-explain__toggle {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.v6-square {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.v6-square__cell {
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 68px;
+}
+
+.v6-gamete {
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 11px;
+}
+
+.v6-stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--pill);
+  overflow: hidden;
+}
+
+.v6-stepper button {
+  background: transparent;
+  border: 0;
+  width: 38px;
+  font-size: 17px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.v6-stepper__value {
+  font-family: var(--display);
+  font-weight: var(--dw);
+  font-size: 24px;
+  line-height: 1;
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 4px;
+}
+
+/* --- Waitlist ------------------------------------------------------------- */
+
+.v6-waitlist {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: var(--border);
+  background: var(--band);
+  padding: 60px 40px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.v6-field {
+  border-radius: var(--pill);
+  border: 1px solid var(--rule-strong);
+  background: var(--panel);
+  padding: 16px 22px;
+  font-size: 16.5px;
+  color: var(--ink);
+  min-width: 290px;
+  font-family: var(--body);
+}
+
+.v6-field::placeholder {
+  color: var(--ink-3);
+}
+
+/* --- Footer --------------------------------------------------------------- */
+
+.v6-footer {
+  position: relative;
+  border-top: 1px solid var(--rule);
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 30px 28px 46px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.v6-footer a {
+  color: var(--ink-3);
+  font-size: 15px;
+}
+
+/* --- Narrow screens --------------------------------------------------------
+ * The design is desktop-first and leans on auto-fit grids to collapse. Two
+ * things it does not handle on a phone: the absolutely positioned hero stage,
+ * and the fixed 40px padding on the waitlist panel. */
+
+@media (max-width: 860px) {
+  .v6-hero__stage {
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .v6-hero__web,
+  .v6-hero__mark {
+    position: static;
+    inset: auto;
+    transform: none;
+    height: 190px;
+    margin: 0 auto;
+  }
+  .v6-hero__card,
+  .v6-hero__clutch {
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .v6-wrap,
+  .v6-mast,
+  .v6-hero {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .v6-waitlist {
+    padding: 40px 22px;
+  }
+  .v6-field {
+    min-width: 0;
+    width: 100%;
+  }
+  /* A 999px radius reads as a pill on one row and as a blob once the nav wraps
+     to three, so the masthead squares off when it stacks. */
+  .v6-nav {
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    justify-content: center;
+  }
+  .v6-nav__links {
+    order: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v6 *,
+  .v6 *::before,
+  .v6 *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

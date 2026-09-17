@@ -43,3 +43,13 @@ export function loginUser({ email, password }) {
 export function getPublicTiers() {
   return req('/api/subscriptions/public/tiers');
 }
+
+// Pre-launch waitlist. NOTE: the backend does not implement this route yet, so
+// every call currently fails and the form falls back to offering sign-up — see
+// WaitlistForm. Adding `POST /api/waitlist` is all that is needed to turn it on.
+export function joinWaitlist({ email }) {
+  return req('/api/waitlist', {
+    method: 'POST',
+    body: JSON.stringify({ email, source: 'serpentora-site' }),
+  });
+}
