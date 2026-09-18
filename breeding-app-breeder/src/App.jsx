@@ -9996,48 +9996,6 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => { refreshMarketplaceListings(); }, [refreshMarketplaceListings]);
 
-  /**
-   * Catch-up for animals listed before photos worked at all.
-   *
-   * Their cards went up with nothing on them, and the pictures cannot be
-   * recovered from the server -- a breeder's photos never leave the device, so
-   * there is no stored copy to point the listing at. This is the only place the
-   * two halves are ever in the same room, so the app does it here rather than
-   * asking the keeper to re-save every animal by hand.
-   *
-   * One attempt per animal per session: a failure that repeats on every render
-   * would be a loop, and the upload is measured in megabytes.
-   */
-  const photoBackfillTried = useRef(new Set());
-
-  useEffect(() => {
-    const pending = Object.entries(marketplaceListingsByAnimal)
-      .filter(([animalId, listing]) => listingNeedsPhoto(listing) && !photoBackfillTried.current.has(animalId));
-    if (!pending.length || !snakes.length) return;
-
-    let cancelled = false;
-    (async () => {
-      for (const [animalId, listing] of pending) {
-        if (cancelled) return;
-        photoBackfillTried.current.add(animalId);
-        const snake = snakes.find((item) => item.id === animalId);
-        if (!snake) continue;
-        const payload = listingUpdatePayloadFromListing(listing);
-        if (!payload) continue;
-        const record = await attachListingPhoto(snake, listing.id, payload);
-        if (cancelled || !record) continue;
-        setSnakes(prev => prev.map(item => item.id === animalId ? {
-          ...item,
-          marketplaceImageUrl: record.imageUrl,
-          marketplaceImageFingerprint: record.fingerprint,
-        } : item));
-      }
-      if (!cancelled) refreshMarketplaceListings();
-    })();
-
-    return () => { cancelled = true; };
-  }, [marketplaceListingsByAnimal, snakes, attachListingPhoto, refreshMarketplaceListings]);
-
   const openSnakeEditor = useCallback((snake) => {
     if (!snake) return;
     setEditSnake(snake);
@@ -10146,6 +10104,48 @@ export default function BreedingPlannerApp() {
       return null;
     }
   }, []);
+
+  /**
+   * Catch-up for animals listed before photos worked at all.
+   *
+   * Their cards went up with nothing on them, and the pictures cannot be
+   * recovered from the server -- a breeder's photos never leave the device, so
+   * there is no stored copy to point the listing at. This is the only place the
+   * two halves are ever in the same room, so the app does it here rather than
+   * asking the keeper to re-save every animal by hand.
+   *
+   * One attempt per animal per session: a failure that repeats on every render
+   * would be a loop, and the upload is measured in megabytes.
+   */
+  const photoBackfillTried = useRef(new Set());
+
+  useEffect(() => {
+    const pending = Object.entries(marketplaceListingsByAnimal)
+      .filter(([animalId, listing]) => listingNeedsPhoto(listing) && !photoBackfillTried.current.has(animalId));
+    if (!pending.length || !snakes.length) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const [animalId, listing] of pending) {
+        if (cancelled) return;
+        photoBackfillTried.current.add(animalId);
+        const snake = snakes.find((item) => item.id === animalId);
+        if (!snake) continue;
+        const payload = listingUpdatePayloadFromListing(listing);
+        if (!payload) continue;
+        const record = await attachListingPhoto(snake, listing.id, payload);
+        if (cancelled || !record) continue;
+        setSnakes(prev => prev.map(item => item.id === animalId ? {
+          ...item,
+          marketplaceImageUrl: record.imageUrl,
+          marketplaceImageFingerprint: record.fingerprint,
+        } : item));
+      }
+      if (!cancelled) refreshMarketplaceListings();
+    })();
+
+    return () => { cancelled = true; };
+  }, [marketplaceListingsByAnimal, snakes, attachListingPhoto, refreshMarketplaceListings]);
 
   const syncSnakeToMarketplace = useCallback(async (snake, { published = true } = {}) => {
     const tokens = getDisplayedSnakeGeneticsTokens(snake);
