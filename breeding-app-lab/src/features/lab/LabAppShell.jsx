@@ -10,6 +10,7 @@ import CompletedTestsPage from "./pages/CompletedTestsPage.jsx";
 import OrderArchivePage from "./pages/OrderArchivePage.jsx";
 import { createLabApiClient } from "./api/client";
 import TestCatalogPage from "./pages/TestCatalogPage.jsx";
+import CatalogueImportPage from "./onboarding/CatalogueImportPage.jsx";
 import PricingLogicPage from "./pages/PricingLogicPage.jsx";
 import LabSettingsPage from "./pages/LabSettingsPage.jsx";
 import LabTeamPage from "./pages/LabTeamPage.jsx";
@@ -153,6 +154,7 @@ const parseRoute = (path) => {
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
   if (normalized === "/lab/archive") return { route: "/lab/archive" };
   if (normalized === "/lab/test-catalog") return { route: "/lab/test-catalog" };
+  if (normalized === "/lab/catalogue-import") return { route: "/lab/catalogue-import" };
   if (normalized === "/lab/pricing-logic") return { route: "/lab/pricing-logic" };
   if (normalized === "/lab/settings") return { route: "/lab/settings" };
   if (normalized === "/lab/team") return { route: "/lab/team" };
@@ -173,6 +175,7 @@ const navItems = [
   { path: "/lab/completed-tests", label: "Completed Tests" },
   { path: "/lab/archive", label: "Archive" },
   { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
+  { path: "/lab/catalogue-import", label: "Import Catalogue", roles: ["lab_staff", "admin"] },
   { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
   { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
   { path: "/lab/team", label: "Team", roles: ["lab_staff", "admin"] },
@@ -209,6 +212,18 @@ const pageForRoute = (parsedRoute, role) => {
         );
       }
       return <TestCatalogPage />;
+    // Publishing a whole price list is the same act as adding one test, so it
+    // sits behind the same roles as the catalogue it writes into.
+    case "/lab/catalogue-import":
+      if (role !== "lab_staff" && role !== "admin") {
+        return (
+          <section className="space-y-3">
+            <h1 className="text-2xl font-semibold text-rose-700">Catalogue Import Restricted</h1>
+            <p className="text-sm text-neutral-700">Only lab staff or admin users can publish a catalogue.</p>
+          </section>
+        );
+      }
+      return <CatalogueImportPage />;
     case "/lab/pricing-logic":
       if (role !== "lab_staff" && role !== "admin") {
         return (

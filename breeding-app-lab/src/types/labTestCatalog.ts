@@ -22,6 +22,12 @@ export interface LabAvailableTest {
   priceModel?: string;
   /** Price when bundled onto a morph test on the same animal. */
   addonPriceCents?: number;
+  /**
+   * This test's own prices per order size, in cents, when the laboratory prices
+   * it on a different scale from the rest of its catalogue. Absent means it
+   * follows the laboratory's tier table.
+   */
+  tierPrices?: { t1: number; t2: number; t3: number } | null;
   /** Every species this test covers. */
   speciesIds?: string[];
   species?: Array<{ id: string; name: string }>;

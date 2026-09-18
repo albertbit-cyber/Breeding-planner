@@ -6,6 +6,7 @@ import {
   getLabProfile,
   getPricingConfig,
   getPublicLab,
+  importOfferings,
   listOfferings,
   listPublicLabs,
   listSeedLibrary,
@@ -81,6 +82,16 @@ export const postMyOffering = async (req: Request, res: Response): Promise<void>
 
 export const patchMyOffering = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await updateOffering(ownOrganizationId(req), req.params.id, req.body || {}));
+};
+
+/**
+ * A whole price list at once, from the spreadsheet a laboratory was sent when it
+ * was invited. `dryRun` returns the plan without writing, which is what the
+ * portal's review step shows before anyone commits to it.
+ */
+export const postMyOfferingImport = async (req: Request, res: Response): Promise<void> => {
+  const result = await importOfferings(ownOrganizationId(req), req.body || {});
+  res.status(result.dryRun ? 200 : 201).json(result);
 };
 
 export const deleteMyOffering = async (req: Request, res: Response): Promise<void> => {
