@@ -1051,6 +1051,18 @@ export const createMarketplaceListing = async (payload: Record<string, unknown>)
     body: JSON.stringify(payload),
   });
 
+/**
+ * Uploads one image and, when `listingId` is given, attaches it to that listing.
+ * The attachment matters for more than tidiness: media is only served to a
+ * signed-out visitor when it belongs to a published listing, so a photo uploaded
+ * without one is a 404 to every buyer.
+ */
+export const uploadMarketplaceMedia = async (payload: Record<string, unknown>) =>
+  request<{ media: { id: string; publicUrl: string; mimeType: string } }>(
+    "/marketplace/uploads",
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+
 export const updateMarketplaceListing = async (id: string, payload: Record<string, unknown>) =>
   request<{ listing: unknown }>(`/marketplace/listings/${encodeURIComponent(id)}`, {
     method: "PATCH",
