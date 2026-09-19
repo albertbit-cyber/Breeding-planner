@@ -10,7 +10,7 @@ import {
   summarise,
 } from './genetics.js';
 
-/* Section № 02 — the one genuinely interactive system on the page.
+/* The genetics calculator — the one genuinely interactive system on the site.
  *
  * Each gene is a tri-state chip per parent: click cycles none → het/visual →
  * visual/super. Everything below the chips is derived, so there is no state to
@@ -312,8 +312,13 @@ function ClutchPanel({ clutch, eggs, setEggs, roll }) {
 }
 
 export default function Calculator() {
-  const [male, setMale] = useState({});
-  const [female, setFemale] = useState({});
+  // The calculator opens on a real pairing rather than two empty parents. It is
+  // the only place a visitor can test the product's central claim before giving
+  // up an email address, and an empty form asks them to do the work first. This
+  // pairing is chosen to show the interesting cases at once: a visual recessive
+  // from two hets, an incomplete dominant with a super, and a 66% possible het.
+  const [male, setMale] = useState({ Pastel: 1, Pied: 1 });
+  const [female, setFemale] = useState({ Clown: 2, Pied: 1 });
   const [explainOpen, setExplainOpen] = useState(false);
   const [focusName, setFocusName] = useState(null);
   const [eggs, setEggs] = useState(6);
@@ -361,7 +366,7 @@ export default function Calculator() {
   return (
     <section id="calculator" className="v6-wrap v6-section">
       <div className="v6-stack" style={{ '--gap': '14px', marginBottom: 24, maxWidth: '60ch' }}>
-        <span className="v6-eyebrow">№ 02 · Genetics &amp; calculator</span>
+        <span className="v6-eyebrow">Genetics &amp; calculator</span>
         <h2 className="v6-h2">Every outcome, and the reason for it</h2>
         <p className="v6-copy v6-copy--lg">
           Tap a gene once for het or single-gene, twice for visual or super. Recessives, dominants,

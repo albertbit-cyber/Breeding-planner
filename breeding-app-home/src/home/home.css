@@ -4,7 +4,13 @@
 
 /* ── Reset ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+
+/* Smooth scrolling only for people who have not asked for less motion. The
+   landing page is long and its nav is anchor-driven, so an unguarded smooth
+   scroll animates thousands of pixels for exactly the visitors who opted out. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 body {
   font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
   background: var(--sk-surface);

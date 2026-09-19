@@ -4,13 +4,47 @@
     <meta charset="utf-8" />
     <link rel="icon" type="image/png" sizes="256x256" href="app-icons/icon_256x256.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1c1c1a" />
-    <meta name="description" content="Breeding Planner — the genetics-first platform for reptile breeders. Track animals, predict morphs, order lab tests, and sell on the marketplace." />
+    <!-- Matches the default "Jungle Glass" ground so mobile browser chrome does not
+         flash the old palette. Kept in sync with the skin toggle by useLook. -->
+    <meta name="theme-color" content="#04100e" />
+    <meta
+      name="description"
+      content="Serpentora keeps reptile breeding records that behave like biology: animals, genetics, pairings, pedigrees, quarantine and lab work in one place, honest about odds, and working offline in the reptile room."
+    />
     <link rel="apple-touch-icon" href="logo192.png" />
     <link rel="manifest" href="manifest.json" />
     <title>Serpentora — reptile breeding records</title>
-    <!-- Tabler Icons webfont — the landing page is built entirely on `ti ti-*` glyphs. -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+
+    <!-- The site's distribution is forums and keeper groups, so the unfurl matters
+         as much as the page. Absolute URL because link previews do not resolve
+         relative paths. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Serpentora" />
+    <meta property="og:title" content="The living system behind every clutch" />
+    <meta
+      property="og:description"
+      content="Animals, genetics, pairings, pedigrees, quarantine and lab work in one place that behaves like biology — connected, traceable, and honest about odds."
+    />
+    <meta property="og:image" content="https://serpentora.com/serpentora-mark-380.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The living system behind every clutch" />
+    <meta
+      name="twitter:description"
+      content="Reptile breeding records that behave like biology. Honest about odds, and offline in the reptile room."
+    />
+    <meta name="twitter:image" content="https://serpentora.com/serpentora-mark-380.png" />
+
+    <!-- Tabler Icons webfont. Used by the legal/auth routes, not by the landing
+         page, so it is loaded without blocking the first render. -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    </noscript>
     <!-- Serpentora landing page type. Sora/DM Mono carry the dark "Jungle Glass"
          skin; Bricolage Grotesque is the display face of the light one. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,9 +53,6 @@
       href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <!-- Tailwind CDN — the shared backend banner/guard carried over from the
-         sibling apps are written in Tailwind utility classes. -->
-    <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

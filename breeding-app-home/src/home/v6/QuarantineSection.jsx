@@ -11,7 +11,7 @@ import {
 } from './data.js';
 import { SectionHead } from './ProductSections.jsx';
 
-/* Section № 08 — the longest section on the page, and the one whose copy is
+/* The quarantine protocol. The longest run of copy on the site, and the one whose wording is
  * most deliberate: it states what each test cannot prove and that the app
  * records rather than diagnoses. None of that hedging is padding. */
 
@@ -27,7 +27,7 @@ export default function QuarantineSection() {
       >
         <div>
           <SectionHead
-            eyebrow="№ 08 · Quarantine"
+            eyebrow="Quarantine"
             title="Quarantine, kept properly."
             aside="Where a new animal earns its way into your collection — with the clock, the checks, the tests and the separation all tracked, and none of it left to memory."
           />
@@ -233,9 +233,8 @@ export default function QuarantineSection() {
                 </span>
               ))}
             </div>
-            <div className="v6-plate" style={{ aspectRatio: '16 / 9' }}>
-              Still · check map — numbered anatomical points, head in profile
-            </div>
+            {/* Awaiting the anatomical check-map illustration. The chips above
+                already name every point, so the section reads without it. */}
           </div>
 
           <div className="v6-stack">
@@ -295,7 +294,7 @@ export default function QuarantineSection() {
             Alongside it, six laboratories known to run reptile diagnostics across the US, Canada,
             Germany, the EU and UK. Deliberately unpriced, not exhaustive, and not an endorsement.
             These are health diagnostics ordered through a vet — not the orderable genetic shed tests
-            in № 05.
+            in shed testing.
           </span>
         </div>
 

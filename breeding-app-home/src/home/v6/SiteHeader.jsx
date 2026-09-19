@@ -1,17 +1,52 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useLook } from './useLook.js';
 
+// Anchors point inside the landing page; paths are their own routes. The mix is
+// the point: the argument is one scroll, the reference material is not.
 const NAV = [
   ['#breeding', 'Breeding'],
   ['#calculator', 'Genetics'],
-  ['#health', 'Health'],
+  ['/collection', 'Collection'],
   ['#lab', 'Lab'],
-  ['#quarantine', 'Quarantine'],
-  ['#setup', 'Settings'],
+  ['/quarantine', 'Quarantine'],
+  ['/settings', 'Settings'],
   ['#plans', 'Plans'],
-  ['#appearance', 'Appearance'],
 ];
+
+/**
+ * One nav item, which has to work from anywhere.
+ *
+ * An anchor tapped on the landing page scrolls. The same anchor tapped from
+ * /quarantine has nothing to scroll to, so it becomes a link back to the
+ * landing page carrying the hash, and V6Layout scrolls once the section exists.
+ */
+function NavItem({ to, label, onNavigate }) {
+  const { pathname } = useLocation();
+  const isAnchor = to.startsWith('#');
+
+  if (!isAnchor) {
+    return (
+      <Link to={to} onClick={onNavigate} aria-current={pathname === to ? 'page' : undefined}>
+        {label}
+      </Link>
+    );
+  }
+
+  if (pathname === '/') {
+    return (
+      <a href={to} onClick={onNavigate}>
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={`/${to}`} onClick={onNavigate}>
+      {label}
+    </Link>
+  );
+}
 
 const STATS = [
   ['635', 'genes and morphs, curated species by species.'],
@@ -20,22 +55,37 @@ const STATS = [
   ['0', 'signal required — it works offline in the reptile room.'],
 ];
 
-function Masthead() {
+export function Masthead() {
   const { toggle, lookLabel } = useLook();
+  // Below 760px the eight anchors and three actions wrapped onto four rows and
+  // ate a third of the opening screen, with a waitlist button competing with the
+  // hero's own. Collapsed, the header is the brand and one control, and the CTA
+  // in the hero is the only one in the first viewport.
+  const [open, setOpen] = React.useState(false);
+  const close = React.useCallback(() => setOpen(false), []);
 
   return (
     <div className="v6-mast">
-      <nav className="v6-nav">
-        <Link to="/" className="v6-nav__brand">
-          <img src="/serpentora-mark.png" alt="" className="v6-nav__mark" />
+      <nav className="v6-nav" data-open={open ? '' : undefined}>
+        <Link to="/" className="v6-nav__brand" onClick={close}>
+          {/* 72px source for a 36px slot — 2x for retina, not the 2911px original. */}
+          <img src="/serpentora-mark-72.png" alt="" width="36" height="35" className="v6-nav__mark" />
           <span className="v6-nav__word">Serpentora</span>
         </Link>
 
-        <div className="v6-nav__links">
+        <button
+          type="button"
+          className="v6-nav__toggle"
+          aria-expanded={open}
+          aria-controls="v6-nav-links"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? 'Close' : 'Menu'}
+        </button>
+
+        <div className="v6-nav__links" id="v6-nav-links">
           {NAV.map(([href, label]) => (
-            <a key={href} href={href}>
-              {label}
-            </a>
+            <NavItem key={href} to={href} label={label} onNavigate={close} />
           ))}
         </div>
 
@@ -51,10 +101,15 @@ function Masthead() {
           </button>
           {/* Kept for people who already have an account: the site sells a
               waitlist, but sign-in is live and shouldn't be hidden from them. */}
-          <Link to="/login" className="v6-nav__signin">
+          <Link to="/login" className="v6-nav__signin" onClick={close}>
             Sign in
           </Link>
-          <a href="#waitlist" className="v6-btn v6-btn--cta v6-btn--sm" style={{ fontSize: 11.5 }}>
+          <a
+            href="#waitlist"
+            onClick={close}
+            className="v6-btn v6-btn--cta v6-btn--sm"
+            style={{ fontSize: 11.5 }}
+          >
             Join waitlist
           </a>
         </div>
@@ -161,7 +216,16 @@ function Hero() {
           </g>
         </svg>
 
-        <img src="/serpentora-mark.png" alt="" className="v6-hero__mark" />
+        {/* Above the fold, so eager and fetch-priority high: this is the LCP candidate. */}
+        <img
+          src="/serpentora-mark-380.png"
+          alt=""
+          width="190"
+          height="182"
+          /* lowercase: React 18 does not recognise the camelCase form and drops it */
+          fetchpriority="high"
+          className="v6-hero__mark"
+        />
 
         <ParentCard
           variant="sire"
@@ -263,10 +327,11 @@ function StatsLedger() {
   );
 }
 
+/* The landing page's opening: hero and stats. The masthead is separate because
+   the deeper routes reuse it through V6Layout without the hero. */
 export default function SiteHeader() {
   return (
     <>
-      <Masthead />
       <Hero />
       <StatsLedger />
     </>

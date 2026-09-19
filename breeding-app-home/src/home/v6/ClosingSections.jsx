@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { INVENTORY, PLANS } from './data.js';
 import WaitlistForm from './WaitlistForm.jsx';
 
-/* Sections № 10 and № 11, the closing call to action, and the footer. */
+/* Plans, the data promise, the closing call to action, and the footer. */
 
 const BREEDER_APP = import.meta.env.VITE_BREEDER_APP_URL || 'https://app.serpentora.com';
 const MARKETPLACE = import.meta.env.VITE_MARKETPLACE_URL || 'https://mp.serpentora.com';
@@ -14,7 +14,7 @@ function Plans() {
       <section id="plans" className="v6-wrap v6-section">
         <div className="v6-sechead">
           <div className="v6-sechead__title">
-            <span className="v6-eyebrow">№ 10 · Plans</span>
+            <span className="v6-eyebrow">Plans</span>
             <h2 className="v6-h2">Plans for every collection.</h2>
           </div>
           <p className="v6-sechead__aside">
@@ -109,7 +109,7 @@ function YourData() {
       style={{ '--min': '300px', '--gap': '30px', alignItems: 'start' }}
     >
       <div className="v6-stack">
-        <span className="v6-eyebrow">№ 11 · Your data</span>
+        <span className="v6-eyebrow">Your data</span>
         <h2 className="v6-h2">Your data stays yours.</h2>
       </div>
       <div className="v6-rows v6-rows--ruled">
@@ -160,13 +160,16 @@ function Waitlist() {
   );
 }
 
-function SiteFooter() {
+export function SiteFooter() {
   return (
     <footer className="v6-footer">
       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <img
-          src="/serpentora-mark.png"
+          src="/serpentora-mark-72.png"
           alt=""
+          width="26"
+          height="26"
+          loading="lazy"
           style={{ width: 26, height: 26, objectFit: 'contain', display: 'block' }}
         />
         <span style={{ fontFamily: 'var(--display)', fontWeight: 'var(--dwb)', fontSize: 16 }}>
@@ -175,12 +178,15 @@ function SiteFooter() {
       </div>
 
       <div className="v6-cluster" style={{ '--gap': '20px' }}>
-        <a href="#breeding">Breeding</a>
-        <a href="#calculator">Genetics</a>
-        <a href="#health">Health</a>
-        <a href="#lab">Lab</a>
-        <a href="#market">Marketplace</a>
-        <a href="#appearance">Appearance</a>
+        {/* Hash links carry the leading slash so they work from the deeper
+            routes as well as from the landing page. */}
+        <Link to="/#breeding">Breeding</Link>
+        <Link to="/#calculator">Genetics</Link>
+        <Link to="/#lab">Lab</Link>
+        <Link to="/collection">Collection</Link>
+        <Link to="/quarantine">Quarantine</Link>
+        <Link to="/settings">Settings</Link>
+        <Link to="/#plans">Plans</Link>
         {/* The app and the marketplace are the only external products linked
             publicly — partner labs run their own portal and it stays unlisted. */}
         <a href={BREEDER_APP}>App</a>
@@ -199,13 +205,16 @@ function SiteFooter() {
   );
 }
 
+export { Plans, Waitlist };
+
+/* The landing page's close. The footer is separate because V6Layout renders it
+   on every route. */
 export default function ClosingSections() {
   return (
     <>
       <Plans />
       <YourData />
       <Waitlist />
-      <SiteFooter />
     </>
   );
 }

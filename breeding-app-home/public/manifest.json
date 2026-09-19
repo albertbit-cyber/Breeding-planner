@@ -1,6 +1,6 @@
 {
-  "short_name": "Breeding Planner",
-  "name": "Breeding Planner",
+  "short_name": "Serpentora",
+  "name": "Serpentora",
   "icons": [
     {
       "src": "app-icons/icon_16x16.png",
@@ -36,6 +36,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#04100e",
+  "background_color": "#04100e",
+  "description": "Reptile breeding records that behave like biology."
 }

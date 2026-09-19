@@ -43,6 +43,10 @@ export const TAGS = {
   dom: ['', 'visual', 'super'],
 };
 
+/* `shot` is the brief for a product still that has not been taken yet, kept so
+ * whoever shoots them knows what each card wants. Nothing renders it: a dashed
+ * placeholder captioned with its own missing photo reads as an unfinished
+ * product. Drop the still in and the card has a picture; until then it has copy. */
 export const SEASON = [
   {
     step: '01',
@@ -75,7 +79,11 @@ export const LAB_CHAIN = [
   {
     n: '04',
     title: 'Certificate on the record',
-    body: 'A numbered certificate with a verification code a buyer can check, attached to the animal.',
+    // Deliberately stops at what exists. The certificate is numbered and carries
+    // a verification code, but every certificate route is still behind
+    // requireRole("admin","lab","breeder") — there is no public lookup yet, so
+    // the site must not tell a buyer they can check one.
+    body: 'A numbered certificate from the testing laboratory, attached to the animal permanently.',
   },
 ];
 
@@ -421,9 +429,12 @@ export const FEATURES = [
     body: 'Print labels, scan a tub on your phone, open the right animal without typing.',
   },
   {
+    // The marketplace is its own product on its own domain, and it is
+    // deliberately absent from INVENTORY ("all features, every tier"). Naming it
+    // as a companion here keeps the two lists telling the same story.
     n: '08',
-    title: 'Marketplace',
-    body: 'List animals with pedigree and lab results already attached to the listing.',
+    title: 'Marketplace — companion',
+    body: 'A separate storefront at mp.serpentora.com. List an animal with its pedigree and lab results already attached.',
   },
   {
     n: '09',

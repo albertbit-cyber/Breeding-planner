@@ -13,9 +13,10 @@ import {
 import { SectionHead } from './ProductSections.jsx';
 import { lookButtonStyles, useLook } from './useLook.js';
 
-/* Sections № 07, № 09 and № 12, plus the species library and the full feature
- * inventory. The appearance blocks re-skin the page you are reading, which is
- * the point: both themes are real product settings. */
+/* Settings, appearance, the species library, the full feature inventory and the
+ * three steps. Only the steps stay on the landing page. The appearance blocks
+ * re-skin the page you are reading, which is the point: both themes are real
+ * product settings. */
 
 const TOKEN_COLUMNS = '.85fr 1.6fr';
 
@@ -99,7 +100,7 @@ function ExportFormats() {
   );
 }
 
-/** The two skins as swatch buttons, shown inside Settings § 06. */
+/** The two skins as swatch buttons, shown inside the appearance setting. */
 function SkinPicker() {
   const { isLight, setDark, setLight } = useLook();
   const styles = lookButtonStyles(isLight);
@@ -213,7 +214,7 @@ function Settings() {
   return (
     <section id="setup" className="v6-wrap v6-section">
       <SectionHead
-        eyebrow="№ 07 · Settings & setup"
+        eyebrow="Settings & setup"
         title="Settings that do the work for you."
         aside={
           <>
@@ -279,7 +280,7 @@ function Appearance() {
       >
         <div className="v6-grid" style={{ '--min': '300px', '--gap': '36px', alignItems: 'center' }}>
           <div className="v6-stack" style={{ '--gap': '15px' }}>
-            <span className="v6-eyebrow">№ 12 · Appearance</span>
+            <span className="v6-eyebrow">Appearance</span>
             <h2 className="v6-h2" style={{ fontSize: 'clamp(32px, 4vw, 42px)' }}>
               The app should look the way you want
             </h2>
@@ -444,7 +445,7 @@ function HowItWorks() {
   return (
     <section id="how" className="v6-wrap v6-section">
       <SectionHead
-        eyebrow="№ 09 · How it works"
+        eyebrow="How it works"
         title="Up and running in minutes."
         aside="Then three things a spreadsheet will never do for you."
       />
@@ -465,9 +466,12 @@ function HowItWorks() {
         ))}
       </div>
 
-      <div className="v6-grid" style={{ '--min': '260px' }}>
+      {/* A hairline above each column, which is the divider language the rest of
+          the site already uses, rather than an accent rail down the left of every
+          item — that reads as a stock component wherever it appears. */}
+      <div className="v6-grid" style={{ '--min': '260px', '--gap': '26px' }}>
         {AGAINST.map((a) => (
-          <div key={a} style={{ borderLeft: '3px solid var(--accent-strong)', padding: '6px 0 6px 18px' }}>
+          <div key={a} style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
             <span
               style={{ fontFamily: 'var(--display)', fontWeight: 'var(--dw)', fontSize: 21, lineHeight: 1.3 }}
             >
@@ -480,14 +484,11 @@ function HowItWorks() {
   );
 }
 
+export { Settings, Appearance, SpeciesLibrary, FeatureInventory, HowItWorks };
+
+/* Only the three steps stay on the landing page — they sit directly before the
+   plans and do conversion work. Settings, appearance and the full inventory are
+   reference material and live on /settings. */
 export default function SetupSections() {
-  return (
-    <>
-      <Settings />
-      <Appearance />
-      <SpeciesLibrary />
-      <FeatureInventory />
-      <HowItWorks />
-    </>
-  );
+  return <HowItWorks />;
 }

@@ -1,8 +1,9 @@
 import React from 'react';
 import { LAB_CHAIN, SEASON } from './data.js';
 
-/* Sections № 01 and № 03–06: breeding management, the advisor, the season,
- * the collection, pedigree and health, shed testing, lab and marketplace. */
+/* Breeding management, the advisor, the season, the collection, pedigree and
+ * health, shed testing, lab and marketplace. The season and the lab chain stay
+ * on the landing page; the rest is composed onto /collection. */
 
 function SectionHead({ eyebrow, title, aside, children }) {
   return (
@@ -17,7 +18,7 @@ function SectionHead({ eyebrow, title, aside, children }) {
   );
 }
 
-/* Rendered before the calculator, which is § 02 and lives in its own file. */
+/* Rendered before the calculator, which lives in its own file. */
 export function Breeding() {
   return (
     <section
@@ -26,7 +27,7 @@ export function Breeding() {
       style={{ '--min': '320px', '--gap': '40px', alignItems: 'center', paddingTop: 20 }}
     >
       <div className="v6-stack" style={{ '--gap': '16px' }}>
-        <span className="v6-eyebrow">№ 01 · Breeding management</span>
+        <span className="v6-eyebrow">Breeding management</span>
         <h2 className="v6-h2" style={{ maxWidth: '20ch' }}>
           A season that keeps its own notes
         </h2>
@@ -87,7 +88,7 @@ function Advisor() {
     <section id="advisor" className="v6-wrap v6-section">
       <div className="v6-sechead">
         <div className="v6-sechead__title">
-          <span className="v6-eyebrow">№ 03 · Breeding advisor</span>
+          <span className="v6-eyebrow">Breeding advisor</span>
           <h2 className="v6-h2">
             Anyone can tell you what a pairing makes. Serpentora tells you{' '}
             <span style={{ color: 'var(--accent)' }}>which pairing to make</span>.
@@ -192,7 +193,7 @@ function Season() {
     <div className="v6-band">
       <section id="season" className="v6-wrap v6-section">
         <SectionHead
-          eyebrow="№ 04 · The season"
+          eyebrow="The season"
           title="One season, from the first pairing to a hatchling on the tree."
           aside="Five-month appointment schedule generated on creation. Every step you log becomes the next one’s reminder."
         />
@@ -208,9 +209,10 @@ function Season() {
                 {s.title}
               </span>
               <span style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.5, flex: 1 }}>{s.body}</span>
-              <div className="v6-plate" style={{ aspectRatio: '3 / 4', padding: 9, fontSize: 8.5 }}>
-                {s.shot}
-              </div>
+              {/* The product still that belongs here has not been shot yet. A
+                  dashed box captioned with the photo it is missing advertises an
+                  unfinished product, so the card stands on its copy until there
+                  is a real screenshot. The brief is kept on SEASON[].shot. */}
             </div>
           ))}
         </div>
@@ -294,7 +296,7 @@ function PedigreeAndHealth() {
   return (
     <section className="v6-wrap v6-section v6-grid" style={{ '--min': '320px', '--gap': '20px' }}>
       <div className="v6-panel v6-panel--lg">
-        <span className="v6-eyebrow">№ 06 · Pedigree &amp; rack</span>
+        <span className="v6-eyebrow">Pedigree &amp; rack</span>
         <h3 className="v6-h3" style={{ margin: '10px 0 16px' }}>
           Four generations, one glance
         </h3>
@@ -359,7 +361,7 @@ function ShedTesting() {
   return (
     <section id="shed" className="v6-wrap v6-section">
       <SectionHead
-        eyebrow="№ 05 · Shed testing"
+        eyebrow="Shed testing"
         title="Send the shed. Get the answer back where it belongs."
         aside="Over 40 orderable morph tests plus sex determination. A disputed het claim stops being an argument and becomes a certificate number."
       />
@@ -394,17 +396,21 @@ function ShedTesting() {
         ))}
       </div>
 
+      {/* Awaiting a still of a real certificate with the animal numbers blurred.
+          Until then the copy carries it alone rather than sitting beside a
+          labelled gap. */}
       <div className="v6-grid" style={{ '--min': '300px', '--gap': '20px', alignItems: 'center' }}>
-        <div className="v6-plate" style={{ aspectRatio: '16 / 7' }}>
-          Still · certificate with verification code visible, animal numbers blurred
-        </div>
         <div className="v6-stack">
           <span className="v6-copy" style={{ fontSize: 16.5 }}>
             Partner labs work the queue in their own portal: intake, result entry, completed tests,
             catalog and pricing.
           </span>
+          {/* Says what the certificate is, not what a buyer can do with it.
+              Buyer-facing verification needs an unauthenticated lookup route
+              that does not exist yet; until it ships this stays descriptive. */}
           <span className="v6-copy" style={{ fontSize: 16.5 }}>
-            Buyers verify a certificate by its number and code. No screenshots, no trust required.
+            Every certificate carries its own number and verification code, issued by the laboratory
+            that ran the test and stored on the animal&rsquo;s record for good.
           </span>
         </div>
       </div>
@@ -483,16 +489,16 @@ function LabAndMarket() {
   );
 }
 
-export { SectionHead };
+export { SectionHead, Advisor, Season, Collection, PedigreeAndHealth, ShedTesting, LabAndMarket };
 
-/* Everything from § 03 to the marketplace pair, in the design's own order. */
+/* What stays on the landing page: the season, because it is the story the
+   product tells, and the lab chain, because it is the one thing a competitor
+   cannot truthfully copy. The collection, pedigree, health and advisor moved to
+   /collection so the front door stops being a manual. */
 export default function ProductSections() {
   return (
     <>
-      <Advisor />
       <Season />
-      <Collection />
-      <PedigreeAndHealth />
       <ShedTesting />
       <LabAndMarket />
     </>

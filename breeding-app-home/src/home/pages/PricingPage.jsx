@@ -173,7 +173,7 @@ export default function PricingPage() {
 
         <p style={{ textAlign: 'center', fontSize: 14, color: 'var(--muted)', marginTop: '1.5rem' }}>
           Need a lab portal or enterprise plan?{' '}
-          <a href="mailto:hello@breedingplanner.com" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Contact us</a>
+          <a href="mailto:info@serpentora.com" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Contact us</a>
         </p>
       </div>
     </section>

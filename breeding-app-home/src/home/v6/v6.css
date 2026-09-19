@@ -61,7 +61,9 @@
   --accent-quiet: #efe9ff;
   --accent-2: #0d80b8;
   --on-accent: #ffffff;
-  --warn: #c2410c;
+  /* Was #c2410c, which measured 4.49:1 against the lilac band behind the
+     pricing note — a rounding hair under AA at 11px. */
+  --warn: #9a3412;
   --r-lg: 36px;
   --r-md: 26px;
   --r-sm: 16px;
@@ -80,13 +82,39 @@
   --chip-bg: #f6f2ff;
 }
 
+/* --- Document ground ------------------------------------------------------
+ * `useLook` stamps data-v6-look on <html> while the landing route is mounted.
+ * Without these rules the skin stops at the `.v6` div and the document behind it
+ * stays white: overscroll flashes, scrollbars and native controls render light on
+ * a near-black page. `color-scheme` is what fixes the controls; the backgrounds
+ * fix the rubber-band. Both are reverted when the route unmounts. */
+
+html[data-v6-look='dark'],
+html[data-v6-look='dark'] body {
+  background: #04100e;
+}
+html[data-v6-look='dark'] {
+  color-scheme: dark;
+}
+
+html[data-v6-look='light'],
+html[data-v6-look='light'] body {
+  background: #fffaf0;
+}
+html[data-v6-look='light'] {
+  color-scheme: light;
+}
+
 /* --- Shell ---------------------------------------------------------------- */
 
 .v6 {
   position: relative;
   width: 100%;
   min-height: 100vh;
-  overflow: hidden;
+  /* `clip`, not `hidden`. Both contain the drifting glows, but `hidden` makes
+     this a scroll container, which silently stops the sticky masthead from
+     sticking to the viewport. `clip` does not. */
+  overflow: clip;
   background: var(--pg);
   color: var(--ink);
   font-family: var(--body);
@@ -559,11 +587,29 @@
 
 /* --- Masthead ------------------------------------------------------------- */
 
+/* Sticky, so the one action on the page is always one tap away. The landing page
+   is still ~6,700px and the plans sit three quarters down it; before this, a
+   reader who scrolled past the hero had no way to act without scrolling back. */
 .v6-mast {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 40;
   max-width: 1240px;
   margin: 0 auto;
   padding: 20px 28px 0;
+}
+
+/* Content would otherwise scroll visibly through the gap above the floating nav
+   pill. A fade rather than a solid strip, so there is no hard edge across the
+   top of the page at rest. */
+.v6-mast::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 34px;
+  background: linear-gradient(var(--pg) 55%, transparent);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .v6-nav {
@@ -626,6 +672,13 @@
   border-radius: var(--pill);
   color: var(--ink-2);
   white-space: nowrap;
+}
+
+/* The route you are on. Anchors within the landing page are not marked, because
+   the page moves under them and a marker that lags is worse than none. */
+.v6-nav__links a[aria-current='page'] {
+  color: var(--accent);
+  background: var(--accent-quiet);
 }
 
 .v6-nav__actions {
@@ -1068,11 +1121,108 @@
   .v6-nav {
     padding: 14px 16px;
     border-radius: var(--r-md);
-    justify-content: center;
   }
-  .v6-nav__links {
+}
+
+/* --- Collapsed masthead ---------------------------------------------------
+ * Eight anchors plus three actions wrapped onto four rows on a phone and took
+ * about a third of the opening screen. Below 760px they fold behind one
+ * control; the brand stays, and the hero keeps the only visible CTA. */
+
+.v6-nav__toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: var(--border);
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .v6-nav {
+    justify-content: space-between;
+    row-gap: 0;
+  }
+  .v6-nav__toggle {
+    display: inline-flex;
+  }
+  .v6-nav__links,
+  .v6-nav__actions {
+    display: none;
+  }
+  .v6-nav[data-open] .v6-nav__links {
+    display: flex;
     order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    margin-inline: 0;
+    padding-top: 14px;
+    margin-top: 12px;
+    border-top: 1px solid var(--rule);
+    gap: 2px 6px;
   }
+  .v6-nav[data-open] .v6-nav__actions {
+    display: flex;
+    order: 4;
+    width: 100%;
+    flex-wrap: wrap;
+    padding-top: 12px;
+  }
+  .v6-nav[data-open] .v6-nav__links a {
+    padding: 11px 10px;
+  }
+}
+
+/* --- Interactive minimums -------------------------------------------------
+ * The gene chips are the calculator's primary control and measured 35px tall;
+ * nav anchors 39px. Everything a finger has to find now clears 44px. */
+
+.v6-nav__links a,
+.v6-nav__signin,
+.v6-nav__brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The gene toggles are the calculator's primary control and the most-tapped
+   thing on the site. They measured 35px. */
+.v6-gene {
+  min-height: 44px;
+}
+
+/* Every button, including the quiet secondaries — "Load example", "Clear" and
+   the per-plan waitlist buttons were all 32-35px. */
+.v6-btn {
+  min-height: 44px;
+}
+
+/* Footer links sat at 23px in two wrapped rows, which is the hardest thing on
+   the page to hit with a thumb. */
+.v6-footer a {
+  min-height: 44px;
+  /* Short labels — "Lab", "App", "Plans" — were 25-36px wide. */
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Any chip that is actually a control, rather than a static label. */
+button.v6-chip,
+a.v6-chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,8 +7,8 @@ import React from 'react';
 export default function Logo({ size = 34 }) {
   return (
     <img
-      src="/Logo.png"
-      alt="Breeding Planner"
+      src="/Logo-144.png"
+      alt="Serpentora"
       style={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
     />
   );

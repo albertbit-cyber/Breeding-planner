@@ -23,14 +23,11 @@ function readStoredLook() {
 }
 
 export function useLookState(initial = 'dark') {
-  const [look, setLook] = useState(initial);
-
-  // Read on mount rather than during the initial render so the first paint is
-  // identical for every visitor and cannot differ from a prerendered page.
-  useEffect(() => {
-    const saved = readStoredLook();
-    if (saved) setLook(saved);
-  }, []);
+  // Read during initialisation, not on mount. Reading afterwards meant a visitor
+  // who had chosen Hatchling got a dark first paint that then transitioned to
+  // light — a visible flash of the wrong skin on every page load. There is no
+  // server render or prerender here, so nothing can disagree with this value.
+  const [look, setLook] = useState(() => readStoredLook() || initial);
 
   const apply = useCallback((next) => {
     setLook(next);
@@ -40,6 +37,32 @@ export function useLookState(initial = 'dark') {
       // Not being able to remember the choice is not worth interrupting anyone.
     }
   }, []);
+
+  // The skin paints `.v6`, but `.v6` is a div inside body — so without this the
+  // document behind it stays white: overscroll rubber-banding flashes white on a
+  // near-black page, native scrollbars and form controls render light, and the
+  // mobile browser chrome is tinted to the wrong colour. Stamp the look onto
+  // <html> so the ground, the colour-scheme and the theme-color all follow it.
+  //
+  // A data attribute rather than a custom property, because AppearanceContext
+  // owns custom properties on the document element for the rest of the suite.
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.dataset.v6Look;
+    root.dataset.v6Look = look;
+
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const previousTheme = meta?.getAttribute('content');
+    meta?.setAttribute('content', look === 'light' ? '#fffaf0' : '#04100e');
+
+    return () => {
+      // Leaving the landing route hands the document back to the light chrome
+      // the other pages are built for.
+      if (previous === undefined) delete root.dataset.v6Look;
+      else root.dataset.v6Look = previous;
+      if (previousTheme != null) meta?.setAttribute('content', previousTheme);
+    };
+  }, [look]);
 
   const isLight = look === 'light';
 
