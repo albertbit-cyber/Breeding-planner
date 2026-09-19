@@ -23,6 +23,7 @@ import {
   patchTeamMemberRole,
   postCatalogItem,
   postMyOffering,
+  postMyOfferingImport,
   postOwnershipTransfer,
   postTeamInvite,
 } from "../controllers/labController";
@@ -77,6 +78,8 @@ vendor.get("/library", requireOrgMember, asyncHandler(getSeedLibrary));
 
 vendor.get("/tests", requireOrgMember, asyncHandler(getMyOfferings));
 vendor.post("/tests", requireOrgAdmin, asyncHandler(postMyOffering));
+// A whole price list in one request: the spreadsheet route onto this catalogue.
+vendor.post("/tests/import", requireOrgAdmin, asyncHandler(postMyOfferingImport));
 vendor.patch("/tests/:id", requireOrgAdmin, asyncHandler(patchMyOffering));
 vendor.delete("/tests/:id", requireOrgAdmin, asyncHandler(deleteMyOffering));
 

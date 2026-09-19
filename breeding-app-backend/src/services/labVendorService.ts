@@ -49,6 +49,30 @@ const optionalInt = (value: unknown, field: string, min = 0, max = 100_000): num
   return parsed;
 };
 
+/**
+ * A per-test tier override, `{ t1, t2, t3 }` in cents.
+ *
+ * All three or nothing: a partial override would silently fall back to the
+ * laboratory's own tier table for the missing sizes, which reads as a price the
+ * lab never set. `null` clears the override and returns the test to that table.
+ */
+const tierPrices = (value: unknown): Prisma.JsonValue | null => {
+  if (value === null || value === "") return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpError(400, "Tier prices must be given as t1, t2 and t3 in cents.");
+  }
+  const source = value as Record<string, unknown>;
+  const parsed: Record<string, number> = {};
+  for (const key of ["t1", "t2", "t3"] as const) {
+    const cents = optionalInt(source[key], `Tier price ${key}`, 0, 10_000_000);
+    if (cents === null) {
+      throw new HttpError(400, "A tier price is needed for all three order sizes, or for none.");
+    }
+    parsed[key] = cents;
+  }
+  return parsed as Prisma.JsonValue;
+};
+
 const decimal = (value: unknown, field: string): Prisma.Decimal | undefined => {
   if (value === undefined) return undefined;
   const parsed = Number(value);
@@ -228,6 +252,11 @@ const offeringWriteData = (payload: Record<string, unknown>, isCreate: boolean):
   if (payload.addonPriceCents !== undefined) {
     data.addonPriceCents = optionalInt(payload.addonPriceCents, "Add-on price", 0, 10_000_000);
   }
+  // The column and the pricing engine have honoured a per-test tier override
+  // since the tier work landed; until now nothing could write one, so every
+  // laboratory priced on one scale whether that was true of its price list or
+  // not.
+  if (payload.tierPrices !== undefined) data.tierPricesJson = tierPrices(payload.tierPrices);
   if (payload.speciesIds !== undefined) {
     data.speciesIds = normalizeSpeciesIds(payload.speciesIds, "Species");
   }
@@ -346,6 +375,171 @@ export const updateOffering = async (
     }
     throw error;
   }
+};
+
+
+// ── Importing a whole catalogue at once ──────────────────────────────────────
+
+/**
+ * A laboratory's first act on this platform is publishing what it sells.
+ * ProHerper has sixty-eight tests; adding them one at a time through a form is
+ * why onboarding one took a day. This takes the whole price list in one request.
+ *
+ * The rows arrive already parsed — the spreadsheet reader lives in the lab
+ * portal, where it can show a laboratory exactly what its file says before
+ * anything is written. That makes this endpoint's input untrusted like any
+ * other, so every row goes through the same `offeringWriteData` and the same
+ * served-species rule as a test typed into the form. Nothing is taken on faith
+ * because it arrived in bulk.
+ */
+const MAX_IMPORT_ROWS = 500;
+
+/**
+ * The importable fields, as a complete statement.
+ *
+ * A row in the file is the whole truth about that test: a laboratory that
+ * cleared the Gene column means the test no longer maps to a gene, and an
+ * update that quietly kept the old value would leave the catalogue saying
+ * something the price list does not. So every optional field absent from a row
+ * is written as empty rather than skipped.
+ *
+ * `active` and `visibleInBreederApp` are deliberately not in this set. They are
+ * not columns in the spreadsheet, and a re-import must not put a test a
+ * laboratory has taken off sale back on it.
+ */
+const completeImportEntry = (entry: Record<string, unknown>): Record<string, unknown> => ({
+  shortLabel: null,
+  description: null,
+  geneTarget: null,
+  addonPriceCents: null,
+  turnaroundDays: null,
+  panelScope: null,
+  aliases: [],
+  availability: "available",
+  priceModel: "tier",
+  priceCents: null,
+  tierPrices: null,
+  ...entry,
+});
+
+type ImportRejection = { position: number; name: string | null; message: string };
+
+export const importOfferings = async (organizationId: string, payload: Record<string, unknown>) => {
+  const incoming = Array.isArray(payload.offerings) ? payload.offerings : null;
+  if (!incoming) throw new HttpError(400, "Send the tests to import as a list called `offerings`.");
+  if (!incoming.length) throw new HttpError(400, "There is nothing in this file to import.");
+  if (incoming.length > MAX_IMPORT_ROWS) {
+    throw new HttpError(400, `A catalogue import is limited to ${MAX_IMPORT_ROWS} tests at a time.`);
+  }
+  // A dry run answers "what would this do" without doing it, so a laboratory
+  // can be shown the consequences of its own file before it commits to them.
+  const dryRun = payload.dryRun === true;
+
+  const lab = await db.labAccount.findUnique({
+    where: { organizationId },
+    select: { servedSpeciesIds: true },
+  });
+  if (!lab) throw new HttpError(404, "This organization does not have a laboratory profile.");
+  const served = new Set<string>(lab.servedSpeciesIds || []);
+
+  const existing = await db.labTestOffering.findMany({
+    where: { organizationId },
+    select: { id: true, name: true, sortOrder: true, active: true },
+  });
+  const existingByName = new Map<string, any>(
+    existing.map((row: any) => [String(row.name).trim().toLowerCase(), row])
+  );
+  let nextSortOrder = existing.reduce(
+    (highest: number, row: any) => Math.max(highest, Number(row.sortOrder) || 0),
+    0
+  );
+
+  const creates: Array<{ name: string; data: Record<string, unknown> }> = [];
+  const updates: Array<{ id: string; name: string; active: boolean; data: Record<string, unknown> }> = [];
+  const rejected: ImportRejection[] = [];
+  const seen = new Set<string>();
+
+  incoming.forEach((raw: unknown, index: number) => {
+    const entry = raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+    const name = String(entry.name ?? "").trim();
+    const position = index + 1;
+
+    try {
+      if (!name) throw new HttpError(400, "A test needs a name.");
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        throw new HttpError(400, `"${name}" is listed more than once in this file.`);
+      }
+      seen.add(key);
+
+      const match = existingByName.get(key);
+      // Always written as a create's worth of fields, so a re-import states the
+      // test in full rather than patching whichever columns happened to be filled.
+      const data = offeringWriteData(completeImportEntry(entry), true);
+
+      const notServed = ((data.speciesIds as string[]) || []).filter((id) => !served.has(id));
+      if (notServed.length) {
+        throw new HttpError(
+          400,
+          `Add ${notServed.map(speciesName).join(", ")} to the species your laboratory serves before offering a test for it.`
+        );
+      }
+
+      if (match) {
+        // Order is left as the laboratory already has it: a supplementary file
+        // of ten tests must not renumber itself to the top of a catalogue of
+        // sixty-eight.
+        delete data.sortOrder;
+        updates.push({ id: match.id, name: match.name, active: Boolean(match.active), data });
+      } else {
+        nextSortOrder += 1;
+        creates.push({ name, data: { ...data, organizationId, sortOrder: nextSortOrder } });
+      }
+    } catch (error) {
+      rejected.push({
+        position,
+        name: name || null,
+        message: error instanceof HttpError ? error.message : "This test could not be read.",
+      });
+    }
+  });
+
+  const plan = {
+    dryRun,
+    willCreate: creates.map((row) => ({ name: row.name })),
+    // A laboratory that re-imports a test it has taken off sale gets its details
+    // updated and its withdrawal respected; saying so is the only way that is
+    // not a mystery later.
+    willUpdate: updates.map((row) => ({ id: row.id, name: row.name, active: row.active })),
+    rejected,
+    created: 0,
+    updated: 0,
+  };
+
+  if (dryRun) return plan;
+  if (!creates.length && !updates.length) {
+    throw new HttpError(400, "Not one test in this file could be imported. Fix the rows listed and upload it again.");
+  }
+
+  try {
+    await db.$transaction(async (tx: any) => {
+      for (const row of creates) {
+        await tx.labTestOffering.create({ data: row.data });
+      }
+      for (const row of updates) {
+        await tx.labTestOffering.update({ where: { id: row.id }, data: row.data });
+      }
+    });
+  } catch (error) {
+    if ((error as { code?: string })?.code === "P2002") {
+      throw new HttpError(409, "Two tests in this file resolved to the same name. Nothing was imported.");
+    }
+    throw error;
+  }
+
+  return { ...plan, created: creates.length, updated: updates.length };
 };
 
 /**

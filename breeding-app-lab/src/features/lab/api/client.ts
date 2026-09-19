@@ -8,6 +8,8 @@ import {
   fetchLabOfferings,
   fetchMyLabPricing,
   fetchTestCatalog,
+  importMyLabTests,
+  type LabCatalogueImportResult,
 } from "../../../shared/apiClient";
 import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
@@ -241,6 +243,17 @@ const toLabAvailableTestRecord = (test: any, index = 0): LabAvailableTest => ({
   testKind: String(test?.testKind || "morph"),
   priceModel: String(test?.priceModel || "tier"),
   addonPriceCents: Number.isFinite(Number(test?.addonPriceCents)) ? Number(test.addonPriceCents) : undefined,
+  // A test priced on its own scale rather than the laboratory's tier table.
+  // Carried through so the catalogue can show the three figures a laboratory
+  // actually typed instead of the words "by tier".
+  tierPrices: (() => {
+    const tiers = test?.tierPrices;
+    if (!tiers || typeof tiers !== "object") return null;
+    const read = (key: string) => Number((tiers as Record<string, unknown>)[key]);
+    return [read("t1"), read("t2"), read("t3")].every(Number.isFinite)
+      ? { t1: read("t1"), t2: read("t2"), t3: read("t3") }
+      : null;
+  })(),
   // A test covers one or more species, so the API sends a list. Keeping the
   // singular label as a joined string is what the catalogue table renders.
   speciesIds: Array.isArray(test?.speciesIds) ? test.speciesIds.map((id: unknown) => String(id)) : [],
@@ -1467,6 +1480,21 @@ export const createLabApiClient = () => {
     return toLabAvailableTestRecord(response?.offering || null);
   };
 
+  /**
+   * A whole catalogue in one request, from the onboarding spreadsheet.
+   *
+   * Goes through the same role check as adding one test by hand: importing
+   * sixty-eight at once is the same act of publishing, and must not be the one
+   * route into the catalogue that skips it.
+   */
+  const importLabAvailableTests = async (
+    offerings: Array<Record<string, unknown>>,
+    options: { dryRun?: boolean } = {}
+  ): Promise<LabCatalogueImportResult> => {
+    requireSessionRole("admin", "lab_staff");
+    return importMyLabTests({ offerings, ...(options.dryRun ? { dryRun: true } : {}) });
+  };
+
   const setLabAvailableTestActive = async (id: string, isActive: boolean): Promise<LabAvailableTest> => {
     requireSessionRole("admin", "lab_staff");
     return updateLabAvailableTest({ id, isActive } as any);
@@ -1621,6 +1649,7 @@ export const createLabApiClient = () => {
     listLabAvailableTests,
     createLabAvailableTest,
     updateLabAvailableTest,
+    importLabAvailableTests,
     setLabAvailableTestActive,
     setLabAvailableTestVisibility,
     deleteLabOrder,

@@ -750,6 +750,29 @@ export const updateMyLabTest = async (id: string, payload: Record<string, unknow
     body: JSON.stringify(payload),
   });
 
+/**
+ * A whole price list at once, from the onboarding spreadsheet. With `dryRun` the
+ * backend returns the plan and writes nothing, which is what the review step
+ * shows before a laboratory commits to it.
+ */
+export type LabCatalogueImportResult = {
+  dryRun: boolean;
+  willCreate: Array<{ name: string }>;
+  willUpdate: Array<{ id: string; name: string; active: boolean }>;
+  rejected: Array<{ position: number; name: string | null; message: string }>;
+  created: number;
+  updated: number;
+};
+
+export const importMyLabTests = async (payload: {
+  offerings: Array<Record<string, unknown>>;
+  dryRun?: boolean;
+}) =>
+  request<LabCatalogueImportResult>("/lab/my/tests/import", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
 export const retireMyLabTest = async (id: string) =>
   request<{ offering: unknown }>(`/lab/my/tests/${encodeURIComponent(id)}`, { method: "DELETE" });
 

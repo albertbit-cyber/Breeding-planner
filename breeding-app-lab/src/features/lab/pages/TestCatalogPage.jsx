@@ -230,13 +230,26 @@ export default function TestCatalogPage() {
             {t("lab.catalog.subtitle", { defaultValue: "Manage the genetic tests offered by this laboratory." })}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreateForm}
-          className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          {t("lab.catalog.addTest", { defaultValue: "+ Add Test" })}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* A laboratory arriving with sixty-eight tests should never meet this
+              form first. */}
+          <button
+            type="button"
+            onClick={() => {
+              window.location.hash = "/lab/catalogue-import";
+            }}
+            className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:border-neutral-400"
+          >
+            {t("lab.catalog.importSpreadsheet", { defaultValue: "Import from spreadsheet" })}
+          </button>
+          <button
+            type="button"
+            onClick={openCreateForm}
+            className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            {t("lab.catalog.addTest", { defaultValue: "+ Add Test" })}
+          </button>
+        </div>
       </div>
 
       {successMessage ? (
@@ -263,10 +276,25 @@ export default function TestCatalogPage() {
           {t("common.loading", { defaultValue: "Loading..." })}
         </div>
       ) : tests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-neutral-200 py-12 text-center">
-          <p className="text-sm text-neutral-500">
+        <div className="rounded-2xl border border-dashed border-neutral-200 px-4 py-12 text-center">
+          <p className="text-sm text-neutral-600">
             {t("lab.catalog.empty", { defaultValue: "No tests in catalog yet. Add the first test to get started." })}
           </p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">
+            {t("lab.catalog.emptyImportHint", {
+              defaultValue:
+                "If you already have a price list, fill in one spreadsheet instead of adding tests one at a time.",
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.hash = "/lab/catalogue-import";
+            }}
+            className="mt-4 rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            {t("lab.catalog.importSpreadsheet", { defaultValue: "Import from spreadsheet" })}
+          </button>
         </div>
       ) : (
         <div className="overflow-auto rounded-2xl border border-neutral-200">
@@ -332,7 +360,11 @@ export default function TestCatalogPage() {
                       <span className="font-medium">{formatEuroFromCents(test.priceCents)}</span>
                     ) : (
                       <span className="text-neutral-500">
-                        {t("lab.catalog.byTier", { defaultValue: "by tier" })}
+                        {test.tierPrices
+                          ? [test.tierPrices.t1, test.tierPrices.t2, test.tierPrices.t3]
+                              .map(formatEuroFromCents)
+                              .join(" / ")
+                          : t("lab.catalog.byTier", { defaultValue: "by tier" })}
                         {test.addonPriceCents
                           ? ` · +${formatEuroFromCents(test.addonPriceCents)} ${t("lab.catalog.asAddon", { defaultValue: "as add-on" })}`
                           : ""}
