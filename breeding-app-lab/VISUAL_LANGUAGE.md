@@ -23,8 +23,8 @@ carry an 83-line provider that only reads.
 
 ### How Tailwind participates
 
-The breeder is the only Tailwind app. `tw-bridge.css` re-points Tailwind v4's
-stock palette variables at the skin roles:
+The breeder is the only *bridged* Tailwind app. `tw-bridge.css` re-points
+Tailwind v4's stock palette variables at the skin roles:
 
 ```css
 @theme {
@@ -41,6 +41,16 @@ usages without editing a single one of them. Import order matters:
 
 `--color-black` is deliberately **not** re-pointed — the label-preview
 checkerboard and QR rendering need true black. Modal scrims use `.sk-scrim`.
+
+**The lab app also compiles Tailwind, but is not bridged.** It used to pull
+`cdn.tailwindcss.com` in at runtime, which made the native Android build depend
+on the network to render at all; it now compiles Tailwind **v3** at build time
+(`breeding-app-lab/tailwind.config.js`, `src/tailwind.css`). v3 is pinned
+deliberately — the CDN served v3, and v4 changes enough defaults (bare `border`
+colour, `ring` width, `shadow-sm`/`rounded-sm`/`outline-none` renames) to
+restyle that app silently. It has no `tw-bridge.css`, so its colour utilities
+sit on Tailwind's stock palette and do **not** follow the active skin. Bridging
+it means moving it to v4 first, and is a change worth making on its own.
 
 ## 1. Color roles
 

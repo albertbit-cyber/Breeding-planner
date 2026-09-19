@@ -1,4 +1,17 @@
-/* This app has no Tailwind, so it imports the skin palette only — no bridge.
+/* Skin palette only, still no Tailwind bridge.
+
+   The "this app has no Tailwind" note that used to sit here was never quite
+   true -- the app has always used Tailwind utility classes; they just arrived
+   from the `cdn.tailwindcss.com` script at runtime instead of from a build. That
+   script is gone and the utilities are compiled in `src/tailwind.css` now, but
+   what has *not* changed is the bridge: the breeder's `tw-bridge.css` re-points
+   Tailwind's palette variables at the `--sk-*` skin roles, and this app has no
+   equivalent, so its `bg-white` / `text-neutral-500` / `border-neutral-200` stay
+   on Tailwind's stock palette and do not follow the active skin. That was the
+   behaviour under the CDN too, so nothing regressed here -- but it is the gap to
+   close if this app is ever meant to honour skins the way the breeder does, and
+   it is why VISUAL_LANGUAGE.md still treats the breeder as the bridged app.
+
    Relative path: there are no npm workspaces in this repo, so a bare
    "@breeding/shared" specifier would not resolve. */
 @import "../../breeding-app-shared/src/styles/skins.css";

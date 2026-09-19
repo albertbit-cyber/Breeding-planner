@@ -41,9 +41,14 @@
 # Android signing secrets
 *.keystore
 *.jks
-android/key.properties
-android/app/*.keystore
-android/app/*.jks
+# Unanchored: a leading path component would pin these to the repo root, and the
+# sub-apps carry their own Capacitor projects (breeding-app-lab/android/, and
+# breeding-app-breeder/android/). `android/key.properties` left a lab or breeder
+# key.properties -- storePassword and keyPassword in cleartext -- tracked in a
+# public repository.
+**/key.properties
+**/android/app/*.keystore
+**/android/app/*.jks
 
 npm-debug.log*
 yarn-debug.log*
@@ -70,5 +75,10 @@ node_installer/
 .claude/settings.local.json
 .claude/skills/
 
-# Written by the impeccable design skill while it works.
+# Written by the impeccable design skill while it works. `.impeccable/config.json`
+# is the shared, checked-in detector config; everything else here is runtime scratch
+# (live-server sessions, hook caches) and is machine-local.
 breeding-app-public/.impeccable/
+.impeccable/live/
+.impeccable/hook.cache.json
+**/.impeccable/hook.cache.json

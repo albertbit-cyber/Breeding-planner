@@ -1,0 +1,11 @@
+/* Tailwind's own layers, kept in a file of their own so the cascade order that
+   the CDN produced is preserved exactly.
+   
+   With the CDN, the <script> in index.html ran first and injected Tailwind's
+   <style> before the app's stylesheets loaded, so skins.css and App.css both
+   sat after Tailwind and won every specificity tie. index.jsx therefore imports
+   this file *before* index.css. Folding these directives into index.css instead
+   would put Tailwind after the skin imports and flip those ties. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
