@@ -2,6 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
+const { assertSeedAllowed } = require("../scripts/seedGuard.js");
+
 const prisma = new PrismaClient();
 
 const E2E_RESET_CONFIRM_VALUE = "local";
@@ -397,6 +399,7 @@ const createBaselineOrder = async (breederId: string, labOrganizationId: string)
 };
 
 const main = async () => {
+  assertSeedAllowed("prisma/e2eReset.ts");
   const database = assertLocalDatabaseUrl();
 
   const [adminUser, breederUser, labUser, labBUser] = await Promise.all([

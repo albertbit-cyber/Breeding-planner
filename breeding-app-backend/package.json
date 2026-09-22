@@ -19,7 +19,7 @@
     "dev:verify-user": "tsx scripts/devVerifyUser.ts",
     "audit:staff": "tsx scripts/auditStaffAccounts.ts",
     "e2e:reset": "tsx prisma/e2eReset.ts",
-    "e2e:reset:local": "cross-env E2E_RESET_CONFIRM=local tsx prisma/e2eReset.ts"
+    "e2e:reset:local": "cross-env E2E_RESET_CONFIRM=local ALLOW_SEED=1 tsx prisma/e2eReset.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
