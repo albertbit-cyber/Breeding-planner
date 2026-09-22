@@ -25,6 +25,18 @@ real environment. `seedBreeder.js` opened with the line
 *"Run in Railway console: node seedBreeder.js"*, which is exactly how
 `admin@proherper.dev` came to exist on the live database.
 
+Two further rows hold `admin` and are **not** from this repository —
+`admin@staging.com` and `morphshaman@gmail.com`. Neither address appears
+anywhere in the codebase, so their passwords are not published. That makes four
+owner rows on a database whose role model intends exactly one.
+
+> **Status, 22 September 2026: none of these accounts has been changed.** The
+> owner is reviewing each one and will delete or rotate them individually. So
+> the four published credentials above are still live on staging as this is
+> written — this runbook describes a hole that is closed *against recurrence*
+> (the seed guard below), not one that is closed on the live database. Re-run
+> the audit before believing otherwise.
+
 ## What the seed scripts do now
 
 Every script that writes a known account with a published password calls
@@ -131,19 +143,55 @@ note or ticket saying the owner can be created through `POST /admin/users` is
 out of date.
 
 The owner account must therefore be an **existing `admin` row**, brought onto
-the right address and a fresh password. Given the four owner rows the audit
-found, the sequence is:
+the right address and a fresh password.
 
-1. Decide which address the owner is (see
-   [`docs/architecture`](../architecture) for the domain plan — a
-   `serpentora.com` address fits it better than a personal one).
-2. Bring one existing `admin` row onto that address with a fresh random
-   password, through a one-off script run with `railway run` against the live
-   environment. Nothing in the API does this.
-3. Suspend every other `admin` row that is not a person you recognise, and
+**The address is decided: `info@serpentora.com`** (owner's decision,
+22 September 2026). None of the steps below has been done yet.
+
+1. **Make the mailbox real first.** `info@serpentora.com` has to be able to
+   receive mail before it becomes the owner address, or the account can lock
+   itself out: no admin endpoint sets another user's password, so the only way
+   back in is the emailed reset link. Confirm delivery works
+   ([`email-delivery.md`](./email-delivery.md)) before step 2, not after.
+2. **Move one existing `admin` row onto it, with a fresh password.** Nothing in
+   the API does this, so it is a one-off script against the live environment.
+   Run it from `breeding-app-backend`, and read `railway status` first to be
+   certain which environment is linked:
+
+   ```bash
+   railway status          # must name the environment you actually mean
+   railway run npx tsx -e '
+     const { PrismaClient } = require("@prisma/client");
+     const bcrypt = require("bcryptjs");
+     const prisma = new PrismaClient();
+     (async () => {
+       const password = require("crypto").randomBytes(24).toString("base64url");
+       const user = await prisma.user.update({
+         where: { email: "<the admin row you are keeping>" },
+         data: {
+           email: "info@serpentora.com",
+           fullName: "Serpentora Owner",
+           passwordHash: await bcrypt.hash(password, 12),
+           role: "admin",
+           status: "active",
+           isActive: true,
+           emailVerified: true,
+           refreshToken: null,
+         },
+       });
+       console.log("owner is now", user.email);
+       console.log("one-time password:", password);
+     })().finally(() => prisma.$disconnect());
+   '
+   ```
+
+   Change that password from the account's own settings straight afterwards, so
+   the one printed in a terminal stops being the live one. `refreshToken` is
+   cleared so any session still open on the old address dies with the change.
+3. **Suspend every other `admin` row** that is not a person you recognise, and
    rotate anything seeded, per the section above.
-4. Re-run `railway run npm run audit:staff`. It should report exactly one owner
-   and no seeded addresses.
+4. **Re-run `railway run npm run audit:staff`.** It should report exactly one
+   owner and no seeded addresses.
 
 Everyone else who needs the console is a **moderator**, and they *are* created
 through the API:
