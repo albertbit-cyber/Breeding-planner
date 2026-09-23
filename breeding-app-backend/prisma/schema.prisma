@@ -1211,8 +1211,8 @@ model MarketplaceWishlist {
   user         User                       @relation("MarketplaceWishlistOwner", fields: [userId], references: [id], onDelete: Cascade)
   label        String
   species      String?
-  includeGenes String[]                   @map("include_genes")
-  excludeGenes String[]                   @map("exclude_genes")
+  includeGenes String[]                   @default([]) @map("include_genes")
+  excludeGenes String[]                   @default([]) @map("exclude_genes")
   sex          String?
   maxPrice     Decimal?                   @map("max_price") @db.Decimal(12, 2)
   country      String?
