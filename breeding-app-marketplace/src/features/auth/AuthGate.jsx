@@ -1088,23 +1088,6 @@ export default function AuthGate({ children, scope }) {
               <button type="submit" className="primary wide">
                 {t("common.continue", { defaultValue: "Continue" })}
               </button>
-              {import.meta.env.DEV ? (
-                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                  Dev login:
-                  {" "}
-                  <code>lab@proherper.dev</code>
-                  {" / "}
-                  <code>demo1234</code>
-                  {" "}
-                  or
-                  {" "}
-                  <code>admin@BreedingPlanner.dev</code>
-                  {" / "}
-                  <code>admin1234</code>.
-                  {" "}
-                  Public registration creates breeder accounts only.
-                </div>
-              ) : null}
             </form>
           )
         )}

@@ -1,8 +1,10 @@
+const { assertSeedAllowed } = require("./scripts/seedGuard.js");
 const bcrypt = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
+  assertSeedAllowed("fixPasswords.js");
   const hash = await bcrypt.hash("demo1234", 12);
   const result = await prisma.user.updateMany({
     where: { email: { in: ["admin@proherper.dev", "breeder@proherper.dev", "lab@proherper.dev"] } },
