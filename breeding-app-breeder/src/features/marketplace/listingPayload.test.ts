@@ -19,9 +19,23 @@ const snake = {
 
 const opts = { genetics: 'Clown, het Pied', species: 'Ball python' };
 
+// Each case below needs a payload to read from, so these fail on a null
+// result up front and hand the rest of the test a non-null value.
+const built = (...args: Parameters<typeof buildMarketplaceListingPayload>) => {
+  const payload = buildMarketplaceListingPayload(...args);
+  if (!payload) throw new Error('expected a listing payload, got null');
+  return payload;
+};
+
+const updated = (...args: Parameters<typeof listingUpdatePayloadFromListing>) => {
+  const payload = listingUpdatePayloadFromListing(...args);
+  if (!payload) throw new Error('expected an update payload, got null');
+  return payload;
+};
+
 describe('buildMarketplaceListingPayload', () => {
   it('carries the four things a buyer is shown', () => {
-    const payload = buildMarketplaceListingPayload(snake, opts);
+    const payload = built(snake, opts);
 
     expect(payload).toMatchObject({
       genetics: 'Clown, het Pied',
@@ -32,25 +46,25 @@ describe('buildMarketplaceListingPayload', () => {
   });
 
   it('publishes as available so the animal shows up in browse', () => {
-    expect(buildMarketplaceListingPayload(snake, opts).status).toBe('available');
+    expect(built(snake, opts).status).toBe('available');
   });
 
   it('sends a draft when the animal is taken off sale', () => {
-    expect(buildMarketplaceListingPayload(snake, { ...opts, published: false }).status).toBe('draft');
+    expect(built(snake, { ...opts, published: false }).status).toBe('draft');
   });
 
   it('links the listing to the animal so re-publishing updates one card', () => {
-    expect(buildMarketplaceListingPayload(snake, opts).animalId).toBe('26-M-004');
+    expect(built(snake, opts).animalId).toBe('26-M-004');
   });
 
   it('defaults the currency to EUR and falls back to the ID for a nameless animal', () => {
-    const payload = buildMarketplaceListingPayload({ id: '26-F-011' }, opts);
+    const payload = built({ id: '26-F-011' }, opts);
     expect(payload.currency).toBe('EUR');
     expect(payload.title).toBe('26-F-011');
   });
 
   it('leaves the price empty rather than sending a zero when none was typed', () => {
-    expect(buildMarketplaceListingPayload({ ...snake, price: '' }, opts).price).toBe('');
+    expect(built({ ...snake, price: '' }, opts).price).toBe('');
   });
 
   it('ignores an animal with no ID', () => {
@@ -87,19 +101,19 @@ describe('the buyer description survives the trip', () => {
   const typed = 'Feeding on frozen-thawed rats every 10 days. Never refused, calm to handle.';
 
   it('carries what the breeder typed through to the listing', () => {
-    const payload = buildMarketplaceListingPayload(
+    const payload = built(
       { ...snake, saleDescription: typed }, opts,
     );
     expect(payload.description).toBe(typed);
   });
 
   it('does not invent one when the box is left empty', () => {
-    expect(buildMarketplaceListingPayload({ ...snake, saleDescription: '' }, opts).description).toBe('');
-    expect(buildMarketplaceListingPayload({ ...snake, saleDescription: undefined }, opts).description).toBe('');
+    expect(built({ ...snake, saleDescription: '' }, opts).description).toBe('');
+    expect(built({ ...snake, saleDescription: undefined }, opts).description).toBe('');
   });
 
   it('keeps a description when the animal is taken off sale, so it comes back with it', () => {
-    const payload = buildMarketplaceListingPayload(
+    const payload = built(
       { ...snake, saleDescription: typed }, { ...opts, published: false },
     );
     expect(payload.status).toBe('draft');
@@ -165,7 +179,7 @@ describe('listingUpdatePayloadFromListing', () => {
   };
 
   it('hands back everything the card is already showing', () => {
-    expect(listingUpdatePayloadFromListing(listing)).toMatchObject({
+    expect(updated(listing)).toMatchObject({
       title: 'Mojave Ultramel × Frank - 5',
       genetics: 'Phantom, Het Ultramel, 50% Het Sunset, 50% Het Hypo',
       price: 1000,
@@ -176,17 +190,17 @@ describe('listingUpdatePayloadFromListing', () => {
   });
 
   it('keeps a published listing published, and its own availability', () => {
-    expect(listingUpdatePayloadFromListing(listing).status).toBe('available');
+    expect(updated(listing).status).toBe('available');
     // Availability is its own column, not a shadow of status: a reserved animal
     // can still be listed as available to browse. The listing's value stands.
-    expect(listingUpdatePayloadFromListing({ ...listing, availability: 'reserved' }).availability).toBe('reserved');
+    expect(updated({ ...listing, availability: 'reserved' }).availability).toBe('reserved');
     // Only when the listing has none of its own does status stand in for it.
     const { availability, ...withoutAvailability } = listing;
-    expect(listingUpdatePayloadFromListing({ ...withoutAvailability, status: 'reserved' }).availability).toBe('reserved');
+    expect(updated({ ...withoutAvailability, status: 'reserved' }).availability).toBe('reserved');
   });
 
   it('does not turn a missing price into a free animal', () => {
-    expect(listingUpdatePayloadFromListing({ ...listing, price: null }).price).toBe('');
+    expect(updated({ ...listing, price: null }).price).toBe('');
   });
 
   it('refuses a listing with no id, which could not be updated anyway', () => {
