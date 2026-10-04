@@ -20,11 +20,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            breeding-app-breeder/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      # dist:win builds breeding-app-breeder and packages its output.
+      - name: Install breeder dependencies
+        run: npm ci
+        working-directory: breeding-app-breeder
 
       - name: Validate tag matches package version
         if: startsWith(github.ref, 'refs/tags/v')

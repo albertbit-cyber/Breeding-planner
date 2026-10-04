@@ -14,11 +14,11 @@ const resolveAssetPath = (...segments) => {
 
 const SETTINGS_PATH = isPackaged
   ? resolveAssetPath("i18n-settings.json")
-  : path.resolve(__dirname, "../src/i18n/settings.json");
+  : path.resolve(__dirname, "../breeding-app-breeder/src/i18n/settings.json");
 
 const LOCALES_DIR = isPackaged
   ? resolveAssetPath("locales")
-  : path.resolve(__dirname, "../src/locales");
+  : path.resolve(__dirname, "../breeding-app-breeder/src/locales");
 
 const loadSettings = () => {
   try {

@@ -52,7 +52,13 @@ function buildBreederAppForElectron() {
   fs.cpSync(breederBuildDir, rootBuildDir, { recursive: true });
 }
 
-console.log(`Building Windows NSIS installer for version=${pkg.version}`);
+// electron-builder arguments come from the command line, e.g.
+//   node scripts/build-desktop.js --win nsis --x64
+// With none, it builds the Windows NSIS installer.
+const builderArgs = process.argv.slice(2);
+const targetArgs = builderArgs.length ? builderArgs : ['--win', 'nsis', '--x64'];
+
+console.log(`Building desktop app (${targetArgs.join(' ')}) for version=${pkg.version}`);
 cleanDist();
 buildBreederAppForElectron();
-runElectronBuilder(['--win', 'nsis', '--x64']);
+runElectronBuilder(targetArgs);
