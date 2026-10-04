@@ -20,16 +20,27 @@ const LABELS = {
   "config-error": ["setup.connection.localOnly", "Working on this device only."],
 };
 
-export default function BackendStatusDot() {
+export default function BackendStatusDot({ failure = null }) {
   const { t } = useTranslation();
   const { snapshot } = useSharedBackend();
   const state = LABELS[snapshot?.state] ? snapshot.state : "checking";
   const [key, fallback] = LABELS[state];
 
   return (
-    <div className="mb-4 flex items-center gap-2 text-xs text-neutral-500" role="status">
-      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[state]}`} aria-hidden="true" />
-      <span>{t(key, { defaultValue: fallback })}</span>
+    <div className="mb-4 space-y-1 text-xs" role="status">
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[state]}`} aria-hidden="true" />
+        <span>{t(key, { defaultValue: fallback })}</span>
+      </div>
+      {/* A failed cloud save, until the next one succeeds. */}
+      {failure ? (
+        <div className="flex items-start gap-2 text-amber-900">
+          <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+          <span>
+            <strong>{t("sync.notSynced", { defaultValue: "Not synced" })}.</strong> {failure.reason}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

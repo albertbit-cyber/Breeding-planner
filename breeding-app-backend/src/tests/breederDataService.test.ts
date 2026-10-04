@@ -25,14 +25,20 @@ const existingRow = (appIdField: string, appId: string, payload: unknown, update
 vi.mock("../lib/prisma", () => ({
   prisma: {
     $transaction: vi.fn(async (callback) => callback(tx)),
-    animal: { findMany: vi.fn() },
+    animal: { findMany: vi.fn(), count: vi.fn() },
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
     breederPlannerState: { findUnique: vi.fn() },
   },
 }));
 
+// The tier lookup is its own service; these tests set the answer it gives.
+vi.mock("../services/subscriptionService", () => ({
+  canAccessFeature: vi.fn(),
+}));
+
 import { prisma } from "../lib/prisma";
+import { canAccessFeature } from "../services/subscriptionService";
 import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederDataService";
 
 beforeEach(() => {
@@ -53,6 +59,91 @@ beforeEach(() => {
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
+  vi.mocked(canAccessFeature).mockResolvedValue({ allowed: true, featureKey: "animals.create", source: "unconfigured", tier: "Unconfigured" } as any);
+});
+
+describe("the tier's animal cap", () => {
+  const freeAt = (currentUsage: number) => ({
+    allowed: currentUsage < 20,
+    featureKey: "animals.create",
+    tier: "Free",
+    currentTier: "Free",
+    currentUsage,
+    limit: 20,
+    ...(currentUsage >= 20 ? { reason: "Usage limit reached" } : {}),
+  });
+  const newAnimals = (count: number, from = 1) =>
+    Array.from({ length: count }, (_, index) => ({ id: `new-${from + index}`, name: `New ${from + index}` }));
+
+  it("lets an account at its cap keep saving edits", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", name: "Old" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", name: "Renamed", updatedAt: "2026-02-01T00:00:00.000Z" }],
+    });
+
+    expect(tx.animal.update).toHaveBeenCalled();
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+  });
+
+  it("accepts new animals up to the cap, counting only live animals", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(19) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(19);
+
+    await upsertBreederSnapshot("breeder-1", { animals: newAnimals(1) });
+
+    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: { ownerId: "breeder-1", deletedAt: null } });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("refuses a save that would take the cloud past the cap, and writes nothing", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(15) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(15);
+
+    await expect(upsertBreederSnapshot("breeder-1", { animals: newAnimals(10) })).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Free keeps 20 animals in the cloud. This save would bring it to 25, so it was not saved. Every animal is still on this device.",
+    });
+    expect((prisma as any).$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a first sync of 60 animals on Free instead of letting the request size decide", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(0) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(0);
+
+    await expect(upsertBreederSnapshot("breeder-1", { animals: newAnimals(60) })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("makes room for a new animal when the same save deletes one", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1" }),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValueOnce(20).mockResolvedValueOnce(1);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", deletedAt: "2026-03-01T00:00:00.000Z" }, ...newAnimals(1)],
+    });
+
+    expect((prisma as any).animal.count).toHaveBeenLastCalledWith({
+      where: { ownerId: "breeder-1", deletedAt: null, appAnimalId: { in: ["snake-1"] } },
+    });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("does not count a deletion of an animal the cloud never had", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "never-synced", deletedAt: "2026-03-01T00:00:00.000Z" }],
+    });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
 });
 
 describe("breederDataService", () => {

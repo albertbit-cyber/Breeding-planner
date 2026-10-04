@@ -1,55 +1,59 @@
-import React, { useEffect, useState } from "react";
-import { checkFeatureAccess } from "../../shared/apiClient";
+import React from "react";
+import { useFeatureAccess } from "./FeatureAccessContext.jsx";
 
-export function LockedFeatureNotice({ access, featureName }) {
+/**
+ * Says what a plan does not include before the keeper presses the button the
+ * backend would refuse, so a 403 is never the first notice.
+ *
+ * It reads the access fetched once after sign-in. An answer it does not have
+ * (signed out, offline, never fetched) lets the action through: this app works
+ * on the device first, and the backend still has the last word.
+ */
+export function LockedFeatureNotice({ access, featureName, onUpgrade, compact = false }) {
+  const usage = access?.limit !== undefined && access?.limit !== null
+    ? `${access.currentUsage || 0} / ${access.limit}`
+    : "";
   return (
-    <div className="locked-feature-notice">
-      <h2>{featureName || access?.featureKey || "Feature"} is locked</h2>
-      <p>{access?.reason || "Your current plan does not include this feature."}</p>
-      <dl>
-        <dt>Current plan</dt><dd>{access?.currentTier || "Unknown"}</dd>
-        <dt>Required plan</dt><dd>{access?.requiredTier || "Upgrade required"}</dd>
-        <dt>Feature</dt><dd>{access?.featureKey || featureName || "-"}</dd>
-        {access?.limit !== undefined ? <><dt>Usage</dt><dd>{access.currentUsage || 0} / {access.limit}</dd></> : null}
-      </dl>
-      <div className="pricing-actions">
-        <button type="button" onClick={() => { window.location.hash = "/pricing"; }}>Upgrade</button>
-        <button type="button" onClick={() => { window.location.hash = "/"; }}>Contact admin</button>
+    <div className="locked-feature-notice rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="status">
+      <div className="font-semibold">
+        {featureName || access?.featureKey || "This feature"} is not included in {access?.currentTier || access?.tier || "your plan"}
       </div>
+      <div className="mt-0.5">
+        {access?.reason === "Usage limit reached" && usage
+          ? `You have used ${usage} this plan allows.`
+          : access?.requiredTier
+            ? `It needs the ${access.requiredTier} plan.`
+            : access?.reason || "Your current plan does not include it."}
+      </div>
+      {onUpgrade ? (
+        <button
+          type="button"
+          className={`mt-2 rounded-md border border-amber-300 bg-white px-2 py-1 font-medium ${compact ? "" : "text-sm"}`}
+          onClick={onUpgrade}
+        >
+          See plans
+        </button>
+      ) : null}
     </div>
   );
 }
 
 export function UpgradeModal({ access, onClose }) {
+  const { openUpgrade } = useFeatureAccess();
   return (
     <div className="upgrade-modal-backdrop">
       <div className="upgrade-modal">
         <button type="button" onClick={onClose}>Close</button>
-        <LockedFeatureNotice access={access} />
+        <LockedFeatureNotice access={access} onUpgrade={() => { onClose?.(); openUpgrade(); }} />
       </div>
     </div>
   );
 }
 
-export default function FeatureAccessGuard({ feature, featureName, children }) {
-  const [access, setAccess] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    checkFeatureAccess(feature)
-      .then((data) => mounted && setAccess(data))
-      .catch((err) => mounted && setAccess({
-        allowed: false,
-        featureKey: feature,
-        reason: err instanceof Error ? err.message : "Feature access could not be checked.",
-      }))
-      .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
-  }, [feature]);
-
-  if (loading) return <div className="locked-feature-notice">Checking feature access...</div>;
-  if (!access?.allowed) return <LockedFeatureNotice access={access} featureName={featureName} />;
-  return children;
+export default function FeatureAccessGuard({ feature, featureName, children, fallback, showUpgrade = true }) {
+  const { access, openUpgrade } = useFeatureAccess();
+  const entry = access?.[feature];
+  if (!entry || entry.allowed !== false) return children;
+  if (fallback !== undefined) return fallback;
+  return <LockedFeatureNotice access={entry} featureName={featureName} onUpgrade={showUpgrade ? openUpgrade : null} compact />;
 }

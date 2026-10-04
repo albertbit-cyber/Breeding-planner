@@ -16,6 +16,7 @@ import {
 } from "./refreshTokenSessionService";
 import { recordSecurityEvent } from "./securityEventService";
 import { createOrganizationWithOwner, defaultOrganizationName } from "./organizationService";
+import { assignDefaultTier } from "./subscriptionService";
 import { issueToken, consumeToken, revokeAllForPurpose } from "./accountTokenService";
 import { enqueueEmail } from "../email/queueService";
 import { maskEmail } from "../utils/maskEmail";
@@ -177,6 +178,10 @@ export const registerUser = async (input: {
       },
     });
 
+    // Every new account starts on Free, so its limits are known from the first
+    // request and My Account names a real tier.
+    const defaultTier = await assignDefaultTier(tx, created.id);
+
     if (role === "breeder") {
       await createOrganizationWithOwner(
         {
@@ -189,7 +194,9 @@ export const registerUser = async (input: {
       );
     }
 
-    return created;
+    return defaultTier
+      ? { ...created, subscriptionPlan: defaultTier.key, subscriptionStatus: "active" }
+      : created;
   });
 
   await recordSecurityEvent({ type: "auth.registered", actorUserId: user.id, outcome: "success", metadata: { email } });

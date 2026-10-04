@@ -31,6 +31,11 @@ import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegrati
 import { useAppearance, HIGH_CONTRAST_SKIN, materialStatus } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
 import BackendStatusDot from "./components/BackendStatusDot.jsx";
+import { useFeatureAccess } from "./features/subscriptions/FeatureAccessContext.jsx";
+import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx";
+import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
+import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
+import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -3733,6 +3738,13 @@ const DEFAULT_GROUPS = ["Breeders", "Holdbacks", "Hatchlings 2024", "Hatchlings 
 
 // QUARANTINE_TAG rather than a literal: this tag drives the whole quarantine section, so the two
 // must never drift apart.
+// What a failed cloud save keeps for the "Not synced" state: enough to word the reason.
+const syncErrorDetails = (error) => ({
+  status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+  kind: typeof error?.kind === 'string' ? error.kind : '',
+  message: typeof error?.message === 'string' ? error.message : '',
+});
+
 const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, 'For sell', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
 const STATUS_TAG_TRANSLATIONS = Object.freeze({
   'active': 'ui.animals.addAnimal.active',
@@ -6149,9 +6161,11 @@ function deriveQuickAddName(text, parsed = {}) {
   return candidate;
 }
 
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], capResult = null, theme='blue' }) {
   const { t } = useTranslation();
-  const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal) && Boolean((newAnimal && newAnimal.species) || '');
+  // Past the plan's animal cap the animal is not added; the notice says so and offers the next plan.
+  const capBlocked = Boolean(capResult?.blocked);
+  const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal) && Boolean((newAnimal && newAnimal.species) || '') && !capBlocked;
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
   const [quickAddText, setQuickAddText] = useState('');
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -6756,6 +6770,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             </div>
       </div>
 
+      {capResult ? <AnimalCapNotice result={capResult} context="add" className="mx-4 mt-3" /> : null}
       <div className="p-4 border-t flex items-center justify-between">
         <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "This animal is saved in your planner on this device." })}</div>
         <div className="flex gap-2">
@@ -7329,6 +7344,32 @@ export default function BreedingPlannerApp() {
     lastSyncedAt: null,
     message: '',
   });
+  // A failed cloud save is a state the keeper can see, not a console line: the header
+  // carries a "Not synced" pill until a save succeeds, and the first failure toasts once.
+  const cloudSyncFailure = useMemo(() => (cloudSyncStatus.state === 'error'
+    ? describeCloudSyncFailure(cloudSyncStatus.error || { message: cloudSyncStatus.message }, { t })
+    : null), [cloudSyncStatus.error, cloudSyncStatus.message, cloudSyncStatus.state, t]);
+  // Settings opens on a given tab when something elsewhere asks for it: "See plans" goes to
+  // My Account, where the plan is chosen, and the "Not synced" pill to the cloud sync panel.
+  const [setupTabRequest, setSetupTabRequest] = useState(null);
+  const openSetupTab = useCallback((setupTab) => {
+    setTab('setup');
+    setSetupTabRequest({ tab: setupTab, at: Date.now() });
+  }, []);
+  const { setUpgradeHandler, access: featureAccessMap } = useFeatureAccess();
+  // Known from the access fetched at sign-in; unknown means "let the backend decide".
+  const marketplaceListingDenied = featureAccessMap?.['marketplace.create_listing']?.allowed === false;
+  const addAnimalCap = useAnimalCap(Array.isArray(snakes) ? snakes.length : 0, 1);
+  useEffect(() => {
+    setUpgradeHandler(() => {
+      // The add and import dialogs sit over the page; My Account has to be in view.
+      // The add draft is kept in state, so reopening the dialog brings it back.
+      setShowAddModal(false);
+      setShowImportModal(false);
+      openSetupTab('account');
+    });
+    return () => setUpgradeHandler(null);
+  }, [openSetupTab, setUpgradeHandler]);
   const sharedBreederDataReady = sharedBackendSnapshot?.state === 'connected'
     && sharedBackendSnapshot?.authStatus === 'authorized';
   const handleAnimalViewTabChange = useCallback((nextView) => {
@@ -7762,7 +7803,16 @@ export default function BreedingPlannerApp() {
   const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
       const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
-      if (!silent) setCloudSyncStatus({ state: 'error', lastSyncedAt: null, message });
+      if (!silent) {
+        setCloudSyncStatus({
+          state: 'error',
+          lastSyncedAt: null,
+          message,
+          error: sharedBackendSnapshot?.authStatus === 'unauthorized'
+            ? { status: 401, kind: 'unauthorized', message }
+            : { kind: 'connection', message },
+        });
+      }
       throw new Error(message);
     }
     if (backendPlannerSyncRef.current.status === 'loading') {
@@ -7830,10 +7880,10 @@ export default function BreedingPlannerApp() {
     } catch (error) {
       backendPlannerSyncRef.current.status = 'idle';
       const message = error?.message || 'Cloud sync failed.';
-      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
       throw error;
     }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
@@ -8378,10 +8428,13 @@ export default function BreedingPlannerApp() {
         .catch((error) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
           backendPlannerSyncRef.current.status = 'ready';
+          // Shown as a "Not synced" pill in the header and one toast, with the reason
+          // in plain words (see cloudSyncFailure). The console line stays for diagnosis.
           setCloudSyncStatus(prev => ({
             ...prev,
             state: 'error',
             message: error?.message || 'Failed to save shared breeder snapshot.',
+            error: syncErrorDetails(error),
           }));
           console.warn('Failed to save shared breeder snapshot', error);
         });
@@ -11426,6 +11479,7 @@ export default function BreedingPlannerApp() {
               <div className="min-w-0">
                 <div className="mt-wordmark text-[28px] leading-tight tracking-tight">{t("app.title")}</div>
                 <div className="text-sm text-neutral-600 truncate">{breederInfo.businessName ? `${breederInfo.businessName} | ${breederInfo.name || ''}` : (breederInfo.name || '')}</div>
+                <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="mt-1" />
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
@@ -11477,8 +11531,10 @@ export default function BreedingPlannerApp() {
               </div>
             )}
           </div>
+          <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="shrink-0" />
         </div>
       </div>
+      <NotSyncedToast failure={cloudSyncFailure} />
 
       {/* Mobile bottom navigation — shown only on mobile via CSS */}
       <nav className="bp-mobile-bottom-nav">
@@ -12443,6 +12499,8 @@ export default function BreedingPlannerApp() {
             pairings={pairings}
             sharedBackendSnapshot={sharedBackendSnapshot}
             cloudSyncStatus={cloudSyncStatus}
+            cloudSyncFailure={cloudSyncFailure}
+            setupTabRequest={setupTabRequest}
             onSyncCloudDatabase={runCloudBreederSync}
             animalExportFields={animalExportFields}
             setAnimalExportFields={setAnimalExportFields}
@@ -12589,6 +12647,7 @@ export default function BreedingPlannerApp() {
               onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
               onCancel={()=>setShowAddModal(false)}
               onAdd={addAnimalFromForm}
+              capResult={addAnimalCap}
               theme={theme}
             />
           </div>
@@ -13335,7 +13394,10 @@ export default function BreedingPlannerApp() {
                               tone: 'danger',
                             });
                           };
-                          if (savedSnake.forSale) {
+                          if (savedSnake.forSale && marketplaceListingDenied) {
+                            // The plan has no marketplace listings; the editor's For sale panel
+                            // already says so, and a publish here would only come back refused.
+                          } else if (savedSnake.forSale) {
                             syncSnakeToMarketplace(savedSnake)
                               .then((photo) => setSnakes(prev => prev.map(x => x.id === newId
                                 ? {
@@ -13720,6 +13782,12 @@ export default function BreedingPlannerApp() {
                           <span>✓</span><span>Published to Marketplace</span>
                         </div>
                       ) : (
+                        <FeatureAccessGuard
+                          feature="marketplace.create_listing"
+                          featureName="Marketplace listings"
+                          // No "See plans" here: leaving the editor would drop its unsaved changes.
+                          showUpgrade={false}
+                        >
                         <button
                           type="button"
                           disabled={editForSalePublishing}
@@ -13733,6 +13801,7 @@ export default function BreedingPlannerApp() {
                         >
                           {editForSalePublishing ? 'Publishing...' : 'Publish to Marketplace'}
                         </button>
+                        </FeatureAccessGuard>
                       )}
                     </div>
                   )}
@@ -18180,6 +18249,8 @@ function BreederSection({
   pairings,
   sharedBackendSnapshot,
   cloudSyncStatus,
+  cloudSyncFailure = null,
+  setupTabRequest = null,
   onSyncCloudDatabase,
   animalExportFields,
   setAnimalExportFields,
@@ -18282,7 +18353,11 @@ function BreederSection({
     lastTemplateSelectionRef.current = { start, end };
   }, []);
 
-  const [setupTab, setSetupTab] = useState('info');
+  const [setupTab, setSetupTab] = useState(() => setupTabRequest?.tab || 'info');
+  useEffect(() => {
+    if (setupTabRequest?.tab) setSetupTab(setupTabRequest.tab);
+  }, [setupTabRequest]);
+  const { refresh: refreshFeatureAccess } = useFeatureAccess();
   const isDevEnvironment = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
   const [aliasDraftAlias, setAliasDraftAlias] = useState('');
   const [aliasDraftGenes, setAliasDraftGenes] = useState('');
@@ -19918,10 +19993,12 @@ function BreederSection({
       }));
       await loadAccountData();
       setAccountState(prev => ({ ...prev, message: successMessage }));
+      // The new plan's limits apply everywhere at once, not after the next sign-in.
+      refreshFeatureAccess();
     } catch (error) {
       setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to change plan.', message: '' }));
     }
-  }, [loadAccountData, showAppConfirm, t]);
+  }, [loadAccountData, refreshFeatureAccess, showAppConfirm, t]);
 
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
@@ -20257,7 +20334,7 @@ function BreederSection({
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
         )}
       </div>
-      <BackendStatusDot />
+      <BackendStatusDot failure={cloudSyncFailure} />
 
       {setupTab === 'info' && (
         <div className="space-y-6">
@@ -26153,7 +26230,10 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   }, []);
   const importCount = Array.isArray(importPreview) ? importPreview.length : 0;
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
-  const canImport = importCount > 0 && Boolean(importSpecies);
+  // Duplicates of animals already here are dropped on apply, so this can count a few too many;
+  // erring that way never lets an import past the plan's cap.
+  const importCapResult = useAnimalCap(Array.isArray(existingAnimals) ? existingAnimals.length : 0, importCount);
+  const canImport = importCount > 0 && Boolean(importSpecies) && !importCapResult?.blocked;
   const importButtonLabel = importCount
     ? t("ui.animals.import.importButtonWithCount", { count: importCount, defaultValue: "Import ({{count}})" })
     : t("ui.animals.import.importButton", { defaultValue: "Import" });
@@ -26236,6 +26316,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           plan={morphMarketPlan}
           result={morphMarketResult}
           busy={parsing}
+          existingAnimalCount={Array.isArray(existingAnimals) ? existingAnimals.length : 0}
           primaryButtonClass={primaryBtnClass(theme, true)}
           onChangeResolution={setRowResolution}
           onConfirm={() => {
@@ -26606,6 +26687,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             </div>
           </div>
 
+          {importCapResult?.blocked ? <AnimalCapNotice result={importCapResult} context="paste" className="mt-3" /> : null}
           <div className="mt-3 flex gap-2">
             <button className="px-3 py-2 rounded-xl text-sm border" onClick={runImportPreview}>
               {t("ui.animals.import.previewButton", { defaultValue: "Preview" })}

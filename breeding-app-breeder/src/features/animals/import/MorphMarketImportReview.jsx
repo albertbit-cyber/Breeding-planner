@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSpeciesById } from '../../../genetics/speciesRegistry';
+import AnimalCapNotice, { useAnimalCap } from '../../subscriptions/AnimalCapNotice.jsx';
 
 /**
  * The mandatory stop between reading a MorphMarket file and writing animals.
@@ -8,6 +9,10 @@ import { getSpeciesById } from '../../../genetics/speciesRegistry';
  * Every count on this screen is computed from the file in hand -- nothing here is a fixed
  * number from a sample export. Rows that collide with the collection start on Skip and stay
  * there unless the keeper says otherwise: an import must never quietly overwrite an animal.
+ *
+ * The plan's animal cap is stated here too, before the confirm. An import that would take the
+ * collection past it cannot be confirmed; the keeper sets rows to Skip until it fits, or
+ * upgrades. Which animals to leave out is their call, never the app's.
  */
 
 const STATUS_STYLES = {
@@ -38,6 +43,7 @@ export default function MorphMarketImportReview({
   onCancel,
   busy = false,
   result = null,
+  existingAnimalCount = 0,
   primaryButtonClass = 'appearance-btn appearance-btn--filled',
 }) {
   const { t } = useTranslation();
@@ -69,6 +75,8 @@ export default function MorphMarketImportReview({
     });
     return { create, update, skip };
   }, [rows]);
+  const capResult = useAnimalCap(existingAnimalCount, pending.create);
+  const capBlocked = Boolean(capResult?.blocked);
 
   if (result) {
     return (
@@ -182,6 +190,17 @@ export default function MorphMarketImportReview({
                 <span className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-lg border ${STATUS_STYLES[effectiveStatus]}`}>
                   {statusLabels[effectiveStatus]}
                 </span>
+                {!row.conflictWithId && row.status !== 'error' && (
+                  <select
+                    className="text-xs border rounded-lg px-2 py-1 bg-white"
+                    value={row.resolution === 'skip' ? 'skip' : 'import'}
+                    onChange={event => onChangeResolution?.(row.rowNumber, event.target.value)}
+                    aria-label={t('ui.animals.import.morphmarket.resolveRow', { defaultValue: 'Import or skip this row' })}
+                  >
+                    <option value="import">{t('ui.animals.import.morphmarket.resolveImport', { defaultValue: 'Import' })}</option>
+                    <option value="skip">{t('ui.animals.import.morphmarket.resolveSkip', { defaultValue: 'Skip' })}</option>
+                  </select>
+                )}
                 {row.conflictWithId && (
                   <select
                     className="text-xs border rounded-lg px-2 py-1 bg-white"
@@ -198,11 +217,13 @@ export default function MorphMarketImportReview({
         })}
       </div>
 
+      {capResult ? <AnimalCapNotice result={capResult} context="import" /> : null}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className={`px-3 py-2 rounded-xl text-sm ${primaryButtonClass} disabled:opacity-50`}
-          disabled={busy || pending.create + pending.update === 0}
+          disabled={busy || pending.create + pending.update === 0 || capBlocked}
           onClick={onConfirm}
         >
           {t('ui.animals.import.morphmarket.confirm', {

@@ -619,6 +619,44 @@ const createManyChunked = async (model: any, rows: JsonRecord[], chunkSize = 200
   }
 };
 
+/**
+ * The tier's animal cap, judged on what this save leaves in the cloud.
+ *
+ * The app uploads only changed records, so the request size says nothing about the
+ * collection: comparing it to the limit let a keeper pass the cap in small steps, and
+ * the usage check that sat beside it counted deleted rows and refused every save --
+ * edits included -- once an account reached its limit exactly. Only new live animals
+ * can push an account over, so a save without any always goes through: edits,
+ * deletions and pairings are never held hostage to the cap.
+ */
+const assertAnimalCapacity = async (
+  ownerId: string,
+  access: any,
+  animalCreates: JsonRecord[],
+  animalUpdates: PlannedUpdate[],
+): Promise<void> => {
+  const limit = access?.limit;
+  if (limit === undefined || limit === null || !Number.isFinite(Number(limit))) return;
+  const added = animalCreates.filter((row) => !row.deletedAt).length;
+  if (!added) return;
+
+  const deletedIds = animalUpdates.filter((update) => update.data.deletedAt).map((update) => update.appId);
+  const [liveNow, liveBeingDeleted] = await Promise.all([
+    db.animal.count({ where: { ownerId, deletedAt: null } }),
+    deletedIds.length
+      ? db.animal.count({ where: { ownerId, deletedAt: null, appAnimalId: { in: deletedIds } } })
+      : Promise.resolve(0),
+  ]);
+  const liveAfter = liveNow - liveBeingDeleted + added;
+  if (liveAfter <= Number(limit)) return;
+
+  const tierName = access.tier || access.currentTier || "Your plan";
+  throw new HttpError(
+    403,
+    `${tierName} keeps ${limit} animals in the cloud. This save would bring it to ${liveAfter}, so it was not saved. Every animal is still on this device.`,
+  );
+};
+
 export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnapshotInput) => {
   const animals = normalizeArray(input.animals, "animals");
   const pairings = normalizeArray(input.pairings, "pairings");
@@ -633,12 +671,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   } catch (error) {
     if (error instanceof HttpError) throw error;
     console.warn("[breeder-sync] canAccessFeature error (proceeding without limit check):", error);
-  }
-  if (!animalAccess.allowed && animalAccess.reason === "Usage limit reached") {
-    throw new HttpError(403, `${animalAccess.reason}: ${animalAccess.currentUsage || 0} / ${animalAccess.limit || 0} animals.`);
-  }
-  if (animalAccess.limit !== undefined && animalAccess.limit !== null && animals.length > Number(animalAccess.limit)) {
-    throw new HttpError(403, `Animal limit reached: ${animals.length} / ${animalAccess.limit} animals.`);
   }
 
   // Read the owner's current rows in bulk, outside the write transaction. The previous
@@ -684,6 +716,8 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       animalUpdates.push({ id: existing.id, appId: appAnimalId, data });
     }
   }
+
+  await assertAnimalCapacity(ownerId, animalAccess, animalCreates, animalUpdates);
 
   // Row ids for every pairing the clutch loop may reference. Pairings created by this request
   // have no id until after the insert, so those are resolved in a single lookup below.
