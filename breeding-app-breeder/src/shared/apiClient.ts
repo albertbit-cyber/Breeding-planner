@@ -1,4 +1,4 @@
-import { DEFAULT_SHARED_API_TIMEOUT_MS, getSharedApiConfig } from "./config/api";
+import { DEFAULT_SHARED_API_TIMEOUT_MS, getSharedApiConfig } from "./apiConfig";
 import {
   type SharedBackendState,
   getSharedBackendSnapshot,

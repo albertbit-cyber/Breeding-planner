@@ -40,7 +40,11 @@ const warnings = [];
 const sameRows = [];
 
 for (const app of apps) {
-  const settingsPath = path.join(root, app, "src", "i18n", "settings.json");
+  // Breeder and lab take their language settings from breeding-app-shared.
+  const ownSettingsPath = path.join(root, app, "src", "i18n", "settings.json");
+  const settingsPath = fs.existsSync(ownSettingsPath)
+    ? ownSettingsPath
+    : path.join(root, "breeding-app-shared", "src", "i18n", "settings.json");
   const localesDir = path.join(root, app, "src", "locales");
   const settings = readJson(settingsPath);
   const languages = settings.supportedLangs || ["en"];

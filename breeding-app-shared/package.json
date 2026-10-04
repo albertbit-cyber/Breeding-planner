@@ -6,6 +6,15 @@
   "description": "Shared types, genetics, API contracts, labels, validation, and reusable UI helpers for the split Breeding Planner apps.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config/api": "./src/shared/config/api.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -16,8 +25,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.8.6",
+    "i18next": "^25.10.10",
+    "i18next-browser-languagedetector": "^8.2.1",
     "typescript": "^5.6.3",
     "vitest": "^1.6.0"
   }
 }
-

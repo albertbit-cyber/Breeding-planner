@@ -1,6 +1,6 @@
 {
   "name": "breeding-app-breeder",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "private": true,
   "type": "module",
   "engines": {
@@ -44,6 +44,7 @@
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@sentry/react": "^8.55.0",
+    "breeding-app-shared": "file:../breeding-app-shared",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "i18next": "^25.6.3",

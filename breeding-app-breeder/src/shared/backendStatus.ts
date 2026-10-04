@@ -1,4 +1,5 @@
-import { getSharedApiConfig, type SharedApiConfigValidation } from "./config/api";
+import type { SharedApiConfigValidation } from "breeding-app-shared/config/api";
+import { getSharedApiConfig } from "./apiConfig";
 
 export type SharedBackendState =
   | "checking"

@@ -32,5 +32,5 @@
 
 ## Desktop & Native Notes
 - Desktop data is saved per-user via `app.getPath('userData')` in [electron/main.js](electron/main.js); never write arbitrary locations from the renderer—use `window.electronAPI.saveData`.
-- The Electron i18n loader in [electron/i18n.js](electron/i18n.js) copies `src/locales/**/electron.json` plus `src/i18n/settings.json` into packaged assets through the `extraResources` block in [package.json](package.json); keep these paths intact when reorganizing locales.
+- The Electron i18n loader in [electron/i18n.js](electron/i18n.js) copies `src/locales/**/electron.json` plus `breeding-app-shared/src/i18n/settings.json` into packaged assets through the `extraResources` block in [package.json](package.json); keep these paths intact when reorganizing locales.
 - Capacitor is configured in [capacitor.config.ts](capacitor.config.ts) to point at `build/`; any mobile packaging must run `npm run build` before `npx cap sync`.

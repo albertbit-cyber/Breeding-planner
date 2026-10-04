@@ -110,7 +110,7 @@
         "to": "locales"
       },
       {
-        "from": "breeding-app-breeder/src/i18n/settings.json",
+        "from": "breeding-app-shared/src/i18n/settings.json",
         "to": "i18n-settings.json"
       }
     ],

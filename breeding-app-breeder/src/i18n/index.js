@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import settings from "./settings.json";
+import { bootstrapI18n } from "breeding-app-shared/i18n";
 
 import enCommon from "../locales/en/common.json";
 import enAnimals from "../locales/en/animals.json";
@@ -62,13 +62,6 @@ import heAnimals from "../locales/he/animals.json";
 import heAdvisor from "../locales/he/advisor.json";
 import heAuth from "../locales/he/auth.json";
 import heElectron from "../locales/he/electron.json";
-
-const {
-  supportedLangs: SUPPORTED_LANGS = ["en"],
-  namespaces: NAMESPACES = ["common"],
-  fallbackLng: FALLBACK_LANGUAGE = "en",
-  defaultNamespace: DEFAULT_NAMESPACE = "common",
-} = settings || {};
 
 const resources = {
   en: {
@@ -143,41 +136,8 @@ const resources = {
   },
 };
 
-// Resolve the language to initialise with.
-// - Returning users: restore whatever they stored in localStorage.
-// - First-time users (nothing stored): always start in English.
-const getInitialLanguage = () => {
-  try {
-    const stored = localStorage.getItem("i18nextLng");
-    const base = stored ? stored.split("-")[0] : "";
-    if (base && SUPPORTED_LANGS.includes(base)) return base;
-  } catch {
-    // ignore - localStorage may be unavailable
-  }
-  return FALLBACK_LANGUAGE;
-};
-
-if (!i18n.isInitialized) {
-  i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-      resources,
-      lng: getInitialLanguage(), // explicit > detector; ensures English on first load
-      fallbackLng: FALLBACK_LANGUAGE,
-      ns: NAMESPACES,
-      defaultNS: DEFAULT_NAMESPACE,
-      fallbackNS: DEFAULT_NAMESPACE,
-      supportedLngs: SUPPORTED_LANGS,
-      interpolation: {
-        escapeValue: false,
-      },
-      detection: {
-        // Only cache language changes the user explicitly makes via the selector.
-        order: ["localStorage"],
-        caches: ["localStorage"],
-      },
-    });
-}
+// Language list, the first-visit-is-English rule and the init options live in
+// breeding-app-shared; this app only brings its own translations.
+bootstrapI18n(i18n, { resources, plugins: [LanguageDetector, initReactI18next] });
 
 export default i18n;
