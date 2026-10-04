@@ -1,4 +1,4 @@
-package com.breedingplanner.mobile;
+package com.serpentora.mobile;
 
 import static org.junit.Assert.*;
 

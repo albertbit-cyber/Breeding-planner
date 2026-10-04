@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.breedingplanner.lab",
-  appName: "Breeding Planner Lab",
+  appId: "com.serpentora.lab",
+  appName: "Serpentora Lab",
   webDir: "build",
   server: {
     androidScheme: "https",

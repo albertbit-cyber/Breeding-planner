@@ -10,7 +10,7 @@ type CapacitorConfig = {
 };
 
 const config: CapacitorConfig = {
-  appId: "com.breedingplanner.mobile",
+  appId: "com.serpentora.mobile",
   appName: "Serpentora",
   webDir: "build",
   server: {

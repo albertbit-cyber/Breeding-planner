@@ -1,15 +1,15 @@
 {
 	"window": {
-		"title": "Breeding Planner"
+		"title": "Serpentora"
 	},
 	"dialogs": {
 		"storageReadFailed": {
 			"title": "Impossible d'ouvrir les données",
-			"message": "Breeding Planner n'a pas pu lire votre fichier de données local. Un nouvel espace de travail va être créé."
+			"message": "Serpentora n'a pas pu lire votre fichier de données local. Un nouvel espace de travail va être créé."
 		},
 		"storageWriteFailed": {
 			"title": "Impossible de sauvegarder les données",
-			"message": "Breeding Planner n'a pas pu enregistrer vos dernières modifications. Réessayez ou exportez une sauvegarde manuelle."
+			"message": "Serpentora n'a pas pu enregistrer vos dernières modifications. Réessayez ou exportez une sauvegarde manuelle."
 		}
 	},
 	"locale": {

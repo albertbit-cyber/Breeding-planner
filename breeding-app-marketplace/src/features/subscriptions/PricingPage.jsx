@@ -17,7 +17,7 @@ function PricingTierCard({ tier }) {
       {tier.isRecommended ? <span className="pricing-badge">{t("pricing.recommended", { defaultValue: "Recommended" })}</span> : null}
       <h2>{tier.name}</h2>
       <strong>{formatPrice(tier, t)}</strong>
-      <p>{tier.shortDescription || tier.longDescription || t("pricing.defaultTierDescription", { defaultValue: "Flexible Breeding Planner access." })}</p>
+      <p>{tier.shortDescription || tier.longDescription || t("pricing.defaultTierDescription", { defaultValue: "Flexible Serpentora access." })}</p>
       <ul>
         {mainFeatures.map((feature) => <li key={feature.featureKey}>{feature.featureName}</li>)}
       </ul>
@@ -57,7 +57,7 @@ export default function PricingPage() {
       <header className="pricing-header">
         <button type="button" onClick={() => { window.location.hash = "/"; }}>{t("common.back", { defaultValue: "Back" })}</button>
         <div>
-          <h1>{t("pricing.title", { defaultValue: "Breeding Planner Pricing" })}</h1>
+          <h1>{t("pricing.title", { defaultValue: "Serpentora Pricing" })}</h1>
           <p>{t("pricing.subtitle", { defaultValue: "Choose the plan that matches your collection, lab, or breeding business." })}</p>
         </div>
       </header>

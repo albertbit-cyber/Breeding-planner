@@ -22,7 +22,7 @@ export default function Footer() {
           }}>
             <Logo size={26} />
           </div>
-          <span style={{ fontSize: 13, color: '#5a5650', marginLeft: 4 }}> 2026 Breeding Planner</span>
+          <span style={{ fontSize: 13, color: '#5a5650', marginLeft: 4 }}> 2026 Serpentora</span>
         </div>
 
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>

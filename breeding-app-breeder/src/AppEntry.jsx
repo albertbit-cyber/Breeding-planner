@@ -33,7 +33,8 @@ export default function AppEntry() {
     <AppearanceProvider>
       <SharedBackendProvider>
         <BatchOrderProvider>
-          <SharedBackendBanner />
+          {/* Diagnostics are for developers; production shows a status dot in Settings. */}
+          {import.meta.env.DEV ? <SharedBackendBanner /> : null}
           <AuthGate>
             <BreedingPlannerApp />
           </AuthGate>

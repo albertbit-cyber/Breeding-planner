@@ -1,4 +1,4 @@
-package com.breedingplanner.lab;
+package com.serpentora.lab;
 
 import com.getcapacitor.BridgeActivity;
 

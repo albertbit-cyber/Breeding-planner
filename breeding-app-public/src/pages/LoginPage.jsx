@@ -48,7 +48,7 @@ export default function LoginPage() {
             Welcome back
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Sign in to your Breeding Planner account
+            Sign in to your Serpentora account
           </p>
         </div>
 

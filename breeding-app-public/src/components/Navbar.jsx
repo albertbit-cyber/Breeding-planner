@@ -28,10 +28,10 @@ export default function Navbar() {
       background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(8px)',
     }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-        <img src="/Logo.png" alt="Breeding Planner" style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: 4, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }} />
+        <img src="/Logo.png" alt="Serpentora" style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: 4, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }} />
         <div>
           <div style={{ fontWeight: 500, fontSize: 15, color: 'var(--dark)', lineHeight: 1.2 }}>
-            Breeding Planner
+            Serpentora
           </div>
           <div style={{ fontSize: 11, color: 'var(--hint)' }}>Morph management platform</div>
         </div>

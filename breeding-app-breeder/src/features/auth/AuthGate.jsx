@@ -1487,24 +1487,35 @@ export default function AuthGate({ children }) {
               <div className="auth-card-brand">
                 <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
                 <h1 className="auth-card-title">
-                  {snapshot.state === "config-error"
-                    ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
-                    : snapshot.state === "unauthorized"
-                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
-                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
+                  {!import.meta.env.DEV
+                    ? t("auth.sharedBackend.offlineTitle", { defaultValue: "Can't connect right now" })
+                    : snapshot.state === "config-error"
+                      ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
+                      : snapshot.state === "unauthorized"
+                        ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
+                        : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
                 </h1>
               </div>
-              <p className="auth-subtitle">{snapshot.message}</p>
-              <div className="text-xs text-neutral-500">
-                {t("auth.sharedBackend.requirements", {
-                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
-                })}
-              </div>
-              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  {snapshot.config.warnings.join(" ")}
-                </div>
-              ) : null}
+              {/* Backend diagnostics are for developers; users get one plain sentence. */}
+              {import.meta.env.DEV ? (
+                <>
+                  <p className="auth-subtitle">{snapshot.message}</p>
+                  <div className="text-xs text-neutral-500">
+                    Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.
+                  </div>
+                  {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      {snapshot.config.warnings.join(" ")}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p className="auth-subtitle">
+                  {t("auth.sharedBackend.offlineMessage", {
+                    defaultValue: "Serpentora can't reach its server. Check your internet connection and try again.",
+                  })}
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" className="primary" onClick={retry}>
                   {t("common.retry", { defaultValue: "Retry" })}

@@ -335,7 +335,7 @@ export default function AuthGate({ children }) {
                 {invite.kind === "vendor_lab" ? (
                   <>
                     You have been invited to run <strong>{invite.organizationName}</strong> on
-                    Breeding Planner. Accepting creates your laboratory's own workspace.
+                    Serpentora. Accepting creates your laboratory's own workspace.
                   </>
                 ) : (
                   <>

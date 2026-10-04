@@ -30,6 +30,7 @@ import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance, HIGH_CONTRAST_SKIN, materialStatus } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
+import BackendStatusDot from "./components/BackendStatusDot.jsx";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -7581,7 +7582,7 @@ export default function BreedingPlannerApp() {
       .map(part => part?.[0]?.toUpperCase())
       .filter(Boolean)
       .slice(0, 2)
-      .join('') || 'BP';
+      .join('') || 'S';
     const confirmLabel = appDialog.confirmLabel || t('common.ok', { defaultValue: 'OK' });
     if (typeof document === 'undefined') return null;
     return createPortal((
@@ -11466,7 +11467,7 @@ export default function BreedingPlannerApp() {
           {breederInfo.logoUrl ? (
             <img src={breederInfo.logoUrl} alt="logo" className="bp-header-mobile__logo" />
           ) : (
-            <div className="bp-header-mobile__logo-placeholder">BP</div>
+            <div className="bp-header-mobile__logo-placeholder">S</div>
           )}
           <div className="min-w-0 flex-1">
             <div className="bp-header-mobile__title">{t("app.title")}</div>
@@ -20256,6 +20257,7 @@ function BreederSection({
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
         )}
       </div>
+      <BackendStatusDot />
 
       {setupTab === 'info' && (
         <div className="space-y-6">
@@ -20371,9 +20373,9 @@ function BreederSection({
               className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))}
               onClick={() => {
                 if (typeof showAppAlert === 'function') {
-                  showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
+                  showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved' }));
                 } else {
-                  console.warn(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
+                  console.warn(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved' }));
                 }
                 if (typeof onSaved === 'function') onSaved();
               }}
@@ -22008,7 +22010,6 @@ function BreederSection({
                         {allowed ? 'Included' : 'Limited'}
                       </span>
                     </div>
-                    <div className="mt-1 text-[11px] text-neutral-500">{featureKey}</div>
                     {access.reason ? <div className="mt-1 text-xs text-amber-700">{access.reason}</div> : null}
                     {usageText ? <div className="mt-1 text-xs text-neutral-600">Usage: {usageText}</div> : null}
                   </div>
@@ -26424,9 +26425,9 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     } catch (err) {
                       console.error('xlsx import failed', err);
                       if (typeof showAppAlert === 'function') {
-                        await showAppAlert(t("ui.animals.import.installXlsxPrompt", { defaultValue: "To import Excel files please install the \"xlsx\" package: npm install xlsx" }));
+                        await showAppAlert(t("ui.animals.import.installXlsxPrompt", { defaultValue: "This Excel file could not be opened. Save it as CSV and import that instead." }));
                       } else {
-                        console.warn(t("ui.animals.import.installXlsxPrompt", { defaultValue: "To import Excel files please install the \"xlsx\" package: npm install xlsx" }));
+                        console.warn(t("ui.animals.import.installXlsxPrompt", { defaultValue: "This Excel file could not be opened. Save it as CSV and import that instead." }));
                       }
                       return;
                     }
@@ -27917,7 +27918,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t("calendar.syncNotConfigured", { defaultValue: "Google Calendar sync is not configured. Add VITE_GOOGLE_CLIENT_ID and reload." }),
+        text: t("calendar.syncUnavailable", { defaultValue: "Google Calendar sync is not available yet." }),
       });
       return;
     }
@@ -27962,7 +27963,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t('calendar.syncNotConfigured', { defaultValue: 'Google Calendar sync is not available. Add VITE_GOOGLE_CLIENT_ID and reload.' }),
+        text: t('calendar.syncUnavailable', { defaultValue: 'Google Calendar sync is not available yet.' }),
       });
       return;
     }
@@ -27985,7 +27986,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t("calendar.syncNotConfigured", { defaultValue: "Google Calendar sync is not configured. Add VITE_GOOGLE_CLIENT_ID and reload." }),
+        text: t("calendar.syncUnavailable", { defaultValue: "Google Calendar sync is not available yet." }),
       });
       return;
     }
@@ -28149,7 +28150,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             )
           ) : (
             <div className="text-[11px] text-neutral-500 max-w-xs">
-              {t('calendar.setClientIdPrefix', { defaultValue: 'Set' })} <code>VITE_GOOGLE_CLIENT_ID</code> {t('calendar.setClientIdSuffix', { defaultValue: 'to enable Google Calendar sync.' })}
+              {t('calendar.syncUnavailable', { defaultValue: 'Google Calendar sync is not available yet.' })}
             </div>
           )}
           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>

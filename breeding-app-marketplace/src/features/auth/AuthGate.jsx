@@ -359,7 +359,7 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
       key: "preferences",
       title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
       description: t("auth.steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Breeding Planner.",
+        defaultValue: "Tell us how you want to use Serpentora.",
       }),
       fields: [
         {
@@ -961,8 +961,8 @@ export default function AuthGate({ children, scope }) {
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
       </div>
       <p className="auth-subtitle">
         {t("auth.subtitle", {
@@ -1175,7 +1175,7 @@ export default function AuthGate({ children, scope }) {
           {showBackendBlocker ? (
             <div className="auth-card">
               <div className="auth-card-brand">
-                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
                 <h1 className="auth-card-title">
                   {snapshot.state === "config-error"
                     ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })

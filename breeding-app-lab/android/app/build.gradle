@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.breedingplanner.lab"
+    namespace = "com.serpentora.lab"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.breedingplanner.lab"
+        applicationId "com.serpentora.lab"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

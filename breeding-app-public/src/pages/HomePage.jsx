@@ -71,11 +71,11 @@ export default function HomePage() {
               <div className="browser-dot" style={{ background: '#ef4444' }} />
               <div className="browser-dot" style={{ background: '#f59e0b' }} />
               <div className="browser-dot" style={{ background: '#22c55e' }} />
-              <div className="browser-url">app.breedingplanner.com</div>
+              <div className="browser-url">serpentora.com</div>
             </div>
             <img
               src="/screenshot.jpeg"
-              alt="Breeding Planner app screenshot"
+              alt="Serpentora app screenshot"
               style={{ width: '100%', display: 'block', borderRadius: '0 0 10px 10px' }}
             />
           </div>

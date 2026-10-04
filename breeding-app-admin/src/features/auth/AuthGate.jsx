@@ -402,8 +402,8 @@ export default function AuthGate({ children }) {
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
       </div>
       <p className="auth-subtitle">
         {t("auth.subtitle", {
@@ -591,8 +591,8 @@ export default function AuthGate({ children }) {
   const linkFlowCard = linkFlow ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Breeding Planner" })}</h1>
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
       </div>
       {linkFlow.type === "reset-password" ? (
         resetPasswordDone ? (
@@ -654,7 +654,7 @@ export default function AuthGate({ children }) {
   const unverifiedGateCard = unverifiedGateActive ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
         <h1 className="auth-card-title">{t("auth.unverified.title", { defaultValue: "Verify your email address" })}</h1>
       </div>
       <p className="auth-subtitle">
@@ -709,7 +709,7 @@ export default function AuthGate({ children }) {
   const pendingVerificationCard = pendingVerificationEmail ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
         <h1 className="auth-card-title">{t("auth.pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
       </div>
       <p className="auth-subtitle">
@@ -793,7 +793,7 @@ export default function AuthGate({ children }) {
           {showBackendBlocker ? (
             <div className="auth-card">
               <div className="auth-card-brand">
-                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Breeding Planner logo" })} className="auth-logo" />
+                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
                 <h1 className="auth-card-title">
                   {snapshot.state === "config-error"
                     ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
