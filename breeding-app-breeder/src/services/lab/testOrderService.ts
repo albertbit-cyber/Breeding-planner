@@ -1,4 +1,3 @@
-declare const require: any;
 
 import type { Sample, SampleType, TestOrder } from "../../types/lab";
 import type { OrderPaymentStatus, TestOrderStatus } from "../../types/labStatus";

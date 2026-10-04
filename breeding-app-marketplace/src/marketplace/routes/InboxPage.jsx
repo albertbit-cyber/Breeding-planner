@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { acceptOffer, blockUser, conversation as fetchConversation, conversations as fetchConversations, markRead, reportMessage, sendMessage } from "../api";
 import { initials, money, relativeTime, shortDate } from "../format";
-import { useSession } from "../session";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
@@ -71,7 +70,6 @@ export default function InboxPage() {
   const { t, i18n } = useTranslation("marketplace");
   const { notify } = useToast();
   const navigate = useNavigate();
-  const session = useSession();
 
   const [threads, setThreads] = useState(null);
   const [error, setError] = useState(null);

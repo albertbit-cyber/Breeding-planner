@@ -86,22 +86,6 @@ const inviteLink = (rawToken: string, kind: "vendor" | "teammate"): string => {
 
 export const inviteIdempotencyKey = (inviteId: string): string => `organization_invite:${inviteId}`;
 
-const INVITE_SELECT = {
-  id: true,
-  email: true,
-  organizationId: true,
-  createsOrgKind: true,
-  createsOrgName: true,
-  role: true,
-  status: true,
-  invitedBy: true,
-  expiresAt: true,
-  acceptedAt: true,
-  acceptedByUserId: true,
-  createdAt: true,
-  updatedAt: true,
-};
-
 export const normalizeInvite = (row: any) => ({
   id: row.id,
   email: row.email,

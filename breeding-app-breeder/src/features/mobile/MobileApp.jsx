@@ -11,7 +11,6 @@ import {
   clearAuthToken,
   fetchBreederSnapshot,
   fetchMobileAnimal,
-  fetchMobileCommunication,
   fetchMobilePermissions,
   fetchMobileRackMode,
   fetchMobileTasks,
@@ -24,7 +23,6 @@ import {
   logMobileWater,
   logMobileWeight,
   saveBreederSnapshot,
-  scanMobileQr,
   syncMobileQueue,
 } from "../../shared/apiClient";
 
@@ -94,7 +92,6 @@ const fmtSyncTime = (iso) => {
     return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} at ${time}`;
   } catch { return "Unknown"; }
 };
-const first = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -2131,7 +2128,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const [animal, setAnimal]            = useState(null);
   const [modal, setModal]              = useState(null);
   const [scanOpen, setScanOpen]        = useState(false);
-  const [photoBusy, setPhotoBusy]      = useState(false);
+  const [, setPhotoBusy]              = useState(false);
   const [online, setOnline]            = useState(() => navigator.onLine !== false);
   const [queue, setQueue]              = useState(() => readJson(QUEUE_KEY, []));
   const [lastSyncAt, setLastSyncAt]    = useState(() => { try { return localStorage.getItem(LAST_SYNC_KEY) || ""; } catch { return ""; } });

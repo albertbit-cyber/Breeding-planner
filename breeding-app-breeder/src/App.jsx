@@ -13,7 +13,6 @@ import SuggestionsTab from "./features/suggestions/SuggestionsTab";
 import FamilyTreePage from "./features/familyTree/index.jsx";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
 import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
-import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
 import { ReproductiveIntelligencePanel } from "./features/animals/ReproductiveIntelligencePanel.jsx";
@@ -133,7 +132,6 @@ import {
 } from "./features/animals/exportScope";
 import {
   CATALOG_COLORS,
-  CATALOG_METRICS,
   catalogBirthValue,
   catalogPhotoBox,
   catalogSexWord,
@@ -1108,7 +1106,6 @@ function getLockRecordedDate(appointment = {}) {
   return null;
 }
 
-const PENDING_ANIMAL_VIEW_KEY = 'breedingPlannerPendingAnimalView';
 const STORAGE_KEYS = {
   snakes: 'breedingPlannerSnakes',
   pairings: 'breedingPlannerPairings',
@@ -4036,15 +4033,6 @@ function normalizeFeederProfileForSave(profile) {
   };
 }
 
-function getLatestAcceptedFeedEntry(snake) {
-  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
-  for (let i = feeds.length - 1; i >= 0; i -= 1) {
-    const entry = feeds[i];
-    if (entry && !entry.refused) return entry;
-  }
-  return null;
-}
-
 function getSnakeFeederProfile(snake) {
   return normalizeFeederProfileForDraft(snake?.feederProfile);
 }
@@ -4798,12 +4786,15 @@ function splitSegmentIntoTokens(segment) {
   return entries.map(entry => entry.token);
 }
 
+// Separators between genes in a free-text genetics field.
+const GENE_TOKEN_SPLIT_REGEX = /[\n\r,;|/+]+/;
+
 function splitMorphHetInput(value) {
   const raw = String(value || '').trim();
   if (!raw) return { morphs: [], hets: [] };
 
   const segments = raw
-    .split(/[\n\r,;|/+]+/)
+    .split(GENE_TOKEN_SPLIT_REGEX)
     .map(segment => segment.trim())
     .filter(Boolean);
 
@@ -6159,30 +6150,9 @@ function deriveQuickAddName(text, parsed = {}) {
 
 function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], theme='blue' }) {
   const { t } = useTranslation();
-  const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
-  const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
-  const collapseLabel = t('clutch.collapse', { defaultValue: 'Collapse' });
-  const labelLabel = t('clutch.label', { defaultValue: 'Label' });
-  const startingDateLabel = t('clutch.startingDate', { defaultValue: 'Starting date' });
-  const appointmentsLabel = t('clutch.appointments', { defaultValue: 'Appointments' });
-  const appointmentsHelp = t('clutch.appointmentsHelp', { defaultValue: 'Manage pairing touchpoints' });
-  const generateMonthsLabel = t('clutch.generate5Months', { defaultValue: 'Generate 5 months' });
-  const addAppointmentLabel = t('clutch.addAppointment', { defaultValue: '+ Add appointment' });
-  const appointmentStatusLabel = t('clutch.appointmentStatus', { defaultValue: 'Appointment' });
-  const pairingDateLabel = t('clutch.pairingDate', { defaultValue: 'Date of Pairing' });
-  const lockLabel = t('clutch.lock', { defaultValue: 'Lock' });
-  const lockDateLabel = t('clutch.lockDate', { defaultValue: 'Date of Lock' });
-  const notesLabel = t('clutch.notes', { defaultValue: 'Notes' });
-  const removeLabel = t('clutch.remove', { defaultValue: 'Remove' });
-  const notesFieldLabel = t('clutch.notesField', { defaultValue: 'Notes' });
-  const geneticsCalculatorLabel = t('clutch.geneticsCalculator', { defaultValue: 'Genetics calculator' });
-  const showLabel = t('clutch.show', { defaultValue: 'Show' });
-  const hideLabel = t('common.hide', { defaultValue: 'Hide' });
   const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal) && Boolean((newAnimal && newAnimal.species) || '');
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
-  const [statusTagInput, setStatusTagInput] = useState('');
   const [quickAddText, setQuickAddText] = useState('');
-  const customTagLookup = useMemo(() => new Set(customStatusTags.map(tag => tag.toLowerCase())), [customStatusTags]);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef(null);
 
@@ -6336,15 +6306,6 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [statusMenuOpen]);
-
-  const handleAddStatusTag = useCallback(() => {
-    const trimmed = (statusTagInput || '').trim();
-    if (!trimmed) return;
-    const created = typeof onCreateStatusTag === 'function' ? onCreateStatusTag(trimmed) : trimmed;
-    if (!created) return;
-    setNewAnimal(a => ({ ...a, status: created }));
-    setStatusTagInput('');
-  }, [statusTagInput, onCreateStatusTag, setNewAnimal]);
 
   const handleSelectStatus = useCallback((tag) => {
     setNewAnimal(a => ({ ...a, status: tag }));
@@ -9485,21 +9446,21 @@ export default function BreedingPlannerApp() {
     if (h) {
       const id = decodeURIComponent(h[1]);
       const s = snakes.find(x=>x.id===id);
+      if (s) { openSnakeEditor(s); }
+    }
+  }, [snakes]);
 
   useEffect(() => {
     const value = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
     saveStoredJson(STORAGE_KEYS.leucisticType, value);
   }, [lastLeucisticType]);
-      if (s) { openSnakeEditor(s); }
-    }
-  }, [snakes]);
 
   // Land on the Shed Test Terminal when a laboratory email links here. Without
   // it, "View your order" opened the collection and left the reader to find the
   // tab themselves.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (/^#shed-terminal/.test(window.location.hash)) setTab('shedTerminal');
+    if (/^#shed-terminal\b/.test(window.location.hash)) setTab('shedTerminal');
   }, []);
 
   // open pairing if URL contains #pairing=id
@@ -9643,7 +9604,6 @@ export default function BreedingPlannerApp() {
     }
   }, [sortedAnimalList, pairings, snakes, t]);
 
-  const snakesById = useMemo(() => Object.fromEntries(snakes.map(snake => [snake.id, snake])), [snakes]);
   const malesById = useMemo(() => Object.fromEntries(snakes.filter(isMaleSnake).map(snake => [snake.id, snake])), [snakes]);
   const femalesById = useMemo(() => Object.fromEntries(snakes.filter(isFemaleSnake).map(snake => [snake.id, snake])), [snakes]);
 
@@ -9931,10 +9891,6 @@ export default function BreedingPlannerApp() {
     const femaleId = suggestion.femaleId || "";
     if (!maleId || !femaleId) return;
 
-    const maleSnake = snakeById(snakes, maleId);
-    const femaleSnake = snakeById(snakes, femaleId);
-    const maleName = maleSnake?.name || maleId;
-    const femaleName = femaleSnake?.name || femaleId;
     const goalChance = Number.isFinite(suggestion?.goalProb) ? `${(suggestion.goalProb * 100).toFixed(1)}%` : null;
     const autoNoteParts = [
       t('advisor.convertedFromSuggestion', { defaultValue: 'Converted from Breeding Advisor suggestion.' }),
@@ -16591,7 +16547,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
 
     const sectionHeading = () => {
       doc.setFontSize(12);
-      doc.text(t("pairing.breedingCycles", { defaultValue: "Breeding cycles" }), left, y);
+      doc.text(i18n.t("pairing.breedingCycles", { defaultValue: "Breeding cycles" }), left, y);
       y += 7;
     };
 
@@ -26590,8 +26546,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                       let sex = 'F';
                       if (/^f$/.test(g) || /\bfemale\b/.test(g)) sex = 'F';
                       else if (/^m$/.test(g) || /\bmale\b/.test(g)) sex = 'M';
-                      const tokens = geneticsRaw ? geneticsRaw.split(GENE_TOKEN_SPLIT_REGEX).map(x => x.trim()).filter(Boolean) : [];
-                      const normalized = normalizeMorphHetLists(tokens);
+                      const normalized = splitMorphHetInput(geneticsRaw);
                       const groups = groupsRaw ? groupsRaw.split(/[;,|]/).map(x=>x.trim()).filter(Boolean) : [];
                       const tags = tagsRaw ? tagsRaw.split(/[;,|]/).map(x=>x.trim()).filter(Boolean) : [];
                       return (name || normalized.morphs.length || normalized.hets.length || groups.length || tags.length)

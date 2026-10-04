@@ -17,7 +17,7 @@ import type {
   SampleStatus,
   TestOrderStatus,
 } from "../types/labStatus";
-import type { LabAvailableTest, CreateLabAvailableTestInput, UpdateLabAvailableTestInput } from "../types/labTestCatalog";
+import type { LabAvailableTest, UpdateLabAvailableTestInput } from "../types/labTestCatalog";
 import { DEFAULT_CATALOG_LAB_ID, LAB_TEST_CATALOG_SEEDS } from "../data/testCatalog";
 import type { CatalogCategory, PricingType } from "../types/labPricing";
 

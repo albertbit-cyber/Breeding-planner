@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
 import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";

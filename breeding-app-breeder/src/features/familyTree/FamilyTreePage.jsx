@@ -6,7 +6,6 @@ import PedigreePassportPanel from './components/PedigreePassportPanel';
 import ViewTabs, { VIEW_TABS } from './components/ViewTabs';
 import StatsBar from './components/StatsBar';
 import './familyTree.css';
-import { splitPairLabel } from '../animals/parentage';
 
 /**
  * The Family Tree.

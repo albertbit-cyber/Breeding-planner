@@ -7,7 +7,6 @@ import {
   ORDER_PAYMENT_STATUS_TONES,
 } from "../../../types/labStatus";
 import {
-  ORDER_STATUS_LIST,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_TONES,
 } from "../constants/orderStatuses";

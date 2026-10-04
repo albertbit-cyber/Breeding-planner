@@ -144,10 +144,6 @@ const clearStoredAuth = (scope?: AuthScope): void => {
 const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
   getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
 
-const setCookiePreferredAuth = (scope?: AuthScope): void => {
-  setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
-};
-
 const getStoredCsrfToken = (scope?: AuthScope): string =>
   getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 

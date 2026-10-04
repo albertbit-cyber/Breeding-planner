@@ -5,7 +5,6 @@ import { favorite, store as fetchStore, storeReviews } from "../api";
 import { initials, shortDate } from "../format";
 import { useAuthAction } from "../session";
 import { SignInPrompt } from "../components/RequireAuth";
-import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import ListingCard from "../ui/ListingCard";
 import { Pill } from "../ui/Pill";

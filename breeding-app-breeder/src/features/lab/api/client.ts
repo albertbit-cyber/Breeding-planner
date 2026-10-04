@@ -7,7 +7,6 @@ import {
   fetchLabDirectoryEntry,
   fetchLabOfferings,
   fetchMyLabPricing,
-  fetchTestCatalog,
 } from "../../../shared/apiClient";
 import {
   resolveLabProfileForOrder,
@@ -97,16 +96,6 @@ const requireSessionRole = (...roles: LegacyRole[]): LegacyRole => {
     throw new Error("Access denied for this role.");
   }
   return role;
-};
-
-const unwrapLocalResponse = async <T>(
-  response: Promise<{ ok: true; data: T } | { ok: false; error: { message: string } }> | { ok: true; data: T } | { ok: false; error: { message: string } }
-): Promise<T> => {
-  const resolved = await response;
-  if (!resolved.ok) {
-    throw new Error(resolved.error?.message || "Lab request failed.");
-  }
-  return resolved.data;
 };
 
 const toLegacyOrder = (order: any): TestOrder => {
@@ -444,12 +433,6 @@ const getSharedOrderedAnimalGroups = (order: any) => {
     });
     return { animalId, animalName, items };
   });
-};
-
-// Flat list for backward compat (primary animal only for single-animal code paths)
-const getSharedOrderedResultItems = (order: any) => {
-  const groups = getSharedOrderedAnimalGroups(order);
-  return groups.flatMap((g) => g.items);
 };
 
 const parseSharedResultFindings = (result: any) => {

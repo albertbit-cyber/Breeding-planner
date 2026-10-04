@@ -148,7 +148,7 @@ export const CATALOGUE_COLUMNS: CatalogueColumn[] = [
 /** Column headings vary by a space or a capital; nobody should lose a file to that. */
 export const normalizeHeader = (value: unknown): string =>
   String(value ?? "")
-    .replace(/﻿/g, "")
+    .replace(/\uFEFF/g, "")
     .trim()
     .toLowerCase()
     .replace(/[\s_-]+/g, " ");

@@ -9,7 +9,7 @@ import Icon from "../ui/Icon";
 import ListingCard from "../ui/ListingCard";
 import PhotoUploader from "../ui/PhotoUploader";
 import ProvenanceMeter from "../ui/ProvenanceMeter";
-import { AvailabilityPill, Pill } from "../ui/Pill";
+import { AvailabilityPill } from "../ui/Pill";
 import { EmptyState, ErrorPanel, Spinner } from "../ui/States";
 import { useToast } from "../ui/Toast";
 

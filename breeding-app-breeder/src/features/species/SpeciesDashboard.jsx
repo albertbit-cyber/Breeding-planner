@@ -341,11 +341,3 @@ function SearchResults({ results, hiddenResultCount, onOpenAnimal, t }) {
     </div>
   );
 }
-
-function Chip({ children }) {
-  return (
-    <span className="text-[11px] tabular-nums bg-neutral-50 border rounded px-1.5 py-0.5 text-neutral-600">
-      {children}
-    </span>
-  );
-}

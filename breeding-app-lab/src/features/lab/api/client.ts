@@ -7,11 +7,9 @@ import {
   fetchLabDirectoryEntry,
   fetchLabOfferings,
   fetchMyLabPricing,
-  fetchTestCatalog,
   importMyLabTests,
   type LabCatalogueImportResult,
 } from "../../../shared/apiClient";
-import type { ServiceActor } from "../../../services/lab/testOrderService";
 import {
   resolveLabProfileForOrder,
   loadBreederInfo,
@@ -91,27 +89,6 @@ const requireSessionRole = (...roles: LegacyRole[]): LegacyRole => {
     throw new Error("Access denied for this role.");
   }
   return role;
-};
-
-const buildActorFromSessionRole = (role: LegacyRole): ServiceActor => {
-  const session = getSession();
-  const profile = session?.profile || {};
-  const userId = String(profile.email || profile.displayName || "local-user").trim() || "local-user";
-  return {
-    userId,
-    role,
-    labId: role === "lab_staff" || role === "admin" ? DEFAULT_LAB_ID : undefined,
-  };
-};
-
-const unwrapLocalResponse = async <T>(
-  response: Promise<{ ok: true; data: T } | { ok: false; error: { message: string } }> | { ok: true; data: T } | { ok: false; error: { message: string } }
-): Promise<T> => {
-  const resolved = await response;
-  if (!resolved.ok) {
-    throw new Error(resolved.error?.message || "Lab request failed.");
-  }
-  return resolved.data;
 };
 
 const toLegacyOrder = (order: any): TestOrder => {
@@ -458,12 +435,6 @@ const getSharedOrderedAnimalGroups = (order: any) => {
     });
     return { animalId, animalName, items };
   });
-};
-
-// Flat list for backward compat (primary animal only for single-animal code paths)
-const getSharedOrderedResultItems = (order: any) => {
-  const groups = getSharedOrderedAnimalGroups(order);
-  return groups.flatMap((g) => g.items);
 };
 
 const parseSharedResultFindings = (result: any) => {

@@ -223,7 +223,6 @@ async function classifyPatterns(
 
   const collAvgFLO = mean(collIntervals.map((i: CycleIntervals) => i.firstLockToOvulation).filter((v: number | null): v is number => v !== null));
   const collAvgLPCycle = mean(collIntervals.map((i: CycleIntervals) => i.lockCount));
-  const collAvgPairingToLay = mean(collIntervals.map((i: CycleIntervals) => i.pairingStartToEggLaying).filter((v: number | null): v is number => v !== null));
 
   if (analytics.avgFirstLockToOvulation !== null && collAvgFLO !== null) {
     if (analytics.avgFirstLockToOvulation < collAvgFLO * 0.8) tags.push("early_ovulator");

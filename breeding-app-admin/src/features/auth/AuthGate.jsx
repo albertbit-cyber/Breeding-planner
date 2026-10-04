@@ -92,6 +92,21 @@ const loadStoredAuth = (scope = "breeder") => {
 
 const normalizeIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
+const logoSrc = `${typeof process !== "undefined" ? (process.env.PUBLIC_URL || "") : ""}/app-icons/icon_512x512.png`;
+
+const LANGUAGE_OPTIONS = [
+  { code: "en", label: "English" },
+  { code: "he", label: "עברית" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "nl", label: "Nederlands" },
+  { code: "pl", label: "Polski" },
+  { code: "pt", label: "Português" },
+  { code: "cs", label: "Čeština" },
+];
+
 export default function AuthGate({ children }) {
   const { t, i18n } = useTranslation();
   const { snapshot, retry } = useSharedBackend();

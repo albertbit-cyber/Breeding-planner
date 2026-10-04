@@ -18,7 +18,7 @@ export const loginLabViaApi = async (
   password: string
 ): Promise<string> => {
   const response = await request.post(`${backendUrl}/api/auth/login`, {
-    data: { email, password },
+    data: { email, password, portal: "lab" },
   });
   expect(response.status()).toBe(200);
   const body = await response.json();
@@ -91,6 +91,7 @@ export const loginViaApi = async (request: APIRequestContext): Promise<string> =
     data: {
       email: labEmail,
       password: requireLabPassword(),
+      portal: "lab",
     },
   });
   expect(response.ok()).toBeTruthy();

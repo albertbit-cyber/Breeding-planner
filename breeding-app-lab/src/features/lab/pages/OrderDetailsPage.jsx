@@ -174,7 +174,7 @@ export default function OrderDetailsPage({ orderId }) {
     }
   }, [normalizedOrderId]);
 
-  const { refetch: refetchPage } = useAutoRefetch(loadAll, {
+  useAutoRefetch(loadAll, {
     intervalMs: 20_000,
     events: ["lab:test-order-updated"],
   });

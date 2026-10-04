@@ -6,7 +6,7 @@ import { money, primaryImage, relativeTime } from "../format";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
-import { AvailabilityPill, Pill } from "../ui/Pill";
+import { AvailabilityPill } from "../ui/Pill";
 import ProvenanceMeter from "../ui/ProvenanceMeter";
 import { EmptyState, ErrorPanel, Spinner } from "../ui/States";
 import { useToast } from "../ui/Toast";
