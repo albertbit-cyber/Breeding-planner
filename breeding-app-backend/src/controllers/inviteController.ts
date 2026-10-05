@@ -33,8 +33,30 @@ export const postInviteAcceptance = async (req: Request, res: Response): Promise
   // A brand-new account is signed in immediately: they just proved control of
   // the address and chose the password in the same request, so bouncing them to
   // a sign-in form would ask them to retype what they typed a second ago.
+  //
+  // The session is minted for the Laboratory portal, which is where every
+  // invitation lands and the only portal an invited (`lab`) account may use.
+  // Without the portal, login fell back to the breeder app and refused the
+  // account with a 403 — after the invitation had already been consumed, so a
+  // laboratory's first contact with the platform was an error and a dead link.
   if (password) {
-    const session = await loginUser(result.email, password);
+    let session: Awaited<ReturnType<typeof loginUser>>;
+    try {
+      session = await loginUser(result.email, password, "lab");
+    } catch (error) {
+      // The account and organization exist by now and the invitation is spent.
+      // Reporting failure here would tell them to retry a link that can no
+      // longer work; telling them to sign in is the truth.
+      console.error("[invites] accepted but could not open a session", { email: result.email, error });
+      res.status(200).json({
+        accepted: true,
+        requiresSignIn: true,
+        email: result.email,
+        organizationId: result.organizationId,
+        organizationRole: result.role,
+      });
+      return;
+    }
     setAuthCookies(res, session);
     const csrfToken = createCsrfToken();
     setCsrfCookie(res, csrfToken);

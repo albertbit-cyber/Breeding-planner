@@ -589,6 +589,33 @@ const devLocalStorageLogin = (
   }
 };
 
+/**
+ * Keeps a session the backend just issued, from sign-in or from accepting an
+ * invitation. Both must store it the same way: an invitation acceptance that
+ * skipped this left the portal believing it was signed in with no token to
+ * prove it, so the new laboratory's first request bounced them to sign-in.
+ */
+const storeIssuedSession = (data: unknown, scope: AuthScope): void => {
+  const session = data as { token?: string; refreshToken?: string; csrfToken?: string } | null;
+  if (!session?.token || !session?.refreshToken) return;
+  const config = getSharedApiConfig();
+  if (config.ok && isSameOriginApiBaseUrl(config.baseUrl)) {
+    // Same-origin deployment: prefer the httpOnly cookies the backend just
+    // set on this response over storing the bearer/refresh token.
+    setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
+    clearStoredToken(scope);
+    clearStoredRefreshToken(scope);
+  } else {
+    // Cross-origin deployment (native WebView, or web not yet behind the
+    // same-origin proxy): store the bearer/refresh token directly instead.
+    clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
+    setStoredToken(session.token, scope);
+    setStoredRefreshToken(session.refreshToken, scope);
+  }
+  if (session.csrfToken) setStoredCsrfToken(String(session.csrfToken), scope);
+  markAuthorized();
+};
+
 export const login = async (
   // `portal` names the app this sign-in came from; the backend refuses
   // credentials that do not belong to it.
@@ -603,24 +630,7 @@ export const login = async (
       requiresAuth: false,
       authScope: scope,
     });
-    if (data?.token && data?.refreshToken) {
-      const config = getSharedApiConfig();
-      if (config.ok && isSameOriginApiBaseUrl(config.baseUrl)) {
-        // Same-origin deployment: prefer the httpOnly cookies the backend just
-        // set on this response over storing the bearer/refresh token.
-        setStoredValue(AUTH_MODE_STORAGE_KEYS[scope], COOKIE_PREFERRED_AUTH_MODE);
-        clearStoredToken(scope);
-        clearStoredRefreshToken(scope);
-      } else {
-        // Cross-origin deployment (native WebView, or web not yet behind the
-        // same-origin proxy): store the bearer/refresh token directly instead.
-        clearStoredValue(AUTH_MODE_STORAGE_KEYS[scope]);
-        setStoredToken(data.token, scope);
-        setStoredRefreshToken(data.refreshToken, scope);
-      }
-      if ((data as { csrfToken?: string })?.csrfToken) setStoredCsrfToken(String((data as { csrfToken?: string }).csrfToken), scope);
-      markAuthorized();
-    }
+    storeIssuedSession(data, scope);
     return data;
   } catch (err) {
     // In development, fall back to the localStorage demo users seeded by seedDemoUser.ts.
@@ -841,13 +851,20 @@ export const submitPartnerApplication = async (payload: {
 
 export const acceptInvite = async (
   token: string,
-  payload: { fullName: string; password?: string }
-) =>
-  request<Record<string, unknown>>(`/invites/${encodeURIComponent(token)}/accept`, {
+  payload: { fullName: string; password?: string },
+  authScope?: AuthScope
+) => {
+  const scope = normalizeAuthScope(authScope);
+  const data = await request<Record<string, unknown>>(`/invites/${encodeURIComponent(token)}/accept`, {
     method: "POST",
     body: JSON.stringify(payload),
     requiresAuth: false,
+    authScope: scope,
   });
+  // A new account comes back signed in; an existing one is told to sign in.
+  storeIssuedSession(data, scope);
+  return data;
+};
 
 export const calculateOrderPrice = async (payload: { labOrganizationId: string; animals: Array<{ animalId: string; animalName?: string; selectedTestIds: string[] }> }) =>
   request("/lab/orders/calculate-price", {

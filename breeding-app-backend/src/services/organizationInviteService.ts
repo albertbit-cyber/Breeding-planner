@@ -221,7 +221,7 @@ export const inviteVendorLab = async (
       expiresAtDisplay: formatExpiry(invite.expiresAt),
       actionUrl: inviteLink(rawToken, "vendor"),
     },
-    subject: "Your laboratory is invited to Breeding Planner",
+    subject: "Your laboratory is invited to Serpentora",
     idempotencyKey: inviteIdempotencyKey(invite.id),
     relatedEntityType: "organization_invite",
     relatedEntityId: invite.id,

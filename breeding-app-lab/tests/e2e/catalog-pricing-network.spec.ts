@@ -31,11 +31,11 @@ test("catalog and pricing screens read the laboratory's own data", async ({ page
   const pricingCatalogResponsePromise = page.waitForResponse((response) =>
     response.url().startsWith(`${backendUrl}/api/lab/my/tests`) && response.status() === 200
   );
-  await page.getByRole("button", { name: "Pricing & Logic" }).click();
+  await page.getByRole("button", { name: "Pricing", exact: true }).click();
   const pricingCatalogResponse = await pricingCatalogResponsePromise;
   const pricingCatalogBody = await pricingCatalogResponse.json();
   expect(Array.isArray(pricingCatalogBody.offerings)).toBeTruthy();
-  await expect(page.getByRole("heading", { name: "Pricing & Logic" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pricing", exact: true })).toBeVisible();
 
   const pricingResponsePromise = page.waitForResponse((response) =>
     response.url().startsWith(`${backendUrl}/api/lab/my/pricing`) && response.status() === 200

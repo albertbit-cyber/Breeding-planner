@@ -25,8 +25,8 @@ export const VENDOR_LAB_INVITATION_TEMPLATE_VERSION = 1;
 
 export const renderVendorLabInvitationTemplate = (props: VendorLabInvitationTemplateProps) => {
   const inviterLine = props.inviterFullName
-    ? `${escapeHtml(props.inviterFullName)} has invited <strong>${escapeHtml(props.organizationName)}</strong> to join Breeding Planner as a partner laboratory.`
-    : `<strong>${escapeHtml(props.organizationName)}</strong> has been invited to join Breeding Planner as a partner laboratory.`;
+    ? `${escapeHtml(props.inviterFullName)} has invited <strong>${escapeHtml(props.organizationName)}</strong> to join Serpentora as a partner laboratory.`
+    : `<strong>${escapeHtml(props.organizationName)}</strong> has been invited to join Serpentora as a partner laboratory.`;
 
   const bodyHtml = `
     <p>Hello,</p>
@@ -43,7 +43,7 @@ export const renderVendorLabInvitationTemplate = (props: VendorLabInvitationTemp
   `;
 
   const html = renderLayout({
-    preheader: `${props.organizationName} has been invited to join Breeding Planner as a partner laboratory.`,
+    preheader: `${props.organizationName} has been invited to join Serpentora as a partner laboratory.`,
     heading: "Your laboratory is invited",
     bodyHtml,
     ctaLabel: "Accept and set your password",
@@ -54,8 +54,8 @@ export const renderVendorLabInvitationTemplate = (props: VendorLabInvitationTemp
     "Hello,",
     "",
     props.inviterFullName
-      ? `${props.inviterFullName} has invited ${props.organizationName} to join Breeding Planner as a partner laboratory.`
-      : `${props.organizationName} has been invited to join Breeding Planner as a partner laboratory.`,
+      ? `${props.inviterFullName} has invited ${props.organizationName} to join Serpentora as a partner laboratory.`
+      : `${props.organizationName} has been invited to join Serpentora as a partner laboratory.`,
     "",
     "Accepting this invitation creates your laboratory's own workspace in the Lab Portal, where you can:",
     "  - Publish the tests you offer and set your own prices",
@@ -69,5 +69,5 @@ export const renderVendorLabInvitationTemplate = (props: VendorLabInvitationTemp
     `Accept your invitation: ${props.actionUrl}`,
   ]);
 
-  return { subject: "Your laboratory is invited to Breeding Planner", html, text };
+  return { subject: "Your laboratory is invited to Serpentora", html, text };
 };

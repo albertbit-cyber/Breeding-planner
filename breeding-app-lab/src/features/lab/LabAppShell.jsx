@@ -176,7 +176,7 @@ const navItems = [
   { path: "/lab/archive", label: "Archive" },
   { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
   { path: "/lab/catalogue-import", label: "Import Catalogue", roles: ["lab_staff", "admin"] },
-  { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
+  { path: "/lab/pricing-logic", label: "Pricing", roles: ["lab_staff", "admin"] },
   { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
   { path: "/lab/team", label: "Team", roles: ["lab_staff", "admin"] },
   { path: "/lab/account", label: "My Account" },
@@ -228,8 +228,8 @@ const pageForRoute = (parsedRoute, role) => {
       if (role !== "lab_staff" && role !== "admin") {
         return (
           <section className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700">Pricing &amp; Logic Restricted</h1>
-            <p className="text-sm text-neutral-700">Only lab staff or admin users can access pricing logic.</p>
+            <h1 className="text-2xl font-semibold text-rose-700">Pricing Restricted</h1>
+            <p className="text-sm text-neutral-700">Only lab staff or admin users can manage pricing.</p>
           </section>
         );
       }

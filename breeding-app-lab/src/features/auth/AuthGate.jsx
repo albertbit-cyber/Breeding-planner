@@ -295,10 +295,14 @@ export default function AuthGate({ children }) {
 
     setBusy(true);
     try {
-      const result = await acceptInviteApi(inviteToken, {
-        fullName,
-        ...(needsPassword ? { password: inviteForm.password } : {}),
-      });
+      const result = await acceptInviteApi(
+        inviteToken,
+        {
+          fullName,
+          ...(needsPassword ? { password: inviteForm.password } : {}),
+        },
+        AUTH_SCOPE
+      );
       window.location.hash = "#/lab/dashboard";
       setInviteToken("");
       if (result?.requiresSignIn) {

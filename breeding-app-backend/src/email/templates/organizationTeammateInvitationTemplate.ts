@@ -29,11 +29,11 @@ export const renderOrganizationTeammateInvitationTemplate = (
   props: OrganizationTeammateInvitationTemplateProps
 ) => {
   const inviterLine = props.inviterFullName
-    ? `${escapeHtml(props.inviterFullName)} invited you to join <strong>${escapeHtml(props.organizationName)}</strong> on Breeding Planner.`
-    : `You have been invited to join <strong>${escapeHtml(props.organizationName)}</strong> on Breeding Planner.`;
+    ? `${escapeHtml(props.inviterFullName)} invited you to join <strong>${escapeHtml(props.organizationName)}</strong> on Serpentora.`
+    : `You have been invited to join <strong>${escapeHtml(props.organizationName)}</strong> on Serpentora.`;
 
   const credentialLine = props.hasExistingAccount
-    ? "<p>Sign in with your existing Breeding Planner account to accept.</p>"
+    ? "<p>Sign in with your existing Serpentora account to accept.</p>"
     : "<p>You will choose your own password when you accept.</p>";
 
   const bodyHtml = `
@@ -45,7 +45,7 @@ export const renderOrganizationTeammateInvitationTemplate = (
   `;
 
   const html = renderLayout({
-    preheader: `You've been invited to join ${props.organizationName} on Breeding Planner.`,
+    preheader: `You've been invited to join ${props.organizationName} on Serpentora.`,
     heading: "You're invited to join the team",
     bodyHtml,
     ctaLabel: props.hasExistingAccount ? "Accept invitation" : "Accept and set your password",
@@ -56,12 +56,12 @@ export const renderOrganizationTeammateInvitationTemplate = (
     "Hello,",
     "",
     props.inviterFullName
-      ? `${props.inviterFullName} invited you to join ${props.organizationName} on Breeding Planner.`
-      : `You have been invited to join ${props.organizationName} on Breeding Planner.`,
+      ? `${props.inviterFullName} invited you to join ${props.organizationName} on Serpentora.`
+      : `You have been invited to join ${props.organizationName} on Serpentora.`,
     `Your role will be: ${readableRole(props.role)}`,
     "",
     props.hasExistingAccount
-      ? "Sign in with your existing Breeding Planner account to accept."
+      ? "Sign in with your existing Serpentora account to accept."
       : "You will choose your own password when you accept.",
     `This invitation expires on ${props.expiresAtDisplay}.`,
     "",
