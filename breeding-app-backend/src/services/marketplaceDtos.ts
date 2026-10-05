@@ -1,3 +1,5 @@
+import { parseGeneticClaims, withLabResults } from "./marketplaceGenetics";
+
 const compactObject = <T extends Record<string, unknown>>(input: T): T =>
   Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 
@@ -37,6 +39,13 @@ export const toMarketplaceListingDto = (row: any, record?: any) => {
           certificate: record.certificate || null,
         }
       : undefined,
+    // Each claim with its own provenance. The certificate only counts where the
+    // seller published it, which is exactly when the record carries it.
+    geneticClaims: withLabResults(
+      parseGeneticClaims(row.genetics),
+      record?.certificate?.lines,
+      record?.certificate?.certificateNumber || null
+    ),
     id: row.id,
     sellerUserId: row.sellerUserId,
     animalId: row.animalId,
@@ -148,8 +157,14 @@ export const toMarketplaceConversationDto = (row: any, viewerId?: string) => {
             row.sale.depositAmount === null || row.sale.depositAmount === undefined ? null : Number(row.sale.depositAmount),
           handoverMethod: row.sale.handoverMethod,
           handoverDate: row.sale.handoverDate,
+          // Only the buyer can review, so only the buyer's view needs to know.
+          reviewed: Array.isArray(row.sale.reviews) ? row.sale.reviews.length > 0 : false,
+          isBuyer: Boolean(viewerId && row.sale.buyerUserId === viewerId),
         }
       : null,
+    // "by_me" lets the blocker undo it. "by_them" is shown only as a closed
+    // thread: who blocked whom is not the blocked party's to know in detail.
+    blocked: row.blocked || null,
     lastMessageAt: row.lastMessageAt,
     updatedAt: row.updatedAt,
   });

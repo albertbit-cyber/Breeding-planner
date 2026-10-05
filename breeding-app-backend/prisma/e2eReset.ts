@@ -34,7 +34,55 @@ const E2E_USERS = {
     password: "demo1234",
     role: "lab" as const,
   },
+  // A marketplace buyer: someone with no collection of their own, which is the
+  // account the buyer journey has to work for.
+  buyer: {
+    email: "buyer@proherper.dev",
+    fullName: "Seed Buyer",
+    password: "buyer1234",
+    role: "buyer" as const,
+  },
 };
+
+/**
+ * Marketplace stock for the buyer-journey spec. Fixed ids and a fixed publish
+ * date so a reset always yields the same catalogue. The genetics are chosen so
+ * a "Clown" search has a right answer: one visual Clown, one het Clown that a
+ * visual search must not return.
+ */
+const E2E_PUBLISHED_AT = new Date("2026-09-01T09:00:00.000Z");
+const E2E_LISTINGS = [
+  {
+    id: "e2e-listing-clown",
+    title: "Clown het Pied female",
+    species: "Ball python",
+    genetics: "Clown het Pied",
+    sex: "female",
+    category: "Juvenile",
+    price: 450,
+    weight: 640,
+  },
+  {
+    id: "e2e-listing-pastel",
+    title: "Pastel het Clown male",
+    species: "Ball python",
+    genetics: "Pastel het Clown",
+    sex: "male",
+    category: "Hatchling",
+    price: 220,
+    weight: 180,
+  },
+  {
+    id: "e2e-listing-corn",
+    title: "Amel corn snake",
+    species: "Corn snake",
+    genetics: "Amel 50% het Anery",
+    sex: "female",
+    category: "Sub-adult",
+    price: 90,
+    weight: 260,
+  },
+];
 
 // The species the seeded animal belongs to, and therefore the one the seeded
 // laboratory has to serve for the breeder flow to be exercisable at all.
@@ -396,14 +444,69 @@ const createBaselineOrder = async (breederId: string, labOrganizationId: string)
   return order;
 };
 
+const resetMarketplace = async (sellerId: string, buyerId: string) => {
+  const listingIds = E2E_LISTINGS.map((listing) => listing.id);
+  // Everything the spec can create: threads (messages cascade), saves, sales,
+  // saved searches and blocks between the two seeded accounts.
+  await prisma.marketplaceConversation.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.marketplaceFavorite.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.marketplaceSale.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.savedSearch.deleteMany({ where: { ownerId: buyerId } });
+  await prisma.marketplaceUserBlock.deleteMany({
+    where: {
+      OR: [
+        { blockerUserId: buyerId, blockedUserId: sellerId },
+        { blockerUserId: sellerId, blockedUserId: buyerId },
+      ],
+    },
+  });
+
+  await prisma.marketplaceStore.upsert({
+    where: { userId: sellerId },
+    update: { storeName: "Seed Breeder Reptiles", country: "Germany", city: "Berlin" },
+    create: { userId: sellerId, storeName: "Seed Breeder Reptiles", country: "Germany", city: "Berlin" },
+  });
+
+  for (const listing of E2E_LISTINGS) {
+    const data = {
+      sellerUserId: sellerId,
+      title: listing.title,
+      species: listing.species,
+      genetics: listing.genetics,
+      sex: listing.sex,
+      category: listing.category,
+      price: listing.price,
+      weight: listing.weight,
+      currency: "EUR",
+      status: "available",
+      availability: "available",
+      country: "Germany",
+      city: "Berlin",
+      shippingAvailable: true,
+      pickupAvailable: true,
+      description: "Seeded for the marketplace buyer-journey test.",
+      favoritesCount: 0,
+      viewsCount: 0,
+      archivedAt: null,
+      publishedAt: E2E_PUBLISHED_AT,
+    };
+    await prisma.marketplaceListing.upsert({
+      where: { id: listing.id },
+      update: data,
+      create: { id: listing.id, ...data },
+    });
+  }
+};
+
 const main = async () => {
   const database = assertLocalDatabaseUrl();
 
-  const [adminUser, breederUser, labUser, labBUser] = await Promise.all([
+  const [adminUser, breederUser, labUser, labBUser, buyerUser] = await Promise.all([
     upsertUser(E2E_USERS.admin),
     upsertUser(E2E_USERS.breeder),
     upsertUser(E2E_USERS.lab),
     upsertUser(E2E_USERS.labB),
+    upsertUser(E2E_USERS.buyer),
   ]);
 
   await prisma.user.update({
@@ -428,11 +531,13 @@ const main = async () => {
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
+  await resetMarketplace(breederUser.id, buyerUser.id);
 
   console.log("E2E reset complete", {
     databaseHost: database.hostname,
     databaseName: database.databaseName,
-    users: [adminUser.email, breederUser.email, labUser.email, labBUser.email],
+    users: [adminUser.email, breederUser.email, labUser.email, labBUser.email, buyerUser.email],
+    marketplaceListings: E2E_LISTINGS.map((listing) => listing.id),
     laboratories: [labOrganizationId, labBOrganizationId],
     baselineOrderNumber: baselineOrder.orderNumber,
   });

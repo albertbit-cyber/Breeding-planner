@@ -98,7 +98,7 @@ export default function ListingCard({
         <h3 className="mk-listing__title">{heading}</h3>
 
         <GeneTags
-          genetics={listing.genetics}
+          listing={listing}
           max={compact ? 2 : 3}
           emptyLabel={t("listing.geneticsOnInquiry", { defaultValue: "Genetics on inquiry" })}
         />

@@ -73,7 +73,7 @@ const asArray = (value: unknown): any[] => (Array.isArray(value) ? value : []);
  * reduced to test name and call. Sample ids, analyst ids, notes and every
  * other animal's results are left behind.
  */
-const summarizeTests = (snapshot: any, resultId: string | null, animalAppId: string): CertifiedTestLine[] => {
+export const summarizeTests = (snapshot: any, resultId: string | null, animalAppId: string): CertifiedTestLine[] => {
   const results = asArray(snapshot?.results);
   const result =
     (resultId && results.find((entry) => text(entry?.id) === resultId)) ||

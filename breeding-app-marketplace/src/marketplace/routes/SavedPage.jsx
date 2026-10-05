@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { favorites as fetchFavorites, removeSearch, reviewableSales, savedSearches, submitReview } from "../api";
+import { favorites as fetchFavorites, markSearchRun, removeSearch, reviewableSales, savedSearches, submitReview } from "../api";
 import { activeChips, toSearchParams } from "../filters";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
@@ -46,6 +46,9 @@ export default function SavedPage() {
   useEffect(load, [load]);
 
   const runSearch = (search) => {
+    // Running it is what "new since you last ran it" is measured from. A
+    // failure to record that must not stop the search itself.
+    markSearchRun(search.id).catch(() => {});
     navigate({ pathname: "/", search: toSearchParams(search.filters || {}).toString() });
   };
 
@@ -130,7 +133,14 @@ export default function SavedPage() {
               return (
                 <article className="mk-card" style={{ padding: 16 }} key={search.id}>
                   <div className="mk-row mk-row--between" style={{ marginBottom: 10 }}>
-                    <b>{search.name}</b>
+                    <span>
+                      <b>{search.name}</b>
+                      {search.newSinceLastRun > 0 ? (
+                        <span className="mk-pill mk-pill--sky" style={{ marginLeft: 8 }}>
+                          {t("saved.newCount", { defaultValue: "{{count}} new", count: search.newSinceLastRun })}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="mk-row" style={{ gap: 8 }}>
                       <Button variant="outline" size="sm" onClick={() => runSearch(search)}>
                         {t("saved.run", { defaultValue: "Run search" })}
@@ -157,7 +167,13 @@ export default function SavedPage() {
                   </div>
                   <p className="mk-hint" style={{ marginBottom: 0 }}>
                     <Icon name="bell" size={13} />{" "}
-                    {t("saved.alertNote", { defaultValue: "You'll be emailed when a new animal matches." })}
+                    {typeof search.matchCount === "number"
+                      ? t("saved.matchSummary", {
+                          defaultValue: "{{count}} match now · {{fresh}} listed since you last ran it.",
+                          count: search.matchCount,
+                          fresh: search.newSinceLastRun || 0,
+                        })
+                      : t("saved.matchUnknown", { defaultValue: "Run it to see what matches now." })}
                   </p>
                 </article>
               );
@@ -167,9 +183,9 @@ export default function SavedPage() {
           <EmptyState
             icon="bell"
             title={t("saved.noSearches", { defaultValue: "No saved searches" })}
-            body={t("saved.noSearchesBody", {
+            body={t("saved.noSearchesBodyCount", {
               defaultValue:
-                "Set up the filters you actually want — a gene, a sex, a price ceiling — then save them, and we'll email you when something matches.",
+                "Set up the filters you actually want — a visual, a het, a sex, a price ceiling — and save them. This page then shows how many new animals match each time you look.",
             })}
             action={
               <Button variant="ink" to="/">

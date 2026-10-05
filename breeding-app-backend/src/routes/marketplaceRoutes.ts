@@ -5,6 +5,7 @@ import {
   adminMarketplace,
   adminStore,
   blockUser,
+  completeSale,
   browseListings,
   conversationDetail,
   conversationRead,
@@ -22,6 +23,7 @@ import {
   myFavorites,
   myBlocks,
   myMedia,
+  reportListing,
   reportMessage,
   reviewableSales,
   saveStore,
@@ -48,6 +50,7 @@ marketplaceRoutes.get("/listings/:id/comparables", asyncHandler(listingComparabl
 marketplaceRoutes.post("/listings", marketplaceMutationLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(createListing));
 marketplaceRoutes.patch("/listings/:id", marketplaceMutationLimiter, requireAuth, asyncHandler(editListing));
 marketplaceRoutes.patch("/listings/:id/status", marketplaceMutationLimiter, requireAuth, asyncHandler(listingStatus));
+marketplaceRoutes.post("/listings/:id/report", marketplaceMessageLimiter, requireAuth, asyncHandler(reportListing));
 marketplaceRoutes.post("/listings/:id/favorite", marketplaceMutationLimiter, requireAuth, asyncHandler(favoriteListing));
 
 marketplaceRoutes.get("/stores/:userId", asyncHandler(storeDetail));
@@ -74,6 +77,7 @@ marketplaceRoutes.get("/blocks", requireAuth, asyncHandler(myBlocks));
 marketplaceRoutes.delete("/blocks/:blockedUserId", marketplaceMessageLimiter, requireAuth, asyncHandler(unblockUser));
 
 marketplaceRoutes.post("/sales", marketplaceMutationLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(createSale));
+marketplaceRoutes.post("/sales/:id/complete", marketplaceMutationLimiter, requireAuth, asyncHandler(completeSale));
 marketplaceRoutes.post("/reviews", marketplaceMutationLimiter, requireAuth, asyncHandler(createReview));
 marketplaceRoutes.get("/reviews/pending", requireAuth, asyncHandler(reviewableSales));
 

@@ -3,6 +3,7 @@ import { HttpError } from "../utils/errors";
 import {
   deleteMarketplaceSearch,
   listMySavedSearches,
+  markMarketplaceSearchRun,
   saveMarketplaceSearch,
 } from "../services/savedSearchService";
 
@@ -22,4 +23,10 @@ export const deleteSavedSearch = async (req: Request, res: Response): Promise<vo
   if (!req.user) throw new HttpError(401, "Unauthorized");
   const result = await deleteMarketplaceSearch(req.user, req.params.id);
   res.status(200).json({ deleted: result.id });
+};
+
+export const markSavedSearchRun = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const search = await markMarketplaceSearchRun(req.user, req.params.id);
+  res.status(200).json({ search });
 };

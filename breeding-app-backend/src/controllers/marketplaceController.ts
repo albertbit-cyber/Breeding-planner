@@ -3,6 +3,7 @@ import { HttpError } from "../utils/errors";
 import {
   acceptMarketplaceOffer,
   addMarketplaceMessage,
+  completeMarketplaceSale,
   adminUpdateStore,
   createMarketplaceConversation,
   createMarketplaceListing,
@@ -32,6 +33,7 @@ import {
   listMyMarketplaceBlocks,
   listMyMarketplaceMedia,
   readMarketplaceMediaObject,
+  reportMarketplaceListing,
   reportMarketplaceMessage,
   unblockMarketplaceUser,
 } from "../services/marketplaceRuntimeService";
@@ -188,4 +190,15 @@ export const sellerAnimals = async (req: Request, res: Response): Promise<void> 
 export const myFavorites = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   res.status(200).json(await listMarketplaceFavorites(req.user));
+};
+
+export const reportListing = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const result = await reportMarketplaceListing(req.user, req.params.id, req.body || {});
+  res.status(result.duplicate ? 200 : 201).json(result);
+};
+
+export const completeSale = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await completeMarketplaceSale(req.user, req.params.id, req.body || {}));
 };

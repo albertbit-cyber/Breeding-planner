@@ -8,3 +8,8 @@ coverage/
 .DS_Store
 *.log
 
+
+# Playwright output
+/playwright-report
+/test-results
+/playwright/.auth

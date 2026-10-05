@@ -11,9 +11,10 @@ import {
   toMarketplaceStoreDto,
 } from "./marketplaceDtos";
 import { buildListingRecord, buildListingRecords, findUnpublishedEvidence } from "./marketplaceRecordService";
+import { geneticsMatchToken, parseGeneToken } from "./marketplaceGenetics";
 import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 import { isStaffRole } from "../auth/identity";
-import { LISTED_AVAILABILITY, LISTED_STATUSES, PUBLIC_STATUSES, isListingPublic } from "./marketplaceVisibility";
+import { LISTED_AVAILABILITY, LISTED_STATUSES, PUBLIC_STATUSES, isListingPublic, listedWhere } from "./marketplaceVisibility";
 
 const db = prisma as any;
 
@@ -175,10 +176,40 @@ const geneList = (value: unknown): string[] =>
  * invisible, and the result count was the size of the truncated page rather
  * than the size of the match.
  */
-export const listMarketplaceListings = async (
-  query: Record<string, unknown>,
-  viewer?: AuthenticatedUser | null
-) => {
+/**
+ * Gene filters, matched the way the hobby means them.
+ *
+ * A database `contains` cannot tell "Clown" from "het Clown" or "Albino" from
+ * "Lavender Albino", and those are exactly the distinctions a buyer filters on.
+ * So the database narrows to listings that mention the gene at all, the
+ * genetics parser decides which of those actually match, and the browse query
+ * filters on the resulting ids -- which keeps `total` and pagination exact.
+ */
+const listingIdsForGenes = async (includeTokens: string[], excludeTokens: string[]) => {
+  const tokens = [...includeTokens, ...excludeTokens];
+  const genes = tokens.map((token) => parseGeneToken(token)?.gene || token).filter(Boolean);
+  const candidates: Array<{ id: string; genetics: string | null }> = genes.length
+    ? await db.marketplaceListing.findMany({
+        where: {
+          archivedAt: null,
+          OR: genes.map((gene) => ({ genetics: { contains: gene, mode: "insensitive" } })),
+        },
+        select: { id: true, genetics: true },
+      })
+    : [];
+  return {
+    include: includeTokens.length
+      ? candidates
+          .filter((row) => includeTokens.every((token) => geneticsMatchToken(row.genetics, token)))
+          .map((row) => row.id)
+      : null,
+    exclude: candidates
+      .filter((row) => excludeTokens.some((token) => geneticsMatchToken(row.genetics, token)))
+      .map((row) => row.id),
+  };
+};
+
+const buildBrowseWhere = async (query: Record<string, unknown>) => {
   const search = text(query.search, 160);
   const includeSold = bool(query.includeSold);
   const availability = text(query.availability, 40);
@@ -216,12 +247,17 @@ export const listMarketplaceListings = async (
   if (maxWeight !== null) where.weight.lte = maxWeight;
 
   // Gene tokens. Include is AND (every gene must be present), exclude is NOT.
-  geneList(query.includeGenes).forEach((gene) => {
-    where.AND.push({ genetics: { contains: gene, mode: "insensitive" } });
-  });
-  geneList(query.excludeGenes).forEach((gene) => {
-    where.AND.push({ NOT: { genetics: { contains: gene, mode: "insensitive" } } });
-  });
+  const includeTokens = geneList(query.includeGenes);
+  const excludeTokens = geneList(query.excludeGenes);
+  if (includeTokens.length || excludeTokens.length) {
+    const ids = await listingIdsForGenes(includeTokens, excludeTokens);
+    if (ids.include) where.AND.push({ id: { in: ids.include } });
+    if (ids.exclude.length) where.AND.push({ id: { notIn: ids.exclude } });
+  }
+
+  // What a saved search counts as "new since you last ran it".
+  const publishedAfter = dateOrNull(query.publishedAfter);
+  if (publishedAfter) where.publishedAt = { gt: publishedAfter };
 
   if (bool(query.verifiedOnly)) {
     where.AND.push({
@@ -246,6 +282,42 @@ export const listMarketplaceListings = async (
   }
 
   if (!where.AND.length) delete where.AND;
+  return where;
+};
+
+/**
+ * The species actually on offer, for the browse filter. Read from live stock
+ * rather than a fixed list, so the filter never offers a species with nothing
+ * behind it. Decoration only: a failure here leaves the filter empty.
+ */
+const speciesOnOffer = async (): Promise<Array<{ species: string; count: number }>> => {
+  try {
+    if (typeof db.marketplaceListing.groupBy !== "function") return [];
+    const rows = await db.marketplaceListing.groupBy({
+      by: ["species"],
+      where: listedWhere(),
+      _count: { _all: true },
+    });
+    return (rows || [])
+      .filter((row: any) => row.species)
+      .map((row: any) => ({ species: String(row.species), count: Number(row._count?._all || 0) }))
+      .sort((a: any, b: any) => b.count - a.count);
+  } catch {
+    return [];
+  }
+};
+
+/** How many listings a saved search matches, optionally only those listed since a date. */
+export const countMarketplaceMatches = async (filters: Record<string, unknown>, since?: Date | null) => {
+  const where = await buildBrowseWhere({ ...filters, publishedAfter: since ? since.toISOString() : undefined });
+  return db.marketplaceListing.count({ where });
+};
+
+export const listMarketplaceListings = async (
+  query: Record<string, unknown>,
+  viewer?: AuthenticatedUser | null
+) => {
+  const where = await buildBrowseWhere(query);
 
   const sort = text(query.sort, 80) || "best";
   const orderBy =
@@ -262,7 +334,7 @@ export const listMarketplaceListings = async (
   const pageSize = Math.min(48, Math.max(1, Number(numberOrNull(query.pageSize) ?? 24)));
   const page = Math.max(1, Number(numberOrNull(query.page) ?? 1));
 
-  const [total, rows] = await Promise.all([
+  const [total, rows, species] = await Promise.all([
     db.marketplaceListing.count({ where }),
     db.marketplaceListing.findMany({
       where,
@@ -271,6 +343,7 @@ export const listMarketplaceListings = async (
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    speciesOnOffer(),
   ]);
 
   /**
@@ -317,6 +390,7 @@ export const listMarketplaceListings = async (
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     hasMore: page * pageSize < total,
     provenanceFiltered: minProvenance > 0 ? rows.length - filtered.length : 0,
+    facets: { species },
   };
 };
 
@@ -657,6 +731,10 @@ export const toggleMarketplaceFavorite = async (actor: AuthenticatedUser, listin
   const access = await canAccessFeature(actor, "marketplace.favorite");
   if (!access.allowed) throw new HttpError(403, access.reason || "Your tier does not include favorites.");
   const existing = await db.marketplaceFavorite.findUnique({ where: { userId_listingId: { userId: actor.id, listingId } } });
+  if (!existing) {
+    const listing = await db.marketplaceListing.findUnique({ where: { id: listingId }, select: { id: true, archivedAt: true } });
+    if (!listing || listing.archivedAt) throw new HttpError(404, "Marketplace listing not found.");
+  }
   if (existing) {
     await db.marketplaceFavorite.delete({ where: { id: existing.id } });
     await db.marketplaceListing.update({ where: { id: listingId }, data: { favoritesCount: { decrement: 1 } } }).catch(() => null);
@@ -676,6 +754,9 @@ export const createMarketplaceConversation = async (actor: AuthenticatedUser, pa
   const listing = await db.marketplaceListing.findUnique({ where: { id: listingId } });
   if (!listing) throw new HttpError(404, "Listing not found.");
   if (listing.sellerUserId === actor.id) throw new HttpError(400, "You cannot contact yourself about your own listing.");
+  // Draft, hidden and archived listings are not there for a stranger to ask about.
+  if (!isListingPublic(listing)) throw new HttpError(404, "Listing not found.");
+  await assertNotBlocked(actor.id, listing.sellerUserId);
   const existing = await db.marketplaceConversation.findFirst({
     where: { listingId, buyerUserId: actor.id },
   });
@@ -717,21 +798,85 @@ const CONVERSATION_INCLUDE = {
 };
 
 /**
- * The deal state a thread renders in its rail. One sale row per conversation
- * -- the newest, since a reservation that lapsed can be followed by another.
+ * Whether either side of a pair has blocked the other. A block is mutual in
+ * effect: the blocked party cannot reach the blocker, and the blocker cannot
+ * keep messaging someone they have shut out.
  */
-const attachSale = async (conversations: any[]) => {
+const blockBetween = async (actorId: string, otherId: string | null | undefined) => {
+  if (!otherId) return null;
+  const rows = await db.marketplaceUserBlock.findMany({
+    where: {
+      OR: [
+        { blockerUserId: actorId, blockedUserId: otherId },
+        { blockerUserId: otherId, blockedUserId: actorId },
+      ],
+    },
+    select: { blockerUserId: true },
+  });
+  if (!rows?.length) return null;
+  return rows.some((row: any) => row.blockerUserId === actorId) ? "by_me" : "by_them";
+};
+
+const assertNotBlocked = async (actorId: string, otherId: string | null | undefined) => {
+  const state = await blockBetween(actorId, otherId);
+  if (state === "by_me") throw new HttpError(403, "You blocked this user. Unblock them to send a message.");
+  if (state === "by_them") throw new HttpError(403, "This user is not accepting messages from you.");
+};
+
+/**
+ * The deal state a thread renders in its rail. One sale row per conversation
+ * -- the newest, since a reservation that lapsed can be followed by another --
+ * plus whether either party has blocked the other.
+ */
+const attachSale = async (conversations: any[], actorId?: string) => {
   if (!conversations.length) return conversations;
   const listingIds = Array.from(new Set(conversations.map((row: any) => row.listingId)));
   const sales = await db.marketplaceSale.findMany({
     where: { listingId: { in: listingIds } },
+    include: { reviews: { select: { id: true } } },
     orderBy: { createdAt: "desc" },
   });
   const byListing = new Map<string, any>();
   sales.forEach((sale: any) => {
     if (!byListing.has(sale.listingId)) byListing.set(sale.listingId, sale);
   });
-  return conversations.map((row: any) => ({ ...row, sale: byListing.get(row.listingId) || null }));
+
+  const blocks = new Map<string, string>();
+  if (actorId) {
+    const others = Array.from(
+      new Set(
+        conversations
+          .map((row: any) => (row.buyerUserId === actorId ? row.sellerUserId : row.buyerUserId))
+          .filter(Boolean)
+      )
+    );
+    const rows = others.length
+      ? await db.marketplaceUserBlock.findMany({
+          where: {
+            OR: [
+              { blockerUserId: actorId, blockedUserId: { in: others } },
+              { blockedUserId: actorId, blockerUserId: { in: others } },
+            ],
+          },
+          select: { blockerUserId: true, blockedUserId: true },
+        })
+      : [];
+    (rows || []).forEach((row: any) => {
+      if (row.blockerUserId === actorId) blocks.set(row.blockedUserId, "by_me");
+      else if (!blocks.has(row.blockerUserId)) blocks.set(row.blockerUserId, "by_them");
+    });
+  }
+
+  return conversations.map((row: any) => {
+    const sale = byListing.get(row.listingId) || null;
+    const other = row.buyerUserId === actorId ? row.sellerUserId : row.buyerUserId;
+    return {
+      ...row,
+      // A sale for this listing to someone else is not this thread's deal.
+      sale: sale && (!sale.buyerUserId || sale.buyerUserId === row.buyerUserId) ? sale : null,
+      blocked: (other && blocks.get(other)) || null,
+    };
+  });
 };
 
 export const listMarketplaceConversations = async (actor: AuthenticatedUser) => {
@@ -741,7 +886,7 @@ export const listMarketplaceConversations = async (actor: AuthenticatedUser) => 
     orderBy: { lastMessageAt: "desc" },
     take: 100,
   });
-  const withSale = await attachSale(rows);
+  const withSale = await attachSale(rows, actor.id);
   return { conversations: withSale.map((row: any) => toMarketplaceConversationDto(row, actor.id)).filter(Boolean) };
 };
 
@@ -751,7 +896,7 @@ export const getMarketplaceConversation = async (actor: AuthenticatedUser, conve
   if (actor.role !== "admin" && row.buyerUserId !== actor.id && row.sellerUserId !== actor.id) {
     throw new HttpError(403, "You cannot access this conversation.");
   }
-  const [withSale] = await attachSale([row]);
+  const [withSale] = await attachSale([row], actor.id);
   return { conversation: toMarketplaceConversationDto(withSale, actor.id) };
 };
 
@@ -894,6 +1039,9 @@ export const addMarketplaceMessage = async (actor: AuthenticatedUser, conversati
   if (actor.role !== "admin" && conversation.buyerUserId !== actor.id && conversation.sellerUserId !== actor.id) throw new HttpError(403, "You cannot access this conversation.");
   const messageText = text(payload.messageText || payload.message, 5000);
   if (!messageText) throw new HttpError(400, "messageText is required.");
+  if (actor.role !== "admin") {
+    await assertNotBlocked(actor.id, conversation.buyerUserId === actor.id ? conversation.sellerUserId : conversation.buyerUserId);
+  }
   const message = await db.marketplaceMessage.create({
     data: { conversationId, senderUserId: actor.id, messageText, offerAmount: numberOrNull(payload.offerAmount) },
   });
@@ -943,22 +1091,42 @@ export const upsertMarketplaceSale = async (actor: AuthenticatedUser, payload: R
   return { sale };
 };
 
+const ratingOrNull = (value: unknown): number | null => {
+  const parsed = numberOrNull(value);
+  if (parsed === null) return null;
+  return Math.max(1, Math.min(5, Math.round(parsed)));
+};
+
+/**
+ * A review is the buyer's account of a sale that happened. So: the reviewer is
+ * that sale's buyer, the sale is completed, and there is one review per sale.
+ * The endpoint used to accept any signed-in user, any sale id in any state,
+ * and any number of repeats -- a store's rating was whatever anyone posted.
+ */
 export const createMarketplaceReview = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
   const saleId = text(payload.saleId, 160);
   if (!saleId) throw new HttpError(400, "saleId is required.");
   const sale = await db.marketplaceSale.findUnique({ where: { id: saleId } });
   if (!sale) throw new HttpError(404, "Sale not found.");
-  const rating = Math.max(1, Math.min(5, Number(payload.rating || 5)));
+  if (sale.buyerUserId !== actor.id) throw new HttpError(403, "Only the buyer on this sale can review it.");
+  if (!["completed", "sold"].includes(String(sale.saleStatus))) {
+    throw new HttpError(409, "This sale is not completed yet. Reviews open once the animal has been handed over.");
+  }
+  const existing = await db.marketplaceReview.findFirst({ where: { saleId, reviewerUserId: actor.id }, select: { id: true } });
+  if (existing) throw new HttpError(409, "You have already reviewed this sale.");
+
+  const rating = ratingOrNull(payload.rating);
+  if (rating === null) throw new HttpError(400, "A rating from 1 to 5 is required.");
   const review = await db.marketplaceReview.create({
     data: {
       saleId,
       reviewerUserId: actor.id,
       sellerUserId: sale.sellerUserId,
       rating,
-      communicationRating: numberOrNull(payload.communicationRating),
-      accuracyRating: numberOrNull(payload.accuracyRating),
-      shippingRating: numberOrNull(payload.shippingRating),
-      healthRating: numberOrNull(payload.healthRating),
+      communicationRating: ratingOrNull(payload.communicationRating),
+      accuracyRating: ratingOrNull(payload.accuracyRating),
+      shippingRating: ratingOrNull(payload.shippingRating),
+      healthRating: ratingOrNull(payload.healthRating),
       reviewText: text(payload.reviewText, 5000),
     },
   });
@@ -967,7 +1135,73 @@ export const createMarketplaceReview = async (actor: AuthenticatedUser, payload:
     where: { userId: sale.sellerUserId },
     data: { ratingAverage: aggregate._avg.rating || 0, reviewCount: aggregate._count.id || 0 },
   });
-  return { review };
+  return { review: toMarketplaceReviewDto(review) };
+};
+
+/**
+ * The seller marks a reserved animal as handed over. The sale completes, the
+ * listing becomes Sold (so it drops out of browse and into price
+ * comparables), and the buyer is invited to review.
+ *
+ * This is the hand-over only. Moving the animal's record to the buyer's
+ * collection is separate work and does not happen here.
+ */
+export const completeMarketplaceSale = async (actor: AuthenticatedUser, saleId: string, payload: Record<string, unknown>) => {
+  const sale = await db.marketplaceSale.findUnique({ where: { id: saleId }, include: { listing: true } });
+  if (!sale) throw new HttpError(404, "Sale not found.");
+  if (actor.role !== "admin" && sale.sellerUserId !== actor.id) throw new HttpError(403, "Only the seller can complete this sale.");
+  if (["completed", "sold"].includes(String(sale.saleStatus))) return { sale };
+  if (["cancelled", "canceled"].includes(String(sale.saleStatus))) throw new HttpError(409, "This sale was cancelled.");
+
+  const handoverDate = dateOrNull(payload.handoverDate) || new Date();
+  const updated = await db.$transaction(async (tx: any) => {
+    const row = await tx.marketplaceSale.update({
+      where: { id: saleId },
+      data: {
+        saleStatus: "completed",
+        paymentStatus: sale.paymentStatus === "pending" || sale.paymentStatus === "deposit_paid" ? "paid" : sale.paymentStatus,
+        handoverDate,
+        handoverMethod: text(payload.handoverMethod, 160) || sale.handoverMethod,
+      },
+    });
+    await tx.marketplaceListing.update({
+      where: { id: sale.listingId },
+      data: { availability: "sold", status: "sold" },
+    });
+    if (sale.buyerUserId) {
+      const conversation = await tx.marketplaceConversation.findFirst({
+        where: { listingId: sale.listingId, buyerUserId: sale.buyerUserId },
+        select: { id: true },
+      });
+      if (conversation) {
+        await tx.marketplaceMessage.create({
+          data: {
+            conversationId: conversation.id,
+            senderUserId: actor.id,
+            messageText: "Handed over. The sale is complete.",
+          },
+        });
+        await tx.marketplaceConversation.update({
+          where: { id: conversation.id },
+          data: { status: "completed", lastMessageAt: new Date() },
+        });
+      }
+    }
+    return row;
+  });
+
+  if (sale.buyerUserId) {
+    await createNotification({
+      recipientId: sale.buyerUserId,
+      actorId: actor.id,
+      type: "marketplace_sale_completed",
+      title: "Your purchase is complete",
+      message: `You can now review the breeder you bought ${sale.listing?.title || "the animal"} from.`,
+      metadata: { saleId, listingId: sale.listingId },
+    });
+  }
+
+  return { sale: updated };
 };
 
 export const listAdminMarketplace = async (actor: AuthenticatedUser) => {

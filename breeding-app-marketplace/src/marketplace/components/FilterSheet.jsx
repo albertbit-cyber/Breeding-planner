@@ -13,7 +13,7 @@ import { GeneTag } from "../ui/GeneTags";
  * including and excluding genes. Genes are a set here: click once to include,
  * again to exclude, again to clear.
  */
-export default function FilterSheet({ open, filters, onApply, onClose, resultCount }) {
+export default function FilterSheet({ open, filters, onApply, onClose, resultCount, species = [] }) {
   const { t } = useTranslation("marketplace");
   const [draft, setDraft] = useState(filters);
 
@@ -38,6 +38,7 @@ export default function FilterSheet({ open, filters, onApply, onClose, resultCou
             variant="quiet"
             onClick={() => {
               const cleared = {
+                species: "",
                 sex: "",
                 category: "",
                 country: "",
@@ -68,11 +69,25 @@ export default function FilterSheet({ open, filters, onApply, onClose, resultCou
         </>
       }
     >
+      {species.length ? (
+        <label className="mk-field">
+          <span className="mk-label">{t("filters.species", { defaultValue: "Species" })}</span>
+          <select className="mk-select" value={draft.species} onChange={(event) => patch({ species: event.target.value })}>
+            <option value="">{t("filters.allSpecies", { defaultValue: "All species" })}</option>
+            {species.map((entry) => (
+              <option key={entry.species} value={entry.species}>
+                {entry.species} ({entry.count})
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
       <fieldset className="mk-field">
-        <legend className="mk-label">{t("filters.genes", { defaultValue: "Genes" })}</legend>
+        <legend className="mk-label">{t("filters.morphsAndHets", { defaultValue: "Morphs and hets" })}</legend>
         <p className="mk-hint" style={{ marginTop: 0 }}>
-          {t("filters.genesHint", {
-            defaultValue: "Tap once to require a gene, again to rule it out.",
+          {t("filters.morphsHint", {
+            defaultValue: "Tap once for a visual, twice for a het, three times to rule visuals out. Type “66% het hypo” or “pos het ghost” in the search box for the rest.",
           })}
         </p>
         <div className="mk-genes">
@@ -81,16 +96,18 @@ export default function FilterSheet({ open, filters, onApply, onClose, resultCou
             return (
               <GeneTag
                 key={gene}
-                label={gene}
-                het={false}
+                label={state === "het" ? `het ${gene}` : gene}
+                het={state === "het"}
                 excluded={state === "exclude"}
                 onClick={() => patch(cycleGene(draft, gene))}
                 title={
-                  state === "include"
-                    ? t("filters.geneIncluded", { defaultValue: "Required — tap to rule out" })
-                    : state === "exclude"
-                      ? t("filters.geneExcluded", { defaultValue: "Ruled out — tap to clear" })
-                      : t("filters.geneOff", { defaultValue: "Tap to require" })
+                  state === "visual"
+                    ? t("filters.geneVisual", { defaultValue: "Visual required. Tap for het." })
+                    : state === "het"
+                      ? t("filters.geneHet", { defaultValue: "Het required. Tap to rule out visuals." })
+                      : state === "exclude"
+                        ? t("filters.geneVisualExcluded", { defaultValue: "Visuals ruled out. Tap to clear." })
+                        : t("filters.geneVisualOff", { defaultValue: "Tap to require a visual." })
                 }
                 style={state === "off" ? { opacity: 0.55 } : undefined}
               />

@@ -424,6 +424,36 @@ button.mk-gene { cursor: pointer; }
   font-style: normal;
 }
 .mk-gene--more { background: var(--mk-surface-2); color: var(--mk-muted); }
+/* Provenance on the tag itself. Lab-confirmed: a tick and a solid edge in the
+   tag's own hue. Disputed by the lab: a cross and a dashed edge. Untested
+   claims stay plain, so the eye finds the tested ones. */
+.mk-gene--lab { border-color: currentColor; }
+.mk-gene--disputed { border: 1px dashed currentColor; }
+.mk-gene__mark { margin-right: 3px; vertical-align: -1px; }
+
+/* ── Genetics with provenance, on the listing page ───────────────────────── */
+
+.mk-claims { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mk-claim {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid var(--mk-rule);
+  border-radius: var(--mk-r-sm);
+  background: var(--mk-surface);
+}
+.mk-claim__what { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mk-claim__how { font-size: 12.5px; color: var(--mk-muted); }
+.mk-claim__how b { color: var(--mk-text, inherit); font-weight: 600; }
+.mk-claim__lab { grid-column: 1 / -1; font-size: 12px; color: var(--mk-muted); }
+.mk-claim__lab--disputed { color: var(--mk-gene-text); }
+.mk-claim-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font-size: 12px; color: var(--mk-muted); }
+@media (max-width: 520px) {
+  .mk-claim { grid-template-columns: 1fr; }
+}
+
 
 /* ── Provenance meter ───────────────────────────────────────────────────── */
 

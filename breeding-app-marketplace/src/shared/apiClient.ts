@@ -770,6 +770,24 @@ export const blockMarketplaceUser = async (payload: Record<string, unknown>) =>
     body: JSON.stringify(payload),
   });
 
+/** Files a moderation case about a listing; a repeat by the same buyer is not a second case. */
+export const reportMarketplaceListing = async (id: string, payload: Record<string, unknown>) =>
+  request<{ report: unknown; duplicate: boolean }>(`/marketplace/listings/${encodeURIComponent(id)}/report`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+/** The seller marks a reserved animal as handed over. */
+export const completeMarketplaceSale = async (id: string, payload: Record<string, unknown> = {}) =>
+  request<{ sale: unknown }>(`/marketplace/sales/${encodeURIComponent(id)}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+/** Resets a saved search's "new since last run" count. */
+export const markSavedSearchRun = async (id: string) =>
+  request<{ search: unknown }>(`/searches/${encodeURIComponent(id)}/run`, { method: "POST" });
+
 export const fetchMarketplaceBlocks = async () =>
   request<{ blocks: unknown[] }>("/marketplace/blocks");
 

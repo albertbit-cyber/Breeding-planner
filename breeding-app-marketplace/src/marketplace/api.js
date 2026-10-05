@@ -3,6 +3,7 @@ import {
   acceptMarketplaceOffer,
   addMarketplaceMessage,
   blockMarketplaceUser,
+  completeMarketplaceSale,
   createMarketplaceConversation,
   createMarketplaceListing,
   createMarketplaceReview,
@@ -22,8 +23,11 @@ import {
   fetchSellableAnimals,
   fetchSellerDashboard,
   markMarketplaceConversationRead,
+  markSavedSearchRun,
+  reportMarketplaceListing,
   reportMarketplaceMessage,
   saveMarketplaceStore,
+  unblockMarketplaceUser,
   updateMarketplaceListing,
   updateMarketplaceListingWorkflow,
 } from "../shared/apiClient";
@@ -104,6 +108,9 @@ export const startConversation = (payload) => createMarketplaceConversation(payl
 export const acceptOffer = (id, payload) => acceptMarketplaceOffer(id, payload);
 export const reportMessage = (id, payload) => reportMarketplaceMessage(id, payload);
 export const blockUser = (payload) => blockMarketplaceUser(payload);
+export const unblockUser = (userId) => unblockMarketplaceUser(userId);
+export const reportListing = (id, payload) => reportMarketplaceListing(id, payload);
+export const completeSale = (saleId, payload) => completeMarketplaceSale(saleId, payload);
 
 export const favorite = (id) => favoriteMarketplaceListing(id);
 export const favorites = async () => ((await fetchMarketplaceFavorites()).listings || []).map(withMedia);
@@ -116,6 +123,7 @@ export const saveStore = (payload) => saveMarketplaceStore(payload);
 export const savedSearches = async () => (await fetchSavedSearches()).searches || [];
 export const saveSearch = (payload) => createSavedSearch(payload);
 export const removeSearch = (id) => deleteSavedSearch(id);
+export const markSearchRun = (id) => markSavedSearchRun(id);
 
 export const reviewableSales = async () => (await fetchMarketplaceReviewableSales()).sales || [];
 export const submitReview = (payload) => createMarketplaceReview(payload);

@@ -41,7 +41,9 @@ export function RequireAuth({ children, seller = false }) {
 /**
  * Asked at the moment of the action, not at the door: the sheet says what is
  * being saved and sends the visitor somewhere that can sign them in. The
- * intent is already held, so the action replays afterwards.
+ * intent is already held; after sign-in the shell returns the visitor to the
+ * page (useReturnAfterSignIn) and the page finishes the action
+ * (useResumeIntent). A message is reopened ready to send, never sent unseen.
  */
 export function SignInPrompt({ intent, onClose }) {
   const { t } = useTranslation("marketplace");
@@ -57,7 +59,7 @@ export function SignInPrompt({ intent, onClose }) {
     message: {
       title: t("gate.messageTitle", { defaultValue: "Sign in to message the seller" }),
       body: t("gate.messageBody", {
-        defaultValue: "Your message is held and sent as soon as you're in.",
+        defaultValue: "We'll bring you back to this animal with your message ready to send.",
       }),
     },
     offer: {
@@ -67,7 +69,7 @@ export function SignInPrompt({ intent, onClose }) {
     savedSearch: {
       title: t("gate.searchTitle", { defaultValue: "Sign in to save this search" }),
       body: t("gate.searchBody", {
-        defaultValue: "We'll email you when an animal matching these filters is listed.",
+        defaultValue: "We'll bring you back to these filters so you can name and save the search.",
       }),
     },
   }[intent.kind] || {
@@ -87,7 +89,10 @@ export function SignInPrompt({ intent, onClose }) {
           <Button variant="quiet" onClick={onClose}>
             {t("common.notNow", { defaultValue: "Not now" })}
           </Button>
-          <Button variant="ink" to="/inbox" onClick={onClose}>
+          {/* No onClose here: closing the sheet forgets the held intent, and
+              signing in is exactly when it is needed. The link unmounts the
+              sheet anyway. */}
+          <Button variant="ink" to="/inbox">
             {t("gate.signIn", { defaultValue: "Sign in" })}
           </Button>
         </>
