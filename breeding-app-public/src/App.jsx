@@ -10,6 +10,7 @@ import PrivacyPage from './pages/PrivacyPage.jsx';
 import TermsPage from './pages/TermsPage.jsx';
 import ImpressumPage from './pages/ImpressumPage.jsx';
 import VerifyCertificatePage from './pages/VerifyCertificatePage.jsx';
+import WaitlistPage from './pages/WaitlistPage.jsx';
 
 export default function App() {
   return (
@@ -19,7 +20,10 @@ export default function App() {
         <Routes>
           <Route path="/"         element={<HomePage />} />
           <Route path="/pricing"  element={<PricingPage />} />
+          {/* Kept reachable, but no site CTA points here: the waitlist is the
+              only action until launch (PRODUCT.md, Capabilities and Constraints). */}
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/waitlist" element={<WaitlistPage />} />
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/privacy"  element={<PrivacyPage />} />
           <Route path="/terms"    element={<TermsPage />} />

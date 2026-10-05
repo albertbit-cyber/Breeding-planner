@@ -42,7 +42,7 @@ export default function Navbar() {
         {navLink('/', 'Home')}
         {navLink('/pricing', 'Pricing')}
         <Link to="/login" style={{ fontSize: 13, color: '#5a5650', textDecoration: 'none' }}>Sign in</Link>
-        <Link to="/register" className="btn btn-primary btn-sm">Get started free</Link>
+        <Link to="/waitlist" className="btn btn-primary btn-sm">Join the waitlist</Link>
       </div>
 
       {/* Mobile toggle */}
@@ -71,8 +71,8 @@ export default function Navbar() {
           <Link to="/"        onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Home</Link>
           <Link to="/pricing" onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Pricing</Link>
           <Link to="/login"   onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Sign in</Link>
-          <Link to="/register" onClick={() => setOpen(false)} className="btn btn-primary btn-sm" style={{ width: 'fit-content' }}>
-            Get started free
+          <Link to="/waitlist" onClick={() => setOpen(false)} className="btn btn-primary btn-sm" style={{ width: 'fit-content' }}>
+            Join the waitlist
           </Link>
         </div>
       )}

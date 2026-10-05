@@ -74,8 +74,8 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)', marginTop: '1.25rem' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Sign up free</Link>
+          Not on the waitlist yet?{' '}
+          <Link to="/waitlist" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Join the waitlist</Link>
         </p>
 
         <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #f0ece0', display: 'flex', justifyContent: 'center', gap: '1.5rem' }}>

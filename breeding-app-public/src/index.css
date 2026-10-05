@@ -190,6 +190,10 @@ img { max-width: 100%; }
 .grid-2    { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .grid-3    { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
+/* Five feature cards: three across, then two wider ones, so no card sits alone on a row. */
+.feat-grid-5 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.feat-grid-5 > * { grid-column: span 2; }
+.feat-grid-5 > :nth-child(n+4) { grid-column: span 3; }
 
 /* ── Auth card ─────────────────────────────────────── */
 .auth-card {
@@ -201,6 +205,11 @@ img { max-width: 100%; }
 /* ── Spin animation ────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { display: inline-block; animation: spin .8s linear infinite; }
+
+/* Radio choices drawn as outline buttons (/waitlist): the input is visually
+   hidden, so its keyboard focus has to show on the label. */
+.choice-chip { position: relative; }
+.choice-chip:focus-within { box-shadow: 0 0 0 3px rgba(14,165,233,0.35); }
 
 /* ── Certificate verification (/verify) ────────────── */
 /* Tab Gold is the lab module's hue, and a certificate is that module's output,
@@ -280,6 +289,8 @@ img { max-width: 100%; }
 /* ── Responsive ────────────────────────────────────── */
 @media (max-width: 640px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .feat-grid-5 { grid-template-columns: 1fr; }
+  .feat-grid-5 > *, .feat-grid-5 > :nth-child(n+4) { grid-column: auto; }
   .section-title, .section-title-light { font-size: 20px; }
   .hero-pills { display: none; }
   .animal-grid { grid-template-columns: 1fr; }

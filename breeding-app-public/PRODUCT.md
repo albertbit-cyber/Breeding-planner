@@ -54,11 +54,12 @@ enter that code on the public website and confirm the certificate is genuine. Th
 claim worth something commercially: the trust transfers to a third party who has no account, at the
 moment of sale, without taking the seller's word for anything.
 
-**This last step is not built yet.** Codes are generated, stored, printed on the certificate PDF and
-shown to the breeder, but there is no public verification page and no unauthenticated lookup — every
-certificate route is behind `requireAuth` and a breeder/lab/admin role. Until a public lookup exists,
-the verification code is a number on a document that nobody outside the platform can check, and the
-site must not tell buyers they can verify anything.
+**This last step is built, but not yet deployed** (commit "Public certificate verification",
+2026-10-05). `GET /api/public/certificates/verify/:code` is unauthenticated and rate limited, and the
+site's `/verify` page (also `/verify/<code>`, the URL printed on the PDF) shows the certificate number,
+issuing lab, species, certified result lines and issue date, and nothing about the breeder, the
+animal's id or the rest of the order. The site may link `/verify` as the proof point; it works for
+buyers only once the backend carrying that route is deployed alongside it.
 
 ## Operating Context
 
@@ -96,12 +97,13 @@ Confirmed and present in the codebase:
 - **Certificates** issued by partner labs carry a certificate number (`PH-GT-<stamp>-<suffix>`) and a
   24-character verification code derived deterministically from the order and result, so the same
   certificate always yields the same code. The code is rendered on the certificate PDF and shown in
-  the breeder's order detail. **Buyer-facing verification of that code is not implemented** — see
-  Positioning and Launch Preconditions.
+  the breeder's order detail. Buyer-facing verification of that code is built (`/verify`) and
+  awaits deployment — see Positioning and Launch Preconditions.
 - **Marketplace exists in code but is a direction, not a feature.** Stores, listings, inquiries,
   favourites, saved searches, reviews and sales are implemented, but the marketplace is spinning out
   as its own product. The blueprint is explicit: mention it as something coming, never in the feature
-  list. The current HomePage feature card and PricingPage feature row both violate this.
+  list. The site now shows it only as a separate "Coming" card below the HomePage feature grid and one
+  "coming later" line on the pricing page.
 - **MorphMarket integration is import-only.** It reads a MorphMarket CSV export into Serpentora and
   refuses to guess on any field it cannot place. There is no export path to MorphMarket.
 - **Platforms** — browser, Windows desktop (Electron), and Capacitor mobile. Android is built and
@@ -118,9 +120,11 @@ Explicitly undecided or not yet true:
   Hobby €5, Hobby Plus €10, Breeder €20, Professional/contact) describe what is coming. The pricing
   page may describe plans but must not promise a purchase.
 - **The only live action on the site is the waitlist.** Not "Start for free", not a trial, not an
-  upgrade. The founding-member pricing lock is the stated incentive for joining now. The current
-  HomePage ("Start for free", "Get started free", "14-day trial", "Start free trial") and the live
-  `/register` route contradict this.
+  upgrade. The founding-member pricing lock is the stated incentive for joining now. Every site CTA
+  now points at `/waitlist`; `/register` still exists as a route but nothing links to it. **There is
+  no waitlist backend yet:** `/waitlist` composes an email to info@serpentora.com, says so on the
+  page, and stores nothing. A real capture endpoint (and the referral mechanics in
+  `marketing-strategy.md` §13) is still to be built.
 - **Multi-device cloud sync is a supporting line, not a headline.** Sync exists and is in daily use but
   has open reliability work. Lead with local-first and offline instead.
 
@@ -169,15 +173,18 @@ Verified against the codebase:
 Claims that are NOT supported and must not be repeated:
 
 - **"Export directly to MorphMarket" — false.** The integration runs the other direction: it imports a
-  MorphMarket CSV into Serpentora. The current Marketplace feature card states this backwards.
+  MorphMarket CSV into Serpentora. The site now says exactly that.
 - **"iOS" — unverified.** Only a Capacitor scaffold exists in the repo. The blueprint asserts iOS
   builds; the code does not corroborate it. Do not claim iOS until resolved.
 - **"7 plans, from free to enterprise" — false.** Five plans exist in `PricingPage.jsx`.
 - **Marketplace as a shipped feature — not to be claimed.** It is spinning out as its own product.
-- **"Buyers can verify the certificate online" — not yet true.** The verification code is issued and
-  printed, but no public lookup exists: all certificate routes require an authenticated
-  breeder/lab/admin role, and the public site has no verification page. Say that certificates are
-  issued by the testing lab and carry a verification code; do not say a buyer can check one.
+- **"Buyers can verify the certificate online" — true in code, live only on deployment.** The public
+  lookup and the `/verify` page exist; the site links them. Do not run a campaign on this claim until
+  the backend route is deployed and a real code resolves on the public domain.
+- **AI sales copy, AI health summaries, Telegram alerts — not shipped.** They exist as feature keys
+  in the subscription catalogue, and the Telegram status is a hardcoded "Not connected" stub. The
+  Breeding Advisor is real and may be named.
+- **"Most popular" plan — false.** There are no customers, so no plan is the most popular.
 - **Paid subscriptions, trials, or "upgrade" as an active state — not yet true.**
 
 Absences future work must not fabricate: there are no testimonials, no named customers, no user
@@ -199,11 +206,9 @@ and when it may point at a signup:
    email-change links are matched on exact paths; moving the app to a subdomain without redirecting
    those three paths from the apex breaks every email already sitting in someone's inbox.
 4. **No purchase promise until payment processing is live.**
-5. **Do not promise buyer-side certificate verification until the public lookup ships.** It needs an
-   unauthenticated endpoint that resolves a verification code, and a public page to enter it on.
-   Because the code is derived deterministically from the order and result, that lookup can confirm a
-   certificate without exposing the breeder's wider records — the design already supports it, only the
-   public surface is missing.
+5. **Do not promise buyer-side certificate verification until the public lookup is deployed.** The
+   unauthenticated endpoint and the `/verify` page are built; they confirm a certificate without
+   exposing the breeder's wider records. What remains is deploying the backend route with the site.
 
 ## Product Principles
 
