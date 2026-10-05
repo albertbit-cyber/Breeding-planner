@@ -26,6 +26,7 @@ import { reproductiveRoutes } from "./routes/reproductiveRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { inviteRoutes } from "./routes/inviteRoutes";
 import { partnerRoutes } from "./routes/partnerRoutes";
+import { publicRoutes } from "./routes/publicRoutes";
 import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -162,6 +163,8 @@ app.use("/api/emails", emailRoutes);
 app.use("/api/invites", inviteRoutes);
 // Unauthenticated: a laboratory asking to be considered has no account yet.
 app.use("/api/partners", partnerRoutes);
+// Unauthenticated: a buyer checking a certificate holds a code, not an account.
+app.use("/api/public", publicRoutes);
 
 app.use(errorHandler);
 
