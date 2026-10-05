@@ -1021,18 +1021,6 @@ export const saveMyBreederProfile = async (payload: BreederProfilePayload) =>
 export const fetchMarketplaceProfiles = async () =>
   request<{ profiles: unknown[] }>("/profiles/marketplace");
 
-export const fetchMyListings = async () =>
-  request<{ listings: unknown[] }>("/listings/me");
-
-export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
-  request<{ listings: unknown[] }>("/listings/me", {
-    method: "PUT",
-    body: JSON.stringify({ listings }),
-  });
-
-export const fetchMarketplaceListings = async () =>
-  request<{ listings: unknown[] }>("/listings/marketplace");
-
 export const fetchMarketplaceCatalog = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -1121,18 +1109,6 @@ export const createMarketplaceReview = async (payload: Record<string, unknown>) 
 
 export const fetchAdminMarketplace = async () =>
   request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");
-
-export const fetchModerationListings = async () =>
-  request<{ listings: unknown[] }>("/listings/moderation");
-
-export const fetchModerationAudit = async () =>
-  request<{ audits: unknown[] }>("/listings/moderation/audit");
-
-export const updateListingStatus = async (id: string, status: string, note = "") =>
-  request<{ listing: unknown }>(`/listings/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status, note }),
-  });
 
 export const fetchSavedSearches = async () =>
   request<{ searches: unknown[] }>("/searches");

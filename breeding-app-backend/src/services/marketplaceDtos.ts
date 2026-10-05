@@ -1,54 +1,25 @@
 const compactObject = <T extends Record<string, unknown>>(input: T): T =>
   Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 
-export const toLegacyListingDto = (row: any) => {
+/**
+ * A listing as the breeder profile surface shows it. Built from
+ * `marketplace_listings`; the field names are the ones the legacy `listings`
+ * table used, so the profile response kept its shape when its source moved.
+ */
+export const toProfileListingDto = (row: any) => {
   if (!row) return null;
+  const price = row.price === null || row.price === undefined ? null : Number(row.price);
   return compactObject({
-    id: row.appListingId,
+    id: row.id,
     rowId: row.id,
-    ownerId: row.ownerId,
-    animalAppId: row.animalAppId,
+    ownerId: row.sellerUserId,
+    animalAppId: row.animalId ?? undefined,
     title: row.title,
     status: row.status,
-    priceCents: row.priceCents,
+    price: price === null || !Number.isFinite(price) ? undefined : price,
+    priceCents: price === null || !Number.isFinite(price) ? undefined : Math.round(price * 100),
     currency: row.currency,
     updatedAt: row.updatedAt,
-  });
-};
-
-export const toLegacyPublicListingDto = (row: any) => {
-  const listing = toLegacyListingDto(row);
-  if (!listing) return null;
-  return compactObject({
-    ...listing,
-    breeder: row.owner?.profile
-      ? {
-          userId: row.owner.id,
-          breederName: row.owner.profile.breederName || row.owner.fullName,
-          location: row.owner.profile.location,
-          publicContactEmail: row.owner.profile.publicContactEmail,
-          publicContactPhone: row.owner.profile.publicContactPhone,
-          contactPreference: row.owner.profile.contactPreference,
-        }
-      : undefined,
-  });
-};
-
-export const toLegacyModerationListingDto = (row: any) => {
-  const listing = toLegacyListingDto(row);
-  if (!listing) return null;
-  return compactObject({
-    ...listing,
-    breeder: row.owner
-      ? {
-          userId: row.owner.id,
-          fullName: row.owner.fullName,
-          email: row.owner.email,
-          role: row.owner.role,
-          breederName: row.owner.profile?.breederName || row.owner.fullName,
-          isPublic: row.owner.profile?.isPublic === true,
-        }
-      : undefined,
   });
 };
 

@@ -53,11 +53,9 @@ import {
   updateMarketplaceListing,
   uploadMarketplaceMedia,
   fetchMySubscription,
-  fetchMyListings,
   fetchPublicSubscriptionTiers,
   getCurrentUser,
   saveBreederSnapshot,
-  saveMyListings,
 } from "./shared/apiClient";
 import {
   getSyncTimestamp,
@@ -118,6 +116,7 @@ import MorphMarketImportReview from "./features/animals/import/MorphMarketImport
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import {
   buildMarketplaceListingPayload,
+  withListingPhoto,
   listingNeedsPhoto,
   listingUpdatePayloadFromListing,
   reconcileDraftWithListing,
@@ -10064,54 +10063,44 @@ export default function BreedingPlannerApp() {
   }, [returnToGroupsAfterEdit]);
 
   /**
-   * The one write that actually puts a snake in front of buyers.
+   * Gets one animal's cover photo to where a listing can carry it, without
+   * writing the listing. Returns the images and media ids to send with the
+   * listing itself, and a record of what went up so the next save does not
+   * upload the same few megabytes again.
    *
-   * `POST /marketplace/listings` is upsert-by-animal on the server, so this is
-   * safe to call on every save: the first call creates the card, the rest keep
-   * its price, genetics and description in step with the animal record.
+   * The upload is made unattached: it is private to the seller until the
+   * listing request names it in `mediaIds`, and the server attaches it in the
+   * same transaction that sets the status. That is what lets a publish be one
+   * write instead of "create, then upload, then patch the photo on".
    */
-  /**
-   * Gets one animal's photo onto one listing.
-   *
-   * Shared by publishing and by the catch-up pass below, because both need the
-   * same two things right: the upload has to name its listing, since media is
-   * only served to a signed-out visitor when it belongs to a published listing;
-   * and the whole listing body has to go back alongside the images, because the
-   * update rebuilds every column from what it is sent.
-   */
-  const attachListingPhoto = useCallback(async (snake, listingId, payload) => {
-    if (!snake || !listingId || !payload) return null;
+  const prepareListingPhoto = useCallback(async (snake) => {
+    const none = { images: [], mediaIds: [], record: null };
+    if (!snake) return none;
     try {
       const plan = planPhotoUpload(snake);
-      if (plan.action === 'none') return null;
-
-      let imageUrl = plan.action === 'link' || plan.action === 'reuse' ? plan.imageUrl : '';
-      let record = null;
-
-      if (plan.action === 'upload') {
-        const parts = splitDataUri(await shrinkToFit(plan.dataUri));
-        if (parts) {
-          const uploaded = await uploadMarketplaceMedia({
-            dataBase64: parts.dataBase64,
-            originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
-            listingId,
-          });
-          imageUrl = uploaded?.media?.publicUrl || '';
-          if (imageUrl) record = { imageUrl, fingerprint: plan.fingerprint };
-        }
+      if (plan.action === 'none') return none;
+      if (plan.action === 'link' || plan.action === 'reuse') {
+        return { images: [{ imageUrl: plan.imageUrl, isPrimary: true, sortOrder: 0 }], mediaIds: [], record: null };
       }
 
-      if (imageUrl) {
-        await updateMarketplaceListing(listingId, {
-          ...payload,
-          images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
-        });
-      }
-      return record;
+      const parts = splitDataUri(await shrinkToFit(plan.dataUri));
+      if (!parts) return none;
+      const uploaded = await uploadMarketplaceMedia({
+        dataBase64: parts.dataBase64,
+        originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
+      });
+      const imageUrl = uploaded?.media?.publicUrl || '';
+      const mediaId = uploaded?.media?.id || '';
+      if (!imageUrl || !mediaId) return none;
+      return {
+        images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
+        mediaIds: [mediaId],
+        record: { imageUrl, fingerprint: plan.fingerprint },
+      };
     } catch (err) {
       // A listing without its photo still sells; a failed publish sells nothing.
-      console.warn('Listing photo could not be attached', err);
-      return null;
+      console.warn('Listing photo could not be prepared', err);
+      return none;
     }
   }, []);
 
@@ -10141,22 +10130,40 @@ export default function BreedingPlannerApp() {
         photoBackfillTried.current.add(animalId);
         const snake = snakes.find((item) => item.id === animalId);
         if (!snake) continue;
+        // The whole body goes back with the images: the update rebuilds every
+        // column from what it is sent.
         const payload = listingUpdatePayloadFromListing(listing);
         if (!payload) continue;
-        const record = await attachListingPhoto(snake, listing.id, payload);
-        if (cancelled || !record) continue;
+        const photo = await prepareListingPhoto(snake);
+        if (cancelled || !photo.images.length) continue;
+        try {
+          await updateMarketplaceListing(listing.id, { ...payload, images: photo.images, mediaIds: photo.mediaIds });
+        } catch (err) {
+          console.warn('Listing photo could not be attached', err);
+          continue;
+        }
+        if (!photo.record) continue;
         setSnakes(prev => prev.map(item => item.id === animalId ? {
           ...item,
-          marketplaceImageUrl: record.imageUrl,
-          marketplaceImageFingerprint: record.fingerprint,
+          marketplaceImageUrl: photo.record.imageUrl,
+          marketplaceImageFingerprint: photo.record.fingerprint,
         } : item));
       }
       if (!cancelled) refreshMarketplaceListings();
     })();
 
     return () => { cancelled = true; };
-  }, [marketplaceListingsByAnimal, snakes, attachListingPhoto, refreshMarketplaceListings]);
+  }, [marketplaceListingsByAnimal, snakes, prepareListingPhoto, refreshMarketplaceListings]);
 
+  /**
+   * The one write that puts a snake in front of buyers, or takes it back off.
+   *
+   * One request: `POST /marketplace/listings` carries the status, the price and
+   * currency, the photo and the id of the upload behind it, and the server
+   * writes them together. It is upsert-by-animal, so it is safe on every save.
+   * Status rules: docs/marketplace-listings.md. There is no second store to
+   * keep in step any more -- the breeder profile reads this same listing.
+   */
   const syncSnakeToMarketplace = useCallback(async (snake, { published = true } = {}) => {
     const tokens = getDisplayedSnakeGeneticsTokens(snake);
     const genetics = tokens.map((tok) =>
@@ -10165,62 +10172,16 @@ export default function BreedingPlannerApp() {
     const speciesName = getSpeciesById(resolveSpeciesId(snake?.species))?.name || '';
 
     const payload = buildMarketplaceListingPayload(snake, { genetics, species: speciesName, published });
-    if (!payload) return;
-    const created = await createMarketplaceListing(payload);
-    const listingId = created?.listing?.id || '';
+    if (!payload) return null;
 
-    /**
-     * The photo. A breeder's pictures live on this device as data URIs and are
-     * stripped out of every snapshot sync, so the marketplace has never had one
-     * to show. Upload it against the listing -- media is only public when it
-     * belongs to a published listing -- and then attach it.
-     *
-     * The whole payload goes back with the images because the update rebuilds
-     * every column from what it is sent: a patch carrying images alone would
-     * blank the title, the genetics and the price.
-     */
-    let photoRecord = null;
-    if (listingId) {
-      photoRecord = await attachListingPhoto(snake, listingId, payload);
-    }
+    // Taking a snake off sale needs no photo; putting it up does.
+    const photo = published ? await prepareListingPhoto(snake) : { images: [], mediaIds: [], record: null };
+    await createMarketplaceListing(withListingPhoto(payload, photo));
 
     // Keep the editor's view of what is listed in step with what was just written.
     refreshMarketplaceListings();
-
-    // The breeder's own public profile page still reads the older listings
-    // table, so it is kept in step too. It is not what the marketplace shows.
-    try {
-      const data = await fetchMyListings();
-      const existing = Array.isArray(data?.listings) ? data.listings : [];
-      const coverUrl = snake.imageUrl
-        || (Array.isArray(snake.photos) && snake.photos.length
-          ? snake.photos[snake.photos.length - 1]?.url || ''
-          : '');
-      const legacy = {
-        id: existing.find((l) => l.animalAppId === snake.id)?.id || `listing-${Date.now()}`,
-        animalAppId: snake.id,
-        title: payload.title,
-        status: published ? 'available' : 'draft',
-        price: String(snake.price ?? ''),
-        currency: payload.currency,
-        description: payload.description,
-        imageUrl: coverUrl,
-        sex: payload.sex,
-        hatchDate: snake.birthDate || '',
-        genetics,
-      };
-      await saveMyListings([
-        ...existing.filter((l) => l.animalAppId !== snake.id),
-        legacy,
-      ]);
-    } catch (err) {
-      // The marketplace write is the one that matters; the profile page catching
-      // up on the next save is not worth failing the publish over.
-      console.warn('Profile listing mirror failed', err);
-    }
-
-    return photoRecord;
-  }, [refreshMarketplaceListings]);
+    return photo.record;
+  }, [prepareListingPhoto, refreshMarketplaceListings]);
 
   const publishEditSnakeToMarketplace = useCallback(async () => {
     if (!editSnakeDraft || editForSalePublishing) return;

@@ -8,7 +8,7 @@ vi.mock("../lib/prisma", () => ({
       findMany: vi.fn(),
       upsert: vi.fn(),
     },
-    listing: {
+    marketplaceListing: {
       findMany: vi.fn(),
     },
   },
@@ -19,7 +19,7 @@ import { listPublicBreederProfiles, upsertMyProfile } from "../services/profileS
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked((prisma as any).listing.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).marketplaceListing.findMany).mockResolvedValue([]);
 });
 
 describe("profileService", () => {
@@ -75,17 +75,16 @@ describe("profileService", () => {
         user: { id: "breeder-1", fullName: "Demo User", email: "breeder@example.com" },
       },
     ]);
-    vi.mocked((prisma as any).listing.findMany).mockResolvedValue([
+    vi.mocked((prisma as any).marketplaceListing.findMany).mockResolvedValue([
       {
-        id: "listing-row-1",
-        ownerId: "breeder-1",
-        appListingId: "listing-1",
-        animalAppId: "snake-1",
+        id: "listing-1",
+        sellerUserId: "breeder-1",
+        animalId: "snake-1",
         title: "Banana Clown",
         status: "available",
-        priceCents: 25000,
+        price: 250,
         currency: "EUR",
-        payload: { id: "listing-1", title: "Banana Clown" },
+        description: "private-ish seller notes are not part of the profile shape",
         updatedAt: new Date("2026-05-01T10:00:00.000Z"),
       },
     ]);
@@ -107,5 +106,15 @@ describe("profileService", () => {
     expect((prisma as any).profile.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ isPublic: true }),
     }));
+    // The profile reads the one listing store, under the catalogue's own rule.
+    expect((prisma as any).marketplaceListing.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        sellerUserId: "breeder-1",
+        archivedAt: null,
+        status: { in: ["available", "reserved"] },
+      }),
+    }));
+    const [profile] = await listPublicBreederProfiles();
+    expect(JSON.stringify(profile.listings)).not.toContain("seller notes");
   });
 });

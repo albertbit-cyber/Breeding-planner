@@ -5,6 +5,7 @@ import {
   listingUpdatePayloadFromListing,
   parseListingPrice,
   reconcileDraftWithListing,
+  withListingPhoto,
 } from './listingPayload';
 
 const snake = {
@@ -222,5 +223,41 @@ describe('listingNeedsPhoto', () => {
 
   it('is false for nothing at all', () => {
     expect(listingNeedsPhoto(undefined)).toBe(false);
+  });
+});
+
+describe('publishing in one pass', () => {
+  const photo = {
+    images: [{ imageUrl: '/marketplace/media/m-1', isPrimary: true, sortOrder: 0 }],
+    mediaIds: ['m-1'],
+  };
+
+  it('sends status, currency and photo in the same body', () => {
+    const body = withListingPhoto(
+      buildMarketplaceListingPayload({ ...snake, price: '450', currency: 'GBP' }, { genetics: 'Clown' }),
+      photo,
+    );
+    expect(body).toMatchObject({ status: 'available', currency: 'GBP', price: 450, mediaIds: ['m-1'] });
+    expect(body.images).toEqual(photo.images);
+  });
+
+  it('leaves images out entirely when there is no photo, so the card keeps the ones it has', () => {
+    const payload = buildMarketplaceListingPayload(snake, {});
+    const body = withListingPhoto(payload, { images: [], mediaIds: [] });
+    expect(body).not.toHaveProperty('images');
+    expect(body).not.toHaveProperty('mediaIds');
+  });
+
+  it('sends a linked photo without a media id', () => {
+    const body = withListingPhoto(buildMarketplaceListingPayload(snake, {}), {
+      images: [{ imageUrl: 'https://example.test/a.jpg', isPrimary: true, sortOrder: 0 }],
+      mediaIds: [],
+    });
+    expect(body.images).toHaveLength(1);
+    expect(body).not.toHaveProperty('mediaIds');
+  });
+
+  it('takes a snake off sale as a draft', () => {
+    expect(buildMarketplaceListingPayload(snake, { published: false })?.status).toBe('draft');
   });
 });

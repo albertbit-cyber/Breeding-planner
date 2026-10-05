@@ -1,52 +1,38 @@
 import { describe, expect, it } from "vitest";
 import {
   assertNoPrivateListingFields,
-  toLegacyPublicListingDto,
   toMarketplaceListingDto,
+  toProfileListingDto,
   toMarketplaceStoreDto,
 } from "../services/marketplaceDtos";
 
 describe("marketplace DTO allowlists", () => {
-  it("does not spread legacy listing payload fields into public DTOs", () => {
-    const dto = toLegacyPublicListingDto({
-      id: "row-1",
-      ownerId: "breeder-1",
-      appListingId: "listing-1",
-      animalAppId: "snake-1",
+  it("builds the profile listing shape from an allowlist, not from the row", () => {
+    const dto = toProfileListingDto({
+      id: "listing-1",
+      sellerUserId: "breeder-1",
+      animalId: "snake-1",
       title: "Banana Clown",
       status: "available",
-      priceCents: 25000,
+      price: 250,
       currency: "EUR",
       updatedAt: new Date("2026-05-01T10:00:00.000Z"),
-      payload: {
-        id: "listing-1",
-        title: "Unsafe title",
-        buyerEmail: "buyer@example.com",
-        refreshToken: "secret",
-        internalNote: "private",
-      },
-      owner: {
-        id: "breeder-1",
-        fullName: "Demo User",
-        email: "private-owner@example.com",
-        profile: {
-          breederName: "Demo Breeder",
-          location: "Berlin",
-          publicContactEmail: "public@example.com",
-          publicContactPhone: null,
-          contactPreference: "email",
-        },
-      },
+      description: "Seller notes",
+      publicDataSettingsJson: { showBreederNotes: false },
+      seller: { email: "private-owner@example.com", refreshToken: "secret" },
     });
 
     expect(dto).toMatchObject({
       id: "listing-1",
+      animalAppId: "snake-1",
       title: "Banana Clown",
-      breeder: expect.objectContaining({ publicContactEmail: "public@example.com" }),
+      price: 250,
+      priceCents: 25000,
+      currency: "EUR",
     });
-    expect(JSON.stringify(dto)).not.toContain("buyer@example.com");
+    expect(JSON.stringify(dto)).not.toContain("private-owner@example.com");
     expect(JSON.stringify(dto)).not.toContain("refreshToken");
-    expect(JSON.stringify(dto)).not.toContain("internalNote");
+    expect(JSON.stringify(dto)).not.toContain("Seller notes");
     expect(assertNoPrivateListingFields(dto)).toBe(true);
   });
 

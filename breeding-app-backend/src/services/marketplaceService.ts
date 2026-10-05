@@ -12,6 +12,8 @@ import {
 } from "./marketplaceDtos";
 import { buildListingRecord, buildListingRecords, findUnpublishedEvidence } from "./marketplaceRecordService";
 import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
+import { isStaffRole } from "../auth/identity";
+import { LISTED_AVAILABILITY, LISTED_STATUSES, PUBLIC_STATUSES, isListingPublic } from "./marketplaceVisibility";
 
 const db = prisma as any;
 
@@ -137,6 +139,26 @@ const imageInputs = (payload: Record<string, unknown>): Array<{ imageUrl: string
   return normalized;
 };
 
+/**
+ * Photos uploaded before the listing existed, named by id so they can be
+ * attached in the same request that publishes it. Only the caller's own,
+ * still-unattached uploads qualify: a media id is not a capability to move
+ * someone else's picture onto your card.
+ */
+const mediaIdInputs = (payload: Record<string, unknown>): string[] =>
+  (Array.isArray(payload.mediaIds) ? payload.mediaIds : [])
+    .map((value) => text(value, 160))
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 12);
+
+const attachMedia = async (tx: any, actor: AuthenticatedUser, listingId: string, mediaIds: string[]) => {
+  if (!mediaIds.length) return;
+  await tx.marketplaceMedia.updateMany({
+    where: { id: { in: mediaIds }, ownerUserId: actor.id, listingId: null },
+    data: { listingId },
+  });
+};
+
 const geneList = (value: unknown): string[] =>
   String(value ?? "")
     .split(",")
@@ -166,10 +188,10 @@ export const listMarketplaceListings = async (
   // Sold animals are price comparison, not stock. They are opt-in.
   if (availability) {
     where.availability = availability;
-    where.status = { in: ["available", "reserved", "sold"] };
+    where.status = { in: [...PUBLIC_STATUSES] };
   } else {
-    where.status = { in: includeSold ? ["available", "reserved", "sold"] : ["available", "reserved"] };
-    if (!includeSold) where.availability = { in: ["available", "reserved", "featured"] };
+    where.status = { in: includeSold ? [...PUBLIC_STATUSES] : [...LISTED_STATUSES] };
+    if (!includeSold) where.availability = { in: [...LISTED_AVAILABILITY] };
   }
 
   const species = text(query.species, 120);
@@ -369,7 +391,17 @@ export const getMarketplaceComparables = async (listingId: string) => {
   };
 };
 
+/**
+ * A drafted, hidden or archived listing is the seller's business. It used to be
+ * served to anyone holding its id, which made "hidden" mean only "not in the
+ * catalogue"; now it answers exactly as a listing that does not exist would.
+ */
 export const getMarketplaceListing = async (id: string, viewer?: AuthenticatedUser | null) => {
+  const found = await db.marketplaceListing.findUnique({ where: { id }, select: { sellerUserId: true, status: true, archivedAt: true } });
+  const canSeePrivate = Boolean(viewer && (viewer.id === found?.sellerUserId || isStaffRole(viewer.role)));
+  if (!found || (!isListingPublic(found) && !canSeePrivate)) {
+    throw new HttpError(404, "Marketplace listing not found.");
+  }
   const listing = await db.marketplaceListing.update({
     where: { id },
     data: { viewsCount: { increment: 1 } },
@@ -554,6 +586,7 @@ export const createMarketplaceListing = async (actor: AuthenticatedUser, payload
   if (!access.allowed) throw new HttpError(403, access.reason || "Your tier does not include marketplace listings.");
   const data = listingData(payload);
   const images = imageInputs(payload);
+  const mediaIds = mediaIdInputs(payload);
 
   if (data.animalId) {
     const existing = await db.marketplaceListing.findFirst({
@@ -573,6 +606,7 @@ export const createMarketplaceListing = async (actor: AuthenticatedUser, payload
         images: { create: images },
       },
     });
+    await attachMedia(tx, actor, row.id, mediaIds);
     return tx.marketplaceListing.findUnique({ where: { id: row.id }, include: LISTING_INCLUDE });
   });
   return { listing: toMarketplaceListingDto(listing) };
@@ -584,6 +618,7 @@ export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: str
   assertOwnerOrAdmin(actor, existing.sellerUserId, "You cannot edit this listing.");
   const data = listingData(payload);
   const images = imageInputs(payload);
+  const mediaIds = mediaIdInputs(payload);
   const listing = await db.$transaction(async (tx: any) => {
     await tx.marketplaceListing.update({
       where: { id },
@@ -593,6 +628,7 @@ export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: str
       await tx.marketplaceListingImage.deleteMany({ where: { listingId: id } });
       await tx.marketplaceListingImage.createMany({ data: images.map((image) => ({ ...image, listingId: id })) });
     }
+    await attachMedia(tx, actor, id, mediaIds);
     return tx.marketplaceListing.findUnique({ where: { id }, include: LISTING_INCLUDE });
   });
   return { listing: toMarketplaceListingDto(listing) };

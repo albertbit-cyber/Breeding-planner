@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // itself only carries writes, inserting through createMany.
 const tx = {
   animal: { createMany: vi.fn(), update: vi.fn() },
+  // Present only so the test can prove a sync never touches either listing store.
   listing: {
     updateMany: vi.fn(),
     upsert: vi.fn(),
   },
+  marketplaceListing: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   pairing: { createMany: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   clutch: { createMany: vi.fn(), update: vi.fn() },
   breederPlannerState: { create: vi.fn(), update: vi.fn() },
@@ -227,16 +229,15 @@ describe("breederDataService", () => {
     })).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("syncs animals tagged for sale into uniform marketplace listings", async () => {
+  it("never writes a listing, even for an animal tagged for sale and published", async () => {
+    // The snapshot used to mirror sale-tagged animals into the legacy listings
+    // table. The one listing pipeline is the explicit publish; a sync must not
+    // put anything on sale, or take anything off it, in either store.
     const animal = {
       id: "snake-1",
-      name: "Banana Clown Female",
-      sex: "female",
       status: "For Sale",
       morphs: ["Banana", "Clown"],
-      hets: ["Pied"],
       price: "450",
-      imageUrl: "https://example.com/snake.jpg",
       marketplacePublished: true,
       marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
     };
@@ -247,49 +248,11 @@ describe("breederDataService", () => {
       pairings: [],
     });
 
-    expect(tx.listing.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        ownerId: "breeder-1",
-        appListingId: { startsWith: "auto-animal-" },
-      }),
-      data: { status: "hidden" },
-    }));
-    expect(tx.listing.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { ownerId_appListingId: { ownerId: "breeder-1", appListingId: "auto-animal-snake-1" } },
-      create: expect.objectContaining({
-        ownerId: "breeder-1",
-        appListingId: "auto-animal-snake-1",
-        animalAppId: "snake-1",
-        title: "Banana, Clown, het Pied",
-        status: "available",
-        priceCents: 45000,
-        payload: expect.objectContaining({
-          source: "breeder-animal-tag",
-          genetics: "Banana, Clown, het Pied",
-          imageUrl: "https://example.com/snake.jpg",
-          marketplacePublished: true,
-          marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
-          price: "450",
-        }),
-      }),
-    }));
-  });
-
-  it("does not publish sale-tagged animals until explicitly published", async () => {
-    const animal = {
-      id: "snake-1",
-      status: "For Sale",
-      morphs: ["Clown"],
-    };
-    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: animal }]);
-
-    await upsertBreederSnapshot("breeder-1", {
-      animals: [animal],
-      pairings: [],
-    });
-
-    expect(tx.listing.updateMany).toHaveBeenCalled();
+    expect(tx.listing.updateMany).not.toHaveBeenCalled();
     expect(tx.listing.upsert).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.create).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.update).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.updateMany).not.toHaveBeenCalled();
   });
 
   it("does not overwrite newer database rows with older incoming animal payloads", async () => {

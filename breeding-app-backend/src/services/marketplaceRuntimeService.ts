@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { isListingPublic } from "./marketplaceVisibility";
 import type { AuthenticatedUser } from "../types/auth";
 import { HttpError } from "../utils/errors";
 import { assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
@@ -122,9 +123,9 @@ export const readMarketplaceMediaObject = async (
   });
   if (!media) throw new HttpError(404, "Marketplace media not found.");
 
-  const listingIsPublic = Boolean(
-    media.listing && media.listing.archivedAt === null && media.listing.status !== "draft"
-  );
+  // The same rule as the listing's own page: a hidden listing's photos used to
+  // stay public because only "draft" was excluded here.
+  const listingIsPublic = isListingPublic(media.listing);
   const isOwner = Boolean(actor && (actor.id === media.ownerUserId || actor.role === "admin"));
   if (!listingIsPublic && !isOwner) throw new HttpError(404, "Marketplace media not found.");
   if (media.status !== "ready" || media.scanStatus === "infected") {

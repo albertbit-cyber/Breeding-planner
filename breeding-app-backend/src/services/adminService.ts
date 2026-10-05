@@ -126,7 +126,12 @@ const normalizeReport = (row: any) => ({
     email: row.reportedUser.email,
     role: row.reportedUser.role,
   } : null,
-  listing: row.relatedListing ? {
+  // Reports filed before 2026-10-05 name a row in the retired listings table.
+  listing: row.relatedMarketplaceListing ? {
+    id: row.relatedMarketplaceListing.id,
+    title: row.relatedMarketplaceListing.title,
+    status: row.relatedMarketplaceListing.status,
+  } : row.relatedListing ? {
     id: row.relatedListing.id,
     title: row.relatedListing.title,
     status: row.relatedListing.status,
@@ -483,6 +488,7 @@ export const createAdminUser = async (actor: AuthenticatedUser, payload: Record<
 const REPORT_INCLUDE = {
   reporterUser: { select: { id: true, fullName: true, email: true, role: true } },
   reportedUser: { select: { id: true, fullName: true, email: true, role: true } },
+  relatedMarketplaceListing: { select: { id: true, title: true, status: true } },
   relatedListing: { select: { id: true, title: true, status: true } },
   assignedAdmin: { select: { id: true, fullName: true, email: true, role: true } },
 };
@@ -1127,6 +1133,7 @@ export const listAdminReports = async (query: Record<string, unknown>) => {
       { reporterUser: { fullName: { contains: search, mode: "insensitive" } } },
       { reportedUser: { email: { contains: search, mode: "insensitive" } } },
       { reportedUser: { fullName: { contains: search, mode: "insensitive" } } },
+      { relatedMarketplaceListing: { title: { contains: search, mode: "insensitive" } } },
       { relatedListing: { title: { contains: search, mode: "insensitive" } } },
     ];
   }
@@ -1260,9 +1267,12 @@ export const applyAdminReportAction = async (
     });
   }
 
-  if (report.relatedListingId && action === "remove_listing") {
-    await db.listing.update({
-      where: { id: report.relatedListingId },
+  // "hidden" takes a listing out of the catalogue, off its own page and its
+  // photos offline (marketplaceVisibility.ts). A report that only names a
+  // retired legacy row has nothing live to hide: nothing reads that table.
+  if (report.relatedMarketplaceListingId && action === "remove_listing") {
+    await db.marketplaceListing.update({
+      where: { id: report.relatedMarketplaceListingId },
       data: { status: "hidden" },
     });
   }

@@ -540,6 +540,11 @@ model BreederPlannerState {
   @@map("breeder_planner_states")
 }
 
+/// RETIRED 2026-10-05 -- frozen, nothing writes it. `marketplace_listings` is the
+/// one listing store. Rows survive only so history (old inquiries, moderation
+/// audits, reports) and the account data export keep their source until
+/// `scripts/copyLegacyListings.ts` has run everywhere. Drop no earlier than
+/// 2027-01-05, together with the 410 stub in src/routes/listingRoutes.ts.
 model Listing {
   id               String                   @id @default(cuid())
   ownerId          String
@@ -564,23 +569,27 @@ model Listing {
 }
 
 model ListingInquiry {
-  id                  String    @id @default(cuid())
-  listingId           String
-  listing             Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  breederId           String
-  breeder             User      @relation("ListingInquiryBreeder", fields: [breederId], references: [id], onDelete: Cascade)
-  buyerId             String?
-  buyer               User?     @relation("ListingInquiryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
-  buyerName           String
-  buyerEmail          String
-  message             String    @db.Text
-  status              String    @default("new")
-  breederResponseNote String?   @db.Text
-  respondedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                   String              @id @default(cuid())
+  /// Legacy link, null for every inquiry made after 2026-10-05.
+  listingId            String?
+  listing              Listing?            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  marketplaceListingId String?             @map("marketplace_listing_id")
+  marketplaceListing   MarketplaceListing? @relation("ListingInquiryMarketplaceListing", fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+  breederId            String
+  breeder              User                @relation("ListingInquiryBreeder", fields: [breederId], references: [id], onDelete: Cascade)
+  buyerId              String?
+  buyer                User?               @relation("ListingInquiryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  buyerName            String
+  buyerEmail           String
+  message              String              @db.Text
+  status               String              @default("new")
+  breederResponseNote  String?             @db.Text
+  respondedAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   @@index([listingId])
+  @@index([marketplaceListingId])
   @@index([breederId])
   @@index([buyerId])
   @@index([status])
@@ -653,27 +662,31 @@ model AdminAuditLog {
 }
 
 model Report {
-  id               String            @id @default(cuid())
-  reporterUserId   String?
-  reporterUser     User?             @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
-  reportedUserId   String?
-  reportedUser     User?             @relation("ReportReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
-  relatedListingId String?
-  relatedListing   Listing?          @relation(fields: [relatedListingId], references: [id], onDelete: SetNull)
-  relatedMessageId String?
-  type             String
-  status           String            @default("open")
-  description      String            @db.Text
-  assignedAdminId  String?
-  assignedAdmin    User?             @relation("ReportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  escalations      AdminEscalation[]
-  resolutionNote   String?           @db.Text
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                          String              @id @default(cuid())
+  reporterUserId              String?
+  reporterUser                User?               @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reportedUserId              String?
+  reportedUser                User?               @relation("ReportReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  /// Legacy link; reports filed after 2026-10-05 use relatedMarketplaceListingId.
+  relatedListingId            String?
+  relatedListing              Listing?            @relation(fields: [relatedListingId], references: [id], onDelete: SetNull)
+  relatedMarketplaceListingId String?             @map("related_marketplace_listing_id")
+  relatedMarketplaceListing   MarketplaceListing? @relation("ReportMarketplaceListing", fields: [relatedMarketplaceListingId], references: [id], onDelete: SetNull)
+  relatedMessageId            String?
+  type                        String
+  status                      String              @default("open")
+  description                 String              @db.Text
+  assignedAdminId             String?
+  assignedAdmin               User?               @relation("ReportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  escalations                 AdminEscalation[]
+  resolutionNote              String?             @db.Text
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
 
   @@index([reporterUserId])
   @@index([reportedUserId])
   @@index([relatedListingId])
+  @@index([relatedMarketplaceListingId])
   @@index([assignedAdminId])
   @@index([status])
   @@index([type])
@@ -1037,7 +1050,12 @@ model MarketplaceListing {
   updatedAt              DateTime                  @updatedAt @map("updated_at")
   publishedAt            DateTime?                 @map("published_at")
   archivedAt             DateTime?                 @map("archived_at")
+  /// The legacy `listings` row this was copied from by scripts/copyLegacyListings.ts.
+  /// Unique, which is what makes the copy safe to re-run.
+  legacyListingId        String?                   @unique @map("legacy_listing_id")
   images                 MarketplaceListingImage[]
+  inquiries              ListingInquiry[]          @relation("ListingInquiryMarketplaceListing")
+  reports                Report[]                  @relation("ReportMarketplaceListing")
   media                  MarketplaceMedia[]
   conversations          MarketplaceConversation[]
   favorites              MarketplaceFavorite[]
