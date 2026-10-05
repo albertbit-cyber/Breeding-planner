@@ -61,236 +61,22 @@ const getAuthSurfaceForHash = (hashValue) => {
   if (path.startsWith("/pricing")) return "public";
   return getAuthScopeForHash(hashValue);
 };
-const COUNTRY_OPTIONS_FALLBACK = [
-  "Afghanistan",
-  "Albania",
-  "Algeria",
-  "Andorra",
-  "Angola",
-  "Antigua and Barbuda",
-  "Argentina",
-  "Armenia",
-  "Australia",
-  "Austria",
-  "Azerbaijan",
-  "Bahamas",
-  "Bahrain",
-  "Bangladesh",
-  "Barbados",
-  "Belarus",
-  "Belgium",
-  "Belize",
-  "Benin",
-  "Bhutan",
-  "Bolivia",
-  "Bosnia and Herzegovina",
-  "Botswana",
-  "Brazil",
-  "Brunei",
-  "Bulgaria",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cambodia",
-  "Cameroon",
-  "Canada",
-  "Central African Republic",
-  "Chad",
-  "Chile",
-  "China",
-  "Colombia",
-  "Comoros",
-  "Congo (Congo-Brazzaville)",
-  "Costa Rica",
-  "Cote d'Ivoire",
-  "Croatia",
-  "Cuba",
-  "Cyprus",
-  "Czechia",
-  "Democratic Republic of the Congo",
-  "Denmark",
-  "Djibouti",
-  "Dominica",
-  "Dominican Republic",
-  "Ecuador",
-  "Egypt",
-  "El Salvador",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Estonia",
-  "Eswatini",
-  "Ethiopia",
-  "Fiji",
-  "Finland",
-  "France",
-  "Gabon",
-  "Gambia",
-  "Georgia",
-  "Germany",
-  "Ghana",
-  "Greece",
-  "Grenada",
-  "Guatemala",
-  "Guinea",
-  "Guinea-Bissau",
-  "Guyana",
-  "Haiti",
-  "Holy See",
-  "Honduras",
-  "Hungary",
-  "Iceland",
-  "India",
-  "Indonesia",
-  "Iran",
-  "Iraq",
-  "Ireland",
-  "Israel",
-  "Italy",
-  "Jamaica",
-  "Japan",
-  "Jordan",
-  "Kazakhstan",
-  "Kenya",
-  "Kiribati",
-  "Kuwait",
-  "Kyrgyzstan",
-  "Laos",
-  "Latvia",
-  "Lebanon",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Liechtenstein",
-  "Lithuania",
-  "Luxembourg",
-  "Madagascar",
-  "Malawi",
-  "Malaysia",
-  "Maldives",
-  "Mali",
-  "Malta",
-  "Marshall Islands",
-  "Mauritania",
-  "Mauritius",
-  "Mexico",
-  "Micronesia",
-  "Moldova",
-  "Monaco",
-  "Mongolia",
-  "Montenegro",
-  "Morocco",
-  "Mozambique",
-  "Myanmar",
-  "Namibia",
-  "Nauru",
-  "Nepal",
-  "Netherlands",
-  "New Zealand",
-  "Nicaragua",
-  "Niger",
-  "Nigeria",
-  "North Korea",
-  "North Macedonia",
-  "Norway",
-  "Oman",
-  "Pakistan",
-  "Palau",
-  "Panama",
-  "Papua New Guinea",
-  "Paraguay",
-  "Peru",
-  "Philippines",
-  "Poland",
-  "Portugal",
-  "Qatar",
-  "Romania",
-  "Russia",
-  "Rwanda",
-  "Saint Kitts and Nevis",
-  "Saint Lucia",
-  "Saint Vincent and the Grenadines",
-  "Samoa",
-  "San Marino",
-  "Sao Tome and Principe",
-  "Saudi Arabia",
-  "Senegal",
-  "Serbia",
-  "Seychelles",
-  "Sierra Leone",
-  "Singapore",
-  "Slovakia",
-  "Slovenia",
-  "Solomon Islands",
-  "Somalia",
-  "South Africa",
-  "South Korea",
-  "South Sudan",
-  "Spain",
-  "Sri Lanka",
-  "Sudan",
-  "Suriname",
-  "Sweden",
-  "Switzerland",
-  "Syria",
-  "Tajikistan",
-  "Tanzania",
-  "Thailand",
-  "Timor-Leste",
-  "Togo",
-  "Tonga",
-  "Trinidad and Tobago",
-  "Tunisia",
-  "Turkey",
-  "Turkmenistan",
-  "Tuvalu",
-  "Uganda",
-  "Ukraine",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Uruguay",
-  "Uzbekistan",
-  "Vanuatu",
-  "Venezuela",
-  "Vietnam",
-  "Yemen",
-  "Zambia",
-  "Zimbabwe",
-];
-const DEVICE_OPTIONS_FALLBACK = [
-  { value: "desktop", label: "Desktop only" },
-  { value: "mobile", label: "Mobile only" },
-  { value: "both", label: "Both desktop and mobile" },
-];
-const DATA_BACKUP_OPTIONS_FALLBACK = [
-  { value: "automatic", label: "Automatic" },
-  { value: "manual", label: "Manual" },
-];
-const EXPERIENCE_OPTIONS_FALLBACK = [
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced breeder" },
-  { value: "professional", label: "Professional" },
-];
 const ROLE_OPTIONS_FALLBACK = [
   { value: "breeder", label: "Breeder" },
   { value: "buyer", label: "Buyer" },
 ];
 
+// Buyer accounts belong to the marketplace, which is a separate deploy. This app
+// refuses them at sign-in, so a buyer is sent there before an account exists
+// rather than after they have verified one they cannot use here.
+const MARKETPLACE_URL = (
+  import.meta.env.VITE_MARKETPLACE_URL || "https://albertbit-cyber.github.io/Breeding-planner/"
+).replace(/\/+$/, "/");
+
 const DEFAULT_REGISTRATION_TEMPLATE = {
   fullName: "",
-  displayName: "",
   email: "",
-  phone: "",
   password: "",
-  confirmPassword: "",
-  country: "",
-  enableCloudSync: true,
-  devicePreference: "both",
-  dataBackupPreference: "automatic",
-  reptileCount: "",
-  experienceLevel: "intermediate",
-  enableAutomaticReptileSync: true,
   consentDataProcessing: false,
   acceptTerms: false,
   role: "breeder",
@@ -301,19 +87,12 @@ const createDefaultRegistrationData = () =>
 
 const createDefaultPasswordRecoveryData = (email = "") => ({ email });
 
+/**
+ * Registration is one screen: the four things the backend actually stores, plus the
+ * two consents. It used to be four steps whose preferences and keeper-profile answers
+ * were never sent anywhere, which is effort asked for and thrown away.
+ */
 const buildRegistrationSteps = (t, optionSets = {}) => {
-  const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
-    ? optionSets.countries
-    : COUNTRY_OPTIONS_FALLBACK;
-  const devicePreferences = Array.isArray(optionSets.devicePreferences) && optionSets.devicePreferences.length
-    ? optionSets.devicePreferences
-    : DEVICE_OPTIONS_FALLBACK;
-  const dataBackup = Array.isArray(optionSets.dataBackup) && optionSets.dataBackup.length
-    ? optionSets.dataBackup
-    : DATA_BACKUP_OPTIONS_FALLBACK;
-  const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
-    ? optionSets.experienceLevels
-    : EXPERIENCE_OPTIONS_FALLBACK;
   const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
     ? optionSets.roleOptions
     : ROLE_OPTIONS_FALLBACK
@@ -329,107 +108,32 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
   return [
     {
       key: "account",
-      title: t("auth:steps.account.title", { defaultValue: "Account basics" }),
-      description: t("auth:steps.account.description", {
-        defaultValue: "Create your keeper profile and secure your login.",
+      title: t("auth:register.title", { defaultValue: "Create your account" }),
+      description: t("auth:register.description", {
+        defaultValue: "Four fields. Your collection comes next.",
       }),
       fields: [
         {
           name: "fullName",
           label: t("auth:fields.fullName", { defaultValue: "Full name" }),
           type: "text",
-          required: true,
-        },
-        {
-          name: "displayName",
-          label: t("auth:fields.displayName", {
-            defaultValue: "Preferred username / display name",
-          }),
-          type: "text",
+          autoComplete: "name",
           required: true,
         },
         {
           name: "email",
           label: t("auth:fields.email", { defaultValue: "Email address" }),
           type: "email",
+          autoComplete: "email",
           required: true,
-        },
-        {
-          name: "phone",
-          label: t("auth:fields.phone", { defaultValue: "Phone number (optional)" }),
-          type: "tel",
         },
         {
           name: "password",
-          label: t("auth:fields.password", { defaultValue: "Password" }),
+          label: t("auth:fields.passwordWithHint", { defaultValue: "Password (8+ characters)" }),
           type: "password",
+          autoComplete: "new-password",
           required: true,
         },
-        {
-          name: "confirmPassword",
-          label: t("auth:fields.confirmPassword", { defaultValue: "Confirm password" }),
-          type: "password",
-          required: true,
-        },
-      ],
-      validate: (data) => {
-        if (data.password.trim().length < 8) {
-          return t("auth:errors.passwordLength", {
-            defaultValue: "Choose a password with at least 8 characters.",
-          });
-        }
-        if (data.password !== data.confirmPassword) {
-          return t("auth:errors.passwordMismatch", {
-            defaultValue: "Passwords do not match.",
-          });
-        }
-        return null;
-      },
-    },
-    {
-      key: "preferences",
-      title: t("auth:steps.preferences.title", { defaultValue: "Preferences" }),
-      description: t("auth:steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Serpentora.",
-      }),
-      fields: [
-        {
-          name: "country",
-          label: t("auth:fields.country", { defaultValue: "Country" }),
-          type: "select",
-          options: countries,
-          required: true,
-        },
-        {
-          name: "enableCloudSync",
-          label: t("auth:fields.enableCloudSync", { defaultValue: "Enable cloud sync" }),
-          type: "checkbox",
-        },
-        {
-          name: "devicePreference",
-          label: t("auth:fields.devicePreference", { defaultValue: "Device preference" }),
-          type: "select",
-          options: devicePreferences,
-          required: true,
-        },
-        {
-          name: "dataBackupPreference",
-          label: t("auth:fields.dataBackupPreference", {
-            defaultValue: "Data backup preference",
-          }),
-          type: "select",
-          options: dataBackup,
-          required: true,
-        },
-      ],
-    },
-    {
-      key: "keeper",
-      title: t("auth:steps.keeper.title", { defaultValue: "Reptile keeper profile" }),
-      description: t("auth:steps.keeper.description", {
-        defaultValue: "Share a bit about your collection and processes.",
-      }),
-      fields: [
         {
           name: "role",
           label: t("auth:fields.userRole", { defaultValue: "User role" }),
@@ -438,43 +142,13 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
           required: true,
         },
         {
-          name: "reptileCount",
-          label: t("auth:fields.reptileCount", {
-            defaultValue: "How many reptiles do you currently keep?",
-          }),
-          type: "number",
-          required: true,
-        },
-        {
-          name: "experienceLevel",
-          label: t("auth:fields.experienceLevel", { defaultValue: "Experience level" }),
-          type: "select",
-          options: experienceLevels,
-          required: true,
-        },
-        {
-          name: "enableAutomaticReptileSync",
-          label: t("auth:fields.enableAutomaticReptileSync", {
-            defaultValue: "Enable automatic reptile-data syncing",
-          }),
-          type: "checkbox",
-        },
-      ],
-    },
-    {
-      key: "consent",
-      title: t("auth:steps.consent.title", { defaultValue: "Consent & finish" }),
-      description: t("auth:steps.consent.description", {
-        defaultValue: "Review the legal bits so we can activate your account.",
-      }),
-      fields: [
-        {
           name: "consentDataProcessing",
           label: t("auth:fields.consentDataProcessing", {
             defaultValue: "I consent to data processing for sync & backup services.",
           }),
           type: "checkbox",
           required: true,
+          shouldDisplay: (data) => data.role !== "buyer",
         },
         {
           name: "acceptTerms",
@@ -497,8 +171,17 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
           ),
           type: "checkbox",
           required: true,
+          shouldDisplay: (data) => data.role !== "buyer",
         },
       ],
+      validate: (data) => {
+        if (data.password.trim().length < 8) {
+          return t("auth:errors.passwordLength", {
+            defaultValue: "Choose a password with at least 8 characters.",
+          });
+        }
+        return null;
+      },
     },
   ];
 };
@@ -588,41 +271,17 @@ export default function AuthGate({ children }) {
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
-  const [registerStep, setRegisterStep] = useState(0);
   const [registrationError, setRegistrationError] = useState("");
   const registrationSteps = useMemo(() => {
-    const countries = t("auth:options.countries", {
-      returnObjects: true,
-      defaultValue: COUNTRY_OPTIONS_FALLBACK,
-    });
-    const devicePreferences = t("auth:options.devicePreferences", {
-      returnObjects: true,
-      defaultValue: DEVICE_OPTIONS_FALLBACK,
-    });
-    const dataBackup = t("auth:options.dataBackup", {
-      returnObjects: true,
-      defaultValue: DATA_BACKUP_OPTIONS_FALLBACK,
-    });
-    const experienceLevels = t("auth:options.experienceLevels", {
-      returnObjects: true,
-      defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
-    });
     const roleOptions = t("auth:options.roles", {
       returnObjects: true,
       defaultValue: ROLE_OPTIONS_FALLBACK,
     });
 
-    return buildRegistrationSteps(t, {
-      countries,
-      devicePreferences,
-      dataBackup,
-      experienceLevels,
-      roleOptions,
-    });
+    return buildRegistrationSteps(t, { roleOptions });
   }, [t, i18n.language]);
 
-  const currentStep = registrationSteps[registerStep] || registrationSteps[0];
-  const totalSteps = registrationSteps.length || 1;
+  const currentStep = registrationSteps[0];
 
   useEffect(() => {
     const onHashChange = () => {
@@ -702,7 +361,6 @@ export default function AuthGate({ children }) {
     setPendingVerificationEmail("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
-    setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
   }, [authScope, persistAuth]);
 
@@ -728,7 +386,6 @@ export default function AuthGate({ children }) {
     setLoginMessage("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData(authState.profile?.email || ""));
-    setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
     setRegistrationError("");
   }, [authScope, authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
@@ -900,9 +557,13 @@ export default function AuthGate({ children }) {
     }));
   };
 
+  const isBuyerRegistration = registrationData.role === "buyer";
+
   const handleRegistrationStepSubmit = async (event) => {
     event.preventDefault();
     setRegistrationError("");
+    // A buyer account is made on the marketplace; the form offers the link instead of a submit.
+    if (isBuyerRegistration) return;
     const missingField = currentStep.fields.find((field) => {
       if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
         return false;
@@ -917,7 +578,10 @@ export default function AuthGate({ children }) {
     });
 
     if (missingField) {
-      setRegistrationError(t("auth:errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
+      // The terms label is a node with links in it, so it cannot be quoted back as text.
+      setRegistrationError(missingField.type === "checkbox"
+        ? t("auth:errors.consentRequired", { defaultValue: "Tick both consent boxes to create your account." })
+        : t("auth:errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
       return;
     }
 
@@ -929,36 +593,30 @@ export default function AuthGate({ children }) {
       }
     }
 
-    if (registerStep === totalSteps - 1) {
-      const desiredEmail = registrationData.email.trim();
-      const desiredFullName = registrationData.fullName.trim();
+    const desiredEmail = registrationData.email.trim();
+    const desiredFullName = registrationData.fullName.trim();
 
-      try {
-        const registration = await registerApi({
-          fullName: desiredFullName || registrationData.fullName,
-          email: desiredEmail,
-          password: registrationData.password,
-          role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
-        });
+    try {
+      const registration = await registerApi({
+        fullName: desiredFullName || registrationData.fullName,
+        email: desiredEmail,
+        password: registrationData.password,
+        role: "breeder",
+      });
 
-        // Registration isn't complete until the emailed link is clicked — no session is
-        // created here. Show the "check your inbox" card instead of logging the user in.
-        setResendVerificationSent(false);
-        setResendVerificationError("");
-        // Older backends do not report this; absence means "assume it was sent".
-        setVerificationEmailQueued(registration?.user?.verificationEmailQueued !== false);
-        setPendingVerificationEmail(desiredEmail);
-      } catch (error) {
-        setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
-      }
-      return;
+      // Registration isn't complete until the emailed link is clicked — no session is
+      // created here. Show the "check your inbox" card instead of logging the user in.
+      setResendVerificationSent(false);
+      setResendVerificationError("");
+      // Older backends do not report this; absence means "assume it was sent".
+      setVerificationEmailQueued(registration?.user?.verificationEmailQueued !== false);
+      setPendingVerificationEmail(desiredEmail);
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
     }
-
-    setRegisterStep((prev) => Math.min(prev + 1, totalSteps - 1));
   };
 
   const resetRegistration = () => {
-    setRegisterStep(0);
     setRegistrationError("");
     setRegistrationData(createDefaultRegistrationData());
   };
@@ -1032,6 +690,7 @@ export default function AuthGate({ children }) {
             {label}
             <input
               type={field.type || "text"}
+              autoComplete={field.autoComplete}
               value={value}
               onChange={(e) =>
                 handleRegistrationChange(field.name, e.target.value)
@@ -1234,31 +893,29 @@ export default function AuthGate({ children }) {
         <button type="button" className="text-button" onClick={() => setView("chooser")}>
           {t("common.back", { defaultValue: "Back" })}
         </button>
-        <div>
-          {t("auth:steps.progress", { defaultValue: "Step {{current}} of {{total}}", current: registerStep + 1, total: totalSteps, })}
-        </div>
       </div>
       <h2>{currentStep.title}</h2>
       <p className="auth-subtitle">{currentStep.description}</p>
       <form className="auth-registration-form" onSubmit={handleRegistrationStepSubmit}>
         {currentStep.fields.map((field) => renderField(field))}
+        {isBuyerRegistration && (
+          <p className="auth-helper-copy" role="status">
+            {t("auth:register.buyerElsewhere", {
+              defaultValue: "Buyer accounts live on the Serpentora Marketplace, not in this breeder app. Create yours there; this form won't make one.",
+            })}
+          </p>
+        )}
         {registrationError && <p className="auth-error">{registrationError}</p>}
         <div className="auth-registration-actions">
-          <button
-            type="button"
-            className="ghost"
-            disabled={registerStep === 0}
-            onClick={() =>
-              setRegisterStep((prev) => Math.max(0, prev - 1))
-            }
-          >
-            {t("common.previous", { defaultValue: "Previous" })}
-          </button>
-          <button type="submit" className="primary">
-            {registerStep === totalSteps - 1
-              ? t("auth:actions.createAccount", { defaultValue: "Create account" })
-              : t("common.next", { defaultValue: "Next" })}
-          </button>
+          {isBuyerRegistration ? (
+            <a className="primary" href={MARKETPLACE_URL} target="_blank" rel="noopener noreferrer">
+              {t("auth:actions.goToMarketplace", { defaultValue: "Go to the Marketplace" })}
+            </a>
+          ) : (
+            <button type="submit" className="primary">
+              {t("auth:actions.createAccount", { defaultValue: "Create account" })}
+            </button>
+          )}
         </div>
       </form>
     </div>

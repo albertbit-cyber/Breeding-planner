@@ -27,6 +27,7 @@ export default function SpeciesDashboard({
   isDemoCollection = false,
   onOpenSpecies,
   onAddAnimal,
+  onImportCollection,
   searchQuery = '',
   onSearchQueryChange,
   searchResults = [],
@@ -43,6 +44,31 @@ export default function SpeciesDashboard({
   const preset = appearanceState?.preset || 'default';
 
   const isSearching = Boolean(String(searchQuery).trim());
+  // Before the keeper has any animals of their own, the ways in come first: on a phone the
+  // demo species would otherwise push them four cards down.
+  const isFirstRun = isDemoCollection || !summaries.length;
+  const entryCards = (
+    <>
+      {/* The two ways in, side by side and the same size, at every width. Most keepers
+          arrive with a spreadsheet or a MorphMarket export, so importing is not an
+          advanced option tucked inside a species: it sits beside adding one by hand. */}
+      <div className="grid grid-cols-2 gap-3 max-w-3xl">
+        <EntryCard
+          symbol="+"
+          title={t('actions.addAnimalAndSpecies', { defaultValue: 'New animal & species' })}
+          hint={t('species.dashboard.addHint', { defaultValue: 'a new species appears here once you own one' })}
+          onClick={() => onAddAnimal?.()}
+        />
+        <EntryCard
+          symbol={'↓'}
+          title={t('species.dashboard.importCollection', { defaultValue: 'Import your collection' })}
+          hint={t('species.dashboard.importHint', { defaultValue: 'MorphMarket export, CSV or spreadsheet' })}
+          onClick={() => onImportCollection?.()}
+        />
+      </div>
+    </>
+  );
+
   const hiddenResultCount = Math.max(0, searchResultTotal - searchResults.length);
   return (
     <div className="space-y-4">
@@ -53,11 +79,13 @@ export default function SpeciesDashboard({
           </span>
           <span className="text-sm text-amber-900">
             {t('species.dashboard.demoBanner', {
-              defaultValue: 'These are example animals so the app has something to show. Add your first animal and they disappear.',
+              defaultValue: 'These are example animals so the app has something to show. Add or import your own animals and they disappear.',
             })}
           </span>
         </div>
       )}
+
+      {isFirstRun && !isSearching && entryCards}
 
       <div className="header-search-shell w-full">
         <input
@@ -112,19 +140,7 @@ export default function SpeciesDashboard({
               />
             ))}
 
-            <button
-              type="button"
-              onClick={() => onAddAnimal?.()}
-              className="text-center border border-dashed rounded-2xl p-4 min-h-[132px] flex flex-col items-center justify-center gap-1 text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
-            >
-              <span className="text-xl font-semibold text-[#3c1b73]" aria-hidden="true">+</span>
-              <span className="text-sm font-medium">
-                {t('actions.addAnimalAndSpecies', { defaultValue: 'New animal & species' })}
-              </span>
-              <span className="text-[11px] leading-snug">
-                {t('species.dashboard.addHint', { defaultValue: 'a new species appears here once you own one' })}
-              </span>
-            </button>
+            {!isFirstRun && entryCards}
           </div>
         </div>
 
@@ -284,6 +300,20 @@ const URGENCY_CLASS = {
   upcoming: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   none: 'bg-neutral-100 text-neutral-600 border border-neutral-200',
 };
+
+function EntryCard({ symbol, title, hint, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-center border border-dashed rounded-2xl p-3 sm:p-4 min-h-[132px] flex flex-col items-center justify-center gap-1 text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
+    >
+      <span className="text-xl font-semibold text-[#3c1b73]" aria-hidden="true">{symbol}</span>
+      <span className="text-sm font-medium">{title}</span>
+      <span className="text-[11px] leading-snug">{hint}</span>
+    </button>
+  );
+}
 
 function SectionHeading({ children }) {
   return (

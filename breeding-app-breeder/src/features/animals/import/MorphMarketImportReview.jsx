@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSpeciesById } from '../../../genetics/speciesRegistry';
 import AnimalCapNotice, { useAnimalCap } from '../../subscriptions/AnimalCapNotice.jsx';
+import BreedersGroupPicker from '../BreedersGroupPicker.jsx';
 
 /**
  * The mandatory stop between reading a MorphMarket file and writing animals.
@@ -13,6 +14,10 @@ import AnimalCapNotice, { useAnimalCap } from '../../subscriptions/AnimalCapNoti
  * The plan's animal cap is stated here too, before the confirm. An import that would take the
  * collection past it cannot be confirmed; the keeper sets rows to Skip until it fits, or
  * upgrades. Which animals to leave out is their call, never the app's.
+ *
+ * After the write comes one more question: which of these animals breed. Pairing only looks in
+ * the Breeders group, so an import that skips this leaves a keeper with a full collection and
+ * nothing they can pair. It is offered, never filled in: nothing is pre-ticked.
  */
 
 const STATUS_STYLES = {
@@ -45,6 +50,7 @@ export default function MorphMarketImportReview({
   result = null,
   existingAnimalCount = 0,
   primaryButtonClass = 'appearance-btn appearance-btn--filled',
+  onAddToBreeders,
 }) {
   const { t } = useTranslation();
   const rows = Array.isArray(plan?.rows) ? plan.rows : [];
@@ -79,6 +85,8 @@ export default function MorphMarketImportReview({
   const capBlocked = Boolean(capResult?.blocked);
 
   if (result) {
+    const offerBreeders = typeof onAddToBreeders === 'function'
+      && ((result.breederCandidates?.males?.length || 0) + (result.breederCandidates?.females?.length || 0)) > 0;
     return (
       <div className="space-y-4">
         <div className="text-base font-semibold">
@@ -102,9 +110,33 @@ export default function MorphMarketImportReview({
             value={result.failed}
           />
         </div>
+        {offerBreeders && (
+          <section className="border rounded-xl p-3 bg-neutral-50" aria-labelledby="import-breeders-heading">
+            <BreedersGroupPicker
+              males={result.breederCandidates.males}
+              females={result.breederCandidates.females}
+              onAdd={onAddToBreeders}
+              primaryButtonClass={primaryButtonClass}
+              heading={(
+                <div>
+                  <h3 id="import-breeders-heading" className="text-sm font-semibold">
+                    {t('ui.animals.import.morphmarket.breedersQuestion', {
+                      defaultValue: 'Add breeding adults to the Breeders group now?',
+                    })}
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {t('ui.animals.import.morphmarket.breedersHint', {
+                      defaultValue: 'Pairing and the Breeding Advisor only use animals in that group. Tick the ones that breed; you can change this later.',
+                    })}
+                  </p>
+                </div>
+              )}
+            />
+          </section>
+        )}
         <button
           type="button"
-          className={`px-3 py-2 rounded-xl text-sm ${primaryButtonClass}`}
+          className={offerBreeders ? 'px-3 py-2 rounded-xl text-sm border bg-white' : `px-3 py-2 rounded-xl text-sm ${primaryButtonClass}`}
           onClick={onCancel}
         >
           {t('ui.animals.import.morphmarket.viewAnimals', { defaultValue: 'View imported animals' })}

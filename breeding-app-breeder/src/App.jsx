@@ -117,6 +117,7 @@ import { parseCsvToRows, detectHeaderKey } from "./utils/csvRows";
 import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/importSource";
 import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
+import { BreedersGroupGate } from "./features/animals/BreedersGroupPicker.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import {
   buildMarketplaceListingPayload,
@@ -9737,6 +9738,35 @@ export default function BreedingPlannerApp() {
     proceedWithPairing(updatedSnake);
   }, [pairingGuard, setSnakes, setGroups, proceedWithPairing]);
 
+  /**
+   * Moves the chosen animals into the Breeders group, the one place pairing and the Advisor
+   * look for parents. Only ever called from a keeper's explicit choice in BreedersGroupPicker.
+   * An animal holds one group, as everywhere else in this file, so this is a move.
+   */
+  const addAnimalsToBreeders = useCallback((ids) => {
+    const wanted = new Set(Array.isArray(ids) ? ids : []);
+    if (!wanted.size) return;
+    setSnakes(prev => prev.map(s => (
+      !s || !wanted.has(s.id) || isBreederGroupMember(s) ? s : { ...s, groups: ['Breeders'] }
+    )));
+    const touchedSpecies = new Set(snakes.filter(s => s && wanted.has(s.id)).map(s => s.species));
+    touchedSpecies.forEach(species => setGroupsForSpecies(
+      species,
+      prev => (prev.includes('Breeders') ? prev : [...prev, 'Breeders'])
+    ));
+  }, [isBreederGroupMember, setGroupsForSpecies, snakes]);
+
+  // Who the Breeders gate in pairing and the Advisor can offer: sexed animals of the open
+  // species that are not breeders yet.
+  const breederCandidateMales = useMemo(
+    () => scopedSnakes.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedSnakes, isBreederGroupMember]
+  );
+  const breederCandidateFemales = useMemo(
+    () => scopedSnakes.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedSnakes, isBreederGroupMember]
+  );
+
   const handleAddSnakePhotos = useCallback(async (snakeId, files, options = {}) => {
     if (!snakeId) return { newEntries: [], combined: null, imageUrl: null };
     const fileArray = Array.isArray(files) ? files : Array.from(files || []);
@@ -10776,11 +10806,27 @@ export default function BreedingPlannerApp() {
     const landingSpecies = plan?.summary?.bySpecies?.[0]?.speciesId;
     if (landingSpecies) openSpeciesWorkspace(landingSpecies);
 
+    // What the result panel can offer for the Breeders group: every sexed animal this import
+    // wrote that is not a breeder already. Updated rows carry the sex the file just gave them.
+    const touched = [
+      ...created,
+      ...update
+        .map(row => {
+          const existing = snakes.find(snake => snake.id === row.conflictWithId);
+          return existing ? { ...existing, sex: row.animal.sex } : null;
+        })
+        .filter(Boolean),
+    ].filter(animal => !isBreederGroupMember(animal));
+
     return {
       created: created.length,
       updated: update.length,
       skipped: skipped.length,
       failed: failed.length,
+      breederCandidates: {
+        males: touched.filter(isMaleSnake),
+        females: touched.filter(isFemaleSnake),
+      },
     };
   }
 
@@ -11595,6 +11641,7 @@ export default function BreedingPlannerApp() {
             isDemoCollection={isDemoCollection}
             onOpenSpecies={openSpeciesWorkspace}
             onAddAnimal={startNewAnimalDraft}
+            onImportCollection={() => setShowImportModal(true)}
             searchQuery={dashboardQuery}
             onSearchQueryChange={setDashboardQuery}
             searchResults={dashboardSearch.matches}
@@ -12088,6 +12135,16 @@ export default function BreedingPlannerApp() {
 
         {tab === "advisor" && (
           <div className="flex flex-col gap-4">
+            <BreedersGroupGate
+              purpose="advisor"
+              breederMaleCount={males.length}
+              breederFemaleCount={females.length}
+              candidateMales={breederCandidateMales}
+              candidateFemales={breederCandidateFemales}
+              onAdd={addAnimalsToBreeders}
+              onAddAnimal={startNewAnimalDraft}
+              primaryButtonClass={cx('sk-on-accent', primaryBtnClass(theme, true))}
+            />
             <SuggestionsTab
               males={males}
               females={females}
@@ -13019,6 +13076,7 @@ export default function BreedingPlannerApp() {
                     existingAnimals={snakes}
                     onGeneticsForSpecies={geneticsForSpecies}
                     onCommitMorphMarketImport={applyMorphMarketImport}
+                    onAddToBreeders={addAnimalsToBreeders}
                   />
                 </div>
               </div>
@@ -13041,8 +13099,16 @@ export default function BreedingPlannerApp() {
                 return (
                   <>
                     {showBreederHint && (
-                      <div className="sm:col-span-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        {t("pairing.modal.breedersHint", { defaultValue: "Add at least one male and one female to the Breeders group to enable pairing." })}
+                      <div className="sm:col-span-2">
+                        <BreedersGroupGate
+                          breederMaleCount={breederMales.length}
+                          breederFemaleCount={breederFemales.length}
+                          candidateMales={breederCandidateMales}
+                          candidateFemales={breederCandidateFemales}
+                          onAdd={addAnimalsToBreeders}
+                          onAddAnimal={() => { setShowPairingModal(false); startNewAnimalDraft(); }}
+                          primaryButtonClass={cx('sk-on-accent', primaryBtnClass(theme, true))}
+                        />
                       </div>
                     )}
                     <div>
@@ -26263,7 +26329,7 @@ function parseYmd(dateStr) {
 }
 
 // import tab
-function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport }) {
+function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport, onAddToBreeders }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const sheetInputRef = useRef();
@@ -26429,6 +26495,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           existingAnimalCount={Array.isArray(existingAnimals) ? existingAnimals.length : 0}
           primaryButtonClass={primaryBtnClass(theme, true)}
           onChangeResolution={setRowResolution}
+          onAddToBreeders={onAddToBreeders}
           onConfirm={() => {
             if (typeof onCommitMorphMarketImport !== 'function') return;
             const result = onCommitMorphMarketImport(morphMarketPlan);

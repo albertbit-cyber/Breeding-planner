@@ -1229,7 +1229,10 @@
 
 .auth-primary-actions button,
 .auth-registration-actions button,
+.auth-registration-actions a,
 .auth-login-form button {
+  display: inline-block;
+  text-decoration: none;
   border-radius: 999px;
   padding: 0.65rem 1.5rem;
   font-weight: 600;
@@ -1337,7 +1340,7 @@
 
 .auth-registration-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-top: 1rem;
 }
