@@ -1173,6 +1173,28 @@ export const changeMySubscription = async (tierId: string) =>
     body: JSON.stringify({ tierId }),
   });
 
+export type BillingStatus = {
+  configured: boolean;
+  mode: "test" | "live" | "off";
+  message: string;
+  purchasableTierKeys: string[];
+  foundingMember: boolean;
+  hasBillingAccount: boolean;
+  hasActivePaidSubscription: boolean;
+};
+
+export const fetchBillingStatus = async () => request<BillingStatus>("/billing/status");
+
+/** Returns Stripe's hosted checkout URL; the plan changes only when Stripe's webhook confirms payment. */
+export const createBillingCheckout = async (tierKey: string) =>
+  request<{ url: string; mode: string; founding: boolean }>("/billing/checkout-session", {
+    method: "POST",
+    body: JSON.stringify({ tierKey }),
+  });
+
+export const createBillingPortal = async () =>
+  request<{ url: string }>("/billing/portal-session", { method: "POST" });
+
 export const fetchSubscriptionTiers = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {

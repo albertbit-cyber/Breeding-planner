@@ -16,6 +16,7 @@ import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
 import { ReproductiveIntelligencePanel } from "./features/animals/ReproductiveIntelligencePanel.jsx";
+import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
 import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
 import {
   getActiveLabelSize,
@@ -45,6 +46,9 @@ import {
   cancelAccountDeletion,
   downloadAccountDataExport,
   changeMySubscription,
+  createBillingCheckout,
+  createBillingPortal,
+  fetchBillingStatus,
   checkFeatureAccess,
   clearAuthToken,
   createMarketplaceListing,
@@ -9516,6 +9520,12 @@ export default function BreedingPlannerApp() {
     if (/^#shed-terminal\b/.test(window.location.hash)) setTab('shedTerminal');
   }, []);
 
+  // Stripe's checkout and billing portal return to #billing=...; My Account shows the outcome.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (/^#billing=/.test(window.location.hash)) openSetupTab('account');
+  }, [openSetupTab]);
+
   // open pairing if URL contains #pairing=id
   useEffect(()=>{
     const h = window.location.hash.match(/#pairing=(.+)/);
@@ -13878,6 +13888,8 @@ export default function BreedingPlannerApp() {
                   animals={snakes}
                   clutchOptions={clutchOptions}
                 />
+                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
+                <AcquisitionRecordPanel snake={editSnake} />
                 <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
 
                 {/* Reproductive Intelligence — females only */}
@@ -18344,8 +18356,12 @@ function BreederSection({
     user: null,
     tiers: [],
     subscription: null,
+    billing: null,
     access: {},
   });
+  // Set on the way back from Stripe. It reports what happened at checkout, never a plan
+  // change: the plan moves only when Stripe's webhook reaches the backend.
+  const [billingReturnNotice, setBillingReturnNotice] = useState('');
   const [accountForms, setAccountForms] = useState({
     email: '',
     emailPassword: '',
@@ -19672,12 +19688,15 @@ function BreederSection({
     setAccountState(prev => ({ ...prev, loading: true, error: '', message: '' }));
     const featureKeys = Object.keys(accountFeatureLabels);
     try {
-      const [userResult, tiersResult, subscriptionResult, ...accessResults] = await Promise.allSettled([
+      const [userResult, tiersResult, subscriptionResult, billingResult, ...accessResults] = await Promise.allSettled([
         getCurrentUser(),
         fetchPublicSubscriptionTiers(),
         fetchMySubscription(),
+        fetchBillingStatus(),
         ...featureKeys.map(featureKey => checkFeatureAccess(featureKey)),
       ]);
+      // A backend without billing answers this with an error; that means "not purchasable", not a failure to show.
+      const billing = billingResult.status === 'fulfilled' ? billingResult.value || null : null;
       const user = userResult.status === 'fulfilled' ? userResult.value?.user || null : null;
       const tiers = tiersResult.status === 'fulfilled' && Array.isArray(tiersResult.value?.tiers)
         ? tiersResult.value.tiers
@@ -19701,6 +19720,7 @@ function BreederSection({
         user,
         tiers,
         subscription,
+        billing,
         access,
       });
       setAccountForms(prev => ({
@@ -19930,21 +19950,67 @@ function BreederSection({
     }
   }, []);
 
+  // Stripe's own pages (checkout and the billing portal) are left to, not embedded.
+  const openBillingPortal = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, actionLoading: 'billing:portal', error: '', message: '' }));
+    try {
+      const { url } = await createBillingPortal();
+      window.location.assign(url);
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to open billing.', message: '' }));
+    }
+  }, []);
+
   const handleChangeAccountPlan = useCallback(async (tier) => {
     const tierId = tier?.id;
     if (!tierId) return;
-    let confirmed = true;
-    if (typeof showAppConfirm === 'function') {
-      confirmed = await showAppConfirm(`Change your account plan to ${tier.name || tier.key || 'this plan'}?`, {
-        confirmLabel: 'Change plan',
-        cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
-      });
+    const tierName = tier.name || tier.key || 'this plan';
+    const billing = accountState.billing;
+    const isPaidTier = Boolean(tier.customPrice) || Number(tier.monthlyPrice || 0) > 0;
+    const confirmAction = async (text, confirmLabel) => {
+      if (typeof showAppConfirm !== 'function') return true;
+      return showAppConfirm(text, { confirmLabel, cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }) });
+    };
+
+    if (isPaidTier) {
+      if (!billing?.configured || !billing.purchasableTierKeys?.includes(tier.key)) {
+        setAccountState(prev => ({ ...prev, error: '', message: `${tierName} is not purchasable yet.` }));
+        return;
+      }
+      if (billing.hasActivePaidSubscription) {
+        // Switching between paid plans happens on the subscription Stripe already holds.
+        if (await confirmAction(`Your paid plan is managed in Stripe's billing page. Open it to switch to ${tierName}?`, 'Manage billing')) {
+          await openBillingPortal();
+        }
+        return;
+      }
+      const testNote = billing.mode === 'test' ? ' This is Stripe test mode: no real card is charged.' : '';
+      if (!(await confirmAction(`Continue to Stripe checkout for ${tierName}?${testNote}`, 'Go to checkout'))) return;
+      setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
+      try {
+        const { url } = await createBillingCheckout(tier.key);
+        window.location.assign(url);
+      } catch (error) {
+        setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to start checkout.', message: '' }));
+      }
+      return;
     }
-    if (!confirmed) return;
+
+    if (billing?.hasActivePaidSubscription) {
+      if (await confirmAction(
+        `Cancel your paid plan in Stripe's billing page. The account then moves to ${tierName} and keeps every animal.`,
+        'Manage billing',
+      )) {
+        await openBillingPortal();
+      }
+      return;
+    }
+
+    if (!(await confirmAction(`Change your account plan to ${tierName}?`, 'Change plan'))) return;
     setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
     try {
       const result = await changeMySubscription(tierId);
-      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tier.name || 'selected plan'}.`;
+      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tierName}.`;
       setAccountState(prev => ({
         ...prev,
         actionLoading: '',
@@ -19959,7 +20025,23 @@ function BreederSection({
     } catch (error) {
       setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to change plan.', message: '' }));
     }
-  }, [loadAccountData, refreshFeatureAccess, showAppConfirm, t]);
+  }, [accountState.billing, loadAccountData, openBillingPortal, refreshFeatureAccess, showAppConfirm, t]);
+
+  // Back from Stripe. The hash says which page sent the keeper here; it is cleared at once so a
+  // reload does not repeat the notice. Nothing here changes the plan.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const match = window.location.hash.match(/^#billing=(success|cancelled|portal)\b/);
+    if (!match) return;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (match[1] === 'success') {
+      setBillingReturnNotice('Stripe has your payment details. Your plan changes here once Stripe confirms the payment, usually within a minute. Reload this tab if it has not.');
+    } else if (match[1] === 'cancelled') {
+      setBillingReturnNotice('Checkout was cancelled. Nothing was charged and your plan is unchanged.');
+    }
+    setAccountState(prev => ({ ...prev, loaded: false }));
+    refreshFeatureAccess();
+  }, [refreshFeatureAccess]);
 
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
@@ -22057,16 +22139,49 @@ function BreederSection({
           </section>
 
           <section className="rounded-xl border bg-white p-4 space-y-3">
-            <div>
-              <div className="font-semibold text-sm">Plans</div>
-              <div className="text-xs text-neutral-500 mt-1">
-                Available public plans from the backend. Changing a plan updates the subscription tier used by feature access and cloud sync.
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <div>
+                <div className="font-semibold text-sm">Plans</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {accountState.billing?.configured
+                    ? 'Paid plans are bought through Stripe checkout. Your plan here changes once Stripe confirms the payment.'
+                    : 'Plans are not purchasable yet.'}
+                </div>
+                {accountState.billing?.configured && accountState.billing.mode === 'test' ? (
+                  <div className="text-xs text-amber-700 mt-1">Stripe test mode: checkout takes test cards only and nobody is charged.</div>
+                ) : null}
+                {accountState.billing?.configured && accountState.billing.foundingMember ? (
+                  <div className="text-xs text-emerald-700 mt-1">Founding member: checkout charges your founding-member price.</div>
+                ) : null}
               </div>
+              {accountState.billing?.configured && accountState.billing.hasBillingAccount ? (
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border text-sm bg-white hover:bg-neutral-50 shrink-0"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={openBillingPortal}
+                >
+                  {accountState.actionLoading === 'billing:portal' ? 'Opening...' : 'Manage billing'}
+                </button>
+              ) : null}
             </div>
+            {billingReturnNotice ? (
+              <div role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm flex items-start justify-between gap-3">
+                <span>{billingReturnNotice}</span>
+                <button type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>Dismiss</button>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => {
                 const isCurrentTier = Boolean(accountState.subscription?.tier?.id && tier.id === accountState.subscription.tier.id);
                 const isChangingThisPlan = accountState.actionLoading === `plan:${tier.id}`;
+                const isPaidTier = Boolean(tier.customPrice) || Number(tier.monthlyPrice || 0) > 0;
+                const isPurchasable = !isPaidTier || Boolean(
+                  accountState.billing?.configured && accountState.billing.purchasableTierKeys?.includes(tier.key)
+                );
+                const planButtonLabel = isChangingThisPlan
+                  ? (isPaidTier ? 'Opening checkout...' : 'Changing...')
+                  : isCurrentTier ? 'Current plan' : isPurchasable ? 'Change plan' : 'Not purchasable yet';
                 return (
                   <div key={tier.id || tier.key || tier.name} className={cx('rounded-xl border p-3 space-y-2', isCurrentTier ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50')}>
                     <div className="flex items-start justify-between gap-2">
@@ -22082,11 +22197,11 @@ function BreederSection({
                     </div>
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
-                      disabled={isCurrentTier || Boolean(accountState.actionLoading)}
+                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier || !isPurchasable ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
+                      disabled={isCurrentTier || !isPurchasable || Boolean(accountState.actionLoading)}
                       onClick={() => handleChangeAccountPlan(tier)}
                     >
-                      {isChangingThisPlan ? 'Changing...' : isCurrentTier ? 'Current plan' : 'Change plan'}
+                      {planButtonLabel}
                     </button>
                   </div>
                 );

@@ -485,6 +485,17 @@ export const changeOwnSubscription = async (user: AuthenticatedUser, payload: Re
     where: { id: tierId, isActive: true, isPublic: true, archivedAt: null },
   });
   if (!tier) throw new HttpError(404, "Public subscription tier not found.");
+  // A paid tier is bought through checkout and granted by Stripe's webhook
+  // (billingService.ts). Switching to one here would hand it out for nothing.
+  if (tier.customPrice || Number(tier.monthlyPrice || 0) > 0) {
+    throw new HttpError(402, "Paid plans can only be bought through checkout.");
+  }
+  const paid = await db.userSubscription.findFirst({
+    where: { userId: user.id, paymentProvider: "stripe", status: { in: ["active", "trialing", "paused", "past_due"] } },
+  });
+  if (paid) {
+    throw new HttpError(409, "Your paid plan is billed by Stripe. Cancel it under Manage billing and the account moves to Free.");
+  }
 
   const now = new Date();
   await db.$transaction(async (tx: any) => {

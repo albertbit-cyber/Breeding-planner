@@ -924,6 +924,22 @@ model UserSubscription {
   @@map("user_subscriptions")
 }
 
+// The waitlist's founding-member price lock. Keyed by email, not by user: the
+// waitlist is a list of addresses (it has no backend; joining is an email to
+// info@serpentora.com), so an entry usually exists before its account does.
+// Checkout looks the account's email up here and, on a match, charges the
+// founding price or applies the founding coupon (see billingService.ts).
+model FoundingMember {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("waitlist")
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("founding_members")
+}
+
 model UserFeatureOverride {
   id               String    @id @default(cuid())
   userId           String    @map("user_id")
