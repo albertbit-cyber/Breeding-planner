@@ -12,6 +12,7 @@ import {
 } from "./marketplaceDtos";
 import { buildListingRecord, buildListingRecords, findUnpublishedEvidence } from "./marketplaceRecordService";
 import { geneticsMatchToken, parseGeneToken } from "./marketplaceGenetics";
+import { markSold } from "./marketplaceSaleService";
 import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 import { isStaffRole } from "../auth/identity";
 import { LISTED_AVAILABILITY, LISTED_STATUSES, PUBLIC_STATUSES, isListingPublic, listedWhere } from "./marketplaceVisibility";
@@ -1143,8 +1144,9 @@ export const createMarketplaceReview = async (actor: AuthenticatedUser, payload:
  * listing becomes Sold (so it drops out of browse and into price
  * comparables), and the buyer is invited to review.
  *
- * This is the hand-over only. Moving the animal's record to the buyer's
- * collection is separate work and does not happen here.
+ * When the buyer has an account the hand-over is a full sale: markSold gives
+ * them the animal's record. A buyer recorded only by name (sold off-platform)
+ * just has the sale closed.
  */
 export const completeMarketplaceSale = async (actor: AuthenticatedUser, saleId: string, payload: Record<string, unknown>) => {
   const sale = await db.marketplaceSale.findUnique({ where: { id: saleId }, include: { listing: true } });
@@ -1152,6 +1154,15 @@ export const completeMarketplaceSale = async (actor: AuthenticatedUser, saleId: 
   if (actor.role !== "admin" && sale.sellerUserId !== actor.id) throw new HttpError(403, "Only the seller can complete this sale.");
   if (["completed", "sold"].includes(String(sale.saleStatus))) return { sale };
   if (["cancelled", "canceled"].includes(String(sale.saleStatus))) throw new HttpError(409, "This sale was cancelled.");
+  if (sale.buyerUserId) {
+    const result = await markSold(actor, {
+      listingId: sale.listingId,
+      buyerUserId: sale.buyerUserId,
+      price: sale.salePrice === null || sale.salePrice === undefined ? null : Number(sale.salePrice),
+      handoverMethod: text(payload.handoverMethod, 160),
+    });
+    return { sale: result.sale, animal: result.animal };
+  }
 
   const handoverDate = dateOrNull(payload.handoverDate) || new Date();
   const updated = await db.$transaction(async (tx: any) => {

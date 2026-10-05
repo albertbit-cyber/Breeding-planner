@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { HttpError } from "../utils/errors";
+import { listAcquiredAnimals, markSold } from "../services/marketplaceSaleService";
 import {
   acceptMarketplaceOffer,
   addMarketplaceMessage,
@@ -196,6 +197,24 @@ export const reportListing = async (req: Request, res: Response): Promise<void> 
   if (!req.user) throw new HttpError(401, "Unauthorized");
   const result = await reportMarketplaceListing(req.user, req.params.id, req.body || {});
   res.status(result.duplicate ? 200 : 201).json(result);
+};
+
+/** The seller marks a listing sold to a buyer from the marketplace; the record goes with it. */
+export const markListingSold = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const body = req.body || {};
+  const result = await markSold(req.user, {
+    listingId: req.params.id,
+    buyerUserId: body.buyerUserId,
+    price: body.price === undefined || body.price === "" ? null : Number(body.price),
+    handoverMethod: body.handoverMethod,
+  });
+  res.status(result.alreadyTransferred ? 200 : 201).json(result);
+};
+
+export const acquiredAnimals = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listAcquiredAnimals(req.user));
 };
 
 export const completeSale = async (req: Request, res: Response): Promise<void> => {

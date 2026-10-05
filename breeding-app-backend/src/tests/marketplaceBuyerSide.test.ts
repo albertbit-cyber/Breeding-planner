@@ -20,9 +20,18 @@ vi.mock("../services/subscriptionService", () => ({
   canAccessFeature: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 vi.mock("../services/notificationService", () => ({ createNotification: vi.fn() }));
+// The record transfer has its own end-to-end test (marketplaceSaleService.test.ts).
+vi.mock("../services/marketplaceSaleService", () => ({
+  markSold: vi.fn(async (_actor: any, input: any) => ({
+    sale: { id: "sale-1", listingId: input.listingId, saleStatus: "completed" },
+    animal: { appAnimalId: "25Ath-1" },
+    alreadyTransferred: false,
+  })),
+}));
 
 import { prisma } from "../lib/prisma";
 import { createNotification } from "../services/notificationService";
+import { markSold } from "../services/marketplaceSaleService";
 import {
   addMarketplaceMessage,
   completeMarketplaceSale,
@@ -161,30 +170,40 @@ describe("completing a sale", () => {
     listing,
   };
 
-  it("marks the sale complete, the animal sold, posts in the thread and invites a review", async () => {
-    db.marketplaceSale.findUnique.mockResolvedValue(reserved);
-    db.marketplaceSale.update.mockImplementation(async ({ data }: any) => ({ ...reserved, ...data }));
-    db.marketplaceConversation.findFirst.mockResolvedValue({ id: "c1" });
+  it("hands a marketplace buyer the animal's record through markSold", async () => {
+    db.marketplaceSale.findUnique.mockResolvedValue({ ...reserved, salePrice: 400 });
+    const result = await completeMarketplaceSale(seller, "sale-1", { handoverMethod: "Pickup at Hamm" });
+    expect(markSold).toHaveBeenCalledWith(seller, {
+      listingId: "listing-1",
+      buyerUserId: "buyer-1",
+      price: 400,
+      handoverMethod: "Pickup at Hamm",
+    });
+    expect(result).toMatchObject({ sale: { saleStatus: "completed" }, animal: { appAnimalId: "25Ath-1" } });
+  });
+
+  it("closes an off-platform sale (a buyer known only by name) without a transfer", async () => {
+    const offPlatform = { ...reserved, buyerUserId: null, buyerName: "Fair visitor" };
+    db.marketplaceSale.findUnique.mockResolvedValue(offPlatform);
+    db.marketplaceSale.update.mockImplementation(async ({ data }: any) => ({ ...offPlatform, ...data }));
 
     const result = await completeMarketplaceSale(seller, "sale-1", {});
+
+    expect(markSold).not.toHaveBeenCalled();
 
     expect(result.sale).toMatchObject({ saleStatus: "completed", paymentStatus: "paid" });
     expect(db.marketplaceListing.update).toHaveBeenCalledWith({
       where: { id: "listing-1" },
       data: { availability: "sold", status: "sold" },
     });
-    expect(db.marketplaceMessage.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ conversationId: "c1", senderUserId: "seller-1" }),
-    });
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ recipientId: "buyer-1", type: "marketplace_sale_completed" })
-    );
+    expect(createNotification).not.toHaveBeenCalled();
   });
 
   it("is the seller's action, not the buyer's", async () => {
     db.marketplaceSale.findUnique.mockResolvedValue(reserved);
     await expect(completeMarketplaceSale(buyer, "sale-1", {})).rejects.toMatchObject({ statusCode: 403 });
     expect(db.marketplaceSale.update).not.toHaveBeenCalled();
+    expect(markSold).not.toHaveBeenCalled();
   });
 });
 

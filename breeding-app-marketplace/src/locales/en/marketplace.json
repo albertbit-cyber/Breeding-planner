@@ -9,7 +9,8 @@
     "sell": "List an animal",
     "signIn": "Sign in",
     "skip": "Skip to content",
-    "language": "Language"
+    "language": "Language",
+    "myAnimals": "My animals"
   },
   "footer": {
     "tagline": "Animals listed with their record — weights, feeding, lineage and lab-verified genetics."
@@ -296,14 +297,14 @@
     "depositOptional": "Deposit received (optional)",
     "depositHint": "Record it here if the buyer has already paid a deposit.",
     "acceptExplainer": "Accepting an offer marks the animal Reserved and writes the sale record. It stays visible with a Reserved badge until you mark it collected.",
-    "completedToast": "Sale complete. The animal is marked sold.",
     "markHandedOver": "Mark as handed over",
     "reviewPrompt": "The sale is complete. How did it go with {{name}}?",
     "reviewed": "You reviewed this sale. It shows on the breeder's store page.",
     "completeTitle": "Mark this animal as handed over?",
-    "completeBody": "The sale is recorded as complete, the listing shows as sold, and the buyer is invited to review you. This can't be undone here.",
     "completeConfirm": "Mark handed over",
-    "completedPill": "Sale complete"
+    "completedPill": "Sale complete",
+    "completedRecordToast": "Sale complete. The animal and its record are now in the buyer's account.",
+    "completeRecordBody": "The sale is recorded as complete and the listing shows as sold. The buyer receives the animal's record (genetics with their sources, weights, feeding, health, lineage and certificate codes) and is invited to review you. Your own copy stays, marked Sold. This can't be undone here."
   },
   "sell": {
     "title": "List an animal",
@@ -519,5 +520,34 @@
     "possibleHet": "possible het",
     "super": "visual (super)",
     "visual": "visual"
+  },
+  "sold": {
+    "title": "Who bought {{title}}?",
+    "body": "The buyer gets the animal's record in their account: genetics with where each claim comes from, weights, feeding, sheds, health entries, lineage and certificates. Your own copy stays, marked Sold.",
+    "confirmOffPlatform": "Mark sold",
+    "confirm": "Mark sold and send the record",
+    "buyer": "Buyer",
+    "offered": "offered {{amount}}",
+    "offPlatform": "Someone without a Serpentora account",
+    "noThreads": "Nobody has messaged you about this animal here, so there is no account to send the record to.",
+    "offPlatformNote": "The listing is marked sold. No record is transferred, because there is no account to receive it.",
+    "price": "Sale price ({{currency}})",
+    "done": "Sold. {{buyer}} now has the animal and its record.",
+    "theBuyer": "The buyer",
+    "doneOffPlatform": "Marked sold.",
+    "bodyNoBuyers": "Only a buyer with a Serpentora account can receive the animal's record."
+  },
+  "acquired": {
+    "from": "Acquired from {{seller}} on {{date}}",
+    "store": "Seller's store",
+    "labDisagrees": "The seller recorded this, but the certificate reads “{{result}}”.",
+    "noGenetics": "No genetics were recorded for this animal.",
+    "certificates": "Lab certificates",
+    "code": "Verification code",
+    "counts": "{{weights}} weights · {{feeds}} feeds · {{sheds}} sheds · {{meds}} health entries",
+    "emptyTitle": "No animals bought here yet",
+    "emptyBody": "When a seller marks an animal sold to you, it arrives here with its record and certificates.",
+    "title": "Animals you bought here",
+    "breederAppNote": "With a breeder account, the same animals appear in your collection in the Serpentora app after it syncs."
   }
 }

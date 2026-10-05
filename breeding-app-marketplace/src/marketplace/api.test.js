@@ -26,6 +26,8 @@ vi.mock("../shared/apiClient", () => {
     fetchMarketplaceReviewableSales: fn(),
     fetchMarketplaceStore: fn(),
     fetchMarketplaceStoreReviews: fn(),
+    fetchAcquiredAnimals: fn(),
+    markMarketplaceListingSold: fn(),
     fetchSavedSearches: fn(),
     fetchSellableAnimals: fn(),
     fetchSellerDashboard: fn(),
@@ -42,8 +44,10 @@ vi.mock("../shared/apiClient", () => {
 
 import * as client from "../shared/apiClient";
 import {
+  acquiredAnimals,
   browse,
   completeSale,
+  markSold,
   markSearchRun,
   reportListing,
   resolveMediaUrl,
@@ -79,6 +83,33 @@ describe("media", () => {
     expect(client.fetchMarketplaceCatalog).toHaveBeenCalledWith({ includeGenes: "het Clown" });
     expect(result.listings[0].images[0].imageUrl).toBe("https://api.example.test/api/marketplace/media/m1");
     expect(result.facets.species).toHaveLength(1);
+  });
+});
+
+describe("the sale that carries the record", () => {
+  it("marks a listing sold to a named buyer at a price", async () => {
+    await markSold("l1", { buyerUserId: "buyer-1", price: 420 });
+    expect(client.markMarketplaceListingSold).toHaveBeenCalledWith("l1", { buyerUserId: "buyer-1", price: 420 });
+  });
+
+  it("lists acquired animals with their photo resolved, keeping certificates and claims as sent", async () => {
+    client.fetchAcquiredAnimals.mockResolvedValue({
+      animals: [
+        {
+          id: "a1",
+          imageUrl: "/marketplace/media/m9",
+          certificates: [{ certificateNumber: "CERT-1", verificationCode: "ABC" }],
+          geneticClaims: [{ label: "het Pied", provenance: "lab_confirmed" }],
+        },
+      ],
+    });
+    const [animal] = await acquiredAnimals();
+    expect(animal.imageUrl).toBe("https://api.example.test/api/marketplace/media/m9");
+    expect(animal.certificates[0]).toEqual({ certificateNumber: "CERT-1", verificationCode: "ABC" });
+    expect(animal.geneticClaims[0].provenance).toBe("lab_confirmed");
+
+    client.fetchAcquiredAnimals.mockResolvedValue({});
+    expect(await acquiredAnimals()).toEqual([]);
   });
 });
 

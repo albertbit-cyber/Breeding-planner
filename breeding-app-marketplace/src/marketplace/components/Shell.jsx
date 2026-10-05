@@ -93,9 +93,11 @@ export default function Shell() {
                 {unread > 0 ? <span className="mk-badge mk-tnum">{unread}</span> : null}
               </NavLink>
             ) : null}
-            {session.isSeller ? (
+            {session.isAuthenticated ? (
               <NavLink to="/dashboard" className={({ isActive }) => (isActive ? "is-active" : "")}>
-                {t("nav.dashboard", { defaultValue: "Selling" })}
+                {session.isSeller
+                  ? t("nav.dashboard", { defaultValue: "Selling" })
+                  : t("nav.myAnimals", { defaultValue: "My animals" })}
               </NavLink>
             ) : null}
           </nav>

@@ -777,6 +777,19 @@ export const reportMarketplaceListing = async (id: string, payload: Record<strin
     body: JSON.stringify(payload),
   });
 
+/** The seller marks a listing sold to a marketplace buyer; the animal's record goes to the buyer. */
+export const markMarketplaceListingSold = async (
+  id: string,
+  payload: { buyerUserId: string; price?: number | null; handoverMethod?: string }
+) =>
+  request<{ sale: unknown; animal: unknown; alreadyTransferred: boolean }>(
+    `/marketplace/listings/${encodeURIComponent(id)}/sold`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+
+/** Animals this account received through a sale, with the record that came with them. */
+export const fetchAcquiredAnimals = async () => request<{ animals: unknown[] }>("/marketplace/acquired");
+
 /** The seller marks a reserved animal as handed over. */
 export const completeMarketplaceSale = async (id: string, payload: Record<string, unknown> = {}) =>
   request<{ sale: unknown }>(`/marketplace/sales/${encodeURIComponent(id)}/complete`, {

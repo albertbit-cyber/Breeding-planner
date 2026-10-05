@@ -8,6 +8,7 @@ import {
   createMarketplaceListing,
   createMarketplaceReview,
   createSavedSearch,
+  fetchAcquiredAnimals,
   deleteSavedSearch,
   favoriteMarketplaceListing,
   fetchMarketplaceCatalog,
@@ -23,6 +24,7 @@ import {
   fetchSellableAnimals,
   fetchSellerDashboard,
   markMarketplaceConversationRead,
+  markMarketplaceListingSold,
   markSavedSearchRun,
   reportMarketplaceListing,
   reportMarketplaceMessage,
@@ -111,6 +113,14 @@ export const blockUser = (payload) => blockMarketplaceUser(payload);
 export const unblockUser = (userId) => unblockMarketplaceUser(userId);
 export const reportListing = (id, payload) => reportMarketplaceListing(id, payload);
 export const completeSale = (saleId, payload) => completeMarketplaceSale(saleId, payload);
+export const markSold = (listingId, payload) => markMarketplaceListingSold(listingId, payload);
+
+/** Acquired animals, with photo URLs resolved like every other image here. */
+export const acquiredAnimals = async () =>
+  ((await fetchAcquiredAnimals()).animals || []).map((animal) => ({
+    ...animal,
+    imageUrl: resolveMediaUrl(animal.imageUrl),
+  }));
 
 export const favorite = (id) => favoriteMarketplaceListing(id);
 export const favorites = async () => ((await fetchMarketplaceFavorites()).listings || []).map(withMedia);

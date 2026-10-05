@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { AppearanceProvider } from "./contexts/AppearanceContext.jsx";
 import { SharedBackendProvider } from "./contexts/SharedBackendContext.jsx";
 import PricingPage from "./features/subscriptions/PricingPage.jsx";
+import AcquiredAnimals from "./marketplace/components/AcquiredAnimals.jsx";
 import RequireAuth from "./marketplace/components/RequireAuth.jsx";
 import Shell from "./marketplace/components/Shell.jsx";
 import BrowsePage from "./marketplace/routes/BrowsePage.jsx";
@@ -14,6 +15,7 @@ import SavedPage from "./marketplace/routes/SavedPage.jsx";
 import SellPage from "./marketplace/routes/SellPage.jsx";
 import StorePage from "./marketplace/routes/StorePage.jsx";
 import { ToastProvider } from "./marketplace/ui/Toast.jsx";
+import { useSession } from "./marketplace/session";
 import "./marketplace/marketplace.css";
 
 /**
@@ -34,6 +36,21 @@ import "./marketplace/marketplace.css";
  * `BASE_URL`, which is the same value, so the two cannot drift apart.
  */
 const BASENAME = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
+
+/**
+ * One dashboard address for everyone signed in: a seller gets the selling
+ * dashboard (which lists anything they bought too), a buyer gets the animals
+ * they bought here, with their records and certificates.
+ */
+function DashboardEntry() {
+  const session = useSession();
+  if (session.isSeller) return <DashboardPage />;
+  return (
+    <div className="mk-wrap" style={{ paddingTop: 24, paddingBottom: 40 }}>
+      <AcquiredAnimals />
+    </div>
+  );
+}
 
 /** A page change should start at the top of the new page, not mid-scroll. */
 function ScrollToTop() {
@@ -105,8 +122,8 @@ export default function AppEntry() {
                 <Route
                   path="dashboard"
                   element={
-                    <RequireAuth seller>
-                      <DashboardPage />
+                    <RequireAuth>
+                      <DashboardEntry />
                     </RequireAuth>
                   }
                 />

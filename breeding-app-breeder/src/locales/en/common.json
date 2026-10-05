@@ -908,5 +908,20 @@
   "feedPrep.intervalDays": "Interval (days)",
   "feedPrep.intervalHelp": "Reminder starts after the first accepted feed log.",
   "calendar.feedDue": "Feed due: {{name}}",
-  "calendar.feedDueEvery": "Every {{count}} days"
+  "calendar.feedDueEvery": "Every {{count}} days",
+  "acquisition.labConfirmedCert": "Lab-confirmed, certificate {{number}}",
+  "acquisition.labConfirmed": "Lab-confirmed",
+  "acquisition.predictedPercent": "Predicted from the pairing, {{percent}}% odds",
+  "acquisition.predicted": "Predicted from the pairing, not tested",
+  "acquisition.observed": "Observed by the seller, not tested",
+  "acquisition.title": "Acquired from {{seller}}",
+  "acquisition.aSeller": "a seller",
+  "acquisition.viaMarket": "Serpentora Market",
+  "acquisition.theirId": "seller's ID {{id}}",
+  "acquisition.labDisagrees": "certificate reads \"{{result}}\"",
+  "acquisition.certificates": "Lab certificates that came with this animal",
+  "acquisition.code": "Verification code",
+  "acquisition.verify": "Check this certificate",
+  "acquisition.lineage": "Lineage as recorded by the seller",
+  "acquisition.clutch": "clutch {{id}}"
 }

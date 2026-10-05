@@ -51,9 +51,43 @@ const E2E_USERS = {
  * visual search must not return.
  */
 const E2E_PUBLISHED_AT = new Date("2026-09-01T09:00:00.000Z");
+/**
+ * The seller's own record for the Clown listing, so a sale has something to
+ * carry: genetics, weights, feeds and a health entry, plus a private note and
+ * an enclosure log that must never reach the buyer.
+ */
+const E2E_LISTED_ANIMAL = {
+  appAnimalId: "E2E-CLOWN-1",
+  name: "Clown het Pied female",
+  payload: {
+    id: "E2E-CLOWN-1",
+    name: "Clown het Pied female",
+    sex: "F",
+    species: "ball-python",
+    morphs: ["Clown"],
+    hets: ["Pied"],
+    possibleHets: ["50% Hypo"],
+    notes: "Private seller note: not for the buyer",
+    groups: ["Holdbacks"],
+    status: "For sell",
+    logs: {
+      weights: [
+        { date: "2026-06-01", grams: 520 },
+        { date: "2026-07-01", grams: 580 },
+        { date: "2026-08-01", grams: 640 },
+      ],
+      feeds: [{ date: "2026-08-03", result: "ate" }],
+      sheds: [{ date: "2026-08-10" }],
+      meds: [{ date: "2026-07-15", note: "Checked for mites, clear" }],
+      cleanings: [{ date: "2026-08-11", note: "Rack B deep clean" }],
+    },
+  },
+};
+
 const E2E_LISTINGS = [
   {
     id: "e2e-listing-clown",
+    animalId: E2E_LISTED_ANIMAL.appAnimalId,
     title: "Clown het Pied female",
     species: "Ball python",
     genetics: "Clown het Pied",
@@ -444,7 +478,19 @@ const createBaselineOrder = async (breederId: string, labOrganizationId: string)
   return order;
 };
 
-const resetMarketplace = async (sellerId: string, buyerId: string) => {
+/**
+ * A shed-test certificate for the listed animal, from the seeded lab: het Pied
+ * confirmed, Hypo not detected. The second call contradicts the seller's
+ * "50% het Hypo", which is what lets the sale test prove a disputed claim
+ * travels as disputed rather than being quietly dropped or upgraded.
+ */
+const E2E_CERTIFICATE = {
+  certificateNumber: "E2E-CERT-0001",
+  verificationCode: "E2E0A1B2C3D4E5F6A7B8C9D0",
+  resultId: "e2e-cert-result-1",
+};
+
+const resetMarketplace = async (sellerId: string, buyerId: string, labOrganizationId: string) => {
   const listingIds = E2E_LISTINGS.map((listing) => listing.id);
   // Everything the spec can create: threads (messages cascade), saves, sales,
   // saved searches and blocks between the two seeded accounts.
@@ -461,6 +507,55 @@ const resetMarketplace = async (sellerId: string, buyerId: string) => {
     },
   });
 
+  // Copies a sale transferred to the buyer, and the seller animal's custody rows.
+  const acquired = await prisma.animal.findMany({
+    where: { ownerId: buyerId, payload: { path: ["acquiredFrom", "source"], equals: "serpentora_marketplace" } },
+    select: { id: true },
+  });
+  await prisma.animal.deleteMany({ where: { id: { in: acquired.map((row) => row.id) } } });
+
+  const animalData = {
+    name: E2E_LISTED_ANIMAL.name,
+    sex: "F",
+    species: "ball-python",
+    status: "For sell",
+    payload: E2E_LISTED_ANIMAL.payload,
+    deletedAt: null,
+  };
+  const listedAnimal = await prisma.animal.upsert({
+    where: { ownerId_appAnimalId: { ownerId: sellerId, appAnimalId: E2E_LISTED_ANIMAL.appAnimalId } },
+    update: animalData,
+    create: { ownerId: sellerId, appAnimalId: E2E_LISTED_ANIMAL.appAnimalId, ...animalData },
+  });
+  await prisma.ownershipHistory.deleteMany({ where: { animalId: listedAnimal.id } });
+
+  const certificateData = {
+    breederId: sellerId,
+    labOrganizationId,
+    animalAppId: E2E_LISTED_ANIMAL.appAnimalId,
+    resultId: E2E_CERTIFICATE.resultId,
+    verificationCode: E2E_CERTIFICATE.verificationCode,
+    issuedAt: new Date("2026-08-20T00:00:00.000Z"),
+    snapshotJson: {
+      results: [
+        {
+          id: E2E_CERTIFICATE.resultId,
+          animalId: E2E_LISTED_ANIMAL.appAnimalId,
+          status: "completed",
+          findingsJson: [
+            { marker: "Pied", outcome: "carrierDetected" },
+            { marker: "Hypo", outcome: "notDetected" },
+          ],
+        },
+      ],
+    },
+  };
+  await prisma.shedTestCertificate.upsert({
+    where: { certificateNumber: E2E_CERTIFICATE.certificateNumber },
+    update: certificateData,
+    create: { certificateNumber: E2E_CERTIFICATE.certificateNumber, ...certificateData },
+  });
+
   await prisma.marketplaceStore.upsert({
     where: { userId: sellerId },
     update: { storeName: "Seed Breeder Reptiles", country: "Germany", city: "Berlin" },
@@ -470,6 +565,7 @@ const resetMarketplace = async (sellerId: string, buyerId: string) => {
   for (const listing of E2E_LISTINGS) {
     const data = {
       sellerUserId: sellerId,
+      animalId: (listing as { animalId?: string }).animalId ?? null,
       title: listing.title,
       species: listing.species,
       genetics: listing.genetics,
@@ -531,7 +627,7 @@ const main = async () => {
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
-  await resetMarketplace(breederUser.id, buyerUser.id);
+  await resetMarketplace(breederUser.id, buyerUser.id, labOrganizationId);
 
   console.log("E2E reset complete", {
     databaseHost: database.hostname,

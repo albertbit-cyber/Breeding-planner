@@ -246,7 +246,11 @@ export default function InboxPage() {
       await completeSale(active.sale.id);
       setCompleteOpen(false);
       await refresh();
-      notify(t("deal.completedToast", { defaultValue: "Sale complete. The animal is marked sold." }));
+      notify(
+        t("deal.completedRecordToast", {
+          defaultValue: "Sale complete. The animal and its record are now in the buyer's account.",
+        })
+      );
     } catch (completeError) {
       notify(completeError?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
     } finally {
@@ -645,9 +649,9 @@ export default function InboxPage() {
         onClose={() => setCompleteOpen(false)}
         size="sm"
         title={t("deal.completeTitle", { defaultValue: "Mark this animal as handed over?" })}
-        description={t("deal.completeBody", {
+        description={t("deal.completeRecordBody", {
           defaultValue:
-            "The sale is recorded as complete, the listing shows as sold, and the buyer is invited to review you. This can't be undone here.",
+            "The sale is recorded as complete and the listing shows as sold. The buyer receives the animal's record (genetics with their sources, weights, feeding, health, lineage and certificate codes) and is invited to review you. Your own copy stays, marked Sold. This can't be undone here.",
         })}
         footer={
           <>

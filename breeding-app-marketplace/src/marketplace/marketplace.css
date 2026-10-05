@@ -429,7 +429,8 @@ button.mk-gene { cursor: pointer; }
    claims stay plain, so the eye finds the tested ones. */
 .mk-gene--lab { border-color: currentColor; }
 .mk-gene--disputed { border: 1px dashed currentColor; }
-.mk-gene__mark { margin-right: 3px; vertical-align: -1px; }
+.mk-gene--lab, .mk-gene--disputed { display: inline-flex; align-items: center; gap: 3px; }
+.mk-gene__mark { display: inline-block; flex: none; }
 
 /* ── Genetics with provenance, on the listing page ───────────────────────── */
 
@@ -1386,3 +1387,21 @@ button.mk-gene { cursor: pointer; }
   .mk-nav__actions .mk-btn--ink .mk-btn__label { display: none; }
   .mk-nav__actions .mk-btn--ink { padding: 8px 11px; }
 }
+
+/* ── Acquired animals: the record that came with a purchase ──────────────── */
+
+.mk-acquired { padding: 16px; display: grid; gap: 14px; }
+.mk-acquired__head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: flex-start; }
+.mk-acquired__certs { border-top: 1px solid var(--mk-rule); padding-top: 12px; }
+.mk-acquired__cert {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+.mk-acquired__cert + .mk-acquired__cert { border-top: 1px dashed var(--mk-rule); }
+.mk-acquired__cert .mk-mono { overflow-wrap: anywhere; }
+.mk-acquired__facts { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mk-acquired__facts .mk-icon { flex: none; }
