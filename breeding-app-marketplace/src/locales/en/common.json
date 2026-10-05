@@ -860,5 +860,6 @@
   "pricing.subscribe": "Subscribe",
   "pricing.loadFailed": "Unable to load pricing.",
   "pricing.title": "Serpentora Pricing",
-  "pricing.subtitle": "Choose the plan that matches your collection, lab, or breeding business."
+  "pricing.subtitle": "Choose the plan that matches your collection, lab, or breeding business.",
+  "common.retry": "Retry"
 }

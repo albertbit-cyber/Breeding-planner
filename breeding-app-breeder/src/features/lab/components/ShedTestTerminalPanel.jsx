@@ -551,7 +551,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                           {Array.isArray(order.resultIds) ? order.resultIds.length : 0}
                           {order.certificateId ? (
                             <span className="ml-2 text-emerald-700">
-                              {t("lab.orders.certificateReadyGeneric", { defaultValue: "Certificate ready" })}
+                              {t("lab.orders.certificateReadyShort", { defaultValue: "Certificate ready" })}
                             </span>
                           ) : null}
                         </div>

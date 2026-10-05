@@ -241,7 +241,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                     className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50"
                     onClick={() => { setMenuOpen(false); onRestart?.(snake); }}
                   >
-                    {t('quarantine.restartClock', { defaultValue: 'Restart clock…' })}
+                    {t('quarantine.restartClockEllipsis', { defaultValue: 'Restart clock…' })}
                   </button>
                 ) : null}
                 <button

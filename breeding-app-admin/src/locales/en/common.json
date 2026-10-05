@@ -836,5 +836,8 @@
   "calendar.slugsCount": "Slugs: {{count}}",
   "calendar.hatchedCount": "Hatched: {{count}}",
   "calendar.daysAfterOvulation": "{{count}} days after ovulation",
-  "calendar.noAppointmentsView": "No appointments in this view."
+  "calendar.noAppointmentsView": "No appointments in this view.",
+  "common.retry": "Retry",
+  "common.selectLanguage": "Select language",
+  "common.sending": "Sending..."
 }

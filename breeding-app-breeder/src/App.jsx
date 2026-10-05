@@ -873,7 +873,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
                 setDraft('');
               }}
             >
-              {t('spaces.addOccupant', { defaultValue: 'Assign snake' })}
+              {t('spaces.assignSnake', { defaultValue: 'Assign snake' })}
             </button>
             {!availableOptions.length && (
               <div className="text-xs text-neutral-500">
@@ -11515,7 +11515,7 @@ export default function BreedingPlannerApp() {
             { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
             { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
             { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }) },
-            { key: '__more', icon: '☰', label: 'More' },
+            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }) },
           ].map(({ key, icon, label }) => (
             <button
               key={key}
@@ -11543,7 +11543,7 @@ export default function BreedingPlannerApp() {
               { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }) },
               { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
               { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminal", { defaultValue: "Shed Test" }) },
+              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Shed Test" }) },
             ].map(({ key, icon, label }) => (
               <button
                 key={key}
@@ -12198,7 +12198,7 @@ export default function BreedingPlannerApp() {
                     active={completedYearFilter === 'All'}
                     onClick={() => setCompletedYearFilter('All')}
                   >
-                    All years
+                    {t("pairing.filters.allYears", { defaultValue: "All years" })}
                   </TabButton>
                   {completedYearOptions.map(year => (
                     <TabButton
@@ -12217,14 +12217,14 @@ export default function BreedingPlannerApp() {
                     active={completedOutcomeFilter === 'all'}
                     onClick={() => setCompletedOutcomeFilter('all')}
                   >
-                    All outcomes
+                    {t("pairing.filters.allOutcomes", { defaultValue: "All outcomes" })}
                   </TabButton>
                   {[
-                    ['productive', 'Eggs or live birth'],
-                    ['no_ovulation_observed', 'No ovulation observed'],
-                    ['follicles_reabsorbed', 'Follicles reabsorbed'],
-                    ['late_outcome', 'Late outcome'],
-                    ['reopened', 'Reopened'],
+                    ['productive', t("pairing.filters.outcome.productive", { defaultValue: "Eggs or live birth" })],
+                    ['no_ovulation_observed', t("pairing.filters.outcome.noOvulationObserved", { defaultValue: "No ovulation observed" })],
+                    ['follicles_reabsorbed', t("pairing.filters.outcome.folliclesReabsorbed", { defaultValue: "Follicles reabsorbed" })],
+                    ['late_outcome', t("pairing.filters.outcome.lateOutcome", { defaultValue: "Late outcome" })],
+                    ['reopened', t("pairing.filters.outcome.reopened", { defaultValue: "Reopened" })],
                   ].map(([key, label]) => (
                     <TabButton
                       key={key}
@@ -12260,15 +12260,15 @@ export default function BreedingPlannerApp() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Clutches</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.clutches", { defaultValue: "Clutches" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.clutches}</div>
                       </div>
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Egg boxes</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.eggBoxes", { defaultValue: "Egg boxes" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.boxes}</div>
                       </div>
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Total eggs</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.totalEggs", { defaultValue: "Total eggs" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.eggs}</div>
                       </div>
                     </div>
@@ -12293,7 +12293,7 @@ export default function BreedingPlannerApp() {
                           </div>
                           {box.clutchId && (
                             <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
-                              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{box.clutchId}</span>
                             </div>
                           )}
@@ -12303,7 +12303,7 @@ export default function BreedingPlannerApp() {
                           <div className="text-xs font-medium">{t("pairing.eggBox.eggs", { count: box.eggs })}</div>
                           {box.badEggs > 0 ? (
                             <div className="text-xs text-rose-600">
-                              Bad eggs: {box.badEggs} of {box.originalEggs}
+                              {t("pairing.incubator.badEggs", { bad: box.badEggs, original: box.originalEggs, defaultValue: "Bad eggs: {{bad}} of {{original}}" })}
                             </div>
                           ) : null}
                           {typeof box.remaining === 'number' && (
@@ -12313,7 +12313,7 @@ export default function BreedingPlannerApp() {
                           )}
                           {box.notes ? (
                             <div className="text-xs text-neutral-500 line-clamp-2">
-                              Notes: {box.notes}
+                              {t("pairing.incubator.notes", { notes: box.notes, defaultValue: "Notes: {{notes}}" })}
                             </div>
                           ) : null}
                           <button
@@ -12321,7 +12321,7 @@ export default function BreedingPlannerApp() {
                             className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
                             onClick={() => setEggBoxModal(box)}
                           >
-                            View / edit egg box
+                            {t("pairing.incubator.viewEditBox", { defaultValue: "View / edit egg box" })}
                           </button>
                           <button
                             type="button"
@@ -12343,11 +12343,11 @@ export default function BreedingPlannerApp() {
                                 });
                               } catch (err) {
                                 console.error('Failed to generate clutch card from incubator', err);
-                                await showAppAlert('Unable to generate clutch card PDF.');
+                                await showAppAlert(t("pairing.incubator.clutchCardFailed", { defaultValue: "Unable to generate clutch card PDF." }));
                               }
                             }}
                           >
-                            Print clutch card
+                            {t("pairing.incubator.printClutchCard", { defaultValue: "Print clutch card" })}
                           </button>
                         </div>
                       ))}
@@ -13030,8 +13030,8 @@ export default function BreedingPlannerApp() {
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
           <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">Create pairing</div>
-              <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>Close</button>
+              <div className="font-semibold">{t("pairing.modal.title", { defaultValue: "Create pairing" })}</div>
+              <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-auto">
               {(() => {
@@ -13042,11 +13042,11 @@ export default function BreedingPlannerApp() {
                   <>
                     {showBreederHint && (
                       <div className="sm:col-span-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        Add at least one male and one female to the Breeders group to enable pairing.
+                        {t("pairing.modal.breedersHint", { defaultValue: "Add at least one male and one female to the Breeders group to enable pairing." })}
                       </div>
                     )}
                     <div>
-                      <label className="text-xs font-medium">Male</label>
+                      <label className="text-xs font-medium">{t("pairing.modal.male", { defaultValue: "Male" })}</label>
                       <div className="mt-1 space-y-2">
                         <input
                           ref={maleSearchInputRef}
@@ -13054,7 +13054,7 @@ export default function BreedingPlannerApp() {
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={maleSearchQuery}
                           onChange={e => setMaleSearchQuery(e.target.value)}
-                          placeholder={breederMales.length ? "Search breeder males (name, ID, genetics...)" : "No breeder males available"}
+                          placeholder={breederMales.length ? t("pairing.modal.searchMales", { defaultValue: "Search breeder males (name, ID, genetics...)" }) : t("pairing.modal.noMales", { defaultValue: "No breeder males available" })}
                           disabled={!breederMales.length}
                         />
                         {currentMale && (
@@ -13064,7 +13064,7 @@ export default function BreedingPlannerApp() {
                               <div className="text-[11px] text-neutral-500 truncate">{currentMale.id}</div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))}>
-                              Clear
+                              {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
                         )}
@@ -13094,21 +13094,21 @@ export default function BreedingPlannerApp() {
                                   <div className="font-medium truncate">{m.name || m.id}</div>
                                   <div className="text-[11px] text-neutral-500 truncate">{m.id}</div>
                                   <div className="text-[11px] text-neutral-500 truncate">
-                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
                                 </button>
                               );
                             })
                           ) : (
                             <div className="px-3 py-2 text-xs text-neutral-500">
-                              No breeder males match that search.
+                              {t("pairing.modal.noMaleMatch", { defaultValue: "No breeder males match that search." })}
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium">Female</label>
+                      <label className="text-xs font-medium">{t("pairing.modal.female", { defaultValue: "Female" })}</label>
                       <div className="mt-1 space-y-2">
                         <input
                           ref={femaleSearchInputRef}
@@ -13116,7 +13116,7 @@ export default function BreedingPlannerApp() {
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={femaleSearchQuery}
                           onChange={e => setFemaleSearchQuery(e.target.value)}
-                          placeholder={breederFemales.length ? "Search breeder females (name, ID, genetics...)" : "No breeder females available"}
+                          placeholder={breederFemales.length ? t("pairing.modal.searchFemales", { defaultValue: "Search breeder females (name, ID, genetics...)" }) : t("pairing.modal.noFemales", { defaultValue: "No breeder females available" })}
                           disabled={!breederFemales.length}
                         />
                         {currentFemale && (
@@ -13126,7 +13126,7 @@ export default function BreedingPlannerApp() {
                               <div className="text-[11px] text-neutral-500 truncate">{currentFemale.id}</div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))}>
-                              Clear
+                              {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
                         )}
@@ -13156,14 +13156,14 @@ export default function BreedingPlannerApp() {
                                   <div className="font-medium truncate">{f.name || f.id}</div>
                                   <div className="text-[11px] text-neutral-500 truncate">{f.id}</div>
                                   <div className="text-[11px] text-neutral-500 truncate">
-                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
                                 </button>
                               );
                             })
                           ) : (
                             <div className="px-3 py-2 text-xs text-neutral-500">
-                              No breeder females match that search.
+                              {t("pairing.modal.noFemaleMatch", { defaultValue: "No breeder females match that search." })}
                             </div>
                           )}
                         </div>
@@ -13175,18 +13175,18 @@ export default function BreedingPlannerApp() {
 
               {draft.maleId && draft.femaleId && (
                 <div className="sm:col-span-2 text-xs text-neutral-500">
-                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} × {(currentMale?.name || draft.maleId)}.
+                  {t("pairing.modal.labelPreview", { female: currentFemale?.name || draft.femaleId, male: currentMale?.name || draft.maleId, defaultValue: "Pairing label will be saved as {{female}} × {{male}}." })}
                 </div>
               )}
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium">Starting date</label>
+                <label className="text-xs font-medium">{t("pairing.modal.startDate", { defaultValue: "Starting date" })}</label>
                 <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2"
                   value={draft.startDate || ""}
                   onChange={e=>setDraft(d=>({...d,startDate:e.target.value}))} />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium">Notes</label>
-                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder="Ultrasound size, rotation plan, etc."/>
+                <label className="text-xs font-medium">{t("pairing.modal.notes", { defaultValue: "Notes" })}</label>
+                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder={t("pairing.modal.notesPlaceholder", { defaultValue: "Ultrasound size, rotation plan, etc." })}/>
               </div>
             </div>
             <div className="p-5 border-t flex items-center justify-between">
@@ -13198,7 +13198,7 @@ export default function BreedingPlannerApp() {
                   disabled={!draft.femaleId || !draft.maleId}
                   onClick={async () => {
                     if (!draft.maleId || !draft.femaleId) {
-                      await showAppAlert('Choose a breeder male and female first.');
+                      await showAppAlert(t("pairing.modal.chooseBoth", { defaultValue: "Choose a breeder male and female first." }));
                       return;
                     }
                     addPairingFromDraft();
@@ -18520,20 +18520,20 @@ function BreederSection({
   const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
   const pairingFieldSet = useMemo(() => new Set(normalizedPairingExportFields), [normalizedPairingExportFields]);
   const accountFeatureLabels = useMemo(() => ({
-    'animals.create': 'Animal records',
-    'breeding.pairings': 'Pairings',
-    'mobile.scan': 'Mobile QR scan',
-    'mobile.profile': 'Mobile animal profile',
-    'mobile.quick_feed': 'Mobile feeding logs',
-    'lab.orders': 'Lab orders',
-    'marketplace.create_listing': 'Marketplace listings',
-  }), []);
+    'animals.create': t("setup.account.feature.animalRecords", { defaultValue: "Animal records" }),
+    'breeding.pairings': t("setup.account.feature.pairings", { defaultValue: "Pairings" }),
+    'mobile.scan': t("setup.account.feature.mobileScan", { defaultValue: "Mobile QR scan" }),
+    'mobile.profile': t("setup.account.feature.mobileProfile", { defaultValue: "Mobile animal profile" }),
+    'mobile.quick_feed': t("setup.account.feature.mobileFeeding", { defaultValue: "Mobile feeding logs" }),
+    'lab.orders': t("setup.account.feature.labOrders", { defaultValue: "Lab orders" }),
+    'marketplace.create_listing': t("setup.account.feature.marketplaceListings", { defaultValue: "Marketplace listings" }),
+  }), [t]);
   const vaultLimitValue = typeof normalizedBackupSettings.maxVaultEntries === 'number' && normalizedBackupSettings.maxVaultEntries > 0
     ? String(normalizedBackupSettings.maxVaultEntries)
     : 'unlimited';
   const vaultLimitDescription = normalizedBackupSettings.maxVaultEntries
-    ? `Keeping the latest ${normalizedBackupSettings.maxVaultEntries} backups. Oldest entries are pruned automatically.`
-    : 'Keeping all backups (no limit).';
+    ? t("setup.backup.retentionKeeping", { n: normalizedBackupSettings.maxVaultEntries, defaultValue: "Keeping the latest {{n}} backups. Oldest entries are pruned automatically." })
+    : t("setup.backup.retentionKeepingAll", { defaultValue: "Keeping all backups (no limit)." });
   const autoBackupStats = useMemo(() => {
     if (!autoBackupSnapshot || typeof autoBackupSnapshot !== 'object') return null;
     const payload = autoBackupSnapshot.payload || {};
@@ -18545,7 +18545,7 @@ function BreederSection({
   }, [autoBackupSnapshot]);
   const lastAutoBackupDisplay = normalizedBackupSettings.lastRun
     ? formatDateTimeForDisplay(normalizedBackupSettings.lastRun)
-    : 'Never';
+    : t("setup.backup.never", { defaultValue: "Never" });
   const manualFeedback = backupFeedback?.context === 'manual' ? backupFeedback : null;
   const autoFeedback = backupFeedback && typeof backupFeedback.context === 'string'
     && backupFeedback.context.startsWith('auto')
@@ -19834,8 +19834,41 @@ function BreederSection({
   const exportSelectionComplete = exportGroups.length === OPTIONAL_EXPORT_GROUP_IDS.length;
 
   const exportButtonLabel = exportSelectionComplete
-    ? 'Download my data'
-    : `Download selected (${exportGroups.length + 1})`;
+    ? t("setup.account.downloadMyData", { defaultValue: "Download my data" })
+    : t("setup.account.downloadSelected", { n: exportGroups.length + 1, defaultValue: "Download selected ({{n}})" });
+
+  // Labels for ACCOUNT_EXPORT_GROUPS (shared/apiClient.ts), which keeps the
+  // English as the id's fallback for anything not listed here.
+  const exportGroupText = useMemo(() => ({
+    account: {
+      label: t("setup.account.exportGroup.account.label", { defaultValue: "Account & profile" }),
+      hint: t("setup.account.exportGroup.account.hint", { defaultValue: "Your login details, breeder profile and notification settings" }),
+    },
+    animals: {
+      label: t("setup.account.exportGroup.animals.label", { defaultValue: "Animals & breeding" }),
+      hint: t("setup.account.exportGroup.animals.hint", { defaultValue: "Animals, pairings, clutches, reproductive cycles and planner state" }),
+    },
+    lab: {
+      label: t("setup.account.exportGroup.lab.label", { defaultValue: "Lab orders" }),
+      hint: t("setup.account.exportGroup.lab.hint", { defaultValue: "Shed test orders, the animals on them and their results" }),
+    },
+    marketplace: {
+      label: t("setup.account.exportGroup.marketplace.label", { defaultValue: "Marketplace" }),
+      hint: t("setup.account.exportGroup.marketplace.hint", { defaultValue: "Listings, stores, favourites, saved searches, sales and purchases" }),
+    },
+    messages: {
+      label: t("setup.account.exportGroup.messages.label", { defaultValue: "Messages & inquiries" }),
+      hint: t("setup.account.exportGroup.messages.hint", { defaultValue: "Marketplace conversations and listing inquiries" }),
+    },
+    reviews: {
+      label: t("setup.account.exportGroup.reviews.label", { defaultValue: "Reviews" }),
+      hint: t("setup.account.exportGroup.reviews.hint", { defaultValue: "Reviews you wrote and reviews you received" }),
+    },
+    security: {
+      label: t("setup.account.exportGroup.security.label", { defaultValue: "Security & activity" }),
+      hint: t("setup.account.exportGroup.security.hint", { defaultValue: "Sign-in history, emails we sent you, devices, usage and subscriptions" }),
+    },
+  }), [t]);
 
   const toggleExportGroup = useCallback((groupId) => {
     setExportGroups(prev => (
@@ -20371,7 +20404,7 @@ function BreederSection({
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>My Account</TabButton>
+        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>{t("setup.account.tab", { defaultValue: "My Account" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
         {isDevEnvironment && (
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
@@ -21674,27 +21707,25 @@ function BreederSection({
         <div className="border-t pt-4 space-y-6">
           <div className="space-y-3">
             <div>
-              <div className="font-semibold text-sm">Compress stored photos</div>
+              <div className="font-semibold text-sm">{t("setup.backup.compressTitle", { defaultValue: "Compress stored photos" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Photos added from now on are shrunk automatically as you upload them. This is a
-                one-time pass over the ones already saved, for accounts that filled up before that
-                existed. Originals are replaced, so download a backup first if you want them kept.
+                {t("setup.backup.compressHelp", { defaultValue: "Photos added from now on are shrunk automatically as you upload them. This is a one-time pass over the ones already saved, for accounts that filled up before that existed. Originals are replaced, so download a backup first if you want them kept." })}
               </div>
             </div>
             <div className="text-xs text-neutral-500">
               {photoCompressionWork.photos
                 ? (
                   <>
-                    {photoCompressionWork.photos} photo{photoCompressionWork.photos === 1 ? '' : 's'} over budget
-                    {' '}across {photoCompressionWork.animals} animal{photoCompressionWork.animals === 1 ? '' : 's'}
-                    {' '}— {formatByteSize(photoCompressionWork.bytes)} stored today.
+                    {t("setup.backup.photosOverBudget", { count: photoCompressionWork.photos, defaultValue_one: "{{count}} photo over budget", defaultValue_other: "{{count}} photos over budget" })}
+                    {' '}{t("setup.backup.acrossAnimals", { count: photoCompressionWork.animals, defaultValue_one: "across {{count}} animal", defaultValue_other: "across {{count}} animals" })}
+                    {' '}{t("setup.backup.storedToday", { size: formatByteSize(photoCompressionWork.bytes), defaultValue: "— {{size}} stored today." })}
                   </>
                 )
-                : 'Every stored photo is already within budget. Nothing to do.'}
+                : t("setup.backup.allWithinBudget", { defaultValue: "Every stored photo is already within budget. Nothing to do." })}
               {lastPhotoCompression?.completedAt && (
                 <span className="block mt-1">
-                  Last run: {formatDateTimeForDisplay(lastPhotoCompression.completedAt)}
-                  {lastPhotoCompression.savedBytes ? ` — saved ${formatByteSize(lastPhotoCompression.savedBytes)}.` : '.'}
+                  {t("setup.backup.lastRun", { date: formatDateTimeForDisplay(lastPhotoCompression.completedAt), defaultValue: "Last run: {{date}}" })}
+                  {lastPhotoCompression.savedBytes ? t("setup.backup.lastRunSaved", { size: formatByteSize(lastPhotoCompression.savedBytes), defaultValue: " — saved {{size}}." }) : '.'}
                 </span>
               )}
             </div>
@@ -21709,19 +21740,19 @@ function BreederSection({
                 onClick={handleCompressPhotos}
                 disabled={photoCompressionRunning || !photoCompressionWork.photos}
               >
-                {photoCompressionRunning ? 'Compressing…' : 'Compress existing photos'}
+                {photoCompressionRunning ? t("setup.backup.compressing", { defaultValue: "Compressing…" }) : t("setup.backup.compressButton", { defaultValue: "Compress existing photos" })}
               </button>
               {photoCompressionRunning && (
                 <>
                   <span className="text-xs text-neutral-500">
-                    {photoCompressionProgress.done} of {photoCompressionProgress.total}
+                    {t("setup.backup.progress", { done: photoCompressionProgress.done, total: photoCompressionProgress.total, defaultValue: "{{done}} of {{total}}" })}
                   </span>
                   <button
                     type="button"
                     className="px-3 py-2 rounded-lg border text-sm"
                     onClick={() => { photoCompressionCancelRef.current = true; }}
                   >
-                    Stop
+                    {t("setup.backup.stop", { defaultValue: "Stop" })}
                   </button>
                 </>
               )}
@@ -21735,9 +21766,9 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Manual backup</div>
+              <div className="font-semibold text-sm">{t("setup.backup.manualTitle", { defaultValue: "Manual backup" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings.
+                {t("setup.backup.manualHelp", { defaultValue: "Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings." })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -21746,14 +21777,14 @@ function BreederSection({
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleManualBackupDownload}
               >
-                Download backup ({BACKUP_FILE_DOT_EXTENSION})
+                {t("setup.backup.downloadButton", { extension: BACKUP_FILE_DOT_EXTENSION, defaultValue: "Download backup ({{extension}})" })}
               </button>
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border text-sm"
                 onClick={handleSaveBackupToVault}
               >
-                Save to vault
+                {t("setup.backup.saveToVault", { defaultValue: "Save to vault" })}
               </button>
             </div>
             {manualFeedback && (
@@ -21766,29 +21797,29 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Automatic backups</div>
+              <div className="font-semibold text-sm">{t("setup.backup.autoTitle", { defaultValue: "Automatic backups" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Keep an automatic snapshot while the planner is open in your browser.
+                {t("setup.backup.autoHelp", { defaultValue: "Keep an automatic snapshot while the planner is open in your browser." })}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
-              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Schedule</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.schedule", { defaultValue: "Schedule" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm"
                 value={normalizedBackupSettings.frequency}
                 onChange={handleBackupFrequencyChange}
               >
-                <option value="off">Off</option>
-                <option value="nightly">Every night</option>
-                <option value="weekly">Every week</option>
-                <option value="monthly">Every month</option>
+                <option value="off">{t("setup.backup.frequency.off", { defaultValue: "Off" })}</option>
+                <option value="nightly">{t("setup.backup.frequency.nightly", { defaultValue: "Every night" })}</option>
+                <option value="weekly">{t("setup.backup.frequency.weekly", { defaultValue: "Every week" })}</option>
+                <option value="monthly">{t("setup.backup.frequency.monthly", { defaultValue: "Every month" })}</option>
               </select>
             </div>
             <div className="text-xs text-neutral-500">
-              Last automatic backup: {lastAutoBackupDisplay}.
+              {t("setup.backup.lastAuto", { date: lastAutoBackupDisplay, defaultValue: "Last automatic backup: {{date}}." })}
               {autoBackupStats && (autoBackupStats.snakes || autoBackupStats.pairings || autoBackupStats.groups) ? (
                 <span>
-                  {' '}Includes {autoBackupStats.snakes} snakes, {autoBackupStats.pairings} pairings, {autoBackupStats.groups} groups.
+                  {' '}{t("setup.backup.autoIncludes", { snakes: autoBackupStats.snakes, pairings: autoBackupStats.pairings, groups: autoBackupStats.groups, defaultValue: "Includes {{snakes}} snakes, {{pairings}} pairings, {{groups}} groups." })}
                 </span>
               ) : null}
             </div>
@@ -21798,7 +21829,7 @@ function BreederSection({
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleRunAutoBackupNow}
               >
-                Run now
+                {t("setup.backup.runNow", { defaultValue: "Run now" })}
               </button>
               <button
                 type="button"
@@ -21806,7 +21837,7 @@ function BreederSection({
                 onClick={handleAutoBackupDownload}
                 disabled={!autoBackupSnapshot}
               >
-                Download latest snapshot
+                {t("setup.backup.downloadSnapshot", { defaultValue: "Download latest snapshot" })}
               </button>
             </div>
             {autoFeedback && (
@@ -21819,28 +21850,28 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Cloud database sync</div>
+              <div className="font-semibold text-sm">{t("setup.backup.cloudTitle", { defaultValue: "Cloud database sync" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places.
+                {t("setup.backup.cloudHelp", { defaultValue: "Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places." })}
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Connection</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.connection", { defaultValue: "Connection" })}</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
               </div>
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Authentication</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.authentication", { defaultValue: "Authentication" })}</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendAuthLabel}</div>
               </div>
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Last cloud sync</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.lastCloudSync", { defaultValue: "Last cloud sync" })}</div>
                 <div className="mt-1 text-neutral-800">{cloudLastSyncDisplay}</div>
               </div>
             </div>
             <div className="text-xs text-neutral-500">
-              Ready to sync {Array.isArray(snakes) ? snakes.length : 0} snakes and {Array.isArray(pairings) ? pairings.length : 0} pairings.
-              {cloudSyncStatus?.message ? <span>{' '}Latest status: {cloudSyncStatus.message}</span> : null}
+              {t("setup.backup.readyToSync", { snakes: Array.isArray(snakes) ? snakes.length : 0, pairings: Array.isArray(pairings) ? pairings.length : 0, defaultValue: "Ready to sync {{snakes}} snakes and {{pairings}} pairings." })}
+              {cloudSyncStatus?.message ? <span>{' '}{t("setup.backup.latestStatus", { status: cloudSyncStatus.message, defaultValue: "Latest status: {{status}}" })}</span> : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -21849,7 +21880,7 @@ function BreederSection({
                 onClick={handleCloudSyncNow}
                 disabled={cloudSyncStatus?.state === 'loading'}
               >
-                {cloudSyncStatus?.state === 'loading' ? 'Syncing...' : 'Sync cloud database'}
+                {cloudSyncStatus?.state === 'loading' ? t("setup.backup.syncing", { defaultValue: "Syncing..." }) : t("setup.backup.syncButton", { defaultValue: "Sync cloud database" })}
               </button>
             </div>
             {cloudFeedback && (
@@ -21862,13 +21893,13 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Backup vault</div>
+              <div className="font-semibold text-sm">{t("setup.backup.vaultTitle", { defaultValue: "Backup vault" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Stored backups with unique identifiers. Rename, download, restore, or remove them here.
+                {t("setup.backup.vaultHelp", { defaultValue: "Stored backups with unique identifiers. Rename, download, restore, or remove them here." })}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Retention limit</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.retentionLimit", { defaultValue: "Retention limit" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm w-full sm:w-auto"
                 value={vaultLimitValue}
@@ -21877,8 +21908,8 @@ function BreederSection({
                 {VAULT_LIMIT_OPTIONS.map(option => {
                   const value = option === 'unlimited' ? 'unlimited' : String(option);
                   const label = option === 'unlimited'
-                    ? 'Unlimited (no pruning)'
-                    : `Keep last ${option}`;
+                    ? t("setup.backup.retentionUnlimited", { defaultValue: "Unlimited (no pruning)" })
+                    : t("setup.backup.retentionKeepLast", { n: option, defaultValue: "Keep last {{n}}" });
                   return (
                     <option key={value} value={value}>{label}</option>
                   );
@@ -21887,7 +21918,7 @@ function BreederSection({
             </div>
             <div className="text-[11px] text-neutral-500">{vaultLimitDescription}</div>
             <div className="text-xs text-neutral-500">
-              {vaultEntries.length ? `${vaultEntries.length} backup${vaultEntries.length === 1 ? '' : 's'} saved.` : 'No backups saved yet.'}
+              {vaultEntries.length ? t("setup.backup.vaultCount", { count: vaultEntries.length, defaultValue_one: "{{count}} backup saved.", defaultValue_other: "{{count}} backups saved." }) : t("setup.backup.vaultEmpty", { defaultValue: "No backups saved yet." })}
             </div>
             {vaultFeedback && (
               <div className={cx('text-xs', vaultFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
@@ -21914,10 +21945,10 @@ function BreederSection({
                       <div>
                         <div className="font-medium text-sm text-neutral-800">{entry.name}</div>
                         <div className="text-[11px] text-neutral-500 space-x-2">
-                          <span>{entry.source === 'auto' ? 'Auto backup' : 'Manual backup'}</span>
-                          <span>Created {createdDisplay}</span>
-                          {updatedDisplay && <span>Updated {updatedDisplay}</span>}
-                          {approxSizeKb && <span>~{approxSizeKb} KB</span>}
+                          <span>{entry.source === 'auto' ? t("setup.backup.entryAuto", { defaultValue: "Auto backup" }) : t("setup.backup.entryManual", { defaultValue: "Manual backup" })}</span>
+                          <span>{t("setup.backup.entryCreated", { date: createdDisplay, defaultValue: "Created {{date}}" })}</span>
+                          {updatedDisplay && <span>{t("setup.backup.entryUpdated", { date: updatedDisplay, defaultValue: "Updated {{date}}" })}</span>}
+                          {approxSizeKb && <span>{t("setup.backup.entrySize", { kb: approxSizeKb, defaultValue: "~{{kb}} KB" })}</span>}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -21926,47 +21957,47 @@ function BreederSection({
                           className="px-3 py-1.5 rounded-lg border text-xs"
                           onClick={() => handleDownloadVaultEntry(entry.id)}
                         >
-                          Download
+                          {t("setup.backup.download", { defaultValue: "Download" })}
                         </button>
                         <button
                           type="button"
                           className={cx('px-3 py-1.5 rounded-lg text-xs sk-on-accent', primaryBtnClass(theme, true))}
                           onClick={() => handleRestoreVaultEntry(entry.id)}
                         >
-                          Restore
+                          {t("setup.backup.restore", { defaultValue: "Restore" })}
                         </button>
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs"
                           onClick={() => handleRenameVaultEntry(entry.id)}
                         >
-                          Rename
+                          {t("setup.backup.rename", { defaultValue: "Rename" })}
                         </button>
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs text-red-600"
                           onClick={() => handleDeleteVaultEntry(entry.id)}
                         >
-                          Delete
+                          {t("setup.backup.delete", { defaultValue: "Delete" })}
                         </button>
                       </div>
                     </div>
                     <div className="text-[10px] text-neutral-400 break-words">
-                      ID: {entry.id}
+                      {t("setup.backup.entryId", { id: entry.id, defaultValue: "ID: {{id}}" })}
                     </div>
                   </div>
                 );
               }) : (
-                <div className="text-xs text-neutral-500">Create a manual or automatic backup to populate the vault.</div>
+                <div className="text-xs text-neutral-500">{t("setup.backup.vaultEmptyHelp", { defaultValue: "Create a manual or automatic backup to populate the vault." })}</div>
               )}
             </div>
           </div>
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Restore from backup</div>
+              <div className="font-semibold text-sm">{t("setup.backup.restoreTitle", { defaultValue: "Restore from backup" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Upload a Serpentora backup file or import a legacy JSON export to replace the current data.
+                {t("setup.backup.restoreHelp", { defaultValue: "Upload a Serpentora backup file or import a legacy JSON export to replace the current data." })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -21992,7 +22023,7 @@ function BreederSection({
                   if (restoreInputRef.current) restoreInputRef.current.click();
                 }}
               >
-                Choose backup file
+                {t("setup.backup.chooseFile", { defaultValue: "Choose backup file" })}
               </button>
               <button
                 type="button"
@@ -22001,9 +22032,9 @@ function BreederSection({
                   if (legacyRestoreInputRef.current) legacyRestoreInputRef.current.click();
                 }}
               >
-                Import legacy JSON
+                {t("setup.backup.importLegacy", { defaultValue: "Import legacy JSON" })}
               </button>
-              <span className="text-xs text-neutral-500">{BACKUP_FILE_DOT_EXTENSION} or .json files</span>
+              <span className="text-xs text-neutral-500">{t("setup.backup.fileTypes", { extension: BACKUP_FILE_DOT_EXTENSION, defaultValue: "{{extension}} or .json files" })}</span>
             </div>
             {restoreFeedback && (
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
@@ -22012,7 +22043,7 @@ function BreederSection({
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
-              Restoring replaces everything in the app. Download a backup first to stay safe.
+              {t("setup.backup.restoreWarning", { defaultValue: "Restoring replaces everything in the app. Download a backup first to stay safe." })}
             </div>
           </div>
         </div>
@@ -22022,9 +22053,9 @@ function BreederSection({
         <div className="border-t pt-4 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">My Account</div>
+              <div className="text-sm font-semibold text-neutral-800">{t("setup.account.title", { defaultValue: "My Account" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features.
+                {t("setup.account.help", { defaultValue: "Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features." })}
               </div>
             </div>
             <button
@@ -22033,68 +22064,68 @@ function BreederSection({
               onClick={loadAccountData}
               disabled={accountState.loading}
             >
-              {accountState.loading ? 'Refreshing...' : 'Refresh account'}
+              {accountState.loading ? t("setup.account.refreshing", { defaultValue: "Refreshing..." }) : t("setup.account.refresh", { defaultValue: "Refresh account" })}
             </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className="rounded-xl border bg-white p-4 space-y-3">
               <div>
-                <div className="font-semibold text-sm">Login information</div>
-                <div className="text-xs text-neutral-500 mt-1">This is the account connected to the shared backend.</div>
+                <div className="font-semibold text-sm">{t("setup.account.loginTitle", { defaultValue: "Login information" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">{t("setup.account.loginHelp", { defaultValue: "This is the account connected to the shared backend." })}</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
-                  <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.email", { defaultValue: "Email" })}</div>
+                  <div className="mt-1 break-words">{accountState.user?.email || t("setup.account.notSignedIn", { defaultValue: "Not signed in" })}</div>
                   {accountState.user && (
                     <div className={`mt-1 text-xs ${accountState.user.emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {accountState.user.emailVerified ? 'Verified' : 'Not verified'}
+                      {accountState.user.emailVerified ? t("setup.account.verified", { defaultValue: "Verified" }) : t("setup.account.notVerified", { defaultValue: "Not verified" })}
                     </div>
                   )}
                   {accountState.user?.pendingEmail && (
                     <div className="mt-1 text-xs text-amber-600 break-words">
-                      Pending confirmation for {accountState.user.pendingEmail} — check that inbox for a confirmation link. Your current email stays active until confirmed.
+                      {t("setup.account.pendingEmail", { email: accountState.user.pendingEmail, defaultValue: "Pending confirmation for {{email}} — check that inbox for a confirmation link. Your current email stays active until confirmed." })}
                     </div>
                   )}
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.name", { defaultValue: "Name" })}</div>
                   <div className="mt-1">{accountState.user?.fullName || '-'}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Role</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.role", { defaultValue: "Role" })}</div>
                   <div className="mt-1 capitalize">{accountState.user?.role || '-'}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">User ID</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.userId", { defaultValue: "User ID" })}</div>
                   <div className="mt-1 break-words text-xs">{accountState.user?.id || '-'}</div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
-                  Sign out on this device
+                  {t("setup.account.signOut", { defaultValue: "Sign out on this device" })}
                 </button>
               </div>
             </section>
 
             <section className="rounded-xl border bg-white p-4 space-y-3">
               <div>
-                <div className="font-semibold text-sm">Backend connection</div>
-                <div className="text-xs text-neutral-500 mt-1">Cloud sync and subscription checks use this backend session.</div>
+                <div className="font-semibold text-sm">{t("setup.account.backendTitle", { defaultValue: "Backend connection" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">{t("setup.account.backendHelp", { defaultValue: "Cloud sync and subscription checks use this backend session." })}</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Connection</div>
-                  <div className="mt-1 capitalize">{String(sharedBackendSnapshot?.state || 'unknown').replace(/-/g, ' ')}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.connection", { defaultValue: "Connection" })}</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.state ? String(sharedBackendSnapshot.state).replace(/-/g, ' ') : t("setup.account.unknownLower", { defaultValue: "unknown" })}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Authentication</div>
-                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || 'unknown'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.authentication", { defaultValue: "Authentication" })}</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || t("setup.account.unknownLower", { defaultValue: "unknown" })}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Sync readiness</div>
-                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? 'Ready' : 'Needs sign-in/configuration'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.syncReadiness", { defaultValue: "Sync readiness" })}</div>
+                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? t("setup.account.ready", { defaultValue: "Ready" }) : t("setup.account.needsSignIn", { defaultValue: "Needs sign-in/configuration" })}</div>
                 </div>
               </div>
             </section>
@@ -22103,16 +22134,19 @@ function BreederSection({
           <section className="rounded-xl border bg-white p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <div className="font-semibold text-sm">Subscription and feature access</div>
+                <div className="font-semibold text-sm">{t("setup.account.subscriptionTitle", { defaultValue: "Subscription and feature access" })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
-                  Feature access is checked against the backend subscription tier for this account.
+                  {t("setup.account.subscriptionHelp", { defaultValue: "Feature access is checked against the backend subscription tier for this account." })}
                 </div>
               </div>
               <div className="text-xs text-neutral-500">
-                Current tier: {accountState.subscription?.tier?.name
-                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
-                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
-                  || 'Unknown'}
+                {t("setup.account.currentTier", {
+                  tier: accountState.subscription?.tier?.name
+                    || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
+                    || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
+                    || t("setup.account.unknown", { defaultValue: "Unknown" }),
+                  defaultValue: "Current tier: {{tier}}",
+                })}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
@@ -22127,11 +22161,11 @@ function BreederSection({
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium">{label}</div>
                       <span className={cx('text-[11px] px-2 py-0.5 rounded-full border', allowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700')}>
-                        {allowed ? 'Included' : 'Limited'}
+                        {allowed ? t("setup.account.included", { defaultValue: "Included" }) : t("setup.account.limited", { defaultValue: "Limited" })}
                       </span>
                     </div>
                     {access.reason ? <div className="mt-1 text-xs text-amber-700">{access.reason}</div> : null}
-                    {usageText ? <div className="mt-1 text-xs text-neutral-600">Usage: {usageText}</div> : null}
+                    {usageText ? <div className="mt-1 text-xs text-neutral-600">{t("setup.account.usage", { usage: usageText, defaultValue: "Usage: {{usage}}" })}</div> : null}
                   </div>
                 );
               })}
@@ -22141,17 +22175,17 @@ function BreederSection({
           <section className="rounded-xl border bg-white p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               <div>
-                <div className="font-semibold text-sm">Plans</div>
+                <div className="font-semibold text-sm">{t("setup.account.plansTitle", { defaultValue: "Plans" })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
                   {accountState.billing?.configured
-                    ? 'Paid plans are bought through Stripe checkout. Your plan here changes once Stripe confirms the payment.'
-                    : 'Plans are not purchasable yet.'}
+                    ? t("setup.account.plansStripe", { defaultValue: "Paid plans are bought through Stripe checkout. Your plan here changes once Stripe confirms the payment." })
+                    : t("setup.account.plansUnavailable", { defaultValue: "Plans are not purchasable yet." })}
                 </div>
                 {accountState.billing?.configured && accountState.billing.mode === 'test' ? (
-                  <div className="text-xs text-amber-700 mt-1">Stripe test mode: checkout takes test cards only and nobody is charged.</div>
+                  <div className="text-xs text-amber-700 mt-1">{t("setup.account.stripeTestMode", { defaultValue: "Stripe test mode: checkout takes test cards only and nobody is charged." })}</div>
                 ) : null}
                 {accountState.billing?.configured && accountState.billing.foundingMember ? (
-                  <div className="text-xs text-emerald-700 mt-1">Founding member: checkout charges your founding-member price.</div>
+                  <div className="text-xs text-emerald-700 mt-1">{t("setup.account.foundingMember", { defaultValue: "Founding member: checkout charges your founding-member price." })}</div>
                 ) : null}
               </div>
               {accountState.billing?.configured && accountState.billing.hasBillingAccount ? (
@@ -22161,14 +22195,14 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={openBillingPortal}
                 >
-                  {accountState.actionLoading === 'billing:portal' ? 'Opening...' : 'Manage billing'}
+                  {accountState.actionLoading === 'billing:portal' ? t("setup.account.opening", { defaultValue: "Opening..." }) : t("setup.account.manageBilling", { defaultValue: "Manage billing" })}
                 </button>
               ) : null}
             </div>
             {billingReturnNotice ? (
               <div role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm flex items-start justify-between gap-3">
                 <span>{billingReturnNotice}</span>
-                <button type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>Dismiss</button>
+                <button type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>{t("setup.account.dismiss", { defaultValue: "Dismiss" })}</button>
               </div>
             ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -22180,20 +22214,26 @@ function BreederSection({
                   accountState.billing?.configured && accountState.billing.purchasableTierKeys?.includes(tier.key)
                 );
                 const planButtonLabel = isChangingThisPlan
-                  ? (isPaidTier ? 'Opening checkout...' : 'Changing...')
-                  : isCurrentTier ? 'Current plan' : isPurchasable ? 'Change plan' : 'Not purchasable yet';
+                  ? (isPaidTier ? t("setup.account.openingCheckout", { defaultValue: "Opening checkout..." }) : t("setup.account.changing", { defaultValue: "Changing..." }))
+                  : isCurrentTier
+                    ? t("setup.account.currentPlan", { defaultValue: "Current plan" })
+                    : isPurchasable
+                      ? t("setup.account.changePlan", { defaultValue: "Change plan" })
+                      : t("setup.account.notPurchasable", { defaultValue: "Not purchasable yet" });
                 return (
                   <div key={tier.id || tier.key || tier.name} className={cx('rounded-xl border p-3 space-y-2', isCurrentTier ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50')}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
+                        <div className="font-semibold text-sm">{tier.name || tier.key || t("setup.account.plan", { defaultValue: "Plan" })}</div>
                         {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
                       </div>
-                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">Current</span> : null}
-                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
+                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">{t("setup.account.current", { defaultValue: "Current" })}</span> : null}
+                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">{t("setup.account.recommended", { defaultValue: "Recommended" })}</span> : null}
                     </div>
                     <div className="text-sm">
-                      {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
+                      {tier.customPrice
+                        ? t("setup.account.customPricing", { defaultValue: "Custom pricing" })
+                        : t("setup.account.pricePerMonth", { currency: tier.currency || 'EUR', price: Number(tier.monthlyPrice || 0).toFixed(2), defaultValue: "{{currency}} {{price}} / month" })}
                     </div>
                     <button
                       type="button"
@@ -22207,37 +22247,37 @@ function BreederSection({
                 );
               })}
               {accountState.loaded && !accountState.tiers.length ? (
-                <div className="text-sm text-neutral-500">No public subscription plans are available from the backend.</div>
+                <div className="text-sm text-neutral-500">{t("setup.account.noPlans", { defaultValue: "No public subscription plans are available from the backend." })}</div>
               ) : null}
             </div>
           </section>
 
           <section className="rounded-xl border bg-white p-4 space-y-3">
             <div>
-              <div className="font-semibold text-sm">Email and password</div>
+              <div className="font-semibold text-sm">{t("setup.account.securityTitle", { defaultValue: "Email and password" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Account security changes require your current password.
+                {t("setup.account.securityHelp", { defaultValue: "Account security changes require your current password." })}
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-                <div className="text-sm font-semibold">Change email</div>
+                <div className="text-sm font-semibold">{t("setup.account.changeEmail", { defaultValue: "Change email" })}</div>
                 <div className="text-xs text-neutral-500">
-                  The new address must be confirmed via an emailed link before it becomes active.
+                  {t("setup.account.changeEmailHelp", { defaultValue: "The new address must be confirmed via an emailed link before it becomes active." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="email"
                   value={accountForms.email}
                   onChange={event => handleAccountFormChange('email', event.target.value)}
-                  placeholder="New email"
+                  placeholder={t("setup.account.newEmail", { defaultValue: "New email" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.emailPassword}
                   onChange={event => handleAccountFormChange('emailPassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <button
                   type="button"
@@ -22245,34 +22285,34 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountEmail}
                 >
-                  {accountState.actionLoading === 'email' ? 'Saving...' : 'Change email'}
+                  {accountState.actionLoading === 'email' ? t("setup.account.saving", { defaultValue: "Saving..." }) : t("setup.account.changeEmail", { defaultValue: "Change email" })}
                 </button>
               </div>
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-                <div className="text-sm font-semibold">Change password</div>
+                <div className="text-sm font-semibold">{t("setup.account.changePassword", { defaultValue: "Change password" })}</div>
                 <div className="text-xs text-neutral-500">
-                  We'll email a confirmation once your password is changed.
+                  {t("setup.account.changePasswordHelp", { defaultValue: "We'll email a confirmation once your password is changed." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.currentPassword}
                   onChange={event => handleAccountFormChange('currentPassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.newPassword}
                   onChange={event => handleAccountFormChange('newPassword', event.target.value)}
-                  placeholder="New password"
+                  placeholder={t("setup.account.newPassword", { defaultValue: "New password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.confirmPassword}
                   onChange={event => handleAccountFormChange('confirmPassword', event.target.value)}
-                  placeholder="Confirm new password"
+                  placeholder={t("setup.account.confirmNewPassword", { defaultValue: "Confirm new password" })}
                 />
                 <button
                   type="button"
@@ -22280,7 +22320,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountPassword}
                 >
-                  {accountState.actionLoading === 'password' ? 'Saving...' : 'Change password'}
+                  {accountState.actionLoading === 'password' ? t("setup.account.saving", { defaultValue: "Saving..." }) : t("setup.account.changePassword", { defaultValue: "Change password" })}
                 </button>
               </div>
             </div>
@@ -22288,18 +22328,16 @@ function BreederSection({
 
           <section className="space-y-3">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">Your data</div>
+              <div className="text-sm font-semibold text-neutral-800">{t("setup.account.dataTitle", { defaultValue: "Your data" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download what we hold about you — all of it, or just the parts you pick — or close
-                your account for good.
+                {t("setup.account.dataHelp", { defaultValue: "Download what we hold about you — all of it, or just the parts you pick — or close your account for good." })}
               </div>
             </div>
 
             <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-              <div className="text-sm font-semibold">Download my data</div>
+              <div className="text-sm font-semibold">{t("setup.account.downloadMyData", { defaultValue: "Download my data" })}</div>
               <div className="text-xs text-neutral-500">
-                A JSON file containing the categories you pick below. Everything is included by
-                default. Records shared with another person identify them only by an internal id.
+                {t("setup.account.downloadHelp", { defaultValue: "A JSON file containing the categories you pick below. Everything is included by default. Records shared with another person identify them only by an internal id." })}
               </div>
 
               <div className="space-y-1 pt-1">
@@ -22319,10 +22357,10 @@ function BreederSection({
                       />
                       <span className="min-w-0">
                         <span className="block text-xs font-medium text-neutral-800">
-                          {group.label}
-                          {group.always ? ' (always included)' : ''}
+                          {exportGroupText[group.id]?.label || group.label}
+                          {group.always ? t("setup.account.alwaysIncluded", { defaultValue: " (always included)" }) : ''}
                         </span>
-                        <span className="block text-[11px] text-neutral-500">{group.hint}</span>
+                        <span className="block text-[11px] text-neutral-500">{exportGroupText[group.id]?.hint || group.hint}</span>
                       </span>
                     </label>
                   );
@@ -22336,7 +22374,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleDownloadMyData}
                 >
-                  {accountState.actionLoading === 'export' ? 'Preparing...' : exportButtonLabel}
+                  {accountState.actionLoading === 'export' ? t("setup.account.preparing", { defaultValue: "Preparing..." }) : exportButtonLabel}
                 </button>
                 {/* status-tag-neutral-button opts out of `.app-root button`, which
                     themes every button as the primary colour with !important.
@@ -22347,7 +22385,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={selectAllExportGroups}
                 >
-                  Select all
+                  {t("setup.account.selectAll", { defaultValue: "Select all" })}
                 </button>
                 <button
                   type="button"
@@ -22355,26 +22393,25 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={clearExportGroups}
                 >
-                  Clear
+                  {t("setup.account.clear", { defaultValue: "Clear" })}
                 </button>
               </div>
 
               {!exportSelectionComplete ? (
                 <div className="text-[11px] text-amber-700">
-                  This will be a partial export. The file is marked as partial so it is not mistaken
-                  for the complete record we hold about you.
+                  {t("setup.account.partialExport", { defaultValue: "This will be a partial export. The file is marked as partial so it is not mistaken for the complete record we hold about you." })}
                 </div>
               ) : null}
             </div>
 
             {deletionState.pending ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2">
-                <div className="text-sm font-semibold text-amber-900">This account is scheduled for deletion</div>
+                <div className="text-sm font-semibold text-amber-900">{t("setup.account.deletionScheduled", { defaultValue: "This account is scheduled for deletion" })}</div>
                 <div className="text-xs text-amber-800">
                   {deletionState.scheduledAt
-                    ? `Everything will be permanently erased on ${formatDateTimeForDisplay(deletionState.scheduledAt)}.`
-                    : 'Everything will be permanently erased when the grace period ends.'}
-                  {' '}Download your data before then if you want to keep a copy.
+                    ? t("setup.account.erasedOn", { date: formatDateTimeForDisplay(deletionState.scheduledAt), defaultValue: "Everything will be permanently erased on {{date}}." })
+                    : t("setup.account.erasedAfterGrace", { defaultValue: "Everything will be permanently erased when the grace period ends." })}
+                  {' '}{t("setup.account.downloadBeforeThen", { defaultValue: "Download your data before then if you want to keep a copy." })}
                 </div>
                 <button
                   type="button"
@@ -22382,17 +22419,14 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleCancelAccountDeletion}
                 >
-                  {accountState.actionLoading === 'cancelDelete' ? 'Cancelling...' : 'Keep my account'}
+                  {accountState.actionLoading === 'cancelDelete' ? t("setup.account.cancelling", { defaultValue: "Cancelling..." }) : t("setup.account.keepAccount", { defaultValue: "Keep my account" })}
                 </button>
               </div>
             ) : (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
-                <div className="text-sm font-semibold text-red-900">Delete my account</div>
+                <div className="text-sm font-semibold text-red-900">{t("setup.account.deleteTitle", { defaultValue: "Delete my account" })}</div>
                 <div className="text-xs text-red-800">
-                  This erases your account and every record in it — animals, pairings, clutches,
-                  photos, notes, lab orders and messages. Nothing is kept. You have{' '}
-                  {deletionState.gracePeriodDays} days to change your mind by signing back in; after
-                  that it cannot be undone.
+                  {t("setup.account.deleteHelp", { days: deletionState.gracePeriodDays, defaultValue: "This erases your account and every record in it — animals, pairings, clutches, photos, notes, lab orders and messages. Nothing is kept. You have {{days}} days to change your mind by signing back in; after that it cannot be undone." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -22400,14 +22434,14 @@ function BreederSection({
                   autoComplete="current-password"
                   value={accountForms.deletePassword}
                   onChange={event => handleAccountFormChange('deletePassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="text"
                   value={accountForms.deleteConfirmation}
                   onChange={event => handleAccountFormChange('deleteConfirmation', event.target.value)}
-                  placeholder="Type DELETE to confirm"
+                  placeholder={t("setup.account.typeDelete", { defaultValue: "Type DELETE to confirm" })}
                 />
                 <button
                   type="button"
@@ -22415,7 +22449,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleRequestAccountDeletion}
                 >
-                  {accountState.actionLoading === 'delete' ? 'Scheduling...' : 'Delete my account'}
+                  {accountState.actionLoading === 'delete' ? t("setup.account.scheduling", { defaultValue: "Scheduling..." }) : t("setup.account.deleteTitle", { defaultValue: "Delete my account" })}
                 </button>
               </div>
             )}

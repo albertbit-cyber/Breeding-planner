@@ -1,3 +1,4 @@
+// i18n-namespace: marketplace (callers pass the t from useTranslation("marketplace"))
 import { geneTokens, joinTokens } from "./format";
 import { geneToken, normalizeGeneToken, parseGeneToken, tokenLabel } from "./genetics";
 

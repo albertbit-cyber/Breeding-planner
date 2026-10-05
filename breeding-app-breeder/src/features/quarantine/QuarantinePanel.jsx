@@ -143,9 +143,12 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 }`}
                 onClick={() => setTab(key)}
               >
-                {t(`quarantine.tab.${key}`, {
-                  defaultValue: { record: 'Record', checks: 'Checks', tests: 'Tests', history: 'History' }[key],
-                })}
+                {{
+                  record: t('quarantine.tab.record', { defaultValue: 'Record' }),
+                  checks: t('quarantine.tab.checks', { defaultValue: 'Checks' }),
+                  tests: t('quarantine.tab.tests', { defaultValue: 'Tests' }),
+                  history: t('quarantine.tab.history', { defaultValue: 'History' }),
+                }[key]}
                 {key === 'checks' && checks.length ? ` (${checks.length})` : ''}
                 {key === 'tests' && tests.length ? ` (${tests.length})` : ''}
               </button>
@@ -524,14 +527,12 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 <div key={entry.id} className="flex items-start gap-2 text-[11px]">
                   <span className="tabular-nums text-neutral-400 shrink-0 w-24">{formatYmd(entry.date)}</span>
                   <span className="text-neutral-700">
-                    {t(`quarantine.historyTo.${entry.to}`, {
-                      defaultValue: {
-                        in: 'Entered quarantine',
-                        cleared: 'Cleared',
-                        restarted: 'Clock restarted',
-                        extended: 'Extended',
-                      }[entry.to] || entry.to,
-                    })}
+                    {{
+                      in: t('quarantine.historyTo.in', { defaultValue: 'Entered quarantine' }),
+                      cleared: t('quarantine.historyTo.cleared', { defaultValue: 'Cleared' }),
+                      restarted: t('quarantine.historyTo.restarted', { defaultValue: 'Clock restarted' }),
+                      extended: t('quarantine.historyTo.extended', { defaultValue: 'Extended' }),
+                    }[entry.to] || entry.to}
                     {entry.note ? <span className="text-neutral-500"> — {entry.note}</span> : null}
                   </span>
                 </div>

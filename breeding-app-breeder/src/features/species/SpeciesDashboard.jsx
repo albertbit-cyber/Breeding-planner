@@ -241,7 +241,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
           <div className="flex flex-wrap gap-1">
             {stages.map(([key, count]) => (
               <span key={key} className="text-[11px] tabular-nums bg-neutral-50 border rounded px-1.5 py-0.5 text-neutral-600">
-                {STAGE_LABELS[key] || key} {count}
+                {stageLabels(t)[key] || key} {count}
               </span>
             ))}
           </div>
@@ -267,14 +267,14 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
 }
 
 /** Stage keys come from the breeding tracker; these are their card-sized labels. */
-const STAGE_LABELS = {
-  locks: 'Locks',
-  ovulation: 'Ovulation',
-  preLay: 'Pre-lay',
-  clutch: 'Incubating',
-  hatched: 'Hatched',
-  active: 'Active',
-};
+const stageLabels = (t) => ({
+  locks: t('species.dashboard.stage.locks', { defaultValue: 'Locks' }),
+  ovulation: t('species.dashboard.stage.ovulation', { defaultValue: 'Ovulation' }),
+  preLay: t('species.dashboard.stage.preLay', { defaultValue: 'Pre-lay' }),
+  clutch: t('species.dashboard.stage.clutch', { defaultValue: 'Incubating' }),
+  hatched: t('species.dashboard.stage.hatched', { defaultValue: 'Hatched' }),
+  active: t('species.dashboard.stage.active', { defaultValue: 'Active' }),
+});
 
 /** Semantic only. Kept clear of every species hue so urgency still reads as urgency. */
 const URGENCY_CLASS = {

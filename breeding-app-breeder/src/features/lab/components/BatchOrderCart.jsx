@@ -225,7 +225,7 @@ export default function BatchOrderCart() {
         {/* Price */}
         {isPricingLoading ? (
           <div className="text-xs text-neutral-500">
-            {t("common.loading", { defaultValue: "Calculating price…" })}
+            {t("lab.batch.calculatingPrice", { defaultValue: "Calculating price…" })}
           </div>
         ) : priceBreakdown ? (
           <div className="flex justify-between text-sm font-semibold text-neutral-800">

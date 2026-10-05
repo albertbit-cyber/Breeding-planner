@@ -59,6 +59,7 @@
     "dist:mac": "node scripts/build-desktop.js --mac dmg zip",
     "dist:linux": "node scripts/build-desktop.js --linux",
     "i18n:verify:apps": "node scripts/check-app-locales.cjs",
+    "i18n:verify:apps:en": "node scripts/check-app-locales.cjs --lang en",
     "i18n:report:apps": "node scripts/check-app-locales.cjs --report-same",
     "handoff:pdf": "node scripts/generate-handoff-pdf.cjs",
     "manual:pdf": "node scripts/generate-user-manual-pdf.cjs",

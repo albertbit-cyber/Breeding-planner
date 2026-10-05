@@ -267,7 +267,7 @@ export default function BreederOrderGeneticTestModal({
           {/* Test selection */}
           <div className={selectedLabId ? "" : "pointer-events-none opacity-40"}>
             <div className="mb-2 text-xs text-neutral-600">
-              {t("lab.orders.requestedTests", { defaultValue: "Requested Gene Tests" })}
+              {t("lab.orders.requestedGeneTests", { defaultValue: "Requested Gene Tests" })}
               {selectedLab?.labName ? (
                 <span className="ml-1 text-neutral-400">
                   — {selectedLab.labName}
@@ -321,7 +321,7 @@ export default function BreederOrderGeneticTestModal({
             <div className="grid max-h-52 grid-cols-1 gap-2 overflow-auto rounded-2xl border border-neutral-200 bg-white p-3 sm:grid-cols-2">
               {isLoadingCatalog ? (
                 <div className="col-span-2 py-2 text-center text-xs text-neutral-500">
-                  {t("common.loading", { defaultValue: "Loading tests…" })}
+                  {t("lab.orders.loadingTests", { defaultValue: "Loading tests…" })}
                 </div>
               ) : catalogError ? (
                 <div className="col-span-2 py-2 text-center text-xs text-rose-600">

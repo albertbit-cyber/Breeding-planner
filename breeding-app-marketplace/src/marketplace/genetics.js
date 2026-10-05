@@ -1,3 +1,4 @@
+// i18n-namespace: marketplace (callers pass the t from useTranslation("marketplace"))
 /**
  * Gene tokens and genetic claims, in the hobby's own words.
  *
