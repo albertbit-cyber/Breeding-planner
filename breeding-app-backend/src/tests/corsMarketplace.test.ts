@@ -23,12 +23,17 @@ const DOCUMENTED_CORS_ORIGIN = [
 let app: Express;
 const saved = { NODE_ENV: process.env.NODE_ENV, CORS_ORIGIN: process.env.CORS_ORIGIN };
 
+// A cold import of the whole app (every router) after resetModules. Alone it takes a
+// second or two; inside the full suite, with every worker importing at once, it has
+// run past vitest's 10 s hook default, so this hook gets room of its own.
+const COLD_APP_IMPORT_TIMEOUT_MS = 60_000;
+
 beforeAll(async () => {
   process.env.NODE_ENV = "production";
   process.env.CORS_ORIGIN = DOCUMENTED_CORS_ORIGIN;
   vi.resetModules();
   ({ app } = await import("../app"));
-});
+}, COLD_APP_IMPORT_TIMEOUT_MS);
 
 afterAll(() => {
   process.env.NODE_ENV = saved.NODE_ENV;
