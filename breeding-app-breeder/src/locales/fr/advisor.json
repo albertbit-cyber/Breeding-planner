@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Accepter",
 			"ignore": "Ignorer",
-			"plan": "Convertir en plan",
-			"showPlan": "Afficher le plan d'élevage"
+			"plan": "Faire un plan",
+			"showPlan": "Afficher le plan"
 		},
 		"successLabel": "réussite"
 	},

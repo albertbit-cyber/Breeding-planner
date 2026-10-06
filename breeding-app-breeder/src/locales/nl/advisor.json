@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Accepteren",
 			"ignore": "Negeren",
-			"plan": "Omzetten naar plan",
-			"showPlan": "Kweekplan tonen"
+			"plan": "Plan maken",
+			"showPlan": "Plan tonen"
 		},
 		"successLabel": "succes"
 	},

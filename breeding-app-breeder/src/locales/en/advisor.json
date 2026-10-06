@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Accept",
 			"ignore": "Ignore",
-			"plan": "Convert to Plan",
-			"showPlan": "Show Breeding Plan"
+			"plan": "Make a plan",
+			"showPlan": "Show plan"
 		},
 		"successLabel": "success"
 	},

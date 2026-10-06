@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Přijmout",
 			"ignore": "Ignorovat",
-			"plan": "Převést na plán",
-			"showPlan": "Zobrazit chovný plán"
+			"plan": "Vytvořit plán",
+			"showPlan": "Zobrazit plán"
 		},
 		"successLabel": "úspěšnost"
 	},

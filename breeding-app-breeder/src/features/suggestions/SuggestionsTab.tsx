@@ -1071,14 +1071,14 @@ export const SuggestionsTab = ({
               className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-50"
               onClick={() => onPlanSuggestion?.(suggestion)}
             >
-              {t("advisor.cards.actions.plan", { defaultValue: "Convert to Plan" })}
+              {t("advisor.cards.actions.plan", { defaultValue: "Make a plan" })}
             </button>
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
               onClick={() => openFlowchartCard(suggestion)}
             >
-              {t("advisor.cards.actions.showPlan", { defaultValue: "Show Breeding Plan" })}
+              {t("advisor.cards.actions.showPlan", { defaultValue: "Show plan" })}
             </button>
             <button
               type="button"

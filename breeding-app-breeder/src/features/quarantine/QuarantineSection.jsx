@@ -411,7 +411,7 @@ export default function QuarantineSection({
               : t('quarantine.emptyAll', { defaultValue: 'No quarantine records yet.' })}
           <p className="mt-1 text-xs text-neutral-400">
             {t('quarantine.emptyHelp', {
-              defaultValue: 'Tick “newly acquired animal” when adding an animal, or set an animal’s tag to Quarantine.',
+              defaultValue: 'Choose “New arrival” when adding an animal, or set an animal’s status to Quarantine.',
             })}
           </p>
         </div>

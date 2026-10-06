@@ -910,7 +910,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
     { key: "name",            label: t("mobile.edit.name", { defaultValue: "Name" }),                 type: "text" },
     { key: "sex",             label: t("mobile.edit.sex", { defaultValue: "Sex" }),                   type: "select", opts: ["", "Male", "Female", "Unknown"] },
     { key: "genetics",        label: t("mobile.edit.genetics", { defaultValue: "Genetics / Morph" }), type: "text" },
-    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For Sale", "Sold", "Deceased", "Quarantine"] },
+    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Sold", "Deceased", "Quarantine"] },
     { key: "species",         label: t("mobile.edit.species", { defaultValue: "Species" }),           type: "text" },
     { key: "dob",             label: t("mobile.edit.dob", { defaultValue: "Date of birth" }),         type: "date" },
     { key: "weight",          label: t("mobile.edit.weight", { defaultValue: "Weight (g)" }),         type: "number" },
@@ -929,7 +929,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
     Female: t("mobile.edit.sexFemale", { defaultValue: "Female" }),
     Unknown: t("mobile.edit.sexUnknown", { defaultValue: "Unknown" }),
     Active: t("mobile.edit.statusActive", { defaultValue: "Active" }),
-    "For Sale": t("mobile.edit.statusForSale", { defaultValue: "For Sale" }),
+    "For sale": t("mobile.edit.statusForSale", { defaultValue: "For sale" }),
     Sold: t("mobile.edit.statusSold", { defaultValue: "Sold" }),
     Deceased: t("mobile.edit.statusDeceased", { defaultValue: "Deceased" }),
     Quarantine: t("mobile.edit.statusQuarantine", { defaultValue: "Quarantine" }),
@@ -1121,7 +1121,7 @@ function AnimalCardRow({ animal, onOpen }) {
   );
 }
 
-// ג”€ג”€ג”€ FULL SCREEN PANEL (Breeding Advisor / Shed Test Terminal) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+// ג”€ג”€ג”€ FULL SCREEN PANEL (Breeding Advisor / Lab tests) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function FullScreenPanel({ title, onClose, children }) {
   const { t } = useTranslation();
   return (
@@ -2643,7 +2643,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         )}
 
         {!loading && morePanel === "shed-test" && (
-          <FullScreenPanel title={t("mobile.more.shedTestTitle", { defaultValue: "Shed Test Terminal" })} onClose={() => setMorePanel(null)}>
+          <FullScreenPanel title={t("mobile.more.shedTestTitle", { defaultValue: "Lab tests" })} onClose={() => setMorePanel(null)}>
             <ShedTestTerminalPanel
               snakes={animals}
               onBatchSubmitted={() => pushToast(t("mobile.toast.batchSubmitted", { defaultValue: "Batch submitted." }))}
@@ -2897,7 +2897,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                   <span className="mbl-settings-chevron">›</span>
                 </button>
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={() => setMorePanel("shed-test")}>
-                  <span>{t("mobile.more.shedTestRow", { defaultValue: "🔬 Shed Test Terminal" })}</span>
+                  <span>{t("mobile.more.shedTestRow", { defaultValue: "🔬 Lab tests" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
               </div>

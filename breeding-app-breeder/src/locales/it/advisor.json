@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Accetta",
 			"ignore": "Ignora",
-			"plan": "Trasforma in piano",
-			"showPlan": "Mostra piano di riproduzione"
+			"plan": "Crea un piano",
+			"showPlan": "Mostra piano"
 		},
 		"successLabel": "successo"
 	},

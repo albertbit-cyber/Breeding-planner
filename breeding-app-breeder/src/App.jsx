@@ -119,6 +119,8 @@ import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/anima
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
 import { BreedersGroupGate } from "./features/animals/BreedersGroupPicker.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
+import { FOR_SALE_STATUS, canonicalStatusValue } from "./features/animals/statusValue";
+import { ARRIVAL, IMPORT_DEFAULT_ARRIVAL, MANUAL_ADD_DEFAULT_ARRIVAL, admitAnimal } from "./features/animals/quarantineDefault";
 import {
   buildMarketplaceListingPayload,
   withListingPhoto,
@@ -161,9 +163,7 @@ import { recordQuarantineStart } from "./services/quarantineNotice";
 import { QUARANTINE_ROOM_NAME, findQuarantineRoom, isQuarantineRoom } from "./services/quarantineHousing";
 import {
   QUARANTINE_SOURCES,
-  QUARANTINE_STATUS,
   QUARANTINE_TAG,
-  applyQuarantineStatus,
   countQuarantined,
   deriveQuarantineEvents,
   getQuarantineDays,
@@ -1492,8 +1492,8 @@ export const ANIMAL_EXPORT_FIELD_DEFS = [
   },
   {
     key: 'projects',
-    label: 'Projects',
-    section: 'Projects',
+    label: 'Pairings',
+    section: 'Pairings',
     getter: (snake, ctx = {}) => {
       const pairings = ctx.pairingsBySnakeId?.get(snake?.id) || [];
       const labels = pairings.map(item => item?.label).filter(Boolean);
@@ -1544,7 +1544,7 @@ export const DEFAULT_ANIMAL_EXPORT_FIELDS = [
 export const PAIRING_EXPORT_FIELD_DEFS = [
   {
     key: 'label',
-    label: 'Project label',
+    label: 'Pairing label',
     section: 'Summary',
     getter: (pairing, ctx = {}) => ctx.displayLabel || pairing?.label || pairing?.id || '',
   },
@@ -1562,7 +1562,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
   },
   {
     key: 'status',
-    label: 'Project status',
+    label: 'Pairing status',
     section: 'Summary',
     getter: (pairing, ctx = {}) => summarizePairingStatus(ctx.derived),
   },
@@ -1759,7 +1759,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
     { key: 'lastFeed', label: columnLabel('lastFeed', 'Last feed') },
     { key: 'groups', label: columnLabel('groups', 'Groups') },
     { key: 'tags', label: columnLabel('tags', 'Tags') },
-    { key: 'projects', label: columnLabel('projects', 'Projects') },
+    { key: 'projects', label: columnLabel('projects', 'Pairings') },
   ];
 
   const snakeMap = makeSnakeMap(allSnakes);
@@ -2837,6 +2837,10 @@ function sanitizeSnakeRecord(raw) {
           .filter(Boolean)
       : []);
   snake.tags = Array.isArray(raw.tags) ? raw.tags.map(token => String(token || '').trim()).filter(Boolean) : [];
+  // The old status list offered the misspelt "for sell" and the phone app writes "For Sale"; both
+  // are read as "For sale". Only that status is rewritten, the same way on every device, so the
+  // sync never churns over it.
+  if (canonicalStatusValue(raw.status) === FOR_SALE_STATUS) snake.status = FOR_SALE_STATUS;
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
@@ -3749,13 +3753,14 @@ const syncErrorDetails = (error) => ({
   message: typeof error?.message === 'string' ? error.message : '',
 });
 
-const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, 'For sell', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
+const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, FOR_SALE_STATUS, 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
 const STATUS_TAG_TRANSLATIONS = Object.freeze({
   'active': 'ui.animals.addAnimal.active',
   'holdback': 'ui.animals.addAnimal.holdback',
   'grow-out': 'ui.animals.addAnimal.growOut',
   'breeder': 'ui.animals.addAnimal.breeder',
   'quarantine': 'ui.animals.addAnimal.quarantine',
+  'for sale': 'ui.animals.addAnimal.forSale',
   'sold': 'ui.animals.addAnimal.sold',
   'on loan': 'ui.animals.addAnimal.onLoan',
   'morphmarket': 'ui.animals.addAnimal.morphMarket',
@@ -3766,7 +3771,7 @@ const STATUS_TAG_TRANSLATIONS = Object.freeze({
 
 function getStatusTagTranslationKey(value) {
   if (!value) return null;
-  const normalized = String(value).trim().toLowerCase();
+  const normalized = canonicalStatusValue(String(value)).toLowerCase();
   return STATUS_TAG_TRANSLATIONS[normalized] || null;
 }
 const SCAN_MODE_STORAGE_KEY = 'breedingPlannerScanMode';
@@ -4156,7 +4161,7 @@ const QUICK_ADD_EXAMPLE_GENES = {
 };
 
 /** Status tags worth a chip on a species card, in the order they appear. */
-const DASHBOARD_STATUS_TAGS = ['Breeder', 'Holdback', 'Grow-out', QUARANTINE_TAG, 'For sell'];
+const DASHBOARD_STATUS_TAGS = ['Breeder', 'Holdback', 'Grow-out', QUARANTINE_TAG, FOR_SALE_STATUS];
 
 /** Lower rank wins when choosing the one event a species card shows. */
 const DASHBOARD_URGENCY_RANK = { overdue: 0, due: 1, soon: 2, upcoming: 3, none: 4 };
@@ -4194,9 +4199,9 @@ function createEmptyNewAnimalDraft() {
     groups: [],
     logs: cloneLogs(),
     feederProfile: createEmptyFeederProfile(),
-    // Animals added by hand are almost always ones just brought in, so this starts ticked. It is a
-    // suggestion, not a rule -- untick it for an animal already settled in the collection.
-    newlyAcquired: true,
+    // Animals added by hand are almost always ones just brought in, so this starts on "new
+    // arrival". It is a suggestion, not a rule -- "already in my collection" skips quarantine.
+    arrival: MANUAL_ADD_DEFAULT_ARRIVAL,
     // Risk is not uniform, and this is the field that sets the suggested quarantine length.
     quarantineSource: 'known-breeder',
     quarantineSourceName: '',
@@ -6470,7 +6475,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
     });
   }, [draftSpeciesId, t]);
 
-  const noTagText = t("snakeEdit.noTag", { defaultValue: "No tag" });
+  const noTagText = t("snakeEdit.noTag", { defaultValue: "No status" });
   const quarantineLabel = useMemo(() => makeQuarantineLabeller(t), [t]);
   const resolveStatusLabel = useCallback((value) => {
     if (!value) return noTagText;
@@ -6581,7 +6586,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
 
         <div ref={statusMenuRef} className="relative">
-              <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Tag" })}</label>
+              <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Status" })}</label>
               <button
                 type="button"
                 className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
@@ -6614,14 +6619,14 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                           type="button"
                           className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                           onClick={() => handleDeleteStatus(option)}
-                          title={t("snakeEdit.deleteTag", { defaultValue: "Delete tag" })}
+                          title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                         >
                           -
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet", { defaultValue: "No tags available yet." })}</div>
+                    <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet", { defaultValue: "No statuses yet." })}</div>
                   )}
                 </div>
               )}
@@ -6723,24 +6728,36 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 autoDetectFromName
               />
             </div>
-            <div className="sm:col-span-2">
-              <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={newAnimal.newlyAcquired !== false}
-                  onChange={e => setNewAnimal(a => ({ ...a, newlyAcquired: e.target.checked }))}
-                />
-                <span className="text-xs">
-                  <span className="font-medium text-amber-800">
-                    {t("quarantine.newlyAcquired", { defaultValue: "Newly acquired animal (bought, traded or imported)" })}
+            <fieldset className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <legend className="sr-only">{t("quarantine.arrivalLegend", { defaultValue: "Is this animal new to your collection?" })}</legend>
+              {[
+                {
+                  value: ARRIVAL.NEW,
+                  label: t("quarantine.newlyAcquired", { defaultValue: "New arrival (bought, traded or on loan)" }),
+                  help: t("quarantine.newlyAcquiredHelp", { defaultValue: "Sets its status to Quarantine and starts a quarantine record from today." }),
+                },
+                {
+                  value: ARRIVAL.EXISTING,
+                  label: t("quarantine.alreadyOwned", { defaultValue: "Already in my collection" }),
+                  help: t("quarantine.alreadyOwnedHelp", { defaultValue: "Keeps the status you picked. Nothing is quarantined." }),
+                },
+              ].map(option => (
+                <label key={option.value} className="flex items-start gap-2 py-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="add-animal-arrival"
+                    className="mt-0.5"
+                    value={option.value}
+                    checked={(newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL) === option.value}
+                    onChange={() => setNewAnimal(a => ({ ...a, arrival: option.value }))}
+                  />
+                  <span className="text-xs">
+                    <span className="font-medium text-amber-800">{option.label}</span>
+                    <span className="block mt-0.5 text-amber-700">{option.help}</span>
                   </span>
-                  <span className="block mt-0.5 text-amber-700">
-                    {t("quarantine.newlyAcquiredHelp", { defaultValue: "Tags it Quarantine and starts a quarantine record from today. Untick for an animal already settled in your collection." })}
-                  </span>
-                </span>
-              </label>
-              {newAnimal.newlyAcquired !== false && (
+                </label>
+              ))}
+              {(newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL) === ARRIVAL.NEW && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="text-xs font-medium">
                     {t("quarantine.source", { defaultValue: "Where it came from" })}
@@ -6771,7 +6788,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   </p>
                 </div>
               )}
-            </div>
+            </fieldset>
       </div>
 
       {capResult ? <AnimalCapNotice result={capResult} context="add" className="mx-4 mt-3" /> : null}
@@ -6934,7 +6951,7 @@ export default function BreedingPlannerApp() {
       if (sex === 'F') bucket.females += 1;
       else if (sex === 'M') bucket.males += 1;
       else bucket.unsexed += 1;
-      const status = String(snake.status || '').trim();
+      const status = canonicalStatusValue(String(snake.status || ''));
       if (DASHBOARD_STATUS_TAGS.includes(status)) {
         bucket.statusCounts[status] = (bucket.statusCounts[status] || 0) + 1;
       }
@@ -7033,7 +7050,7 @@ export default function BreedingPlannerApp() {
   }, [speciesScope]);
 
   // `destinationTab` exists for the dashboard's breeding table, which sends a keeper straight
-  // to a species' Breeding Tracker. Everything else lands on Animals, as it always did.
+  // to a species' Breeding tab. Everything else lands on Animals, as it always did.
   const openSpeciesWorkspace = useCallback((speciesId, destinationTab = 'animals') => {
     const resolved = resolveSpeciesId(speciesId);
     setSpeciesScope(resolved);
@@ -7323,6 +7340,7 @@ export default function BreedingPlannerApp() {
   // collection listing, not a mixed catalogue. Asking once per batch beats asking per row,
   // and beats guessing, which would scatter animals into the wrong workspaces silently.
   const [importSpecies, setImportSpecies] = useState('');
+  const [importArrival, setImportArrival] = useState(IMPORT_DEFAULT_ARRIVAL);
   const [testOrderSnake, setTestOrderSnake] = useState(null);
   const [panelRefreshToken, setPanelRefreshToken] = useState(0);
   const [returnToGroupsAfterEdit, setReturnToGroupsAfterEdit] = useState(false);
@@ -8106,11 +8124,11 @@ export default function BreedingPlannerApp() {
   const statusTagOptions = useMemo(() => {
     const set = new Set(DEFAULT_STATUS_TAGS);
     customStatusTags.forEach(tag => {
-      const trimmed = (tag || '').trim();
+      const trimmed = canonicalStatusValue(tag || '');
       if (trimmed) set.add(trimmed);
     });
     snakes.forEach(s => {
-      const value = typeof s?.status === 'string' ? s.status.trim() : '';
+      const value = typeof s?.status === 'string' ? canonicalStatusValue(s.status) : '';
       if (value) set.add(value);
     });
     const newDraftTag = typeof newAnimal?.status === 'string' ? newAnimal.status.trim() : '';
@@ -9130,7 +9148,7 @@ export default function BreedingPlannerApp() {
   }, [activePairings, snakes]);
 
   /**
-   * The same urgency counts the Breeding Tracker dashboard shows, but for every species at
+   * The same urgency counts the Breeding dashboard shows, but for every species at
    * once. Built from all pairings rather than the scoped ones on purpose -- this is the view
    * that cannot be had from inside a single species workspace, which is why it earns the
    * dashboard's lower half.
@@ -9166,7 +9184,7 @@ export default function BreedingPlannerApp() {
 
   /**
    * Set only when a keeper presses an urgency count on the dashboard, and read only as the
-   * Breeding Tracker dashboard's opening filter. That view unmounts whenever the tab or the
+   * Breeding dashboard's opening filter. That view unmounts whenever the tab or the
    * sub-view changes, so it picks this up on mount and owns the filter from then on -- the
    * keeper can clear it in place without the dashboard reimposing it.
    */
@@ -9513,7 +9531,7 @@ export default function BreedingPlannerApp() {
     saveStoredJson(STORAGE_KEYS.leucisticType, value);
   }, [lastLeucisticType]);
 
-  // Land on the Shed Test Terminal when a laboratory email links here. Without
+  // Land on Lab tests when a laboratory email links here. Without
   // it, "View your order" opened the collection and left the reader to find the
   // tab themselves.
   useEffect(() => {
@@ -9634,7 +9652,7 @@ export default function BreedingPlannerApp() {
       lastFeed: t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }),
       groups: t('animals.list.columns.groups', { defaultValue: 'Groups' }),
       tags: t('animals.list.columns.tags', { defaultValue: 'Tags' }),
-      projects: t('animals.list.columns.projects', { defaultValue: 'Projects' }),
+      projects: t('animals.list.columns.projects', { defaultValue: 'Pairings' }),
       noData: t('logs.noData', { defaultValue: 'No data' }),
       refused: t('logs.refused', { defaultValue: 'Refused feed' }),
       feedDefault: t('logs.feed', { defaultValue: 'Feed' }),
@@ -10553,14 +10571,13 @@ export default function BreedingPlannerApp() {
 
     // The tag the breeder picked is parked as previousStatus, so clearing quarantine later hands
     // the animal back the status they actually chose rather than a generic default.
-    const goesIntoQuarantine = newAnimal.newlyAcquired !== false;
-    const snakeToAdd = goesIntoQuarantine
-      ? applyQuarantineStatus(snake, QUARANTINE_STATUS.IN, {
-        today: quarantineTodayYmd(),
-        source: newAnimal.quarantineSource || 'known-breeder',
-        sourceName: newAnimal.quarantineSourceName || '',
-      })
-      : snake;
+    const arrival = newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL;
+    const goesIntoQuarantine = arrival === ARRIVAL.NEW;
+    const snakeToAdd = admitAnimal(snake, arrival, {
+      today: quarantineTodayYmd(),
+      source: newAnimal.quarantineSource || 'known-breeder',
+      sourceName: newAnimal.quarantineSourceName || '',
+    });
 
     if (goesIntoQuarantine) {
       const { state, show } = recordQuarantineStart(loadStoredJson(STORAGE_KEYS.quarantineNotice, null));
@@ -10665,10 +10682,12 @@ export default function BreedingPlannerApp() {
       const normalizedGroups = normalizeSingleGroupValue(
         (converted.groups || []).map(normalizeImportedGroup).filter(Boolean)
       );
-      // An import is an existing collection moving in, so nothing is quarantined wholesale. A row
-      // that explicitly carries the Quarantine tag is honoured and gets a record opened for it.
-      normalizedToAdd.push(reconcileQuarantineWithStatus(
+      // An import is usually an existing collection moving in, so by default nothing is
+      // quarantined wholesale; a row that carries the Quarantine status is still honoured. The
+      // keeper can say these are new arrivals instead, and then each one starts quarantine.
+      normalizedToAdd.push(admitAnimal(
         { ...converted, sex, species: resolveSpeciesId(importSpecies), groups: normalizedGroups, isDemo: false },
+        importArrival,
         { today: quarantineTodayYmd() }
       ));
     }
@@ -10739,7 +10758,7 @@ export default function BreedingPlannerApp() {
       );
       existingIds.push(converted.id);
       existingRecords.push({ id: converted.id, idSequence: converted.idSequence });
-      return reconcileQuarantineWithStatus(
+      return admitAnimal(
         {
           ...converted,
           // convertParsedToSnake strips a leading year off a name to seed the id generator,
@@ -10757,6 +10776,7 @@ export default function BreedingPlannerApp() {
           importRawTraits: draft.importRawTraits,
           isDemo: false,
         },
+        importArrival,
         { today }
       );
     });
@@ -11505,7 +11525,7 @@ export default function BreedingPlannerApp() {
                   are absent until a species is open rather than shown in a broken state. */}
               {speciesScope && (<>
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Tracker" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding" })}</TabButton>
                 <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
                 <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
               </>)}
@@ -11523,7 +11543,7 @@ export default function BreedingPlannerApp() {
                 {quarantineCount ? <span className="ms-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
               </TabButton>
               <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
-              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
+              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Lab tests" })}</TabButton>
               <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
             </div>
             {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
@@ -11589,7 +11609,7 @@ export default function BreedingPlannerApp() {
               { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }) },
               { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
               { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Shed Test" }) },
+              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }) },
             ].map(({ key, icon, label }) => (
               <button
                 key={key}
@@ -11877,7 +11897,7 @@ export default function BreedingPlannerApp() {
                           className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-start flex items-center justify-between"
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
-                          <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
+                          <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No status" })}</span>
                           <span className="text-[10px] text-neutral-500">v</span>
                         </button>
                         {tagFilterMenuOpen && (
@@ -11893,7 +11913,7 @@ export default function BreedingPlannerApp() {
                                 setTagFilterMenuOpen(false);
                               }}
                             >
-                              {t("snakeEdit.noTag", { defaultValue: "No tag" })}
+                              {t("snakeEdit.noTag", { defaultValue: "No status" })}
                             </button>
                             {statusTagOptions.map(option => {
                               const selected = selectedStatusTags[0] === option;
@@ -11915,7 +11935,7 @@ export default function BreedingPlannerApp() {
                                   <button
                                     type="button"
                                     className="status-tag-menu-button px-2 py-2 text-sm font-semibold text-neutral-500 hover:text-rose-500"
-                                    title={t("snakeEdit.deleteTag", { defaultValue: "Delete tag" })}
+                                    title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                                     onClick={() => handleDeleteStatusTag(option)}
                                   >
                                     -
@@ -12456,8 +12476,8 @@ export default function BreedingPlannerApp() {
                 ? t('pairing.searchEmpty', { defaultValue: 'No pairings match your search.' })
                 : (pairingsView === 'completed'
                   ? (completedYearFilter === 'All'
-                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed projects yet. Hatchlings will land here once the cycle is marked finished.' })
-                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed projects recorded for {{year}}.', year: completedYearFilter }))
+                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed pairings yet. Hatchlings will land here once the cycle is marked finished.' })
+                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed pairings recorded for {{year}}.', year: completedYearFilter }))
                   : t('pairing.emptyDefault'))}
               variant="collapsed"
             />
@@ -12498,7 +12518,8 @@ export default function BreedingPlannerApp() {
         )}
 
         {tab === "shedTerminal" && (
-          <Card title={t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}>
+          <Card>
+            {/* Untitled: the panel inside carries the "Lab tests" title and its explanation. */}
             <ShedTestTerminalPanel snakes={snakes} />
           </Card>
         )}
@@ -13074,6 +13095,8 @@ export default function BreedingPlannerApp() {
                     applyImport={applyImport}
                     importSpecies={importSpecies}
                     setImportSpecies={setImportSpecies}
+                    importArrival={importArrival}
+                    setImportArrival={setImportArrival}
                     onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
                     theme={theme}
                     onCancel={()=>setShowImportModal(false)}
@@ -13756,7 +13779,7 @@ export default function BreedingPlannerApp() {
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For Sale" })}</label>
+                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
                     <button
                       type="button"
                       role="switch"
@@ -14763,7 +14786,7 @@ function Card({ title, children }) {
   // materials) its own ink. On `flat` it resolves to today's surface + border.
   return (
     <div className="mt-card border">
-      <div className="px-4 py-3 border-b mt-display font-semibold">{title}</div>
+      {title ? <div className="px-4 py-3 border-b mt-display font-semibold">{title}</div> : null}
       <div className="p-4">{children}</div>
     </div>
   );
@@ -17434,7 +17457,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
               color: 'var(--sk-warning-text, #166534)',
             }}
           >
-            {t("snakeEdit.forSale", { defaultValue: "For Sale" })}
+            {t("snakeEdit.forSale", { defaultValue: "For sale" })}
           </span>
         )}
         {(hasFamilyTree || hasDelete) && (
@@ -19660,13 +19683,13 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToPdf(dataset, {
         title: pairingExportType === 'byPairing'
           ? t('export.pairingsByMaleTitle', { defaultValue: 'Pairings by male' })
-          : t('export.pairingsTitle', { defaultValue: 'Breeding projects export' }),
+          : t('export.pairingsTitle', { defaultValue: 'Pairings export' }),
         subtitle: t('export.rowsSubtitle', { defaultValue: '{{rows}} rows - {{fields}} fields', rows: dataset.rows.length, fields: dataset.columns.length }),
         fileName: `${pairingExportType === 'byPairing' ? 'pairings-by-male' : 'pairings-export'}-${safeStamp}.pdf`,
       });
@@ -19674,7 +19697,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsPdf', { defaultValue: 'Exported {{count}} pairing rows to PDF.', count: dataset.rows.length })
-          : t('export.feedback.projectsPdf', { defaultValue: 'Exported {{count}} projects to PDF.', count: dataset.rows.length }),
+          : t('export.feedback.projectsPdf', { defaultValue: 'Exported {{count}} pairings to PDF.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19682,7 +19705,7 @@ function BreederSection({
       console.error('Pairings PDF export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsPdfFailed', { defaultValue: 'Failed to export breeding projects to PDF.' }),
+        message: err?.message || t('export.feedback.projectsPdfFailed', { defaultValue: 'Failed to export pairings to PDF.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19697,7 +19720,7 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToXlsx(dataset, {
@@ -19710,7 +19733,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsSheet', { defaultValue: 'Exported {{count}} pairing rows to spreadsheet.', count: dataset.rows.length })
-          : t('export.feedback.projectsSheet', { defaultValue: 'Exported {{count}} projects to spreadsheet.', count: dataset.rows.length }),
+          : t('export.feedback.projectsSheet', { defaultValue: 'Exported {{count}} pairings to spreadsheet.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19718,7 +19741,7 @@ function BreederSection({
       console.error('Pairings sheet export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsSheetFailed', { defaultValue: 'Failed to export breeding projects to spreadsheet.' }),
+        message: err?.message || t('export.feedback.projectsSheetFailed', { defaultValue: 'Failed to export pairings to spreadsheet.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19733,7 +19756,7 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToCsv(dataset, {
@@ -19743,7 +19766,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsCsv', { defaultValue: 'Exported {{count}} pairing rows to CSV.', count: dataset.rows.length })
-          : t('export.feedback.projectsCsv', { defaultValue: 'Exported {{count}} projects to CSV.', count: dataset.rows.length }),
+          : t('export.feedback.projectsCsv', { defaultValue: 'Exported {{count}} pairings to CSV.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19751,7 +19774,7 @@ function BreederSection({
       console.error('Pairings CSV export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsCsvFailed', { defaultValue: 'Failed to export breeding projects to CSV.' }),
+        message: err?.message || t('export.feedback.projectsCsvFailed', { defaultValue: 'Failed to export pairings to CSV.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -20993,7 +21016,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">{t('setup.dataExports', { defaultValue: 'Data exports' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and breeding projects.' })}
+                {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and pairings.' })}
               </div>
             </div>
             <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4">
@@ -21609,7 +21632,7 @@ function BreederSection({
               <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-sm">{t('setup.breedingProjects', { defaultValue: 'Breeding projects' })}</div>
+                    <div className="font-semibold text-sm">{t('setup.breedingProjects', { defaultValue: 'Pairings' })}</div>
                     <div className="text-xs text-neutral-500">
                       {t('export.selectedFields', { defaultValue: 'Selected {{selected}} of {{total}} fields.', selected: normalizedPairingExportFields.length, total: PAIRING_EXPORT_FIELD_DEFS.length })}
                     </div>
@@ -23095,7 +23118,7 @@ function AppearancePreview({ density, mode }) {
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="border rounded-xl p-3 bg-white space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.preview.card', { defaultValue: 'Card surface' })}</div>
-          <div className="font-semibold text-sm">{t('appearance.preview.demoProject', { defaultValue: 'Demo project' })}</div>
+          <div className="font-semibold text-sm">{t('appearance.preview.demoProject', { defaultValue: 'Demo pairing' })}</div>
           <p className="text-xs text-neutral-500">{t('appearance.preview.demoProjectBody', { defaultValue: 'Task timeline, feed reminders, QR workflows.' })}</p>
           <div className="flex gap-2">
             <button type="button" className="px-3 py-1.5 rounded-lg text-xs border appearance-btn appearance-btn--ghost">{t('appearance.preview.secondary', { defaultValue: 'Secondary' })}</button>
@@ -23432,7 +23455,7 @@ function ProjectCompletionPanel({
               <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
             </div>
             <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
-              {t("pairing.completion.reopen", { defaultValue: "Reopen project" })}
+              {t("pairing.completion.reopen", { defaultValue: "Reopen pairing" })}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
@@ -23460,7 +23483,7 @@ function ProjectCompletionPanel({
             </div>
           ) : null}
           <div className="text-xs text-neutral-600">
-            {t("pairing.completion.help", { defaultValue: "Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later." })}
+            {t("pairing.completion.help", { defaultValue: "Completing a pairing ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later." })}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
             <label className="flex flex-col gap-1">
@@ -23639,7 +23662,7 @@ function PairingInlineCard({
   const doneEditingParticipantsLabel = t('pairing.editParticipantsDone', { defaultValue: 'Done' });
   const maleSelectPlaceholder = t('pairing.selectMalePlaceholder', { defaultValue: 'Choose a male' });
   const femaleSelectPlaceholder = t('pairing.selectFemalePlaceholder', { defaultValue: 'Choose a female' });
-  const femaleRuleHelper = t('pairing.femaleUniqueRule', { defaultValue: 'Each female can only be in one active pairing. Update or remove the other project first.' });
+  const femaleRuleHelper = t('pairing.femaleUniqueRule', { defaultValue: 'Each female can only be in one active pairing. Update or remove the other pairing first.' });
   const clutchCardTitleLabel = t('clutchCard.clutch', { defaultValue: clutchTitleLabel });
   const clutchCardMaleLabel = t('clutchCard.male', { defaultValue: maleLabel });
   const clutchCardFemaleLabel = t('clutchCard.female', { defaultValue: femaleLabel });
@@ -25688,14 +25711,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
         {isWorkflowCompleted ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This project is marked completed. You can still record this event." })}</div>
+            <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This pairing is marked completed. You can still record this event." })}</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
-                {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep project completed and add event" })}
+                {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep pairing completed and add event" })}
               </span>
               {typeof onReopenProject === 'function' ? (
                 <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
-                  {t("clutch.reopenAddEvent", { defaultValue: "Reopen project and add event" })}
+                  {t("clutch.reopenAddEvent", { defaultValue: "Reopen pairing and add event" })}
                 </button>
               ) : null}
             </div>
@@ -26354,7 +26377,7 @@ function parseYmd(dateStr) {
 }
 
 // import tab
-function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport, onAddToBreeders }) {
+function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, importArrival = IMPORT_DEFAULT_ARRIVAL, setImportArrival, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport, onAddToBreeders }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const sheetInputRef = useRef();
@@ -26508,11 +26531,32 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     />
   );
 
+  // Shown on both panels, because a MorphMarket file replaces the first one before its review.
+  const arrivalChoice = (
+    <label className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
+      <input
+        type="checkbox"
+        className="mt-0.5"
+        checked={importArrival !== ARRIVAL.NEW}
+        onChange={e => setImportArrival?.(e.target.checked ? ARRIVAL.EXISTING : ARRIVAL.NEW)}
+      />
+      <span className="text-xs">
+        <span className="font-medium text-amber-800">
+          {t("ui.animals.import.alreadyOwned", { defaultValue: "These animals are already in my collection" })}
+        </span>
+        <span className="block mt-0.5 text-amber-700">
+          {t("ui.animals.import.alreadyOwnedHelp", { defaultValue: "Nothing is put into quarantine. Untick if they are new arrivals: each one then starts quarantine from today." })}
+        </span>
+      </span>
+    </label>
+  );
+
   // A recognised MorphMarket file replaces the panel wholesale: reviewing 26 rows needs the
   // room, and none of the manual mapping controls apply to it.
   if (morphMarketPlan || morphMarketResult) {
     return (
       <Card title={t("ui.animals.import.morphmarket.title", { defaultValue: "Import from MorphMarket" })}>
+        {!morphMarketResult && arrivalChoice}
         <MorphMarketImportReview
           plan={morphMarketPlan}
           result={morphMarketResult}
@@ -26539,8 +26583,11 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   }
 
   return (
-    <Card title={t("ui.animals.import.title", { defaultValue: "Import snakes from text" })}>
+    // No title of its own: the modal around it already says "Import animals", and one flow
+    // gets one title.
+    <Card>
       {morphMarketFileInput}
+      {arrivalChoice}
       <div className="mb-4 p-3 border rounded-xl bg-neutral-50">
         <div className="text-xs font-medium">
           {t("ui.animals.import.sourceLabel", { defaultValue: "Where are these animals coming from?" })}
@@ -26580,7 +26627,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste text exported from the PDF" })}</label>
+          <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste your animal list (text copied from a PDF)" })}</label>
           <textarea className="mt-1 w-full h-64 border rounded-xl px-3 py-2"
             value={importText} onChange={e=>setImportText(e.target.value.replace(/Ball Python\s*\(Python regius\)/ig, ''))} placeholder={t("ui.animals.import.pastePlaceholder", { defaultValue: "Paste content here..." })}/>
 
@@ -26914,7 +26961,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           <div className="text-xs font-medium">{t("ui.animals.import.previewTitle", { defaultValue: "Preview" })}</div>
           <div className="mt-1 border rounded-xl p-2 h-64 overflow-auto bg-neutral-50">
             {!importCount && (
-              <div className="text-sm text-neutral-500">{t("ui.animals.import.previewHint", { defaultValue: "Click Preview to see parsed snakes." })}</div>
+              <div className="text-sm text-neutral-500">{t("ui.animals.import.previewHint", { defaultValue: "Click Preview to see the animals found." })}</div>
             )}
             {importPreview.map((s,i)=> (
               <div key={i} className="text-sm py-1 border-b last:border-b-0">
@@ -27189,7 +27236,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
           )}
           {!clutchOptions.length && (
             <div className="mt-1 text-[11px] text-neutral-500">
-              {t("snakeEdit.parentage.noClutchesYet", { defaultValue: "No clutches recorded in the breeding tracker yet." })}
+              {t("snakeEdit.parentage.noClutchesYet", { defaultValue: "No clutches recorded under Breeding yet." })}
             </div>
           )}
         </div>
@@ -28805,7 +28852,7 @@ function prepareCalendarEventExport(event, context) {
     if (typeof event.spanOffset === 'number' && event.spanOffset > 0) return null;
     durationDays = 3;
     summary = `Breeding: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
-    if (pairing?.label) descriptionParts.push(`Project: ${pairing.label}`);
+    if (pairing?.label) descriptionParts.push(`Pairing: ${pairing.label}`);
     const lockRecordedAt = event.lockDate || event.lockLoggedAt || null;
     if (event.lockObserved && lockRecordedAt) descriptionParts.push(buildLockLogLine(lockRecordedAt));
     if (event.notes) descriptionParts.push(event.notes);

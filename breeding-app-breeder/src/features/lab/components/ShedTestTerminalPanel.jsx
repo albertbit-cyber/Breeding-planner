@@ -161,7 +161,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
         if (pricingResult.status === "fulfilled") pricing = pricingResult.value || null;
         if (catalogResult.status === "rejected" || pricingResult.status === "rejected") {
           labUnavailable = t("lab.terminal.labUnavailable", {
-            defaultValue: "The laboratory this queue is addressed to could not be read. Your saved sheds are safe; choose a laboratory again before submitting.",
+            defaultValue: "The lab these tests are addressed to could not be loaded. Your saved sheds are safe; choose a lab again before you send them.",
           });
         }
       }
@@ -176,7 +176,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       console.debug("[lab-pricing-debug] pricing response", pricing || null);
       console.debug("[lab-pricing-debug] catalog response", tests || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load Shed Test Terminal.");
+      setError(err instanceof Error ? err.message : "Unable to load lab tests.");
       setPricingConfig(null);
       setSubmittedOrders([]);
       setQueueUnavailable(false);
@@ -341,7 +341,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
   const submitBatch = async () => {
     const selected = pendingItems.filter((entry) => entry.selected);
     if (!selected.length) {
-      setError(t("lab.terminal.selectAtLeastOne", { defaultValue: "Select at least one pending shed test." }));
+      setError(t("lab.terminal.selectAtLeastOne", { defaultValue: "Pick at least one shed test to send." }));
       return;
     }
     if (!pricingConfig || loadingQuote) {
@@ -410,11 +410,11 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {t("lab.terminal.title", { defaultValue: "Shed Test Terminal" })}
+            {t("lab.terminal.title", { defaultValue: "Lab tests" })}
           </div>
           <div className="mt-1 text-[11px] text-neutral-500">
             {t("lab.terminal.subtitle", {
-              defaultValue: "Batch review and submission for pending shed tests across your snakes.",
+              defaultValue: "Shed tests waiting to go to the lab. Check them, then send them together as one order.",
             })}
           </div>
         </div>
@@ -426,8 +426,8 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
               onClick={() => setShowHistory((prev) => !prev)}
             >
               {showHistory
-                ? t("lab.terminal.hideHistory", { defaultValue: "Hide Batch History" })
-                : t("lab.terminal.showHistory", { defaultValue: "Show Batch History" })}
+                ? t("lab.terminal.hideHistory", { defaultValue: "Hide past orders" })
+                : t("lab.terminal.showHistory", { defaultValue: "Show past orders" })}
             </button>
           ) : null}
           <button type="button" className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => refreshData()}>
@@ -449,12 +449,12 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       {!loading && !pendingItems.length ? (
         <div className="mt-3 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-3 text-xs text-neutral-600">
           {queueUnavailable || sharedFeaturesEnabled
-            ? t("lab.terminal.sharedModeEmpty", { defaultValue: "Shared backend mode creates shed orders immediately. There is no pending local batch queue." })
-            : t("lab.terminal.empty", { defaultValue: "No pending shed tests yet. Add items from snake cards." })}
+            ? t("lab.terminal.sharedModeEmpty", { defaultValue: "Orders go to the lab as soon as you create them, so nothing waits here." })
+            : t("lab.terminal.empty", { defaultValue: "No shed tests waiting. Add one from an animal's card." })}
           {queueUnavailable ? (
             <div className="mt-2 text-neutral-500">
               {t("lab.terminal.sharedModeHelp", {
-                defaultValue: "Use Create Shed Test Order from a snake card. Submitted orders will appear in All Shed Orders immediately.",
+                defaultValue: "Order a shed test from an animal's card. Sent orders appear below straight away.",
               })}
             </div>
           ) : null}
@@ -466,10 +466,10 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                {t("lab.terminal.trackingTitle", { defaultValue: "Submitted Shed Test Tracking" })}
+                {t("lab.terminal.trackingTitle", { defaultValue: "Sent orders" })}
               </div>
               <div className="mt-1 text-[11px] text-neutral-500">
-                {t("lab.terminal.trackingSubtitle", { defaultValue: "Status updates for every shed test order sent from your snakes." })}
+                {t("lab.terminal.trackingSubtitle", { defaultValue: "Where each shed test order you sent stands now." })}
               </div>
             </div>
             <span className="rounded-lg border border-neutral-200 bg-white px-2 py-0.5 text-[11px] text-neutral-600">
@@ -479,7 +479,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
 
           {!sortedSubmittedOrders.length ? (
             <div className="mt-3 rounded-lg border border-dashed border-neutral-300 bg-white px-3 py-3 text-xs text-neutral-600">
-              {t("lab.terminal.trackingEmpty", { defaultValue: "No submitted shed test orders yet." })}
+              {t("lab.terminal.trackingEmpty", { defaultValue: "No shed test orders sent yet." })}
             </div>
           ) : (
             <div className="mt-3 space-y-2">
@@ -741,11 +741,11 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       {queueUnavailable ? (
         <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
           <div className="font-medium">
-            {t("lab.terminal.sharedModeDirectOrdersTitle", { defaultValue: "Direct Order Mode" })}
+            {t("lab.terminal.sharedModeDirectOrdersTitle", { defaultValue: "Orders go straight to the lab" })}
           </div>
           <div className="mt-1 text-xs text-sky-800">
             {t("lab.terminal.sharedModeDirectOrdersBody", {
-              defaultValue: "The hosted backend submits shed test orders immediately. Review pricing in the snake order modal, then create the order directly instead of building a local batch queue.",
+              defaultValue: "Each order is sent as soon as you create it. Check the price on the animal's order form, then send it from there.",
             })}
           </div>
         </div>
@@ -757,7 +757,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
               <div className="font-medium text-neutral-800">{(quote.items || []).length}</div>
             </div>
             <div>
-              <div className="text-[11px] text-neutral-500">{t("lab.terminal.total", { defaultValue: "Batch Total" })}</div>
+              <div className="text-[11px] text-neutral-500">{t("lab.terminal.total", { defaultValue: "Order total" })}</div>
               <div className="font-semibold text-neutral-900">{formatMoney(quote.currency, quote.totalCents)}</div>
             </div>
             <button
@@ -780,11 +780,11 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       {showHistory && !queueUnavailable ? (
         <div className="mt-3 space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {t("lab.terminal.batchHistory", { defaultValue: "Batch History" })}
+            {t("lab.terminal.batchHistory", { defaultValue: "Past orders" })}
           </div>
           {!batches.length ? (
             <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-              {t("lab.terminal.batchHistoryEmpty", { defaultValue: "No submitted batches yet." })}
+              {t("lab.terminal.batchHistoryEmpty", { defaultValue: "No orders sent yet." })}
             </div>
           ) : (
             batches.map((batch) => (
@@ -808,7 +808,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-[11px]"
                     onClick={() => redownloadBatch(batch.id)}
                   >
-                    {t("lab.terminal.downloadBatch", { defaultValue: "Re-download Full Batch Labels" })}
+                    {t("lab.terminal.downloadBatch", { defaultValue: "Download all labels again" })}
                   </button>
                 </div>
               </div>

@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Przyjmij",
 			"ignore": "Ignoruj",
-			"plan": "Zamień w plan",
-			"showPlan": "Pokaż plan hodowlany"
+			"plan": "Utwórz plan",
+			"showPlan": "Pokaż plan"
 		},
 		"successLabel": "sukces"
 	},

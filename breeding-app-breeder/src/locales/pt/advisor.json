@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Aceitar",
 			"ignore": "Ignorar",
-			"plan": "Converter em plano",
-			"showPlan": "Ver plano de criação"
+			"plan": "Fazer um plano",
+			"showPlan": "Ver plano"
 		},
 		"successLabel": "sucesso"
 	},

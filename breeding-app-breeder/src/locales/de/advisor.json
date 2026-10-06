@@ -51,8 +51,8 @@
 		"actions": {
 			"accept": "Annehmen",
 			"ignore": "Ignorieren",
-			"plan": "In Plan umwandeln",
-			"showPlan": "Zuchtplan anzeigen"
+			"plan": "Plan erstellen",
+			"showPlan": "Plan anzeigen"
 		},
 		"successLabel": "Erfolg"
 	},

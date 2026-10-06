@@ -1,7 +1,7 @@
 /**
  * Where collapsing an expanded pairing card should leave the keeper.
  *
- * The Breeding Tracker dashboard opens a pairing by switching to Active (or Completed)
+ * The Breeding dashboard opens a pairing by switching to Active (or Completed)
  * Projects and focusing its card, which expands it. Collapsing that card should hand the
  * keeper back to the dashboard they came from -- but only then. Someone who opened Active
  * Projects by hand, or arrived from the calendar or a snake card, expects a collapse to
