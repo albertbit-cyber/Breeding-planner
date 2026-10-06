@@ -89,6 +89,7 @@ import { DEFAULT_SPECIES_ID, getSpeciesById, resolveSpeciesId, speciesHasGeneDat
 import { syncGeneOverlay } from "./genetics/geneOverlaySync";
 import SpeciesSelect from "./components/SpeciesSelect";
 import SpeciesDashboard from "./features/species/SpeciesDashboard";
+import SpeciesGate from "./features/species/SpeciesGate";
 import {
   flattenGroupsBySpecies,
   mergeGroupsBySpecies,
@@ -7063,12 +7064,12 @@ export default function BreedingPlannerApp() {
     setTab('dashboard');
   }, []);
 
-  // Several flows (scan, deep link, "back to animals") set a per-species tab directly. Landing
-  // on one with no species open would show every species mixed into one list, which is the
-  // thing the workspaces exist to prevent -- so fall back to the dashboard instead.
-  useEffect(() => {
-    if (!speciesScope && SPECIES_SCOPED_TABS.has(tab)) setTab('dashboard');
-  }, [speciesScope, tab]);
+  // Several flows (scan, deep link, "back to animals", the phone bottom bar) land on a
+  // per-species tab with no species open. Drawing it would mix every species into one list,
+  // which is the thing the workspaces exist to prevent. It used to bounce silently to the
+  // dashboard, which on a phone read as a dead button; now the tab explains itself and offers
+  // the species list instead (SpeciesGate), and picking one keeps the tab that was asked for.
+  const speciesGateActive = !speciesScope && SPECIES_SCOPED_TABS.has(tab);
 
   const animalsMissingSpecies = useMemo(
     () => snakes.filter(snake => snake && !isDemoSnakeRecord(snake) && !String(snake.species || '').trim()),
@@ -7093,6 +7094,15 @@ export default function BreedingPlannerApp() {
     dismissSpeciesBackfill();
   }, [animalsMissingSpecies, dismissSpeciesBackfill]);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  // The phone-width stand-in for the animals toolbar's right half. Under 768px those buttons
+  // do not fit beside the filters, so the "+" opens this sheet with every one of them.
+  const [animalActionSheetOpen, setAnimalActionSheetOpen] = useState(false);
+  useEffect(() => {
+    if (!animalActionSheetOpen) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setAnimalActionSheetOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [animalActionSheetOpen]);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [pairingsView, setPairingsView] = useState('dashboard');
   // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
@@ -11577,6 +11587,7 @@ export default function BreedingPlannerApp() {
       <nav className="bp-mobile-bottom-nav">
         <div className="bp-mobile-bottom-nav__items">
           {[
+            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }) },
             { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }) },
             { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
             { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
@@ -11586,13 +11597,16 @@ export default function BreedingPlannerApp() {
             <button
               key={key}
               type="button"
+              aria-current={tab === key ? 'page' : undefined}
               className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','quarantine','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
               onClick={() => {
                 if (key === '__more') { setMobileMoreOpen(prev => !prev); }
+                // Dashboard closes any open species, exactly like the desktop tab does.
+                else if (key === 'dashboard') { leaveSpeciesWorkspace(); setMobileMoreOpen(false); }
                 else { setTab(key); setMobileMoreOpen(false); }
               }}
             >
-              <span className="bp-mobile-bottom-nav__icon">{icon}</span>
+              <span className="bp-mobile-bottom-nav__icon" aria-hidden="true">{icon}</span>
               <span className="bp-mobile-bottom-nav__label">{label}</span>
             </button>
           ))}
@@ -11617,7 +11631,38 @@ export default function BreedingPlannerApp() {
                 className="bp-more-menu__btn"
                 onClick={() => { setTab(key); setMobileMoreOpen(false); }}
               >
-                <span className="bp-more-menu__btn-icon">{icon}</span>
+                <span className="bp-more-menu__btn-icon" aria-hidden="true">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Animal action sheet: everything the desktop toolbar's right half offers, for the
+          phone widths where that half is hidden. Export list CSV stays inline in list view. */}
+      {animalActionSheetOpen && (
+        <div className="bp-more-menu" role="dialog" aria-modal="true" aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}>
+          <div className="bp-more-menu__backdrop" onClick={() => setAnimalActionSheetOpen(false)} />
+          <div className="bp-more-menu__panel bp-more-menu__panel--list">
+            {[
+              {
+                key: 'add',
+                icon: '+',
+                label: speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" }),
+                run: startNewAnimalDraft,
+              },
+              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true) },
+              { key: 'exportQr', icon: '▦', label: t("actions.exportQr"), run: () => setShowExportModal(true) },
+              { key: 'scanQr', icon: '⌖', label: t("actions.scanQr"), run: () => setShowScanner(true) },
+            ].map(({ key, icon, label, run }) => (
+              <button
+                key={key}
+                type="button"
+                className="bp-more-menu__row"
+                onClick={() => { setAnimalActionSheetOpen(false); run(); }}
+              >
+                <span className="bp-more-menu__row-icon" aria-hidden="true">{icon}</span>
                 {label}
               </button>
             ))}
@@ -11675,7 +11720,17 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "animals" && (
+        {speciesGateActive && (
+          <SpeciesGate
+            summaries={speciesSummaries}
+            onOpenSpecies={(speciesId) => openSpeciesWorkspace(speciesId, tab)}
+            onAddAnimal={startNewAnimalDraft}
+            onImportCollection={() => setShowImportModal(true)}
+            t={t}
+          />
+        )}
+
+        {tab === "animals" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
             <div className="bp-toolbar flex flex-wrap items-center gap-2">
               <div className="bp-filter-tabs flex flex-wrap items-center gap-2">
@@ -11766,13 +11821,17 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
               )}
-              {/* Mobile FAB for Add Animal — only visible via CSS on mobile */}
+              {/* Phone-width FAB, only visible via CSS under 768px. It opens the action sheet
+                  rather than adding straight away: the toolbar buttons it stands in for are
+                  hidden at that width, and Import must not go with them. */}
               <button
                 type="button"
                 className="bp-fab"
-                onClick={() => { setNewAnimal(createEmptyNewAnimalDraft()); setShowAddModal(true); }}
-                aria-label={t("actions.addAnimal")}
-                title={t("actions.addAnimal")}
+                onClick={() => setAnimalActionSheetOpen(true)}
+                aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}
+                aria-haspopup="dialog"
+                aria-expanded={animalActionSheetOpen}
+                title={t("actions.animalActions", { defaultValue: "Animal actions" })}
               >
                 +
               </button>
@@ -11782,13 +11841,13 @@ export default function BreedingPlannerApp() {
                     moved out to the header — it plans the whole collection, not this list. */}
                 <button
                   onClick={startNewAnimalDraft}
-                  className={toolbarControlClass}
+                  className={cx(toolbarControlClass, 'bp-toolbar-action')}
                 >
                   + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
-                <button onClick={() => setShowImportModal(true)} className={toolbarControlClass}>{t("actions.importAnimals")}</button>
-                <button onClick={()=>setShowExportModal(true)} className={toolbarControlClass}>{t("actions.exportQr")}</button>
-                <button onClick={()=>setShowScanner(true)} className={toolbarControlClass}>{t("actions.scanQr")}</button>
+                <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
                 {isAnimalScannerView && (
@@ -12153,7 +12212,7 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "advisor" && (
+        {tab === "advisor" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
             <BreedersGroupGate
               purpose="advisor"
@@ -12174,7 +12233,7 @@ export default function BreedingPlannerApp() {
           </div>
         )}
 
-        {tab === "pairings" && (
+        {tab === "pairings" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -12565,7 +12624,7 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "familyTree" && (
+        {tab === "familyTree" && !speciesGateActive && (
           <FamilyTreePage snakes={scopedSnakes} pairings={scopedPairings} focusSnakeId={familyTreeFocusSnakeId} />
         )}
       </div>

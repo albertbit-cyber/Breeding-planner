@@ -3396,10 +3396,14 @@
 .bp-mobile-bottom-nav__items {
   display: flex;
   align-items: stretch;
+  /* Fill the bar: as a bare flex child it shrank to its content and six labels clipped. */
+  flex: 1;
+  min-width: 0;
 }
 
 .bp-mobile-bottom-nav__item {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3428,6 +3432,12 @@
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  /* Six items at 390px leave about 60px each; a long translation ("Tableau de bord") is
+     clipped rather than allowed to widen the bar past the screen. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── More menu overlay ───────────────────────────────────────── */
@@ -3482,6 +3492,42 @@
 .bp-more-menu__btn-icon {
   font-size: 1.5rem;
   line-height: 1;
+}
+
+/* List variant: an action sheet reads as verbs, one per row, not as a grid of places. */
+.bp-more-menu__panel--list {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 8px;
+}
+
+.bp-more-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--sk-text-secondary, #374151);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bp-more-menu__row:active {
+  background: var(--sk-surface-2, #f3f4f6);
+}
+
+.bp-more-menu__row-icon {
+  width: 28px;
+  flex: none;
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--sk-series-4, #3c1b73);
 }
 
 /* ── Snake card mobile improvements ──────────────────────────── */
@@ -3854,7 +3900,9 @@
     align-items: stretch !important;
     gap: 10px !important;
   }
-  .bp-toolbar-right {
+  /* The action buttons step aside for the "+" action sheet, which offers every one of them.
+     The scanner status stays: it reports state, and there is room for one small pill. */
+  .bp-toolbar-action {
     display: none !important;
   }
 }
