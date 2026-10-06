@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import {
   calculateOrderPrice,
@@ -19,14 +20,29 @@ import {
  */
 
 const TIERS = [
-  { key: "1to9", label: "1–9 animals", first: "morphTier1to9FirstTest", additional: "morphTier1to9AdditionalTest", sex: "sexTier1to9" },
-  { key: "10to49", label: "10–49 animals", first: "morphTier10to49FirstTest", additional: "morphTier10to49AdditionalTest", sex: "sexTier10to49" },
-  { key: "50plus", label: "50+ animals", first: "morphTier50PlusFirstTest", additional: "morphTier50PlusAdditionalTest", sex: "sexTier50Plus" },
+  { key: "1to9", first: "morphTier1to9FirstTest", additional: "morphTier1to9AdditionalTest", sex: "sexTier1to9" },
+  { key: "10to49", first: "morphTier10to49FirstTest", additional: "morphTier10to49AdditionalTest", sex: "sexTier10to49" },
+  { key: "50plus", first: "morphTier50PlusFirstTest", additional: "morphTier50PlusAdditionalTest", sex: "sexTier50Plus" },
 ];
 
 const PRICE_FIELDS = TIERS.flatMap((tier) => [tier.first, tier.additional, tier.sex]);
 
-const TIER_LABELS = { tier_1_9: "1–9 animals", tier_10_49: "10–49 animals", tier_50_plus: "50+ animals" };
+// Accepts both the form's tier keys and the quote's tier ids; anything else is shown as-is.
+const tierLabel = (t, tier) => {
+  switch (tier) {
+    case "1to9":
+    case "tier_1_9":
+      return t("lab.pricing.tier1to9", { defaultValue: "1–9 animals" });
+    case "10to49":
+    case "tier_10_49":
+      return t("lab.pricing.tier10to49", { defaultValue: "10–49 animals" });
+    case "50plus":
+    case "tier_50_plus":
+      return t("lab.pricing.tier50plus", { defaultValue: "50+ animals" });
+    default:
+      return tier;
+  }
+};
 
 const formatMoney = (value, currency) => {
   const amount = Number(value);
@@ -46,6 +62,7 @@ const toForm = (pricing) => ({
 const createBlankAnimal = (index) => ({ animalId: `animal-${index + 1}`, selectedTestIds: [] });
 
 export default function PricingLogicPage() {
+  const { t } = useTranslation();
   const [pricing, setPricing] = useState(null);
   const [form, setForm] = useState(() => toForm(null));
   const [organizationId, setOrganizationId] = useState("");
@@ -75,7 +92,11 @@ export default function PricingLogicPage() {
         setOrganizationId(String(profileData?.lab?.organizationId || ""));
         setTests(Array.isArray(rows) ? rows : []);
       } catch (error) {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : "Could not load your prices.");
+        if (!cancelled) {
+          setLoadError(
+            error instanceof Error ? error.message : t("lab.pricing.loadFailed", { defaultValue: "Could not load your prices." })
+          );
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -100,18 +121,22 @@ export default function PricingLogicPage() {
       for (const field of PRICE_FIELDS) {
         const amount = Number(String(form[field]).replace(",", "."));
         if (!Number.isFinite(amount) || amount < 0) {
-          throw new Error("Prices must be zero or a positive amount.");
+          throw new Error(t("lab.pricing.invalidPrice", { defaultValue: "Prices must be zero or a positive amount." }));
         }
         payload[field] = amount;
       }
       const data = await updateMyLabPricing(payload);
       setPricing(data?.pricing || null);
       setForm(toForm(data?.pricing));
-      setSaveState({ saving: false, error: "", message: "Prices saved. New quotes and orders use them from now on." });
+      setSaveState({
+        saving: false,
+        error: "",
+        message: t("lab.pricing.saved", { defaultValue: "Prices saved. New quotes and orders use them from now on." }),
+      });
     } catch (error) {
       setSaveState({
         saving: false,
-        error: error instanceof Error ? error.message : "Could not save your prices.",
+        error: error instanceof Error ? error.message : t("lab.pricing.saveFailed", { defaultValue: "Could not save your prices." }),
         message: "",
       });
     }
@@ -166,7 +191,9 @@ export default function PricingLogicPage() {
       setQuoteError("");
     } catch (error) {
       setQuote(null);
-      setQuoteError(error instanceof Error ? error.message : "Could not price this order.");
+      setQuoteError(
+        error instanceof Error ? error.message : t("lab.pricing.quoteFailed", { defaultValue: "Could not price this order." })
+      );
     }
   }, [animals, organizationId]);
 
@@ -183,11 +210,12 @@ export default function PricingLogicPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-xl font-semibold text-neutral-900">Pricing</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">{t("lab.shell.nav.pricing", { defaultValue: "Pricing" })}</h1>
         <p className="text-sm text-neutral-600">
-          Your laboratory's own prices. The tier is chosen by the number of animals in an order; morph tests are
-          charged per animal, the first test at the first-test price and each further one at the additional price.
-          A test with its own flat or per-tier price in the Test Catalog uses that instead.
+          {t("lab.pricing.subtitle", {
+            defaultValue:
+              "Your laboratory's own prices. The tier is chosen by the number of animals in an order; morph tests are charged per animal, the first test at the first-test price and each further one at the additional price. A test with its own flat or per-tier price in the Test Catalog uses that instead.",
+          })}
         </p>
       </header>
 
@@ -197,34 +225,38 @@ export default function PricingLogicPage() {
 
       <form onSubmit={handleSave} className="space-y-3 rounded-2xl border border-neutral-200 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-neutral-900">Tier prices</h2>
+          <h2 className="text-base font-semibold text-neutral-900">
+            {t("lab.pricing.tierPrices", { defaultValue: "Tier prices" })}
+          </h2>
           <label className="flex items-center gap-2 text-sm text-neutral-700">
-            Currency
+            {t("lab.catalog.fieldCurrency", { defaultValue: "Currency" })}
             <input
               className="w-20 rounded-lg border border-neutral-300 px-2 py-1 uppercase"
               value={form.currency}
               maxLength={3}
               onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}
               disabled={isLoading}
-              aria-label="Currency code"
+              aria-label={t("lab.pricing.currencyCode", { defaultValue: "Currency code" })}
             />
           </label>
         </div>
 
         <div className="overflow-auto rounded-xl border border-neutral-200">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
+            <thead className="bg-neutral-50 text-start text-xs text-neutral-500">
               <tr>
-                <th className="px-3 py-2">Order size</th>
-                <th className="px-3 py-2">First morph test</th>
-                <th className="px-3 py-2">Each additional morph test</th>
-                <th className="px-3 py-2">Sex determination</th>
+                <th className="px-3 py-2">{t("lab.pricing.colOrderSize", { defaultValue: "Order size" })}</th>
+                <th className="px-3 py-2">{t("lab.pricing.colFirstMorph", { defaultValue: "First morph test" })}</th>
+                <th className="px-3 py-2">
+                  {t("lab.pricing.colEachAdditional", { defaultValue: "Each additional morph test" })}
+                </th>
+                <th className="px-3 py-2">{t("lab.pricing.colSexDetermination", { defaultValue: "Sex determination" })}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {TIERS.map((tier) => (
                 <tr key={tier.key}>
-                  <td className="px-3 py-2 font-medium text-neutral-900">{tier.label}</td>
+                  <td className="px-3 py-2 font-medium text-neutral-900">{tierLabel(t, tier.key)}</td>
                   {[tier.first, tier.additional, tier.sex].map((field) => (
                     <td key={field} className="px-3 py-2">
                       <input
@@ -236,7 +268,15 @@ export default function PricingLogicPage() {
                         value={form[field]}
                         onChange={(event) => setForm((prev) => ({ ...prev, [field]: event.target.value }))}
                         disabled={isLoading}
-                        aria-label={`${tier.label}: ${field.includes("sex") ? "sex determination" : field.includes("Additional") ? "additional morph test" : "first morph test"}`}
+                        aria-label={t("lab.pricing.priceFieldAria", {
+                          defaultValue: "{{tier}}: {{field}}",
+                          tier: tierLabel(t, tier.key),
+                          field: field.includes("sex")
+                            ? t("lab.pricing.fieldSexDetermination", { defaultValue: "sex determination" })
+                            : field.includes("Additional")
+                              ? t("lab.pricing.fieldAdditionalMorph", { defaultValue: "additional morph test" })
+                              : t("lab.pricing.fieldFirstMorph", { defaultValue: "first morph test" }),
+                        })}
                       />
                     </td>
                   ))}
@@ -259,33 +299,48 @@ export default function PricingLogicPage() {
             className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isLoading || saveState.saving || !isDirty}
           >
-            {saveState.saving ? "Saving…" : "Save prices"}
+            {saveState.saving
+              ? t("lab.pricing.saving", { defaultValue: "Saving…" })
+              : t("lab.pricing.save", { defaultValue: "Save prices" })}
           </button>
           <span className="text-xs text-neutral-500">
-            Orders already placed keep the price they were quoted. Only owners and administrators can change prices.
+            {t("lab.pricing.saveHelp", {
+              defaultValue:
+                "Orders already placed keep the price they were quoted. Only owners and administrators can change prices.",
+            })}
           </span>
         </div>
       </form>
 
       <section className="space-y-4 rounded-2xl border border-neutral-200 p-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-neutral-900">What a breeder would pay</h2>
+          <h2 className="text-base font-semibold text-neutral-900">
+            {t("lab.pricing.previewTitle", { defaultValue: "What a breeder would pay" })}
+          </h2>
           <p className="text-sm text-neutral-600">
-            Priced by the same calculation as a real order, using your saved prices and the tests breeders can see.
+            {t("lab.pricing.previewHelp", {
+              defaultValue:
+                "Priced by the same calculation as a real order, using your saved prices and the tests breeders can see.",
+            })}
           </p>
         </div>
 
         {isLoading ? (
-          <div className="text-sm text-neutral-500">Loading…</div>
+          <div className="text-sm text-neutral-500">{t("lab.common.loading", { defaultValue: "Loading…" })}</div>
         ) : !orderableTests.length ? (
           <div className="rounded-xl border border-dashed border-neutral-300 px-3 py-3 text-sm text-neutral-600">
-            No tests are on offer to breeders yet. Add one in the{" "}
-            <a className="underline" href="#/lab/test-catalog">Test Catalog</a> to preview a quote.
+            <Trans
+              i18nKey="lab.pricing.noTests"
+              defaults="No tests are on offer to breeders yet. Add one in the <0>Test Catalog</0> to preview a quote."
+              components={[<a key="catalog" className="underline" href="#/lab/test-catalog" />]}
+            />
           </div>
         ) : (
           <>
             <div className="flex items-center gap-3 text-sm">
-              <label className="text-neutral-700" htmlFor="animal-count">Animals in order</label>
+              <label className="text-neutral-700" htmlFor="animal-count">
+                {t("lab.pricing.animalsInOrder", { defaultValue: "Animals in order" })}
+              </label>
               <input
                 id="animal-count"
                 type="number"
@@ -297,7 +352,7 @@ export default function PricingLogicPage() {
               />
               {quote ? (
                 <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
-                  {TIER_LABELS[quote.tier] || quote.tier}
+                  {tierLabel(t, quote.tier)}
                 </span>
               ) : null}
             </div>
@@ -305,7 +360,9 @@ export default function PricingLogicPage() {
             <div className="space-y-3">
               {animals.map((animal, index) => (
                 <fieldset key={`animal-row-${index}`} className="rounded-xl border border-neutral-200 p-3">
-                  <legend className="px-1 text-xs uppercase tracking-wide text-neutral-500">Animal {index + 1}</legend>
+                  <legend className="px-1 text-xs uppercase tracking-wide text-neutral-500">
+                    {t("lab.pricing.animalNumber", { defaultValue: "Animal {{number}}", number: index + 1 })}
+                  </legend>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {orderableTests.map((test) => (
                       <label key={`${index}-${test.id}`} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1 text-sm">
@@ -329,21 +386,23 @@ export default function PricingLogicPage() {
             {quote ? (
               <div className="overflow-auto rounded-xl border border-neutral-200">
                 <table className="w-full text-sm">
-                  <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
+                  <thead className="bg-neutral-50 text-start text-xs text-neutral-500">
                     <tr>
-                      <th className="px-3 py-2">Animal</th>
-                      <th className="px-3 py-2">First morph test</th>
-                      <th className="px-3 py-2">Additional morph tests</th>
-                      <th className="px-3 py-2">Sex</th>
-                      <th className="px-3 py-2">Panels</th>
-                      <th className="px-3 py-2">Line total</th>
+                      <th className="px-3 py-2">{t("lab.pricing.colAnimal", { defaultValue: "Animal" })}</th>
+                      <th className="px-3 py-2">{t("lab.pricing.colFirstMorph", { defaultValue: "First morph test" })}</th>
+                      <th className="px-3 py-2">
+                        {t("lab.pricing.colAdditionalMorphs", { defaultValue: "Additional morph tests" })}
+                      </th>
+                      <th className="px-3 py-2">{t("lab.pricing.colSex", { defaultValue: "Sex" })}</th>
+                      <th className="px-3 py-2">{t("lab.pricing.colPanels", { defaultValue: "Panels" })}</th>
+                      <th className="px-3 py-2">{t("lab.pricing.colLineTotal", { defaultValue: "Line total" })}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
                     {(quote.perAnimal || []).map((row, index) => (
                       <tr key={`quote-${index}`}>
                         <td className="px-3 py-2 font-medium text-neutral-900">
-                          Animal {index + 1}
+                          {t("lab.pricing.animalNumber", { defaultValue: "Animal {{number}}", number: index + 1 })}
                           <div className="text-xs font-normal text-neutral-500">
                             {(animals.filter((a) => a.selectedTestIds.length)[index]?.selectedTestIds || [])
                               .map((id) => testNameById.get(id))
@@ -361,14 +420,18 @@ export default function PricingLogicPage() {
                   </tbody>
                   <tfoot className="bg-neutral-50 text-sm">
                     <tr>
-                      <td className="px-3 py-2 font-semibold text-neutral-900" colSpan={5}>Order total</td>
+                      <td className="px-3 py-2 font-semibold text-neutral-900" colSpan={5}>
+                        {t("lab.pricing.orderTotal", { defaultValue: "Order total" })}
+                      </td>
                       <td className="px-3 py-2 font-semibold text-neutral-900">{formatMoney(quote.total, quote.currency || currency)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             ) : !quoteError ? (
-              <div className="text-sm text-neutral-500">Tick a test to see the price.</div>
+              <div className="text-sm text-neutral-500">
+                {t("lab.pricing.tickToPrice", { defaultValue: "Tick a test to see the price." })}
+              </div>
             ) : null}
           </>
         )}

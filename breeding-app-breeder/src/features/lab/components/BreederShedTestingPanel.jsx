@@ -538,7 +538,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
   };
 
   return (
-    <SharedBackendGuard featureName="Breeder shed testing history">
+    <SharedBackendGuard featureName={t("lab.shedTesting.historyFeatureName", { defaultValue: "Breeder shed testing history" })}>
     <>
     <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex items-center justify-between gap-2">
@@ -606,7 +606,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
               <div key={order.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-neutral-800">{order.orderNumber || order.id}</div>
+                    <div className="truncate text-sm font-medium text-neutral-800"><bdi>{order.orderNumber || order.id}</bdi></div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <StatusBadge label={statusLabel} tone={statusTone} />
@@ -742,7 +742,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                     ) : details ? (
                       <div className="space-y-1">
                         <div>
-                          <span className="font-semibold text-neutral-600">{t("lab.orders.details.orderNumber", { defaultValue: "Order Number" })}:</span> {details.orderNumber || details.id}
+                          <span className="font-semibold text-neutral-600">{t("lab.orders.details.orderNumber", { defaultValue: "Order Number" })}:</span> <bdi>{details.orderNumber || details.id}</bdi>
                         </div>
                         <div>
                           <span className="font-semibold text-neutral-600">{t("lab.orders.details.labId", { defaultValue: "Lab" })}:</span> {details.labId}

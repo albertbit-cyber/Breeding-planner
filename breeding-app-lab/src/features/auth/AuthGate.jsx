@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
   acceptInvite as acceptInviteApi,
   clearAuthToken,
@@ -10,6 +10,7 @@ import {
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
+import { backendMessageText } from "../../components/backendMessageText.js";
 
 /**
  * The Lab Portal's authentication gate.
@@ -186,7 +187,11 @@ export default function AuthGate({ children }) {
       })
       .catch((error) => {
         setInvite(null);
-        setInviteError(error instanceof Error ? error.message : "This invitation link is not valid.");
+        setInviteError(
+          error instanceof Error
+            ? error.message
+            : t("auth:lab.invite.invalidLink", { defaultValue: "This invitation link is not valid." })
+        );
       })
       .finally(() => setBusy(false));
   }, [inviteToken]);
@@ -214,7 +219,9 @@ export default function AuthGate({ children }) {
       }
       signedInAs(response?.user, email);
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Sign in failed.");
+      setLoginError(
+        error instanceof Error ? error.message : t("auth:lab.signInFailed", { defaultValue: "Sign in failed." })
+      );
     } finally {
       setBusy(false);
     }
@@ -267,7 +274,11 @@ export default function AuthGate({ children }) {
         })
       );
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Could not send your application.");
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : t("auth:lab.applyFailed", { defaultValue: "Could not send your application." })
+      );
     } finally {
       setBusy(false);
     }
@@ -278,17 +289,19 @@ export default function AuthGate({ children }) {
     setInviteError("");
     const fullName = String(inviteForm.fullName || "").trim();
     if (!fullName) {
-      setInviteError("Enter your name.");
+      setInviteError(t("auth:lab.invite.nameRequired", { defaultValue: "Enter your name." }));
       return;
     }
     const needsPassword = invite?.requiresPassword;
     if (needsPassword) {
       if (String(inviteForm.password || "").length < 8) {
-        setInviteError("Choose a password of at least 8 characters.");
+        setInviteError(
+          t("auth:lab.invite.passwordLength", { defaultValue: "Choose a password of at least 8 characters." })
+        );
         return;
       }
       if (inviteForm.password !== inviteForm.confirmPassword) {
-        setInviteError("Those passwords do not match.");
+        setInviteError(t("auth:lab.invite.passwordMismatch", { defaultValue: "Those passwords do not match." }));
         return;
       }
     }
@@ -306,13 +319,17 @@ export default function AuthGate({ children }) {
       window.location.hash = "#/lab/dashboard";
       setInviteToken("");
       if (result?.requiresSignIn) {
-        setNotice("Invitation accepted. Sign in to continue.");
+        setNotice(t("auth:lab.invite.acceptedSignIn", { defaultValue: "Invitation accepted. Sign in to continue." }));
         setLoginValues({ email: String(result.email || ""), password: "" });
         return;
       }
       signedInAs(result?.user, String(invite?.email || ""));
     } catch (error) {
-      setInviteError(error instanceof Error ? error.message : "Could not accept this invitation.");
+      setInviteError(
+        error instanceof Error
+          ? error.message
+          : t("auth:lab.invite.acceptFailed", { defaultValue: "Could not accept this invitation." })
+      );
     } finally {
       setBusy(false);
     }
@@ -328,7 +345,9 @@ export default function AuthGate({ children }) {
       <div className="auth-shell lab-auth">
         <div className="auth-card">
           <h1 className="auth-card-title">
-            {invite?.kind === "vendor_lab" ? "Set up your laboratory" : "Join the team"}
+            {invite?.kind === "vendor_lab"
+              ? t("auth:lab.invite.setUpTitle", { defaultValue: "Set up your laboratory" })
+              : t("auth:lab.invite.joinTitle", { defaultValue: "Join the team" })}
           </h1>
 
           {inviteError ? <div className="auth-error">{inviteError}</div> : null}
@@ -337,24 +356,39 @@ export default function AuthGate({ children }) {
             <>
               <p className="auth-subtitle">
                 {invite.kind === "vendor_lab" ? (
-                  <>
-                    You have been invited to run <strong>{invite.organizationName}</strong> on
-                    Serpentora. Accepting creates your laboratory's own workspace.
-                  </>
+                  <Trans
+                    ns="auth"
+                    i18nKey="lab.invite.runLab"
+                    defaults="You have been invited to run <0>{{lab}}</0> on Serpentora. Accepting creates your laboratory's own workspace."
+                    values={{ lab: invite.organizationName }}
+                    components={[<strong key="lab" />]}
+                  />
                 ) : (
-                  <>
-                    You have been invited to join <strong>{invite.organizationName}</strong> as{" "}
-                    {String(invite.role || "member").replace(/_/g, " ")}.
-                  </>
+                  <Trans
+                    ns="auth"
+                    i18nKey="lab.invite.joinLab"
+                    defaults="You have been invited to join <0>{{lab}}</0> as {{role}}."
+                    values={{
+                      lab: invite.organizationName,
+                      role: String(invite.role || "member").replace(/_/g, " "),
+                    }}
+                    components={[<strong key="lab" />]}
+                  />
                 )}
               </p>
               <p className="auth-subtitle">
-                Invitation for <strong>{invite.email}</strong>
+                <Trans
+                  ns="auth"
+                  i18nKey="lab.invite.invitationFor"
+                  defaults="Invitation for <0>{{email}}</0>"
+                  values={{ email: invite.email }}
+                  components={[<strong key="email" />]}
+                />
               </p>
 
               <form onSubmit={handleAcceptInvite}>
                 <label>
-                  Your name
+                  {t("auth:lab.applyContact", { defaultValue: "Your name" })}
                   <input
                     value={inviteForm.fullName}
                     onChange={(e) => setInviteForm((p) => ({ ...p, fullName: e.target.value }))}
@@ -365,7 +399,7 @@ export default function AuthGate({ children }) {
                 {invite.requiresPassword ? (
                   <>
                     <label>
-                      Choose a password
+                      {t("auth:lab.invite.choosePassword", { defaultValue: "Choose a password" })}
                       <input
                         type="password"
                         value={inviteForm.password}
@@ -375,7 +409,7 @@ export default function AuthGate({ children }) {
                       />
                     </label>
                     <label>
-                      Confirm password
+                      {t("auth:fields.confirmPassword", { defaultValue: "Confirm password" })}
                       <input
                         type="password"
                         value={inviteForm.confirmPassword}
@@ -388,18 +422,26 @@ export default function AuthGate({ children }) {
                   </>
                 ) : (
                   <p className="auth-subtitle">
-                    This address already has an account — accept, then sign in with your existing
-                    password.
+                    {t("auth:lab.invite.existingAccount", {
+                      defaultValue:
+                        "This address already has an account — accept, then sign in with your existing password.",
+                    })}
                   </p>
                 )}
 
                 <button type="submit" className="primary" disabled={busy}>
-                  {busy ? "Working…" : "Accept invitation"}
+                  {busy
+                    ? t("auth:lab.invite.working", { defaultValue: "Working…" })
+                    : t("auth:lab.invite.accept", { defaultValue: "Accept invitation" })}
                 </button>
               </form>
             </>
           ) : (
-            !inviteError && <p className="auth-subtitle">Checking your invitation…</p>
+            !inviteError && (
+              <p className="auth-subtitle">
+                {t("auth:lab.invite.checking", { defaultValue: "Checking your invitation…" })}
+              </p>
+            )
           )}
         </div>
       </div>
@@ -424,7 +466,7 @@ export default function AuthGate({ children }) {
 
         {snapshot.state === "unreachable" ? (
           <div className="auth-error">
-            {snapshot?.message ||
+            {backendMessageText(t, snapshot?.message) ||
               t("auth:sharedBackend.unreachable", { defaultValue: "The backend is unreachable." })}
             <button type="button" className="ghost" onClick={retry}>
               {t("common.retry", { defaultValue: "Retry" })}
@@ -444,7 +486,7 @@ export default function AuthGate({ children }) {
               />
             </label>
             <button type="submit" className="primary" disabled={busy}>
-              {busy ? "Sending…" : t("auth:reset.send", { defaultValue: "Send reset link" })}
+              {busy ? t("common.sending", { defaultValue: "Sending…" }) : t("auth:reset.send", { defaultValue: "Send reset link" })}
             </button>
             <button type="button" className="ghost" onClick={() => setIsResetting(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}
@@ -473,7 +515,7 @@ export default function AuthGate({ children }) {
               />
             </label>
             <button type="submit" className="primary" disabled={busy}>
-              {busy ? "Signing in…" : t("auth:actions.login", { defaultValue: "Sign in" })}
+              {busy ? t("auth:lab.signingIn", { defaultValue: "Signing in…" }) : t("auth:actions.login", { defaultValue: "Sign in" })}
             </button>
             <button
               type="button"

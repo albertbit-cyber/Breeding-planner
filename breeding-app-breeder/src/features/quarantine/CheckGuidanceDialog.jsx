@@ -76,7 +76,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
             <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">
               {t('quarantine.guide.howTo', { defaultValue: 'How to check' })}
             </div>
-            <ol className="list-decimal pl-4 flex flex-col gap-1 text-xs text-neutral-700">
+            <ol className="list-decimal ps-4 flex flex-col gap-1 text-xs text-neutral-700">
               {guidance.howTo.map((step, position) => <li key={position}>{step}</li>)}
             </ol>
           </div>

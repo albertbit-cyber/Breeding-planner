@@ -1,9 +1,9 @@
 {
 	"title": "Conseiller en élevage",
-	"description": "Nous n'examinons que les animaux étiquetés dans le groupe <strong>Breeders</strong> et mettons en avant les accouplements ayant une très forte probabilité de produire votre morphe cible sélectionné.",
+	"description": "Nous n'examinons que les animaux étiquetés dans le groupe <strong>Breeders</strong> et mettons en avant les accouplements ayant une très forte probabilité de produire le morph visé.",
 	"goal": {
 		"label": "Objectif (Nom et Traits)",
-		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"placeholder": "Clown visual : Clown, het Desert Ghost",
 		"tip": "Conseil de format : « Nom de l'objectif : trait un, trait deux ». Si vous ne listez que des traits, nous créerons un objectif générique.",
 		"defaultName": "Objectif personnalisé"
 	},
@@ -75,9 +75,9 @@
 			"none": "Normal"
 		},
 		"expectation": {
-			"none-visual": "100% het",
-			"het-het": "≈66% het",
-			"het-none": "≈50% het"
+			"none-visual": "100 % het",
+			"het-het": "≈66 % het",
+			"het-none": "≈50 % het"
 		}
 	},
 	"labels": {
@@ -88,7 +88,7 @@
 	},
 	"outcomes": {
 		"none": "Aucune projection disponible.",
-		"unknownMorph": "Morphe inconnu",
+		"unknownMorph": "Morph inconnu",
 		"probability": "{{genotype}} ({{chance}} de chance d'apparition)"
 	},
 	"goals": {
@@ -119,9 +119,9 @@
 		"minProbability": "Probabilité minimale ({{percent}}%)",
 		"weight": "Poids ({{value}})",
 		"idLabel": "ID : {{id}}",
-		"loadPreset": "Charger un Preset",
+		"loadPreset": "Charger un préréglage",
 		"presets": {
-			"title": "Presets",
+			"title": "Préréglages",
 			"close": "Fermer"
 		},
 		"defaultName": "Nouvel objectif"

@@ -95,7 +95,7 @@ export default function SpeciesBreedingTable({
               tabIndex={0}
               onClick={openAll}
               onKeyDown={pressKeys(openAll)}
-              className="flex-1 min-w-0 text-left text-sm font-medium truncate rounded-lg px-1 py-1 cursor-pointer hover:text-[#3c1b73] focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="flex-1 min-w-0 text-start text-sm font-medium truncate rounded-lg px-1 py-1 cursor-pointer hover:text-[#3c1b73] focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
               {row.name}
             </div>

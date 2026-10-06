@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -25,18 +25,11 @@ const LANGUAGES = [
   ["he", "עברית"],
 ];
 
-const RTL = new Set(["he", "ar", "fa", "ur"]);
-
 export default function LanguageMenu() {
   const { t, i18n } = useTranslation("marketplace");
   const current = (i18n.language || "en").split("-")[0];
 
-  // Hebrew has to flip the whole document, not just the copy.
-  useEffect(() => {
-    const root = document.documentElement;
-    root.lang = current;
-    root.dir = RTL.has(current) ? "rtl" : "ltr";
-  }, [current]);
+  // <html lang dir> follows the language from src/i18n/index.js.
 
   return (
     <label className="mk-langmenu">

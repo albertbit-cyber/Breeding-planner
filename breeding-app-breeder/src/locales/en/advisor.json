@@ -167,6 +167,12 @@
 		"strongPairings": "{{count}} strong pairings found",
 		"titleRunning": "Breeding Advisor Running",
 		"viewResults": "View Results",
-		"waiting": "Waiting for analysis to start..."
+		"waiting": "Waiting for analysis to start...",
+		"stepStatus": {
+			"completed": "Completed",
+			"failed": "Failed",
+			"pending": "Pending",
+			"running": "Running"
+		}
 	}
 }

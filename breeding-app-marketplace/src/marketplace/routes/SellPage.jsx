@@ -485,7 +485,7 @@ export default function SellPage() {
                     className="mk-input"
                     value={draft.category}
                     onChange={(event) => setDraft({ ...draft, category: event.target.value })}
-                    placeholder="Juvenile"
+                    placeholder={t("sell.categoryPlaceholder", { defaultValue: "Juvenile" })}
                   />
                 </label>
               </div>

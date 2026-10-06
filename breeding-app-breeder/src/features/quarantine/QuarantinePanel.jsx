@@ -442,7 +442,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                         : null}
                       <button
                         type="button"
-                        className="ml-auto text-[11px] text-neutral-400 hover:text-rose-600"
+                        className="ms-auto text-[11px] text-neutral-400 hover:text-rose-600"
                         onClick={() => patch(current => removeQuarantineTest(current, test.id))}
                       >
                         {t('actions.delete', { defaultValue: 'Delete' })}

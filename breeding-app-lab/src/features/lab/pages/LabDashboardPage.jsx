@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import LabOrderQueueWidget from "../components/dashboard/LabOrderQueueWidget.jsx";
 import { useLabDashboardData } from "../hooks/useLabDashboardData";
 
@@ -10,15 +11,21 @@ const openOrderRoute = (orderId) => {
 };
 
 export default function LabDashboardPage() {
+  const { t } = useTranslation();
   const { sections, isLoading, error, refetch } = useLabDashboardData();
 
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Laboratory Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-neutral-900">
+            {t("lab.dashboard.title", { defaultValue: "Laboratory Dashboard" })}
+          </h1>
           <p className="mt-1 text-sm text-neutral-600">
-            Operational queues for order triage, payment follow-up, sample receipt, active testing, and completion tracking.
+            {t("lab.dashboard.subtitle", {
+              defaultValue:
+                "Operational queues for order triage, payment follow-up, sample receipt, active testing, and completion tracking.",
+            })}
           </p>
         </div>
         <button
@@ -27,13 +34,15 @@ export default function LabDashboardPage() {
           disabled={isLoading}
           onClick={refetch}
         >
-          {isLoading ? "Refreshing..." : "Refresh"}
+          {isLoading
+            ? t("lab.common.refreshing", { defaultValue: "Refreshing..." })
+            : t("lab.common.refresh", { defaultValue: "Refresh" })}
         </button>
       </header>
 
       {isLoading ? (
         <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-          Loading lab queues...
+          {t("lab.dashboard.loading", { defaultValue: "Loading lab queues..." })}
         </div>
       ) : null}
 

@@ -98,6 +98,11 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Locales cover every source key in all ten languages
+        # Fails on a translation key used in source but missing from English,
+        # and on any English key missing from one of the other nine languages.
+        run: npm run i18n:verify:apps
+
       - name: Install Playwright browsers
         run: |
           npm --prefix breeding-app-lab exec playwright install chromium

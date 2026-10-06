@@ -1,72 +1,72 @@
 ﻿{
-	"title": "Breeding Advisor",
-	"description": "We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal.",
+	"title": "Doradca hodowlany",
+	"description": "Bierzemy pod uwagę tylko zwierzęta z grupy <strong>Breeders</strong> i pokazujemy pary, które mają bardzo duże szanse na uzyskanie wybranego celu morfowego.",
 	"goal": {
-		"label": "Goal (Name and Traits)",
+		"label": "Cel (nazwa i cechy)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
-		"tip": "Format tip: \"Goal Name: trait one, trait two\". If you only list traits, we’ll build a generic goal.",
-		"defaultName": "Custom goal"
+		"tip": "Wskazówka: \"Nazwa celu: cecha pierwsza, cecha druga\". Jeśli podasz same cechy, utworzymy cel ogólny.",
+		"defaultName": "Własny cel"
 	},
 	"status": {
 		"heading": "Status"
 	},
 	"summary": {
-		"loading": "Crunching punnett squares…",
-		"ready": "Run the advisor to discover promising pairings.",
-		"supportingOnly": "No pairs meet the high-confidence bar yet, but here are {{count}} options to review.",
-		"noConfidence": "No pairings crossed the confidence bar. Try adjusting your collections or goals.",
-		"confidentCount": "{{count}} pairing(s) meet the ≥ {{threshold}} goal confidence target."
+		"loading": "Liczymy kwadraty Punnetta…",
+		"ready": "Uruchom doradcę, aby znaleźć obiecujące pary.",
+		"supportingOnly": "Żadna para nie spełnia jeszcze progu wysokiej pewności, ale oto opcje do przejrzenia: {{count}}.",
+		"noConfidence": "Żadna para nie przekroczyła progu pewności. Spróbuj zmienić kolekcje lub cele.",
+		"confidentCount": "Pary spełniające próg pewności celu ≥ {{threshold}}: {{count}}."
 	},
 	"stats": {
-		"males": "{{count}} breeder male",
-		"males_plural": "{{count}} breeder males",
-		"females": "{{count}} breeder female",
-		"females_plural": "{{count}} breeder females",
-		"confidenceBar": "Confidence bar ≥ {{threshold}}"
+		"males": "Samce hodowlane: {{count}}",
+		"males_plural": "Samce hodowlane: {{count}}",
+		"females": "Samice hodowlane: {{count}}",
+		"females_plural": "Samice hodowlane: {{count}}",
+		"confidenceBar": "Próg pewności ≥ {{threshold}}"
 	},
 	"buttons": {
-		"run": "Run Advisor",
-		"generating": "Generating...",
-		"reset": "Reset Advisor"
+		"run": "Uruchom doradcę",
+		"generating": "Generowanie...",
+		"reset": "Resetuj doradcę"
 	},
 	"errors": {
-		"noBreeders": "Add animals to the Breeders group to see advisor recommendations.",
-		"noGoals": "Add goal traits before running the advisor.",
-		"failure": "Failed to generate suggestions."
+		"noBreeders": "Dodaj zwierzęta do grupy Breeders, aby zobaczyć rekomendacje doradcy.",
+		"noGoals": "Dodaj cechy celu przed uruchomieniem doradcy.",
+		"failure": "Nie udało się wygenerować sugestii."
 	},
 	"cards": {
-		"goalSuccessLabel": "Goal success chance:",
-		"belowTarget": "(below confidence target)",
-		"demandSignals": "Demand signals:",
-		"priceRange": "Price guidance: {{range}}",
-		"sources": "Sources:",
-		"additionalHeading": "Additional pairings worth reviewing",
-		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
+		"goalSuccessLabel": "Szansa na osiągnięcie celu:",
+		"belowTarget": "(poniżej progu pewności)",
+		"demandSignals": "Sygnały popytu:",
+		"priceRange": "Orientacyjna cena: {{range}}",
+		"sources": "Źródła:",
+		"additionalHeading": "Inne pary warte przejrzenia",
+		"readyCallout": "Gotowe, kiedy zechcesz — kliknij <strong>Uruchom doradcę</strong>, aby znaleźć najmocniejsze pary hodowlane."
 	},
 	"genes": {
-		"goalVisuals": "Goal Visuals",
-		"goalHets": "Goal Hets",
-		"projectedVisuals": "Projected Visuals",
-		"projectedHets": "Projected Hets",
-		"holdbackVisuals": "Holdback Visuals",
-		"holdbackHets": "Holdback Hets",
-		"nextVisuals": "Next-Gen Visuals",
-		"nextHets": "Next-Gen Hets",
-		"focusVisuals": "Focus Visuals",
-		"focusHets": "Focus Hets"
+		"goalVisuals": "Visuale celu",
+		"goalHets": "Hety celu",
+		"projectedVisuals": "Prognozowane visuale",
+		"projectedHets": "Prognozowane hety",
+		"holdbackVisuals": "Visuale do zatrzymania",
+		"holdbackHets": "Hety do zatrzymania",
+		"nextVisuals": "Visuale następnego pokolenia",
+		"nextHets": "Hety następnego pokolenia",
+		"focusVisuals": "Kluczowe visuale",
+		"focusHets": "Kluczowe hety"
 	},
 	"plan": {
-		"title": "Multi-generation plan ({{strategy}})",
+		"title": "Plan wielopokoleniowy ({{strategy}})",
 		"strategy": {
-			"multi": "2-step",
-			"direct": "direct"
+			"multi": "2 etapy",
+			"direct": "bezpośrednio"
 		},
-		"combinedProbability": "Combined ≈ {{value}}",
-		"generationLabel": "Generation {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
-		"goalProbability": "Goal ≈ {{value}}",
+		"combinedProbability": "Łącznie ≈ {{value}}",
+		"generationLabel": "Pokolenie {{generation}}",
+		"prereqProbability": "Etap wstępny ≈ {{value}}",
+		"goalProbability": "Cel ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
-		"holdbackGenes": "Holdback genes: {{genes}}",
+		"holdbackGenes": "Geny holdbacku: {{genes}}",
 		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
 		"status": {
 			"visual": "Visual",
@@ -81,67 +81,67 @@
 		}
 	},
 	"labels": {
-		"unknownAnimal": "Unknown",
-		"holdbackMale": "Holdback Male",
-		"holdbackFemale": "Holdback Female",
+		"unknownAnimal": "Nieznane",
+		"holdbackMale": "Samiec do zatrzymania (holdback)",
+		"holdbackFemale": "Samica do zatrzymania (holdback)",
 		"holdback": "Holdback"
 	},
 	"outcomes": {
-		"none": "No projection available.",
-		"unknownMorph": "Unknown morph",
-		"probability": "{{genotype}} ({{chance}} appearance chance)"
+		"none": "Brak dostępnej prognozy.",
+		"unknownMorph": "Nieznany morf",
+		"probability": "{{genotype}} (szansa wystąpienia: {{chance}})"
 	},
 	"goals": {
-		"title": "Goals",
-		"add": "Add Goal",
-		"empty": "No goals yet. Add one to tailor suggestions.",
-		"namePlaceholder": "Goal name",
-		"remove": "Remove",
+		"title": "Cele",
+		"add": "Dodaj cel",
+		"empty": "Brak celów. Dodaj cel, aby dopasować sugestie.",
+		"namePlaceholder": "Nazwa celu",
+		"remove": "Usuń",
 		"requireAll": {
-			"label": "Require all",
-			"placeholder": "Add trait and press Enter"
+			"label": "Wymagaj wszystkich",
+			"placeholder": "Dodaj cechę i naciśnij Enter"
 		},
 		"requireAny": {
-			"label": "Require any",
-			"placeholder": "Optional traits"
+			"label": "Wymagaj dowolnej",
+			"placeholder": "Cechy opcjonalne"
 		},
 		"avoid": {
-			"label": "Avoid",
-			"placeholder": "Problem traits"
+			"label": "Unikaj",
+			"placeholder": "Cechy problematyczne"
 		},
 		"recessiveState": {
-			"label": "Recessive state",
-			"any": "Any",
+			"label": "Stan recesywny",
+			"any": "Dowolny",
 			"visual": "Visual",
 			"het": "Het",
 			"possibleHet": "Possible het"
 		},
-		"minProbability": "Min probability ({{percent}}%)",
-		"weight": "Weight ({{value}})",
+		"minProbability": "Min. prawdopodobieństwo ({{percent}}%)",
+		"weight": "Waga ({{value}})",
 		"idLabel": "ID: {{id}}",
-		"loadPreset": "Load Preset",
+		"loadPreset": "Wczytaj preset",
 		"presets": {
-			"title": "Presets",
-			"close": "Close"
+			"title": "Presety",
+			"close": "Zamknij"
 		},
-		"defaultName": "New goal"
+		"defaultName": "Nowy cel"
 	},
 	"api": {
-		"rationaleSummary": "Projected score {{score}} with demand index {{demand}}. {{goalSummary}}",
-		"noGoalTargets": "No specific goal targets.",
-		"goalSummary": "{{prob}}% chance to hit goal '{{goal}}'.",
-		"watchouts": " Watchouts: {{list}}.",
-		"sources": " Sources: {{list}}.",
+		"rationaleSummary": "Prognozowany wynik {{score}} przy indeksie popytu {{demand}}. {{goalSummary}}",
+		"noGoalTargets": "Brak konkretnych celów.",
+		"goalSummary": "{{prob}}% szans na osiągnięcie celu „{{goal}}”.",
+		"watchouts": " Na co uważać: {{list}}.",
+		"sources": " Źródła: {{list}}.",
 		"plan": {
-			"stepTitle": "Generation {{generation}}: {{male}} × {{female}}",
-			"directSummary": "Direct chance to reach the goal is {{chance}}%.",
-			"holdbackSummary": "No direct visual expected; produce holdbacks carrying {{traits}}.",
-			"adjustedSummary": "Direct goal chance {{chance}}%. Prioritize producing holdbacks carrying {{holdback}}.",
-			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Retain the {{sex}} holdback ({{holdback}}). Pair with {{partner}} for {{chance}}% chance at the goal.",
+			"stepTitle": "Pokolenie {{generation}}: {{male}} × {{female}}",
+			"directSummary": "Bezpośrednia szansa na osiągnięcie celu wynosi {{chance}}%.",
+			"holdbackSummary": "Nie należy spodziewać się bezpośrednio visuali; uzyskaj holdbacki z {{traits}}.",
+			"adjustedSummary": "Bezpośrednia szansa na cel: {{chance}}%. Skup się na uzyskaniu holdbacków z {{holdback}}.",
+			"secondTitle": "Pokolenie {{generation}}: holdback × {{partner}}",
+			"secondSummary": "Zatrzymaj holdback ({{sex}}, {{holdback}}). Połącz z {{partner}}, aby mieć {{chance}}% szans na cel.",
 			"holdbackSex": {
-				"female": "female",
-				"male": "male"
+				"female": "samica",
+				"male": "samiec"
 			}
 		}
 	}

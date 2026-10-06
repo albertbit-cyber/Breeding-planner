@@ -62,7 +62,7 @@ export default function TestCatalogPage() {
       const data = await api.listLabAvailableTests();
       setTests(data);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to load tests.");
+      setLoadError(error instanceof Error ? error.message : t("lab.catalog.loadFailed", { defaultValue: "Failed to load tests." }));
     } finally {
       setIsLoading(false);
     }
@@ -183,7 +183,7 @@ export default function TestCatalogPage() {
       closeForm();
       await loadTests();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Failed to save.");
+      setFormError(error instanceof Error ? error.message : t("lab.catalog.saveFailed", { defaultValue: "Failed to save." }));
     } finally {
       setIsSaving(false);
     }
@@ -200,7 +200,7 @@ export default function TestCatalogPage() {
       );
       await loadTests();
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to update.");
+      setLoadError(error instanceof Error ? error.message : t("lab.catalog.updateFailed", { defaultValue: "Failed to update." }));
     }
   };
 
@@ -215,7 +215,7 @@ export default function TestCatalogPage() {
       );
       await loadTests();
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to update.");
+      setLoadError(error instanceof Error ? error.message : t("lab.catalog.updateFailed", { defaultValue: "Failed to update." }));
     }
   };
 
@@ -257,7 +257,7 @@ export default function TestCatalogPage() {
           {successMessage}
           <button
             type="button"
-            className="ml-3 text-xs underline"
+            className="ms-3 text-xs underline"
             onClick={() => setSuccessMessage("")}
           >
             {t("common.dismiss", { defaultValue: "Dismiss" })}
@@ -299,7 +299,7 @@ export default function TestCatalogPage() {
       ) : (
         <div className="overflow-auto rounded-2xl border border-neutral-200">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50 text-left text-xs text-neutral-500">
+            <thead className="border-b border-neutral-100 bg-neutral-50 text-start text-xs text-neutral-500">
               <tr>
                 <th className="px-3 py-2">{t("lab.catalog.colName", { defaultValue: "Name" })}</th>
                 <th className="px-3 py-2">{t("lab.catalog.colKind", { defaultValue: "Kind" })}</th>

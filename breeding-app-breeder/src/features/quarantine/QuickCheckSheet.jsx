@@ -40,7 +40,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
       >
         <div className="sticky top-0 bg-white/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between rounded-t-2xl">
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{snake?.name || snake?.id}</div>
+            <div className="text-sm font-semibold truncate"><bdi>{snake?.name || snake?.id}</bdi></div>
             <div className="text-[11px] text-neutral-500">
               {day === null
                 ? t('quarantine.noStartDate', { defaultValue: 'No start date' })

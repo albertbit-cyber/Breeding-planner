@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 import { createLabApiClient } from "../api/client";
 import { useSharedBackend } from "../../../contexts/SharedBackendContext.jsx";
+import { backendMessageText } from "../../../components/backendMessageText.js";
 
 const formatPrice = (amount, currency = "EUR") => {
   try {
@@ -122,7 +123,7 @@ export default function BatchOrderCart() {
   // ── Success banner ──────────────────────────────────────────────────────────
   if (createdOrder) {
     return renderFloating(
-      <div className="fixed bottom-4 right-4 z-[10030] w-80 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-xl">
+      <div className="fixed bottom-4 end-4 z-[10030] w-80 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-xl">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="font-semibold text-emerald-800">
@@ -143,7 +144,7 @@ export default function BatchOrderCart() {
             type="button"
             className="text-lg leading-none text-emerald-600 hover:text-emerald-800"
             onClick={() => setCreatedOrder(null)}
-            aria-label="Dismiss"
+            aria-label={t("lab.batch.dismiss", { defaultValue: "Dismiss" })}
           >
             ×
           </button>
@@ -157,7 +158,7 @@ export default function BatchOrderCart() {
     return renderFloating(
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-[10030] flex items-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5 shadow-xl text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+        className="fixed bottom-4 end-4 z-[10030] flex items-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5 shadow-xl text-sm font-medium text-neutral-800 hover:bg-neutral-50"
         onClick={() => setIsExpanded(true)}
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-bold sk-on-accent">
@@ -174,7 +175,7 @@ export default function BatchOrderCart() {
 
   // ── Expanded panel ──────────────────────────────────────────────────────────
   return renderFloating(
-    <div className="fixed bottom-4 right-4 z-[10030] w-80 rounded-2xl border border-neutral-200 bg-white shadow-xl">
+    <div className="fixed bottom-4 end-4 z-[10030] w-80 rounded-2xl border border-neutral-200 bg-white shadow-xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
         <div className="text-sm font-semibold text-neutral-800">
@@ -189,7 +190,7 @@ export default function BatchOrderCart() {
           type="button"
           className="text-lg leading-none text-neutral-400 hover:text-neutral-700"
           onClick={() => setIsExpanded(false)}
-          aria-label="Collapse"
+          aria-label={t("actions.collapse", { defaultValue: "Collapse" })}
         >
           ×
         </button>
@@ -241,7 +242,7 @@ export default function BatchOrderCart() {
               {t("lab.sharedBackend.requiredTitle", { defaultValue: "Shared backend required" })}
             </div>
             <div className="mt-0.5 text-[11px]">
-              {snapshot?.message || t("lab.sharedBackend.required", { defaultValue: "Connect the backend to submit orders." })}
+              {backendMessageText(t, snapshot?.message) || t("lab.sharedBackend.required", { defaultValue: "Connect the backend to submit orders." })}
             </div>
             <button
               type="button"

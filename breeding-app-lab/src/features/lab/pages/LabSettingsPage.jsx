@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchMyLabProfile, fetchSpeciesCatalog, updateMyLabProfile } from "../../../shared/apiClient";
 import { setActiveLabProfile } from "../../../services/lab/labelProfileService";
 
@@ -12,18 +13,44 @@ import { setActiveLabProfile } from "../../../services/lab/labelProfileService";
  */
 
 const FIELDS = [
-  { key: "labName", label: "Laboratory name", required: true },
-  { key: "contactPerson", label: "Contact person" },
-  { key: "contactEmail", label: "Contact email", type: "email" },
-  { key: "phone", label: "Phone" },
-  { key: "addressLine1", label: "Address" },
-  { key: "addressLine2", label: "Address (line 2)" },
-  { key: "postalCode", label: "Postal code" },
-  { key: "city", label: "City" },
-  { key: "country", label: "Country" },
+  { key: "labName", required: true },
+  { key: "contactPerson" },
+  { key: "contactEmail", type: "email" },
+  { key: "phone" },
+  { key: "addressLine1" },
+  { key: "addressLine2" },
+  { key: "postalCode" },
+  { key: "city" },
+  { key: "country" },
 ];
 
+const fieldLabel = (t, key) => {
+  switch (key) {
+    case "labName":
+      return t("lab.settings.fieldLabName", { defaultValue: "Laboratory name" });
+    case "contactPerson":
+      return t("lab.settings.fieldContactPerson", { defaultValue: "Contact person" });
+    case "contactEmail":
+      return t("lab.settings.fieldContactEmail", { defaultValue: "Contact email" });
+    case "phone":
+      return t("lab.settings.fieldPhone", { defaultValue: "Phone" });
+    case "addressLine1":
+      return t("lab.settings.fieldAddress", { defaultValue: "Address" });
+    case "addressLine2":
+      return t("lab.settings.fieldAddress2", { defaultValue: "Address (line 2)" });
+    case "postalCode":
+      return t("lab.settings.fieldPostalCode", { defaultValue: "Postal code" });
+    case "city":
+      return t("lab.settings.fieldCity", { defaultValue: "City" });
+    case "country":
+      return t("lab.settings.fieldCountry", { defaultValue: "Country" });
+    default:
+      return key;
+  }
+};
+
 export default function LabSettingsPage() {
+  const { t } = useTranslation();
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +67,11 @@ export default function LabSettingsPage() {
       .catch(() => setSpeciesCatalog([]));
     fetchMyLabProfile()
       .then((data) => setForm(data?.lab || null))
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load your laboratory."))
+      .catch((err) =>
+        setError(
+          err instanceof Error ? err.message : t("lab.settings.loadFailed", { defaultValue: "Unable to load your laboratory." })
+        )
+      )
       .finally(() => setLoading(false));
   };
 
@@ -52,7 +83,11 @@ export default function LabSettingsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 900_000) {
-      setError("That logo is too large — please use an image under about 900 KB.");
+      setError(
+        t("lab.settings.logoTooLarge", {
+          defaultValue: "That logo is too large — please use an image under about 900 KB.",
+        })
+      );
       return;
     }
     const reader = new FileReader();
@@ -95,24 +130,38 @@ export default function LabSettingsPage() {
         },
         logoUrl: data?.lab?.logoUrl || null,
       });
-      setMessage("Saved.");
+      setMessage(t("lab.settings.saved", { defaultValue: "Saved." }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save your laboratory settings.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("lab.settings.saveFailed", { defaultValue: "Could not save your laboratory settings." })
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-6 text-sm text-neutral-500">Loading…</div>;
-  if (!form) return <div className="p-6 text-sm text-rose-600">{error || "No laboratory profile."}</div>;
+  if (loading) return <div className="p-6 text-sm text-neutral-500">{t("lab.common.loading", { defaultValue: "Loading…" })}</div>;
+  if (!form) {
+    return (
+      <div className="p-6 text-sm text-rose-600">
+        {error || t("lab.settings.noProfile", { defaultValue: "No laboratory profile." })}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Laboratory settings</h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">
+          {t("lab.settings.title", { defaultValue: "Laboratory settings" })}
+        </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          These details appear on the labels and certificates you issue, and on your entry in the
-          breeder directory.
+          {t("lab.settings.subtitle", {
+            defaultValue:
+              "These details appear on the labels and certificates you issue, and on your entry in the breeder directory.",
+          })}
         </p>
       </div>
 
@@ -123,7 +172,7 @@ export default function LabSettingsPage() {
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FIELDS.map((field) => (
             <label key={field.key} className="block text-sm">
-              <span className="text-neutral-700">{field.label}</span>
+              <span className="text-neutral-700">{fieldLabel(t, field.key)}</span>
               <input
                 type={field.type || "text"}
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -137,7 +186,9 @@ export default function LabSettingsPage() {
 
         <section className="space-y-4">
           <label className="block text-sm">
-            <span className="text-neutral-700">Description shown to breeders</span>
+            <span className="text-neutral-700">
+              {t("lab.settings.publicDescription", { defaultValue: "Description shown to breeders" })}
+            </span>
             <textarea
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
               rows={3}
@@ -148,7 +199,9 @@ export default function LabSettingsPage() {
           </label>
 
           <label className="block text-sm sm:w-64">
-            <span className="text-neutral-700">Typical turnaround (days)</span>
+            <span className="text-neutral-700">
+              {t("lab.settings.turnaround", { defaultValue: "Typical turnaround (days)" })}
+            </span>
             <input
               type="number"
               min={0}
@@ -160,19 +213,19 @@ export default function LabSettingsPage() {
           </label>
 
           <div className="text-sm">
-            <span className="text-neutral-700">Certificate logo</span>
+            <span className="text-neutral-700">{t("lab.settings.logo", { defaultValue: "Certificate logo" })}</span>
             <div className="mt-2 flex items-center gap-3">
               {form.logoUrl ? (
                 <img src={form.logoUrl} alt="" className="h-12 w-12 rounded border object-contain" />
               ) : (
                 <div className="flex h-12 w-12 items-center justify-center rounded border text-[10px] text-neutral-400">
-                  none
+                  {t("lab.settings.logoNone", { defaultValue: "none" })}
                 </div>
               )}
               <input type="file" accept="image/png,image/jpeg" onChange={handleLogo} />
               {form.logoUrl ? (
                 <button type="button" className="text-xs underline" onClick={() => set("logoUrl", null)}>
-                  Remove
+                  {t("lab.team.remove", { defaultValue: "Remove" })}
                 </button>
               ) : null}
             </div>
@@ -182,11 +235,13 @@ export default function LabSettingsPage() {
               tests may claim, and decides which breeders see it at all. */}
           <fieldset className="rounded border border-neutral-200 p-4">
             <legend className="px-1 text-sm font-medium text-neutral-800">
-              Species you test
+              {t("lab.settings.speciesTitle", { defaultValue: "Species you test" })}
             </legend>
             <p className="mb-3 text-xs text-neutral-500">
-              A breeder ordering for one of these will see your laboratory. Your tests can only
-              be tagged with species listed here.
+              {t("lab.settings.speciesHelp", {
+                defaultValue:
+                  "A breeder ordering for one of these will see your laboratory. Your tests can only be tagged with species listed here.",
+              })}
             </p>
 
             <div className="mb-2 flex flex-wrap gap-1.5">
@@ -201,7 +256,7 @@ export default function LabSettingsPage() {
                       {entry?.name || id}
                       <button
                         type="button"
-                        aria-label={`Stop testing ${entry?.name || id}`}
+                        aria-label={t("lab.settings.stopTesting", { defaultValue: "Stop testing {{species}}", species: entry?.name || id })}
                         className="text-neutral-500 hover:text-rose-600"
                         onClick={() =>
                           set(
@@ -217,14 +272,16 @@ export default function LabSettingsPage() {
                 })
               ) : (
                 <span className="text-xs text-amber-700">
-                  None yet — until you add one, breeders cannot find your laboratory.
+                  {t("lab.settings.speciesNone", {
+                    defaultValue: "None yet — until you add one, breeders cannot find your laboratory.",
+                  })}
                 </span>
               )}
             </div>
 
             <input
               type="search"
-              placeholder="Search species to add…"
+              placeholder={t("lab.settings.speciesSearch", { defaultValue: "Search species to add…" })}
               className="mb-2 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
               value={speciesFilter}
               onChange={(e) => setSpeciesFilter(e.target.value)}
@@ -242,14 +299,14 @@ export default function LabSettingsPage() {
                     <li key={sp.id}>
                       <button
                         type="button"
-                        className="w-full rounded px-2 py-1 text-left text-sm hover:bg-neutral-100"
+                        className="w-full rounded px-2 py-1 text-start text-sm hover:bg-neutral-100"
                         onClick={() => {
                           set("servedSpeciesIds", [...(form.servedSpeciesIds || []), sp.id]);
                           setSpeciesFilter("");
                         }}
                       >
                         {sp.name}
-                        <span className="ml-2 text-xs text-neutral-400">
+                        <span className="ms-2 text-xs text-neutral-400">
                           {sp.scientificName || ""}
                         </span>
                       </button>
@@ -261,10 +318,12 @@ export default function LabSettingsPage() {
 
           <fieldset className="rounded border border-neutral-200 p-4">
             <legend className="px-1 text-sm font-medium text-neutral-800">
-              Payment details on your certificates
+              {t("lab.settings.paymentTitle", { defaultValue: "Payment details on your certificates" })}
             </legend>
             <p className="mb-3 text-xs text-neutral-500">
-              Printed on the certificates you issue. Not shown in the breeder directory.
+              {t("lab.settings.paymentHelp", {
+                defaultValue: "Printed on the certificates you issue. Not shown in the breeder directory.",
+              })}
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label className="block text-sm">
@@ -284,7 +343,7 @@ export default function LabSettingsPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-neutral-700">VAT number</span>
+                <span className="text-neutral-700">{t("lab.settings.vatNumber", { defaultValue: "VAT number" })}</span>
                 <input
                   className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
                   value={form.vatNumber ?? ""}
@@ -302,10 +361,14 @@ export default function LabSettingsPage() {
               onChange={(e) => set("listedInDirectory", e.target.checked)}
             />
             <span>
-              <span className="text-neutral-800">List my laboratory in the breeder directory</span>
+              <span className="text-neutral-800">
+                {t("lab.settings.listInDirectory", { defaultValue: "List my laboratory in the breeder directory" })}
+              </span>
               <span className="block text-xs text-neutral-500">
-                Turn this off to stop receiving new orders — for a holiday, say — without closing
-                your account. Orders already in progress are unaffected.
+                {t("lab.settings.listInDirectoryHelp", {
+                  defaultValue:
+                    "Turn this off to stop receiving new orders — for a holiday, say — without closing your account. Orders already in progress are unaffected.",
+                })}
               </span>
             </span>
           </label>
@@ -316,7 +379,9 @@ export default function LabSettingsPage() {
           disabled={saving}
           className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {saving ? "Saving…" : "Save settings"}
+          {saving
+            ? t("lab.settings.saving", { defaultValue: "Saving…" })
+            : t("lab.settings.save", { defaultValue: "Save settings" })}
         </button>
       </form>
     </div>

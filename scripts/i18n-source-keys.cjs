@@ -12,7 +12,17 @@
 // comment: `// i18n-namespace: marketplace`.
 const fs = require("fs");
 const path = require("path");
-const ts = require("typescript");
+// CI installs each app but not the root, so fall back to an app's copy.
+const ts = (() => {
+  for (const from of [__dirname, path.join(__dirname, "../breeding-app-breeder"), path.join(__dirname, "../breeding-app-lab")]) {
+    try {
+      return require(require.resolve("typescript", { paths: [from] }));
+    } catch {
+      // try the next location
+    }
+  }
+  throw new Error("i18n-source-keys: no typescript package found (install the root or an app's dependencies)");
+})();
 
 const PLURAL_SUFFIXES = ["_zero", "_one", "_two", "_few", "_many", "_other"];
 const SOURCE_EXT = /\.(jsx?|tsx?|mjs|cjs)$/;
@@ -94,6 +104,7 @@ const scanApp = (srcDir, { namespaces, defaultNs = "common" }) => {
     const rel = path.relative(srcDir, file).replace(/\\/g, "/");
 
     // Namespace for a `t` this file did not bind itself.
+    const usesTuples = /\btranslateTuple\b/.test(text);
     const hint = text.match(/\/\/\s*i18n-namespace:\s*([\w-]+)/);
     const hookNamespaces = new Set();
     // Local hooks that wrap useTranslation, e.g. useAdvisorTranslation, which
@@ -221,6 +232,27 @@ const scanApp = (srcDir, { namespaces, defaultNs = "common" }) => {
         }
       }
 
+      // The quarantine module keeps labels as ['key', 'English default'] tuples and renders
+      // them through translateTuple(t, tuple); a file that uses that helper declares them.
+      if (
+        usesTuples &&
+        ts.isArrayLiteralExpression(node) &&
+        node.elements.length === 2 &&
+        /^[a-z][\w]*(\.[\w-]+)+$/.test(staticString(node.elements[0]) || "") &&
+        staticString(node.elements[1]) !== undefined
+      ) {
+        keys.push({
+          ns: fileBinding.ns,
+          key: staticString(node.elements[0]),
+          defaultValue: staticString(node.elements[1]),
+          pluralDefaults: {},
+          plural: false,
+          returnObjects: false,
+          file: rel,
+          line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+        });
+      }
+
       // <Trans ns="..." i18nKey="..." defaults="..." />
       if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(sf) === "Trans") {
         const attrs = {};
@@ -231,9 +263,16 @@ const scanApp = (srcDir, { namespaces, defaultNs = "common" }) => {
           }
         }
         if (attrs.i18nKey) {
+          let transNs = attrs.ns || fileBinding.ns;
+          let transKey = attrs.i18nKey;
+          const colon = transKey.indexOf(":");
+          if (colon > 0 && nsSet.has(transKey.slice(0, colon))) {
+            transNs = transKey.slice(0, colon);
+            transKey = transKey.slice(colon + 1);
+          }
           keys.push({
-            ns: attrs.ns || fileBinding.ns,
-            key: attrs.i18nKey,
+            ns: transNs,
+            key: transKey,
             defaultValue: attrs.defaults,
             pluralDefaults: {},
             plural: false,

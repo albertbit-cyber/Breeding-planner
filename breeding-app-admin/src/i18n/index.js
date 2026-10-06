@@ -178,6 +178,17 @@ if (!i18n.isInitialized) {
         caches: ["localStorage"],
       },
     });
+  // Hebrew has to flip the whole document, not just the copy. Same rule as
+  // breeding-app-shared's applyDocumentLanguage, which this app does not depend on.
+  const RTL = new Set(["he", "ar", "fa", "ur"]);
+  const applyDocumentLanguage = (lng) => {
+    if (typeof document === "undefined" || !document.documentElement) return;
+    const base = String(lng || FALLBACK_LANGUAGE).split("-")[0];
+    document.documentElement.lang = base;
+    document.documentElement.dir = RTL.has(base) ? "rtl" : "ltr";
+  };
+  i18n.on("languageChanged", applyDocumentLanguage);
+  applyDocumentLanguage(i18n.language);
 }
 
 export default i18n;

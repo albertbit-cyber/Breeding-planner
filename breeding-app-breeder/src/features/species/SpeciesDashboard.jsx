@@ -94,7 +94,7 @@ export default function SpeciesDashboard({
           placeholder={t('species.dashboard.searchPlaceholder', {
             defaultValue: 'Search every animal, any species',
           })}
-          className="header-search-input w-full pr-11"
+          className="header-search-input w-full pe-11"
         />
         {searchQuery ? (
           <button
@@ -186,7 +186,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
       type="button"
       onClick={onOpen}
       style={style}
-      className="text-left bg-white border rounded-2xl overflow-hidden flex flex-col hover:border-neutral-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
+      className="text-start bg-white border rounded-2xl overflow-hidden flex flex-col hover:border-neutral-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
     >
       {/* Livestock */}
       <div
@@ -206,7 +206,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
               <div className="text-xs italic truncate text-neutral-600">{summary.scientificName}</div>
             )}
           </div>
-          <div className="ml-auto text-2xl font-semibold tabular-nums leading-none">{summary.total}</div>
+          <div className="ms-auto text-2xl font-semibold tabular-nums leading-none">{summary.total}</div>
         </div>
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs tabular-nums text-neutral-700">
@@ -242,7 +242,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
             {t('species.dashboard.breedingHeading', { defaultValue: 'Breeding' })}
           </span>
-          <span className="ml-auto text-xs tabular-nums text-neutral-600">
+          <span className="ms-auto text-xs tabular-nums text-neutral-600">
             {summary.activePairings > 0
               ? t('species.dashboard.pairingCount', {
                   defaultValue: '{{count}} pairing(s)',
@@ -343,7 +343,7 @@ function SearchResults({ results, hiddenResultCount, onOpenAnimal, t }) {
           key={result.key}
           type="button"
           onClick={() => onOpenAnimal?.(result.snake)}
-          className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50 transition"
+          className="w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50 transition"
         >
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 min-w-0">

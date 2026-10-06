@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import LabQrScanner from "./LabQrScanner.jsx";
 import { createLabApiClient } from "../api/client";
 
@@ -11,6 +12,7 @@ import { createLabApiClient } from "../api/client";
  * the right page first.
  */
 export default function GlobalScanOverlay({ onClose }) {
+  const { t } = useTranslation();
   const [error, setError] = useState("");
   const [resolving, setResolving] = useState(false);
 
@@ -23,7 +25,9 @@ export default function GlobalScanOverlay({ onClose }) {
       const api = createLabApiClient();
       const resolved = await api.resolveLabSampleByQrToken(normalized);
       const orderId = String(resolved?.testOrder?.id || "").trim();
-      if (!orderId) throw new Error("Scanned code did not resolve to an order.");
+      if (!orderId) {
+        throw new Error(t("lab.scan.noOrder", { defaultValue: "Scanned code did not resolve to an order." }));
+      }
       const status = String(resolved?.testOrder?.status || "").trim();
 
       if (status === "submitted") {
@@ -35,37 +39,43 @@ export default function GlobalScanOverlay({ onClose }) {
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to resolve scanned code.");
+      setError(
+        err instanceof Error ? err.message : t("lab.scan.resolveFailed", { defaultValue: "Unable to resolve scanned code." })
+      );
       setResolving(false);
     }
-  }, [onClose]);
+  }, [onClose, t]);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-neutral-950/90 p-4">
       <div className="flex items-center justify-between text-white">
         <div>
-          <div className="text-xs uppercase tracking-wide text-neutral-400">Laboratory</div>
-          <div className="text-base font-semibold">Scan Sample QR Code</div>
+          <div className="text-xs uppercase tracking-wide text-neutral-400">
+            {t("lab.shell.laboratory", { defaultValue: "Laboratory" })}
+          </div>
+          <div className="text-base font-semibold">{t("lab.scan.title", { defaultValue: "Scan Sample QR Code" })}</div>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-sm text-white"
         >
-          Close
+          {t("lab.scan.close", { defaultValue: "Close" })}
         </button>
       </div>
 
       <div className="mt-4 flex-1 overflow-y-auto rounded-2xl bg-white p-3">
         {resolving ? (
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
-            Looking up sample…
+            {t("lab.scan.lookingUp", { defaultValue: "Looking up sample…" })}
           </div>
         ) : (
           <>
             <p className="mb-2 text-sm text-neutral-600">
-              Point the camera at the sample's QR label. The app figures out what stage it's at —
-              intake, result entry, or a finished order — and takes you straight there.
+              {t("lab.scan.help", {
+                defaultValue:
+                  "Point the camera at the sample's QR label. The app figures out what stage it's at — intake, result entry, or a finished order — and takes you straight there.",
+              })}
             </p>
             <LabQrScanner onScan={handleScan} autoStart />
           </>

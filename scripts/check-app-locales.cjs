@@ -255,7 +255,13 @@ for (const app of apps) {
 
       const targetKeys = Object.keys(targetFlat).sort();
       const missingKeys = baseKeys.filter((key) => !(key in targetFlat));
-      const extra = targetKeys.filter((key) => !(key in baseFlat));
+      // A language's own plural forms (Polish _few/_many, Hebrew _two…) are not
+      // in English but belong to an English plural key.
+      const ownPluralForm = (key) => {
+        const m = key.match(/^(.*)_(zero|one|two|few|many|other)$/);
+        return Boolean(m) && `${m[1]}_other` in baseFlat;
+      };
+      const extra = targetKeys.filter((key) => !(key in baseFlat) && !ownPluralForm(key));
       if (missingKeys.length) translationFailures.push(`${app}: ${language}/${namespace} missing ${missingKeys.length} key(s): ${sample(missingKeys)}`);
       if (extra.length) warnings.push(`${app}: ${language}/${namespace} has ${extra.length} extra key(s): ${sample(extra)}`);
 

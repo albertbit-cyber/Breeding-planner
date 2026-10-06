@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const SCANNER_ELEMENT_ID = "lab-intake-qr-scanner-root";
 
@@ -8,6 +9,7 @@ const SCANNER_ELEMENT_ID = "lab-intake-qr-scanner-root";
  * On a successful scan, calls onScan(decodedText) and stops automatically.
  */
 export default function LabQrScanner({ onScan }) {
+  const { t } = useTranslation();
   const [isActive, setIsActive] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const qrModuleRef = useRef(null);
@@ -103,7 +105,7 @@ export default function LabQrScanner({ onScan }) {
         }
       } catch {
         if (isMounted) {
-          setScannerError("Unable to start camera. Check camera permissions and try again.");
+          setScannerError(t("lab.qrScanner.cameraFailed", { defaultValue: "Unable to start camera. Check camera permissions and try again." }));
           setIsActive(false);
         }
       }
@@ -131,18 +133,18 @@ export default function LabQrScanner({ onScan }) {
           onClick={() => { setScannerError(""); setIsActive(true); }}
         >
           <CameraIcon />
-          Scan QR Code with Camera
+          {t("lab.qrScanner.start", { defaultValue: "Scan QR Code with Camera" })}
         </button>
       ) : (
         <div className="overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50">
           <div className="flex items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2">
-            <div className="text-xs font-medium text-neutral-700">Camera active — point at QR code label</div>
+            <div className="text-xs font-medium text-neutral-700">{t("lab.qrScanner.active", { defaultValue: "Camera active — point at QR code label" })}</div>
             <button
               type="button"
               className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-600"
               onClick={handleStop}
             >
-              Stop
+              {t("lab.qrScanner.stop", { defaultValue: "Stop" })}
             </button>
           </div>
           <div id={SCANNER_ELEMENT_ID} className="p-2" />

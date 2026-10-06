@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
-import { ORDER_STATUS_LABELS } from "../constants/orderStatuses";
+import { orderStatusLabel } from "../constants/statusLabelsI18n";
 
 const COMPLETED = new Set(["completed"]);
 
@@ -12,6 +13,7 @@ const formatDate = (value) => {
 };
 
 export default function CompletedTestsPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,7 +52,9 @@ export default function CompletedTestsPage() {
       } catch (err) {
         if (!mounted) return;
         setRows([]);
-        setError(err instanceof Error ? err.message : "Failed to load completed tests.");
+        setError(
+          err instanceof Error ? err.message : t("lab.completed.loadFailed", { defaultValue: "Failed to load completed tests." })
+        );
       } finally {
         if (mounted) setLoading(false);
       }
@@ -79,23 +83,34 @@ export default function CompletedTestsPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold text-neutral-900">Completed Tests</h1>
-      <p className="text-sm text-neutral-600">Completed and certificate-issued shed test orders, for follow-up and audit. Orders filed away live under Archive.</p>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        {t("lab.shell.nav.completedTests", { defaultValue: "Completed Tests" })}
+      </h1>
+      <p className="text-sm text-neutral-600">
+        {t("lab.completed.subtitle", {
+          defaultValue:
+            "Completed and certificate-issued shed test orders, for follow-up and audit. Orders filed away live under Archive.",
+        })}
+      </p>
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <label className="text-sm">
-          <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Search Completed Orders</span>
+          <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+            {t("lab.completed.searchLabel", { defaultValue: "Search Completed Orders" })}
+          </span>
           <input
             className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Order number, snake ID, certificate number"
+            placeholder={t("lab.completed.searchPlaceholder", { defaultValue: "Order number, snake ID, certificate number" })}
           />
         </label>
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Loading completed tests...</div>
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
+          {t("lab.completed.loading", { defaultValue: "Loading completed tests..." })}
+        </div>
       ) : null}
 
       {!loading && error ? (
@@ -104,7 +119,7 @@ export default function CompletedTestsPage() {
 
       {!loading && !error && !filtered.length ? (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-          No completed orders found.
+          {t("lab.completed.empty", { defaultValue: "No completed orders found." })}
         </div>
       ) : null}
 
@@ -113,31 +128,31 @@ export default function CompletedTestsPage() {
           <table className="min-w-[1100px] w-full text-sm">
             <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold">Order</th>
-                <th className="px-3 py-2 text-left font-semibold">Snake</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                <th className="px-3 py-2 text-left font-semibold">Submitted</th>
-                <th className="px-3 py-2 text-left font-semibold">Result Summary</th>
-                <th className="px-3 py-2 text-left font-semibold">Certificate</th>
-                <th className="px-3 py-2 text-left font-semibold">Action</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.colOrder", { defaultValue: "Order" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.colSnake", { defaultValue: "Snake" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.colStatus", { defaultValue: "Status" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.submitted", { defaultValue: "Submitted" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.results.summary", { defaultValue: "Result Summary" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.certificate", { defaultValue: "Certificate" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.common.colAction", { defaultValue: "Action" })}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(({ order, outcome }) => (
                 <tr key={order.id} className="border-t border-neutral-100 align-top">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-neutral-800">{order.orderNumber || order.id}</div>
+                    <div className="font-medium text-neutral-800"><bdi>{order.orderNumber || order.id}</bdi></div>
                   </td>
                   <td className="px-3 py-2 text-neutral-700">{order.animalId || "-"}</td>
-                  <td className="px-3 py-2 text-neutral-700">{ORDER_STATUS_LABELS[order.status] || order.status}</td>
+                  <td className="px-3 py-2 text-neutral-700">{orderStatusLabel(t, order.status)}</td>
                   <td className="px-3 py-2 text-neutral-700">{formatDate(order.submittedAt || order.createdAt)}</td>
                   <td className="px-3 py-2 text-neutral-700 max-w-[280px] truncate" title={outcome?.latestResult?.summary || ""}>
-                    {outcome?.latestResult?.summary || "No summary"}
+                    {outcome?.latestResult?.summary || t("lab.completed.noSummary", { defaultValue: "No summary" })}
                   </td>
                   <td className="px-3 py-2 text-neutral-700">
                     {outcome?.certificate?.certificateNumber
                       ? `${outcome.certificate.certificateNumber} (${outcome.certificate.status})`
-                      : "Not issued"}
+                      : t("lab.completed.notIssued", { defaultValue: "Not issued" })}
                   </td>
                   <td className="px-3 py-2">
                     <button
@@ -145,7 +160,7 @@ export default function CompletedTestsPage() {
                       className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs hover:border-neutral-500"
                       onClick={() => openOrder(order.id)}
                     >
-                      Open
+                      {t("lab.common.open", { defaultValue: "Open" })}
                     </button>
                   </td>
                 </tr>

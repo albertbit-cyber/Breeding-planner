@@ -1107,7 +1107,7 @@ function AnimalCardRow({ animal, onOpen }) {
       </div>
       <div className="mbl-animal-card-body">
         <div className="mbl-animal-card-row1">
-          <strong className="mbl-animal-card-name">{animal.name || animal.id}</strong>
+          <strong className="mbl-animal-card-name"><bdi>{animal.name || animal.id}</bdi></strong>
           {animal.status && <span className={`mbl-status-badge mbl-status--${statusKey}`}>{animal.status}</span>}
         </div>
         {genetics && <div className="mbl-animal-card-genetics">{genetics}</div>}

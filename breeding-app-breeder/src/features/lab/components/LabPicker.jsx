@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchLabDirectory } from "../../../shared/apiClient";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 
@@ -10,6 +11,7 @@ import { useBatchOrder } from "../contexts/BatchOrderContext";
  * picked here. Nothing is shown from any other laboratory.
  */
 export default function LabPicker({ onChosen, speciesId, speciesName }) {
+  const { t } = useTranslation();
   const { selectedLabId, chooseLab, cartItems } = useBatchOrder();
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
     // for a laboratory that only handles ball pythons.
     fetchLabDirectory(speciesId)
       .then((data) => setLabs(Array.isArray(data?.labs) ? data.labs : []))
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load laboratories."))
+      .catch((err) => setError(err instanceof Error ? err.message : t("lab.picker.loadFailed", { defaultValue: "Unable to load laboratories." })))
       .finally(() => setLoading(false));
   }, [speciesId]);
 
@@ -32,7 +34,7 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
   };
 
   if (loading) {
-    return <div className="text-sm text-neutral-500">Loading laboratories…</div>;
+    return <div className="text-sm text-neutral-500">{t("lab.picker.loading", { defaultValue: "Loading laboratories…" })}</div>;
   }
 
   if (error) {
@@ -48,20 +50,20 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
     return (
       <div className="text-sm text-neutral-600">
         {speciesName
-          ? `No laboratory is receiving orders for ${speciesName} yet. A laboratory has to list the species it tests before it appears here.`
-          : "No laboratories are receiving orders right now. Please check back later."}
+          ? t("lab.picker.noneForSpecies", { defaultValue: "No laboratory is receiving orders for {{species}} yet. A laboratory has to list the species it tests before it appears here.", species: speciesName })
+          : t("lab.picker.noneAtAll", { defaultValue: "No laboratories are receiving orders right now. Please check back later." })}
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <div className="text-sm font-medium text-neutral-900">Choose a laboratory</div>
+      <div className="text-sm font-medium text-neutral-900">{t("lab.picker.title", { defaultValue: "Choose a laboratory" })}</div>
       <p className="text-xs text-neutral-500">
         {speciesName
-          ? `Laboratories that test ${speciesName}. `
-          : "Showing every laboratory, because this animal has no species set. "}
-        Available tests, prices and turnaround all come from the laboratory you choose.
+          ? `${t("lab.picker.forSpecies", { defaultValue: "Laboratories that test {{species}}.", species: speciesName })} `
+          : `${t("lab.picker.everyLab", { defaultValue: "Showing every laboratory, because this animal has no species set." })} `}
+        {t("lab.picker.help", { defaultValue: "Available tests, prices and turnaround all come from the laboratory you choose." })}
       </p>
       <ul className="space-y-2">
         {labs.map((lab) => {
@@ -72,7 +74,7 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
                 type="button"
                 onClick={() => pick(lab)}
                 aria-pressed={isSelected}
-                className={`w-full rounded border p-3 text-left transition ${
+                className={`w-full rounded border p-3 text-start transition ${
                   isSelected ? "border-emerald-500 bg-emerald-50" : "border-neutral-200 hover:border-neutral-400"
                 }`}
               >
@@ -83,8 +85,8 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-neutral-900">{lab.labName}</div>
                     <div className="truncate text-xs text-neutral-500">
-                      {[lab.location, lab.testCount ? `${lab.testCount} tests` : null,
-                        lab.turnaroundDays ? `~${lab.turnaroundDays} day turnaround` : null]
+                      {[lab.location, lab.testCount ? t("lab.picker.testCount", { defaultValue: "{{tests}} tests", tests: lab.testCount }) : null,
+                        lab.turnaroundDays ? t("lab.picker.turnaround", { defaultValue: "~{{days}} day turnaround", days: lab.turnaroundDays }) : null]
                         .filter(Boolean)
                         .join(" · ")}
                     </div>
@@ -100,9 +102,11 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
       </ul>
       {selectedLabId && cartItems.length ? (
         <p className="text-xs text-amber-700">
-          Choosing a different laboratory clears the {cartItems.length} animal
-          {cartItems.length === 1 ? "" : "s"} staged here, because the tests you selected belong to
-          the current laboratory's catalogue.
+          {t("lab.picker.switchClearsCart", {
+            count: cartItems.length,
+            defaultValue_one: "Choosing a different laboratory clears the {{count}} animal staged here, because the tests you selected belong to the current laboratory's catalogue.",
+            defaultValue_other: "Choosing a different laboratory clears the {{count}} animals staged here, because the tests you selected belong to the current laboratory's catalogue.",
+          })}
         </p>
       ) : null}
     </div>

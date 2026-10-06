@@ -212,7 +212,7 @@ export default function BreederOrderGeneticTestModal({
             <div className="font-medium">
               {snake?.name || t("snakeEdit.unnamed", { defaultValue: "Unnamed" })}
             </div>
-            <div className="font-mono text-xs text-neutral-500">{snake?.id}</div>
+            <div className="font-mono text-xs text-neutral-500"><bdi>{snake?.id}</bdi></div>
             {snakeTokens.length ? (
               <div className="mt-1 text-xs text-neutral-600">
                 {t("snakeEdit.geneticsShort", { defaultValue: "Genetics" })}:{" "}
@@ -269,7 +269,7 @@ export default function BreederOrderGeneticTestModal({
             <div className="mb-2 text-xs text-neutral-600">
               {t("lab.orders.requestedGeneTests", { defaultValue: "Requested Gene Tests" })}
               {selectedLab?.labName ? (
-                <span className="ml-1 text-neutral-400">
+                <span className="ms-1 text-neutral-400">
                   — {selectedLab.labName}
                 </span>
               ) : null}

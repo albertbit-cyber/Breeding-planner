@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
 import InlineResultEntry, { ELIGIBLE_STATUSES as RESULT_ENTRY_STATUSES } from "../components/InlineResultEntry";
 import { getCurrentAppRole, canAccessLabApp } from "../auth/roleGuard";
-import {
-  ORDER_PAYMENT_STATUS_LABELS,
-  ORDER_PAYMENT_STATUS_TONES,
-} from "../../../types/labStatus";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { ORDER_PAYMENT_STATUS_TONES } from "../../../types/labStatus";
+import { ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { orderStatusLabel, paymentStatusLabel } from "../constants/statusLabelsI18n";
 
 const toneClass = {
   neutral: "border-neutral-300 bg-neutral-50 text-neutral-700",
@@ -76,7 +75,8 @@ const base64ToBlob = (base64, mimeType) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const label = ORDER_STATUS_LABELS[status] || status;
+  const { t } = useTranslation();
+  const label = orderStatusLabel(t, status);
   const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -86,7 +86,8 @@ const StatusBadge = ({ status }) => {
 };
 
 const PaymentBadge = ({ paymentStatus }) => {
-  const label = ORDER_PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus;
+  const { t } = useTranslation();
+  const label = paymentStatusLabel(t, paymentStatus);
   const tone = ORDER_PAYMENT_STATUS_TONES[paymentStatus] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -96,6 +97,7 @@ const PaymentBadge = ({ paymentStatus }) => {
 };
 
 export default function OrderDetailsPage({ orderId }) {
+  const { t } = useTranslation();
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
   const [orderOutcome, setOrderOutcome] = useState(null);
@@ -127,7 +129,7 @@ export default function OrderDetailsPage({ orderId }) {
 
   const loadAll = useCallback(async () => {
     if (!normalizedOrderId) {
-      setError("Order ID is missing from route.");
+      setError(t("lab.orderDetails.missingId", { defaultValue: "Order ID is missing from route." }));
       setLoading(false);
       return;
     }
@@ -163,7 +165,9 @@ export default function OrderDetailsPage({ orderId }) {
       setAllowedStatuses(Array.isArray(nextStatuses) ? nextStatuses : []);
       hasLoadedOnce.current = true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load order details.");
+      setError(
+        err instanceof Error ? err.message : t("lab.orderDetails.loadFailed", { defaultValue: "Failed to load order details." })
+      );
       setOrder(null);
       setHistory([]);
       setOrderOutcome(null);
@@ -198,7 +202,9 @@ export default function OrderDetailsPage({ orderId }) {
       await loadAll();
       setActionReason("");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Status update failed.");
+      setActionError(
+        err instanceof Error ? err.message : t("lab.orderDetails.statusUpdateFailed", { defaultValue: "Status update failed." })
+      );
     } finally {
       setActionLoading("");
     }
@@ -239,7 +245,10 @@ export default function OrderDetailsPage({ orderId }) {
     } catch (err) {
       setArchiveAction({
         loading: false,
-        error: err instanceof Error ? err.message : "Failed to update the archive.",
+        error:
+          err instanceof Error
+            ? err.message
+            : t("lab.orderDetails.archiveFailed", { defaultValue: "Failed to update the archive." }),
       });
     }
   };
@@ -255,10 +264,10 @@ export default function OrderDetailsPage({ orderId }) {
     const confirmed = typeof window === "undefined"
       ? true
       : window.confirm(
-        "Delete this lab order permanently?\n\n" +
-        "This removes the laboratory's copy: the order, its samples and its results.\n\n" +
-        "The breeder keeps the confirmed genetics on their animal, and keeps their certificate.\n\n" +
-        "This cannot be undone. To take the order off the dashboard without losing it, use Archive instead."
+        t("lab.orderDetails.deleteConfirm", {
+          defaultValue:
+            "Delete this lab order permanently?\n\nThis removes the laboratory's copy: the order, its samples and its results.\n\nThe breeder keeps the confirmed genetics on their animal, and keeps their certificate.\n\nThis cannot be undone. To take the order off the dashboard without losing it, use Archive instead.",
+        })
       );
 
     if (!confirmed) return;
@@ -275,7 +284,9 @@ export default function OrderDetailsPage({ orderId }) {
         window.location.hash = "/lab/incoming-orders";
       }
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete order.");
+      setDeleteError(
+        err instanceof Error ? err.message : t("lab.orderDetails.deleteFailed", { defaultValue: "Failed to delete order." })
+      );
     } finally {
       setDeleteLoading(false);
     }
@@ -292,7 +303,13 @@ export default function OrderDetailsPage({ orderId }) {
         window.dispatchEvent(new CustomEvent("lab:test-order-updated", { detail: { orderId: order.id } }));
       }
     } catch (err) {
-      setPaymentAction({ loading: false, error: err instanceof Error ? err.message : "Payment update failed." });
+      setPaymentAction({
+        loading: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : t("lab.orderDetails.paymentUpdateFailed", { defaultValue: "Payment update failed." }),
+      });
       return;
     }
     setPaymentAction({ loading: false, error: "" });
@@ -322,19 +339,22 @@ export default function OrderDetailsPage({ orderId }) {
     } catch (err) {
       setCertificateAction({
         loading: false,
-        error: err instanceof Error ? err.message : "Unable to load certificate.",
+        error:
+          err instanceof Error
+            ? err.message
+            : t("lab.orderDetails.certificateFailed", { defaultValue: "Unable to load certificate." }),
       });
     }
   };
 
   // Workflow step indicator
   const WORKFLOW_STEPS = [
-    { key: "submitted", label: "Submitted" },
-    { key: "payment", label: "Payment" },
-    { key: "intake", label: "Sample Intake" },
-    { key: "testing", label: "Testing" },
-    { key: "results", label: "Results" },
-    { key: "completed", label: "Certificate" },
+    { key: "submitted", label: t("lab.common.submitted", { defaultValue: "Submitted" }) },
+    { key: "payment", label: t("lab.common.colPayment", { defaultValue: "Payment" }) },
+    { key: "intake", label: t("lab.shell.nav.sampleIntake", { defaultValue: "Sample Intake" }) },
+    { key: "testing", label: t("lab.orderDetails.stepTesting", { defaultValue: "Testing" }) },
+    { key: "results", label: t("lab.shell.tab.results", { defaultValue: "Results" }) },
+    { key: "completed", label: t("lab.common.certificate", { defaultValue: "Certificate" }) },
   ];
 
   const getActiveStep = (status) => {
@@ -355,16 +375,21 @@ export default function OrderDetailsPage({ orderId }) {
       <header className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">Order Details</h1>
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              {t("lab.shell.nav.orderDetails", { defaultValue: "Order Details" })}
+            </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {order ? <StatusBadge status={order.status} /> : null}
               {order ? <PaymentBadge paymentStatus={paymentStatus} /> : null}
               {order?.orderNumber ? (
-                <span className="text-sm text-neutral-500">#{order.orderNumber}</span>
+                <span className="text-sm text-neutral-500">#<bdi>{order.orderNumber}</bdi></span>
               ) : null}
               {isArchived ? (
                 <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                  Archived {formatDateTime(order.archivedAt)}
+                  {t("lab.orderDetails.archivedAt", {
+                    defaultValue: "Archived {{date}}",
+                    date: formatDateTime(order.archivedAt),
+                  })}
                 </span>
               ) : null}
             </div>
@@ -380,7 +405,9 @@ export default function OrderDetailsPage({ orderId }) {
                 onClick={() => handleCertificateAction("download")}
                 disabled={certificateAction.loading}
               >
-                {certificateAction.loading ? "Loading..." : "Download Certificate PDF"}
+                {certificateAction.loading
+                  ? t("lab.orderDetails.loadingShort", { defaultValue: "Loading..." })
+                  : t("lab.orderDetails.downloadCertificatePdf", { defaultValue: "Download Certificate PDF" })}
               </button>
             ) : null}
             {canArchiveOrder ? (
@@ -391,8 +418,12 @@ export default function OrderDetailsPage({ orderId }) {
                 disabled={archiveAction.loading}
               >
                 {archiveAction.loading
-                  ? isArchived ? "Restoring..." : "Archiving..."
-                  : isArchived ? "Restore from Archive" : "Archive Order"}
+                  ? isArchived
+                    ? t("lab.orderDetails.restoring", { defaultValue: "Restoring..." })
+                    : t("lab.orderDetails.archiving", { defaultValue: "Archiving..." })
+                  : isArchived
+                    ? t("lab.orderDetails.restore", { defaultValue: "Restore from Archive" })
+                    : t("lab.orderDetails.archive", { defaultValue: "Archive Order" })}
               </button>
             ) : null}
             {canDeleteOrder ? (
@@ -402,7 +433,9 @@ export default function OrderDetailsPage({ orderId }) {
                 onClick={handleDeleteOrder}
                 disabled={deleteLoading}
               >
-                {deleteLoading ? "Deleting..." : "Delete Order"}
+                {deleteLoading
+                  ? t("lab.orderDetails.deleting", { defaultValue: "Deleting..." })
+                  : t("lab.orderDetails.delete", { defaultValue: "Delete Order" })}
               </button>
             ) : null}
           </div>
@@ -435,7 +468,9 @@ export default function OrderDetailsPage({ orderId }) {
       </header>
 
       {loading ? (
-        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Loading order details...</div>
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
+          {t("lab.orderDetails.loading", { defaultValue: "Loading order details..." })}
+        </div>
       ) : null}
 
       {!loading && error ? (
@@ -453,23 +488,23 @@ export default function OrderDetailsPage({ orderId }) {
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">1</span>
-                <h2 className="text-base font-semibold text-neutral-900">Order Submission</h2>
+                <h2 className="text-base font-semibold text-neutral-900">{t("lab.orderDetails.submissionTitle", { defaultValue: "Order Submission" })}</h2>
               </div>
               <dl className="grid gap-2 text-sm text-neutral-700">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Order Number</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.orderNumber", { defaultValue: "Order Number" })}</dt>
                   <dd>{order.orderNumber || "-"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Internal ID</dt>
-                  <dd className="font-mono text-xs">{order.id}</dd>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.internalId", { defaultValue: "Internal ID" })}</dt>
+                  <dd className="font-mono text-xs"><bdi>{order.id}</bdi></dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Submitted</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.common.submitted", { defaultValue: "Submitted" })}</dt>
                   <dd>{formatDateTime(order.submittedAt || order.createdAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Requested Tests</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.common.requestedTests", { defaultValue: "Requested Tests" })}</dt>
                   <dd>{(order.requestedTests || []).join(", ") || "-"}</dd>
                 </div>
               </dl>
@@ -478,15 +513,17 @@ export default function OrderDetailsPage({ orderId }) {
             <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-200 text-xs font-semibold text-neutral-600">→</span>
-                <h2 className="text-base font-semibold text-neutral-900">Snake & Breeder</h2>
+                <h2 className="text-base font-semibold text-neutral-900">
+                  {t("lab.orderDetails.snakeBreederTitle", { defaultValue: "Snake & Breeder" })}
+                </h2>
               </div>
               <dl className="grid gap-2 text-sm text-neutral-700">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Animal ID</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.animalId", { defaultValue: "Animal ID" })}</dt>
                   <dd>{order.animalId || "-"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Breeder User ID</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.breederUserId", { defaultValue: "Breeder User ID" })}</dt>
                   <dd className="font-mono text-xs">{order.breederUserId || order.requestedByUserId || "-"}</dd>
                 </div>
               </dl>
@@ -499,7 +536,7 @@ export default function OrderDetailsPage({ orderId }) {
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">2</span>
-                  <h2 className="text-base font-semibold text-neutral-900">Payment</h2>
+                  <h2 className="text-base font-semibold text-neutral-900">{t("lab.common.colPayment", { defaultValue: "Payment" })}</h2>
                   <PaymentBadge paymentStatus={paymentStatus} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -510,7 +547,9 @@ export default function OrderDetailsPage({ orderId }) {
                       disabled={paymentAction.loading}
                       onClick={() => handleMarkAsPaid("paid")}
                     >
-                      {paymentAction.loading ? "Saving..." : "Mark as Paid"}
+                      {paymentAction.loading
+                        ? t("lab.orderDetails.saving", { defaultValue: "Saving..." })
+                        : t("lab.orderDetails.markPaid", { defaultValue: "Mark as Paid" })}
                     </button>
                   ) : null}
                   {paymentStatus === "paid" ? (
@@ -520,22 +559,24 @@ export default function OrderDetailsPage({ orderId }) {
                       disabled={paymentAction.loading}
                       onClick={() => handleMarkAsPaid("pending")}
                     >
-                      {paymentAction.loading ? "Saving..." : "Revert to Pending"}
+                      {paymentAction.loading
+                        ? t("lab.orderDetails.saving", { defaultValue: "Saving..." })
+                        : t("lab.orderDetails.revertPending", { defaultValue: "Revert to Pending" })}
                     </button>
                   ) : null}
                 </div>
               </div>
               <dl className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Requested</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.paymentRequested", { defaultValue: "Payment Requested" })}</dt>
                   <dd>{formatDateTime(order.paymentRequestedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Paid At</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.paidAt", { defaultValue: "Paid At" })}</dt>
                   <dd>{formatDateTime(order.paidAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-neutral-500">Payment Reference</dt>
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.paymentReference", { defaultValue: "Payment Reference" })}</dt>
                   <dd className="font-mono text-xs">{order.paymentRef || "-"}</dd>
                 </div>
               </dl>
@@ -551,31 +592,31 @@ export default function OrderDetailsPage({ orderId }) {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">3</span>
-              <h2 className="text-base font-semibold text-neutral-900">Sample Intake</h2>
+              <h2 className="text-base font-semibold text-neutral-900">{t("lab.shell.nav.sampleIntake", { defaultValue: "Sample Intake" })}</h2>
             </div>
             <dl className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample IDs</dt>
-                <dd>{(order.sampleIds || []).length ? order.sampleIds.join(", ") : "No sample IDs linked yet."}</dd>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.sampleIds", { defaultValue: "Sample IDs" })}</dt>
+                <dd>{(order.sampleIds || []).length ? order.sampleIds.join(", ") : t("lab.orderDetails.noSampleIds", { defaultValue: "No sample IDs linked yet." })}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">QR Token</dt>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.qrToken", { defaultValue: "QR Token" })}</dt>
                 <dd className="break-all font-mono text-xs">{sampleQrToken || "-"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Received</dt>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.sampleReceived", { defaultValue: "Sample Received" })}</dt>
                 <dd>{formatDateTime(intakeInfo.receivedAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Approved</dt>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.intakeApproved", { defaultValue: "Intake Approved" })}</dt>
                 <dd>{formatDateTime(intakeInfo.approvedAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">Sample Condition</dt>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.intake.sampleCondition", { defaultValue: "Sample Condition" })}</dt>
                 <dd>{intakeInfo.condition || "-"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">Intake Notes</dt>
+                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.intake.notes", { defaultValue: "Intake Notes" })}</dt>
                 <dd>{intakeInfo.notes || "-"}</dd>
               </div>
             </dl>
@@ -585,15 +626,21 @@ export default function OrderDetailsPage({ orderId }) {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">4</span>
-              <h2 className="text-base font-semibold text-neutral-900">Testing & Workflow</h2>
+              <h2 className="text-base font-semibold text-neutral-900">
+              {t("lab.orderDetails.workflowTitle", { defaultValue: "Testing & Workflow" })}
+            </h2>
             </div>
             <label className="block text-sm">
-              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Transition Note (optional)</span>
+              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+                {t("lab.orderDetails.transitionNote", { defaultValue: "Transition Note (optional)" })}
+              </span>
               <input
                 className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
                 value={actionReason}
                 onChange={(event) => setActionReason(event.target.value)}
-                placeholder="Add a note before advancing the status"
+                placeholder={t("lab.orderDetails.transitionNotePlaceholder", {
+                  defaultValue: "Add a note before advancing the status",
+                })}
               />
             </label>
             {actionError ? (
@@ -609,12 +656,12 @@ export default function OrderDetailsPage({ orderId }) {
                   onClick={() => handleAdvanceStatus(nextStatus)}
                 >
                   {actionLoading === nextStatus
-                    ? "Updating..."
-                    : `→ ${ORDER_STATUS_LABELS[nextStatus] || nextStatus}`}
+                    ? t("lab.orderDetails.updating", { defaultValue: "Updating..." })
+                    : `→ ${orderStatusLabel(t, nextStatus)}`}
                 </button>
               )) : (
                 <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500">
-                  No further actions available for the current status.
+                  {t("lab.orderDetails.noActions", { defaultValue: "No further actions available for the current status." })}
                 </div>
               )}
             </div>
@@ -625,9 +672,16 @@ export default function OrderDetailsPage({ orderId }) {
             <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-700 text-xs font-semibold text-white">5</span>
-                <h2 className="text-base font-semibold text-sky-900">Enter Results</h2>
+                <h2 className="text-base font-semibold text-sky-900">
+                  {t("lab.orderDetails.enterResultsTitle", { defaultValue: "Enter Results" })}
+                </h2>
               </div>
-              <p className="mb-4 text-sm text-sky-700">Record gene findings for this order. Save a draft to work in stages, or submit to finalise and notify the breeder.</p>
+              <p className="mb-4 text-sm text-sky-700">
+                {t("lab.orderDetails.enterResultsHelp", {
+                  defaultValue:
+                    "Record gene findings for this order. Save a draft to work in stages, or submit to finalise and notify the breeder.",
+                })}
+              </p>
               <InlineResultEntry orderId={order.id} onSaved={loadAll} />
             </section>
           ) : null}
@@ -636,11 +690,15 @@ export default function OrderDetailsPage({ orderId }) {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs font-semibold text-white">6</span>
-              <h2 className="text-base font-semibold text-neutral-900">Results & Certificate</h2>
+              <h2 className="text-base font-semibold text-neutral-900">
+                {t("lab.orderDetails.resultsTitle", { defaultValue: "Results & Certificate" })}
+              </h2>
             </div>
             <div className="grid gap-3 xl:grid-cols-2">
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                <div className="text-xs uppercase tracking-wide text-neutral-500">Latest Result</div>
+                <div className="text-xs uppercase tracking-wide text-neutral-500">
+                  {t("lab.orderDetails.latestResult", { defaultValue: "Latest Result" })}
+                </div>
                 {orderOutcome?.latestResult ? (
                   <>
                     <div className="mt-1 text-sm font-semibold text-neutral-900">
@@ -650,25 +708,41 @@ export default function OrderDetailsPage({ orderId }) {
                         orderOutcome.latestResult.reportedAt || orderOutcome.latestResult.releasedAt || orderOutcome.latestResult.reviewedAt
                       )}
                     </div>
-                    <div className="text-xs text-neutral-600">Status: {orderOutcome.latestResult.status}</div>
-                    <div className="mt-2 text-sm text-neutral-700">{orderOutcome.latestResult.summary || "No summary provided."}</div>
+                    <div className="text-xs text-neutral-600">
+                      {t("lab.orderDetails.statusLabel", { defaultValue: "Status:" })} {orderOutcome.latestResult.status}
+                    </div>
+                    <div className="mt-2 text-sm text-neutral-700">{orderOutcome.latestResult.summary ||
+                        t("lab.orderDetails.noSummary", { defaultValue: "No summary provided." })}</div>
                     <div className="mt-2 text-xs text-neutral-600">
-                      Findings: {formatFindingSummary(orderOutcome.latestResult.findings) || "-"}
+                      {t("lab.orderDetails.findings", { defaultValue: "Findings:" })}{" "}
+                      {formatFindingSummary(orderOutcome.latestResult.findings) || "-"}
                     </div>
                   </>
                 ) : (
-                  <div className="mt-1 text-sm text-neutral-600">No finalized result available yet.</div>
+                  <div className="mt-1 text-sm text-neutral-600">
+                    {t("lab.orderDetails.noResult", { defaultValue: "No finalized result available yet." })}
+                  </div>
                 )}
               </div>
 
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                <div className="text-xs uppercase tracking-wide text-neutral-500">Certificate</div>
+                <div className="text-xs uppercase tracking-wide text-neutral-500">
+                  {t("lab.common.certificate", { defaultValue: "Certificate" })}
+                </div>
                 {orderOutcome?.certificate ? (
                   <>
                     <div className="mt-1 text-sm font-semibold text-neutral-900">{orderOutcome.certificate.certificateNumber}</div>
-                    <div className="text-xs text-neutral-600">Status: {orderOutcome.certificate.status}</div>
-                    <div className="text-xs text-neutral-600">Issued: {formatDateTime(orderOutcome.certificate.issuedAt)}</div>
-                    <div className="mt-1 text-xs text-neutral-600">Verification: {orderOutcome.certificate.verificationCode || "-"}</div>
+                    <div className="text-xs text-neutral-600">
+                      {t("lab.orderDetails.statusLabel", { defaultValue: "Status:" })} {orderOutcome.certificate.status}
+                    </div>
+                    <div className="text-xs text-neutral-600">
+                      {t("lab.orderDetails.issued", { defaultValue: "Issued:" })}{" "}
+                      {formatDateTime(orderOutcome.certificate.issuedAt)}
+                    </div>
+                    <div className="mt-1 text-xs text-neutral-600">
+                      {t("lab.orderDetails.verification", { defaultValue: "Verification:" })}{" "}
+                      {orderOutcome.certificate.verificationCode || "-"}
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -676,7 +750,9 @@ export default function OrderDetailsPage({ orderId }) {
                         onClick={() => handleCertificateAction("view")}
                         disabled={certificateAction.loading}
                       >
-                        {certificateAction.loading ? "Loading..." : "View Certificate"}
+                        {certificateAction.loading
+                          ? t("lab.orderDetails.loadingShort", { defaultValue: "Loading..." })
+                          : t("lab.orderDetails.viewCertificate", { defaultValue: "View Certificate" })}
                       </button>
                       <button
                         type="button"
@@ -684,7 +760,7 @@ export default function OrderDetailsPage({ orderId }) {
                         onClick={() => handleCertificateAction("download")}
                         disabled={certificateAction.loading}
                       >
-                        Download PDF
+                        {t("lab.orderDetails.downloadPdf", { defaultValue: "Download PDF" })}
                       </button>
                     </div>
                     {certificateAction.error ? (
@@ -694,14 +770,18 @@ export default function OrderDetailsPage({ orderId }) {
                     ) : null}
                   </>
                 ) : (
-                  <div className="mt-1 text-sm text-neutral-600">Certificate not issued yet.</div>
+                  <div className="mt-1 text-sm text-neutral-600">
+                    {t("lab.orderDetails.noCertificate", { defaultValue: "Certificate not issued yet." })}
+                  </div>
                 )}
               </div>
             </div>
 
             {(orderOutcome?.resultHistory || []).length > 0 ? (
               <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                <div className="mb-2 text-xs uppercase tracking-wide text-neutral-500">Result History</div>
+                <div className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
+                  {t("lab.orderDetails.resultHistory", { defaultValue: "Result History" })}
+                </div>
                 <ul className="space-y-1 text-sm text-neutral-700">
                   {orderOutcome.resultHistory.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-neutral-200 bg-white px-2 py-1">
@@ -722,10 +802,12 @@ export default function OrderDetailsPage({ orderId }) {
 
           {/* Status History Timeline */}
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-neutral-900">Status History</h2>
+            <h2 className="mb-3 text-base font-semibold text-neutral-900">
+              {t("lab.orderDetails.statusHistory", { defaultValue: "Status History" })}
+            </h2>
             {!history.length ? (
               <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600">
-                No status history entries yet.
+                {t("lab.orderDetails.noHistory", { defaultValue: "No status history entries yet." })}
               </div>
             ) : (
               <ol className="space-y-2">
@@ -738,8 +820,16 @@ export default function OrderDetailsPage({ orderId }) {
                     {entry.fromStatus ? (
                       <div className="mt-1 text-xs text-neutral-500">{entry.fromStatus} → {entry.toStatus}</div>
                     ) : null}
-                    {entry.reason ? <div className="mt-1 text-xs text-neutral-600">Note: {entry.reason}</div> : null}
-                    {entry.changedByUserId ? <div className="mt-1 text-xs text-neutral-400">By: {entry.changedByUserId}</div> : null}
+                    {entry.reason ? (
+                      <div className="mt-1 text-xs text-neutral-600">
+                        {t("lab.orderDetails.note", { defaultValue: "Note:" })} {entry.reason}
+                      </div>
+                    ) : null}
+                    {entry.changedByUserId ? (
+                      <div className="mt-1 text-xs text-neutral-400">
+                        {t("lab.orderDetails.by", { defaultValue: "By:" })} {entry.changedByUserId}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ol>

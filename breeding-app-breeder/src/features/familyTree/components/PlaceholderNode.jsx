@@ -1,9 +1,15 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
+import { useTranslation } from 'react-i18next';
 
 const PlaceholderNode = ({ data }) => {
+  const { t } = useTranslation();
   const { role } = data;
-  const label    = role === 'sire' ? 'Unknown Sire' : role === 'dam' ? 'Unknown Dam' : 'Unknown Parent';
+  const label    = role === 'sire'
+    ? t('familyTree.placeholder.unknownSire', { defaultValue: 'Unknown Sire' })
+    : role === 'dam'
+      ? t('familyTree.placeholder.unknownDam', { defaultValue: 'Unknown Dam' })
+      : t('familyTree.placeholder.unknownParent', { defaultValue: 'Unknown Parent' });
   const sexIcon  = role === 'sire' ? '♂' : role === 'dam' ? '♀' : '?';
   const sexColor = role === 'sire' ? 'text-sky-300' : role === 'dam' ? 'text-pink-300' : 'text-neutral-400';
 
@@ -23,7 +29,7 @@ const PlaceholderNode = ({ data }) => {
         </div>
         <div className="min-w-0">
           <div className="text-xs font-medium text-neutral-400">{label}</div>
-          <div className="text-[10px] text-neutral-400">No record</div>
+          <div className="text-[10px] text-neutral-400">{t('familyTree.placeholder.noRecord', { defaultValue: 'No record' })}</div>
         </div>
       </div>
 

@@ -117,19 +117,19 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
           <div className="min-w-0">
             <button
               type="button"
-              className="text-left text-sm font-semibold text-neutral-900 hover:underline truncate max-w-full"
+              className="text-start text-sm font-semibold text-neutral-900 hover:underline truncate max-w-full"
               onClick={() => onOpenAnimal?.(snake)}
             >
               {snake.name || snake.id || t('quarantine.unnamed', { defaultValue: 'Unnamed' })}
             </button>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-neutral-500">
               <span aria-hidden="true">{sexSymbol(snake.sex)}</span>
-              {snake.id ? <span className="truncate font-mono">{snake.id}</span> : null}
+              {snake.id ? <span className="truncate font-mono"><bdi>{snake.id}</bdi></span> : null}
               {record.source ? <span className="truncate">{label(SOURCE_LABELS, record.source)}</span> : null}
               {record.sourceName ? <span className="truncate">· {record.sourceName}</span> : null}
             </div>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-end shrink-0">
             <div className={`text-sm font-semibold tabular-nums ${inQuarantine ? 'text-amber-700' : 'text-emerald-700'}`}>
               {days === null
                 ? t('quarantine.noStartDate', { defaultValue: 'No start date' })
@@ -214,7 +214,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
             {t('quarantine.putBack', { defaultValue: 'Back into quarantine' })}
           </button>
         )}
-        <div className="relative ml-auto">
+        <div className="relative ms-auto">
           <button
             type="button"
             className="rounded-xl border bg-white px-2.5 py-1.5 text-xs"
@@ -227,10 +227,10 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
           {menuOpen ? (
             <>
               <div className="fixed inset-0 z-10" role="presentation" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 bottom-full z-20 mb-1 w-56 rounded-xl border bg-white py-1 shadow-lg">
+              <div className="absolute end-0 bottom-full z-20 mb-1 w-56 rounded-xl border bg-white py-1 shadow-lg">
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50"
+                  className="w-full px-3 py-2 text-start text-xs hover:bg-neutral-50"
                   onClick={() => { setMenuOpen(false); onOpenAnimal?.(snake); }}
                 >
                   {t('quarantine.openAnimal', { defaultValue: 'Open animal' })}
@@ -238,7 +238,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                 {inQuarantine ? (
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50"
+                    className="w-full px-3 py-2 text-start text-xs hover:bg-neutral-50"
                     onClick={() => { setMenuOpen(false); onRestart?.(snake); }}
                   >
                     {t('quarantine.restartClockEllipsis', { defaultValue: 'Restart clock…' })}
@@ -246,7 +246,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                 ) : null}
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-xs text-neutral-500 hover:bg-neutral-50"
+                  className="w-full px-3 py-2 text-start text-xs text-neutral-500 hover:bg-neutral-50"
                   onClick={() => { setMenuOpen(false); onRemove?.(snake); }}
                 >
                   {t('quarantine.removeRecord', { defaultValue: 'Remove record' })}

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
@@ -47,6 +48,7 @@ export default function LabOrderQueueWidget({
   emptyMessage,
   onOpenOrder,
 }) {
+  const { t } = useTranslation();
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -68,20 +70,20 @@ export default function LabOrderQueueWidget({
           <table className="min-w-[820px] w-full text-sm">
             <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold">Order</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                <th className="px-3 py-2 text-left font-semibold">Payment</th>
-                <th className="px-3 py-2 text-left font-semibold">Date</th>
-                <th className="px-3 py-2 text-left font-semibold">Requested Tests</th>
-                <th className="px-3 py-2 text-left font-semibold">Action</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.queue.order", { defaultValue: "Order" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.queue.status", { defaultValue: "Status" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.queue.payment", { defaultValue: "Payment" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.queue.date", { defaultValue: "Date" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.orders.requestedTests", { defaultValue: "Requested Tests" })}</th>
+                <th className="px-3 py-2 text-start font-semibold">{t("lab.queue.action", { defaultValue: "Action" })}</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id} className="border-t border-neutral-100 align-top">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-neutral-800">{order.orderNumber || order.id}</div>
-                    <div className="text-xs text-neutral-500">Animal: {order.animalId || "-"}</div>
+                    <div className="font-medium text-neutral-800"><bdi>{order.orderNumber || order.id}</bdi></div>
+                    <div className="text-xs text-neutral-500">{t("lab.queue.animal", { defaultValue: "Animal: {{animal}}", animal: order.animalId || "-" })}</div>
                   </td>
                   <td className="px-3 py-2">
                     <StatusBadge status={order.status} />
@@ -103,7 +105,7 @@ export default function LabOrderQueueWidget({
                       className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs hover:border-neutral-400"
                       onClick={() => onOpenOrder?.(order.id)}
                     >
-                      View details
+                      {t("lab.queue.viewDetails", { defaultValue: "View details" })}
                     </button>
                   </td>
                 </tr>

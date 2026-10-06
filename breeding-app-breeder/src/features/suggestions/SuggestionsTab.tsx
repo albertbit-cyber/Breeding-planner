@@ -484,7 +484,7 @@ const GeneTagRow = ({ label, tokens }) => {
   if (!list.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-600">
-      <span className="uppercase tracking-wide text-[10px] text-neutral-500 mr-1">{label}:</span>
+      <span className="uppercase tracking-wide text-[10px] text-neutral-500 me-1">{label}:</span>
       {list.map((token) => (
         <span
           key={`${label}-${token}`}
@@ -1096,7 +1096,7 @@ export const SuggestionsTab = ({
               <button
                 type="button"
                 onClick={togglePlanExpanded}
-                className="flex w-full items-center justify-between text-left"
+                className="flex w-full items-center justify-between text-start"
                 aria-expanded={isPlanExpanded}
               >
                 <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">

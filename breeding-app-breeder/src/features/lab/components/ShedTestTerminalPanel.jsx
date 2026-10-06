@@ -502,7 +502,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-neutral-800">{order.orderNumber || order.id}</div>
+                        <div className="truncate text-sm font-medium text-neutral-800"><bdi>{order.orderNumber || order.id}</bdi></div>
                         <div className="mt-0.5 text-[11px] text-neutral-500">
                           {t("lab.orders.orderDate", { defaultValue: "Order Date" })}: {formatDate(order.submittedAt || order.createdAt)}
                         </div>
@@ -550,7 +550,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                         <div className="text-neutral-700">
                           {Array.isArray(order.resultIds) ? order.resultIds.length : 0}
                           {order.certificateId ? (
-                            <span className="ml-2 text-emerald-700">
+                            <span className="ms-2 text-emerald-700">
                               {t("lab.orders.certificateReadyShort", { defaultValue: "Certificate ready" })}
                             </span>
                           ) : null}
@@ -794,11 +794,11 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="font-medium text-neutral-800">{batch.id}</div>
+                    <div className="font-medium text-neutral-800"><bdi>{batch.id}</bdi></div>
                     <div className="text-neutral-500">{new Date(batch.submittedAt).toLocaleString()}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-neutral-500">{batch.itemCount} items</div>
+                  <div className="text-end">
+                    <div className="text-neutral-500">{t("lab.terminal.itemCount", { defaultValue: "{{items}} items", items: batch.itemCount })}</div>
                     <div className="font-medium text-neutral-800">{formatMoney(batch.currency, batch.totalCents)}</div>
                   </div>
                 </div>

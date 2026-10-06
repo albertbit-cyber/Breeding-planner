@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Schematic drawings, deliberately not photographs. A diagram can exaggerate the one feature that
 // matters — a sunken eye, a spinal ridge — in a way a photograph of one particular snake never
@@ -46,14 +47,15 @@ function Label({ x, y, tone, children, anchor = 'middle' }) {
   );
 }
 
-const DIAGRAMS = {
+// Built per render so the captions follow the active language.
+const buildDiagrams = (t) => ({
   eyes: {
     normal: (
       <HeadProfile>
         <circle cx="42" cy="44" r="9" fill="#fff" stroke={LINE} strokeWidth="1.4" />
         <circle cx="42" cy="44" r="4" fill={LINE} />
         <circle cx="39" cy="41" r="1.8" fill="#fff" />
-        <Label x="42" y="76" tone={OK}>Full, clear, round</Label>
+        <Label x="42" y="76" tone={OK}>{t('quarantine.diagram.eyes.normal', { defaultValue: 'Full, clear, round' })}</Label>
       </HeadProfile>
     ),
     concerning: (
@@ -62,7 +64,7 @@ const DIAGRAMS = {
         <circle cx="42" cy="44" r="6.5" fill="#d6d3d1" />
         <path d="M34 38 C 38 41, 46 41, 50 38" fill="none" stroke={BAD} strokeWidth="1.1" />
         <path d="M34 50 C 38 47, 46 47, 50 50" fill="none" stroke={BAD} strokeWidth="1.1" />
-        <Label x="42" y="76" tone={BAD}>Sunken, wrinkled, cloudy</Label>
+        <Label x="42" y="76" tone={BAD}>{t('quarantine.diagram.eyes.concerning', { defaultValue: 'Sunken, wrinkled, cloudy' })}</Label>
       </HeadProfile>
     ),
   },
@@ -82,7 +84,7 @@ const DIAGRAMS = {
             opacity="0.45"
           />
         ))}
-        <Label x="60" y="76" tone={OK}>Clean scale seams</Label>
+        <Label x="60" y="76" tone={OK}>{t('quarantine.diagram.mites.normal', { defaultValue: 'Clean scale seams' })}</Label>
       </HeadProfile>
     ),
     concerning: (
@@ -103,7 +105,7 @@ const DIAGRAMS = {
           <circle key={index} cx={cx} cy={cy} r="1.7" fill={BAD} />
         ))}
         <circle cx="42" cy="44" r="12" fill="none" stroke={BAD} strokeWidth="1" strokeDasharray="2 2" />
-        <Label x="60" y="76" tone={BAD}>Specks at eye rim and seams</Label>
+        <Label x="60" y="76" tone={BAD}>{t('quarantine.diagram.mites.concerning', { defaultValue: 'Specks at eye rim and seams' })}</Label>
       </HeadProfile>
     ),
   },
@@ -115,7 +117,7 @@ const DIAGRAMS = {
         <circle cx="42" cy="42" r="3" fill={LINE} />
         <path d="M14 50 C 40 58, 80 60, 110 52" fill="none" stroke={LINE} strokeWidth="1.5" />
         <circle cx="18" cy="43" r="1.4" fill={LINE} />
-        <Label x="60" y="76" tone={OK}>Mouth closed, silent</Label>
+        <Label x="60" y="76" tone={OK}>{t('quarantine.diagram.breathing.normal', { defaultValue: 'Mouth closed, silent' })}</Label>
       </HeadProfile>
     ),
     concerning: (
@@ -136,7 +138,7 @@ const DIAGRAMS = {
         <circle cx="42" cy="38" r="2.6" fill={LINE} />
         <circle cx="17" cy="41" r="3.4" fill="none" stroke={BAD} strokeWidth="1.3" />
         <circle cx="21" cy="36" r="2.2" fill="none" stroke={BAD} strokeWidth="1.1" />
-        <Label x="60" y="80" tone={BAD}>Gaping, bubbles at nostril</Label>
+        <Label x="60" y="80" tone={BAD}>{t('quarantine.diagram.breathing.concerning', { defaultValue: 'Gaping, bubbles at nostril' })}</Label>
       </>
     ),
   },
@@ -147,7 +149,7 @@ const DIAGRAMS = {
         <ellipse cx="60" cy="42" rx="30" ry="24" fill={SKIN} stroke={LINE} strokeWidth="1.6" />
         <path d="M60 18 L 60 24" stroke={LINE} strokeWidth="1.4" />
         <path d="M40 60 C 50 66, 70 66, 80 60" fill="none" stroke={LINE} strokeWidth="0.9" opacity="0.5" />
-        <Label x="60" y="78" tone={OK}>Rounded in section</Label>
+        <Label x="60" y="78" tone={OK}>{t('quarantine.diagram.condition.normal', { defaultValue: 'Rounded in section' })}</Label>
       </>
     ),
     concerning: (
@@ -155,7 +157,7 @@ const DIAGRAMS = {
         <path d="M60 16 C 78 34, 88 52, 84 62 C 72 68, 48 68, 36 62 C 32 52, 42 34, 60 16 Z" fill={SKIN} stroke={LINE} strokeWidth="1.6" />
         <path d="M60 16 L 60 26" stroke={BAD} strokeWidth="2" />
         <path d="M50 22 L 60 14 L 70 22" fill="none" stroke={BAD} strokeWidth="1.4" />
-        <Label x="60" y="78" tone={BAD}>Spine ridged, triangular</Label>
+        <Label x="60" y="78" tone={BAD}>{t('quarantine.diagram.condition.concerning', { defaultValue: 'Spine ridged, triangular' })}</Label>
       </>
     ),
   },
@@ -168,7 +170,7 @@ const DIAGRAMS = {
           <path key={index} d={`M${18 + index * 16} 26 C ${20 + index * 16} 40, ${20 + index * 16} 44, ${18 + index * 16} 58`} stroke={LINE} strokeWidth="0.7" opacity="0.4" fill="none" />
         ))}
         <path d="M46 42 L 74 42" stroke={LINE} strokeWidth="2.2" strokeLinecap="round" />
-        <Label x="60" y="76" tone={OK}>Flat, clean, closed</Label>
+        <Label x="60" y="76" tone={OK}>{t('quarantine.diagram.vent.normal', { defaultValue: 'Flat, clean, closed' })}</Label>
       </>
     ),
     concerning: (
@@ -177,7 +179,7 @@ const DIAGRAMS = {
         <ellipse cx="60" cy="42" rx="20" ry="12" fill="#fecaca" stroke={BAD} strokeWidth="1.3" />
         <path d="M48 42 C 54 38, 66 46, 72 42" stroke={BAD} strokeWidth="2.2" strokeLinecap="round" fill="none" />
         <path d="M78 48 C 86 52, 94 50, 100 54" stroke="#a16207" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-        <Label x="60" y="76" tone={BAD}>Swollen, smeared</Label>
+        <Label x="60" y="76" tone={BAD}>{t('quarantine.diagram.vent.concerning', { defaultValue: 'Swollen, smeared' })}</Label>
       </>
     ),
   },
@@ -196,7 +198,7 @@ const DIAGRAMS = {
             opacity="0.45"
           />
         ))}
-        <Label x="60" y="76" tone={OK}>Even, intact scales</Label>
+        <Label x="60" y="76" tone={OK}>{t('quarantine.diagram.skin.normal', { defaultValue: 'Even, intact scales' })}</Label>
       </>
     ),
     concerning: (
@@ -215,7 +217,7 @@ const DIAGRAMS = {
         <path d="M26 30 C 40 26, 48 40, 38 50 C 28 54, 20 44, 26 30 Z" fill="#fde68a" stroke="#a16207" strokeWidth="1.2" />
         <ellipse cx="80" cy="42" rx="11" ry="8" fill="#fecaca" stroke={BAD} strokeWidth="1.3" />
         <ellipse cx="80" cy="42" rx="4.5" ry="3" fill={BAD} opacity="0.55" />
-        <Label x="60" y="76" tone={BAD}>Retained shed, lesion</Label>
+        <Label x="60" y="76" tone={BAD}>{t('quarantine.diagram.skin.concerning', { defaultValue: 'Retained shed, lesion' })}</Label>
       </>
     ),
   },
@@ -227,7 +229,7 @@ const DIAGRAMS = {
         <path d="M14 54 C 30 26, 56 66, 74 38 C 86 20, 100 30, 108 26" fill="none" stroke={LINE} strokeWidth="1" strokeDasharray="3 2" />
         <circle cx="18" cy="50" r="3.2" fill="none" stroke={OK} strokeWidth="1.3" />
         <circle cx="25" cy="45" r="3.2" fill="none" stroke={OK} strokeWidth="1.3" />
-        <Label x="60" y="76" tone={OK}>One piece, both eye caps</Label>
+        <Label x="60" y="76" tone={OK}>{t('quarantine.diagram.shed.normal', { defaultValue: 'One piece, both eye caps' })}</Label>
       </>
     ),
     concerning: (
@@ -237,7 +239,7 @@ const DIAGRAMS = {
         <path d="M84 40 C 92 30, 100 34, 106 28" fill="none" stroke={LINE} strokeWidth="7" strokeLinecap="round" opacity="0.35" />
         <path d="M100 30 L 108 24" stroke={BAD} strokeWidth="2.4" strokeLinecap="round" />
         <path d="M42 30 L 50 22 M 50 30 L 42 22" stroke={BAD} strokeWidth="1.6" strokeLinecap="round" />
-        <Label x="60" y="76" tone={BAD}>Fragments, caps retained</Label>
+        <Label x="60" y="76" tone={BAD}>{t('quarantine.diagram.shed.concerning', { defaultValue: 'Fragments, caps retained' })}</Label>
       </>
     ),
   },
@@ -247,27 +249,32 @@ const DIAGRAMS = {
       <>
         <ellipse cx="44" cy="46" rx="18" ry="11" fill="#78716c" stroke={LINE} strokeWidth="1.3" />
         <ellipse cx="78" cy="44" rx="12" ry="9" fill="#fafaf9" stroke={LINE} strokeWidth="1.3" />
-        <Label x="44" y="70" tone={OK}>Formed</Label>
-        <Label x="78" y="70" tone={OK}>Firm urate</Label>
+        <Label x="44" y="70" tone={OK}>{t('quarantine.diagram.stool.normalStool', { defaultValue: 'Formed' })}</Label>
+        <Label x="78" y="70" tone={OK}>{t('quarantine.diagram.stool.normalUrate', { defaultValue: 'Firm urate' })}</Label>
       </>
     ),
     concerning: (
       <>
         <path d="M22 50 C 34 38, 48 56, 62 46 C 72 40, 80 52, 92 46 C 96 50, 88 58, 74 58 C 54 60, 30 60, 22 50 Z" fill="#a8a29e" stroke={BAD} strokeWidth="1.3" />
         <ellipse cx="84" cy="34" rx="9" ry="6" fill="#fef08a" stroke="#a16207" strokeWidth="1.2" />
-        <Label x="56" y="72" tone={BAD}>Watery, yellow urate</Label>
+        <Label x="56" y="72" tone={BAD}>{t('quarantine.diagram.stool.concerning', { defaultValue: 'Watery, yellow urate' })}</Label>
       </>
     ),
   },
-};
+});
+
+const DIAGRAM_KEYS = new Set(Object.keys(buildDiagrams(() => '')));
 
 export function hasDiagram(key) {
-  return Boolean(DIAGRAMS[key]);
+  return DIAGRAM_KEYS.has(key);
 }
 
 /** Side-by-side comparison. The whole point is that the two frames differ in exactly one way. */
-export default function CheckDiagram({ checkKey, normalLabel = 'Normal', concerningLabel = 'Worth acting on' }) {
-  const pair = DIAGRAMS[checkKey];
+export default function CheckDiagram({ checkKey, normalLabel, concerningLabel }) {
+  const { t } = useTranslation();
+  if (normalLabel === undefined) normalLabel = t('quarantine.diagram.normal', { defaultValue: 'Normal' });
+  if (concerningLabel === undefined) concerningLabel = t('quarantine.diagram.concerning', { defaultValue: 'Worth acting on' });
+  const pair = buildDiagrams(t)[checkKey];
   if (!pair) return null;
   return (
     <div className="grid grid-cols-2 gap-2">

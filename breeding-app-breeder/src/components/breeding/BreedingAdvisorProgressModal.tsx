@@ -38,11 +38,12 @@ function elapsedLabel(step: AdvisorProgressStep): string | null {
 // ─── Status icon ─────────────────────────────────────────────────────────────
 
 function StatusIcon({ status }: { status: AdvisorStepStatus }) {
+  const { t } = useTranslation("advisor");
   if (status === "running") {
     return (
       <span
         className="inline-block w-4 h-4 rounded-full border-2 border-sky-500 border-t-transparent animate-spin flex-shrink-0"
-        aria-label="Running"
+        aria-label={t("progress.stepStatus.running", { defaultValue: "Running" })}
       />
     );
   }
@@ -52,7 +53,7 @@ function StatusIcon({ status }: { status: AdvisorStepStatus }) {
         className="w-4 h-4 text-emerald-500 flex-shrink-0"
         viewBox="0 0 16 16"
         fill="none"
-        aria-label="Completed"
+        aria-label={t("progress.stepStatus.completed", { defaultValue: "Completed" })}
       >
         <circle cx="8" cy="8" r="7.25" stroke="currentColor" strokeWidth="1.5" />
         <path
@@ -71,7 +72,7 @@ function StatusIcon({ status }: { status: AdvisorStepStatus }) {
         className="w-4 h-4 text-rose-500 flex-shrink-0"
         viewBox="0 0 16 16"
         fill="none"
-        aria-label="Failed"
+        aria-label={t("progress.stepStatus.failed", { defaultValue: "Failed" })}
       >
         <circle cx="8" cy="8" r="7.25" stroke="currentColor" strokeWidth="1.5" />
         <path
@@ -87,7 +88,7 @@ function StatusIcon({ status }: { status: AdvisorStepStatus }) {
   return (
     <span
       className="inline-block w-4 h-4 rounded-full border-2 border-neutral-300 flex-shrink-0"
-      aria-label="Pending"
+      aria-label={t("progress.stepStatus.pending", { defaultValue: "Pending" })}
     />
   );
 }

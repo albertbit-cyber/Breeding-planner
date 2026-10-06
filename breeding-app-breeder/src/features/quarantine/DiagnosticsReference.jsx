@@ -31,7 +31,7 @@ function TestRow({ test, expanded, onToggle }) {
     <div className="border-t border-neutral-100 first:border-t-0">
       <button
         type="button"
-        className="w-full text-left px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-neutral-50"
+        className="w-full text-start px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-neutral-50"
         aria-expanded={expanded}
         onClick={onToggle}
       >
@@ -115,7 +115,7 @@ function BodyGuide() {
             <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">
               {t('quarantine.guide.howTo', { defaultValue: 'How to check' })}
             </div>
-            <ol className="list-decimal pl-4 flex flex-col gap-1 text-[11px] text-neutral-700">
+            <ol className="list-decimal ps-4 flex flex-col gap-1 text-[11px] text-neutral-700">
               {guidance.howTo.map((step, index) => <li key={index}>{step}</li>)}
             </ol>
           </div>

@@ -5,9 +5,7 @@
     "label": "יעד (שם ותכונות)",
     "placeholder": "Clown ויזואלי: Clown, het Desert Ghost",
     "tip": "טיפ לפורמט: \"שם יעד: תכונה אחת, תכונה שתיים\". אם תכתוב רק תכונות, ניצור יעד כללי.",
-    "defaultName": "יעד מותאם אישית",
-    "freeTextPlaceholder": "אני רוצה ליצור clown desert ghost עם pastel ו-possible het pied",
-    "freeTextTip": "כתוב את היעד בצורה טבעית. היועץ מתאים שמות מורפים וכינויים ממסד הנתונים אוטומטית, כך שאין חובה להשתמש בפסיקים."
+    "defaultName": "יעד מותאם אישית"
   },
   "status": {
     "heading": "סטטוס"
@@ -24,20 +22,16 @@
     "males_plural": "{{count}} זכרי רבייה",
     "females": "{{count}} נקבת רבייה",
     "females_plural": "{{count}} נקבות רבייה",
-    "malesFiltered": "{{filtered}}/{{total}} זכרי רבייה התאימו ליעד",
-    "femalesFiltered": "{{filtered}}/{{total}} נקבות רבייה התאימו ליעד",
     "confidenceBar": "רף ביטחון ≥ {{threshold}}"
   },
   "buttons": {
     "run": "הפעל יועץ",
     "generating": "מחשב...",
-    "reset": "אפס יועץ",
-    "exportPairingsByMale": "ייצא לפי זיווג (זכר → נקבות)"
+    "reset": "אפס יועץ"
   },
   "errors": {
     "noBreeders": "הוסף חיות לקבוצת Breeders כדי לראות המלצות מהיועץ.",
     "noGoals": "הוסף תכונות יעד לפני הפעלת היועץ.",
-    "noRelevantAnimals": "אין חיות רבייה שנושאות גנים הקשורים ליעד הזה. הוסף חיות עם הגנטיקה המבוקשת לקבוצת Breeders.",
     "failure": "יצירת ההצעות נכשלה."
   },
   "cards": {
@@ -47,25 +41,19 @@
     "priceRange": "הערכת מחיר: {{range}}",
     "sources": "מקורות:",
     "additionalHeading": "זיווגים נוספים שכדאי לבדוק",
-    "readyCallout": "מוכן כשאתה מוכן - לחץ על <strong>הפעל יועץ</strong> כדי למצוא את זיווגי הרבייה החזקים ביותר.",
-    "actions": {
-      "accept": "קבל",
-      "plan": "המר לתוכנית",
-      "showPlan": "הצג תוכנית רבייה",
-      "ignore": "התעלם"
-    }
+    "readyCallout": "מוכן כשאתה מוכן - לחץ על <strong>הפעל יועץ</strong> כדי למצוא את זיווגי הרבייה החזקים ביותר."
   },
   "genes": {
     "goalVisuals": "ויזואלים ביעד",
-    "goalHets": "הטים ביעד",
+    "goalHets": "hets ביעד",
     "projectedVisuals": "ויזואלים צפויים",
-    "projectedHets": "הטים צפויים",
+    "projectedHets": "hets צפויים",
     "holdbackVisuals": "ויזואלים לשמירה",
-    "holdbackHets": "הטים לשמירה",
+    "holdbackHets": "hets לשמירה",
     "nextVisuals": "ויזואלים בדור הבא",
-    "nextHets": "הטים בדור הבא",
+    "nextHets": "hets בדור הבא",
     "focusVisuals": "ויזואלים במיקוד",
-    "focusHets": "הטים במיקוד"
+    "focusHets": "hets במיקוד"
   },
   "plan": {
     "title": "תוכנית רב-דורית ({{strategy}})",
@@ -80,17 +68,16 @@
     "holdbackProbability": "שמירה ≈ {{value}}",
     "holdbackGenes": "גנים לשמירה: {{genes}}",
     "hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
-    "flowchartUnavailable": "לא ניתן היה ליצור תרשים רבייה עבור ההצעה הזו.",
     "status": {
       "visual": "ויזואלי",
-      "het": "הט",
-      "possibleHet": "הט אפשרי",
+      "het": "Het",
+      "possibleHet": "Possible het",
       "none": "רגיל"
     },
     "expectation": {
-      "none-visual": "100% הט",
-      "het-het": "≈66% הט",
-      "het-none": "≈50% הט"
+      "none-visual": "100% het",
+      "het-het": "≈66% het",
+      "het-none": "≈50% het"
     }
   },
   "labels": {
@@ -126,8 +113,8 @@
       "label": "מצב רצסיבי",
       "any": "כל מצב",
       "visual": "ויזואלי",
-      "het": "הט",
-      "possibleHet": "הט אפשרי"
+      "het": "Het",
+      "possibleHet": "Possible het"
     },
     "minProbability": "הסתברות מינימלית ({{percent}}%)",
     "weight": "משקל ({{value}})",
@@ -138,16 +125,6 @@
       "close": "סגור"
     },
     "defaultName": "יעד חדש"
-  },
-  "progress": {
-    "titleRunning": "יועץ הרבייה פועל",
-    "running": "הניתוח מתבצע...",
-    "waiting": "ממתין לתחילת הניתוח...",
-    "scanned": "עובדו {{count}} נחשים",
-    "relevant": "{{count}} מועמדים רלוונטיים",
-    "strongPairings": "נמצאו {{count}} זיווגים חזקים",
-    "retry": "נסה שוב",
-    "viewResults": "הצג תוצאות"
   },
   "api": {
     "rationaleSummary": "ציון צפוי {{score}} עם מדד ביקוש {{demand}}. {{goalSummary}}",

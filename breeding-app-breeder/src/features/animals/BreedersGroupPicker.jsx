@@ -121,7 +121,7 @@ export default function BreedersGroupPicker({
                 />
                 <span className="w-4 text-neutral-500" aria-hidden="true">{sexSymbol}</span>
                 <span className="min-w-0 flex-1 truncate">
-                  {animal.name || animal.id}
+                  <bdi>{animal.name || animal.id}</bdi>
                   {showSpecies && animal.species ? (
                     <span className="block text-[11px] text-neutral-500 truncate">
                       {getSpeciesById(animal.species)?.name || animal.species}

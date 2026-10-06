@@ -5,11 +5,11 @@
 	"dialogs": {
 		"storageReadFailed": {
 			"title": "Daten können nicht geöffnet werden",
-			"message": "Serpentora konnte Ihre lokale Datendatei nicht lesen. Ein neuer Arbeitsbereich wird erstellt."
+			"message": "Serpentora konnte deine lokale Datendatei nicht lesen. Ein neuer Arbeitsbereich wird erstellt."
 		},
 		"storageWriteFailed": {
 			"title": "Daten können nicht gespeichert werden",
-			"message": "Serpentora konnte Ihre letzten Änderungen nicht speichern. Versuchen Sie es erneut oder exportieren Sie eine manuelle Sicherung."
+			"message": "Serpentora konnte deine letzten Änderungen nicht speichern. Versuch es erneut oder exportiere ein manuelles Backup."
 		}
 	},
 	"locale": {

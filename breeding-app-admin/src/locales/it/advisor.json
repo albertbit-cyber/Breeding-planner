@@ -3,7 +3,7 @@
 	"description": "Esaminiamo solo gli animali etichettati nel gruppo <strong>Breeders</strong> e mostriamo accoppiamenti con un'altissima probabilità di produrre il morph obiettivo selezionato.",
 	"goal": {
 		"label": "Obiettivo (Nome e Tratti)",
-		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"placeholder": "Clown visual: Clown, het Desert Ghost",
 		"tip": "Suggerimento formato: \"Nome obiettivo: tratto uno, tratto due\". Se elenchi solo tratti, creeremo un obiettivo generico.",
 		"defaultName": "Obiettivo personalizzato"
 	},
@@ -63,7 +63,7 @@
 		},
 		"combinedProbability": "Combinato ≈ {{value}}",
 		"generationLabel": "Generazione {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
+		"prereqProbability": "Prerequisito ≈ {{value}}",
 		"goalProbability": "Obiettivo ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
 		"holdbackGenes": "Geni Holdback: {{genes}}",

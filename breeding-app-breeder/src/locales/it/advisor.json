@@ -3,9 +3,11 @@
 	"description": "Esaminiamo solo gli animali etichettati nel gruppo <strong>Breeders</strong> e mostriamo accoppiamenti con un'altissima probabilità di produrre il morph obiettivo selezionato.",
 	"goal": {
 		"label": "Obiettivo (Nome e Tratti)",
-		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"placeholder": "Clown visual: Clown, het Desert Ghost",
 		"tip": "Suggerimento formato: \"Nome obiettivo: tratto uno, tratto due\". Se elenchi solo tratti, creeremo un obiettivo generico.",
-		"defaultName": "Obiettivo personalizzato"
+		"defaultName": "Obiettivo personalizzato",
+		"freeTextPlaceholder": "Voglio ottenere clown desert ghost con pastel e possible het pied",
+		"freeTextTip": "Scrivi il tuo obiettivo in modo naturale. Il consulente riconosce automaticamente i nomi delle morph e i loro alias dal database, quindi non servono virgole."
 	},
 	"status": {
 		"heading": "Stato"
@@ -22,17 +24,21 @@
 		"males_plural": "{{count}} maschi riproduttori",
 		"females": "{{count}} femmina riproduttrice",
 		"females_plural": "{{count}} femmine riproduttrici",
-		"confidenceBar": "Soglia di confidenza ≥ {{threshold}}"
+		"confidenceBar": "Soglia di confidenza ≥ {{threshold}}",
+		"femalesFiltered": "{{filtered}}/{{total}} femmine riproduttrici corrispondono all'obiettivo",
+		"malesFiltered": "{{filtered}}/{{total}} maschi riproduttori corrispondono all'obiettivo"
 	},
 	"buttons": {
 		"run": "Avvia Consulente",
 		"generating": "Generazione in corso...",
-		"reset": "Reimposta Consulente"
+		"reset": "Reimposta Consulente",
+		"exportPairingsByMale": "Esporta per accoppiamento (Maschio → Femmine)"
 	},
 	"errors": {
 		"noBreeders": "Aggiungi animali al gruppo Breeders per vedere i consigli del consulente.",
 		"noGoals": "Aggiungi tratti obiettivo prima di avviare il consulente.",
-		"failure": "Impossibile generare suggerimenti."
+		"failure": "Impossibile generare suggerimenti.",
+		"noRelevantAnimals": "Nessun riproduttore porta geni legati a questo obiettivo. Aggiungi al gruppo Breeders animali con la genetica desiderata."
 	},
 	"cards": {
 		"goalSuccessLabel": "Probabilità di successo dell'obiettivo:",
@@ -41,7 +47,14 @@
 		"priceRange": "Guida ai prezzi: {{range}}",
 		"sources": "Fonti:",
 		"additionalHeading": "Accoppiamenti aggiuntivi da esaminare",
-		"readyCallout": "Pronto quando vuoi — fai clic su <strong>Avvia Consulente</strong> per scoprire i migliori accoppiamenti dei tuoi riproduttori."
+		"readyCallout": "Pronto quando vuoi — fai clic su <strong>Avvia Consulente</strong> per scoprire i migliori accoppiamenti dei tuoi riproduttori.",
+		"actions": {
+			"accept": "Accetta",
+			"ignore": "Ignora",
+			"plan": "Trasforma in piano",
+			"showPlan": "Mostra piano di riproduzione"
+		},
+		"successLabel": "successo"
 	},
 	"genes": {
 		"goalVisuals": "Visuals dell'Obiettivo",
@@ -63,7 +76,7 @@
 		},
 		"combinedProbability": "Combinato ≈ {{value}}",
 		"generationLabel": "Generazione {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
+		"prereqProbability": "Prerequisito ≈ {{value}}",
 		"goalProbability": "Obiettivo ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
 		"holdbackGenes": "Geni Holdback: {{genes}}",
@@ -78,7 +91,8 @@
 			"none-visual": "100% het",
 			"het-het": "≈66% het",
 			"het-none": "≈50% het"
-		}
+		},
+		"flowchartUnavailable": "Non è stato possibile generare un diagramma di riproduzione per questo suggerimento."
 	},
 	"labels": {
 		"unknownAnimal": "Sconosciuto",
@@ -143,6 +157,22 @@
 				"female": "femmina",
 				"male": "maschio"
 			}
+		}
+	},
+	"progress": {
+		"relevant": "{{count}} candidati pertinenti",
+		"retry": "Riprova",
+		"running": "Analisi in corso...",
+		"scanned": "{{count}} serpenti elaborati",
+		"strongPairings": "{{count}} accoppiamenti promettenti trovati",
+		"titleRunning": "Consulente di allevamento in esecuzione",
+		"viewResults": "Vedi risultati",
+		"waiting": "In attesa che l'analisi inizi...",
+		"stepStatus": {
+			"completed": "Completato",
+			"failed": "Non riusciti",
+			"pending": "In sospeso",
+			"running": "In esecuzione"
 		}
 	}
 }

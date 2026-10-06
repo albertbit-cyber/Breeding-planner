@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
-import { ORDER_STATUS_LABELS } from "../constants/orderStatuses";
+import { orderStatusLabel } from "../constants/statusLabelsI18n";
 
 /**
  * Orders the laboratory has filed away, by year and month.
@@ -16,6 +17,38 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+// Display label for a month group; the grouping itself keeps English labels.
+const monthLabel = (t, monthIndex) => {
+  switch (monthIndex) {
+    case 0:
+      return t("lab.archive.month.january", { defaultValue: "January" });
+    case 1:
+      return t("lab.archive.month.february", { defaultValue: "February" });
+    case 2:
+      return t("lab.archive.month.march", { defaultValue: "March" });
+    case 3:
+      return t("lab.archive.month.april", { defaultValue: "April" });
+    case 4:
+      return t("lab.archive.month.may", { defaultValue: "May" });
+    case 5:
+      return t("lab.archive.month.june", { defaultValue: "June" });
+    case 6:
+      return t("lab.archive.month.july", { defaultValue: "July" });
+    case 7:
+      return t("lab.archive.month.august", { defaultValue: "August" });
+    case 8:
+      return t("lab.archive.month.september", { defaultValue: "September" });
+    case 9:
+      return t("lab.archive.month.october", { defaultValue: "October" });
+    case 10:
+      return t("lab.archive.month.november", { defaultValue: "November" });
+    case 11:
+      return t("lab.archive.month.december", { defaultValue: "December" });
+    default:
+      return t("lab.archive.undated", { defaultValue: "Undated" });
+  }
+};
 
 const formatDate = (value) => {
   if (!value) return "-";
@@ -80,6 +113,7 @@ export const groupOrdersByArchiveDate = (orders) => {
 };
 
 export default function OrderArchivePage() {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -99,7 +133,7 @@ export default function OrderArchivePage() {
       setOrders(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setOrders([]);
-      setError(err instanceof Error ? err.message : "Failed to load the archive.");
+      setError(err instanceof Error ? err.message : t("lab.archive.loadFailed", { defaultValue: "Failed to load the archive." }));
     } finally {
       setLoading(false);
     }
@@ -167,7 +201,9 @@ export default function OrderArchivePage() {
       // and a full reload would flash the whole list for a one-row change.
       setOrders((prev) => prev.filter((order) => order.id !== normalized));
     } catch (err) {
-      setRestoreError(err instanceof Error ? err.message : "Failed to restore the order.");
+      setRestoreError(
+        err instanceof Error ? err.message : t("lab.archive.restoreFailed", { defaultValue: "Failed to restore the order." })
+      );
     } finally {
       setRestoringId("");
     }
@@ -179,10 +215,12 @@ export default function OrderArchivePage() {
     <section className="space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Archive</h1>
+          <h1 className="text-2xl font-semibold text-neutral-900">{t("lab.shell.nav.archive", { defaultValue: "Archive" })}</h1>
           <p className="mt-1 text-sm text-neutral-600">
-            Orders filed away from the working queues, by the year and month they were archived.
-            Nothing here has been deleted — restore an order to put it back on the dashboard.
+            {t("lab.archive.subtitle", {
+              defaultValue:
+                "Orders filed away from the working queues, by the year and month they were archived. Nothing here has been deleted — restore an order to put it back on the dashboard.",
+            })}
           </p>
         </div>
         <button
@@ -191,34 +229,45 @@ export default function OrderArchivePage() {
           disabled={loading}
           onClick={load}
         >
-          {loading ? "Refreshing..." : "Refresh"}
+          {loading
+            ? t("lab.common.refreshing", { defaultValue: "Refreshing..." })
+            : t("lab.common.refresh", { defaultValue: "Refresh" })}
         </button>
       </header>
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <label className="text-sm">
           <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
-            Search the archive
+            {t("lab.archive.searchLabel", { defaultValue: "Search the archive" })}
           </span>
           <input
             className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Order number, snake ID, test name"
+            placeholder={t("lab.archive.searchPlaceholder", { defaultValue: "Order number, snake ID, test name" })}
           />
         </label>
         {!loading && !error ? (
           <p className="mt-2 text-xs text-neutral-500">
             {isSearching
-              ? `${filtered.length} of ${totalCount} archived order${totalCount === 1 ? "" : "s"} match.`
-              : `${totalCount} archived order${totalCount === 1 ? "" : "s"}.`}
+              ? t("lab.archive.matchCount", {
+                  count: totalCount,
+                  matched: filtered.length,
+                  defaultValue_one: "{{matched}} of {{count}} archived order match.",
+                  defaultValue_other: "{{matched}} of {{count}} archived orders match.",
+                })
+              : t("lab.archive.totalCount", {
+                  count: totalCount,
+                  defaultValue_one: "{{count}} archived order.",
+                  defaultValue_other: "{{count}} archived orders.",
+                })}
           </p>
         ) : null}
       </div>
 
       {loading ? (
         <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-          Loading the archive...
+          {t("lab.archive.loading", { defaultValue: "Loading the archive..." })}
         </div>
       ) : null}
 
@@ -233,8 +282,10 @@ export default function OrderArchivePage() {
       {!loading && !error && !groups.length ? (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
           {isSearching
-            ? "No archived orders match that search."
-            : "Nothing archived yet. Archive an order from its details page to file it away here."}
+            ? t("lab.archive.noMatches", { defaultValue: "No archived orders match that search." })
+            : t("lab.archive.empty", {
+                defaultValue: "Nothing archived yet. Archive an order from its details page to file it away here.",
+              })}
         </div>
       ) : null}
 
@@ -245,16 +296,22 @@ export default function OrderArchivePage() {
               <section key={year.key} className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start"
                   onClick={() => toggleYear(year.key)}
                   aria-expanded={expanded}
                 >
                   <span className="flex items-center gap-2">
                     <span className="text-neutral-400" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-                    <span className="text-lg font-semibold text-neutral-900">{year.label}</span>
+                    <span className="text-lg font-semibold text-neutral-900">
+                      {year.key === "Undated" ? t("lab.archive.undated", { defaultValue: "Undated" }) : year.label}
+                    </span>
                   </span>
                   <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs font-medium text-neutral-700">
-                    {year.count} order{year.count === 1 ? "" : "s"}
+                    {t("lab.archive.orderCount", {
+                      count: year.count,
+                      defaultValue_one: "{{count}} order",
+                      defaultValue_other: "{{count}} orders",
+                    })}
                   </span>
                 </button>
 
@@ -263,32 +320,36 @@ export default function OrderArchivePage() {
                     {year.months.map((month) => (
                       <div key={month.key} className="border-b border-neutral-100 last:border-b-0">
                         <div className="flex items-center justify-between gap-3 bg-neutral-50 px-4 py-2">
-                          <h3 className="text-sm font-semibold text-neutral-700">{month.label}</h3>
+                          <h3 className="text-sm font-semibold text-neutral-700">{monthLabel(t, month.monthIndex)}</h3>
                           <span className="text-xs text-neutral-500">
-                            {month.orders.length} order{month.orders.length === 1 ? "" : "s"}
+                            {t("lab.archive.orderCount", {
+                              count: month.orders.length,
+                              defaultValue_one: "{{count}} order",
+                              defaultValue_other: "{{count}} orders",
+                            })}
                           </span>
                         </div>
                         <div className="overflow-auto">
                           <table className="w-full min-w-[820px] text-sm">
                             <thead className="text-xs uppercase tracking-wide text-neutral-500">
                               <tr>
-                                <th className="px-4 py-2 text-left font-semibold">Order</th>
-                                <th className="px-4 py-2 text-left font-semibold">Snake</th>
-                                <th className="px-4 py-2 text-left font-semibold">Status</th>
-                                <th className="px-4 py-2 text-left font-semibold">Submitted</th>
-                                <th className="px-4 py-2 text-left font-semibold">Archived</th>
-                                <th className="px-4 py-2 text-left font-semibold">Actions</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.common.colOrder", { defaultValue: "Order" })}</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.common.colSnake", { defaultValue: "Snake" })}</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.common.colStatus", { defaultValue: "Status" })}</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.common.submitted", { defaultValue: "Submitted" })}</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.archive.colArchived", { defaultValue: "Archived" })}</th>
+                                <th className="px-4 py-2 text-start font-semibold">{t("lab.catalog.colActions", { defaultValue: "Actions" })}</th>
                               </tr>
                             </thead>
                             <tbody>
                               {month.orders.map((order) => (
                                 <tr key={order.id} className="border-t border-neutral-100">
                                   <td className="px-4 py-2 font-medium text-neutral-800">
-                                    {order.orderNumber || order.id}
+                                    <bdi>{order.orderNumber || order.id}</bdi>
                                   </td>
                                   <td className="px-4 py-2 text-neutral-700">{order.animalId || "-"}</td>
                                   <td className="px-4 py-2 text-neutral-700">
-                                    {ORDER_STATUS_LABELS[order.status] || order.status}
+                                    {orderStatusLabel(t, order.status)}
                                   </td>
                                   <td className="px-4 py-2 text-neutral-700">
                                     {formatDate(order.submittedAt || order.createdAt)}
@@ -301,7 +362,7 @@ export default function OrderArchivePage() {
                                         className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs hover:border-neutral-500"
                                         onClick={() => openOrder(order.id)}
                                       >
-                                        Open
+                                        {t("lab.common.open", { defaultValue: "Open" })}
                                       </button>
                                       <button
                                         type="button"
@@ -309,7 +370,9 @@ export default function OrderArchivePage() {
                                         onClick={() => restore(order.id)}
                                         disabled={restoringId === order.id}
                                       >
-                                        {restoringId === order.id ? "Restoring..." : "Restore"}
+                                        {restoringId === order.id
+                                          ? t("lab.orderDetails.restoring", { defaultValue: "Restoring..." })
+                                          : t("lab.archive.restore", { defaultValue: "Restore" })}
                                       </button>
                                     </div>
                                   </td>

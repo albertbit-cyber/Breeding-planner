@@ -352,7 +352,8 @@
     "saveDraft": "Save as draft",
     "publish": "Publish listing",
     "published": "Listing published.",
-    "savedDraft": "Saved as a draft."
+    "savedDraft": "Saved as a draft.",
+    "categoryPlaceholder": "Juvenile"
   },
   "publish": {
     "title": "What should buyers see?",

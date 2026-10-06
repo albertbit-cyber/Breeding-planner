@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { clearAuthToken, getAuthScopeForHash, hasStoredAuthSession, login as loginApi, recoverPassword as recoverPasswordApi, register as registerApi } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
+import { backendMessageText } from "../../components/backendMessageText.js";
 
 /**
  * The marketplace admits buyers as well as breeders, which is why it names its
@@ -1184,7 +1185,7 @@ export default function AuthGate({ children, scope }) {
                       : t("auth:sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
                 </h1>
               </div>
-              <p className="auth-subtitle">{snapshot.message}</p>
+              <p className="auth-subtitle">{backendMessageText(t, snapshot.message)}</p>
               <div className="text-xs text-neutral-500">
                 {t("auth:sharedBackend.requirements", {
                   defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",

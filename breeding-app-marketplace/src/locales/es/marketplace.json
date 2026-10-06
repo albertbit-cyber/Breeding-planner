@@ -1,7 +1,7 @@
 {
   "nav": {
     "market": "Mercado",
-    "primary": "Mercado",
+    "primary": "Marketplace",
     "browse": "Explorar",
     "saved": "Guardados",
     "inbox": "Mensajes",
@@ -9,7 +9,8 @@
     "sell": "Publicar un animal",
     "signIn": "Iniciar sesión",
     "skip": "Ir al contenido",
-    "language": "Idioma"
+    "language": "Idioma",
+    "myAnimals": "Mis animales"
   },
   "footer": {
     "tagline": "Animales con su historial — pesos, alimentación, linaje y genética verificada en laboratorio."
@@ -82,7 +83,11 @@
     "emptyTitle": "Ningún animal coincide con esos filtros",
     "emptyBody": "Amplía el rango de precio, quita un gen, o incluye los vendidos como comparación de precios.",
     "pagination": "Páginas",
-    "pageOf": "Página {{page}} de {{total}}"
+    "pageOf": "Página {{page}} de {{total}}",
+    "searchPlaceholderHobby": "Morph, het, criador o ciudad: “clown”, “het pied”…",
+    "emptyVisualBody": "Un gen sin más significa visual. Toca el gen otra vez para buscar hets, amplía el precio o guarda esta búsqueda y vuelve más tarde.",
+    "catalogueEmptyTitle": "Todavía no hay nada publicado",
+    "catalogueEmptyBody": "Ningún criador ha publicado un animal todavía. Vuelve pronto."
   },
   "filters": {
     "title": "Filtros",
@@ -115,7 +120,15 @@
     "pickup": "Recogida en persona",
     "availableOnly": "Solo disponibles",
     "includeSold": "Incluir vendidos, como comparación de precios",
-    "showingSold": "Vendidos incluidos"
+    "showingSold": "Vendidos incluidos",
+    "geneVisual": "Visual obligatorio. Toca para het.",
+    "geneHet": "Het obligatorio. Toca para excluir visuales.",
+    "geneVisualExcluded": "Visuales excluidos. Toca para quitar.",
+    "geneVisualOff": "Toca para exigir visual.",
+    "species": "Especie",
+    "allSpecies": "Todas las especies",
+    "morphsAndHets": "Morphs y hets",
+    "morphsHint": "Toca una vez para visual, dos para het y tres para excluir visuales. Para lo demás, escribe “66% het hypo” o “pos het ghost” en el buscador."
   },
   "listing": {
     "untitled": "Anuncio sin título",
@@ -149,7 +162,18 @@
     "feedingNotes": "Alimentación",
     "report": "Denunciar este anuncio",
     "reportedShort": "Denunciado",
-    "reported": "Gracias — nuestra moderación revisará este anuncio."
+    "reported": "Gracias — nuestra moderación revisará este anuncio.",
+    "reportTitle": "Denunciar este anuncio",
+    "sendReport": "Enviar a los moderadores",
+    "reportWhat": "¿Qué ocurre?",
+    "reportNote": "Algo que deban saber los moderadores (opcional)",
+    "reportTypes": {
+      "incorrect_genetics": "La genética es incorrecta o exagerada",
+      "fake_listing": "El animal o las fotos no son reales",
+      "scam_suspicion": "Parece una estafa",
+      "animal_welfare_concern": "Preocupación por el bienestar animal",
+      "other": "Otra cosa"
+    }
   },
   "record": {
     "title": "El historial — publicado por el vendedor",
@@ -165,7 +189,9 @@
     "lineage_other": "Linaje — {{count}} progenitores registrados",
     "clutch": "puesta {{id}}",
     "kept": "No publicado: {{list}}.",
-    "none": "Este vendedor no ha publicado nada del historial del animal. Puedes pedírselo antes de comprar."
+    "none": "Este vendedor no ha publicado nada del historial del animal. Puedes pedírselo antes de comprar.",
+    "labCertificate": "Certificado de laboratorio (prueba de muda)",
+    "checkCertificate": "Comprobar este certificado"
   },
   "seller": {
     "verified": "Criador verificado",
@@ -237,7 +263,21 @@
     "reportTitle": "Denunciar esta conversación",
     "reportReason": "¿Qué ocurre?",
     "reportPlaceholder": "Intento de estafa, lenguaje abusivo, pago fuera de la plataforma …",
-    "sendReport": "Enviar denuncia"
+    "sendReport": "Enviar denuncia",
+    "unblocked": "Desbloqueado. Ya pueden volver a escribirse.",
+    "nothingToReport": "Todavía no ha escrito nada.",
+    "unblock": "Desbloquear",
+    "youBlocked": "Has bloqueado a {{name}}. Ninguno de los dos puede enviar mensajes aquí hasta que lo desbloquees.",
+    "closedThread": "Esta conversación está cerrada. No se pueden enviar mensajes nuevos.",
+    "reportGoesTo": "Esto llega a los moderadores con su último mensaje adjunto.",
+    "reportWhat": "¿Qué ocurre?",
+    "reportNote": "Detalles (opcional)",
+    "reportTypes": {
+      "scam_suspicion": "Estafa, o pide pagar fuera de la plataforma",
+      "abusive_message": "Ofensivo o amenazante",
+      "spam": "Spam",
+      "other": "Otra cosa"
+    }
   },
   "deal": {
     "title": "Cómo va el trato",
@@ -256,7 +296,15 @@
     "acceptedToast": "Oferta aceptada. El animal queda reservado.",
     "depositOptional": "Señal recibida (opcional)",
     "depositHint": "Anótala aquí si el comprador ya ha pagado una señal.",
-    "acceptExplainer": "Aceptar una oferta marca el animal como Reservado y crea el registro de venta. Sigue visible con la etiqueta Reservado hasta que lo marques como recogido."
+    "acceptExplainer": "Aceptar una oferta marca el animal como Reservado y crea el registro de venta. Sigue visible con la etiqueta Reservado hasta que lo marques como recogido.",
+    "markHandedOver": "Marcar como entregado",
+    "reviewPrompt": "La venta está completada. ¿Qué tal fue con {{name}}?",
+    "reviewed": "Has valorado esta venta. Aparece en la página de la tienda del criador.",
+    "completeTitle": "¿Marcar este animal como entregado?",
+    "completeConfirm": "Marcar entregado",
+    "completedPill": "Venta completada",
+    "completedRecordToast": "Venta completada. El animal y su historial ya están en la cuenta del comprador.",
+    "completeRecordBody": "La venta queda registrada como completada y el anuncio aparece como vendido. El comprador recibe el historial del animal (genética con sus fuentes, pesos, alimentación, salud, linaje y códigos de certificado) y se le invita a valorarte. Tu copia se conserva, marcada como Vendido. Esto no se puede deshacer aquí."
   },
   "sell": {
     "title": "Publicar un animal",
@@ -304,7 +352,8 @@
     "saveDraft": "Guardar como borrador",
     "publish": "Publicar anuncio",
     "published": "Anuncio publicado.",
-    "savedDraft": "Guardado como borrador."
+    "savedDraft": "Guardado como borrador.",
+    "categoryPlaceholder": "Juvenil"
   },
   "publish": {
     "title": "¿Qué deben ver los compradores?",
@@ -404,7 +453,13 @@
     "name": "Ponle nombre a la búsqueda",
     "save": "Guardar búsqueda",
     "searchDefaultName": "Mi búsqueda",
-    "searchRemoved": "Búsqueda guardada eliminada."
+    "searchRemoved": "Búsqueda guardada eliminada.",
+    "searchSavedCount": "Guardada. Tu página Guardados muestra cuántos animales nuevos coinciden cada vez que la miras.",
+    "saveBodyCount": "Va a tu página Guardados, que muestra cuántos animales nuevos coinciden desde la última vez que la ejecutaste.",
+    "newCount": "{{count}} nuevos",
+    "matchSummary": "{{count}} coinciden ahora · {{fresh}} publicados desde la última vez que la ejecutaste.",
+    "matchUnknown": "Ejecútala para ver qué coincide ahora.",
+    "noSearchesBodyCount": "Configura los filtros que de verdad quieres — un visual, un het, un sexo, un precio máximo — y guárdalos. Esta página mostrará cuántos animales nuevos coinciden cada vez que la mires."
   },
   "reviews": {
     "aria": "Valorado {{rating}} sobre 5",
@@ -437,10 +492,63 @@
     "defaultTitle": "Inicia sesión para continuar",
     "defaultBody": "Esta parte del mercado necesita una cuenta.",
     "sellerTitle": "Vender requiere una cuenta de criador",
-    "sellerBody": "Has iniciado sesión, pero esta cuenta no puede publicar animales. Pide a un administrador que lo active, o usa tu cuenta de criador."
+    "sellerBody": "Has iniciado sesión, pero esta cuenta no puede publicar animales. Pide a un administrador que lo active, o usa tu cuenta de criador.",
+    "messageBody": "Te devolveremos a este animal con tu mensaje listo para enviar.",
+    "searchBody": "Te devolveremos a estos filtros para que puedas nombrar y guardar la búsqueda."
   },
   "notFound": {
     "title": "Esa página no está aquí",
     "body": "Puede que el anuncio se haya vendido y archivado, o que el enlace esté desactualizado."
+  },
+  "genes": {
+    "none": "El vendedor no ha indicado la genética. Pregunta antes de comprar.",
+    "labDisagrees": "El resultado de laboratorio del certificado indica “{{result}}”. Pregúntale al vendedor antes de comprar.",
+    "labInconclusive": "Analizado, resultado no concluyente: “{{result}}”.",
+    "labOnly": "Detectado por el laboratorio; no figura en la descripción del vendedor.",
+    "legendObserved": "Observado: un visual que el vendedor puede ver.",
+    "legendPredicted": "Previsto: deducido de los padres, sin prueba.",
+    "legendLab": "Confirmado en laboratorio: en un certificado de prueba de muda.",
+    "title": "Genética, y de dónde sale cada dato",
+    "hetToken": "het {{gene}}",
+    "posHetToken": "pos het {{gene}}",
+    "visualToken": "visual {{gene}}",
+    "labConfirmedCert": "Confirmado en laboratorio, certificado {{number}}",
+    "labConfirmed": "Confirmado en laboratorio",
+    "predictedPercent": "Previsto según el apareamiento, {{percent}}% de probabilidad",
+    "predicted": "Previsto según el apareamiento, sin prueba",
+    "observed": "Observado por el vendedor, sin prueba",
+    "het": "het",
+    "possibleHet": "possible het",
+    "super": "visual (super)",
+    "visual": "visual"
+  },
+  "sold": {
+    "title": "¿Quién compró {{title}}?",
+    "body": "El comprador recibe en su cuenta el historial del animal: genética con el origen de cada dato, pesos, alimentación, mudas, registros de salud, linaje y certificados. Tu copia se conserva, marcada como Vendido.",
+    "confirmOffPlatform": "Marcar como vendido",
+    "confirm": "Marcar como vendido y enviar el historial",
+    "buyer": "Comprador",
+    "offered": "ofreció {{amount}}",
+    "offPlatform": "Alguien sin cuenta de Serpentora",
+    "noThreads": "Nadie te ha escrito por este animal aquí, así que no hay ninguna cuenta a la que enviar el historial.",
+    "offPlatformNote": "El anuncio queda marcado como vendido. No se transfiere ningún historial, porque no hay ninguna cuenta que lo reciba.",
+    "price": "Precio de venta ({{currency}})",
+    "done": "Vendido. {{buyer}} ya tiene el animal y su historial.",
+    "theBuyer": "El comprador",
+    "doneOffPlatform": "Marcado como vendido.",
+    "bodyNoBuyers": "Solo un comprador con cuenta de Serpentora puede recibir el historial del animal."
+  },
+  "acquired": {
+    "from": "Adquirido de {{seller}} el {{date}}",
+    "store": "Tienda del vendedor",
+    "labDisagrees": "El vendedor registró esto, pero el certificado indica “{{result}}”.",
+    "noGenetics": "No se registró genética para este animal.",
+    "certificates": "Certificados de laboratorio",
+    "code": "Código de verificación",
+    "counts": "{{weights}} pesos · {{feeds}} comidas · {{sheds}} mudas · {{meds}} registros de salud",
+    "emptyTitle": "Aún no has comprado animales aquí",
+    "emptyBody": "Cuando un vendedor marque un animal como vendido a ti, llegará aquí con su historial y sus certificados.",
+    "title": "Animales que compraste aquí",
+    "breederAppNote": "Con una cuenta de criador, esos mismos animales aparecen en tu colección de la app Serpentora tras sincronizarse."
   }
 }

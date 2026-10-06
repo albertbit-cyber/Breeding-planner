@@ -682,7 +682,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
             <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
-        <div className="mt-5 space-y-4 max-h-[65vh] overflow-auto pr-1">
+        <div className="mt-5 space-y-4 max-h-[65vh] overflow-auto pe-1">
           {grouped.map(group => (
             <div key={group.levelIndex} className="rounded-3xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="mb-2 text-xs uppercase tracking-wide text-neutral-500">{t('spaces.levelLabel', { defaultValue: 'Level {{index}}', index: group.levelIndex + 1 })}</div>
@@ -696,20 +696,20 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                       key={slotKey}
                       type="button"
                       className={cx(
-                        'relative rounded-2xl border px-3 py-3 text-left transition-colors flex flex-col justify-between overflow-hidden',
+                        'relative rounded-2xl border px-3 py-3 text-start transition-colors flex flex-col justify-between overflow-hidden',
                         occupant ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400' : 'border-neutral-200 bg-white hover:border-neutral-300'
                       )}
                       style={{ height: `${slotHeight}px` }}
                       onClick={() => handleOpenSlot(slot)}
                     >
-                      <span className="absolute top-2 right-2 text-[11px] font-semibold text-neutral-600 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
+                      <span className="absolute top-2 end-2 text-[11px] font-semibold text-neutral-600 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
                         {slotNumber}
                       </span>
                       {occupant ? (
                         <div>
                           <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.slotLabel', { defaultValue: 'Slot {{slot}}', slot: `${slot.levelIndex + 1}.${slot.columnIndex + 1}` })}</div>
                           <div className="text-sm font-semibold text-neutral-900 truncate">{occupant?.name}</div>
-                          <div className="text-xs text-neutral-500 truncate">{occupant.id}</div>
+                          <div className="text-xs text-neutral-500 truncate"><bdi>{occupant.id}</bdi></div>
                         </div>
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center text-neutral-400">
@@ -735,7 +735,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                 <div>
                   <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}.${activeSlot.columnIndex + 1}` })}</div>
                   <div className="text-lg font-semibold text-neutral-900">{activeSlotOccupant?.name || t('spaces.emptySlot', { defaultValue: 'Empty' })}</div>
-                  {activeSlotOccupant && <div className="text-xs text-neutral-500">{activeSlotOccupant.id}</div>}
+                  {activeSlotOccupant && <div className="text-xs text-neutral-500"><bdi>{activeSlotOccupant.id}</bdi></div>}
                 </div>
                 <button type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
               </div>
@@ -761,13 +761,13 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                         key={option.id}
                         type="button"
                         className={cx(
-                          'w-full px-4 py-3 text-left text-sm transition-colors',
+                          'w-full px-4 py-3 text-start text-sm transition-colors',
                           optionSelected ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-neutral-50'
                         )}
                         onClick={() => handleAssignForSlot(option.id)}
                       >
                         <div className="font-semibold text-neutral-900">{option.label}</div>
-                        <div className="text-xs text-neutral-500">{option.id}</div>
+                        <div className="text-xs text-neutral-500"><bdi>{option.id}</bdi></div>
                         {optionSelected && <div className="text-[11px] font-semibold text-emerald-600 mt-1">{t('spaces.assign.current', { defaultValue: 'Currently assigned' })}</div>}
                       </button>
                     );
@@ -836,7 +836,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
           <div>
             <div className="text-sm font-semibold text-neutral-700 mb-2">
               {t('spaces.currentOccupants', { defaultValue: 'Animals inside: {{count}}', count: occupants.length })}
-              <span className="ml-2 text-xs text-neutral-500">{t('spaces.capacitySummary', { defaultValue: '{{count}} / {{capacity}} slots', count: occupants.length, capacity: capacityValue })}</span>
+              <span className="ms-2 text-xs text-neutral-500">{t('spaces.capacitySummary', { defaultValue: '{{count}} / {{capacity}} slots', count: occupants.length, capacity: capacityValue })}</span>
             </div>
             {occupants.length ? (
               <div className="flex flex-wrap gap-2">
@@ -6557,7 +6557,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             className="mt-1 w-full border rounded-xl px-2 py-1 text-sm font-mono"
             value={(newAnimal && newAnimal.id) || ''}
             onChange={handleNewAnimalIdChange}
-            placeholder="Optional: custom ID (e.g., 25Ath-2)"
+            placeholder={t("ui.animals.addAnimal.customIdPlaceholder", { defaultValue: "Optional: custom ID (e.g., 25Ath-2)" })}
           />
           <div className="mt-1 text-[11px] text-neutral-500">
             {t("ui.animals.addAnimal.idHelp", {
@@ -6584,7 +6584,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Tag" })}</label>
               <button
                 type="button"
-                className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
                 onClick={() => setStatusMenuOpen(open => !open)}
               >
                 <span>{(newAnimal.status || '').trim() ? resolveStatusLabel(newAnimal.status) : noTagText}</span>
@@ -6594,7 +6594,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
                   <button
                     type="button"
-                    className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                    className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
                     onClick={handleClearStatus}
                   >
                     {noTagText}
@@ -6605,16 +6605,16 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                       <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
                         <button
                           type="button"
-                          className="status-tag-menu-button flex-1 text-left"
+                          className="status-tag-menu-button flex-1 text-start"
                           onClick={() => handleSelectStatus(option)}
                         >
                           {resolveStatusLabel(option)}
                         </button>
                         <button
                           type="button"
-                          className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                          className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                           onClick={() => handleDeleteStatus(option)}
-                          title="Delete tag"
+                          title={t("snakeEdit.deleteTag", { defaultValue: "Delete tag" })}
                         >
                           -
                         </button>
@@ -6667,7 +6667,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 type="text"
                 className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                 value={newAnimal.birthDate || ''}
-                placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
+                placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                 onChange={e => {
                   const raw = e.target.value;
                   setNewAnimal(prev => {
@@ -9681,7 +9681,7 @@ export default function BreedingPlannerApp() {
         const panel = document.getElementById('bp-legend-tooltip');
         if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
       }}>
-        ? Gene colors
+        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
       </button>
       <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: 'var(--sk-surface)', border: '1px solid var(--sk-border)', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--sk-shadow-2)'}}>
         <GeneLegend />
@@ -10252,7 +10252,7 @@ export default function BreedingPlannerApp() {
         currency: editSnakeDraft.currency || x.currency,
       } : x));
     } catch (err) {
-      setEditForSalePublishError(err instanceof Error ? err.message : 'Could not publish to Marketplace.');
+      setEditForSalePublishError(err instanceof Error ? err.message : t("snakeEdit.publishFailed", { defaultValue: "Could not publish to Marketplace." }));
     } finally {
       setEditForSalePublishing(false);
     }
@@ -10337,7 +10337,7 @@ export default function BreedingPlannerApp() {
   });
 
   const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
-  const passiveScannerLabel = passiveScanNotice?.text ?? 'Scanner ready';
+  const passiveScannerLabel = passiveScanNotice?.text ?? t("animals.scanner.ready", { defaultValue: "Scanner ready" });
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
@@ -11489,9 +11489,9 @@ export default function BreedingPlannerApp() {
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-3 min-w-0 max-w-full">
               {breederInfo.logoUrl ? (
-                <img src={breederInfo.logoUrl} alt="logo" className="w-16 h-16 rounded-full object-cover border shadow-sm" />
+                <img src={breederInfo.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="w-16 h-16 rounded-full object-cover border shadow-sm" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-600 border shadow-sm">Logo</div>
+                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-600 border shadow-sm">{t("setup.logo", { defaultValue: "Logo" })}</div>
               )}
               <div className="min-w-0">
                 <div className="mt-wordmark text-[28px] leading-tight tracking-tight">{t("app.title")}</div>
@@ -11520,7 +11520,7 @@ export default function BreedingPlannerApp() {
               <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
               <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button">
                 {t("nav.quarantine", { defaultValue: "Quarantine" })}
-                {quarantineCount ? <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
+                {quarantineCount ? <span className="ms-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
               </TabButton>
               <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
               <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
@@ -11536,7 +11536,7 @@ export default function BreedingPlannerApp() {
       <div className="bp-header-mobile">
         <div className="bp-header-mobile__top">
           {breederInfo.logoUrl ? (
-            <img src={breederInfo.logoUrl} alt="logo" className="bp-header-mobile__logo" />
+            <img src={breederInfo.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="bp-header-mobile__logo" />
           ) : (
             <div className="bp-header-mobile__logo-placeholder">S</div>
           )}
@@ -11621,7 +11621,7 @@ export default function BreedingPlannerApp() {
             {getSpeciesById(speciesScope)?.scientificName && (
               <span className="text-xs text-neutral-500 italic">{getSpeciesById(speciesScope).scientificName}</span>
             )}
-            <span className="ml-auto text-xs text-neutral-600 tabular-nums">
+            <span className="ms-auto text-xs text-neutral-600 tabular-nums">
               {t('species.scope.summary', {
                 defaultValue: '{{animals}} animals · {{genes}} genes',
                 animals: scopedSnakes.length,
@@ -11756,7 +11756,7 @@ export default function BreedingPlannerApp() {
               >
                 +
               </button>
-              <div className="ml-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
+              <div className="ms-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
                 {/* Adding animals comes first: it is what this row is mostly used for. The two
                     QR actions sit last, next to the scanner status they belong with. Feed prep
                     moved out to the header — it plans the whole collection, not this list. */}
@@ -11807,7 +11807,7 @@ export default function BreedingPlannerApp() {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder={t("header.search")}
-                  className="header-search-input w-full pr-11"
+                  className="header-search-input w-full pe-11"
                 />
                 {query ? (
                   <button
@@ -11874,7 +11874,7 @@ export default function BreedingPlannerApp() {
                       <div className="relative" ref={tagFilterMenuRef}>
                         <button
                           type="button"
-                          className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-left flex items-center justify-between"
+                          className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-start flex items-center justify-between"
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
                           <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
@@ -11885,7 +11885,7 @@ export default function BreedingPlannerApp() {
                             <button
                               type="button"
                               className={cx(
-                                'status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                'status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                 !selectedStatusTags.length ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
                               )}
                               onClick={() => {
@@ -11902,7 +11902,7 @@ export default function BreedingPlannerApp() {
                                   <button
                                     type="button"
                                     className={cx(
-                                      'status-tag-menu-button flex-1 px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                      'status-tag-menu-button flex-1 px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                       selected ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
                                     )}
                                     onClick={() => {
@@ -11915,7 +11915,7 @@ export default function BreedingPlannerApp() {
                                   <button
                                     type="button"
                                     className="status-tag-menu-button px-2 py-2 text-sm font-semibold text-neutral-500 hover:text-rose-500"
-                                    title="Delete tag"
+                                    title={t("snakeEdit.deleteTag", { defaultValue: "Delete tag" })}
                                     onClick={() => handleDeleteStatusTag(option)}
                                   >
                                     -
@@ -12211,11 +12211,11 @@ export default function BreedingPlannerApp() {
                   {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
                 </TabButton>
               </div>
-              <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <div className="flex flex-wrap items-center gap-2 ms-auto">
                 <div className="relative w-full sm:w-64">
                   <input
                     type="text"
-                    className="w-full border rounded-xl px-3 py-2 text-sm pr-8"
+                    className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
                     placeholder={t('pairing.searchPlaceholder', { defaultValue: 'Search pairings or snakes' })}
                     value={pairingsSearchQuery}
                     onChange={e => setPairingsSearchQuery(e.target.value)}
@@ -12223,7 +12223,7 @@ export default function BreedingPlannerApp() {
                   {pairingsSearchQuery && (
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-2 text-neutral-500 text-lg leading-none"
+                      className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
                       onClick={() => setPairingsSearchQuery('')}
                       aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
                     >
@@ -12351,7 +12351,7 @@ export default function BreedingPlannerApp() {
                           {box.clutchId && (
                             <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
                               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
-                              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{box.clutchId}</span>
+                              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate"><bdi>{box.clutchId}</bdi></span>
                             </div>
                           )}
                           <div className="text-xs text-neutral-500">
@@ -12560,15 +12560,15 @@ export default function BreedingPlannerApp() {
           >
             <div className="flex items-start justify-between gap-4 px-5 pt-5">
               <div>
-                <div className="text-base font-semibold">{photoGallerySnake.name || 'Unnamed snake'}</div>
-                <div className="text-xs text-neutral-500 mt-1">{photoGallerySnake.id}</div>
-                <div className="text-xs text-neutral-500 mt-1">{photoGalleryPhotos.length} photo{photoGalleryPhotos.length === 1 ? '' : 's'} stored</div>
+                <div className="text-base font-semibold">{photoGallerySnake.name || t("photoGallery.unnamedSnake", { defaultValue: "Unnamed snake" })}</div>
+                <div className="text-xs text-neutral-500 mt-1"><bdi>{photoGallerySnake.id}</bdi></div>
+                <div className="text-xs text-neutral-500 mt-1">{t("photoGallery.storedCount", { count: photoGalleryPhotos.length, defaultValue_one: "{{count}} photo stored", defaultValue_other: "{{count}} photos stored" })}</div>
               </div>
               <button
                 className="text-sm px-3 py-1.5 border rounded-lg"
                 onClick={handleClosePhotoGallery}
               >
-                Close
+                {t("common.close", { defaultValue: "Close" })}
               </button>
             </div>
             <div className="px-5 pb-5 overflow-y-auto max-h-[70vh] mt-4">
@@ -12584,24 +12584,24 @@ export default function BreedingPlannerApp() {
                         <div className="relative bg-neutral-100">
                           <img
                             src={photo.url}
-                            alt={photo.name || `${photoGallerySnake.name || 'Snake'} photo`}
+                            alt={photo.name || t("photoGallery.photoAlt", { name: photoGallerySnake.name || t("photoGallery.snakeFallback", { defaultValue: "Snake" }), defaultValue: "{{name}} photo" })}
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
                           {isCover && (
-                            <div className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 sk-on-accent shadow">Cover</div>
+                            <div className="absolute top-2 start-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 sk-on-accent shadow">{t("photoGallery.cover", { defaultValue: "Cover" })}</div>
                           )}
                         </div>
                         <div className="p-3 flex-1 flex flex-col gap-2 text-sm">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="font-medium truncate" title={photo.name || fileName}>{photo.name || 'Untitled photo'}</div>
+                            <div className="font-medium truncate" title={photo.name || fileName}>{photo.name || t("photoGallery.untitledPhoto", { defaultValue: "Untitled photo" })}</div>
                           </div>
                           <div className="text-xs text-neutral-500">
-                            {photo.source === 'camera' ? 'Captured on device' : 'Uploaded file'}
+                            {photo.source === 'camera' ? t("photoGallery.sourceCamera", { defaultValue: "Captured on device" }) : t("photoGallery.sourceUpload", { defaultValue: "Uploaded file" })}
                             {sizeLabel ? ` — ${sizeLabel}` : ''}
                           </div>
                           {addedLabel && (
-                            <div className="text-xs text-neutral-500">Added {addedLabel}</div>
+                            <div className="text-xs text-neutral-500">{t("photoGallery.addedAt", { date: addedLabel, defaultValue: "Added {{date}}" })}</div>
                           )}
                           <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
                             <a
@@ -12611,14 +12611,14 @@ export default function BreedingPlannerApp() {
                               rel="noopener noreferrer"
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100"
                             >
-                              Open
+                              {t("actions.open", { defaultValue: "Open" })}
                             </a>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100 disabled:opacity-60"
                               onClick={() => handleSetSnakeCoverPhoto(photoGallerySnake.id, photo.id)}
                               disabled={isCover}
                             >
-                              {isCover ? 'Current cover' : 'Set as cover'}
+                              {isCover ? t("photoGallery.currentCover", { defaultValue: "Current cover" }) : t("photoGallery.setAsCover", { defaultValue: "Set as cover" })}
                             </button>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg text-rose-600 hover:bg-rose-50"
@@ -12631,7 +12631,7 @@ export default function BreedingPlannerApp() {
                                 if (ok) handleRemoveSnakePhoto(photoGallerySnake.id, photo.id);
                               }}
                             >
-                              Remove
+                              {t("common.remove", { defaultValue: "Remove" })}
                             </button>
                           </div>
                         </div>
@@ -12640,7 +12640,7 @@ export default function BreedingPlannerApp() {
                   })}
                 </div>
               ) : (
-                <div className="text-sm text-neutral-500">No photos saved for this snake yet. Use the card buttons to add some.</div>
+                <div className="text-sm text-neutral-500">{t("photoGallery.empty", { defaultValue: "No photos saved for this snake yet. Use the card buttons to add some." })}</div>
               )}
             </div>
           </div>
@@ -12739,49 +12739,49 @@ export default function BreedingPlannerApp() {
             className="relative z-[10051] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
             onClick={e => e.stopPropagation()}
           >
-            <div className="text-lg font-semibold">Select Leucistic Type</div>
+            <div className="text-lg font-semibold">{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
             <div className="text-sm text-neutral-600 space-y-3">
               <p>
-                When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations.
+                {t("leucistic.intro", { defaultValue: "When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations." })}
               </p>
               <div>
-                <div className="font-medium text-neutral-800">Blue Eyed Leucistic (BEL)</div>
+                <div className="font-medium text-neutral-800">{t("leucistic.belHeading", { defaultValue: "Blue Eyed Leucistic (BEL)" })}</div>
                 <p className="mt-1">
-                  A Blue Eyed Leucistic is produced when two compatible genes from the BEL complex are combined. Common BEL complex genes include Mojave, Lesser, Butter, Russo, Mystic, Phantom, and Special.
+                  {t("leucistic.belBody", { defaultValue: "A Blue Eyed Leucistic is produced when two compatible genes from the BEL complex are combined. Common BEL complex genes include Mojave, Lesser, Butter, Russo, Mystic, Phantom, and Special." })}
                 </p>
                 <p className="mt-1">
-                  Example combinations: Mojave + Lesser, Mojave + Butter, Lesser + Russo, Mystic + Mojave, Phantom + Mojave.
+                  {t("leucistic.belExamples", { defaultValue: "Example combinations: Mojave + Lesser, Mojave + Butter, Lesser + Russo, Mystic + Mojave, Phantom + Mojave." })}
                 </p>
               </div>
               <div>
-                <div className="font-medium text-neutral-800">Black Eyed Leucistic</div>
+                <div className="font-medium text-neutral-800">{t("leucistic.blackEye", { defaultValue: "Black Eyed Leucistic" })}</div>
                 <p className="mt-1">
-                  Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically.
+                  {t("leucistic.blackEyeBody", { defaultValue: "Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically." })}
                 </p>
                 <p className="mt-1">
-                  Examples: Fire + Fire creates Super Fire, Lesser + Lesser creates Super Lesser, Butter + Butter creates Super Butter.
+                  {t("leucistic.blackEyeExamples", { defaultValue: "Examples: Fire + Fire creates Super Fire, Lesser + Lesser creates Super Lesser, Butter + Butter creates Super Butter." })}
                 </p>
               </div>
               <p>
-                Defining the exact genes keeps genetics records accurate, preserves breeding outcomes, and ensures pairing predictions are correct.
+                {t("leucistic.why", { defaultValue: "Defining the exact genes keeps genetics records accurate, preserves breeding outcomes, and ensures pairing predictions are correct." })}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium">Leucistic Type</label>
+              <label className="text-xs font-medium">{t("leucistic.typeLabel", { defaultValue: "Leucistic Type" })}</label>
               <select
                 className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                 value={leucisticTypeChoice}
                 onChange={e => setLeucisticTypeChoice(e.target.value === 'blackEye' ? 'blackEye' : 'bel')}
               >
-                <option value="bel">Blue Eyed Leucistic</option>
-                <option value="blackEye">Black Eyed Leucistic</option>
+                <option value="bel">{t("leucistic.bel", { defaultValue: "Blue Eyed Leucistic" })}</option>
+                <option value="blackEye">{t("leucistic.blackEye", { defaultValue: "Black Eyed Leucistic" })}</option>
               </select>
             </div>
 
             {leucisticTypeChoice === 'bel' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium">BEL Gene 1</label>
+                  <label className="text-xs font-medium">{t("leucistic.belGene1", { defaultValue: "BEL Gene 1" })}</label>
                   <select
                     className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                     value={leucisticBelGene1}
@@ -12793,7 +12793,7 @@ export default function BreedingPlannerApp() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium">BEL Gene 2</label>
+                  <label className="text-xs font-medium">{t("leucistic.belGene2", { defaultValue: "BEL Gene 2" })}</label>
                   <select
                     className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                     value={leucisticBelGene2}
@@ -12806,13 +12806,13 @@ export default function BreedingPlannerApp() {
                 </div>
                 {String(leucisticBelGene1 || '').trim() && String(leucisticBelGene2 || '').trim() && String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() && (
                   <div className="sm:col-span-2 text-xs text-red-600">
-                    Select two different genes for Blue Eyed Leucistic.
+                    {t("leucistic.belSameGene", { defaultValue: "Select two different genes for Blue Eyed Leucistic." })}
                   </div>
                 )}
               </div>
             ) : (
               <div>
-                <label className="text-xs font-medium">Black Eye Complex Gene</label>
+                <label className="text-xs font-medium">{t("leucistic.blackEyeGene", { defaultValue: "Black Eye Complex Gene" })}</label>
                 <select
                   className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                   value={leucisticBlackGene}
@@ -12826,14 +12826,14 @@ export default function BreedingPlannerApp() {
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>Cancel</button>
+              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
                 onClick={confirmLeucisticSelector}
                 disabled={leucisticTypeChoice === 'bel' ? !(leucisticBelGene1 && leucisticBelGene2) || String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() : !leucisticBlackGene}
               >
-                Apply
+                {t("filters.apply", { defaultValue: "Apply" })}
               </button>
             </div>
           </div>
@@ -12910,7 +12910,7 @@ export default function BreedingPlannerApp() {
         const total = Array.isArray(hatchWizard.entries) ? hatchWizard.entries.length : 0;
         const safeIndex = total ? Math.min(total - 1, Math.max(0, hatchWizard.currentIndex || 0)) : 0;
         const entry = total ? hatchWizard.entries[safeIndex] : null;
-        const pairingName = hatchWizard.context?.pairingName || 'Hatchling';
+        const pairingName = hatchWizard.context?.pairingName || t("hatchWizard.pairingFallback", { defaultValue: "Hatchling" });
         const groupName = hatchWizard.context?.groupName || '';
         const isLast = safeIndex === total - 1;
         const canAdvance = entry && String(entry.id || '').trim().length > 0;
@@ -12932,19 +12932,19 @@ export default function BreedingPlannerApp() {
               <div className="p-4 border-b bg-neutral-50">
                 <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Hatching clutch</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("hatchWizard.title", { defaultValue: "Hatching clutch" })}</div>
                     <div className="mt-1 font-semibold text-neutral-900 truncate">{pairingName}</div>
                     <div className="text-xs text-neutral-500 mt-0.5">
-                      {total > 0 ? `Hatchling ${safeIndex + 1} of ${total}` : 'No hatchlings to record'}
+                      {total > 0 ? t("hatchWizard.progress", { current: safeIndex + 1, total, defaultValue: "Hatchling {{current}} of {{total}}" }) : t("hatchWizard.noneToRecordShort", { defaultValue: "No hatchlings to record" })}
                       {groupName ? ` - ${groupName}` : ''}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="text-right">
+                    <div className="text-end">
                       <div className="text-2xl font-semibold leading-none">{savedCount}/{total}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">Saved</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">{t("hatchWizard.saved", { defaultValue: "Saved" })}</div>
                     </div>
-                    <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>Close</button>
+                    <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>{t("common.close", { defaultValue: "Close" })}</button>
                   </div>
                 </div>
               </div>
@@ -12952,15 +12952,20 @@ export default function BreedingPlannerApp() {
                 {entry ? (
                   <div className="space-y-4">
                     <div className="text-sm text-neutral-600">
-                      Pairing: <span className="font-medium text-neutral-800">{pairingName}</span>
+                      {t("hatchWizard.pairingLabel", { defaultValue: "Pairing:" })} <span className="font-medium text-neutral-800">{pairingName}</span>
                     </div>
-                    {groupName && (
-                      <div className="text-xs text-neutral-500">
-                        New hatchlings will be placed in <span className="font-medium text-neutral-700">{groupName}</span>.
-                      </div>
-                    )}
+                    {groupName && (() => {
+                      const groupToken = '__GROUP__';
+                      const placedIn = t("hatchWizard.placedIn", { group: groupToken, defaultValue: "New hatchlings will be placed in {{group}}." });
+                      const [placedBefore, placedAfter = ''] = placedIn.split(groupToken);
+                      return (
+                        <div className="text-xs text-neutral-500">
+                          {placedBefore}<span className="font-medium text-neutral-700">{groupName}</span>{placedAfter}
+                        </div>
+                      );
+                    })()}
                     <div>
-                      <label className="text-xs font-medium">Hatchling ID</label>
+                      <label className="text-xs font-medium">{t("hatchWizard.hatchlingId", { defaultValue: "Hatchling ID" })}</label>
                       <div className="mt-1 flex gap-2">
                         <input
                           className="flex-1 border rounded-xl px-3 py-2 text-sm"
@@ -12972,50 +12977,50 @@ export default function BreedingPlannerApp() {
                           className={cx('px-3 py-2 rounded-xl text-sm border', entry.autoId ? 'text-neutral-600' : 'text-neutral-700')}
                           onClick={() => handleWizardRegenerateId(safeIndex)}
                         >
-                          Regenerate
+                          {t("hatchWizard.regenerate", { defaultValue: "Regenerate" })}
                         </button>
                       </div>
                       <div className="text-xs text-neutral-500 mt-1">
                         {entry.saved
-                          ? `Saved as ${entry.savedId || entry.id}.`
-                          : (entry.autoId ? 'Generated automatically based on pairing.' : 'ID locked—edit to override or regenerate.')}
+                          ? t("hatchWizard.savedAs", { id: entry.savedId || entry.id, defaultValue: "Saved as {{id}}." })
+                          : (entry.autoId ? t("hatchWizard.idAuto", { defaultValue: "Generated automatically based on pairing." }) : t("hatchWizard.idLocked", { defaultValue: "ID locked—edit to override or regenerate." }))}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-medium">Sex</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.sex", { defaultValue: "Sex" })}</label>
                         <select
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm bg-white"
                           value={entry.sex || 'U'}
                           onChange={e => handleWizardSexChange(safeIndex, e.target.value)}
                         >
-                          <option value="U">Unknown</option>
-                          <option value="F">Female</option>
-                          <option value="M">Male</option>
+                          <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
+                          <option value="F">{t("ui.animals.addAnimal.female", { defaultValue: "Female" })}</option>
+                          <option value="M">{t("ui.animals.addAnimal.male", { defaultValue: "Male" })}</option>
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs font-medium">Weight (g)</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.weight", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.weight}
                           onChange={e => handleWizardWeightChange(safeIndex, e.target.value)}
-                          placeholder="e.g., 75"
+                          placeholder={t("hatchWizard.weightPlaceholder", { defaultValue: "e.g., 75" })}
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="text-xs font-medium">Morph / het notes</label>
+                        <label className="text-xs font-medium">{t("hatchWizard.morphNotes", { defaultValue: "Morph / het notes" })}</label>
                         <input
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.morph || ''}
                           onChange={e => handleWizardMorphChange(safeIndex, e.target.value)}
-                          placeholder="e.g., Pastel Clown 66% Het Hypo"
+                          placeholder={t("hatchWizard.morphPlaceholder", { defaultValue: "e.g., Pastel Clown 66% Het Hypo" })}
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium">Birth date</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.birthDate", { defaultValue: "Birth date" })}</label>
                         <input
                           type="date"
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
@@ -13026,7 +13031,7 @@ export default function BreedingPlannerApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-neutral-500">No hatchlings to record.</div>
+                  <div className="text-sm text-neutral-500">{t("hatchWizard.noneToRecord", { defaultValue: "No hatchlings to record." })}</div>
                 )}
               </div>
               <div className="p-4 border-t flex items-center justify-between gap-3">
@@ -13034,7 +13039,7 @@ export default function BreedingPlannerApp() {
                 <div className="flex items-center gap-2">
                   {safeIndex > 0 && (
                     <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleWizardPrev}>
-                      Previous
+                      {t("common.previous", { defaultValue: "Previous" })}
                     </button>
                   )}
                   <button
@@ -13043,7 +13048,7 @@ export default function BreedingPlannerApp() {
                     onClick={handleWizardSaveCurrent}
                     disabled={!canAdvance}
                   >
-                    {isLast ? 'Save hatchling' : 'Save & next'}
+                    {isLast ? t("hatchWizard.saveHatchling", { defaultValue: "Save hatchling" }) : t("hatchWizard.saveNext", { defaultValue: "Save & next" })}
                   </button>
                 </div>
               </div>
@@ -13126,8 +13131,8 @@ export default function BreedingPlannerApp() {
                         {currentMale && (
                           <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
                             <div className="min-w-0 text-xs">
-                              <div className="font-medium text-sm truncate">{currentMale.name || currentMale.id}</div>
-                              <div className="text-[11px] text-neutral-500 truncate">{currentMale.id}</div>
+                              <div className="font-medium text-sm truncate"><bdi>{currentMale.name || currentMale.id}</bdi></div>
+                              <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentMale.id}</bdi></div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))}>
                               {t("pairing.modal.clear", { defaultValue: "Clear" })}
@@ -13148,7 +13153,7 @@ export default function BreedingPlannerApp() {
                                   key={m.id}
                                   type="button"
                                   className={cx(
-                                    "w-full text-left px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
+                                    "w-full text-start px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
                                     selected && "bg-sky-50/80"
                                   )}
                                   onClick={() => {
@@ -13157,8 +13162,8 @@ export default function BreedingPlannerApp() {
                                     setPairingSearchTarget("female");
                                   }}
                                 >
-                                  <div className="font-medium truncate">{m.name || m.id}</div>
-                                  <div className="text-[11px] text-neutral-500 truncate">{m.id}</div>
+                                  <div className="font-medium truncate"><bdi>{m.name || m.id}</bdi></div>
+                                  <div className="text-[11px] text-neutral-500 truncate"><bdi>{m.id}</bdi></div>
                                   <div className="text-[11px] text-neutral-500 truncate">
                                     {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
@@ -13188,8 +13193,8 @@ export default function BreedingPlannerApp() {
                         {currentFemale && (
                           <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
                             <div className="min-w-0 text-xs">
-                              <div className="font-medium text-sm truncate">{currentFemale.name || currentFemale.id}</div>
-                              <div className="text-[11px] text-neutral-500 truncate">{currentFemale.id}</div>
+                              <div className="font-medium text-sm truncate"><bdi>{currentFemale.name || currentFemale.id}</bdi></div>
+                              <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentFemale.id}</bdi></div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))}>
                               {t("pairing.modal.clear", { defaultValue: "Clear" })}
@@ -13210,7 +13215,7 @@ export default function BreedingPlannerApp() {
                                   key={f.id}
                                   type="button"
                                   className={cx(
-                                    "w-full text-left px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
+                                    "w-full text-start px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
                                     selected && "bg-rose-50/80"
                                   )}
                                   onClick={() => {
@@ -13219,8 +13224,8 @@ export default function BreedingPlannerApp() {
                                     setPairingSearchTarget(null);
                                   }}
                                 >
-                                  <div className="font-medium truncate">{f.name || f.id}</div>
-                                  <div className="text-[11px] text-neutral-500 truncate">{f.id}</div>
+                                  <div className="font-medium truncate"><bdi>{f.name || f.id}</bdi></div>
+                                  <div className="text-[11px] text-neutral-500 truncate"><bdi>{f.id}</bdi></div>
                                   <div className="text-[11px] text-neutral-500 truncate">
                                     {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
@@ -13474,7 +13479,7 @@ export default function BreedingPlannerApp() {
                   <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
                   <button
                     type="button"
-                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
                     onClick={() => setEditStatusMenuOpen(open => !open)}
                   >
                     <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
@@ -13484,7 +13489,7 @@ export default function BreedingPlannerApp() {
                     <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
                       <button
                         type="button"
-                        className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                        className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
                         onClick={handleClearEditStatus}
                       >
                         {t("snakeEdit.noTag")}
@@ -13495,14 +13500,14 @@ export default function BreedingPlannerApp() {
                           <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
                             <button
                               type="button"
-                              className="status-tag-menu-button flex-1 text-left"
+                              className="status-tag-menu-button flex-1 text-start"
                               onClick={() => handleSelectEditStatus(option)}
                             >
                               {option}
                             </button>
                             <button
                               type="button"
-                              className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                              className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                               onClick={() => handleDeleteEditStatus(option)}
                               title={t("snakeEdit.deleteTag")}
                             >
@@ -13621,7 +13626,7 @@ export default function BreedingPlannerApp() {
                   <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
                   <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
                     value={editSnakeDraft.birthDate || ''}
-                    placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
+                    placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                     onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
                   <div className="text-xs text-neutral-500 mt-0.5">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
                 </div>
@@ -13751,7 +13756,7 @@ export default function BreedingPlannerApp() {
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">For Sale</label>
+                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For Sale" })}</label>
                     <button
                       type="button"
                       role="switch"
@@ -13789,7 +13794,7 @@ export default function BreedingPlannerApp() {
                           />
                         </div>
                         <div className="flex flex-col gap-0.5 w-20">
-                          <label className="text-xs font-medium text-neutral-600">Currency</label>
+                          <label className="text-xs font-medium text-neutral-600">{t("snakeEdit.currency", { defaultValue: "Currency" })}</label>
                           <select
                             className="border rounded-lg px-2 py-1 text-sm bg-white"
                             value={editSnakeDraft.currency || 'EUR'}
@@ -13802,13 +13807,13 @@ export default function BreedingPlannerApp() {
                         </div>
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        <label className="text-xs font-medium text-neutral-600">Description for buyers</label>
+                        <label className="text-xs font-medium text-neutral-600">{t("snakeEdit.saleDescription", { defaultValue: "Description for buyers" })}</label>
                         <textarea
                           rows={2}
                           className="border rounded-lg px-2 py-1 text-sm resize-none w-full"
                           value={editSnakeDraft.saleDescription || ''}
                           onChange={e => setEditSnakeDraft(d => ({ ...d, saleDescription: e.target.value }))}
-                          placeholder="Optional details..."
+                          placeholder={t("snakeEdit.saleDescriptionPlaceholder", { defaultValue: "Optional details..." })}
                         />
                       </div>
                       {editForSalePublishError && (
@@ -13816,12 +13821,12 @@ export default function BreedingPlannerApp() {
                       )}
                       {editSnakeDraft.marketplacePublished ? (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5">
-                          <span>✓</span><span>Published to Marketplace</span>
+                          <span>✓</span><span>{t("snakeEdit.publishedToMarketplace", { defaultValue: "Published to Marketplace" })}</span>
                         </div>
                       ) : (
                         <FeatureAccessGuard
                           feature="marketplace.create_listing"
-                          featureName="Marketplace listings"
+                          featureName={t("snakeEdit.marketplaceListingsFeature", { defaultValue: "Marketplace listings" })}
                           // No "See plans" here: leaving the editor would drop its unsaved changes.
                           showUpgrade={false}
                         >
@@ -13836,7 +13841,7 @@ export default function BreedingPlannerApp() {
                               : 'bg-amber-500 hover:bg-amber-600 sk-on-accent'
                           )}
                         >
-                          {editForSalePublishing ? 'Publishing...' : 'Publish to Marketplace'}
+                          {editForSalePublishing ? t("snakeEdit.publishing", { defaultValue: "Publishing..." }) : t("snakeEdit.publishToMarketplace", { defaultValue: "Publish to Marketplace" })}
                         </button>
                         </FeatureAccessGuard>
                       )}
@@ -13991,7 +13996,7 @@ export default function BreedingPlannerApp() {
                         const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
                         return (
                           <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
-                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#{pairing.id})</div>
+                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
                             <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
                             <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
                             {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
@@ -14401,7 +14406,7 @@ export {
                 )}
               >
                 {isCameraMode ? (
-                  <div className="text-center text-sm text-neutral-500 px-4">Align the QR inside the box</div>
+                  <div className="text-center text-sm text-neutral-500 px-4">{t("scanner.alignQr", { defaultValue: "Align the QR inside the box" })}</div>
                 ) : (
                   <div className="text-center text-sm text-neutral-500 px-4">{t('cameraDisabled')}</div>
                 )}
@@ -14627,9 +14632,9 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
   return createPortal((
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
       <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="font-semibold text-lg">Delete {snake.name || 'this snake'}?</div>
+        <div className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-          This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added.
+          {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
@@ -14637,7 +14642,7 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
             className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
             onClick={onConfirm}
           >
-            Delete
+            {t("common.delete", { defaultValue: "Delete" })}
           </button>
         </div>
       </div>
@@ -15117,7 +15122,7 @@ function SpacesSection({
               return (
                 <div
                   key={room.id}
-                  className="text-left rounded-[28px] border border-neutral-200 bg-white p-5 shadow-sm hover:border-neutral-400 transition cursor-pointer"
+                  className="text-start rounded-[28px] border border-neutral-200 bg-white p-5 shadow-sm hover:border-neutral-400 transition cursor-pointer"
                   onClick={openRoom}
                   onKeyDown={event => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -15268,21 +15273,22 @@ function SpacesSection({
 }
 
 function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
+  const { t } = useTranslation();
   if (!id) return null;
   const geneticsTokens = combineMorphsAndHetsForDisplay(morphs, hets, possibleHets);
   if (typeof document === 'undefined') return null;
   return createPortal((
         <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
       <div className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
-        <div className="font-medium mb-2">QR for {name || id}</div>
-        <div className="text-sm text-neutral-500 mb-2">ID: <span className="font-mono">{id}</span></div>
+        <div className="font-medium mb-2">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
+        <div className="text-sm text-neutral-500 mb-2">{t("qrPreview.idLabel", { defaultValue: "ID:" })} <span className="font-mono">{id}</span></div>
         <div className="space-y-1 mb-3">
-          {geneticsTokens.length ? <GeneLine label="Genetics" genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">Genetics: -</div>}
+          {geneticsTokens.length ? <GeneLine label={t("qrPreview.genetics", { defaultValue: "Genetics" })} genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">{t("qrPreview.geneticsNone", { defaultValue: "Genetics: -" })}</div>}
         </div>
-        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generating…</div>}
+        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">{t("qrPreview.generating", { defaultValue: "Generating…" })}</div>}
         <div className="mt-3 flex gap-2">
-          {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>Download</a>}
-          <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>Close</button>
+          {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>{t("actions.download", { defaultValue: "Download" })}</a>}
+          <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
       </div>
     </div>
@@ -15290,6 +15296,7 @@ function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
 }
 
 function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
+  const { t } = useTranslation();
   const [notes, setNotes] = useState('');
   const [badEggs, setBadEggs] = useState('0');
 
@@ -15301,8 +15308,8 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
   if (!box || typeof document === 'undefined') return null;
 
   const title = box.eggBoxCount > 1
-    ? `Egg box #${box.eggBoxNumber} (${box.eggBoxIndexInClutch} of ${box.eggBoxCount})`
-    : `Egg box #${box.eggBoxNumber}`;
+    ? t("pairing.eggBox.splitTitle", { number: box.eggBoxNumber, box: box.eggBoxIndexInClutch, total: box.eggBoxCount, defaultValue: "Egg box #{{number}} ({{box}} of {{total}})" })
+    : t("pairing.eggBox.title", { number: box.eggBoxNumber, defaultValue: "Egg box #{{number}}" });
   const originalEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
   const badEggsCount = Math.max(0, Math.min(originalEggs, Math.floor(Number(badEggs) || 0)));
   const goodEggsCount = Math.max(0, originalEggs - badEggsCount);
@@ -15315,42 +15322,42 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
             <div className="font-semibold text-lg">{title}</div>
             {box.clutchId && (
               <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5">
-                <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">Clutch ID</span>
-                <span className="text-[10px] font-mono font-semibold text-violet-700">{box.clutchId}</span>
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
+                <span className="text-[10px] font-mono font-semibold text-violet-700"><bdi>{box.clutchId}</bdi></span>
               </div>
             )}
           </div>
-          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Close</button>
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Pairing</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.pairing", { defaultValue: "Pairing" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.pairingLabel}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Good eggs in this box</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.goodEggs", { defaultValue: "Good eggs in this box" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{goodEggsCount}</div>
-              <div className="mt-1 text-xs text-neutral-500">Started with {originalEggs}</div>
+              <div className="mt-1 text-xs text-neutral-500">{t("eggBoxModal.startedWith", { eggs: originalEggs, defaultValue: "Started with {{eggs}}" })}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Laid</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.laid", { defaultValue: "Laid" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.laidLabel || '-'}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Due</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.due", { defaultValue: "Due" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.dueLabel || '-'}</div>
             </div>
             {typeof box.remaining === 'number' ? (
               <div className="rounded-xl border bg-neutral-50 p-3 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-neutral-500">Remaining</div>
-                <div className="mt-1 font-medium text-neutral-900">{box.remaining} days</div>
+                <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.remaining", { defaultValue: "Remaining" })}</div>
+                <div className="mt-1 font-medium text-neutral-900">{t("eggBoxModal.remainingDays", { days: box.remaining, defaultValue: "{{days}} days" })}</div>
               </div>
             ) : null}
           </div>
 
           <div>
-            <label className="text-xs font-medium">Bad eggs</label>
+            <label className="text-xs font-medium">{t("eggBoxModal.badEggs", { defaultValue: "Bad eggs" })}</label>
             <input
               type="number"
               min="0"
@@ -15360,28 +15367,28 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
               onChange={e => setBadEggs(e.target.value)}
             />
             <div className="mt-1 text-xs text-neutral-500">
-              Enter eggs that went bad. The egg box count will reduce to {goodEggsCount}.
+              {t("eggBoxModal.badEggsHelp", { good: goodEggsCount, defaultValue: "Enter eggs that went bad. The egg box count will reduce to {{good}}." })}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium">Egg box notes</label>
+            <label className="text-xs font-medium">{t("eggBoxModal.notes", { defaultValue: "Egg box notes" })}</label>
             <textarea
               className="mt-1 w-full min-h-32 border rounded-xl px-3 py-2 text-sm"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Add incubation notes, egg condition, movement, or reminders."
+              placeholder={t("eggBoxModal.notesPlaceholder", { defaultValue: "Add incubation notes, egg condition, movement, or reminders." })}
             />
           </div>
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Cancel</button>
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
           <button
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
             onClick={() => onSave?.(box, { notes, badEggs: badEggsCount })}
           >
-            Save egg box
+            {t("eggBoxModal.save", { defaultValue: "Save egg box" })}
           </button>
         </div>
       </div>
@@ -15458,7 +15465,7 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
                     const on = e.target.checked; setSelectedSnakesLocal(prev=>{
                       const set = new Set(prev||[]); on?set.add(s.id):set.delete(s.id); return [...set];
                     });
-                  }} />{s.name} <span className="text-xs text-neutral-500">{s.id}</span></label>;
+                  }} />{s.name} <span className="text-xs text-neutral-500"><bdi>{s.id}</bdi></span></label>;
                 })}
               </div>
             )}
@@ -17064,10 +17071,10 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                   <table className="min-w-full text-sm">
                     <thead className="bg-white border-b text-xs uppercase text-neutral-500">
                       <tr>
-                        <th className="text-left px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
-                        <th className="text-left px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
-                        <th className="text-left px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
-                        <th className="text-right px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
+                        <th className="text-end px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -17076,7 +17083,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                           <td className="px-4 py-3 font-medium">{row.feedType}</td>
                           <td className="px-4 py-3">{row.sizeClass || '-'}</td>
                           <td className="px-4 py-3">{row.weightText || '-'}</td>
-                          <td className="px-4 py-3 text-right font-semibold">{row.quantity}</td>
+                          <td className="px-4 py-3 text-end font-semibold">{row.quantity}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -17104,7 +17111,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium truncate">{row.name}</span>
-                      <span className="block text-xs text-neutral-500 truncate">{row.id}</span>
+                      <span className="block text-xs text-neutral-500 truncate"><bdi>{row.id}</bdi></span>
                       {row.excluded ? (
                         <span className="block text-xs text-sky-700">{row.excludedReason}</span>
                       ) : row.complete ? (
@@ -17384,7 +17391,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-medium text-base truncate">{s.name}</div>
-              <div className="text-xs font-mono text-neutral-500 mt-1 truncate">{s.id}</div>
+              <div className="text-xs font-mono text-neutral-500 mt-1 truncate"><bdi>{s.id}</bdi></div>
               <div className="text-xs text-neutral-500">{s.birthDate ? formatDateForDisplay(s.birthDate) : ''}</div>
             </div>
             <div className="shrink-0">
@@ -17427,16 +17434,16 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
               color: 'var(--sk-warning-text, #166534)',
             }}
           >
-            For Sale
+            {t("snakeEdit.forSale", { defaultValue: "For Sale" })}
           </span>
         )}
         {(hasFamilyTree || hasDelete) && (
-          <div className="relative ml-auto" ref={overflowMenuRef}>
+          <div className="relative ms-auto" ref={overflowMenuRef}>
             <button
               className="bp-card-overflow-btn bp-card-btn-primary text-[11px] px-2.5 py-1.5 border rounded-lg font-bold text-neutral-500 hover:bg-neutral-50 transition-colors"
               onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(prev => !prev); }}
-              title="More actions"
-              aria-label="More actions"
+              title={t("actions.moreActions", { defaultValue: "More actions" })}
+              aria-label={t("actions.moreActions", { defaultValue: "More actions" })}
             >
               ⋮
             </button>
@@ -17751,7 +17758,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
         <div className="mt-2">
         <div className="text-xs text-neutral-500 mb-1">{t("pairing.breedingCycles", { defaultValue: "Breeding cycles" })}</div>
-          <div className="flex flex-col gap-1 max-h-40 overflow-auto pr-1">
+          <div className="flex flex-col gap-1 max-h-40 overflow-auto pe-1">
             {breedingCyclesByYear.map(group => (
               <div key={group.year} className="rounded-lg border bg-neutral-50 p-2 space-y-1">
                 <div className="text-[10px] font-semibold uppercase text-neutral-500">{group.year}</div>
@@ -17764,31 +17771,31 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                           className="text-[10px] px-1.5 py-0.5 border rounded-lg"
                           onClick={() => onOpenPairing(cycle.id)}
                         >
-                          Open
+                          {t("actions.open", { defaultValue: "Open" })}
                         </button>
                       )}
                     </div>
                     <div className="space-y-0.5 text-neutral-700">
                       {cycle.locks && cycle.locks.length ? (
                         <div>
-                          <span className="font-semibold text-neutral-600">Locks:</span>{' '}
+                          <span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.locks", { defaultValue: "Locks:" })}</span>{' '}
                           <span>{cycle.locks.map(lock => lock.display || formatDateTimeForDisplay(lock.iso)).filter(Boolean).join(', ')}</span>
                         </div>
                       ) : null}
                       {cycle.ovulationDate ? (
-                        <div><span className="font-semibold text-neutral-600">Ovulation:</span> <span>{formatDateForDisplay(cycle.ovulationDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.ovulation", { defaultValue: "Ovulation:" })}</span> <span>{formatDateForDisplay(cycle.ovulationDate)}</span></div>
                       ) : null}
                       {cycle.preLayDate ? (
-                        <div><span className="font-semibold text-neutral-600">Pre-Lay Shed:</span> <span>{formatDateForDisplay(cycle.preLayDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.preLayShed", { defaultValue: "Pre-Lay Shed:" })}</span> <span>{formatDateForDisplay(cycle.preLayDate)}</span></div>
                       ) : null}
                       {cycle.clutchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Eggs laid:</span> <span>{formatDateForDisplay(cycle.clutchDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.eggsLaid", { defaultValue: "Eggs laid:" })}</span> <span>{formatDateForDisplay(cycle.clutchDate)}</span></div>
                       ) : null}
                       {cycle.hatchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Hatched:</span> <span>{formatDateForDisplay(cycle.hatchDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.hatched", { defaultValue: "Hatched:" })}</span> <span>{formatDateForDisplay(cycle.hatchDate)}</span></div>
                       ) : null}
                       {!cycle.locks?.length && !cycle.ovulationDate && !cycle.preLayDate && !cycle.clutchDate && !cycle.hatchDate ? (
-                        <div className="text-neutral-500">No cycle events recorded.</div>
+                        <div className="text-neutral-500">{t("pairing.cycleEvents.none", { defaultValue: "No cycle events recorded." })}</div>
                       ) : null}
                     </div>
                   </div>
@@ -17808,7 +17815,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           return (
             <div className="flex flex-col gap-1 max-h-36 overflow-auto">
               {visible.map(p => (
-                <button key={p.id} className="text-sm text-left px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
+                <button key={p.id} className="text-sm text-start px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
                   <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
                   <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </button>
@@ -17883,7 +17890,7 @@ function WeightTrendMiniChart({ data = [] }) {
       <svg
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         role="img"
-        aria-label="Weight trend chart"
+        aria-label={t("snakeEdit.weightTrendChart", { defaultValue: "Weight trend chart" })}
         className="w-full h-32"
       >
         <defs>
@@ -17935,7 +17942,7 @@ function WeightTrendMiniChart({ data = [] }) {
         <div>
           <span className="font-semibold text-neutral-700">{t("logs.latest", { defaultValue: "Latest" })}:</span> {formatNumber(latest.grams)} g
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <span className="font-semibold text-neutral-700">{t("logs.change", { defaultValue: "Change" })}:</span> {diffLabel}
         </div>
         <div className="col-span-2 text-neutral-500">
@@ -18002,7 +18009,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
     const isActive = sortBy === field;
     const arrow = isActive ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
     return (
-      <th className="text-left px-3 py-2 font-semibold">
+      <th className="text-start px-3 py-2 font-semibold">
         <button
           type="button"
           className={cx('flex items-center gap-1 hover:text-neutral-900', isActive ? 'text-neutral-900' : 'text-neutral-500')}
@@ -18095,12 +18102,12 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
         <thead className="text-xs uppercase tracking-wide text-neutral-500 bg-neutral-50">
           <tr>
             {renderSortableHeader('name', t('animals.list.columns.animal', { defaultValue: 'Animal' }))}
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
             {renderSortableHeader('status', t('animals.list.columns.status', { defaultValue: 'Status' }))}
             {renderSortableHeader('weight', t('animals.list.columns.weight', { defaultValue: 'Weight' }))}
             {renderSortableHeader('lastFeed', t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }))}
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
           </tr>
         </thead>
         <tbody>
@@ -18121,7 +18128,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
               <tr key={snake.id || `snake-row-${index}`} className="border-t border-neutral-100">
                 <td className="px-3 py-3 align-top">
                   <div className="font-medium text-base">{snake.name || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' })}</div>
-                  <div className="text-xs font-mono text-neutral-500">{snake.id || '—'}</div>
+                  <div className="text-xs font-mono text-neutral-500"><bdi>{snake.id || '—'}</bdi></div>
                   <div className="mt-1 inline-flex items-center gap-2 text-xs text-neutral-600">
                     <span className="font-semibold">{sexSummary.symbol}</span>
                     <span>{sexSummary.label}</span>
@@ -18245,17 +18252,18 @@ function filterSnakes(list, query, tag) {
 }
 
 function AddGroupInline({ onAdd }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState("");
   return (
     <div className="flex gap-2 px-2">
-      <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder="Add new group"
+      <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
         value={val} onChange={e=>setVal(e.target.value)} />
       <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
         const g = val.trim();
         if (!g) return;
         onAdd(g);
         setVal("");
-      }}>Add</button>
+      }}>{t("actions.add", { defaultValue: "Add" })}</button>
     </div>
   );
 }
@@ -20582,7 +20590,7 @@ function BreederSection({
                 >
                   {t('setup.uploadLogo', { defaultValue: 'Upload logo' })}
                 </button>
-                {info.logoUrl && <img src={info.logoUrl} alt="logo" className="w-20 h-20 object-cover rounded-md border" />}
+                {info.logoUrl && <img src={info.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="w-20 h-20 object-cover rounded-md border" />}
               </div>
             </div>
           </div>
@@ -20762,7 +20770,7 @@ function BreederSection({
                     aria-pressed={hasToken}
                     onClick={() => handleTemplateTokenToggle(token)}
                     className={cx(
-                      'status-tag-neutral-button w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-left transition',
+                      'status-tag-neutral-button w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-start transition',
                       hasToken
                         ? 'border-blue-500/60 text-blue-700 shadow-sm'
                         : 'border-neutral-200 bg-white hover:border-blue-400'
@@ -20842,7 +20850,7 @@ function BreederSection({
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={aliasDraftNotes}
                 onChange={e => setAliasDraftNotes(e.target.value)}
-                placeholder="BEL complex combinations"
+                placeholder={t("setup.aliases.notesPlaceholder", { defaultValue: "BEL complex combinations" })}
               />
             </div>
           </div>
@@ -21446,10 +21454,10 @@ function BreederSection({
                                 checked={!excludedAnimalIds.has(String(snake.id))}
                                 onChange={() => toggleAnimalScopeSelection(snake.id)}
                               />
-                              <span className="font-medium">{snake.name || snake.id}</span>
-                              <span className="text-neutral-500">{snake.id}</span>
+                              <span className="font-medium"><bdi>{snake.name || snake.id}</bdi></span>
+                              <span className="text-neutral-500"><bdi>{snake.id}</bdi></span>
                               {isAnimalForSale(snake) && (
-                                <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-700">
+                                <span className="ms-auto text-[10px] uppercase tracking-wide text-emerald-700">
                                   {t('export.scope.forSaleFlag', { defaultValue: 'For sale' })}
                                 </span>
                               )}
@@ -22165,7 +22173,7 @@ function BreederSection({
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.userId", { defaultValue: "User ID" })}</div>
-                  <div className="mt-1 break-words text-xs">{accountState.user?.id || '-'}</div>
+                  <div className="mt-1 break-words text-xs"><bdi>{accountState.user?.id || '-'}</bdi></div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -22791,7 +22799,7 @@ function AppearanceSettingsPanel() {
         <AppearancePreview density={appearanceState.layoutDensity} mode={effectiveThemeMode} />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto pe-1 space-y-6">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -22830,7 +22838,7 @@ function AppearanceSettingsPanel() {
                         style={{ background: `var(${role})`, borderColor: 'var(--sk-border)' }}
                       />
                     ))}
-                    <span className="text-[9px] uppercase tracking-wide text-neutral-500 ml-0.5">
+                    <span className="text-[9px] uppercase tracking-wide text-neutral-500 ms-0.5">
                       {preset.tone === 'light'
                         ? t('appearance.presets.toneLight', { defaultValue: 'Light' })
                         : preset.tone === 'dark'
@@ -22876,7 +22884,7 @@ function AppearanceSettingsPanel() {
                     type="button"
                     onClick={() => applyMaterial(material.key)}
                     className={cx(
-                      'text-left rounded-lg border p-2 transition-colors',
+                      'text-start rounded-lg border p-2 transition-colors',
                       active ? 'border-neutral-400 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50'
                     )}
                   >
@@ -23087,8 +23095,8 @@ function AppearancePreview({ density, mode }) {
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="border rounded-xl p-3 bg-white space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.preview.card', { defaultValue: 'Card surface' })}</div>
-          <div className="font-semibold text-sm">Demo project</div>
-          <p className="text-xs text-neutral-500">Task timeline, feed reminders, QR workflows.</p>
+          <div className="font-semibold text-sm">{t('appearance.preview.demoProject', { defaultValue: 'Demo project' })}</div>
+          <p className="text-xs text-neutral-500">{t('appearance.preview.demoProjectBody', { defaultValue: 'Task timeline, feed reminders, QR workflows.' })}</p>
           <div className="flex gap-2">
             <button type="button" className="px-3 py-1.5 rounded-lg text-xs border appearance-btn appearance-btn--ghost">{t('appearance.preview.secondary', { defaultValue: 'Secondary' })}</button>
             <button type="button" className="px-3 py-1.5 rounded-lg text-xs appearance-btn appearance-btn--filled" style={buttonStyle}>{t('appearance.preview.primary', { defaultValue: 'Primary' })}</button>
@@ -23098,7 +23106,7 @@ function AppearancePreview({ density, mode }) {
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.preview.list', { defaultValue: 'List sample' })}</div>
           {['Females', 'Males', 'Holdbacks'].map((label, index) => (
             <div key={label} className="flex items-center justify-between text-sm border rounded-lg px-2 py-1 bg-white/80">
-              <span>{label}</span>
+              <span>{label === 'Females' ? t('appearance.preview.females', { defaultValue: 'Females' }) : label === 'Males' ? t('appearance.preview.males', { defaultValue: 'Males' }) : t('appearance.preview.holdbacks', { defaultValue: 'Holdbacks' })}</span>
               <span className="text-xs text-neutral-500">{t('appearance.preview.count', { defaultValue: '{{count}} entries', count: sampleCounts[index] })}</span>
             </div>
           ))}
@@ -23241,7 +23249,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                         const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);
                         return dashClutchId ? (
                           <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
-                            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                             <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{dashClutchId}</span>
                           </div>
                         ) : null;
@@ -23405,6 +23413,7 @@ function ProjectCompletionPanel({
   onComplete,
   onReopen,
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('season_ended');
   const [confidence, setConfidence] = useState('likely');
   const [note, setNote] = useState('');
@@ -23419,43 +23428,43 @@ function ProjectCompletionPanel({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold uppercase text-neutral-500">Completed</div>
+              <div className="text-xs font-semibold uppercase text-neutral-500">{t("pairing.completion.completed", { defaultValue: "Completed" })}</div>
               <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
             </div>
             <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
-              Reopen project
+              {t("pairing.completion.reopen", { defaultValue: "Reopen project" })}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
-            <div><span className="font-semibold">Date:</span> {completedAtLabel || 'Unknown'}</div>
-            <div><span className="font-semibold">Confidence:</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
-            <div><span className="font-semibold">Final outcome:</span> {finalOutcomeLabel}</div>
+            <div><span className="font-semibold">{t("pairing.completion.date", { defaultValue: "Date:" })}</span> {completedAtLabel || t("pairing.completion.unknown", { defaultValue: "Unknown" })}</div>
+            <div><span className="font-semibold">{t("pairing.completion.confidence", { defaultValue: "Confidence:" })}</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
+            <div><span className="font-semibold">{t("pairing.completion.finalOutcome", { defaultValue: "Final outcome:" })}</span> {finalOutcomeLabel}</div>
           </div>
           {completion.completionNote ? (
-            <div className="text-xs text-neutral-700"><span className="font-semibold">Note:</span> {completion.completionNote}</div>
+            <div className="text-xs text-neutral-700"><span className="font-semibold">{t("pairing.completion.note", { defaultValue: "Note:" })}</span> {completion.completionNote}</div>
           ) : null}
           {lateOutcomeRecorded ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              A reproductive event was recorded after completion. The original completion record is preserved.
+              {t("pairing.completion.lateOutcome", { defaultValue: "A reproductive event was recorded after completion. The original completion record is preserved." })}
             </div>
           ) : null}
           {completion.reopenedAt ? (
-            <div className="text-xs text-neutral-600">Previously reopened {formatDateTimeForDisplay(completion.reopenedAt) || 'after completion'}.</div>
+            <div className="text-xs text-neutral-600">{t("pairing.completion.previouslyReopened", { when: formatDateTimeForDisplay(completion.reopenedAt) || t("pairing.completion.afterCompletion", { defaultValue: "after completion" }), defaultValue: "Previously reopened {{when}}." })}</div>
           ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {completion.completedAt ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Previously completed as {getCompletionReasonLabel(completion.completionReason)}. Reopening preserved that history.
+              {t("pairing.completion.previouslyCompleted", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Previously completed as {{reason}}. Reopening preserved that history." })}
             </div>
           ) : null}
           <div className="text-xs text-neutral-600">
-            Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later.
+            {t("pairing.completion.help", { defaultValue: "Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later." })}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Completion reason</span>
+              <span className="text-xs font-medium">{t("pairing.completion.reason", { defaultValue: "Completion reason" })}</span>
               <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
                 {COMPLETION_REASON_GROUPS.map(group => (
                   <optgroup key={group.key} label={group.label}>
@@ -23467,7 +23476,7 @@ function ProjectCompletionPanel({
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Outcome confidence</span>
+              <span className="text-xs font-medium">{t("pairing.completion.outcomeConfidence", { defaultValue: "Outcome confidence" })}</span>
               <select
                 className="border rounded-xl px-3 py-2 bg-white text-sm"
                 value={requiresConfidence ? confidence : 'confirmed'}
@@ -23481,7 +23490,7 @@ function ProjectCompletionPanel({
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Completion note</span>
+            <span className="text-xs font-medium">{t("pairing.completion.completionNote", { defaultValue: "Completion note" })}</span>
             <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
           </label>
           <button
@@ -23489,7 +23498,7 @@ function ProjectCompletionPanel({
             className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
             onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
           >
-            Mark completed
+            {t("pairing.completion.markCompleted", { defaultValue: "Mark completed" })}
           </button>
         </div>
       )}
@@ -23500,10 +23509,21 @@ function ProjectCompletionPanel({
 const PAIRING_STAGE_LABELS = ['Paired', 'Locked', 'Ovulated', 'Pre-lay Shed', 'Clutch Laid', 'Incubating', 'Hatched'];
 
 function PairingStageTracker({ reached }) {
+  const { t } = useTranslation();
   const lastReachedIdx = reached.reduce((acc, isReached, idx) => (isReached ? idx : acc), -1);
   const activeIdx = lastReachedIdx === -1 ? 0 : lastReachedIdx;
+  // Display labels, index-aligned with PAIRING_STAGE_LABELS (which stays English: it is the React key).
+  const stageDisplayLabels = [
+    t("pairing.stageTracker.paired", { defaultValue: "Paired" }),
+    t("pairing.stageTracker.locked", { defaultValue: "Locked" }),
+    t("pairing.stageTracker.ovulated", { defaultValue: "Ovulated" }),
+    t("pairing.stageTracker.preLayShed", { defaultValue: "Pre-lay Shed" }),
+    t("pairing.stageTracker.clutchLaid", { defaultValue: "Clutch Laid" }),
+    t("pairing.stageTracker.incubating", { defaultValue: "Incubating" }),
+    t("pairing.stageTracker.hatched", { defaultValue: "Hatched" }),
+  ];
   return (
-    <div className="flex items-center" role="list" aria-label="Pairing stage progress">
+    <div className="flex items-center" role="list" aria-label={t("pairing.stageTracker.ariaLabel", { defaultValue: "Pairing stage progress" })}>
       {PAIRING_STAGE_LABELS.map((label, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
@@ -23522,7 +23542,7 @@ function PairingStageTracker({ reached }) {
               />
               <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
             </div>
-            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{label}</div>
+            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{stageDisplayLabels[i] || label}</div>
           </div>
         );
       })}
@@ -23915,7 +23935,7 @@ function PairingInlineCard({
         ref={cardRef}
         role="button"
         tabIndex={0}
-        className={cx(cardClasses, 'text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400')}
+        className={cx(cardClasses, 'text-start cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400')}
         onClick={handleExpand}
         onKeyDown={handleCollapsedKey}
         aria-expanded={false}
@@ -23928,20 +23948,20 @@ function PairingInlineCard({
               </div>
               {buildClutchId(femaleName, maleName, cycleYear) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]">
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                   <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
                 </span>
               )}
               {edit?.clutch?.allEggsLost && (
                 <span className="inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
-                  Clutch lost
+                  {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
                 </span>
               )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
               {isWorkflowCompleted && (
                 <span className="inline-flex items-center rounded-full border bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  Completed
+                  {t("pairing.completion.completed", { defaultValue: "Completed" })}
                 </span>
               )}
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
@@ -23954,7 +23974,7 @@ function PairingInlineCard({
               {typeof onOpenSnake === 'function' && maleSnake ? (
                 <button
                   type="button"
-                  className="truncate font-medium text-sm text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenMale}
                 >
                   {maleName}
@@ -23968,7 +23988,7 @@ function PairingInlineCard({
               {typeof onOpenSnake === 'function' && femaleSnake ? (
                 <button
                   type="button"
-                  className="truncate font-medium text-sm text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenFemale}
                 >
                   {femaleName}
@@ -24000,13 +24020,13 @@ function PairingInlineCard({
           </div>
           {buildClutchId(femaleName, maleName, cycleYear) && (
             <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
             </div>
           )}
           {edit?.clutch?.allEggsLost && (
             <div className="mt-1.5 inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-              Clutch lost
+              {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
             </div>
           )}
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -24023,13 +24043,13 @@ function PairingInlineCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
                   <SexBadge sex="M" label={maleLabel} showText={false} />
-                  <span>Sire</span>
+                  <span>{t("snakeEdit.parentage.sire", { defaultValue: "Sire" })}</span>
                 </div>
                 <div className="truncate text-[13px] font-semibold text-neutral-800">
                   {typeof onOpenSnake === 'function' && maleSnake ? (
                     <button
                       type="button"
-                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                       style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenMale}
                     >
@@ -24059,13 +24079,13 @@ function PairingInlineCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
                   <SexBadge sex="F" label={femaleLabel} showText={false} />
-                  <span>Dam</span>
+                  <span>{t("snakeEdit.parentage.dam", { defaultValue: "Dam" })}</span>
                 </div>
                 <div className="truncate text-[13px] font-semibold text-neutral-800">
                   {typeof onOpenSnake === 'function' && femaleSnake ? (
                     <button
                       type="button"
-                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                       style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenFemale}
                     >
@@ -24088,8 +24108,8 @@ function PairingInlineCard({
           </div>
           {isWorkflowCompleted && (
             <div className="mt-2 text-[11px] text-neutral-600">
-              Completed: {getCompletionReasonLabel(completion.completionReason)}
-              {lateOutcomeRecorded ? ' - late outcome recorded' : ''}
+              {t("pairing.completion.completedWithReason", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Completed: {{reason}}" })}
+              {lateOutcomeRecorded ? t("pairing.completion.lateOutcomeSuffix", { defaultValue: " - late outcome recorded" }) : ''}
             </div>
           )}
         </div>
@@ -24139,7 +24159,7 @@ function PairingInlineCard({
         className="mt-3 border rounded-2xl p-3"
         style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
       >
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">Stage</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">{t("pairing.stageTracker.title", { defaultValue: "Stage" })}</div>
         <PairingStageTracker
           reached={[
             (edit.appointments || []).some(ap => ap && ap.pairingObserved),
@@ -24385,7 +24405,7 @@ function PairingInlineCard({
                 </button>
               </div>
             ))}
-            {!(edit.appointments || []).length && <div className="text-xs text-neutral-500">No appointments yet.</div>}
+            {!(edit.appointments || []).length && <div className="text-xs text-neutral-500">{t("pairing.noAppointments", { defaultValue: "No appointments yet." })}</div>}
           </div>
           </div>
           <CycleTimersFrame lifecycle={lifecycle} theme={theme} />
@@ -24417,7 +24437,7 @@ function PairingInlineCard({
 
       {hatchlings.length > 0 && (
         <div className="mt-4">
-          <div className="text-xs font-medium mb-1">Hatchlings</div>
+          <div className="text-xs font-medium mb-1">{t("pairing.hatchlings", { defaultValue: "Hatchlings" })}</div>
           <div className="flex flex-wrap gap-1">
             {hatchlings.map(h => (
               <button
@@ -24430,7 +24450,7 @@ function PairingInlineCard({
                 onClick={onOpenSnake ? () => onOpenSnake(h) : undefined}
                 title={h.name || h.id}
               >
-                {h.name || h.id}
+                <bdi>{h.name || h.id}</bdi>
               </button>
             ))}
           </div>
@@ -24462,6 +24482,7 @@ function PairingInlineCard({
 }
 
 function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
+  const { t } = useTranslation();
   const odds = useMemo(() => {
     if (providedOdds) return providedOdds;
     return computePairingGenetics(male, female);
@@ -24473,7 +24494,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
     <div className="mt-3">
       {perGene.length > 0 && (
         <>
-          <div className="text-xs font-medium mb-1.5">Genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.title", { defaultValue: "Genetics odds" })}</div>
           <div className="flex flex-col gap-2">
             {perGene.map(item => {
               const visualOutcomes = item.outcomes.filter(out => !/^het\s/i.test(out.label));
@@ -24487,7 +24508,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                   <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
                   <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Visual outcomes</div>
+                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.visualOutcomes", { defaultValue: "Visual outcomes" })}</div>
                       <div className="flex flex-col gap-1.5">
                         {visualOutcomes.map(out => (
                           <div key={`${item.gene}-v-${out.label}`}>
@@ -24507,7 +24528,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                     </div>
                     {hetOutcomes.length > 0 && (
                       <div>
-                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Het outcomes (carried, non-visual)</div>
+                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.hetOutcomes", { defaultValue: "Het outcomes (carried, non-visual)" })}</div>
                         <div className="flex flex-col gap-1.5">
                           {hetOutcomes.map(out => (
                             <div key={`${item.gene}-h-${out.label}`}>
@@ -24540,7 +24561,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
       )}
       {combined.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs font-medium mb-1.5">Combined genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.combined", { defaultValue: "Combined genetics odds" })}</div>
           <div className="flex flex-col gap-1.5">
             {combined.map(item => {
               const breakdownItems = (item.breakdown || []).filter(detail => detail.label && detail.label !== 'Normal');
@@ -25667,14 +25688,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
         {isWorkflowCompleted ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <div className="font-semibold">This project is marked completed. You can still record this event.</div>
+            <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This project is marked completed. You can still record this event." })}</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
-                Keep project completed and add event
+                {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep project completed and add event" })}
               </span>
               {typeof onReopenProject === 'function' ? (
                 <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
-                  Reopen project and add event
+                  {t("clutch.reopenAddEvent", { defaultValue: "Reopen project and add event" })}
                 </button>
               ) : null}
             </div>
@@ -25684,7 +25705,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{breedingCycleLabel}</div>
           <div className="text-[12px] text-neutral-500">{breedingCycleHelper}</div>
         </div>
-        <div className="flex flex-col gap-2.5 min-w-0 overflow-auto pr-1">
+        <div className="flex flex-col gap-2.5 min-w-0 overflow-auto pe-1">
           <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:items-stretch">
             <div className={cx(tileClass, 'flex-1 lg:h-full')}>
               <div className="flex-1 text-center space-y-1">
@@ -25698,12 +25719,12 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                   </div>
                 ) : null}
                 {ovulationObserved && preLayWindowTarget && (
-                  <div className="text-[11px] text-neutral-500">Pre-lay window {formatDateForDisplay(preLayWindowTarget)}</div>
+                  <div className="text-[11px] text-neutral-500">{t("clutch.preLayWindow", { date: formatDateForDisplay(preLayWindowTarget), defaultValue: "Pre-lay window {{date}}" })}</div>
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog}>
-                  {ovulationObserved ? 'Edit details' : logOvulationLabel}
+                  {ovulationObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logOvulationLabel}
                 </button>
                 {ovulationObserved && (
                   <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
@@ -25713,7 +25734,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
                       return next;
                     });
-                  }}>Clear</button>
+                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
                 )}
               </div>
             </div>
@@ -25725,7 +25746,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 </div>
                 {preLayObserved && Number.isFinite(edit?.preLayShed?.intervalFromOvulation) && (
                   <div className="text-[11px] text-neutral-500">
-                    {edit.preLayShed.intervalFromOvulation} days after ovulation
+                    {t("clutch.daysAfterOvulation", { days: edit.preLayShed.intervalFromOvulation, defaultValue: "{{days}} days after ovulation" })}
                   </div>
                 )}
                 {preLayObserved && edit?.preLayShed?.notes ? (
@@ -25734,12 +25755,12 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                   </div>
                 ) : null}
                 {preLayObserved && eggLayingTarget && (
-                  <div className="text-[11px] text-neutral-500">Egg window {formatDateForDisplay(eggLayingTarget)}</div>
+                  <div className="text-[11px] text-neutral-500">{t("clutch.eggWindow", { date: formatDateForDisplay(eggLayingTarget), defaultValue: "Egg window {{date}}" })}</div>
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog}>
-                  {preLayObserved ? 'Edit details' : logPreLayLabel}
+                  {preLayObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logPreLayLabel}
                 </button>
                 {preLayObserved && (
                   <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
@@ -25748,7 +25769,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
                       return next;
                     });
-                  }}>Clear</button>
+                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
                 )}
               </div>
             </div>
@@ -25762,7 +25783,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 </div>
               </div>
 
-              <div className="mt-3 w-full text-left space-y-3">
+              <div className="mt-3 w-full text-start space-y-3">
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{eggLayingDateLabel}</label>
                   <input
@@ -25823,21 +25844,21 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         onClick={() => onCreateClutchCard?.()}
                         disabled={!canGenerateClutchCard}
                       >
-                        Create clutch card
+                        {t("clutch.createClutchCard", { defaultValue: "Create clutch card" })}
                       </button>
                       {!hatchedRecorded && (
                         <button
                           className="text-[11px] px-2.5 py-1 border rounded-lg"
                           onClick={openHatchGate}
                         >
-                          Eggs hatched
+                          {t("clutch.eggsHatched", { defaultValue: "Eggs hatched" })}
                         </button>
                       )}
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={() => toggleClutch(false)}
                       >
-                        Clear egg record
+                        {t("clutch.clearEggRecord", { defaultValue: "Clear egg record" })}
                       </button>
                     </>
                   )}
@@ -25845,14 +25866,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
               </div>
 
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 mt-2 flex items-start justify-between gap-3 w-full">
-                <div className="space-y-1 text-left">
+                <div className="space-y-1 text-start">
                   <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">{hatchedLabel}</div>
                   <div className="text-[13px] text-neutral-700">
                     {hatchedRecorded && edit?.hatch?.date ? `${hatchedLabel} ${formatDateForDisplay(edit.hatch.date)}` : notYetLabel}
                   </div>
                   {hatchedRecorded && (
                     <div className="text-[11px] text-neutral-500 space-y-1">
-                      <div>Hatched count: {edit?.hatch?.hatchedCount || 0}</div>
+                      <div>{t("clutch.hatchedCount", { hatched: edit?.hatch?.hatchedCount || 0, defaultValue: "Hatched count: {{hatched}}" })}</div>
                       {edit?.hatch?.notes ? <div>{notesFieldLabel}: {edit.hatch.notes}</div> : null}
                     </div>
                   )}
@@ -25864,13 +25885,13 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         className="text-[11px] px-2.5 py-1 border rounded-lg"
                         onClick={openHatchGate}
                       >
-                        View / edit hatch
+                        {t("clutch.viewEditHatch", { defaultValue: "View / edit hatch" })}
                       </button>
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={clearHatched}
                       >
-                        Clear hatch record
+                        {t("clutch.clearHatchRecord", { defaultValue: "Clear hatch record" })}
                       </button>
                     </div>
                   )}
@@ -25886,7 +25907,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'ovulation' && (
         <FloatingDialog
-          title="Ovulation details"
+          title={t("clutch.ovulationDetails", { defaultValue: "Ovulation details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveOvulationDraft}
@@ -25894,7 +25915,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Ovulation date</label>
+              <label className="text-xs font-medium">{t("clutch.ovulationDate", { defaultValue: "Ovulation date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.date} onChange={e=>setOvulationDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
@@ -25907,7 +25928,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'preLay' && (
         <FloatingDialog
-          title="Pre-Lay shed details"
+          title={t("clutch.preLayShedDetails", { defaultValue: "Pre-Lay shed details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={savePreLayDraft}
@@ -25915,7 +25936,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Pre-Lay shed date</label>
+              <label className="text-xs font-medium">{t("clutch.preLayShedDate", { defaultValue: "Pre-Lay shed date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.date} onChange={e=>setPreLayDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
@@ -25928,7 +25949,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'clutch' && (
         <FloatingDialog
-          title="Log eggs laid"
+          title={t("clutch.logEggsLaid", { defaultValue: "Log eggs laid" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveClutchDraft}
@@ -25975,7 +25996,9 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 }}
               />
               <div className="mt-1 text-[11px] text-neutral-500">
-                Total eggs laid will be saved as fertile eggs + slugs{typeof clutchDraftTotal === 'number' ? ` = ${clutchDraftTotal}` : ''}.
+                {typeof clutchDraftTotal === 'number'
+                  ? t("clutch.totalEggsFormulaWithTotal", { total: clutchDraftTotal, defaultValue: "Total eggs laid will be saved as fertile eggs + slugs = {{total}}." })
+                  : t("clutch.totalEggsFormula", { defaultValue: "Total eggs laid will be saved as fertile eggs + slugs." })}
               </div>
             </div>
           </div>
@@ -26051,7 +26074,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'hatched' && (
         <FloatingDialog
-          title="Hatch details"
+          title={t("clutch.hatchDetails", { defaultValue: "Hatch details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveHatchedDraft}
@@ -26059,11 +26082,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Hatch date</label>
+              <label className="text-xs font-medium">{t("clutch.hatchDate", { defaultValue: "Hatch date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.date} onChange={e=>setHatchedDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
-              <label className="text-xs font-medium">Number hatched</label>
+              <label className="text-xs font-medium">{t("clutch.numberHatched", { defaultValue: "Number hatched" })}</label>
               <input
                 type="number"
                 min="0"
@@ -26083,7 +26106,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 }}
               />
               {hatchLimitForUi !== null && (
-                <div className="mt-1 text-[11px] text-neutral-500">Maximum allowed: {hatchLimitForUi} ({hatchLimitLabel})</div>
+                <div className="mt-1 text-[11px] text-neutral-500">{t("clutch.maxAllowed", { max: hatchLimitForUi, basis: hatchLimitLabel, defaultValue: "Maximum allowed: {{max}} ({{basis}})" })}</div>
               )}
             </div>
             <div>
@@ -26098,6 +26121,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 }
 
 function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
+  const { t } = useTranslation();
   const timerQueue = lifecycle?.timerQueue || [];
   const hasTimers = timerQueue.length > 0;
   const [now, setNow] = useState(new Date());
@@ -26130,14 +26154,14 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
       <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Cycle timers</div>
-            <div className="text-sm text-neutral-600">Breeding cycle status</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
+            <div className="text-sm text-neutral-600">{t("clutch.timers.statusSubtitle", { defaultValue: "Breeding cycle status" })}</div>
           </div>
         </div>
         <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div className="font-medium text-neutral-700">This breeding cycle is over.</div>
+          <div className="font-medium text-neutral-700">{t("clutch.timers.cycleOver", { defaultValue: "This breeding cycle is over." })}</div>
           {hatchDate ? (
-            <div className="text-xs text-neutral-500">Hatched on {formatDateForDisplay(hatchDate)}</div>
+            <div className="text-xs text-neutral-500">{t("clutch.timers.hatchedOn", { date: formatDateForDisplay(hatchDate), defaultValue: "Hatched on {{date}}" })}</div>
           ) : null}
         </div>
       </div>
@@ -26148,11 +26172,11 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
     <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Cycle timers</div>
-          <div className="text-sm text-neutral-600">Upcoming breeding milestones</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
+          <div className="text-sm text-neutral-600">{t("clutch.timers.upcomingSubtitle", { defaultValue: "Upcoming breeding milestones" })}</div>
         </div>
         {hasTimers && (
-          <div className="text-xs text-neutral-500">{timerQueue.length} active</div>
+          <div className="text-xs text-neutral-500">{t("clutch.timers.activeCount", { active: timerQueue.length, defaultValue: "{{active}} active" })}</div>
         )}
       </div>
       {hasTimers ? (
@@ -26170,29 +26194,30 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
         </div>
       ) : (
         <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div>No active timers yet. Log ovulation, pre-lay, or clutch events to start tracking milestones.</div>
-          <div className="text-xs font-medium text-neutral-500">Current time: {formatDateTimeForDisplay(now)}</div>
+          <div>{t("clutch.timers.none", { defaultValue: "No active timers yet. Log ovulation, pre-lay, or clutch events to start tracking milestones." })}</div>
+          <div className="text-xs font-medium text-neutral-500">{t("clutch.timers.currentTime", { time: formatDateTimeForDisplay(now), defaultValue: "Current time: {{time}}" })}</div>
         </div>
       )}
     </div>
   );
 }
 
-function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel = 'Save', disableConfirm = false }) {
+function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel, disableConfirm = false }) {
   const { t } = useTranslation();
+  const resolvedConfirmLabel = confirmLabel ?? t("common.save", { defaultValue: "Save" });
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>Close</button>
+          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
-        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
+        <div className="space-y-3 max-h-[60vh] overflow-auto pe-1">
           {children}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{confirmLabel}</button>
+          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{resolvedConfirmLabel}</button>
         </div>
       </div>
     </div>
@@ -26206,7 +26231,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>Close</button>
+          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
         {description ? <div className="text-sm text-neutral-600">{description}</div> : null}
         <div className="mt-4 flex flex-col gap-2">
@@ -26214,7 +26239,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
             <button
               key={option.key || idx}
               className={cx(
-                'w-full text-left px-3 py-2 rounded-xl text-sm border',
+                'w-full text-start px-3 py-2 rounded-xl text-sm border',
                 option.tone === 'danger' && 'border-rose-300 text-rose-600',
                 option.tone === 'primary' && primaryBtnClass(theme, true),
                 !option.tone && 'hover:bg-neutral-50'
@@ -27151,7 +27176,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">
                 {t("snakeEdit.parentage.clutchIdLabel", { defaultValue: "Clutch ID" })}
               </span>
-              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{selectedClutch.clutchId}</span>
+              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate"><bdi>{selectedClutch.clutchId}</bdi></span>
             </div>
           )}
           {unlistedClutchId && (
@@ -27335,9 +27360,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:false})}
                     >
-                      Undo refused
+                      {t("logs.undoRefused", { defaultValue: "Undo refused" })}
                     </button>
-                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>Delete</button>
+                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                   </div>
                 </div>
               );
@@ -27351,9 +27376,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {/* feed type */}
                 <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
-                  <option value="Mouse">Mouse</option>
-                  <option value="Rat">Rat</option>
-                  <option value="Multimammate">Multimammate</option>
+                  <option value="Mouse">{t("logs.mouse", { defaultValue: "Mouse" })}</option>
+                  <option value="Rat">{t("logs.rat", { defaultValue: "Rat" })}</option>
+                  <option value="Multimammate">{t("logs.multimammate", { defaultValue: "Multimammate" })}</option>
                 </select>
 
                 {/* weight class */}
@@ -27370,18 +27395,18 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {/* method of feed */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:col-span-2">
                   <select className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
-                      <option value="Live">Live</option>
-                      <option value="Freshly killed">Freshly killed</option>
-                      <option value="Frozen/thawed">Frozen/thawed</option>
-                      <option value="Other">Other</option>
+                      <option value="Live">{t("logs.live", { defaultValue: "Live" })}</option>
+                      <option value="Freshly killed">{t("logs.freshKilled", { defaultValue: "Freshly killed" })}</option>
+                      <option value="Frozen/thawed">{t("logs.frozenThawed", { defaultValue: "Frozen/thawed" })}</option>
+                      <option value="Other">{t("logs.other", { defaultValue: "Other" })}</option>
                   </select>
                   {x.method === 'Other' && (
-                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder="Method details" value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
+                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
                   )}
                 </div>
 
                 <div className="sm:col-span-7">
-                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder="Notes" value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
+                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
                 </div>
 
                 <div className="sm:col-span-7 flex justify-end items-center gap-2 flex-wrap">
@@ -27389,9 +27414,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                     className="text-xs px-2 py-1 border rounded-lg"
                     onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:true})}
                   >
-                    Mark refused
+                    {t("logs.markRefused", { defaultValue: "Mark refused" })}
                   </button>
-                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>Delete</button>
+                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                 </div>
               </div>
             );
@@ -27415,11 +27440,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
             <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{date:e.target.value})}/>
-              <input type="number" className="border rounded-lg px-2 py-1" placeholder="grams"
+              <input type="number" className="border rounded-lg px-2 py-1" placeholder={t("logs.grams", { defaultValue: "grams" })}
                 value={x.grams} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{grams:Number(e.target.value)||0})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes"
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>Delete</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.weights.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27446,8 +27471,8 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                   onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{complete:e.target.checked})}/>
                 {t("logs.complete", { defaultValue: "Complete" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes" value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>Delete</button>
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.sheds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27474,8 +27499,8 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                   onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{deep:e.target.checked})}/>
                 {t("logs.deepClean", { defaultValue: "Deep clean" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes" value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>Delete</button>
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.cleanings.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27503,7 +27528,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 value={x.dose||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{dose:e.target.value})}/>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>Delete</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.meds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -28299,7 +28324,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   return (
     <div className="bg-white border rounded-2xl shadow-sm">
       <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
-        <div className="font-semibold mr-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
+        <div className="font-semibold me-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -28342,7 +28367,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             ›
           </button>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
           {googleSupported ? (
             googleSignedIn ? (
               <>
@@ -28598,7 +28623,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       <div
                         key={idx}
                         className={cx(
-                          'text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full',
+                          'text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full',
                           entered ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'
                         )}
                       >
@@ -28653,7 +28678,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       <button
                         key={idx}
                         onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
-                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
+                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
                       >
                         <div className="font-medium truncate">{stageLabels[e.stage] || t('calendar.filters.clutch', { defaultValue: 'Clutch action' })}</div>
                         <div className="text-[11px] text-neutral-500 truncate">{maleName} × {femaleName}</div>
@@ -28677,11 +28702,11 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     <button
                       key={idx}
                       onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
-                      className="text-xs px-2 py-1 rounded-lg border flex items-center gap-2 text-left w-full"
+                      className="text-xs px-2 py-1 rounded-lg border flex items-center gap-2 text-start w-full"
                       style={{ borderColor: maleColors.border, background: maleColors.fill }}
                     >
                       <span
-                        className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                        className="inline-block w-2 h-2 rounded-full me-1 align-middle"
                         style={{ backgroundColor: maleColors.dot }}
                       ></span>
                       <div className="truncate">
@@ -28717,7 +28742,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 aria-pressed={l.isActive}
               >
                 <span
-                  className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                  className="inline-block w-2 h-2 rounded-full me-1 align-middle"
                   style={l.colors ? { backgroundColor: l.colors.dot } : undefined}
                 ></span>
                 {l.name}
@@ -29190,7 +29215,7 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
   const styles = GENE_LINE_SIZE_STYLES[size] || GENE_LINE_SIZE_STYLES.sm;
   return (
     <div className={cx('flex flex-wrap items-center gap-1 leading-snug', styles.container, className)}>
-      {label && <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>}
+      {label && <span className={cx('uppercase tracking-wide text-neutral-500 me-1', styles.label)}>{label}:</span>}
       {list.map((gene, idx) => {
         const rawGroup = getGeneDisplayGroup(gene);
         const superInfo = getSuperGeneInfo(gene);
@@ -29215,12 +29240,21 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
 }
 
 function GeneLegend({ className }) {
+  const { t } = useTranslation();
+  const legendLabels = {
+    Recessive: t("geneLegend.recessive", { defaultValue: "Recessive" }),
+    Het: t("geneLegend.het", { defaultValue: "Het / Possible Het" }),
+    SuperCodominant: t("geneLegend.superCodominant", { defaultValue: "Super (homozygous co-dom)" }),
+    'Incomplete Dominant': t("geneLegend.incompleteDominant", { defaultValue: "Incomplete Dominant" }),
+    Dominant: t("geneLegend.dominant", { defaultValue: "Dominant" }),
+    Other: t("geneLegend.other", { defaultValue: "Other / Polygenic" }),
+  };
   return (
     <div className={cx('flex flex-wrap items-center justify-center gap-3 text-[11px] font-normal', className)}>
       {GENE_LEGEND_ITEMS.map(item => (
         <div key={item.key} className="flex items-center gap-1">
           <span className={cx('inline-block h-3 w-3 rounded-sm', GENE_GROUP_COLOR_CLASSES[item.key])}></span>
-          <span className="text-neutral-600 whitespace-nowrap">{item.label}</span>
+          <span className="text-neutral-600 whitespace-nowrap">{legendLabels[item.key] || item.label}</span>
         </div>
       ))}
     </div>
@@ -29228,6 +29262,7 @@ function GeneLegend({ className }) {
 }
 
 function ScrollToTopButton({ theme = 'blue', className }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -29246,12 +29281,12 @@ function ScrollToTopButton({ theme = 'blue', className }) {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       className={cx(
-        'fixed bottom-6 right-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
+        'fixed bottom-6 end-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         primaryBtnClass(theme, true),
         className
       )}
-      aria-label="Scroll to top"
+      aria-label={t("common.scrollToTop", { defaultValue: "Scroll to top" })}
     >
       <svg
         aria-hidden="true"

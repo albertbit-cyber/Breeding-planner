@@ -4,29 +4,29 @@
 	},
 	"dialogs": {
 		"storageReadFailed": {
-			"title": "Unable to open data",
-			"message": "Serpentora could not read your local data file. A new workspace will be created."
+			"title": "Data nelze otevřít",
+			"message": "Serpentora nemohla přečíst váš místní datový soubor. Vytvoří se nový pracovní prostor."
 		},
 		"storageWriteFailed": {
-			"title": "Unable to save data",
-			"message": "Serpentora could not save your latest changes. Try again or export a manual backup."
+			"title": "Data nelze uložit",
+			"message": "Serpentora nemohla uložit vaše poslední změny. Zkuste to znovu nebo exportujte ruční zálohu."
 		}
 	},
 	"locale": {
-		"set": "Language switched to {{language}}"
+		"set": "Jazyk přepnut na {{language}}"
 	},
 	"prompts": {
 		"backupName": {
-			"title": "Name this backup file"
+			"title": "Pojmenujte tento soubor zálohy"
 		},
 		"backupRename": {
-			"title": "Rename backup"
+			"title": "Přejmenovat zálohu"
 		},
 		"backupDelete": {
-			"message": "Delete \"{{name}}\"? This cannot be undone."
+			"message": "Smazat \"{{name}}\"? Tuto akci nelze vrátit."
 		},
 		"photoRemove": {
-			"message": "Remove this photo?"
+			"message": "Odebrat tuto fotku?"
 		}
 	}
 }

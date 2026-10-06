@@ -1,36 +1,36 @@
 ﻿{
 	"quickAdd": {
-		"date": "Date",
-		"feedType": "Feed type",
-		"size": "Size",
-		"selectPlaceholder": "Select",
-		"customSizePlaceholder": "Custom size",
-		"weight": "Weight (g)",
-		"form": "Form",
-		"methodDetailsPlaceholder": "Method details",
-		"gramsLabel": "Grams",
-		"recentProgress": "Recent progress",
-		"medicationDrug": "Drug",
-		"medicationDose": "Dose",
-		"notes": "Notes",
+		"date": "תאריך",
+		"feedType": "סוג מזון",
+		"size": "גודל",
+		"selectPlaceholder": "בחר",
+		"customSizePlaceholder": "גודל מותאם אישית",
+		"weight": "משקל (גרם)",
+		"form": "צורה",
+		"methodDetailsPlaceholder": "פרטי השיטה",
+		"gramsLabel": "גרם",
+		"recentProgress": "התקדמות אחרונה",
+		"medicationDrug": "תרופה",
+		"medicationDose": "מינון",
+		"notes": "הערות",
 		"feedOptions": {
-			"mouse": "Mouse",
-			"rat": "Rat",
-			"chick": "Chick",
-			"other": "Other"
+			"mouse": "עכבר",
+			"rat": "חולדה",
+			"chick": "אפרוח",
+			"other": "אחר"
 		},
 		"sizeOptions": {
 			"pinky": "pinky",
 			"fuzzy": "fuzzy",
-			"medium": "medium",
-			"adult": "adult",
-			"other": "Other"
+			"medium": "בינוני",
+			"adult": "בוגר",
+			"other": "אחר"
 		},
 		"formOptions": {
-			"live": "Live",
-			"fresh": "Freshly killed",
-			"frozen": "Frozen/thawed",
-			"other": "Other"
+			"live": "חי",
+			"fresh": "טרי (הומת זה עתה)",
+			"frozen": "קפוא/מופשר",
+			"other": "אחר"
 		}
 	}
 }

@@ -1,10 +1,10 @@
 {
-	"title": "Zucht-Berater",
-	"description": "Wir betrachten nur Tiere, die in der Gruppe <strong>Breeders</strong> markiert sind, und zeigen Paarungen mit einer sehr hohen Chance, Ihr ausgewähltes Morph-Ziel zu produzieren.",
+	"title": "Zuchtberater",
+	"description": "Wir berücksichtigen nur Tiere aus der Gruppe <strong>Breeders</strong> und zeigen Verpaarungen mit einer sehr hohen Chance, dein ausgewähltes Morph-Ziel zu erreichen.",
 	"goal": {
 		"label": "Ziel (Name und Merkmale)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
-		"tip": "Format-Tipp: \"Zielname: Merkmal eins, Merkmal zwei\". Wenn Sie nur Merkmale auflisten, erstellen wir ein generisches Ziel.",
+		"tip": "Format-Tipp: \"Zielname: Merkmal eins, Merkmal zwei\". Wenn du nur Merkmale auflistest, erstellen wir ein allgemeines Ziel.",
 		"defaultName": "Benutzerdefiniertes Ziel"
 	},
 	"status": {
@@ -12,10 +12,10 @@
 	},
 	"summary": {
 		"loading": "Punnett-Quadrate werden berechnet…",
-		"ready": "Starten Sie den Berater, um vielversprechende Paarungen zu entdecken.",
+		"ready": "Starte den Berater, um vielversprechende Verpaarungen zu entdecken.",
 		"supportingOnly": "Noch keine Paare erfüllen die Hochvertrauens-Schwelle, aber hier sind {{count}} Optionen zur Überprüfung.",
-		"noConfidence": "Keine Paarung hat die Vertrauensschwelle überschritten. Versuchen Sie, Ihre Sammlungen oder Ziele anzupassen.",
-		"confidentCount": "{{count}} Paarung(en) erreichen das Vertrauensziel ≥ {{threshold}}."
+		"noConfidence": "Keine Verpaarung hat die Vertrauensschwelle überschritten. Versuch, deine Sammlungen oder Ziele anzupassen.",
+		"confidentCount": "{{count}} Verpaarung(en) erreichen das Vertrauensziel ≥ {{threshold}}."
 	},
 	"stats": {
 		"males": "{{count}} Zuchtmännchen",
@@ -30,8 +30,8 @@
 		"reset": "Berater zurücksetzen"
 	},
 	"errors": {
-		"noBreeders": "Fügen Sie der Breeders-Gruppe Tiere hinzu, um Beraterempfehlungen zu sehen.",
-		"noGoals": "Fügen Sie Zielmerkmale hinzu, bevor Sie den Berater starten.",
+		"noBreeders": "Füge der Gruppe Breeders Tiere hinzu, um Empfehlungen des Beraters zu sehen.",
+		"noGoals": "Füge Zielmerkmale hinzu, bevor du den Berater startest.",
 		"failure": "Vorschläge konnten nicht generiert werden."
 	},
 	"cards": {
@@ -40,8 +40,8 @@
 		"demandSignals": "Nachfragesignale:",
 		"priceRange": "Preisrichtlinie: {{range}}",
 		"sources": "Quellen:",
-		"additionalHeading": "Weitere Paarungen zur Überprüfung",
-		"readyCallout": "Bereit wenn Sie es sind—klicken Sie auf <strong>Berater starten</strong>, um Ihre stärksten Zuchtpaarungen zu entdecken."
+		"additionalHeading": "Weitere Verpaarungen, die einen Blick wert sind",
+		"readyCallout": "Bereit, wenn du es bist — klicke auf <strong>Berater starten</strong>, um deine stärksten Zuchtverpaarungen zu entdecken."
 	},
 	"genes": {
 		"goalVisuals": "Ziel-Visuals",
@@ -75,9 +75,9 @@
 			"none": "Normal"
 		},
 		"expectation": {
-			"none-visual": "100% het",
-			"het-het": "≈66% het",
-			"het-none": "≈50% het"
+			"none-visual": "100 % het",
+			"het-het": "≈66 % het",
+			"het-none": "≈50 % het"
 		}
 	},
 	"labels": {
@@ -94,7 +94,7 @@
 	"goals": {
 		"title": "Ziele",
 		"add": "Ziel hinzufügen",
-		"empty": "Noch keine Ziele. Fügen Sie eines hinzu, um Vorschläge anzupassen.",
+		"empty": "Noch keine Ziele. Füge eines hinzu, um die Vorschläge anzupassen.",
 		"namePlaceholder": "Zielname",
 		"remove": "Entfernen",
 		"requireAll": {
@@ -138,7 +138,7 @@
 			"holdbackSummary": "Kein direktes Visual erwartet; Holdbacks produzieren, die {{traits}} tragen.",
 			"adjustedSummary": "Direkte Zielchance {{chance}}%. Priorität auf die Produktion von Holdbacks legen, die {{holdback}} tragen.",
 			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Das {{sex}} Holdback ({{holdback}}) behalten. Mit {{partner}} paaren für {{chance}}% Chance auf das Ziel.",
+			"secondSummary": "Behalte das Holdback-{{sex}} ({{holdback}}). Verpaare es mit {{partner}} für {{chance}}% Chance auf das Ziel.",
 			"holdbackSex": {
 				"female": "Weibchen",
 				"male": "Männchen"
