@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { DialogHelpButton } from "../../features/help/ui/HelpButton";
+import { help } from "../../features/help/help";
 import type {
   AdvisorProgressStep,
   AdvisorProgressSummary,
@@ -299,6 +300,7 @@ export function BreedingAdvisorProgressModal({
         role="dialog"
         aria-modal="true"
         data-dialog="advisor-progress"
+        {...help("advisor-progress")}
         aria-label={t("progress.titleRunning", { ns: "advisor", defaultValue: "Breeding Advisor Running" })}
         className="bg-white w-full max-w-md rounded-2xl shadow-xl border flex flex-col"
         style={{ maxHeight: "min(90vh, 600px)" }}
@@ -372,6 +374,7 @@ export function BreedingAdvisorProgressModal({
                 : "border-sky-200 text-sky-400 cursor-not-allowed",
             ].join(" ")}
             onClick={canRetry ? onRetry : undefined}
+            {...help("advisor-progress-retry")}
             disabled={!canRetry}
           >
             {t("progress.retry", { ns: "advisor", defaultValue: "Retry" })}
@@ -385,6 +388,7 @@ export function BreedingAdvisorProgressModal({
                 : "appearance-btn--filled opacity-50 cursor-not-allowed",
             ].join(" ")}
             onClick={canViewResults ? onViewResults : undefined}
+            {...help("advisor-progress-results")}
             disabled={!canViewResults}
           >
             {t("progress.viewResults", { ns: "advisor", defaultValue: "View Results" })}

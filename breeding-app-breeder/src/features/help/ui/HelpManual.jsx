@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getTopic, resolveAll, resolveTopic, topicsByCategory, categoryLabel } from '../registry';
 import { indexTopics, searchTopics } from '../search';
 import { helpStore } from '../helpStore';
+import { useTranslation } from 'react-i18next';
 import { useHelpTranslator } from './useHelpTranslator';
 
 const SECTION_PEERS = 6;
@@ -10,7 +11,8 @@ const SECTION_PEERS = 6;
 // topic, search results. Every jump pushes onto a history that Back pops. Typing a query
 // shows results over the topic; clearing the query returns to it.
 export default function HelpManual({ topicId }) {
-  const { t, translator } = useHelpTranslator();
+  const { t } = useTranslation('help');
+  const { translator } = useHelpTranslator();
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState([]);
   const headingRef = useRef(null);

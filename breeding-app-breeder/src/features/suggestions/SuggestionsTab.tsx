@@ -21,6 +21,7 @@ import {
 } from "../breedingAdvisor/advisorProgressStore";
 import BreedingAdvisorProgressModal from "../../components/breeding/BreedingAdvisorProgressModal";
 import BreedingPlanFlowchartCard from "../../components/breeding/BreedingPlanFlowchartCard";
+import { help } from "../help/help";
 
 const normalizeString = (value: unknown): string => {
   if (value == null) return "";
@@ -1004,6 +1005,7 @@ export const SuggestionsTab = ({
     return (
       <div
         key={key}
+        {...help("advisor-card")}
         className={`rounded-xl border ${
           highConfidence ? "border-emerald-200 bg-emerald-50" : "border-neutral-200 bg-white"
         } p-4 shadow-sm`}
@@ -1063,6 +1065,7 @@ export const SuggestionsTab = ({
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
               onClick={() => onAcceptSuggestion?.(suggestion)}
+              {...help("advisor-accept")}
             >
               {t("advisor.cards.actions.accept", { defaultValue: "Accept" })}
             </button>
@@ -1070,6 +1073,7 @@ export const SuggestionsTab = ({
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-50"
               onClick={() => onPlanSuggestion?.(suggestion)}
+              {...help("advisor-make-plan")}
             >
               {t("advisor.cards.actions.plan", { defaultValue: "Make a plan" })}
             </button>
@@ -1077,12 +1081,14 @@ export const SuggestionsTab = ({
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
               onClick={() => openFlowchartCard(suggestion)}
+              {...help("advisor-show-plan")}
             >
               {t("advisor.cards.actions.showPlan", { defaultValue: "Show plan" })}
             </button>
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              {...help("advisor-ignore")}
               onClick={() => {
                 setIgnoredSuggestions((current) => ({ ...current, [key]: true }));
                 onIgnoreSuggestion?.(suggestion);
@@ -1096,6 +1102,7 @@ export const SuggestionsTab = ({
               <button
                 type="button"
                 onClick={togglePlanExpanded}
+                {...help("advisor-multi-gen")}
                 className="flex w-full items-center justify-between text-start"
                 aria-expanded={isPlanExpanded}
               >
@@ -1223,7 +1230,7 @@ export const SuggestionsTab = ({
       <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">{t("advisor.title", { defaultValue: "Breeding Advisor" })}</h2>
+            <h2 className="text-lg font-semibold text-neutral-900" {...help("advisor-screen")}>{t("advisor.title", { defaultValue: "Breeding Advisor" })}</h2>
             <p className="text-sm text-neutral-600">
               <Trans
                 ns="advisor"
@@ -1234,7 +1241,7 @@ export const SuggestionsTab = ({
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="sm:col-span-2 flex flex-col gap-1 text-sm text-neutral-700">
+            <label className="sm:col-span-2 flex flex-col gap-1 text-sm text-neutral-700" {...help("advisor-goal")}>
               <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("advisor.goal.label", { defaultValue: "Goal (Name and Traits)" })}</span>
               <textarea
                 value={goalInput}
@@ -1247,12 +1254,12 @@ export const SuggestionsTab = ({
             </label>
           </div>
 
-          <div className="flex flex-col gap-2 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+          <div className="flex flex-col gap-2 rounded-lg bg-sky-50 p-3 text-sm text-sky-900" {...help("advisor-status")}>
             <div className="font-medium">{t("advisor.status.heading", { defaultValue: "Status" })}</div>
             <div>{advisorSummary()}</div>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
+          <div className="flex flex-wrap gap-2 text-xs text-neutral-500" {...help("advisor-status")}>
             <span>
               {filteredMaleCount !== null
                 ? t("advisor.stats.malesFiltered", {
@@ -1280,6 +1287,7 @@ export const SuggestionsTab = ({
             <button
               type="button"
               onClick={runSuggestions}
+              {...help("advisor-run")}
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold sk-on-accent shadow hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-800"
             >
@@ -1288,6 +1296,7 @@ export const SuggestionsTab = ({
             <button
               type="button"
               onClick={handleResetAdvisor}
+              {...help("advisor-reset")}
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
@@ -1297,6 +1306,7 @@ export const SuggestionsTab = ({
               <button
                 type="button"
                 onClick={onExportPairingsByMale}
+                {...help("advisor-export")}
                 disabled={loading}
                 className="inline-flex items-center justify-center rounded-lg border border-sky-400 px-4 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
               >

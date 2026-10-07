@@ -125,6 +125,13 @@ const addKeysToFile = (filePath, entries) => {
   return conflicts;
 };
 
+// Namespaces an app ships in English only, by decision, until they are translated. The
+// source is still checked against en/<ns>.json; the other languages are not compared.
+// breeder `help`: the in-app help system's text (2026-10-07); P2.9 translates it.
+const ENGLISH_ONLY_NAMESPACES = {
+  "breeding-app-breeder": ["help"],
+};
+
 const failures = [];
 const translationFailures = [];
 const warnings = [];
@@ -144,16 +151,19 @@ for (const app of apps) {
   const baseLanguage = settings.fallbackLng || "en";
   const defaultNs = settings.defaultNamespace || "common";
   const basePath = (ns) => path.join(localesDir, baseLanguage, `${ns}.json`);
+  const englishOnly = (ENGLISH_ONLY_NAMESPACES[app] || []).filter((ns) => fs.existsSync(basePath(ns)));
+  // Everything the app loads: translated namespaces plus the English-only ones.
+  const loaded = [...namespaces, ...englishOnly];
   const loadBase = () => {
     const flatByNs = {};
-    for (const ns of namespaces) {
+    for (const ns of loaded) {
       if (fs.existsSync(basePath(ns))) flatByNs[ns] = flatten(readJson(basePath(ns)));
     }
     return flatByNs;
   };
 
   // ---- 1. source -> en ----
-  const { keys: used, dynamic } = scanApp(path.join(root, app, "src"), { namespaces, defaultNs });
+  const { keys: used, dynamic } = scanApp(path.join(root, app, "src"), { namespaces: loaded, defaultNs });
   const unique = new Map();
   for (const entry of used) {
     const id = `${entry.ns}:${entry.key}`;
@@ -169,10 +179,10 @@ for (const app of apps) {
   }
 
   let flatByNs = loadBase();
-  const unknownNs = [...unique.values()].filter((e) => !namespaces.includes(e.ns));
+  const unknownNs = [...unique.values()].filter((e) => !loaded.includes(e.ns));
   for (const e of unknownNs) failures.push(`${app}: ${e.sites[0].file}:${e.sites[0].line} uses namespace "${e.ns}", which the app does not load`);
 
-  let missing = [...unique.values()].filter((e) => namespaces.includes(e.ns) && !resolves(flatByNs, e.ns, e, defaultNs));
+  let missing = [...unique.values()].filter((e) => loaded.includes(e.ns) && !resolves(flatByNs, e.ns, e, defaultNs));
 
   if (writeEn && missing.length) {
     const byNs = new Map();
@@ -208,7 +218,7 @@ for (const app of apps) {
     }
     unwritable.forEach((e) => failures.push(`${app}: ${e.ns}:${e.key} (${e.sites[0].file}:${e.sites[0].line}) has no literal English default to write; add it to ${baseLanguage}/${e.ns}.json by hand`));
     flatByNs = loadBase();
-    missing = [...unique.values()].filter((e) => namespaces.includes(e.ns) && !resolves(flatByNs, e.ns, e, defaultNs));
+    missing = [...unique.values()].filter((e) => loaded.includes(e.ns) && !resolves(flatByNs, e.ns, e, defaultNs));
   }
 
   // A template-literal key cannot be checked key by key, but a family with no

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 
 /**
  * Where an animal bought on Serpentora Market came from, and the record that
@@ -52,7 +53,7 @@ export function AcquisitionRecordPanel({ snake }) {
   const parents = Array.isArray(snake.lineage?.parents) ? snake.lineage.parents : [];
 
   return (
-    <div className="p-3 border rounded-xl bg-white" data-testid="acquisition-record">
+    <div {...help('animals-acquisition')} className="p-3 border rounded-xl bg-white" data-testid="acquisition-record">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
         <div className="font-medium text-sm">
           {t('acquisition.title', { defaultValue: 'Acquired from {{seller}}', seller: from.sellerName || t('acquisition.aSeller', { defaultValue: 'a seller' }) })}
@@ -101,7 +102,7 @@ export function AcquisitionRecordPanel({ snake }) {
                 <span className="font-mono break-all">{certificate.verificationCode}</span>
               </span>
               {certificate.verifyUrl ? (
-                <a className="underline text-sky-700" href={certificate.verifyUrl} target="_blank" rel="noreferrer">
+                <a {...help('animals-acquisition-certificate')} className="underline text-sky-700" href={certificate.verifyUrl} target="_blank" rel="noreferrer">
                   {t('acquisition.verify', { defaultValue: 'Check this certificate' })}
                 </a>
               ) : null}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 import { getClearanceChecklist } from '../../services/quarantine';
 import { CLEARANCE_LABELS, formatYmd, makeLabeller } from './labels';
@@ -65,7 +66,7 @@ export default function ClearanceDialog({ snake, onConfirm, onClose }) {
         aria-label={t('quarantine.clearTitle', { name: snake?.name || snake?.id, defaultValue: 'Clear {{name}} from quarantine?' })}
       >
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="px-5 pe-16 py-4 border-b">
+        <div className="px-5 pe-16 py-4 border-b" {...help('quarantine-clearance')}>
           <div className="text-base font-semibold">
             {t('quarantine.clearTitle', { name: snake?.name || snake?.id, defaultValue: 'Clear {{name}} from quarantine?' })}
           </div>
@@ -110,11 +111,12 @@ export default function ClearanceDialog({ snake, onConfirm, onClose }) {
         </div>
 
         <div className="px-5 py-4 border-t flex flex-wrap justify-end gap-2">
-          <button type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={onClose}>
+          <button {...help('quarantine-clearance-not-yet')} type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={onClose}>
             {t('quarantine.clearance.notYet', { defaultValue: 'Not yet' })}
           </button>
           <button
             type="button"
+            {...help('quarantine-clearance-confirm')}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
             onClick={() => {
               const note = unmet.length

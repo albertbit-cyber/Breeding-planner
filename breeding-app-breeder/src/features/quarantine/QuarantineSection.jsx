@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import {
   QUARANTINE_STATUS,
   addQuarantineCheck,
@@ -111,11 +112,12 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
   const record = snake?.quarantine || {};
 
   return (
-    <div className="rounded-2xl border bg-white shadow-sm overflow-hidden flex flex-col">
+    <div {...help('quarantine-card')} className="rounded-2xl border bg-white shadow-sm overflow-hidden flex flex-col">
       <div className="p-3 flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <button
+              {...help('quarantine-card-name')}
               type="button"
               className="text-start text-sm font-semibold text-neutral-900 hover:underline truncate max-w-full"
               onClick={() => onOpenAnimal?.(snake)}
@@ -193,6 +195,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
             <button
               type="button"
               className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
+              {...help('quarantine-log-check')}
               onClick={() => onCheck?.(snake)}
             >
               {t('quarantine.logCheck', { defaultValue: 'Log check' })}
@@ -200,6 +203,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
             <button
               type="button"
               className="rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700"
+              {...help('quarantine-mark-cleared')}
               onClick={() => onClear?.(snake)}
             >
               {t('quarantine.markCleared', { defaultValue: 'Mark cleared' })}
@@ -209,6 +213,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
           <button
             type="button"
             className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700"
+            {...help('quarantine-put-back')}
             onClick={() => onEnter?.(snake)}
           >
             {t('quarantine.putBack', { defaultValue: 'Back into quarantine' })}
@@ -218,6 +223,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
           <button
             type="button"
             className="rounded-xl border bg-white px-2.5 py-1.5 text-xs"
+            {...help('quarantine-card-menu')}
             aria-haspopup="true"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(open => !open)}
@@ -231,6 +237,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-start text-xs hover:bg-neutral-50"
+                  {...help('quarantine-open-animal')}
                   onClick={() => { setMenuOpen(false); onOpenAnimal?.(snake); }}
                 >
                   {t('quarantine.openAnimal', { defaultValue: 'Open animal' })}
@@ -239,6 +246,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                   <button
                     type="button"
                     className="w-full px-3 py-2 text-start text-xs hover:bg-neutral-50"
+                    {...help('quarantine-restart-clock')}
                     onClick={() => { setMenuOpen(false); onRestart?.(snake); }}
                   >
                     {t('quarantine.restartClockEllipsis', { defaultValue: 'Restart clock…' })}
@@ -247,6 +255,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-start text-xs text-neutral-500 hover:bg-neutral-50"
+                  {...help('quarantine-remove-record')}
                   onClick={() => { setMenuOpen(false); onRemove?.(snake); }}
                 >
                   {t('quarantine.removeRecord', { defaultValue: 'Remove record' })}
@@ -320,7 +329,7 @@ export default function QuarantineSection({
       <div className="rounded-2xl border bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold">{t('quarantine.title', { defaultValue: 'Quarantine' })}</h2>
+            <h2 {...help('quarantine-screen')} className="text-base font-semibold">{t('quarantine.title', { defaultValue: 'Quarantine' })}</h2>
             <p className="mt-0.5 text-xs text-neutral-500 max-w-prose">
               {t('quarantine.intro', {
                 defaultValue: 'Animals tagged Quarantine appear here. Records and reminders only — nothing in the app is blocked.',
@@ -331,6 +340,7 @@ export default function QuarantineSection({
             <button
               type="button"
               className="rounded-xl border px-3 py-1.5 text-xs font-medium text-neutral-600"
+              {...help('quarantine-notice-open')}
               onClick={() => setNoticeOpen(true)}
             >
               {t('quarantine.notice.open', { defaultValue: 'Read the notice' })}
@@ -338,6 +348,7 @@ export default function QuarantineSection({
             <button
               type="button"
               className="rounded-xl border px-3 py-1.5 text-xs font-medium text-neutral-600"
+              {...help('quarantine-reference-toggle')}
               aria-expanded={referenceOpen}
               onClick={() => setReferenceOpen(open => !open)}
             >
@@ -346,7 +357,7 @@ export default function QuarantineSection({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div {...help('quarantine-tiles')} className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SummaryTile value={summary.inQuarantine} label={t('quarantine.tile.in', { defaultValue: 'In quarantine' })} />
           <SummaryTile value={summary.checkDue} tone={summary.checkDue ? 'watch' : 'neutral'} label={t('quarantine.tile.due', { defaultValue: 'Check due' })} />
           <SummaryTile value={summary.awaitingResults} tone={summary.awaitingResults ? 'info' : 'neutral'} label={t('quarantine.tile.awaiting', { defaultValue: 'Awaiting results' })} />
@@ -369,6 +380,7 @@ export default function QuarantineSection({
               className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
                 filter === option.key ? 'border-sky-500 bg-sky-500 text-white' : 'bg-white text-neutral-600'
               }`}
+              {...help('quarantine-filter')}
               aria-pressed={filter === option.key}
               onClick={() => setFilter(option.key)}
             >

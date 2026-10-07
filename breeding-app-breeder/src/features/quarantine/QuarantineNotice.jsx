@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 
 // The one place in this feature that says out loud what it cannot do.
@@ -32,7 +33,7 @@ export default function QuarantineNotice({ mode = 'intake', onConfirm, onClose }
       >
         <DialogHelpButton className="help-dialog-corner" />
         <div className="px-5 pt-5 pb-4 flex flex-col gap-3">
-          <h2 id="quarantine-notice-title" className="text-base font-semibold pe-12">
+          <h2 id="quarantine-notice-title" {...help('quarantine-notice')} className="text-base font-semibold pe-12">
             {isIntake
               ? t('quarantine.notice.title', { defaultValue: 'Before you start' })
               : t('quarantine.notice.referenceTitle', { defaultValue: 'About quarantine records' })}
@@ -80,6 +81,7 @@ export default function QuarantineNotice({ mode = 'intake', onConfirm, onClose }
           <button
             type="button"
             className="w-full rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white"
+            {...(isIntake ? help('quarantine-notice-start') : help('quarantine-window-close'))}
             onClick={dismiss}
             autoFocus
           >

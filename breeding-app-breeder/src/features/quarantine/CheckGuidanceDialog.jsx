@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 import { CHECK_GUIDANCE, getGuidance } from './checkGuidance';
 import CheckDiagram from './CheckDiagrams';
@@ -37,7 +38,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
         aria-label={guidance.title}
       >
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between gap-2 rounded-t-2xl">
-          <div className="min-w-0">
+          <div className="min-w-0" {...help('quarantine-guide-window')}>
             <div className="text-sm font-semibold truncate">{guidance.title}</div>
             <div className="text-[11px] text-neutral-500">
               {t('quarantine.guide.subtitle', { defaultValue: 'How to check, and what you are looking for' })}
@@ -45,7 +46,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             <DialogHelpButton />
-            <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
+            <button {...help('quarantine-window-close')} type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
               {t('common.close', { defaultValue: 'Close' })}
             </button>
           </div>
@@ -117,6 +118,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
           <button
             type="button"
             className="rounded-xl border px-3 py-1.5 text-xs disabled:opacity-40"
+            {...help('quarantine-guide-step')}
             disabled={!previous}
             onClick={() => previous && setActiveKey(previous.key)}
           >
@@ -125,6 +127,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
           <button
             type="button"
             className="rounded-xl border px-3 py-1.5 text-xs disabled:opacity-40"
+            {...help('quarantine-guide-step')}
             disabled={!next}
             onClick={() => next && setActiveKey(next.key)}
           >
@@ -144,6 +147,7 @@ export function GuidanceButton({ checkKey, onOpen, className = '' }) {
     <button
       type="button"
       className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold leading-none text-neutral-500 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-600 ${className}`}
+      {...help('quarantine-check-guide')}
       aria-label={t('quarantine.guide.open', { defaultValue: 'How do I check this?' })}
       title={t('quarantine.guide.open', { defaultValue: 'How do I check this?' })}
       onClick={event => { event.preventDefault(); event.stopPropagation(); onOpen?.(checkKey); }}

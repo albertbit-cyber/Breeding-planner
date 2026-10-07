@@ -14,6 +14,7 @@ import {
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
+import { help } from "../help/help";
 
 /**
  * The account-lifecycle emails link back to plain paths (e.g. `${appUrl}/verify-email?token=...`),
@@ -922,14 +923,14 @@ export default function AuthGate({ children }) {
   );
 
   const signedInChip = authState.isAuthenticated ? (
-    <div className="auth-floating-chip">
+    <div className="auth-floating-chip" {...help('account-signed-in-chip')}>
       <span>
         {t("auth:status.signedInAs", { defaultValue: "Signed in as" })}{" "}
         {authState.profile?.displayName ||
           authState.profile?.fullName ||
           t("auth:status.defaultName", { defaultValue: "Keeper" })}
       </span>
-      <button type="button" onClick={handleLogout}>
+      <button type="button" onClick={handleLogout} {...help('account-sign-out')}>
         {t("auth:actions.signOut", { defaultValue: "Sign out" })}
       </button>
     </div>

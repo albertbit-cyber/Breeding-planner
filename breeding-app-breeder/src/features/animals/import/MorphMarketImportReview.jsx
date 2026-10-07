@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getSpeciesById } from '../../../genetics/speciesRegistry';
 import AnimalCapNotice, { useAnimalCap } from '../../subscriptions/AnimalCapNotice.jsx';
 import BreedersGroupPicker from '../BreedersGroupPicker.jsx';
+import { help } from '../../help/help';
 
 /**
  * The mandatory stop between reading a MorphMarket file and writing animals.
@@ -89,7 +90,7 @@ export default function MorphMarketImportReview({
       && ((result.breederCandidates?.males?.length || 0) + (result.breederCandidates?.females?.length || 0)) > 0;
     return (
       <div className="space-y-4">
-        <div className="text-base font-semibold">
+        <div className="text-base font-semibold" {...help('import-mm-result')}>
           {t('ui.animals.import.morphmarket.completeTitle', { defaultValue: 'Import complete' })}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -111,7 +112,7 @@ export default function MorphMarketImportReview({
           />
         </div>
         {offerBreeders && (
-          <section className="border rounded-xl p-3 bg-neutral-50" aria-labelledby="import-breeders-heading">
+          <section className="border rounded-xl p-3 bg-neutral-50" aria-labelledby="import-breeders-heading" {...help('import-mm-breeders')}>
             <BreedersGroupPicker
               males={result.breederCandidates.males}
               females={result.breederCandidates.females}
@@ -138,6 +139,7 @@ export default function MorphMarketImportReview({
           type="button"
           className={offerBreeders ? 'px-3 py-2 rounded-xl text-sm border bg-white' : `px-3 py-2 rounded-xl text-sm ${primaryButtonClass}`}
           onClick={onCancel}
+          {...help('import-mm-view')}
         >
           {t('ui.animals.import.morphmarket.viewAnimals', { defaultValue: 'View imported animals' })}
         </button>
@@ -148,7 +150,7 @@ export default function MorphMarketImportReview({
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-base font-semibold">
+        <div className="text-base font-semibold" {...help('import-mm-review')}>
           {t('ui.animals.import.morphmarket.detected', {
             count: summary?.total || 0,
             defaultValue: '{{count}} animals detected from MorphMarket',
@@ -227,6 +229,7 @@ export default function MorphMarketImportReview({
                     className="text-xs border rounded-lg px-2 py-1 bg-white"
                     value={row.resolution === 'skip' ? 'skip' : 'import'}
                     onChange={event => onChangeResolution?.(row.rowNumber, event.target.value)}
+                    {...help('import-mm-row')}
                     aria-label={t('ui.animals.import.morphmarket.resolveRow', { defaultValue: 'Import or skip this row' })}
                   >
                     <option value="import">{t('ui.animals.import.morphmarket.resolveImport', { defaultValue: 'Import' })}</option>
@@ -238,6 +241,7 @@ export default function MorphMarketImportReview({
                     className="text-xs border rounded-lg px-2 py-1 bg-white"
                     value={row.resolution === 'update' ? 'update' : 'skip'}
                     onChange={event => onChangeResolution?.(row.rowNumber, event.target.value)}
+                    {...help('import-mm-row')}
                   >
                     <option value="skip">{t('ui.animals.import.morphmarket.resolveSkip', { defaultValue: 'Skip' })}</option>
                     <option value="update">{t('ui.animals.import.morphmarket.resolveUpdate', { defaultValue: 'Update existing' })}</option>
@@ -257,13 +261,14 @@ export default function MorphMarketImportReview({
           className={`px-3 py-2 rounded-xl text-sm ${primaryButtonClass} disabled:opacity-50`}
           disabled={busy || pending.create + pending.update === 0 || capBlocked}
           onClick={onConfirm}
+          {...help('import-mm-confirm')}
         >
           {t('ui.animals.import.morphmarket.confirm', {
             count: pending.create + pending.update,
             defaultValue: 'Import {{count}} animals',
           })}
         </button>
-        <button type="button" className="px-3 py-2 rounded-xl text-sm border bg-white" onClick={onCancel}>
+        <button type="button" className="px-3 py-2 rounded-xl text-sm border bg-white" onClick={onCancel} {...help('import-mm-cancel')}>
           {t('common.cancel', { defaultValue: 'Cancel' })}
         </button>
         <div className="text-[11px] text-neutral-500">

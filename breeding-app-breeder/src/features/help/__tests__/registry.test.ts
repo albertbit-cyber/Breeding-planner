@@ -24,8 +24,8 @@ const REQUIRED_TOPICS = [
   'guided-tours',
 ];
 
-// Sections that must never be empty. Grows as the coverage pass fills the manual.
-const REQUIRED_CATEGORIES = ['getting-started'];
+// Every manual section must have topics.
+const REQUIRED_CATEGORIES = [...CATEGORIES];
 
 describe('help registry', () => {
   it('has every required topic', () => {

@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getTopic, resolveTopic } from '../registry';
 import { helpStore } from '../helpStore';
 import { placePopover } from '../popoverPlacement';
+import { useTranslation } from 'react-i18next';
 import { useHelpTranslator } from './useHelpTranslator';
 
 const MAX_SEE_ALSO = 4;
@@ -12,7 +13,8 @@ const PILL_ROOM_PHONE = 140;
 
 // What Help Mode shows next to a pressed control.
 export default function HelpPopover({ popover }) {
-  const { t, translator } = useHelpTranslator();
+  const { t } = useTranslation('help');
+  const { translator } = useHelpTranslator();
   const ref = useRef(null);
   const gotItRef = useRef(null);
   const [expanded, setExpanded] = useState(false);

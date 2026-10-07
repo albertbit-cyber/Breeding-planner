@@ -6,6 +6,7 @@ import SelectedSnakePanel from './components/SelectedSnakePanel';
 import PedigreePassportPanel from './components/PedigreePassportPanel';
 import ViewTabs, { VIEW_TABS, viewTabText } from './components/ViewTabs';
 import StatsBar from './components/StatsBar';
+import { help } from '../help/help';
 import './familyTree.css';
 
 /**
@@ -117,7 +118,7 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
   };
 
   return (
-    <div className="ft-page">
+    <div className="ft-page" {...help('tree-screen')}>
       <div className="ft-header">
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -163,7 +164,7 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
             </div>
           )}
 
-          <div className="ft-canvas-area">{canvasBody()}</div>
+          <div className="ft-canvas-area" {...help('tree-canvas')}>{canvasBody()}</div>
         </div>
 
         <div className="ft-right-col border-s border-violet-100">

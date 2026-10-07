@@ -103,7 +103,7 @@ test("a fresh phone account imports a MorphMarket file in three clicks and pairs
   await page.getByRole("button", { name: "View imported animals" }).click();
 
   // Pair right away, from the phone's own navigation.
-  await page.locator("nav").getByRole("button", { name: /Breeding Tracker/ }).click();
+  await page.locator("nav").getByRole("button", { name: "Breeding", exact: true }).click();
   await page.getByRole("button", { name: "New pairing" }).click();
   const pairingModal = page.locator("div.fixed", { hasText: "Create pairing" }).last();
   await expect(pairingModal.getByText(/Breeders group, and/)).toHaveCount(0);
@@ -111,5 +111,5 @@ test("a fresh phone account imports a MorphMarket file in three clicks and pairs
   await pairingModal.getByText("Pastel Yellow Belly Female").click();
   await pairingModal.getByRole("button", { name: "New pairing" }).click();
 
-  await expect(page.getByText("Active pairings (1)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Active pairings (1)" })).toBeVisible();
 });

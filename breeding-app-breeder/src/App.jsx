@@ -301,7 +301,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
     <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
       <form role="dialog" aria-modal="true" data-dialog="rack-form" aria-label={mode === 'edit' ? t('spaces.editRackTitle', { defaultValue: 'Edit rack' }) : t('spaces.addRack', { defaultValue: 'Create rack' })} className="relative w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="pe-12">
+        <div className="pe-12" {...help('rack-form')}>
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
           <div className="text-lg font-semibold">
             {mode === 'edit'
@@ -315,6 +315,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
               <span>{t('spaces.rack.name', { defaultValue: 'Rack name' })}</span>
               <input
+                {...help('rack-name')}
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
                 value={form.name}
                 onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -324,6 +325,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
               <span>{t('spaces.rack.tubSize', { defaultValue: 'Tub size' })}</span>
               <select
+                {...help('rack-tub-size')}
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
                 value={form.tubSizePreset}
                 onChange={handlePresetChange}
@@ -342,6 +344,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
               <input
                 type="number"
                 min="1"
+                {...help('rack-columns')}
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
                 value={form.columns}
                 onChange={e => setForm(prev => ({ ...prev, columns: e.target.value }))}
@@ -356,6 +359,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
               <input
                 type="number"
                 min="1"
+                {...help('rack-levels')}
                 className="w-full border rounded-2xl px-3 py-2 text-sm"
                 value={form.levels}
                 onChange={e => setForm(prev => ({ ...prev, levels: e.target.value }))}
@@ -369,7 +373,7 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
         </div>
 
         {isCustomPreset && (
-          <div className="space-y-3">
+          <div className="space-y-3" {...help('rack-custom-tub')}>
             <label className="space-y-1 text-sm font-medium text-neutral-700 min-w-0">
               <span>{t('spaces.rack.customLabel', { defaultValue: 'Custom tub label' })}</span>
               <input
@@ -423,8 +427,9 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
         </div>
 
         <div className="flex justify-end gap-2">
-          <button type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
+          <button {...help('spaces-form-cancel')} type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
           <button
+            {...help('rack-form-save')}
             type="submit"
             className={cx('px-4 py-2 rounded-2xl sk-on-accent', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
             disabled={!canSubmit}
@@ -475,7 +480,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
     <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
       <form role="dialog" aria-modal="true" data-dialog="terrarium-form" aria-label={mode === 'edit' ? t('spaces.editTerrariumTitle', { defaultValue: 'Edit terrarium' }) : t('spaces.addTerrarium', { defaultValue: 'Create terrarium' })} className="relative w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="pe-12">
+        <div className="pe-12" {...help('terrarium-form')}>
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
           <div className="text-lg font-semibold">
             {mode === 'edit'
@@ -487,6 +492,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
         <div className="space-y-1">
           <label className="text-xs font-semibold text-neutral-600">{t('spaces.terrarium.name', { defaultValue: 'Terrarium name' })}</label>
           <input
+            {...help('terrarium-name')}
             className="border rounded-2xl px-3 py-2 text-sm"
             value={form.name}
             onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -494,7 +500,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-4" {...help('terrarium-dimensions')}>
           <input
             type="number"
             min="1"
@@ -535,6 +541,7 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
             {t('spaces.terrarium.capacityLabel', { defaultValue: 'Number of animals' })}
           </label>
           <input
+            {...help('terrarium-capacity')}
             id="terrarium-capacity-input"
             type="number"
             min="1"
@@ -549,8 +556,9 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
         </div>
 
         <div className="flex justify-end gap-2">
-          <button type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
+          <button {...help('spaces-form-cancel')} type="button" className="px-4 py-2 rounded-2xl border" onClick={onCancel}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
           <button
+            {...help('terrarium-form-save')}
             type="submit"
             className={cx('px-4 py-2 rounded-2xl sk-on-accent', canSubmit ? 'bg-neutral-900' : 'bg-neutral-400 cursor-not-allowed')}
             disabled={!canSubmit}
@@ -678,16 +686,16 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
     <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" data-dialog="rack-view" aria-label={rack.name} className="w-full max-w-5xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
-          <div>
+          <div {...help('rack-view')}>
             <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.rack.name', { defaultValue: 'Rack' })}</div>
             <div className="text-xl font-semibold">{rack.name}</div>
             <div className="text-sm text-neutral-500">{t('spaces.occupancy', { defaultValue: '{{occupied}} / {{total}} tubs occupied', occupied: slots.filter(slot => slot?.snakeId).length, total: rack.totalTubs })}</div>
           </div>
           <div className="flex gap-2 text-sm">
-            <button className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(rack.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
-            <button className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(rack.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
+            <button {...help('spaces-rack-edit')} className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(rack.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
+            <button {...help('spaces-rack-delete')} className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(rack.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
             <DialogHelpButton />
-            <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+            <button {...help('spaces-window-close')} className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
         <div className="mt-5 space-y-4 max-h-[65vh] overflow-auto pe-1">
@@ -702,6 +710,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                   return (
                     <button
                       key={slotKey}
+                      {...help('rack-slot')}
                       type="button"
                       className={cx(
                         'relative rounded-2xl border px-3 py-3 text-start transition-colors flex flex-col justify-between overflow-hidden',
@@ -740,19 +749,20 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
           <div className="sk-scrim fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={dismissAssignModal}>
             <div role="dialog" aria-modal="true" data-dialog="rack-assign" aria-label={t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}-${activeSlot.columnIndex + 1}` })} className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div {...help('rack-assign')}>
                   <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}.${activeSlot.columnIndex + 1}` })}</div>
                   <div className="text-lg font-semibold text-neutral-900">{activeSlotOccupant?.name || t('spaces.emptySlot', { defaultValue: 'Empty' })}</div>
                   {activeSlotOccupant && <div className="text-xs text-neutral-500"><bdi>{activeSlotOccupant.id}</bdi></div>}
                 </div>
                 <div className="flex items-center gap-2">
                   <DialogHelpButton />
-                  <button type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
+                  <button {...help('spaces-window-close')} type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
                 </div>
               </div>
               <div className="mt-4">
                 <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('common.search', { defaultValue: 'Search' })}</label>
                 <input
+                  {...help('rack-assign-search')}
                   ref={assignInputRef}
                   className="mt-1 w-full rounded-2xl border px-3 py-2 text-sm"
                   value={assignSearch}
@@ -760,7 +770,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                   placeholder={t('spaces.assign.searchPlaceholder', { defaultValue: 'Search by name or ID' })}
                 />
               </div>
-              <div className="mt-3 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+              <div {...help('rack-assign-scanner')} className="mt-3 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
                 {t('spaces.assign.hardwareScannerHint', { defaultValue: 'Ready for QR input. Scan the snake label with your handheld scanner to auto-fill this slot.' })}
               </div>
               <div className="mt-3 rounded-2xl border border-neutral-200 max-h-72 overflow-y-auto divide-y">
@@ -770,6 +780,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                     return (
                       <button
                         key={option.id}
+                        {...help('rack-assign-pick')}
                         type="button"
                         className={cx(
                           'w-full px-4 py-3 text-start text-sm transition-colors',
@@ -790,13 +801,14 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
               {assignError && <div className="mt-3 text-xs text-rose-600">{assignError}</div>}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
+                  {...help('rack-assign-empty')}
                   type="button"
                   className="px-3 py-2 rounded-2xl border border-neutral-300 text-sm"
                   onClick={() => handleAssignForSlot(null)}
                 >
                   {t('spaces.emptySlot', { defaultValue: 'Empty' })}
                 </button>
-                <button type="button" className="px-3 py-2 rounded-2xl border text-sm" onClick={dismissAssignModal}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
+                <button {...help('spaces-form-cancel')} type="button" className="px-3 py-2 rounded-2xl border text-sm" onClick={dismissAssignModal}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
               </div>
             </div>
           </div>
@@ -830,7 +842,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
     <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" data-dialog="terrarium-view" aria-label={terrarium.name} className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
-          <div>
+          <div {...help('terrarium-view')}>
             <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.terrarium.name', { defaultValue: 'Terrarium' })}</div>
             <div className="text-xl font-semibold">{terrarium.name}</div>
             {terrarium.dimensions && (
@@ -838,10 +850,10 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
             )}
           </div>
           <div className="flex gap-2 text-sm">
-            <button className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(terrarium.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
-            <button className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(terrarium.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
+            <button {...help('spaces-terrarium-edit')} className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(terrarium.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
+            <button {...help('spaces-terrarium-delete')} className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(terrarium.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
             <DialogHelpButton />
-            <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+            <button {...help('spaces-window-close')} className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
         <div className="mt-5 space-y-4">
@@ -855,7 +867,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
                 {occupants.map(id => (
                   <span key={id} className="inline-flex items-center gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-1 text-sm">
                     {snakeMap.get(id)?.name || id}
-                    <button className="text-xs text-rose-600" onClick={() => onUpdateOccupants?.(terrarium.id, occupants.filter(item => item !== id))}>x</button>
+                    <button {...help('terrarium-occupant-remove')} className="text-xs text-rose-600" onClick={() => onUpdateOccupants?.(terrarium.id, occupants.filter(item => item !== id))}>x</button>
                   </span>
                 ))}
               </div>
@@ -866,6 +878,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 space-y-3">
             <div className="text-sm font-semibold text-neutral-700">{t('spaces.addOccupant', { defaultValue: 'Add occupant' })}</div>
             <select
+              {...help('terrarium-choose')}
               className="w-full rounded-2xl border px-3 py-2 text-sm"
               value={draft}
               onChange={e => setDraft(e.target.value)}
@@ -877,6 +890,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
               ))}
             </select>
             <button
+              {...help('terrarium-assign')}
               type="button"
               className="w-full rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold sk-on-accent disabled:opacity-40"
               disabled={!canAssign}
@@ -936,7 +950,7 @@ function RoomModal({
       <div role="dialog" aria-modal="true" data-dialog="room-view" aria-label={room.name} className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 bg-white px-4 pt-4 sm:px-6 sm:pt-6 flex flex-col gap-4 border-b border-neutral-100 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div {...help('spaces-room-window')}>
               <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
               <div className="text-2xl font-semibold text-neutral-900">{room.name}</div>
               <div className="mt-1 text-xs text-neutral-500">
@@ -944,23 +958,23 @@ function RoomModal({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <button className="px-3 py-1.5 rounded-xl border" onClick={() => onCreateRack?.(room)}>
+              <button {...help('spaces-add-rack')} className="px-3 py-1.5 rounded-xl border" onClick={() => onCreateRack?.(room)}>
                 + {t('spaces.addRack', { defaultValue: 'Create Rack' })}
               </button>
-              <button className="px-3 py-1.5 rounded-xl border" onClick={() => onCreateTerrarium?.(room)}>
+              <button {...help('spaces-add-terrarium')} className="px-3 py-1.5 rounded-xl border" onClick={() => onCreateTerrarium?.(room)}>
                 + {t('spaces.addTerrarium', { defaultValue: 'Create Terrarium' })}
               </button>
               <DialogHelpButton />
-              <button className="px-3 py-1.5 rounded-xl border" onClick={onClose}>
+              <button {...help('spaces-room-close')} className="px-3 py-1.5 rounded-xl border" onClick={onClose}>
                 {t('spaces.closeRoom', { defaultValue: 'Close room' })}
               </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <button className="px-3 py-1.5 rounded-xl border" onClick={() => onRenameRoom?.(room)}>{t('actions.rename', { defaultValue: 'Rename' })}</button>
-            <button className={cx('px-3 py-1.5 rounded-xl border', !canMoveUp && 'opacity-40 cursor-not-allowed')} disabled={!canMoveUp} onClick={() => canMoveUp && onMoveRoom?.(room.id, -1)}>{t('spaces.moveUp', { defaultValue: 'Move up' })}</button>
-            <button className={cx('px-3 py-1.5 rounded-xl border', !canMoveDown && 'opacity-40 cursor-not-allowed')} disabled={!canMoveDown} onClick={() => canMoveDown && onMoveRoom?.(room.id, 1)}>{t('spaces.moveDown', { defaultValue: 'Move down' })}</button>
-            <button className="px-3 py-1.5 rounded-xl border text-rose-600" onClick={() => onDeleteRoom?.(room.id)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+            <button {...help('spaces-room-rename')} className="px-3 py-1.5 rounded-xl border" onClick={() => onRenameRoom?.(room)}>{t('actions.rename', { defaultValue: 'Rename' })}</button>
+            <button {...help('spaces-room-move')} className={cx('px-3 py-1.5 rounded-xl border', !canMoveUp && 'opacity-40 cursor-not-allowed')} disabled={!canMoveUp} onClick={() => canMoveUp && onMoveRoom?.(room.id, -1)}>{t('spaces.moveUp', { defaultValue: 'Move up' })}</button>
+            <button {...help('spaces-room-move')} className={cx('px-3 py-1.5 rounded-xl border', !canMoveDown && 'opacity-40 cursor-not-allowed')} disabled={!canMoveDown} onClick={() => canMoveDown && onMoveRoom?.(room.id, 1)}>{t('spaces.moveDown', { defaultValue: 'Move down' })}</button>
+            <button {...help('spaces-room-delete')} className="px-3 py-1.5 rounded-xl border text-rose-600" onClick={() => onDeleteRoom?.(room.id)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
           </div>
         </div>
 
@@ -977,6 +991,7 @@ function RoomModal({
                   return (
                     <div
                       key={rack.id}
+                      {...help('spaces-rack-card')}
                       className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm hover:border-neutral-400 cursor-pointer transition"
                       onClick={() => onViewRack?.(rack.id)}
                     >
@@ -986,8 +1001,8 @@ function RoomModal({
                           <div className="text-xs text-neutral-500">{rack.tubSizeLabel || t('spaces.rack.tubSize', { defaultValue: 'Tub size' })}</div>
                         </div>
                         <div className="flex gap-2 text-xs">
-                          <button className="px-2 py-1 rounded-lg border" onClick={(event) => { event.stopPropagation(); onEditRack?.(rack.id); }}>{t('common.edit', { defaultValue: 'Edit' })}</button>
-                          <button className="px-2 py-1 rounded-lg border text-rose-600" onClick={(event) => { event.stopPropagation(); onDeleteRack?.(rack.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+                          <button {...help('spaces-rack-edit')} className="px-2 py-1 rounded-lg border" onClick={(event) => { event.stopPropagation(); onEditRack?.(rack.id); }}>{t('common.edit', { defaultValue: 'Edit' })}</button>
+                          <button {...help('spaces-rack-delete')} className="px-2 py-1 rounded-lg border text-rose-600" onClick={(event) => { event.stopPropagation(); onDeleteRack?.(rack.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -1024,6 +1039,7 @@ function RoomModal({
                   return (
                     <div
                       key={item.id}
+                      {...help('spaces-terrarium-card')}
                       className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm hover:border-neutral-400 cursor-pointer transition"
                       onClick={() => onViewTerrarium?.(item.id)}
                     >
@@ -1033,8 +1049,8 @@ function RoomModal({
                           <div className="text-xs text-neutral-500">{dims}</div>
                         </div>
                         <div className="flex gap-2 text-xs">
-                          <button className="px-2 py-1 rounded-lg border" onClick={(event) => { event.stopPropagation(); onEditTerrarium?.(item.id); }}>{t('common.edit', { defaultValue: 'Edit' })}</button>
-                          <button className="px-2 py-1 rounded-lg border text-rose-600" onClick={(event) => { event.stopPropagation(); onDeleteTerrarium?.(item.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+                          <button {...help('spaces-terrarium-edit')} className="px-2 py-1 rounded-lg border" onClick={(event) => { event.stopPropagation(); onEditTerrarium?.(item.id); }}>{t('common.edit', { defaultValue: 'Edit' })}</button>
+                          <button {...help('spaces-terrarium-delete')} className="px-2 py-1 rounded-lg border text-rose-600" onClick={(event) => { event.stopPropagation(); onDeleteTerrarium?.(item.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                         </div>
                       </div>
                       <div className="mt-3 rounded-2xl bg-neutral-50 px-3 py-2 text-sm font-semibold text-neutral-800">
@@ -6499,7 +6515,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
   return (
     <div className="p-4">
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm max-h-[68vh] overflow-auto">
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-2" {...help('add-species')}>
           <label className="text-xs font-medium">{t("ui.animals.addAnimal.species", { defaultValue: "Species" })}</label>
           <SpeciesSelect
             value={(newAnimal && newAnimal.species) || ''}
@@ -6515,6 +6531,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             rows={4}
             className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
             value={quickAddText}
+            {...help('add-quick-add')}
             onChange={e => setQuickAddText(e.target.value)}
             placeholder={quickAddPlaceholder}
           />
@@ -6523,6 +6540,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               type="button"
               className={cx('px-3 py-2 rounded-xl text-sm border', canParseQuickAdd ? primaryBtnClass(theme, true) : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
               onClick={handleQuickAddUpdateFields}
+              {...help('add-update-fields')}
               disabled={!canParseQuickAdd}
             >
               {t('ui.animals.addAnimal.updateFields', { defaultValue: 'Update Fields' })}
@@ -6565,6 +6583,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
             value={(newAnimal && newAnimal.name) || ''}
             onChange={handleNewAnimalNameChange}
+            {...help('add-name')}
             placeholder={t("ui.animals.addAnimal.exampleName", { defaultValue: "e.g., Athena" })}
           />
         </div>
@@ -6575,6 +6594,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             className="mt-1 w-full border rounded-xl px-2 py-1 text-sm font-mono"
             value={(newAnimal && newAnimal.id) || ''}
             onChange={handleNewAnimalIdChange}
+            {...help('add-id')}
             placeholder={t("ui.animals.addAnimal.customIdPlaceholder", { defaultValue: "Optional: custom ID (e.g., 25Ath-2)" })}
           />
           <div className="mt-1 text-[11px] text-neutral-500">
@@ -6590,6 +6610,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             className="mt-1 w-full border rounded-xl px-2 py-1 bg-white text-sm"
             value={(newAnimal && newAnimal.sex) || 'U'}
             onChange={handleNewAnimalSexChange}
+            {...help('add-sex')}
           >
             <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
             <option value="F">{t("ui.animals.addAnimal.female", { defaultValue: "Female" })}</option>
@@ -6598,7 +6619,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
         </div>
 
 
-        <div ref={statusMenuRef} className="relative">
+        <div ref={statusMenuRef} className="relative" {...help('add-status')}>
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Status" })}</label>
               <button
                 type="button"
@@ -6632,6 +6653,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                           type="button"
                           className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                           onClick={() => handleDeleteStatus(option)}
+                          {...help('record-status-delete')}
                           title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                         >
                           -
@@ -6646,7 +6668,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.genetics", { defaultValue: "Genetics (morphs & hets)" })}</label>
-              <div className="mt-1">
+              <div className="mt-1" {...help('add-genetics')}>
                 <GeneAutocomplete
                   morphs={Array.isArray(newAnimal.morphs) ? newAnimal.morphs : []}
                   hets={Array.isArray(newAnimal.hets) ? newAnimal.hets : []}
@@ -6661,7 +6683,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             </div>
             <div>
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.weight", { defaultValue: "Weight (g)" })}</label>
-              <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" value={newAnimal.weight} onChange={e=>setNewAnimal(a=>({...a,weight:e.target.value}))} placeholder="0" />
+              <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" {...help('add-weight')} value={newAnimal.weight} onChange={e=>setNewAnimal(a=>({...a,weight:e.target.value}))} placeholder="0" />
             </div>
             {isAnimalForSale(newAnimal) && (
               <div>
@@ -6670,6 +6692,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   type="text"
                   className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                   value={newAnimal.price || ''}
+                  {...help('add-price')}
                   onChange={e=>setNewAnimal(a=>({...a,price:e.target.value}))}
                   placeholder={t("ui.animals.addAnimal.pricePlaceholder", { defaultValue: "e.g., 450" })}
                 />
@@ -6677,7 +6700,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             )}
             <div>
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.year", { defaultValue: "Year" })}</label>
-              <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" value={newAnimal.year} onChange={e=>setNewAnimal(a=>({...a,year:e.target.value}))} placeholder="2025" />
+              <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm" {...help('add-year')} value={newAnimal.year} onChange={e=>setNewAnimal(a=>({...a,year:e.target.value}))} placeholder="2025" />
             </div>
             <div>
               <label className="text-xs font-medium">{t("snakeEdit.birthDate", { defaultValue: "Birth date" })}</label>
@@ -6685,6 +6708,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 type="text"
                 className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                 value={newAnimal.birthDate || ''}
+                {...help('add-birth-date')}
                 placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                 onChange={e => {
                   const raw = e.target.value;
@@ -6708,6 +6732,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 <select
                   className="mt-1 w-full border rounded-xl px-2 py-2 text-sm bg-white"
                   value={selectedGroup}
+                  {...help('add-group')}
                   onChange={e => {
                     const value = e.target.value.trim();
                     setNewAnimal(a => ({
@@ -6724,7 +6749,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
               ) : (
                 <div className="mt-1 text-xs text-neutral-500">{t("groups.noneAdd", { defaultValue: "No groups yet. Add one below." })}</div>
               )}
-              <div className="mt-3 border border-dashed border-neutral-200 rounded-xl p-3 bg-white">
+              <div className="mt-3 border border-dashed border-neutral-200 rounded-xl p-3 bg-white" {...help('record-add-group')}>
                 <AddGroupInline onAdd={(g)=>{
                   if (!g) return;
                   setGroups(prev => prev.includes(g) ? prev : [...prev, g]);
@@ -6741,7 +6766,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 autoDetectFromName
               />
             </div>
-            <fieldset className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <fieldset className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3" {...help('add-arrival')}>
               <legend className="sr-only">{t("quarantine.arrivalLegend", { defaultValue: "Is this animal new to your collection?" })}</legend>
               {[
                 {
@@ -6777,6 +6802,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                     <select
                       className="mt-1 w-full border rounded-xl px-2 py-2 text-sm bg-white"
                       value={newAnimal.quarantineSource || 'known-breeder'}
+                      {...help('add-source')}
                       onChange={e => setNewAnimal(a => ({ ...a, quarantineSource: e.target.value }))}
                     >
                       {QUARANTINE_SOURCES.filter(source => source.key !== 'own-collection').map(source => (
@@ -6792,6 +6818,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                       type="text"
                       className="mt-1 w-full border rounded-xl px-2 py-2 text-sm"
                       value={newAnimal.quarantineSourceName || ''}
+                      {...help('add-source-name')}
                       placeholder={t("quarantine.sourceNamePlaceholder", { defaultValue: "Breeder, shop or shipment" })}
                       onChange={e => setNewAnimal(a => ({ ...a, quarantineSourceName: e.target.value }))}
                     />
@@ -6808,8 +6835,8 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
       <div className="p-4 border-t flex items-center justify-between">
         <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "This animal is saved in your planner on this device." })}</div>
         <div className="flex gap-2">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel")}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', canSubmit ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))} disabled={!canSubmit} onClick={onAdd}>
+          <button className="px-3 py-2 rounded-xl text-sm border" {...help('add-cancel')} onClick={onCancel}>{t("common.cancel")}</button>
+          <button className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', canSubmit ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))} disabled={!canSubmit} {...help('add-submit')} onClick={onAdd}>
             {t("ui.animals.addAnimal.button")}
           </button>
         </div>
@@ -7679,6 +7706,7 @@ export default function BreedingPlannerApp() {
           role={appDialog.type === 'alert' ? 'alertdialog' : 'dialog'}
           aria-modal="true"
           data-dialog="app-dialog"
+          {...help('app-dialog')}
           aria-label={appDialog.title || brandName}
           className="relative z-[10031] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5 space-y-4"
           onClick={e => e.stopPropagation()}
@@ -7709,6 +7737,7 @@ export default function BreedingPlannerApp() {
           </div>
           {appDialog.type === 'prompt' && (
             <input
+              {...help('app-dialog-input')}
               className="w-full border rounded-xl px-3 py-2 text-sm"
               value={appDialog.inputValue}
               onChange={handleAppDialogInputChange}
@@ -7718,6 +7747,7 @@ export default function BreedingPlannerApp() {
           <div className="flex justify-end gap-2 pt-2">
             {appDialog.cancelLabel && (
               <button
+                {...help('app-dialog-cancel')}
                 type="button"
                 className="px-3 py-2 rounded-xl text-sm border"
                 onClick={handleAppDialogCancel}
@@ -7727,6 +7757,7 @@ export default function BreedingPlannerApp() {
             )}
             <button
               type="button"
+              {...help('app-dialog-confirm')}
               className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true))}
               onClick={handleAppDialogConfirm}
             >
@@ -9718,11 +9749,11 @@ export default function BreedingPlannerApp() {
 
   const animalsCardTitle = (
     <div className="flex flex-col items-center gap-2 w-full">
-      <span className="text-base font-semibold">{`${activeAnimalLabel} (${activeAnimalList.length})`}</span>
-      <div className="bp-genetics-legend">
+      <span {...help('animals-screen')} className="text-base font-semibold">{`${activeAnimalLabel} (${activeAnimalList.length})`}</span>
+      <div {...help('animals-gene-colors')} className="bp-genetics-legend">
         <GeneLegend />
       </div>
-      <button type="button" className="bp-genetics-legend-toggle" onClick={() => {
+      <button type="button" {...help('animals-gene-colors')} className="bp-genetics-legend-toggle" onClick={() => {
         const panel = document.getElementById('bp-legend-tooltip');
         if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
       }}>
@@ -11668,7 +11699,7 @@ export default function BreedingPlannerApp() {
           <div className="bp-more-menu__backdrop" onClick={() => setAnimalActionSheetOpen(false)} />
           <div className="bp-more-menu__panel bp-more-menu__panel--list">
             <div className="help-sheet-head">
-              <span>{t("actions.animalActions", { defaultValue: "Animal actions" })}</span>
+              <span {...help('animals-actions')}>{t("actions.animalActions", { defaultValue: "Animal actions" })}</span>
               <DialogHelpButton />
             </div>
             {[
@@ -11677,13 +11708,15 @@ export default function BreedingPlannerApp() {
                 icon: '+',
                 label: speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" }),
                 run: startNewAnimalDraft,
+                helpId: 'animals-add',
               },
-              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true) },
-              { key: 'exportQr', icon: '▦', label: t("actions.exportQr"), run: () => setShowExportModal(true) },
-              { key: 'scanQr', icon: '⌖', label: t("actions.scanQr"), run: () => setShowScanner(true) },
-            ].map(({ key, icon, label, run }) => (
+              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true), helpId: 'animals-import' },
+              { key: 'exportQr', icon: '▦', label: t("actions.exportQr"), run: () => setShowExportModal(true), helpId: 'animals-export-qr' },
+              { key: 'scanQr', icon: '⌖', label: t("actions.scanQr"), run: () => setShowScanner(true), helpId: 'animals-scan-qr' },
+            ].map(({ key, icon, label, run, helpId }) => (
               <button
                 key={key}
+                data-help={helpId}
                 type="button"
                 className="bp-more-menu__row"
                 onClick={() => { setAnimalActionSheetOpen(false); run(); }}
@@ -11703,16 +11736,17 @@ export default function BreedingPlannerApp() {
           <div className="max-w-7xl mx-auto px-5 py-2 flex flex-wrap items-center gap-3">
             <button
               type="button"
+              {...help('animals-all-species')}
               onClick={leaveSpeciesWorkspace}
               className="text-xs font-semibold text-[#3c1b73] bg-white border rounded-full px-2.5 py-1 hover:border-neutral-400"
             >
               ◂ {t('species.scope.allSpecies', { defaultValue: 'All species' })}
             </button>
-            <span className="font-semibold">{getSpeciesById(speciesScope)?.name || speciesScope}</span>
+            <span {...help('animals-scope-bar')} className="font-semibold">{getSpeciesById(speciesScope)?.name || speciesScope}</span>
             {getSpeciesById(speciesScope)?.scientificName && (
               <span className="text-xs text-neutral-500 italic">{getSpeciesById(speciesScope).scientificName}</span>
             )}
-            <span className="ms-auto text-xs text-neutral-600 tabular-nums">
+            <span {...help('animals-scope-bar')} className="ms-auto text-xs text-neutral-600 tabular-nums">
               {t('species.scope.summary', {
                 defaultValue: '{{animals}} animals · {{genes}} genes',
                 animals: scopedSnakes.length,
@@ -11761,13 +11795,14 @@ export default function BreedingPlannerApp() {
             <div className="bp-toolbar flex flex-wrap items-center gap-2">
               <div className="bp-filter-tabs flex flex-wrap items-center gap-2">
                 {[
-                  { key: 'all', label: t("filters.all") },
-                  { key: 'males', label: t("filters.males") },
-                  { key: 'females', label: t("filters.females") },
-                  { key: 'groups', label: t("filters.groups") },
-                ].map(filter => (
+                  { key: 'all', label: t("filters.all"), helpId: 'animals-view' },
+                  { key: 'males', label: t("filters.males"), helpId: 'animals-view' },
+                  { key: 'females', label: t("filters.females"), helpId: 'animals-view' },
+                  { key: 'groups', label: t("filters.groups"), helpId: 'animals-groups-view' },
+                ].map(({ helpId, ...filter }) => (
                   <button
                     key={filter.key}
+                    data-help={helpId}
                     type="button"
                     className={cx(
                       toolbarControlClass,
@@ -11788,6 +11823,7 @@ export default function BreedingPlannerApp() {
                   <div className={cx(toolbarControlClass, 'bp-toolbar-segment')}>
                     <button
                       type="button"
+                      {...help('animals-layout')}
                       className={cx('bp-toolbar-segment__part', animalLayout === 'cards' && 'bp-toolbar-segment__part--selected')}
                       aria-pressed={animalLayout === 'cards'}
                       onClick={() => handleAnimalLayoutChange('cards')}
@@ -11796,6 +11832,7 @@ export default function BreedingPlannerApp() {
                     </button>
                     <button
                       type="button"
+                      {...help('animals-layout')}
                       className={cx('bp-toolbar-segment__part', animalLayout === 'list' && 'bp-toolbar-segment__part--selected')}
                       aria-pressed={animalLayout === 'list'}
                       onClick={() => handleAnimalLayoutChange('list')}
@@ -11804,6 +11841,7 @@ export default function BreedingPlannerApp() {
                     </button>
                     <div className={cx('bp-toolbar-segment__part', animalSortBy && 'bp-toolbar-segment__part--selected')}>
                       <select
+                        {...help('animals-sort')}
                         className="bp-toolbar-select"
                         value={animalSortBy}
                         onChange={(e) => handleAnimalSortFieldChange(e.target.value)}
@@ -11818,6 +11856,7 @@ export default function BreedingPlannerApp() {
                       </select>
                       <button
                         type="button"
+                        {...help('animals-sort-direction')}
                         className={cx('bp-toolbar-sort-dir font-semibold', animalSortBy ? 'opacity-100' : 'opacity-40 cursor-not-allowed')}
                         onClick={handleAnimalSortDirToggle}
                         disabled={!animalSortBy}
@@ -11835,6 +11874,7 @@ export default function BreedingPlannerApp() {
                   {animalLayout === 'list' && (
                     <button
                       type="button"
+                      {...help('animals-export-csv')}
                       className={toolbarControlClass}
                       onClick={() => {
                         // Animal list export entry point
@@ -11852,6 +11892,7 @@ export default function BreedingPlannerApp() {
                   hidden at that width, and Import must not go with them. */}
               <button
                 type="button"
+                {...help('animals-actions')}
                 className="bp-fab"
                 onClick={() => setAnimalActionSheetOpen(true)}
                 aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}
@@ -11866,18 +11907,20 @@ export default function BreedingPlannerApp() {
                     QR actions sit last, next to the scanner status they belong with. Feed prep
                     moved out to the header — it plans the whole collection, not this list. */}
                 <button
+                  {...help('animals-add')}
                   onClick={startNewAnimalDraft}
                   className={cx(toolbarControlClass, 'bp-toolbar-action')}
                 >
                   + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
-                <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
-                <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
-                <button onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
+                <button {...help('animals-import')} onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                <button {...help('animals-export-qr')} onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                <button {...help('animals-scan-qr')} onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
                 {isAnimalScannerView && (
                   <div
+                    {...help('animals-scanner-status')}
                     className={cx(
                       'bp-toolbar-status flex items-center gap-1.5 border transition-colors',
                       passiveScannerStatus === 'success'
@@ -11909,6 +11952,7 @@ export default function BreedingPlannerApp() {
             {animalView !== "groups" && (
               <div className="header-search-shell w-full">
                 <input
+                  {...help('animals-search')}
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder={t("header.search")}
@@ -11917,6 +11961,7 @@ export default function BreedingPlannerApp() {
                 {query ? (
                   <button
                     type="button"
+                    {...help('animals-search-clear')}
                     className="header-search-clear"
                     onClick={() => setQuery("")}
                     aria-label={t("filters.clear", { defaultValue: "Clear" })}
@@ -11967,6 +12012,7 @@ export default function BreedingPlannerApp() {
                     {selectedStatusTags.length > 0 && (
                       <button
                         type="button"
+                        {...help('animals-status-clear')}
                         className="text-[11px] px-2 py-1 border rounded-lg bg-white hover:bg-neutral-50"
                         onClick={clearStatusTagFilters}
                       >
@@ -11979,6 +12025,7 @@ export default function BreedingPlannerApp() {
                       <div className="relative" ref={tagFilterMenuRef}>
                         <button
                           type="button"
+                          {...help('animals-status-filter')}
                           className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-start flex items-center justify-between"
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
@@ -11989,6 +12036,7 @@ export default function BreedingPlannerApp() {
                           <div className="absolute z-30 mt-1 w-full min-w-[220px] max-h-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
                             <button
                               type="button"
+                              {...help('animals-status-filter')}
                               className={cx(
                                 'status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                 !selectedStatusTags.length ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
@@ -12006,6 +12054,7 @@ export default function BreedingPlannerApp() {
                                 <div key={option} className="flex items-center">
                                   <button
                                     type="button"
+                                    {...help('animals-status-filter')}
                                     className={cx(
                                       'status-tag-menu-button flex-1 px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                       selected ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
@@ -12019,6 +12068,7 @@ export default function BreedingPlannerApp() {
                                   </button>
                                   <button
                                     type="button"
+                                    {...help('animals-status-delete')}
                                     className="status-tag-menu-button px-2 py-2 text-sm font-semibold text-neutral-500 hover:text-rose-500"
                                     title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                                     onClick={() => handleDeleteStatusTag(option)}
@@ -12056,6 +12106,7 @@ export default function BreedingPlannerApp() {
                       <div className="flex items-center gap-2 mb-2">
                         <button
                           type="button"
+                          {...help('animals-filter-sheet')}
                           className={cx('bp-filter-sheet-trigger', mobileFilterCount > 0 ? 'has-filters' : '')}
                           onClick={() => setFilterSheetOpen(true)}
                         >
@@ -12069,6 +12120,7 @@ export default function BreedingPlannerApp() {
                             <button
                               key={g}
                               type="button"
+                              {...help('animals-filter-chip')}
                               className="bp-active-filter-chip"
                               onClick={() => setShowGroups(prev => (prev || []).filter(x => x !== g))}
                             >
@@ -12079,6 +12131,7 @@ export default function BreedingPlannerApp() {
                             <button
                               key={tag}
                               type="button"
+                              {...help('animals-filter-chip')}
                               className="bp-active-filter-chip"
                               onClick={() => toggleStatusTagFilter(tag)}
                             >
@@ -12088,6 +12141,7 @@ export default function BreedingPlannerApp() {
                           {!showUnassigned && (
                             <button
                               type="button"
+                              {...help('animals-filter-chip')}
                               className="bp-active-filter-chip"
                               onClick={() => setShowUnassigned(true)}
                             >
@@ -12105,7 +12159,7 @@ export default function BreedingPlannerApp() {
                     <div className="bp-filter-sheet__backdrop" onClick={() => setFilterSheetOpen(false)} />
                     <div className="bp-filter-sheet__panel">
                       <div className="bp-filter-sheet__handle" />
-                      <div className="bp-filter-sheet__title">{t("filters.filters", { defaultValue: "Filters" })}</div>
+                      <div {...help('animals-filter-sheet')} className="bp-filter-sheet__title">{t("filters.filters", { defaultValue: "Filters" })}</div>
                       {groups.length > 0 && (
                         <>
                           <div className="bp-filter-sheet__section-title">{t("filters.groups", { defaultValue: "Groups" })}</div>
@@ -12116,6 +12170,7 @@ export default function BreedingPlannerApp() {
                                 <button
                                   key={g}
                                   type="button"
+                                  {...help('animals-group-filter')}
                                   className={cx('bp-filter-sheet__chip', active ? 'is-active' : '')}
                                   onClick={() => setShowGroups(prev => {
                                     const next = new Set(prev || []);
@@ -12134,6 +12189,7 @@ export default function BreedingPlannerApp() {
                       <div className="bp-filter-sheet__chips">
                         <button
                           type="button"
+                          {...help('animals-hide-unassigned')}
                           className={cx('bp-filter-sheet__chip', !showUnassigned ? 'is-active' : '')}
                           onClick={() => setShowUnassigned(prev => !prev)}
                         >
@@ -12143,6 +12199,7 @@ export default function BreedingPlannerApp() {
                       <div className="bp-filter-sheet__actions">
                         <button
                           type="button"
+                          {...help('animals-filter-sheet-clear')}
                           className="bp-filter-sheet__btn-clear"
                           onClick={() => {
                             setShowGroups([]);
@@ -12155,6 +12212,7 @@ export default function BreedingPlannerApp() {
                         </button>
                         <button
                           type="button"
+                          {...help('animals-filter-sheet-apply')}
                           className="bp-filter-sheet__btn-apply"
                           onClick={() => setFilterSheetOpen(false)}
                         >
@@ -12239,7 +12297,7 @@ export default function BreedingPlannerApp() {
         )}
 
         {tab === "advisor" && !speciesGateActive && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4" {...help('advisor-screen')}>
             <BreedersGroupGate
               purpose="advisor"
               breederMaleCount={males.length}
@@ -12260,12 +12318,13 @@ export default function BreedingPlannerApp() {
         )}
 
         {tab === "pairings" && !speciesGateActive && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4" {...help('breeding-screen')}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'dashboard'}
+                  {...help('pairing-view-dashboard')}
                   onClick={() => {
                     setPairingsView('dashboard');
                     setFocusedPairingId(null);
@@ -12279,6 +12338,7 @@ export default function BreedingPlannerApp() {
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'active'}
+                  {...help('pairing-view-active')}
                   onClick={() => {
                     setPairingsView('active');
                     setFocusedPairingId(null);
@@ -12292,6 +12352,7 @@ export default function BreedingPlannerApp() {
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'completed'}
+                  {...help('pairing-view-completed')}
                   onClick={() => {
                     setPairingsView('completed');
                     setFocusedPairingId(null);
@@ -12305,6 +12366,7 @@ export default function BreedingPlannerApp() {
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'incubator'}
+                  {...help('pairing-view-incubator')}
                   onClick={() => {
                     setPairingsView('incubator');
                     setFocusedPairingId(null);
@@ -12322,6 +12384,7 @@ export default function BreedingPlannerApp() {
                     type="text"
                     className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
                     placeholder={t('pairing.searchPlaceholder', { defaultValue: 'Search pairings or snakes' })}
+                    {...help('pairing-search')}
                     value={pairingsSearchQuery}
                     onChange={e => setPairingsSearchQuery(e.target.value)}
                   />
@@ -12331,6 +12394,7 @@ export default function BreedingPlannerApp() {
                       className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
                       onClick={() => setPairingsSearchQuery('')}
                       aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
+                      {...help('pairing-search-clear')}
                     >
                       ×
                     </button>
@@ -12339,6 +12403,7 @@ export default function BreedingPlannerApp() {
                 <button
                   type="button"
                   onClick={() => setShowPairingQrModal(true)}
+                  {...help('pairing-qr-labels')}
                   className="px-3 py-2 rounded-xl text-sm border bg-white"
                 >
                   {t("actions.exportPairingQr", { defaultValue: "Pairing QR labels" })}
@@ -12347,6 +12412,7 @@ export default function BreedingPlannerApp() {
                   type="button"
                   onClick={openNewPairingModal}
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
+                  {...help('pairing-new')}
                 >
                   {t("pairing.new")}
                 </button>
@@ -12358,6 +12424,7 @@ export default function BreedingPlannerApp() {
                   <TabButton
                     theme={theme}
                     active={completedYearFilter === 'All'}
+                    {...help('pairing-filter-year')}
                     onClick={() => setCompletedYearFilter('All')}
                   >
                     {t("pairing.filters.allYears", { defaultValue: "All years" })}
@@ -12367,6 +12434,7 @@ export default function BreedingPlannerApp() {
                       key={year}
                       theme={theme}
                       active={completedYearFilter === year}
+                      {...help('pairing-filter-year')}
                       onClick={() => setCompletedYearFilter(year)}
                     >
                       {year}
@@ -12377,6 +12445,7 @@ export default function BreedingPlannerApp() {
                   <TabButton
                     theme={theme}
                     active={completedOutcomeFilter === 'all'}
+                    {...help('pairing-filter-outcome')}
                     onClick={() => setCompletedOutcomeFilter('all')}
                   >
                     {t("pairing.filters.allOutcomes", { defaultValue: "All outcomes" })}
@@ -12392,6 +12461,7 @@ export default function BreedingPlannerApp() {
                       key={key}
                       theme={theme}
                       active={completedOutcomeFilter === key}
+                      {...help('pairing-filter-outcome')}
                       onClick={() => setCompletedOutcomeFilter(key)}
                     >
                       {label}
@@ -12419,8 +12489,8 @@ export default function BreedingPlannerApp() {
             ) : pairingsView === 'incubator' ? (
               <Card title={t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}>
                 {eggBoxes.length ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-3" {...help('incubator-screen')}>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" {...help('incubator-summary')}>
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.clutches", { defaultValue: "Clutches" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.clutches}</div>
@@ -12436,7 +12506,7 @@ export default function BreedingPlannerApp() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                       {eggBoxes.map(box => (
-                        <div key={box.id} className="border rounded-xl p-3 bg-white shadow-sm flex flex-col gap-1.5 text-sm">
+                        <div key={box.id} className="border rounded-xl p-3 bg-white shadow-sm flex flex-col gap-1.5 text-sm" {...help('incubator-egg-box')}>
                           <div className="flex items-center justify-between">
                             <div className="font-semibold text-sm leading-snug">
                               {box.eggBoxCount > 1
@@ -12454,7 +12524,7 @@ export default function BreedingPlannerApp() {
                             {t("pairing.eggBox.clutchLabel", { number: box.clutchNumber || box.number, pairing: box.pairingLabel })}
                           </div>
                           {box.clutchId && (
-                            <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
+                            <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full" {...help('pairing-clutch-id')}>
                               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate"><bdi>{box.clutchId}</bdi></span>
                             </div>
@@ -12482,12 +12552,14 @@ export default function BreedingPlannerApp() {
                             type="button"
                             className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
                             onClick={() => setEggBoxModal(box)}
+                            {...help('incubator-edit-box')}
                           >
                             {t("pairing.incubator.viewEditBox", { defaultValue: "View / edit egg box" })}
                           </button>
                           <button
                             type="button"
                             className={cx('mt-1 w-fit px-2.5 py-1.5 rounded-xl text-xs', primaryBtnClass(theme, true))}
+                            {...help('incubator-print-card')}
                             onClick={async () => {
                               try {
                                 await exportClutchCardToPdf({
@@ -12516,7 +12588,7 @@ export default function BreedingPlannerApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-neutral-500">{t("pairing.incubatorEmpty")}</div>
+                  <div className="text-sm text-neutral-500" {...help('incubator-screen')}>{t("pairing.incubatorEmpty")}</div>
                 )}
               </Card>
             ) : (
@@ -12667,7 +12739,7 @@ export default function BreedingPlannerApp() {
           >
             <div className="flex items-start justify-between gap-4 px-5 pt-5">
               <div>
-                <div className="text-base font-semibold">{photoGallerySnake.name || t("photoGallery.unnamedSnake", { defaultValue: "Unnamed snake" })}</div>
+                <div className="text-base font-semibold" {...help('record-gallery')}>{photoGallerySnake.name || t("photoGallery.unnamedSnake", { defaultValue: "Unnamed snake" })}</div>
                 <div className="text-xs text-neutral-500 mt-1"><bdi>{photoGallerySnake.id}</bdi></div>
                 <div className="text-xs text-neutral-500 mt-1">{t("photoGallery.storedCount", { count: photoGalleryPhotos.length, defaultValue_one: "{{count}} photo stored", defaultValue_other: "{{count}} photos stored" })}</div>
               </div>
@@ -12676,6 +12748,7 @@ export default function BreedingPlannerApp() {
                 <button
                   className="text-sm px-3 py-1.5 border rounded-lg"
                   onClick={handleClosePhotoGallery}
+                  {...help('record-gallery-close')}
                 >
                   {t("common.close", { defaultValue: "Close" })}
                 </button>
@@ -12719,6 +12792,7 @@ export default function BreedingPlannerApp() {
                               download={fileName}
                               target="_blank"
                               rel="noopener noreferrer"
+                              {...help('record-gallery-open')}
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100"
                             >
                               {t("actions.open", { defaultValue: "Open" })}
@@ -12726,12 +12800,14 @@ export default function BreedingPlannerApp() {
                             <button
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100 disabled:opacity-60"
                               onClick={() => handleSetSnakeCoverPhoto(photoGallerySnake.id, photo.id)}
+                              {...help('record-gallery-set-cover')}
                               disabled={isCover}
                             >
                               {isCover ? t("photoGallery.currentCover", { defaultValue: "Current cover" }) : t("photoGallery.setAsCover", { defaultValue: "Set as cover" })}
                             </button>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg text-rose-600 hover:bg-rose-50"
+                              {...help('record-gallery-remove')}
                               onClick={async () => {
                                 const confirmMessage = t("electron.prompts.photoRemove.message", { defaultValue: "Remove this photo?" });
                                 const ok = await showAppConfirm(confirmMessage, {
@@ -12762,10 +12838,10 @@ export default function BreedingPlannerApp() {
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowAddModal(false)}>
       <div role="dialog" aria-modal="true" data-dialog="add-animal" aria-label={i18n.t("ui.animals.addAnimal.title")} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">{i18n.t("ui.animals.addAnimal.title")}</div>
+              <div className="font-semibold" {...help('add-window')}>{i18n.t("ui.animals.addAnimal.title")}</div>
               <div className="flex items-center gap-2">
                 <DialogHelpButton />
-                <button className="text-sm px-2 py-1" onClick={()=>setShowAddModal(false)}>{i18n.t("common.close")}</button>
+                <button className="text-sm px-2 py-1" {...help('add-close')} onClick={()=>setShowAddModal(false)}>{i18n.t("common.close")}</button>
               </div>
             </div>
 
@@ -12799,7 +12875,7 @@ export default function BreedingPlannerApp() {
         <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10060]", overlayClass(theme))}>
           <div role="dialog" aria-modal="true" data-dialog="species-backfill" aria-label={t("species.backfill.title", { defaultValue: "Confirm your animals' species" })} className="relative z-[10061] bg-white w-full max-w-lg rounded-2xl shadow-2xl border p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <DialogHelpButton className="help-dialog-corner" />
-            <div className="text-lg font-semibold pe-12">
+            <div className="text-lg font-semibold pe-12" {...help('add-species-backfill')}>
               {t("species.backfill.title", { defaultValue: "Confirm your animals' species" })}
             </div>
             <p className="text-sm text-neutral-600">
@@ -12808,7 +12884,7 @@ export default function BreedingPlannerApp() {
                 count: animalsMissingSpecies.length,
               })}
             </p>
-            <div>
+            <div {...help('add-backfill-species')}>
               <label className="text-xs font-medium">{t("ui.animals.addAnimal.species", { defaultValue: "Species" })}</label>
               <SpeciesSelect
                 value={speciesBackfillChoice}
@@ -12825,6 +12901,7 @@ export default function BreedingPlannerApp() {
               <button
                 className="px-3 py-2 rounded-xl text-sm border"
                 onClick={dismissSpeciesBackfill}
+                {...help('add-backfill-later')}
               >
                 {t("species.backfill.later", { defaultValue: "I'll set them individually" })}
               </button>
@@ -12832,6 +12909,7 @@ export default function BreedingPlannerApp() {
                 className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(speciesBackfillChoice)))}
                 disabled={!speciesBackfillChoice}
                 onClick={() => applySpeciesBackfill(speciesBackfillChoice)}
+                {...help('add-backfill-apply')}
               >
                 {t("species.backfill.apply", {
                   defaultValue: "Set all {{count}} to {{species}}",
@@ -12855,7 +12933,7 @@ export default function BreedingPlannerApp() {
             onClick={e => e.stopPropagation()}
           >
             <DialogHelpButton className="help-dialog-corner" />
-            <div className="text-lg font-semibold pe-12">{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
+            <div className="text-lg font-semibold pe-12" {...help('add-leucistic')}>{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
             <div className="text-sm text-neutral-600 space-y-3">
               <p>
                 {t("leucistic.intro", { defaultValue: "When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations." })}
@@ -12887,6 +12965,7 @@ export default function BreedingPlannerApp() {
               <select
                 className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                 value={leucisticTypeChoice}
+                {...help('add-leucistic-type')}
                 onChange={e => setLeucisticTypeChoice(e.target.value === 'blackEye' ? 'blackEye' : 'bel')}
               >
                 <option value="bel">{t("leucistic.bel", { defaultValue: "Blue Eyed Leucistic" })}</option>
@@ -12895,7 +12974,7 @@ export default function BreedingPlannerApp() {
             </div>
 
             {leucisticTypeChoice === 'bel' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" {...help('add-leucistic-bel')}>
                 <div>
                   <label className="text-xs font-medium">{t("leucistic.belGene1", { defaultValue: "BEL Gene 1" })}</label>
                   <select
@@ -12927,7 +13006,7 @@ export default function BreedingPlannerApp() {
                 )}
               </div>
             ) : (
-              <div>
+              <div {...help('add-leucistic-black')}>
                 <label className="text-xs font-medium">{t("leucistic.blackEyeGene", { defaultValue: "Black Eye Complex Gene" })}</label>
                 <select
                   className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
@@ -12942,11 +13021,12 @@ export default function BreedingPlannerApp() {
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+              <button type="button" className="px-3 py-2 rounded-xl text-sm border" {...help('add-leucistic-cancel')} onClick={cancelLeucisticSelector}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
                 onClick={confirmLeucisticSelector}
+                {...help('add-leucistic-apply')}
                 disabled={leucisticTypeChoice === 'bel' ? !(leucisticBelGene1 && leucisticBelGene2) || String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() : !leucisticBlackGene}
               >
                 {t("filters.apply", { defaultValue: "Apply" })}
@@ -12977,7 +13057,7 @@ export default function BreedingPlannerApp() {
             )}
             onClick={handlePairingGuardCancel}
           >
-            <div role="dialog" aria-modal="true" data-dialog="breeders-guard"
+            <div role="dialog" aria-modal="true" data-dialog="breeders-guard" {...help('breeders-guard')}
               aria-label={t('modals.breedersOnly.breedersOnlyTitle', { defaultValue: 'Breeders only' })}
               className="relative bg-white w-full max-w-md rounded-2xl shadow-xl border p-6 space-y-4"
               onClick={e => e.stopPropagation()}
@@ -13013,6 +13093,7 @@ export default function BreedingPlannerApp() {
                 <button
                   className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true))}
                   onClick={handlePairingGuardConfirm}
+                  {...help('breeders-guard-add')}
                 >
                   {t('modals.breedersOnly.addToBreedersAndPair', {
                     defaultValue: 'Add to Breeders & pair'
@@ -13043,7 +13124,7 @@ export default function BreedingPlannerApp() {
             )}
             onClick={handleWizardCancel}
           >
-            <div role="dialog" aria-modal="true" data-dialog="hatch-wizard"
+            <div role="dialog" aria-modal="true" data-dialog="hatch-wizard" {...help('hatch-wizard')}
               aria-label={t("hatchWizard.title", { defaultValue: "Hatching clutch" })}
               className="relative z-[10011] bg-white w-full max-w-3xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
@@ -13091,11 +13172,13 @@ export default function BreedingPlannerApp() {
                           className="flex-1 border rounded-xl px-3 py-2 text-sm"
                           value={entry.id || ''}
                           onChange={e => handleWizardIdChange(safeIndex, e.target.value)}
+                          {...help('hatch-id')}
                         />
                         <button
                           type="button"
                           className={cx('px-3 py-2 rounded-xl text-sm border', entry.autoId ? 'text-neutral-600' : 'text-neutral-700')}
                           onClick={() => handleWizardRegenerateId(safeIndex)}
+                          {...help('hatch-regenerate-id')}
                         >
                           {t("hatchWizard.regenerate", { defaultValue: "Regenerate" })}
                         </button>
@@ -13113,6 +13196,7 @@ export default function BreedingPlannerApp() {
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm bg-white"
                           value={entry.sex || 'U'}
                           onChange={e => handleWizardSexChange(safeIndex, e.target.value)}
+                          {...help('hatch-sex')}
                         >
                           <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
                           <option value="F">{t("ui.animals.addAnimal.female", { defaultValue: "Female" })}</option>
@@ -13127,6 +13211,7 @@ export default function BreedingPlannerApp() {
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.weight}
                           onChange={e => handleWizardWeightChange(safeIndex, e.target.value)}
+                          {...help('hatch-weight')}
                           placeholder={t("hatchWizard.weightPlaceholder", { defaultValue: "e.g., 75" })}
                         />
                       </div>
@@ -13136,6 +13221,7 @@ export default function BreedingPlannerApp() {
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.morph || ''}
                           onChange={e => handleWizardMorphChange(safeIndex, e.target.value)}
+                          {...help('hatch-morph')}
                           placeholder={t("hatchWizard.morphPlaceholder", { defaultValue: "e.g., Pastel Clown 66% Het Hypo" })}
                         />
                       </div>
@@ -13146,6 +13232,7 @@ export default function BreedingPlannerApp() {
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.birthDate || ''}
                           onChange={e => handleWizardBirthDateChange(safeIndex, e.target.value)}
+                          {...help('hatch-birth-date')}
                         />
                       </div>
                     </div>
@@ -13158,7 +13245,7 @@ export default function BreedingPlannerApp() {
                 <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleWizardCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
                 <div className="flex items-center gap-2">
                   {safeIndex > 0 && (
-                    <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleWizardPrev}>
+                    <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleWizardPrev} {...help('hatch-previous')}>
                       {t("common.previous", { defaultValue: "Previous" })}
                     </button>
                   )}
@@ -13167,6 +13254,7 @@ export default function BreedingPlannerApp() {
                     className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', canAdvance ? primaryBtnClass(theme, true) : primaryBtnClass(theme, false))}
                     onClick={handleWizardSaveCurrent}
                     disabled={!canAdvance}
+                    {...help('hatch-save')}
                   >
                     {isLast ? t("hatchWizard.saveHatchling", { defaultValue: "Save hatchling" }) : t("hatchWizard.saveNext", { defaultValue: "Save & next" })}
                   </button>
@@ -13181,10 +13269,10 @@ export default function BreedingPlannerApp() {
             <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
               <div role="dialog" aria-modal="true" data-dialog="import-animals" aria-label={t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })} className="relative z-[10011] bg-white w-full max-w-5xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b flex items-center justify-between">
-                  <div className="font-semibold">{t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })}</div>
+                  <div className="font-semibold" {...help('import-window')}>{t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })}</div>
                   <div className="flex items-center gap-2">
                     <DialogHelpButton />
-                    <button className="text-sm px-2 py-1" onClick={()=>setShowImportModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
+                    <button className="text-sm px-2 py-1" {...help('import-close')} onClick={()=>setShowImportModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
                   </div>
                 </div>
                 <div className="p-4 overflow-auto max-h-[80vh]">
@@ -13216,7 +13304,7 @@ export default function BreedingPlannerApp() {
       {/* create pairing modal — breeders only, male-first */}
     {showPairingModal && typeof document !== 'undefined' && createPortal((
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
-          <div role="dialog" aria-modal="true" data-dialog="create-pairing" aria-label={t("pairing.modal.title", { defaultValue: "Create pairing" })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" data-dialog="create-pairing" {...help('pairing-create-dialog')} aria-label={t("pairing.modal.title", { defaultValue: "Create pairing" })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">{t("pairing.modal.title", { defaultValue: "Create pairing" })}</div>
               <div className="flex items-center gap-2">
@@ -13249,6 +13337,7 @@ export default function BreedingPlannerApp() {
                       <div className="mt-1 space-y-2">
                         <input
                           ref={maleSearchInputRef}
+                          {...help('pairing-create-male')}
                           type="text"
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={maleSearchQuery}
@@ -13262,7 +13351,7 @@ export default function BreedingPlannerApp() {
                               <div className="font-medium text-sm truncate"><bdi>{currentMale.name || currentMale.id}</bdi></div>
                               <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentMale.id}</bdi></div>
                             </div>
-                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))}>
+                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))} {...help('pairing-create-clear')}>
                               {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
@@ -13284,6 +13373,7 @@ export default function BreedingPlannerApp() {
                                     "w-full text-start px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
                                     selected && "bg-sky-50/80"
                                   )}
+                                  {...help('pairing-create-male')}
                                   onClick={() => {
                                     setDraft(d => ({ ...d, maleId: m.id }));
                                     setMaleSearchQuery("");
@@ -13311,6 +13401,7 @@ export default function BreedingPlannerApp() {
                       <div className="mt-1 space-y-2">
                         <input
                           ref={femaleSearchInputRef}
+                          {...help('pairing-create-female')}
                           type="text"
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={femaleSearchQuery}
@@ -13324,7 +13415,7 @@ export default function BreedingPlannerApp() {
                               <div className="font-medium text-sm truncate"><bdi>{currentFemale.name || currentFemale.id}</bdi></div>
                               <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentFemale.id}</bdi></div>
                             </div>
-                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))}>
+                            <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))} {...help('pairing-create-clear')}>
                               {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
@@ -13346,6 +13437,7 @@ export default function BreedingPlannerApp() {
                                     "w-full text-start px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
                                     selected && "bg-rose-50/80"
                                   )}
+                                  {...help('pairing-create-female')}
                                   onClick={() => {
                                     setDraft(d => ({ ...d, femaleId: f.id }));
                                     setFemaleSearchQuery("");
@@ -13380,12 +13472,13 @@ export default function BreedingPlannerApp() {
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium">{t("pairing.modal.startDate", { defaultValue: "Starting date" })}</label>
                 <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2"
+                  {...help('pairing-create-start')}
                   value={draft.startDate || ""}
                   onChange={e=>setDraft(d=>({...d,startDate:e.target.value}))} />
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium">{t("pairing.modal.notes", { defaultValue: "Notes" })}</label>
-                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder={t("pairing.modal.notesPlaceholder", { defaultValue: "Ultrasound size, rotation plan, etc." })}/>
+                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} {...help('pairing-create-notes')} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder={t("pairing.modal.notesPlaceholder", { defaultValue: "Ultrasound size, rotation plan, etc." })}/>
               </div>
             </div>
             <div className="p-5 border-t flex items-center justify-between">
@@ -13395,6 +13488,7 @@ export default function BreedingPlannerApp() {
                 <button
                   className={cx("px-3 py-2 rounded-xl text-sm sk-on-accent", draft.femaleId && draft.maleId ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
                   disabled={!draft.femaleId || !draft.maleId}
+                  {...help('pairing-create-add')}
                   onClick={async () => {
                     if (!draft.maleId || !draft.femaleId) {
                       await showAppAlert(t("pairing.modal.chooseBoth", { defaultValue: "Choose a breeder male and female first." }));
@@ -13434,24 +13528,27 @@ export default function BreedingPlannerApp() {
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="font-semibold text-lg leading-snug break-words min-w-0" title={editSnake.name}>{editSnake.name}</div>
+                          <div className="font-semibold text-lg leading-snug break-words min-w-0" title={editSnake.name} {...help('record-window')}>{editSnake.name}</div>
                           <DialogHelpButton />
                         </div>
                         <div className="snake-editor-actions">
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
+                            {...help('record-delete')}
                             onClick={()=>requestDeleteSnake(editSnake)}>
                             {t("actions.delete", { defaultValue: "Delete" })}
                           </button>
                           <button
                             className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
                             onClick={() => openFamilyTreeForSnake(editSnakeDraft || editSnake)}
+                            {...help('record-family-tree')}
                           >
                             {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
                           </button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} {...help('record-export-pdf')} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
                           <button
                             className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
                             disabled={!((editSnakeDraft.id || '').trim())}
+                            {...help('record-qr-label')}
                             onClick={async () => {
                               const trimmedId = (editSnakeDraft.id || '').trim();
                               if (!trimmedId) {
@@ -13478,10 +13575,12 @@ export default function BreedingPlannerApp() {
                           <button
                             className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
                             onClick={() => setTestOrderSnake(editSnakeDraft)}
+                            {...help('record-order-test')}
                           >
                             {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
                           </button>
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))}
+                            {...help('record-save')}
                             onClick={()=>{
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
@@ -13597,7 +13696,7 @@ export default function BreedingPlannerApp() {
                           }
                           closeSnakeEditor();
                             }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
+                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} {...help('record-cancel')} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
                         </div>
                         </div>
             </div>
@@ -13611,13 +13710,14 @@ export default function BreedingPlannerApp() {
                   <button
                     type="button"
                     className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
+                    {...help('record-status')}
                     onClick={() => setEditStatusMenuOpen(open => !open)}
                   >
                     <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
                     <span className="text-[10px] text-neutral-500">v</span>
                   </button>
                   {editStatusMenuOpen && (
-                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
+                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg" {...help('record-status')}>
                       <button
                         type="button"
                         className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
@@ -13641,6 +13741,7 @@ export default function BreedingPlannerApp() {
                               className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                               onClick={() => handleDeleteEditStatus(option)}
                               title={t("snakeEdit.deleteTag")}
+                              {...help('record-status-delete')}
                             >
                               -
                             </button>
@@ -13651,7 +13752,7 @@ export default function BreedingPlannerApp() {
                       )}
                     </div>
                   )}
-                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2" {...help('record-status-add')}>
                     <input
                       className="w-full border rounded-lg px-2 py-1 text-sm"
                       value={editStatusTagInput}
@@ -13673,6 +13774,7 @@ export default function BreedingPlannerApp() {
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.name")}</label>
                   <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                    {...help('record-name')}
                     value={editSnakeDraft.name}
                     onChange={e=>setEditSnakeDraft(d=>({...d,name:e.target.value}))}/>
                 </div>
@@ -13684,6 +13786,7 @@ export default function BreedingPlannerApp() {
                         type="button"
                         className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={handleGenerateIdForEditSnake}
+                        {...help('record-generate-id')}
                         disabled={Boolean((editSnakeDraft.id || '').trim())}
                       >
                         {t("snakeEdit.generateId")}
@@ -13692,12 +13795,13 @@ export default function BreedingPlannerApp() {
                         type="button"
                         className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700"
                         onClick={handleUpdateIdForEditSnake}
+                        {...help('record-update-id')}
                       >
                         {t("snakeEdit.updateId")}
                       </button>
                     </div>
                   </div>
-                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm font-mono" value={editSnakeDraft.id}
+                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm font-mono" {...help('record-id')} value={editSnakeDraft.id}
                     onChange={e=>{ setEditIdRetagBlocked(false); setEditSnakeDraft(d=>({...d,id:e.target.value})); }} />
                   {!((editSnakeDraft.id || '').trim()) && (
                     <div className="mt-0.5 text-[11px] text-neutral-500">{t("snakeEdit.idHint")}</div>
@@ -13714,13 +13818,14 @@ export default function BreedingPlannerApp() {
                   <label className="text-xs font-medium">{t("snakeEdit.sex")}</label>
                   <select className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
                     value={normalizeSexValue(editSnakeDraft.sex)}
+                    {...help('record-sex')}
                     onChange={e=>handleEditSnakeSexChange(e.target.value)}>
                     <option value="U">{t("snakeEdit.sexUnknown", { defaultValue: "Unknown" })}</option>
                     <option value="F">{t("snakeEdit.sexFemale")}</option>
                     <option value="M">{t("snakeEdit.sexMale")}</option>
                   </select>
                 </div>
-                <div>
+                <div {...help('record-species')}>
                   <label className="text-xs font-medium">{t("snakeEdit.species", { defaultValue: "Species" })}</label>
                   <SpeciesSelect
                     className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
@@ -13756,6 +13861,7 @@ export default function BreedingPlannerApp() {
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
                   <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                    {...help('record-birth-date')}
                     value={editSnakeDraft.birthDate || ''}
                     placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                     onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
@@ -13763,7 +13869,7 @@ export default function BreedingPlannerApp() {
                 </div>
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.genetics")}</label>
-                  <div className="mt-0.5">
+                  <div className="mt-0.5" {...help('record-genetics')}>
                     <GeneAutocomplete
                       morphs={Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []}
                       hets={Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []}
@@ -13786,11 +13892,12 @@ export default function BreedingPlannerApp() {
                 <div>
                   <label className="text-xs font-medium">{t("snakeEdit.weight")}</label>
                   <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
+                    {...help('record-weight')}
                     value={editSnakeDraft.weight}
                     onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
                 </div>
                 <div className="border rounded-xl p-2 bg-neutral-50 mt-1">
-                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
+                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide" {...help('record-feed-cycle')}>{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
                   <div className="grid grid-cols-1 gap-1.5">
                     <div className="grid grid-cols-2 gap-1.5">
                       <div>
@@ -13798,6 +13905,7 @@ export default function BreedingPlannerApp() {
                         <select
                           className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
                           value={editSnakeDraft.feederProfile?.feedType || ''}
+                          {...help('record-feed-type')}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
                             feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), feedType: e.target.value },
@@ -13812,6 +13920,7 @@ export default function BreedingPlannerApp() {
                         <select
                           className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
                           value={editSnakeDraft.feederProfile?.sizeClass || ''}
+                          {...help('record-feed-size')}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
                             feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), sizeClass: e.target.value },
@@ -13832,6 +13941,7 @@ export default function BreedingPlannerApp() {
                           min="0"
                           className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.weightGrams || ''}
+                          {...help('record-feed-weight')}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
                             feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), weightGrams: e.target.value },
@@ -13847,6 +13957,7 @@ export default function BreedingPlannerApp() {
                           step="1"
                           className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.quantity || 1}
+                          {...help('record-feed-quantity')}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
                             feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), quantity: Number(e.target.value) || 1 },
@@ -13861,6 +13972,7 @@ export default function BreedingPlannerApp() {
                           step="1"
                           className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                           value={editSnakeDraft.feederProfile?.intervalDays || ''}
+                          {...help('record-feed-interval')}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
                             feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), intervalDays: e.target.value },
@@ -13875,6 +13987,7 @@ export default function BreedingPlannerApp() {
                       <input
                         className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
                         value={editSnakeDraft.feederProfile?.notes || ''}
+                        {...help('record-feed-notes')}
                         onChange={e => setEditSnakeDraft(d => ({
                           ...d,
                           feederProfile: { ...createEmptyFeederProfile(), ...(d.feederProfile || {}), notes: e.target.value },
@@ -13887,11 +14000,12 @@ export default function BreedingPlannerApp() {
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
+                    <label className="text-xs font-semibold text-neutral-700" {...help('sell-for-sale')}>{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={!!editSnakeDraft.forSale}
+                      {...help('sell-for-sale')}
                       onClick={() => setEditSnakeDraft(d => ({
                         ...d,
                         forSale: !d.forSale,
@@ -13920,6 +14034,7 @@ export default function BreedingPlannerApp() {
                             type="text"
                             className="border rounded-lg px-2 py-1 text-sm w-full"
                             value={editSnakeDraft.price || ''}
+                            {...help('sell-price')}
                             onChange={e => setEditSnakeDraft(d => ({ ...d, price: e.target.value }))}
                             placeholder={t("snakeEdit.pricePlaceholder", { defaultValue: "e.g., 450" })}
                           />
@@ -13929,6 +14044,7 @@ export default function BreedingPlannerApp() {
                           <select
                             className="border rounded-lg px-2 py-1 text-sm bg-white"
                             value={editSnakeDraft.currency || 'EUR'}
+                            {...help('sell-currency')}
                             onChange={e => setEditSnakeDraft(d => ({ ...d, currency: e.target.value }))}
                           >
                             <option value="EUR">EUR</option>
@@ -13943,6 +14059,7 @@ export default function BreedingPlannerApp() {
                           rows={2}
                           className="border rounded-lg px-2 py-1 text-sm resize-none w-full"
                           value={editSnakeDraft.saleDescription || ''}
+                          {...help('sell-description')}
                           onChange={e => setEditSnakeDraft(d => ({ ...d, saleDescription: e.target.value }))}
                           placeholder={t("snakeEdit.saleDescriptionPlaceholder", { defaultValue: "Optional details..." })}
                         />
@@ -13951,10 +14068,11 @@ export default function BreedingPlannerApp() {
                         <div className="text-xs text-rose-600 bg-rose-50 rounded-lg px-2 py-1">{editForSalePublishError}</div>
                       )}
                       {editSnakeDraft.marketplacePublished ? (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5" {...help('sell-published')}>
                           <span>✓</span><span>{t("snakeEdit.publishedToMarketplace", { defaultValue: "Published to Marketplace" })}</span>
                         </div>
                       ) : (
+                        <div {...help('sell-publish')}>
                         <FeatureAccessGuard
                           feature="marketplace.create_listing"
                           featureName={t("snakeEdit.marketplaceListingsFeature", { defaultValue: "Marketplace listings" })}
@@ -13975,6 +14093,7 @@ export default function BreedingPlannerApp() {
                           {editForSalePublishing ? t("snakeEdit.publishing", { defaultValue: "Publishing..." }) : t("snakeEdit.publishToMarketplace", { defaultValue: "Publish to Marketplace" })}
                         </button>
                         </FeatureAccessGuard>
+                        </div>
                       )}
                     </div>
                   )}
@@ -13988,6 +14107,7 @@ export default function BreedingPlannerApp() {
                   <select
                     className="mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white"
                     value={(Array.isArray(editSnakeDraft.groups) && editSnakeDraft.groups[0]) || ''}
+                    {...help('record-group')}
                     onChange={e => {
                       const value = e.target.value.trim();
                       setEditSnakeDraft(d => ({
@@ -14001,7 +14121,7 @@ export default function BreedingPlannerApp() {
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
-                  <div className="mt-2 border border-dashed border-neutral-200 rounded-xl p-3 bg-white">
+                  <div className="mt-2 border border-dashed border-neutral-200 rounded-xl p-3 bg-white" {...help('record-add-group')}>
                     <AddGroupInline onAdd={(g)=>{
                       if (!g) return;
                       setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
@@ -14054,6 +14174,7 @@ export default function BreedingPlannerApp() {
                     <button
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={triggerEditCameraCapture}
+                      {...help('record-photo-take')}
                       disabled={editUploadingPhoto || !editSnake?.id}
                     >
                       {t("snakeEdit.image.take")}
@@ -14061,6 +14182,7 @@ export default function BreedingPlannerApp() {
                     <button
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={triggerEditUploadPicker}
+                      {...help('record-photo-upload')}
                       disabled={editUploadingPhoto || !editSnake?.id}
                     >
                       {t("snakeEdit.image.upload")}
@@ -14068,6 +14190,7 @@ export default function BreedingPlannerApp() {
                     <button
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={handleEditViewPictures}
+                      {...help('record-photo-view')}
                       disabled={!editSnake?.id}
                     >
                       {editPhotoCount ? t("snakeEdit.image.viewWithCount", { count: editPhotoCount }) : t("snakeEdit.image.view")}
@@ -14079,6 +14202,7 @@ export default function BreedingPlannerApp() {
                         setEditSnake(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
                       }}
                       disabled={!editSnakeDraft?.imageUrl}
+                      {...help('record-photo-clear')}
                     >
                       {t("snakeEdit.image.clear")}
                     </button>
@@ -14101,7 +14225,7 @@ export default function BreedingPlannerApp() {
 
                 <div className="p-3 border rounded-xl bg-white">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
+                    <div className="font-medium text-sm" {...help('record-pairing-overview')}>{t("snakeEdit.pairingOverview")}</div>
                     <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
                   </div>
                   <div className="space-y-2">
@@ -14146,7 +14270,7 @@ export default function BreedingPlannerApp() {
                 {/* Re-add logs editor so feeds/weights/sheds/cleanings/meds can be edited */}
                 <div className="mt-4 p-2 border rounded-xl bg-neutral-50">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.logsTitle")}</div>
+                    <div className="font-medium text-sm" {...help('record-logs')}>{t("snakeEdit.logsTitle")}</div>
                     <div className="text-xs text-neutral-500">{t("snakeEdit.logsHint")}</div>
                   </div>
                   <LogsEditor editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
@@ -14498,12 +14622,12 @@ export {
           <div role="dialog" aria-modal="true" data-dialog="scan-qr" aria-label={t('scanQrCode')} className="relative z-[10011] bg-white p-4 rounded-lg shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
-                <div className="font-medium text-lg">{t('scanQrCode')}</div>
+                <div {...help('animals-scan-window')} className="font-medium text-lg">{t('scanQrCode')}</div>
                 <div className="text-xs text-neutral-500 mt-1">{t('chooseHow')}</div>
               </div>
               <div className="flex items-center gap-2">
                 <DialogHelpButton />
-                <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+                <button {...help('animals-close')} className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
               </div>
             </div>
 
@@ -14512,6 +14636,7 @@ export {
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
+                  {...help('animals-scan-camera')}
                   onClick={() => handleModeChange('camera')}
                   className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', isCameraMode ? 'bg-sky-600 sk-on-accent border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
                 >
@@ -14519,6 +14644,7 @@ export {
                 </button>
                 <button
                   type="button"
+                  {...help('animals-scan-usb')}
                   onClick={() => handleModeChange('scanner')}
                   className={cx('px-3 py-1.5 rounded-lg text-sm border transition-colors', !isCameraMode ? 'bg-sky-600 sk-on-accent border-sky-600 shadow-sm' : 'bg-white text-neutral-700 border-neutral-200 hover:border-sky-400')}
                 >
@@ -14533,6 +14659,7 @@ export {
             <div className="mt-3">
               <div
                 id="qr-scan-root"
+                {...help('animals-scan-camera-view')}
                 key={scanMode}
                 className={cx(
                   'w-full h-56 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors',
@@ -14556,7 +14683,7 @@ export {
             <div className="mt-3 flex flex-col gap-1">
               <label className="text-sm font-medium">{t('uploadImage')}</label>
               <div className="flex items-center gap-2">
-                <input type="file" accept="image/*" onChange={handleFile} />
+                <input type="file" {...help('animals-scan-upload')} accept="image/*" onChange={handleFile} />
                 <span className="text-xs text-neutral-500 truncate">{lastUploadName || t('noFile')}</span>
               </div>
             </div>
@@ -14569,6 +14696,7 @@ export {
               <div className="mt-2 flex flex-col sm:flex-row gap-2">
                 <input
                   ref={manualInputRef}
+                  {...help('animals-scan-input')}
                   type="text"
                   value={manualValue}
                   onChange={(e) => setManualValue(e.target.value)}
@@ -14581,6 +14709,7 @@ export {
                 />
                 <button
                   type="button"
+                  {...help('animals-scan-lookup')}
                   className={cx('px-3 py-2 rounded-lg text-sm border transition-colors', hasManualValue ? 'bg-sky-600 sk-on-accent border-sky-600' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
                   onClick={handleManualSubmit}
                   disabled={!hasManualValue}
@@ -14591,7 +14720,7 @@ export {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <button className="px-3 py-2 rounded-lg border" onClick={onClose}>{t('close')}</button>
+              <button {...help('animals-close')} className="px-3 py-2 rounded-lg border" onClick={onClose}>{t('close')}</button>
             </div>
           </div>
         </div>
@@ -14770,15 +14899,16 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
       <div role="alertdialog" aria-modal="true" data-dialog="delete-animal" aria-label={t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })} className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="font-semibold text-lg pe-12">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
+        <div className="font-semibold text-lg pe-12" {...help('record-delete-dialog')}>{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
         </p>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          <button className="px-3 py-2 rounded-xl text-sm border" {...help('record-delete-cancel')} onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
           <button
             className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
             onClick={onConfirm}
+            {...help('record-delete-confirm')}
           >
             {t("common.delete", { defaultValue: "Delete" })}
           </button>
@@ -15000,6 +15130,7 @@ function GroupCheckboxes({
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button
           type="button"
+          {...help('animals-group-filter-clear')}
           disabled={!filtersActive && showUnassigned}
           className={cx(
             'px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
@@ -15014,7 +15145,7 @@ function GroupCheckboxes({
         >
           {t("filters.clear")}
         </button>
-        <label className={cx(
+        <label {...help('animals-hide-unassigned')} className={cx(
           'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer select-none transition-colors',
           !showUnassigned ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
         )}>
@@ -15033,6 +15164,7 @@ function GroupCheckboxes({
           return (
             <label
               key={group}
+              {...help('animals-group-filter')}
               className={cx(
                 'inline-flex items-center gap-2 text-sm px-2.5 py-1 rounded-lg border cursor-pointer select-none transition-colors',
                 checked
@@ -15232,10 +15364,11 @@ function SpacesSection({
   }, [terrariumViewId, terrariumForView]);
 
   return (
-    <Card title={t('nav.spaces', { defaultValue: 'Spaces' })}>
+    <Card title={<span {...help('spaces-screen')}>{t('nav.spaces', { defaultValue: 'Spaces' })}</span>}>
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2 items-center">
           <input
+            {...help('spaces-room-name')}
             className="flex-1 min-w-[220px] border rounded-xl px-3 py-2 text-sm"
             value={newRoomName}
             onChange={e => setNewRoomName(e.target.value)}
@@ -15244,6 +15377,7 @@ function SpacesSection({
           <button
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, !!newRoomName.trim()))}
+            {...help('spaces-add-room')}
             onClick={handleCreateRoom}
             disabled={!newRoomName.trim()}
           >
@@ -15271,20 +15405,21 @@ function SpacesSection({
                   }}
                   role="button"
                   tabIndex={0}
+                  {...help('spaces-room-card')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm uppercase tracking-wide text-neutral-500">{t('spaces.roomLabel', { defaultValue: 'Room' })}</div>
                       <div className="text-xl font-semibold text-neutral-900 truncate">{room.name}</div>
                       {isQuarantineRoom(room) ? (
-                        <div className="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        <div {...help('spaces-service-last')} className="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                           {t('spaces.serviceLast', { defaultValue: 'Service last' })}
                         </div>
                       ) : null}
                     </div>
                     <div className="flex flex-col gap-2 text-xs">
-                      <button className="px-2 py-1 border rounded-lg" onClick={(event) => { event.stopPropagation(); handlePromptRenameRoom(room); }}>{t('actions.rename', { defaultValue: 'Rename' })}</button>
-                      <button className="px-2 py-1 border rounded-lg text-rose-600" onClick={(event) => { event.stopPropagation(); handleConfirmDeleteRoom(room.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+                      <button {...help('spaces-room-rename')} className="px-2 py-1 border rounded-lg" onClick={(event) => { event.stopPropagation(); handlePromptRenameRoom(room); }}>{t('actions.rename', { defaultValue: 'Rename' })}</button>
+                      <button {...help('spaces-room-delete')} className="px-2 py-1 border rounded-lg text-rose-600" onClick={(event) => { event.stopPropagation(); handleConfirmDeleteRoom(room.id); }}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3">
@@ -15308,6 +15443,7 @@ function SpacesSection({
                     </div>
                     <button
                       type="button"
+                      {...help('spaces-room-open')}
                       className="px-3 py-1.5 rounded-xl border text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -15420,15 +15556,15 @@ function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
         <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
       <div role="dialog" aria-modal="true" data-dialog="qr-preview" aria-label={t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })} className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="font-medium mb-2 pe-12">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
+        <div {...help('animals-qr-preview')} className="font-medium mb-2 pe-12">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
         <div className="text-sm text-neutral-500 mb-2">{t("qrPreview.idLabel", { defaultValue: "ID:" })} <span className="font-mono">{id}</span></div>
         <div className="space-y-1 mb-3">
           {geneticsTokens.length ? <GeneLine label={t("qrPreview.genetics", { defaultValue: "Genetics" })} genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">{t("qrPreview.geneticsNone", { defaultValue: "Genetics: -" })}</div>}
         </div>
         {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">{t("qrPreview.generating", { defaultValue: "Generating…" })}</div>}
         <div className="mt-3 flex gap-2">
-          {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>{t("actions.download", { defaultValue: "Download" })}</a>}
-          <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          {dataUrl && <a {...help('animals-qr-download')} className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>{t("actions.download", { defaultValue: "Download" })}</a>}
+          <button {...help('animals-close')} className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
       </div>
     </div>
@@ -15456,7 +15592,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
 
   return createPortal((
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" data-dialog="egg-box" aria-label={title} className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="egg-box" {...help('incubator-box-dialog')} aria-label={title} className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b flex items-start justify-between gap-3">
           <div>
             <div className="font-semibold text-lg">{title}</div>
@@ -15505,6 +15641,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
               type="number"
               min="0"
               max={originalEggs}
+              {...help('incubator-bad-eggs')}
               className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
               value={badEggs}
               onChange={e => setBadEggs(e.target.value)}
@@ -15518,6 +15655,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
             <label className="text-xs font-medium">{t("eggBoxModal.notes", { defaultValue: "Egg box notes" })}</label>
             <textarea
               className="mt-1 w-full min-h-32 border rounded-xl px-3 py-2 text-sm"
+              {...help('incubator-box-notes')}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder={t("eggBoxModal.notesPlaceholder", { defaultValue: "Add incubation notes, egg condition, movement, or reminders." })}
@@ -15530,6 +15668,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
             onClick={() => onSave?.(box, { notes, badEggs: badEggsCount })}
+            {...help('incubator-save-box')}
           >
             {t("eggBoxModal.save", { defaultValue: "Save egg box" })}
           </button>
@@ -15579,18 +15718,18 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
     <div className={cx("fixed inset-0 flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
       <div role="dialog" aria-modal="true" data-dialog="export-qr" aria-label={t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })} className="relative z-[10011] bg-white p-4 rounded-lg shadow w-full max-w-2xl" onClick={e=>e.stopPropagation()}>
         <DialogHelpButton className="help-dialog-corner" />
-        <div className="font-medium mb-2 pe-12">{t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })}</div>
+        <div {...help('animals-export-qr-window')} className="font-medium mb-2 pe-12">{t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })}</div>
         <div className="space-y-3">
           <div>
-            <label className="inline-flex items-center gap-2"><input type="radio" checked={mode==='all'} onChange={()=>setMode('all')} /> {t("qrModal.allSnakes", { defaultValue: "All snakes" })}</label>
+            <label {...help('animals-export-qr-all')} className="inline-flex items-center gap-2"><input type="radio" checked={mode==='all'} onChange={()=>setMode('all')} /> {t("qrModal.allSnakes", { defaultValue: "All snakes" })}</label>
           </div>
           <div>
-            <label className="inline-flex items-center gap-2"><input type="radio" checked={mode==='groups'} onChange={()=>setMode('groups')} /> {t("qrModal.byGroups", { defaultValue: "By groups" })}</label>
+            <label {...help('animals-export-qr-groups')} className="inline-flex items-center gap-2"><input type="radio" checked={mode==='groups'} onChange={()=>setMode('groups')} /> {t("qrModal.byGroups", { defaultValue: "By groups" })}</label>
             {mode==='groups' && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {groups.map(g=>{
                   const checked = selectedGroupsLocal.includes(g);
-                  return <label key={g} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg"><input type="checkbox" checked={checked} onChange={e=>{
+                  return <label key={g} {...help('animals-export-qr-groups')} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg"><input type="checkbox" checked={checked} onChange={e=>{
                     const on = e.target.checked; setSelectedGroupsLocal(prev=>{
                       const set = new Set(prev||[]); on?set.add(g):set.delete(g); return [...set];
                     });
@@ -15600,12 +15739,12 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
             )}
           </div>
           <div>
-            <label className="inline-flex items-center gap-2"><input type="radio" checked={mode==='selected'} onChange={()=>setMode('selected')} /> {t("qrModal.selectedSnakes", { defaultValue: "Selected snakes" })}</label>
+            <label {...help('animals-export-qr-selected')} className="inline-flex items-center gap-2"><input type="radio" checked={mode==='selected'} onChange={()=>setMode('selected')} /> {t("qrModal.selectedSnakes", { defaultValue: "Selected snakes" })}</label>
             {mode==='selected' && (
               <div className="mt-2 max-h-40 overflow-auto border rounded p-2">
                 {snakes.map(s=>{
                   const checked = selectedSnakesLocal.includes(s.id);
-                  return <label key={s.id} className="flex items-center gap-2"><input type="checkbox" checked={checked} onChange={e=>{
+                  return <label key={s.id} {...help('animals-export-qr-selected')} className="flex items-center gap-2"><input type="checkbox" checked={checked} onChange={e=>{
                     const on = e.target.checked; setSelectedSnakesLocal(prev=>{
                       const set = new Set(prev||[]); on?set.add(s.id):set.delete(s.id); return [...set];
                     });
@@ -15616,8 +15755,8 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-lg border" onClick={onClose} disabled={isGenerating}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))} onClick={handleGenerate} disabled={isGenerating}>
+          <button {...help('animals-close')} className="px-3 py-2 rounded-lg border" onClick={onClose} disabled={isGenerating}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          <button {...help('animals-export-qr-generate')} className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))} onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? t("qrModal.generating", { defaultValue: "Generating..." }) : t("qrModal.generate", { defaultValue: "Generate PDF" })}
           </button>
         </div>
@@ -15692,18 +15831,18 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
 
   return open && typeof document !== 'undefined' ? createPortal((
     <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-[10010]', overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
-      <div role="dialog" aria-modal="true" data-dialog="pairing-qr" aria-label={t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="pairing-qr" {...help('pairing-qr-dialog')} aria-label={t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b font-semibold flex items-center justify-between gap-3">
           <span>{t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })}</span>
           <DialogHelpButton />
         </div>
         <div className="p-4 space-y-4">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm" {...help('pairing-qr-all')}>
             <input type="radio" checked={mode === 'all'} onChange={() => setMode('all')} />
             {t('pairingQrModal.all', { defaultValue: 'All pairings' })}
           </label>
           <div>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm" {...help('pairing-qr-selected')}>
               <input type="radio" checked={mode === 'selected'} onChange={() => setMode('selected')} />
               {t('pairingQrModal.selected', { defaultValue: 'Selected pairings' })}
             </label>
@@ -15712,7 +15851,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
                 {summaries.length ? summaries.map(item => {
                   const checked = selectedIds.includes(item.id);
                   return (
-                    <label key={item.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <label key={item.id} className="flex items-center gap-2 px-3 py-2 text-sm" {...help('pairing-qr-pick')}>
                       <input type="checkbox" checked={checked} onChange={() => toggleSelection(item.id)} />
                       <span className="flex-1">
                         <span className="font-medium block">{item.label}</span>
@@ -15742,6 +15881,7 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
             className={cx('px-3 py-2 rounded-xl text-sm sk-on-accent', primaryBtnClass(theme, true), !pairings.length && 'opacity-60 cursor-not-allowed')}
             onClick={handleGenerate}
             disabled={!pairings.length || isGenerating}
+            {...help('pairing-qr-generate')}
           >
             {isGenerating
               ? t('pairingQrModal.generating', { defaultValue: 'Generating...' })
@@ -17161,29 +17301,29 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]", overlayClass(theme))} onClick={onClose}>
       <div role="dialog" aria-modal="true" data-dialog="feed-prep" aria-label={t('feedPrep.title', { defaultValue: 'Feed preparation' })} className="relative z-[10021] bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border" onClick={event => event.stopPropagation()}>
         <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div {...help('feed-prep-window')}>
             <div className="text-lg font-semibold text-neutral-900">{t('feedPrep.title', { defaultValue: 'Feed preparation' })}</div>
             <div className="text-sm text-neutral-500">{t('feedPrep.subtitle', { defaultValue: 'Select snakes and generate the grouped defrost list.' })}</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean))}>
+            <button {...help('feed-prep-select-all')} type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean))}>
               {t('feedPrep.selectAll', { defaultValue: 'Select all' })}
             </button>
-            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds([])}>
+            <button {...help('feed-prep-clear')} type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setSelectedIds([])}>
               {t('feedPrep.clearSelection', { defaultValue: 'Clear' })}
             </button>
-            <button type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
+            <button {...help('feed-prep-copy')} type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
               {copied ? t('feedPrep.copied', { defaultValue: 'Copied' }) : t('feedPrep.copyReport', { defaultValue: 'Copy report' })}
             </button>
             <DialogHelpButton />
-            <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
+            <button {...help('feed-prep-close')} type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
               {t('common.close', { defaultValue: 'Close' })}
             </button>
           </div>
         </div>
 
         <div className="p-5 space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3" {...help('feed-prep-totals')}>
             <div className="rounded-xl border bg-neutral-50 p-3">
               <div className="text-xs text-neutral-500">{t('feedPrep.selectedSnakes', { defaultValue: 'Selected snakes' })}</div>
               <div className="text-2xl font-semibold">{selectedRows.length}</div>
@@ -17209,7 +17349,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] gap-5">
             <section className="rounded-xl border overflow-hidden">
               <div className="px-4 py-3 border-b bg-neutral-50">
-                <h3 className="font-semibold text-neutral-900">{t('feedPrep.reportTitle', { defaultValue: 'Defrost report' })}</h3>
+                <h3 {...help('feed-prep-report')} className="font-semibold text-neutral-900">{t('feedPrep.reportTitle', { defaultValue: 'Defrost report' })}</h3>
                 <p className="text-xs text-neutral-500">{t('feedPrep.reportHint', { defaultValue: 'Grouped by food type and size or weight class.' })}</p>
               </div>
               {reportRows.length ? (
@@ -17242,12 +17382,12 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
 
             <section className="rounded-xl border overflow-hidden">
               <div className="px-4 py-3 border-b bg-neutral-50">
-                <h3 className="font-semibold text-neutral-900">{t('feedPrep.snakeSelection', { defaultValue: 'Snake selection' })}</h3>
+                <h3 {...help('feed-prep-selection')} className="font-semibold text-neutral-900">{t('feedPrep.snakeSelection', { defaultValue: 'Snake selection' })}</h3>
                 <p className="text-xs text-neutral-500">{t('feedPrep.selectionHint', { defaultValue: 'Missing profiles are listed but excluded from the grouped totals.' })}</p>
               </div>
               <div className="max-h-[32rem] overflow-y-auto divide-y">
                 {snakeRows.map(row => (
-                  <label key={row.id} className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-neutral-50">
+                  <label key={row.id} {...help('feed-prep-animal')} className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-neutral-50">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -17268,6 +17408,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                     </span>
                     {!row.excluded && !row.complete && typeof onEditSnake === 'function' ? (
                       <button
+                        {...help('feed-prep-edit')}
                         type="button"
                         className="text-xs px-2 py-1 rounded-lg border text-neutral-700"
                         onClick={(event) => {
@@ -17535,7 +17676,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
+            <div {...help('animals-card')} className="min-w-0">
               <div className="font-medium text-base truncate">{s.name}</div>
               <div className="text-xs font-mono text-neutral-500 mt-1 truncate"><bdi>{s.id}</bdi></div>
               <div className="text-xs text-neutral-500">{s.birthDate ? formatDateForDisplay(s.birthDate) : ''}</div>
@@ -17562,12 +17703,12 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       </div>
       <div className="bp-card-actions flex items-center gap-2">
         {hasEdit && (
-          <button className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onEdit(s)}>
+          <button {...help('animals-edit')} className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onEdit(s)}>
             {t("actions.edit", { defaultValue: "Edit" })}
           </button>
         )}
         {hasQuick && (
-          <button className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onQuickPair(s)}>
+          <button {...help('animals-pair')} className="bp-card-btn-primary text-[11px] px-3 py-1.5 border rounded-lg font-medium hover:bg-neutral-50 transition-colors" onClick={() => onQuickPair(s)}>
             {t("actions.pair", { defaultValue: "Pair" })}
           </button>
         )}
@@ -17586,6 +17727,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         {(hasFamilyTree || hasDelete) && (
           <div className="relative ms-auto" ref={overflowMenuRef}>
             <button
+              {...help('animals-more')}
               className="bp-card-overflow-btn bp-card-btn-primary text-[11px] px-2.5 py-1.5 border rounded-lg font-bold text-neutral-500 hover:bg-neutral-50 transition-colors"
               onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(prev => !prev); }}
               title={t("actions.moreActions", { defaultValue: "More actions" })}
@@ -17598,12 +17740,12 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                 <div data-backdrop="" className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
                 <div className="bp-overflow-menu z-[150]">
                   {hasFamilyTree && (
-                    <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
+                    <button {...help('animals-family-tree')} className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
                       🌳 {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
                     </button>
                   )}
                   {hasDelete && (
-                    <button className="bp-overflow-menu__item bp-overflow-menu__item--danger" onClick={() => { setOverflowMenuOpen(false); onDelete(s); }}>
+                    <button {...help('animals-delete')} className="bp-overflow-menu__item bp-overflow-menu__item--danger" onClick={() => { setOverflowMenuOpen(false); onDelete(s); }}>
                       🗑 {t("actions.delete")}
                     </button>
                   )}
@@ -17665,7 +17807,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             const isClickableActivity = ['feeds','weights','cleanings','sheds','meds'].includes(k);
             const pal = activityPalettes[k] || { bg: '#efefef', border: '#ddd' };
             return (
-              <div key={k} onClick={(e)=>{ if (isClickableActivity) { e.stopPropagation(); openQuickForKey(k,e); } }} role={isClickableActivity? 'button': undefined}
+              <div key={k} {...help('animals-activity-tile')} onClick={(e)=>{ if (isClickableActivity) { e.stopPropagation(); openQuickForKey(k,e); } }} role={isClickableActivity? 'button': undefined}
                 className={cx(isClickableActivity? 'cursor-pointer':'' ,'mt-well w-full px-2 py-1 text-[11px] flex flex-col justify-between gap-1 min-h-[48px]')}
                 style={{ backgroundColor: pal.bg, borderColor: pal.border }}>
                   <div className="flex items-center justify-between">
@@ -17786,10 +17928,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <div className="text-base font-semibold">{t("actions.add", { defaultValue: "Add" })} {quickTagOpen}</div>
+              <div {...help('animals-quick-add')} className="text-base font-semibold">{t("actions.add", { defaultValue: "Add" })} {quickTagOpen}</div>
               <span className="flex-1" />
               <DialogHelpButton className="me-2" />
               <button
+                {...help('animals-quick-add-close')}
                 className="text-sm px-2 py-1 border rounded-lg text-neutral-500 hover:text-neutral-700"
                 onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}
               >
@@ -17799,13 +17942,13 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             <div className="space-y-3 text-sm">
               <div>
                 <div className="text-xs text-neutral-500">{t("animals.quickAdd.date", { defaultValue: "Date" })}</div>
-                <input className="w-full px-2 py-1 border rounded" type="date" value={quickDraft.date} onChange={(e)=>setQuickDraft(d=>({...d, date: e.target.value}))} />
+                <input {...help('animals-quick-add-date')} className="w-full px-2 py-1 border rounded" type="date" value={quickDraft.date} onChange={(e)=>setQuickDraft(d=>({...d, date: e.target.value}))} />
               </div>
               {quickTagOpen.toLowerCase().includes('feed') && (
                 <>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.feedType", { defaultValue: "Feed type" })}</div>
-                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: ''}))}>
+                    <select {...help('animals-quick-add-feed-type')} className="w-full px-2 py-1 border rounded" value={quickDraft.feed||''} onChange={(e)=>setQuickDraft(d=>({...d, feed: e.target.value, size: ''}))}>
                       <option value="Mouse">{t("animals.quickAdd.feedOptions.mouse", { defaultValue: "Mouse" })}</option>
                       <option value="Rat">{t("animals.quickAdd.feedOptions.rat", { defaultValue: "Rat" })}</option>
                       <option value="Multimammate">{t("animals.quickAdd.feedOptions.multimammate", { defaultValue: "Multimammate" })}</option>
@@ -17813,7 +17956,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.size", { defaultValue: "Weight class" })}</div>
-                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
+                    <select {...help('animals-quick-add-size')} className="w-full px-2 py-1 border rounded" value={quickDraft.size||''} onChange={e=>setQuickDraft(d=>({...d, size: e.target.value}))}>
                       <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
                       {(FEEDER_SIZE_OPTIONS_BY_TYPE[quickDraft.feed] || FEEDER_SIZE_OPTIONS).map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
@@ -17822,11 +17965,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.weight", { defaultValue: "Weight (g)" })}</div>
-                    <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                    <input {...help('animals-quick-add-feeder-weight')} className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.form", { defaultValue: "Form" })}</div>
-                    <select className="w-full px-2 py-1 border rounded" value={quickDraft.form||''} onChange={(e)=>setQuickDraft(d=>({...d, form: e.target.value}))}>
+                    <select {...help('animals-quick-add-form')} className="w-full px-2 py-1 border rounded" value={quickDraft.form||''} onChange={(e)=>setQuickDraft(d=>({...d, form: e.target.value}))}>
                       <option value="">{t("animals.quickAdd.selectPlaceholder", { defaultValue: "Select" })}</option>
                       <option value="Live">{t("animals.quickAdd.formOptions.live", { defaultValue: "Live" })}</option>
                       <option value="Freshly killed">{t("animals.quickAdd.formOptions.fresh", { defaultValue: "Freshly killed" })}</option>
@@ -17834,7 +17977,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                       <option value="Other">{t("animals.quickAdd.formOptions.other", { defaultValue: "Other" })}</option>
                     </select>
                     {quickDraft.form === 'Other' && (
-                      <input className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.methodDetailsPlaceholder", { defaultValue: "Method details" })} value={quickDraft.formDetail||''} onChange={e=>setQuickDraft(d=>({...d, formDetail: e.target.value}))} />
+                      <input {...help('animals-quick-add-form-detail')} className="mt-2 w-full px-2 py-1 border rounded" placeholder={t("animals.quickAdd.methodDetailsPlaceholder", { defaultValue: "Method details" })} value={quickDraft.formDetail||''} onChange={e=>setQuickDraft(d=>({...d, formDetail: e.target.value}))} />
                     )}
                   </div>
                 </>
@@ -17843,7 +17986,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                         <>
                           <div>
                             <div className="text-xs text-neutral-500">{t("animals.quickAdd.gramsLabel", { defaultValue: "Grams" })}</div>
-                            <input className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
+                            <input {...help('animals-quick-add-grams')} className="w-full px-2 py-1 border rounded" type="number" value={quickDraft.grams} onChange={(e)=>setQuickDraft(d=>({...d, grams: e.target.value}))} />
                           </div>
                           <div>
                             <div className="text-xs text-neutral-500">{t("animals.quickAdd.recentProgress", { defaultValue: "Recent progress" })}</div>
@@ -17855,22 +17998,23 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                 <>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.medicationDrug", { defaultValue: "Drug" })}</div>
-                    <input className="w-full px-2 py-1 border rounded" value={quickDraft.drug} onChange={(e)=>setQuickDraft(d=>({...d, drug: e.target.value}))} />
+                    <input {...help('animals-quick-add-drug')} className="w-full px-2 py-1 border rounded" value={quickDraft.drug} onChange={(e)=>setQuickDraft(d=>({...d, drug: e.target.value}))} />
                   </div>
                   <div>
                     <div className="text-xs text-neutral-500">{t("animals.quickAdd.medicationDose", { defaultValue: "Dose" })}</div>
-                    <input className="w-full px-2 py-1 border rounded" value={quickDraft.dose} onChange={(e)=>setQuickDraft(d=>({...d, dose: e.target.value}))} />
+                    <input {...help('animals-quick-add-dose')} className="w-full px-2 py-1 border rounded" value={quickDraft.dose} onChange={(e)=>setQuickDraft(d=>({...d, dose: e.target.value}))} />
                   </div>
                 </>
               )}
               <div>
                 <div className="text-xs text-neutral-500">{t("animals.quickAdd.notes", { defaultValue: "Notes" })}</div>
-                <input className="w-full px-2 py-1 border rounded" value={quickDraft.notes} onChange={(e)=>setQuickDraft(d=>({...d, notes: e.target.value}))} />
+                <input {...help('animals-quick-add-notes')} className="w-full px-2 py-1 border rounded" value={quickDraft.notes} onChange={(e)=>setQuickDraft(d=>({...d, notes: e.target.value}))} />
               </div>
               <div className="flex items-center justify-end gap-2">
-                <button className="px-2 py-1 border rounded" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+                <button {...help('animals-quick-add-close')} className="px-2 py-1 border rounded" onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
                 {quickTagOpen.toLowerCase().includes('feed') && (
                   <button
+                    {...help('animals-quick-add-refused')}
                     className="px-2 py-1 border rounded text-rose-600"
                     onClick={(e)=>{
                       e.stopPropagation();
@@ -17880,7 +18024,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                     {t("logs.refused", { defaultValue: "Refused feed" })}
                   </button>
                 )}
-                <button className="px-2 py-1 bg-emerald-500 sk-on-accent rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>{t("actions.add", { defaultValue: "Add" })}</button>
+                <button {...help('animals-quick-add-save')} className="px-2 py-1 bg-emerald-500 sk-on-accent rounded" onClick={(e)=>{ e.stopPropagation(); submitQuickAdd(quickTagOpen); }}>{t("actions.add", { defaultValue: "Add" })}</button>
               </div>
             </div>
           </div>
@@ -17906,7 +18050,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
 
       {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
         <div className="mt-2">
-        <div className="text-xs text-neutral-500 mb-1">{t("pairing.breedingCycles", { defaultValue: "Breeding cycles" })}</div>
+        <div {...help('animals-breeding-cycles')} className="text-xs text-neutral-500 mb-1">{t("pairing.breedingCycles", { defaultValue: "Breeding cycles" })}</div>
           <div className="flex flex-col gap-1 max-h-40 overflow-auto pe-1">
             {breedingCyclesByYear.map(group => (
               <div key={group.year} className="rounded-lg border bg-neutral-50 p-2 space-y-1">
@@ -17917,6 +18061,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                       <div className="font-medium truncate">{cycle.label}</div>
                       {onOpenPairing && cycle.id && (
                         <button
+                          {...help('animals-breeding-cycles')}
                           className="text-[10px] px-1.5 py-0.5 border rounded-lg"
                           onClick={() => onOpenPairing(cycle.id)}
                         >
@@ -17957,21 +18102,21 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
 
       {/* Pairings involving this snake */}
       <div className="mt-2">
-        <div className="text-xs text-neutral-500 mb-1">{t("snakeEdit.pairingsLabel", { defaultValue: "Pairings" })}</div>
+        <div {...help('animals-card-pairings')} className="text-xs text-neutral-500 mb-1">{t("snakeEdit.pairingsLabel", { defaultValue: "Pairings" })}</div>
         {(() => {
           const myPairings = pairings.filter(p => p.maleId === s.id || p.femaleId === s.id);
           const visible = myPairings.slice(0,3);
           return (
             <div className="flex flex-col gap-1 max-h-36 overflow-auto">
               {visible.map(p => (
-                <button key={p.id} className="text-sm text-start px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
+                <button key={p.id} {...help('animals-card-pairings')} className="text-sm text-start px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
                   <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
                   <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </button>
               ))}
               {myPairings.length === 0 && (<div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>)}
               {myPairings.length > 3 && (
-                <button className="text-xs mt-1 px-2 py-1 border rounded-lg text-neutral-700" onClick={()=>setShowPairingsModal(true)}>+{myPairings.length - 3} {i18n.t("snakeEdit.more", { defaultValue: "more" })}</button>
+                <button {...help('animals-card-pairings')} className="text-xs mt-1 px-2 py-1 border rounded-lg text-neutral-700" onClick={()=>setShowPairingsModal(true)}>+{myPairings.length - 3} {i18n.t("snakeEdit.more", { defaultValue: "more" })}</button>
               )}
             </div>
           );
@@ -18001,7 +18146,7 @@ function WeightTrendMiniChart({ data = [] }) {
 
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <div className="mt-2 border rounded-lg bg-neutral-50 px-3 py-4 text-xs text-neutral-500">
+      <div {...help('animals-weight-chart')} className="mt-2 border rounded-lg bg-neutral-50 px-3 py-4 text-xs text-neutral-500">
         {t("logs.weightsEmpty", { defaultValue: "No weight history yet. Log a weight to start tracking progress." })}
       </div>
     );
@@ -18035,7 +18180,7 @@ function WeightTrendMiniChart({ data = [] }) {
   const diffLabel = `${diff >= 0 ? '+' : ''}${formatNumber(diff)} g`;
 
   return (
-    <div className="mt-2 border rounded-lg bg-neutral-50 p-3">
+    <div {...help('animals-weight-chart')} className="mt-2 border rounded-lg bg-neutral-50 p-3">
       <svg
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         role="img"
@@ -18117,12 +18262,12 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
       <div role="dialog" aria-modal="true" data-dialog="animal-pairings" aria-label={t("snakeEdit.pairingsFor", { defaultValue: "Pairings for {{name}}", name: snake.name })} className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium">{t("snakeEdit.pairingsFor", { defaultValue: "Pairings for {{name}}", name: snake.name })}</div>
+            <div {...help('animals-pairings-window')} className="font-medium">{t("snakeEdit.pairingsFor", { defaultValue: "Pairings for {{name}}", name: snake.name })}</div>
             <div className="text-xs text-neutral-500">{t("pairing.openHint", { defaultValue: "Click a pairing to open it." })}</div>
           </div>
           <div className="flex items-center gap-2">
             <DialogHelpButton />
-            <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t("actions.close", { defaultValue: "Close" })}</button>
+            <button {...help('animals-close')} className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t("actions.close", { defaultValue: "Close" })}</button>
           </div>
         </div>
         <div className="mt-3 space-y-2 max-h-72 overflow-auto">
@@ -18134,7 +18279,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
                   <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onOpenPairing && onOpenPairing(p.id)}>{t("actions.open", { defaultValue: "Open" })}</button>
+                  <button {...help('animals-pairings-open')} className="text-xs px-2 py-1 border rounded-lg" onClick={() => onOpenPairing && onOpenPairing(p.id)}>{t("actions.open", { defaultValue: "Open" })}</button>
                 </div>
               </div>
                   <div className="mt-2 text-xs">
@@ -18164,6 +18309,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
       <th className="text-start px-3 py-2 font-semibold">
         <button
           type="button"
+          {...help('animals-sort-header')}
           className={cx('flex items-center gap-1 hover:text-neutral-900', isActive ? 'text-neutral-900' : 'text-neutral-500')}
           onClick={() => typeof onSortHeaderClick === 'function' && onSortHeaderClick(field)}
         >
@@ -18320,30 +18466,31 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
                 <td className="px-3 py-3 align-top">
                   <div className="flex flex-wrap gap-2">
                     {typeof onEdit === 'function' && (
-                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onEdit(snake)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
+                      <button {...help('animals-edit')} className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onEdit(snake)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
                     )}
                     {typeof onQuickPair === 'function' && (
-                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onQuickPair(snake)}>{t('actions.pair', { defaultValue: 'Pair' })}</button>
+                      <button {...help('animals-pair')} className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onQuickPair(snake)}>{t('actions.pair', { defaultValue: 'Pair' })}</button>
                     )}
                     {typeof onOpenFamilyTree === 'function' && (
-                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOpenFamilyTree(snake)}>
+                      <button {...help('animals-family-tree')} className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOpenFamilyTree(snake)}>
                         {t('actions.openFamilyTree', { defaultValue: 'Open family tree' })}
                       </button>
                     )}
                     {typeof onOrderGeneticTest === 'function' && (
-                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOrderGeneticTest(snake)}>
+                      <button {...help('animals-order-test')} className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onOrderGeneticTest(snake)}>
                         {t('actions.orderGeneticTest', { defaultValue: 'Order Genetic Test' })}
                       </button>
                     )}
                     <button
                       type="button"
+                      {...help('animals-table-pairings')}
                       className="text-[11px] px-2 py-1 border rounded-lg"
                       onClick={() => handleOpenPairings(snake)}
                     >
                       {t('snakeEdit.pairingsLabel', { defaultValue: 'Pairings' })}{relatedPairings.length ? ` (${relatedPairings.length})` : ''}
                     </button>
                     {typeof onDelete === 'function' && (
-                      <button className="text-[11px] px-2 py-1 border rounded-lg text-rose-600" onClick={() => onDelete(snake)}>{t('actions.delete')}</button>
+                      <button {...help('animals-delete')} className="text-[11px] px-2 py-1 border rounded-lg text-rose-600" onClick={() => onDelete(snake)}>{t('actions.delete')}</button>
                     )}
                   </div>
                 </td>
@@ -18408,9 +18555,9 @@ function AddGroupInline({ onAdd }) {
   const [val, setVal] = useState("");
   return (
     <div className="flex gap-2 px-2">
-      <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
+      <input {...help('animals-group-add-inline')} className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
         value={val} onChange={e=>setVal(e.target.value)} />
-      <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
+      <button {...help('animals-group-add-inline')} className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
         const g = val.trim();
         if (!g) return;
         onAdd(g);
@@ -20622,29 +20769,30 @@ function BreederSection({
 
   return (
     <Card title={`${t("nav.setup", { defaultValue: "Settings" })} · Serpentora v${__APP_VERSION__}`}>
-      <div ref={setupTabStripRef} className="settings-tab-strip mb-4">
-        <TabButton theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'geneAliases'} onClick={() => setSetupTab('geneAliases')}>{t('setup.aliases.geneTitle', { defaultValue: 'Gene Alias Manager' })}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>{t("setup.account.tab", { defaultValue: "My Account" })}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
+      <div ref={setupTabStripRef} className="settings-tab-strip mb-4" {...help('settings-screen')}>
+        <TabButton {...help('settings-info')} theme={theme} active={setupTab === 'info'} onClick={() => setSetupTab('info')}>{t("setup.info")}</TabButton>
+        <TabButton {...help('settings-id-wizard')} theme={theme} active={setupTab === 'id'} onClick={() => setSetupTab('id')}>{t("setup.idWizard")}</TabButton>
+        <TabButton {...help('settings-morph-aliases')} theme={theme} active={setupTab === 'aliases'} onClick={() => setSetupTab('aliases')}>{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</TabButton>
+        <TabButton {...help('settings-gene-aliases')} theme={theme} active={setupTab === 'geneAliases'} onClick={() => setSetupTab('geneAliases')}>{t('setup.aliases.geneTitle', { defaultValue: 'Gene Alias Manager' })}</TabButton>
+        <TabButton {...help('export-screen')} theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
+        <TabButton {...help('settings-appearance')} theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
+        <TabButton {...help('backup-screen')} theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
+        <TabButton {...help('account-screen')} theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>{t("setup.account.tab", { defaultValue: "My Account" })}</TabButton>
+        <TabButton {...help('settings-language')} theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
         {isDevEnvironment && (
-          <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
+          <TabButton {...help('settings-dev-tools')} theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
         )}
       </div>
       <BackendStatusDot failure={cloudSyncFailure} />
 
       {setupTab === 'info' && (
-        <div className="space-y-6">
+        <div className="space-y-6" {...help('settings-info')}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium">{t('setup.name', { defaultValue: 'Name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-name')}
                 value={info.name}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, name: e.target.value }))}
               />
@@ -20653,6 +20801,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.businessName', { defaultValue: 'Business name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-business')}
                 value={info.businessName}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, businessName: e.target.value }))}
               />
@@ -20661,6 +20810,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.email', { defaultValue: 'Email' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-email')}
                 value={info.email}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, email: e.target.value }))}
               />
@@ -20669,6 +20819,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.phone', { defaultValue: 'Phone' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-phone')}
                 value={info.phone}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, phone: e.target.value }))}
               />
@@ -20677,6 +20828,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.street', { defaultValue: 'Street' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-address')}
                 value={info.street}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, street: e.target.value }))}
               />
@@ -20685,6 +20837,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.postalCode', { defaultValue: 'Postal code' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-address')}
                 value={info.postalCode}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, postalCode: e.target.value }))}
               />
@@ -20693,6 +20846,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.city', { defaultValue: 'City' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-address')}
                 value={info.city}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, city: e.target.value }))}
               />
@@ -20701,6 +20855,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.country', { defaultValue: 'Country' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-info-address')}
                 value={info.country}
                 onChange={e => persistBreederInfo(prev => ({ ...prev, country: e.target.value }))}
               />
@@ -20733,6 +20888,7 @@ function BreederSection({
                   }}
                 />
                 <button
+                  {...help('settings-info-logo')}
                   type="button"
                   className="px-3 py-2 rounded-lg border text-sm"
                   onClick={() => {
@@ -20749,6 +20905,7 @@ function BreederSection({
 
           <div className="flex justify-end">
             <button
+              {...help('settings-info-save')}
               className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))}
               onClick={() => {
                 if (typeof showAppAlert === 'function') {
@@ -20766,7 +20923,7 @@ function BreederSection({
       )}
 
       {setupTab === 'id' && (
-        <div className="border-t pt-4 space-y-4">
+        <div className="border-t pt-4 space-y-4" {...help('settings-id-wizard')}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="font-semibold text-sm">{t('setup.idTitle', { defaultValue: 'ID generator wizard' })}</div>
@@ -20775,6 +20932,7 @@ function BreederSection({
               </div>
             </div>
             <button
+              {...help('settings-id-reset')}
               type="button"
               className="text-xs px-2 py-1 border rounded-lg"
               onClick={handleResetIdConfig}
@@ -20787,6 +20945,7 @@ function BreederSection({
             <label className="text-xs font-medium">{t('setup.template', { defaultValue: 'Template' })}</label>
             <input
               className="mt-1 w-full border rounded-xl px-3 py-2 font-mono text-sm"
+              {...help('settings-id-template')}
               ref={templateInputRef}
               value={idConfig.template}
               onChange={e => {
@@ -20813,6 +20972,7 @@ function BreederSection({
                 min={1}
                 max={6}
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-id-padding')}
                 value={idConfig.sequencePadding}
                 onChange={e => updateIdConfig({ sequencePadding: parseInt(e.target.value, 10) || 1 })}
               />
@@ -20823,6 +20983,7 @@ function BreederSection({
               <div className="mt-1 flex items-center gap-2">
                 <input
                   type="checkbox"
+                  {...help('settings-id-uppercase')}
                   checked={idConfig.uppercase}
                   onChange={e => updateIdConfig({ uppercase: e.target.checked })}
                 />
@@ -20834,6 +20995,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.freeText', { defaultValue: 'Free text token value' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-id-free-text')}
                 value={idConfig.customText}
                 onChange={e => updateIdConfig({ customText: e.target.value })}
                 placeholder="BREED"
@@ -20842,7 +21004,7 @@ function BreederSection({
             </div>
           </div>
 
-          <div className="border rounded-xl bg-neutral-50 p-4 space-y-3">
+          <div className="border rounded-xl bg-neutral-50 p-4 space-y-3" {...help('settings-id-preview')}>
             <div className="font-medium text-sm">{t('setup.livePreview', { defaultValue: 'Live preview' })}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div>
@@ -20917,6 +21079,7 @@ function BreederSection({
                 const tokenKey = token === '[-]' ? 'dash' : token.replace(/^\[|\]$/g, '').toLowerCase();
                 return (
                   <button
+                    {...help('settings-id-tokens')}
                     key={token}
                     type="button"
                     aria-pressed={hasToken}
@@ -20952,7 +21115,7 @@ function BreederSection({
       )}
 
       {setupTab === 'aliases' && (
-        <div className="border-t pt-4 space-y-4">
+        <div className="border-t pt-4 space-y-4" {...help('settings-morph-aliases')}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="font-semibold text-sm">{t('setup.aliases.morphTitle', { defaultValue: 'Morph Alias Manager' })}</div>
@@ -20968,10 +21131,10 @@ function BreederSection({
                 className="hidden"
                 onChange={handleImportAliases}
               />
-              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => aliasImportInputRef.current?.click()}>
+              <button {...help('settings-morph-alias-import')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => aliasImportInputRef.current?.click()}>
                 {t('setup.aliases.importJson', { defaultValue: 'Import JSON' })}
               </button>
-              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportAliases}>
+              <button {...help('settings-morph-alias-export')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportAliases}>
                 {t('setup.aliases.exportJson', { defaultValue: 'Export JSON' })}
               </button>
             </div>
@@ -20982,6 +21145,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.aliasLabel', { defaultValue: 'Alias' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-morph-alias-name')}
                 value={aliasDraftAlias}
                 onChange={e => setAliasDraftAlias(e.target.value)}
                 placeholder="Pompeii"
@@ -20991,6 +21155,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.genesLabel', { defaultValue: 'Genes (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-morph-alias-genes')}
                 value={aliasDraftGenes}
                 onChange={e => setAliasDraftGenes(e.target.value)}
                 placeholder="Black Pastel, Red Stripe, Spotnose, Yellow Belly, Clown"
@@ -21000,6 +21165,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.notesLabel', { defaultValue: 'Notes (optional)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-morph-alias-notes')}
                 value={aliasDraftNotes}
                 onChange={e => setAliasDraftNotes(e.target.value)}
                 placeholder={t("setup.aliases.notesPlaceholder", { defaultValue: "BEL complex combinations" })}
@@ -21008,13 +21174,13 @@ function BreederSection({
           </div>
 
           <div className="flex items-center gap-2">
-            <button type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
+            <button {...help('settings-morph-alias-save')} type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveAlias}>
               {editingAliasKey
                 ? t('setup.aliases.updateAlias', { defaultValue: 'Update alias' })
                 : t('setup.aliases.addAlias', { defaultValue: 'Add alias' })}
             </button>
             {editingAliasKey && (
-              <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetAliasDraft}>
+              <button {...help('settings-alias-cancel-edit')} type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetAliasDraft}>
                 {t('setup.aliases.cancelEdit', { defaultValue: 'Cancel edit' })}
               </button>
             )}
@@ -21033,8 +21199,8 @@ function BreederSection({
                     {row.notes && <div className="text-[11px] text-neutral-500 mt-0.5">{row.notes}</div>}
                   </div>
                   <div className="flex items-center gap-2 whitespace-nowrap">
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteAlias(row.alias)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+                    <button {...help('settings-alias-edit')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
+                    <button {...help('settings-alias-delete')} type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteAlias(row.alias)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                   </div>
                 </div>
               )) : (
@@ -21046,7 +21212,7 @@ function BreederSection({
       )}
 
       {setupTab === 'geneAliases' && (
-        <div className="border-t pt-4 space-y-4">
+        <div className="border-t pt-4 space-y-4" {...help('settings-gene-aliases')}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="font-semibold text-sm">{t('setup.aliases.geneTitle', { defaultValue: 'Gene Alias Manager' })}</div>
@@ -21062,10 +21228,10 @@ function BreederSection({
                 className="hidden"
                 onChange={handleImportGeneAliases}
               />
-              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => geneAliasImportInputRef.current?.click()}>
+              <button {...help('settings-gene-alias-import')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => geneAliasImportInputRef.current?.click()}>
                 {t('setup.aliases.importJson', { defaultValue: 'Import JSON' })}
               </button>
-              <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportGeneAliases}>
+              <button {...help('settings-gene-alias-export')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={handleExportGeneAliases}>
                 {t('setup.aliases.exportJson', { defaultValue: 'Export JSON' })}
               </button>
             </div>
@@ -21076,6 +21242,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.geneNameLabel', { defaultValue: 'Gene name' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-gene-alias-name')}
                 value={geneAliasDraftName}
                 onChange={e => setGeneAliasDraftName(e.target.value)}
                 placeholder="Orange Dream"
@@ -21085,6 +21252,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.geneAliasesLabel', { defaultValue: 'Aliases (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-gene-alias-aliases')}
                 value={geneAliasDraftAliases}
                 onChange={e => setGeneAliasDraftAliases(e.target.value)}
                 placeholder="Orange Dream, OrangeDream"
@@ -21094,6 +21262,7 @@ function BreederSection({
               <label className="text-xs font-medium">{t('setup.aliases.shorthandLabel', { defaultValue: 'Shorthand (comma separated)' })}</label>
               <input
                 className="mt-1 w-full border rounded-xl px-3 py-2"
+                {...help('settings-gene-alias-shorthand')}
                 value={geneAliasDraftShorthand}
                 onChange={e => setGeneAliasDraftShorthand(e.target.value)}
                 placeholder="OD"
@@ -21102,13 +21271,13 @@ function BreederSection({
           </div>
 
           <div className="flex items-center gap-2">
-            <button type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
+            <button {...help('settings-gene-alias-save')} type="button" className={cx('px-3 py-2 rounded-lg sk-on-accent text-sm', primaryBtnClass(theme, true))} onClick={handleSaveGeneAlias}>
               {editingGeneAliasKey
                 ? t('setup.aliases.updateGeneAlias', { defaultValue: 'Update gene alias' })
                 : t('setup.aliases.addGeneAlias', { defaultValue: 'Add gene alias' })}
             </button>
             {editingGeneAliasKey && (
-              <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetGeneAliasDraft}>
+              <button {...help('settings-alias-cancel-edit')} type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={resetGeneAliasDraft}>
                 {t('setup.aliases.cancelEdit', { defaultValue: 'Cancel edit' })}
               </button>
             )}
@@ -21127,8 +21296,8 @@ function BreederSection({
                     <div className="text-neutral-500 text-xs">{t('setup.aliases.shorthandPrefix', { defaultValue: 'Shorthand:' })} {(row.shorthand || []).join(', ') || '-'}</div>
                   </div>
                   <div className="flex items-center gap-2 whitespace-nowrap">
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditGeneAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
-                    <button type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteGeneAlias(row.geneName)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
+                    <button {...help('settings-alias-edit')} type="button" className="text-xs px-2 py-1 border rounded-lg" onClick={() => handleEditGeneAlias(row)}>{t('actions.edit', { defaultValue: 'Edit' })}</button>
+                    <button {...help('settings-alias-delete')} type="button" className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={() => handleDeleteGeneAlias(row.geneName)}>{t('actions.delete', { defaultValue: 'Delete' })}</button>
                   </div>
                 </div>
               )) : (
@@ -21140,7 +21309,7 @@ function BreederSection({
       )}
 
       {setupTab === 'export' && (
-        <div className="border-t pt-4 space-y-6">
+        <div className="border-t pt-4 space-y-6" {...help('export-screen')}>
           <div className="space-y-3">
             <div>
               <div className="font-semibold text-sm">{t('setup.dataExports', { defaultValue: 'Data exports' })}</div>
@@ -21148,7 +21317,7 @@ function BreederSection({
                 {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and pairings.' })}
               </div>
             </div>
-            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4">
+            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4" {...help('export-lab-label-size')}>
               <div>
                 <div className="font-semibold text-sm">{t('export.shedTestingLabelSize', { defaultValue: 'Shed Testing Label Size' })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
@@ -21161,6 +21330,7 @@ function BreederSection({
                     || (Number(labLabelDraft.widthMm) === preset.widthMm && Number(labLabelDraft.heightMm) === preset.heightMm);
                   return (
                     <button
+                      {...help('export-lab-label-preset')}
                       key={preset.key}
                       type="button"
                       className={cx(
@@ -21185,6 +21355,7 @@ function BreederSection({
                     max={LAB_LABEL_SIZE_LIMITS_MM.max}
                     step="1"
                     className="w-full border rounded-lg px-2 py-2 text-sm"
+                    {...help('export-lab-label-dimensions')}
                     value={labLabelDraft.widthMm}
                     onChange={e => handleLabLabelDraftChange('widthMm', e.target.value)}
                   />
@@ -21197,6 +21368,7 @@ function BreederSection({
                     max={LAB_LABEL_SIZE_LIMITS_MM.max}
                     step="1"
                     className="w-full border rounded-lg px-2 py-2 text-sm"
+                    {...help('export-lab-label-dimensions')}
                     value={labLabelDraft.heightMm}
                     onChange={e => handleLabLabelDraftChange('heightMm', e.target.value)}
                   />
@@ -21204,6 +21376,7 @@ function BreederSection({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
+                  {...help('export-lab-label-save')}
                   type="button"
                   className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                   onClick={handleSaveLabLabelSettings}
@@ -21211,6 +21384,7 @@ function BreederSection({
                   {t('modal.save', { defaultValue: 'Save' })}
                 </button>
                 <button
+                  {...help('export-lab-label-reset')}
                   type="button"
                   className="px-3 py-2 rounded-lg border text-sm"
                   onClick={handleResetLabLabelSettings}
@@ -21224,6 +21398,7 @@ function BreederSection({
               <label className="flex items-center gap-2 text-xs text-neutral-700">
                 <input
                   type="checkbox"
+                  {...help('export-lab-label-guides')}
                   checked={labLabelDebugGuides}
                   onChange={e => setLabLabelDebugGuides(e.target.checked)}
                 />
@@ -21313,7 +21488,7 @@ function BreederSection({
                 </div>
               </div>
             </div>
-            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
+            <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3" {...help('export-pdf-labels')}>
               <div>
                 <div className="font-semibold text-sm">{t('export.pdfLabelSettings', { defaultValue: 'PDF label settings' })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
@@ -21325,6 +21500,7 @@ function BreederSection({
                   <span>{t('export.formatType', { defaultValue: 'Format type' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    {...help('export-pdf-label-format')}
                     value={normalizedPdfLabelSettings.formatType}
                     onChange={e => handlePdfFormatTypeChange(e.target.value)}
                   >
@@ -21337,6 +21513,7 @@ function BreederSection({
                   <span>{t('export.brand', { defaultValue: 'Brand' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    {...help('export-pdf-label-preset')}
                     value={normalizedPdfLabelSettings.brand}
                     onChange={e => handlePdfBrandChange(e.target.value)}
                   >
@@ -21349,6 +21526,7 @@ function BreederSection({
                   <span>{t('export.labelCategory', { defaultValue: 'Label category' })}</span>
                   <select
                     className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                    {...help('export-pdf-label-preset')}
                     value={normalizedPdfLabelSettings.category}
                     onChange={e => handlePdfCategoryChange(e.target.value)}
                   >
@@ -21362,6 +21540,7 @@ function BreederSection({
                     <span>{t('export.sizePreset', { defaultValue: 'Size preset' })}</span>
                     <select
                       className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                      {...help('export-pdf-label-preset')}
                       value={normalizedPdfLabelSettings.presetKey}
                       onChange={e => handlePdfPresetChange(e.target.value)}
                     >
@@ -21377,6 +21556,7 @@ function BreederSection({
                       <span>{t('export.unit', { defaultValue: 'Unit' })}</span>
                       <select
                         className="w-full border rounded-lg px-2 py-2 bg-white text-sm"
+                        {...help('export-pdf-label-custom')}
                         value={normalizedPdfLabelSettings.unit}
                         onChange={e => updatePdfLabelSettings({ unit: e.target.value })}
                       >
@@ -21392,6 +21572,7 @@ function BreederSection({
                         min="1"
                         step="0.1"
                         className="w-full border rounded-lg px-2 py-2 text-sm"
+                        {...help('export-pdf-label-custom')}
                         value={normalizedPdfLabelSettings.width}
                         onChange={e => handlePdfCustomNumberChange('width', e.target.value)}
                       />
@@ -21403,6 +21584,7 @@ function BreederSection({
                         min="1"
                         step="0.1"
                         className="w-full border rounded-lg px-2 py-2 text-sm"
+                        {...help('export-pdf-label-custom')}
                         value={normalizedPdfLabelSettings.height}
                         onChange={e => handlePdfCustomNumberChange('height', e.target.value)}
                       />
@@ -21454,6 +21636,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), (!hasAnimalData || !hasAnimalsInScope ? 'opacity-60 cursor-not-allowed' : ''))}
+                      {...help('export-animals-pdf')}
                       onClick={handleAnimalsExportPdf}
                       disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
@@ -21462,6 +21645,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
+                      {...help('export-animals-sheet')}
                       onClick={handleAnimalsExportSheet}
                       disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
@@ -21470,6 +21654,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
+                      {...help('export-catalog')}
                       onClick={handleGenerateSnakeCatalog}
                       disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
@@ -21478,6 +21663,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm border', hasAnimalData && hasAnimalsInScope ? '' : 'opacity-60 cursor-not-allowed')}
+                      {...help('export-text-list')}
                       onClick={handleOpenAnimalTextList}
                       disabled={!hasAnimalData || !hasAnimalsInScope}
                     >
@@ -21485,7 +21671,7 @@ function BreederSection({
                     </button>
                   </div>
                 </div>
-                <div className="rounded-lg border bg-neutral-50 p-3 space-y-2">
+                <div className="rounded-lg border bg-neutral-50 p-3 space-y-2" {...help('export-scope')}>
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                     {t('export.whichAnimals', { defaultValue: 'Which animals' })}
                   </div>
@@ -21498,7 +21684,7 @@ function BreederSection({
                       { mode: 'groups', label: t('export.scope.byGroup', { defaultValue: 'By group' }) },
                       { mode: 'tags', label: t('export.scope.byTag', { defaultValue: 'By tag' }) },
                     ].map(option => (
-                      <label key={option.mode} className="inline-flex items-center gap-2 cursor-pointer">
+                      <label key={option.mode} className="inline-flex items-center gap-2 cursor-pointer" {...help('export-scope-start')}>
                         <input
                           type="radio"
                           name="animal-export-scope"
@@ -21514,7 +21700,7 @@ function BreederSection({
                     animalScopeOptions.groups.length ? (
                       <div className="flex flex-wrap gap-2">
                         {animalScopeOptions.groups.map(group => (
-                          <label key={group} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer">
+                          <label key={group} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer" {...help('export-scope-filter')}>
                             <input
                               type="checkbox"
                               checked={animalExportScope.groups.includes(group)}
@@ -21535,7 +21721,7 @@ function BreederSection({
                     animalScopeOptions.tags.length ? (
                       <div className="flex flex-wrap gap-2">
                         {animalScopeOptions.tags.map(tag => (
-                          <label key={tag} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer">
+                          <label key={tag} className="inline-flex items-center gap-2 px-2 py-1 border rounded-lg bg-white text-xs cursor-pointer" {...help('export-scope-filter')}>
                             <input
                               type="checkbox"
                               checked={animalExportScope.tags.includes(tag)}
@@ -21564,6 +21750,7 @@ function BreederSection({
                       {animalScopeCandidates.length > 0 && (
                         <div className="flex items-center gap-2">
                           <button
+                            {...help('export-scope-select')}
                             type="button"
                             className="px-2 py-1 rounded-lg border bg-white text-[11px]"
                             onClick={selectAllVisibleScopeAnimals}
@@ -21571,6 +21758,7 @@ function BreederSection({
                             {t('export.scope.selectAll', { defaultValue: 'Select all' })}
                           </button>
                           <button
+                            {...help('export-scope-select')}
                             type="button"
                             className="px-2 py-1 rounded-lg border bg-white text-[11px]"
                             onClick={clearVisibleScopeAnimals}
@@ -21594,13 +21782,14 @@ function BreederSection({
                             type="search"
                             className="w-full border rounded-lg px-2 py-1.5 text-xs"
                             placeholder={t('export.scope.searchPlaceholder', { defaultValue: 'Search by name or ID' })}
+                            {...help('export-scope-search')}
                             value={animalScopeSearch}
                             onChange={e => setAnimalScopeSearch(e.target.value)}
                           />
                         )}
                         <div className="max-h-56 overflow-y-auto rounded-lg border bg-white divide-y">
                           {visibleScopeCandidates.length ? visibleScopeCandidates.map(snake => (
-                            <label key={snake.id} className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-neutral-50">
+                            <label key={snake.id} className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-neutral-50" {...help('export-scope-animal')}>
                               <input
                                 type="checkbox"
                                 checked={!excludedAnimalIds.has(String(snake.id))}
@@ -21638,6 +21827,7 @@ function BreederSection({
                       <button
                         type="button"
                         className="status-tag-neutral-button px-2 py-1 rounded-lg border text-[11px]"
+                        {...help('export-scope-reset')}
                         onClick={clearAnimalScope}
                       >
                         {t('export.scope.reset', { defaultValue: 'Back to all animals' })}
@@ -21649,6 +21839,7 @@ function BreederSection({
                     <label className="inline-flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
                       <input
                         type="checkbox"
+                        {...help('export-catalog-for-sale')}
                         checked={catalogOnlyForSale}
                         onChange={() => setCatalogOnlyForSale(value => !value)}
                       />
@@ -21669,7 +21860,7 @@ function BreederSection({
                     className={cx('fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]', overlayClass(theme))}
                     onClick={() => setAnimalTextListPreview(null)}
                   >
-                    <div role="dialog" aria-modal="true" data-dialog="text-list"
+                    <div role="dialog" aria-modal="true" data-dialog="text-list" {...help('export-text-list-window')}
                       aria-label={t('export.textList.title', { defaultValue: 'Animal list as text' })}
                       className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border"
                       onClick={event => event.stopPropagation()}
@@ -21688,6 +21879,7 @@ function BreederSection({
                       </div>
                       <div className="p-5">
                         <textarea
+                          {...help('export-text-list-window')}
                           readOnly
                           value={animalTextListPreview.text}
                           onFocus={event => event.target.select()}
@@ -21696,6 +21888,7 @@ function BreederSection({
                       </div>
                       <div className="px-5 pb-5 flex flex-wrap items-center justify-end gap-2">
                         <button
+                          {...help('app-dialog-close')}
                           type="button"
                           className="px-3 py-2 rounded-lg text-sm border"
                           onClick={() => setAnimalTextListPreview(null)}
@@ -21705,6 +21898,7 @@ function BreederSection({
                         <button
                           type="button"
                           className="px-3 py-2 rounded-lg text-sm border"
+                          {...help('export-text-list-download')}
                           onClick={handleDownloadAnimalTextList}
                         >
                           {t('export.textList.download', { defaultValue: 'Download .txt' })}
@@ -21712,6 +21906,7 @@ function BreederSection({
                         <button
                           type="button"
                           className={cx('px-3 py-2 rounded-lg text-sm text-white', primaryBtnClass(theme, true))}
+                          {...help('export-text-list-copy')}
                           onClick={handleCopyAnimalTextList}
                         >
                           {animalTextListCopied
@@ -21724,8 +21919,8 @@ function BreederSection({
                 ), document.body)}
 
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
-                  <button type="button" className="underline" onClick={handleSelectAllAnimalFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
-                  <button type="button" className="underline" onClick={handleResetAnimalFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
+                  <button {...help('export-fields-select-all')} type="button" className="underline" onClick={handleSelectAllAnimalFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
+                  <button {...help('export-fields-reset')} type="button" className="underline" onClick={handleResetAnimalFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {animalFieldSections.map(section => (
@@ -21739,6 +21934,7 @@ function BreederSection({
                               <input
                                 type="checkbox"
                                 className="w-4 h-4 rounded border-neutral-300"
+                                {...help('export-field')}
                                 checked={checked}
                                 onChange={() => handleToggleAnimalField(field.key)}
                               />
@@ -21772,6 +21968,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), (!canExportPairings ? 'opacity-60 cursor-not-allowed' : ''))}
+                      {...help('export-pairings-pdf')}
                       onClick={handlePairingsExportPdf}
                       disabled={!canExportPairings}
                     >
@@ -21780,6 +21977,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm border', canExportPairings ? '' : 'opacity-60 cursor-not-allowed')}
+                      {...help('export-pairings-sheet')}
                       onClick={handlePairingsExportSheet}
                       disabled={!canExportPairings}
                     >
@@ -21788,6 +21986,7 @@ function BreederSection({
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-lg text-sm border', canExportPairings ? '' : 'opacity-60 cursor-not-allowed')}
+                      {...help('export-pairings-csv')}
                       onClick={handlePairingsExportCsv}
                       disabled={!canExportPairings}
                     >
@@ -21804,6 +22003,7 @@ function BreederSection({
                         className={cx('px-2.5 py-1.5 rounded-full border text-xs font-semibold transition', pairingExportType === 'default'
                           ? 'bg-blue-600 sk-on-accent border-blue-600 shadow-sm'
                           : 'border-neutral-300 text-neutral-700 bg-white')}
+                        {...help('export-pairings-layout')}
                         onClick={() => setPairingExportType('default')}
                       >
                         {t('export.defaultLayout', { defaultValue: 'Default' })}
@@ -21813,6 +22013,7 @@ function BreederSection({
                         className={cx('px-2.5 py-1.5 rounded-full border text-xs font-semibold transition', pairingExportType === 'byPairing'
                           ? 'bg-blue-900 sk-on-accent border-blue-900 shadow-sm'
                           : 'border-neutral-300 text-neutral-700 bg-white')}
+                        {...help('export-pairings-layout')}
                         onClick={() => setPairingExportType('byPairing')}
                       >
                         {t('export.byPairingLayout', { defaultValue: 'By pairing (Male -> Females)' })}
@@ -21825,6 +22026,7 @@ function BreederSection({
                         <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('export.season', { defaultValue: 'Season' })}</label>
                         <select
                           className="border rounded-lg px-3 py-2 bg-white text-sm"
+                          {...help('export-pairings-season')}
                           value={pairingSeasonFilter}
                           onChange={e => setPairingSeasonFilter(e.target.value || 'all')}
                         >
@@ -21847,6 +22049,7 @@ function BreederSection({
                                   className={cx('px-2 py-1 rounded-full border text-[11px] transition', active
                                     ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
                                     : 'border-neutral-300 text-neutral-700 bg-white hover:border-emerald-400')}
+                                  {...help('export-pairings-status')}
                                   onClick={() => handleTogglePairingStatusFilter(status)}
                                 >
                                   {status}
@@ -21855,7 +22058,7 @@ function BreederSection({
                             })}
                           </div>
                           {pairingStatusFilter.length > 0 && (
-                            <button type="button" className="text-[11px] underline" onClick={handleClearPairingStatusFilter}>{t('export.clearStatuses', { defaultValue: 'Clear statuses' })}</button>
+                            <button {...help('export-pairings-status')} type="button" className="text-[11px] underline" onClick={handleClearPairingStatusFilter}>{t('export.clearStatuses', { defaultValue: 'Clear statuses' })}</button>
                           )}
                         </div>
                       )}
@@ -21863,6 +22066,7 @@ function BreederSection({
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-neutral-300"
+                          {...help('export-pairings-unpaired')}
                           checked={includeUnpairedMales}
                           onChange={e => setIncludeUnpairedMales(e.target.checked)}
                         />
@@ -21886,8 +22090,8 @@ function BreederSection({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
-                  <button type="button" className="underline" onClick={handleSelectAllPairingFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
-                  <button type="button" className="underline" onClick={handleResetPairingFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
+                  <button {...help('export-fields-select-all')} type="button" className="underline" onClick={handleSelectAllPairingFields}>{t('export.selectAll', { defaultValue: 'Select all' })}</button>
+                  <button {...help('export-fields-reset')} type="button" className="underline" onClick={handleResetPairingFields}>{t('export.resetDefaults', { defaultValue: 'Reset defaults' })}</button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pairingFieldSections.map(section => (
@@ -21901,6 +22105,7 @@ function BreederSection({
                               <input
                                 type="checkbox"
                                 className="w-4 h-4 rounded border-neutral-300"
+                                {...help('export-field')}
                                 checked={checked}
                                 onChange={() => handleTogglePairingField(field.key)}
                               />
@@ -21932,7 +22137,7 @@ function BreederSection({
       )}
 
       {setupTab === 'backup' && (
-        <div className="border-t pt-4 space-y-6">
+        <div className="border-t pt-4 space-y-6" {...help('backup-screen')}>
           <div className="space-y-3">
             <div>
               <div className="font-semibold text-sm">{t("setup.backup.compressTitle", { defaultValue: "Compress stored photos" })}</div>
@@ -21965,6 +22170,7 @@ function BreederSection({
                   primaryBtnClass(theme, true),
                   (photoCompressionRunning || !photoCompressionWork.photos) && 'opacity-60 cursor-not-allowed'
                 )}
+                {...help('backup-compress-photos')}
                 onClick={handleCompressPhotos}
                 disabled={photoCompressionRunning || !photoCompressionWork.photos}
               >
@@ -21978,6 +22184,7 @@ function BreederSection({
                   <button
                     type="button"
                     className="px-3 py-2 rounded-lg border text-sm"
+                    {...help('backup-compress-stop')}
                     onClick={() => { photoCompressionCancelRef.current = true; }}
                   >
                     {t("setup.backup.stop", { defaultValue: "Stop" })}
@@ -22003,6 +22210,7 @@ function BreederSection({
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
+                {...help('backup-download')}
                 onClick={handleManualBackupDownload}
               >
                 {t("setup.backup.downloadButton", { extension: BACKUP_FILE_DOT_EXTENSION, defaultValue: "Download backup ({{extension}})" })}
@@ -22010,6 +22218,7 @@ function BreederSection({
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border text-sm"
+                {...help('backup-save-to-vault')}
                 onClick={handleSaveBackupToVault}
               >
                 {t("setup.backup.saveToVault", { defaultValue: "Save to vault" })}
@@ -22034,6 +22243,7 @@ function BreederSection({
               <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.schedule", { defaultValue: "Schedule" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm"
+                {...help('backup-schedule')}
                 value={normalizedBackupSettings.frequency}
                 onChange={handleBackupFrequencyChange}
               >
@@ -22055,6 +22265,7 @@ function BreederSection({
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
+                {...help('backup-run-now')}
                 onClick={handleRunAutoBackupNow}
               >
                 {t("setup.backup.runNow", { defaultValue: "Run now" })}
@@ -22062,6 +22273,7 @@ function BreederSection({
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-lg text-sm border', autoBackupSnapshot ? '' : 'opacity-60 cursor-not-allowed')}
+                {...help('backup-download-snapshot')}
                 onClick={handleAutoBackupDownload}
                 disabled={!autoBackupSnapshot}
               >
@@ -22083,7 +22295,7 @@ function BreederSection({
                 {t("setup.backup.cloudHelp", { defaultValue: "Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places." })}
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs" {...help('sync-status')}>
               <div className="rounded-lg border bg-white p-3">
                 <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.connection", { defaultValue: "Connection" })}</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
@@ -22105,6 +22317,7 @@ function BreederSection({
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true), cloudSyncStatus?.state === 'loading' ? 'opacity-60 cursor-wait' : '')}
+                {...help('sync-now')}
                 onClick={handleCloudSyncNow}
                 disabled={cloudSyncStatus?.state === 'loading'}
               >
@@ -22130,6 +22343,7 @@ function BreederSection({
               <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.retentionLimit", { defaultValue: "Retention limit" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm w-full sm:w-auto"
+                {...help('backup-retention')}
                 value={vaultLimitValue}
                 onChange={handleVaultLimitChange}
               >
@@ -22168,7 +22382,7 @@ function BreederSection({
                   approxSizeKb = null;
                 }
                 return (
-                  <div key={entry.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2">
+                  <div key={entry.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2" {...help('backup-vault')}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                         <div className="font-medium text-sm text-neutral-800">{entry.name}</div>
@@ -22183,6 +22397,7 @@ function BreederSection({
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs"
+                          {...help('backup-vault-download')}
                           onClick={() => handleDownloadVaultEntry(entry.id)}
                         >
                           {t("setup.backup.download", { defaultValue: "Download" })}
@@ -22190,6 +22405,7 @@ function BreederSection({
                         <button
                           type="button"
                           className={cx('px-3 py-1.5 rounded-lg text-xs sk-on-accent', primaryBtnClass(theme, true))}
+                          {...help('backup-vault-restore')}
                           onClick={() => handleRestoreVaultEntry(entry.id)}
                         >
                           {t("setup.backup.restore", { defaultValue: "Restore" })}
@@ -22197,6 +22413,7 @@ function BreederSection({
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs"
+                          {...help('backup-vault-rename')}
                           onClick={() => handleRenameVaultEntry(entry.id)}
                         >
                           {t("setup.backup.rename", { defaultValue: "Rename" })}
@@ -22204,6 +22421,7 @@ function BreederSection({
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs text-red-600"
+                          {...help('backup-vault-delete')}
                           onClick={() => handleDeleteVaultEntry(entry.id)}
                         >
                           {t("setup.backup.delete", { defaultValue: "Delete" })}
@@ -22247,6 +22465,7 @@ function BreederSection({
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border text-sm"
+                {...help('backup-restore-file')}
                 onClick={() => {
                   if (restoreInputRef.current) restoreInputRef.current.click();
                 }}
@@ -22256,6 +22475,7 @@ function BreederSection({
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border text-sm"
+                {...help('backup-import-legacy')}
                 onClick={() => {
                   if (legacyRestoreInputRef.current) legacyRestoreInputRef.current.click();
                 }}
@@ -22278,7 +22498,7 @@ function BreederSection({
       )}
 
       {setupTab === 'account' && (
-        <div className="border-t pt-4 space-y-5">
+        <div className="border-t pt-4 space-y-5" {...help('account-screen')}>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-neutral-800">{t("setup.account.title", { defaultValue: "My Account" })}</div>
@@ -22289,6 +22509,7 @@ function BreederSection({
             <button
               type="button"
               className="px-3 py-2 rounded-lg border text-sm"
+              {...help('account-refresh')}
               onClick={loadAccountData}
               disabled={accountState.loading}
             >
@@ -22297,7 +22518,7 @@ function BreederSection({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <section className="rounded-xl border bg-white p-4 space-y-3">
+            <section className="rounded-xl border bg-white p-4 space-y-3" {...help('account-login-info')}>
               <div>
                 <div className="font-semibold text-sm">{t("setup.account.loginTitle", { defaultValue: "Login information" })}</div>
                 <div className="text-xs text-neutral-500 mt-1">{t("setup.account.loginHelp", { defaultValue: "This is the account connected to the shared backend." })}</div>
@@ -22331,13 +22552,13 @@ function BreederSection({
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
+                <button {...help('account-sign-out-device')} type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
                   {t("setup.account.signOut", { defaultValue: "Sign out on this device" })}
                 </button>
               </div>
             </section>
 
-            <section className="rounded-xl border bg-white p-4 space-y-3">
+            <section className="rounded-xl border bg-white p-4 space-y-3" {...help('account-backend')}>
               <div>
                 <div className="font-semibold text-sm">{t("setup.account.backendTitle", { defaultValue: "Backend connection" })}</div>
                 <div className="text-xs text-neutral-500 mt-1">{t("setup.account.backendHelp", { defaultValue: "Cloud sync and subscription checks use this backend session." })}</div>
@@ -22359,7 +22580,7 @@ function BreederSection({
             </section>
           </div>
 
-          <section className="rounded-xl border bg-white p-4 space-y-3">
+          <section className="rounded-xl border bg-white p-4 space-y-3" {...help('account-features')}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <div className="font-semibold text-sm">{t("setup.account.subscriptionTitle", { defaultValue: "Subscription and feature access" })}</div>
@@ -22400,7 +22621,7 @@ function BreederSection({
             </div>
           </section>
 
-          <section className="rounded-xl border bg-white p-4 space-y-3">
+          <section className="rounded-xl border bg-white p-4 space-y-3" {...help('account-plans')}>
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
               <div>
                 <div className="font-semibold text-sm">{t("setup.account.plansTitle", { defaultValue: "Plans" })}</div>
@@ -22420,6 +22641,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border text-sm bg-white hover:bg-neutral-50 shrink-0"
+                  {...help('account-plans')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={openBillingPortal}
                 >
@@ -22430,7 +22652,7 @@ function BreederSection({
             {billingReturnNotice ? (
               <div role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm flex items-start justify-between gap-3">
                 <span>{billingReturnNotice}</span>
-                <button type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>{t("setup.account.dismiss", { defaultValue: "Dismiss" })}</button>
+                <button {...help('account-dismiss-notice')} type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>{t("setup.account.dismiss", { defaultValue: "Dismiss" })}</button>
               </div>
             ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -22467,6 +22689,7 @@ function BreederSection({
                       type="button"
                       className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier || !isPurchasable ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
                       disabled={isCurrentTier || !isPurchasable || Boolean(accountState.actionLoading)}
+                      {...help('account-change-plan')}
                       onClick={() => handleChangeAccountPlan(tier)}
                     >
                       {planButtonLabel}
@@ -22496,6 +22719,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="email"
+                  {...help('account-change-email')}
                   value={accountForms.email}
                   onChange={event => handleAccountFormChange('email', event.target.value)}
                   placeholder={t("setup.account.newEmail", { defaultValue: "New email" })}
@@ -22503,6 +22727,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
+                  {...help('account-change-email')}
                   value={accountForms.emailPassword}
                   onChange={event => handleAccountFormChange('emailPassword', event.target.value)}
                   placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
@@ -22510,6 +22735,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  {...help('account-change-email')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountEmail}
                 >
@@ -22524,6 +22750,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
+                  {...help('account-change-password')}
                   value={accountForms.currentPassword}
                   onChange={event => handleAccountFormChange('currentPassword', event.target.value)}
                   placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
@@ -22531,6 +22758,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
+                  {...help('account-change-password')}
                   value={accountForms.newPassword}
                   onChange={event => handleAccountFormChange('newPassword', event.target.value)}
                   placeholder={t("setup.account.newPassword", { defaultValue: "New password" })}
@@ -22538,6 +22766,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
+                  {...help('account-change-password')}
                   value={accountForms.confirmPassword}
                   onChange={event => handleAccountFormChange('confirmPassword', event.target.value)}
                   placeholder={t("setup.account.confirmNewPassword", { defaultValue: "Confirm new password" })}
@@ -22545,6 +22774,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  {...help('account-change-password')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountPassword}
                 >
@@ -22573,6 +22803,7 @@ function BreederSection({
                   const checked = group.always || exportGroups.includes(group.id);
                   return (
                     <label
+                      {...help('account-export-groups')}
                       key={group.id}
                       className={`flex gap-2 items-start rounded-lg px-2 py-1.5 ${group.always ? 'opacity-70' : 'cursor-pointer hover:bg-white'}`}
                     >
@@ -22599,6 +22830,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  {...help('account-download-data')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleDownloadMyData}
                 >
@@ -22610,6 +22842,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="status-tag-neutral-button px-2 py-1 rounded-lg border text-xs"
+                  {...help('account-export-groups')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={selectAllExportGroups}
                 >
@@ -22618,6 +22851,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="status-tag-neutral-button px-2 py-1 rounded-lg border text-xs"
+                  {...help('account-export-groups')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={clearExportGroups}
                 >
@@ -22644,6 +22878,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg border bg-white text-sm"
+                  {...help('account-keep')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleCancelAccountDeletion}
                 >
@@ -22660,6 +22895,7 @@ function BreederSection({
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   autoComplete="current-password"
+                  {...help('account-delete')}
                   value={accountForms.deletePassword}
                   onChange={event => handleAccountFormChange('deletePassword', event.target.value)}
                   placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
@@ -22667,6 +22903,7 @@ function BreederSection({
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="text"
+                  {...help('account-delete')}
                   value={accountForms.deleteConfirmation}
                   onChange={event => handleAccountFormChange('deleteConfirmation', event.target.value)}
                   placeholder={t("setup.account.typeDelete", { defaultValue: "Type DELETE to confirm" })}
@@ -22674,6 +22911,7 @@ function BreederSection({
                 <button
                   type="button"
                   className="px-3 py-2 rounded-lg text-sm sk-on-accent bg-red-600 disabled:opacity-60"
+                  {...help('account-delete')}
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleRequestAccountDeletion}
                 >
@@ -22698,7 +22936,7 @@ function BreederSection({
       )}
 
       {setupTab === 'language' && (
-        <div className="border-t pt-4 space-y-4">
+        <div className="border-t pt-4 space-y-4" {...help('settings-language')}>
           <div className="space-y-2">
             <div className="text-sm font-semibold text-neutral-800">{t("setup.chooseLanguage")}</div>
             <div className="text-xs text-neutral-600">{t("setup.languageHelp")}</div>
@@ -22708,7 +22946,7 @@ function BreederSection({
       )}
 
       {isDevEnvironment && setupTab === 'devTools' && (
-        <div className="border-t pt-4 space-y-4">
+        <div className="border-t pt-4 space-y-4" {...help('settings-dev-tools')}>
           {/* TEMP DEV TOOL - REMOVE BEFORE PRODUCTION */}
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             This section contains destructive developer-only actions.
@@ -22720,6 +22958,7 @@ function BreederSection({
             </div>
             <button
               type="button"
+              {...help('settings-return-to-defaults')}
               className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
               onClick={handleReturnToDefaults}
             >
@@ -22948,7 +23187,7 @@ function AppearanceSettingsPanel() {
   // a sticky preview would need a hardcoded offset matching a header whose
   // height is not fixed.
   return (
-    <div className="border-t pt-4 flex flex-col gap-4 max-h-[calc(100vh-14rem)] min-h-[22rem]">
+    <div className="border-t pt-4 flex flex-col gap-4 max-h-[calc(100vh-14rem)] min-h-[22rem]" {...help('settings-appearance')}>
       <div className="shrink-0">
         <AppearancePreview density={appearanceState.layoutDensity} mode={effectiveThemeMode} />
       </div>
@@ -22961,7 +23200,7 @@ function AppearanceSettingsPanel() {
               <div className="text-xs text-neutral-500">{t('appearance.presets.subtitle', { defaultValue: 'Start with a curated palette then fine tune the details.' })}</div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="px-3 py-2 rounded-lg border text-xs" onClick={() => resetAppearance('default')}>
+              <button {...help('settings-appearance-reset')} type="button" className="px-3 py-2 rounded-lg border text-xs" onClick={() => resetAppearance('default')}>
                 {t('appearance.actions.reset', { defaultValue: 'Reset to default' })}
               </button>
             </div>
@@ -23004,6 +23243,7 @@ function AppearanceSettingsPanel() {
                     <button
                       type="button"
                       className={cx('flex-1 px-2 py-1.5 rounded-lg text-xs', primaryBtnClass('appearance', !active))}
+                      {...help('settings-appearance-preset')}
                       onClick={() => applyPreset(preset.key)}
                       disabled={active}
                     >
@@ -23036,6 +23276,7 @@ function AppearanceSettingsPanel() {
                   <button
                     key={material.key}
                     type="button"
+                    {...help('settings-appearance-material')}
                     onClick={() => applyMaterial(material.key)}
                     className={cx(
                       'text-start rounded-lg border p-2 transition-colors',
@@ -23072,6 +23313,7 @@ function AppearanceSettingsPanel() {
             <div className="flex flex-wrap gap-2">
               <input
                 className="flex-1 min-w-[180px] border rounded-xl px-3 py-2 text-sm"
+                {...help('settings-appearance-save-preset')}
                 value={customPresetName}
                 onChange={e => setCustomPresetName(e.target.value)}
                 placeholder={t('appearance.presets.namePlaceholder', { defaultValue: 'Preset name' })}
@@ -23079,6 +23321,7 @@ function AppearanceSettingsPanel() {
               <button
                 type="button"
                 className="sk-btn sk-btn--filled px-4 py-2 rounded-xl text-sm font-semibold"
+                {...help('settings-appearance-save-preset')}
                 disabled={!customPresetName.trim()}
                 onClick={handleSavePreset}
               >
@@ -23098,7 +23341,7 @@ function AppearanceSettingsPanel() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.mode', { defaultValue: 'Mode & palette' })}</div>
               <div className="mt-2 space-y-2">
-                <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
+                <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm" {...help('settings-appearance-high-contrast')}>
                   <input type="checkbox" checked={highContrastEnabled} onChange={handleHighContrastToggle} className="mt-0.5" />
                   <span>
                     <span className="block font-semibold text-neutral-900">{t('appearance.accessibility.highContrast', { defaultValue: 'High contrast mode' })}</span>
@@ -23106,13 +23349,13 @@ function AppearanceSettingsPanel() {
                   </span>
                 </label>
                 <label className="text-xs font-medium">{t('appearance.modes.label', { defaultValue: 'Theme mode' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.themeMode} onChange={handleThemeModeChange}>
+                <select {...help('settings-appearance-theme-mode')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.themeMode} onChange={handleThemeModeChange}>
                   {themeModeOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
                 <label className="text-xs font-medium">{t('appearance.background.label', { defaultValue: 'Background style' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.backgroundMode || 'solid'} onChange={handleBackgroundModeChange}>
+                <select {...help('settings-appearance-background')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.backgroundMode || 'solid'} onChange={handleBackgroundModeChange}>
                   <option value="solid">{t('appearance.background.solid', { defaultValue: 'Solid color' })}</option>
                   <option value="logo">{t('appearance.background.logo', { defaultValue: 'Breeder logo pattern' })}</option>
                 </select>
@@ -23123,7 +23366,7 @@ function AppearanceSettingsPanel() {
             </div>
             <div className="space-y-3">
               {colorFields.map(field => (
-                <div key={field.key} className="border rounded-xl p-3 space-y-2 bg-white">
+                <div key={field.key} className="border rounded-xl p-3 space-y-2 bg-white" {...help('settings-appearance-colour')}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-neutral-800">{field.label}</div>
@@ -23144,7 +23387,7 @@ function AppearanceSettingsPanel() {
                 </div>
               ))}
               {hasColorOverrides && (
-                <button type="button" className="text-xs underline text-neutral-600" onClick={handleClearOverrides}>
+                <button {...help('settings-appearance-colour-reset')} type="button" className="text-xs underline text-neutral-600" onClick={handleClearOverrides}>
                   {t('appearance.colors.clearOverrides', { defaultValue: 'Reset colours to the skin defaults' })}
                 </button>
               )}
@@ -23156,19 +23399,19 @@ function AppearanceSettingsPanel() {
               <div className="border rounded-xl p-3 bg-white space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.typography', { defaultValue: 'Typography' })}</div>
                 <label className="text-xs font-medium">{t('appearance.type.font', { defaultValue: 'Font family' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontFamily} onChange={e => handleTypographyChange({ fontFamily: e.target.value })}>
+                <select {...help('settings-appearance-typography')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontFamily} onChange={e => handleTypographyChange({ fontFamily: e.target.value })}>
                   {fontFamilyOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
                 <label className="text-xs font-medium">{t('appearance.type.size', { defaultValue: 'Base size' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontSize} onChange={e => handleTypographyChange({ fontSize: e.target.value })}>
+                <select {...help('settings-appearance-typography')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.fontSize} onChange={e => handleTypographyChange({ fontSize: e.target.value })}>
                   {fontSizeOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
                 <label className="text-xs font-medium">{t('appearance.type.lineSpacing', { defaultValue: 'Line spacing' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.lineSpacing} onChange={e => handleTypographyChange({ lineSpacing: e.target.value })}>
+                <select {...help('settings-appearance-typography')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.typography.lineSpacing} onChange={e => handleTypographyChange({ lineSpacing: e.target.value })}>
                   {lineSpacingOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -23178,13 +23421,13 @@ function AppearanceSettingsPanel() {
               <div className="border rounded-xl p-3 bg-white space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.layout', { defaultValue: 'Layout & density' })}</div>
                 <label className="text-xs font-medium">{t('appearance.density.label', { defaultValue: 'Density' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.layoutDensity} onChange={handleDensityChange}>
+                <select {...help('settings-appearance-density')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.layoutDensity} onChange={handleDensityChange}>
                   {densityOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
                 <label className="text-xs font-medium">{t('appearance.borders.label', { defaultValue: 'Corner radius' })}</label>
-                <select className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.borderStyle} onChange={handleBorderChange}>
+                <select {...help('settings-appearance-corners')} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" value={appearanceState.borderStyle} onChange={handleBorderChange}>
                   {borderOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -23193,11 +23436,11 @@ function AppearanceSettingsPanel() {
 
               <div className="border rounded-xl p-3 bg-white space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.section.motion', { defaultValue: 'Motion' })}</div>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-sm" {...help('settings-appearance-motion')}>
                   <input type="checkbox" checked={motion.animations !== false} onChange={handleAnimationsToggle} />
                   {t('appearance.motion.animations', { defaultValue: 'Allow subtle animations' })}
                 </label>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-sm" {...help('settings-appearance-motion')}>
                   <input type="checkbox" checked={motion.reducedMotion === true} onChange={handleReducedMotionToggle} />
                   {t('appearance.motion.reduce', { defaultValue: 'Prefer reduced motion' })}
                 </label>
@@ -23237,7 +23480,7 @@ function AppearancePreview({ density, mode }) {
       : t('appearance.preview.density.comfortable', { defaultValue: 'Balanced spacing' });
 
   return (
-    <div className="appearance-preview border rounded-2xl bg-white/80 p-4 shadow-sm">
+    <div className="appearance-preview border rounded-2xl bg-white/80 p-4 shadow-sm" {...help('settings-appearance-preview')}>
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-full border" style={{ background: 'var(--sk-accent)' }} />
         <div>
@@ -23328,7 +23571,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
 
   return (
     <Card title={t('pairing.dashboardTitle', { count: list.length, defaultValue: 'Breeding Dashboard ({{count}})' })}>
-      <div className="space-y-4">
+      <div className="space-y-4" {...help('breeding-dashboard')}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {summaryCards.map(card => (
             <div
@@ -23338,6 +23581,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
               onClick={() => setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey))}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setUrgencyFilter(prev => (prev === card.filterKey ? null : card.filterKey)); } }}
               className={cx('border rounded-xl p-3 cursor-pointer', card.className)}
+              {...help('breeding-urgency-card')}
             >
               <div className="text-2xl font-semibold leading-none">{card.value}</div>
               <div className="mt-1 text-xs font-medium">{card.label}</div>
@@ -23347,7 +23591,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stageCards.map(card => (
-            <div key={card.key} className="border rounded-xl p-3 bg-neutral-50">
+            <div key={card.key} className="border rounded-xl p-3 bg-neutral-50" {...help('breeding-stage-counts')}>
               <div className="text-lg font-semibold text-neutral-900">{activeStageCounts[card.key] || 0}</div>
               <div className="text-xs text-neutral-500">{card.label}</div>
             </div>
@@ -23392,7 +23636,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                   ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
                   : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
               return (
-                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
+                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5" {...help('breeding-dashboard-item')}>
                   <div className="flex flex-col gap-2">
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -23402,7 +23646,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                       {(() => {
                         const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);
                         return dashClutchId ? (
-                          <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full" {...help('pairing-clutch-id')}>
                             <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                             <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{dashClutchId}</span>
                           </div>
@@ -23473,6 +23717,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                       type="button"
                       className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
                       onClick={() => openPairing(item.id)}
+                      {...help('breeding-dashboard-open')}
                     >
                       {item.actionLabel}
                     </button>
@@ -23585,7 +23830,7 @@ function ProjectCompletionPanel({
               <div className="text-xs font-semibold uppercase text-neutral-500">{t("pairing.completion.completed", { defaultValue: "Completed" })}</div>
               <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
             </div>
-            <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
+            <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen} {...help('pairing-reopen')}>
               {t("pairing.completion.reopen", { defaultValue: "Reopen pairing" })}
             </button>
           </div>
@@ -23619,7 +23864,7 @@ function ProjectCompletionPanel({
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">{t("pairing.completion.reason", { defaultValue: "Completion reason" })}</span>
-              <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
+              <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)} {...help('pairing-completion-reason')}>
                 {COMPLETION_REASON_GROUPS.map(group => (
                   <optgroup key={group.key} label={group.label}>
                     {group.options.map(option => (
@@ -23634,6 +23879,7 @@ function ProjectCompletionPanel({
               <select
                 className="border rounded-xl px-3 py-2 bg-white text-sm"
                 value={requiresConfidence ? confidence : 'confirmed'}
+                {...help('pairing-outcome-confidence')}
                 disabled={!requiresConfidence}
                 onChange={event => setConfidence(event.target.value)}
               >
@@ -23645,12 +23891,13 @@ function ProjectCompletionPanel({
           </div>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium">{t("pairing.completion.completionNote", { defaultValue: "Completion note" })}</span>
-            <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
+            <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} {...help('pairing-completion-note')} />
           </label>
           <button
             type="button"
             className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
             onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
+            {...help('pairing-mark-completed')}
           >
             {t("pairing.completion.markCompleted", { defaultValue: "Mark completed" })}
           </button>
@@ -23677,7 +23924,7 @@ function PairingStageTracker({ reached }) {
     t("pairing.stageTracker.hatched", { defaultValue: "Hatched" }),
   ];
   return (
-    <div className="flex items-center" role="list" aria-label={t("pairing.stageTracker.ariaLabel", { defaultValue: "Pairing stage progress" })}>
+    <div className="flex items-center" role="list" aria-label={t("pairing.stageTracker.ariaLabel", { defaultValue: "Pairing stage progress" })} {...help('pairing-stage-tracker')}>
       {PAIRING_STAGE_LABELS.map((label, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
@@ -24093,6 +24340,7 @@ function PairingInlineCard({
         onClick={handleExpand}
         onKeyDown={handleCollapsedKey}
         aria-expanded={false}
+        {...help('pairing-card')}
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
@@ -24101,7 +24349,7 @@ function PairingInlineCard({
                 {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
               </div>
               {buildClutchId(femaleName, maleName, cycleYear) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]" {...help('pairing-clutch-id')}>
                   <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                   <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
                 </span>
@@ -24130,6 +24378,7 @@ function PairingInlineCard({
                   type="button"
                   className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenMale}
+                  {...help('pairing-sire')}
                 >
                   {maleName}
                 </button>
@@ -24144,6 +24393,7 @@ function PairingInlineCard({
                   type="button"
                   className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenFemale}
+                  {...help('pairing-dam')}
                 >
                   {femaleName}
                 </button>
@@ -24166,14 +24416,14 @@ function PairingInlineCard({
   }
 
   return (
-    <div ref={cardRef} className={cardClasses} tabIndex={-1}>
+    <div ref={cardRef} className={cardClasses} tabIndex={-1} {...help('pairing-card')}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-semibold leading-tight text-sm sm:text-base">
             <div className="truncate">{clutchTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}</div>
           </div>
           {buildClutchId(femaleName, maleName, cycleYear) && (
-            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
+            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full" {...help('pairing-clutch-id')}>
               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
             </div>
@@ -24185,6 +24435,7 @@ function PairingInlineCard({
           )}
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div
+              {...help('pairing-sire')}
               className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
               style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
             >
@@ -24221,6 +24472,7 @@ function PairingInlineCard({
               </div>
             </div>
             <div
+              {...help('pairing-dam')}
               className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
               style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
             >
@@ -24273,18 +24525,20 @@ function PairingInlineCard({
               type="button"
               className="text-xs px-2 py-1 border rounded-lg"
               onClick={() => onExportPairingQr([pairing])}
+              {...help('pairing-qr-label')}
             >
               {t('pairing.qrLabelButton', { defaultValue: 'QR label' })}
             </button>
           )}
           {typeof onDelete === 'function' && (
-            <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onDelete(pairing.id)}>{deleteLabel}</button>
+            <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onDelete(pairing.id)} {...help('pairing-delete')}>{deleteLabel}</button>
           )}
           <button
             type="button"
             className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => setIsEditingParticipants(prev => !prev)}
             disabled={!hasMaleOptions || !hasFemaleOptions}
+            {...help('pairing-edit')}
           >
             {isEditingParticipants ? doneEditingParticipantsLabel : editParticipantsLabel}
           </button>
@@ -24293,6 +24547,7 @@ function PairingInlineCard({
               type="button"
               className="text-xs px-2 py-1 border rounded-lg"
               onClick={handleCollapse}
+              {...help('pairing-collapse')}
             >
               {collapseLabel}
             </button>
@@ -24335,6 +24590,7 @@ function PairingInlineCard({
               className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
               value={edit.maleId || ''}
               onChange={handleChangeMale}
+              {...help('pairing-edit-male')}
               disabled={!hasMaleOptions}
             >
               <option value="" disabled>{maleSelectPlaceholder}</option>
@@ -24356,6 +24612,7 @@ function PairingInlineCard({
               className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
               value={edit.femaleId || ''}
               onChange={handleChangeFemale}
+              {...help('pairing-edit-female')}
               disabled={!hasFemaleOptions}
             >
               <option value="" disabled>{femaleSelectPlaceholder}</option>
@@ -24384,6 +24641,7 @@ function PairingInlineCard({
             className="w-full border rounded-xl px-3 py-2 text-sm"
             value={labelValue}
             onChange={e => setEdit(d => ({ ...d, label: e.target.value }))}
+            {...help('pairing-label')}
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -24392,6 +24650,7 @@ function PairingInlineCard({
             type="date"
             className="w-full border rounded-xl px-3 py-2 text-sm"
             value={edit.startDate || ''}
+            {...help('pairing-start-date')}
             onChange={e => {
               const nextStart = e.target.value || '';
               setEdit(d => {
@@ -24414,12 +24673,12 @@ function PairingInlineCard({
           <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{appointmentsLabel}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500" {...help('pairing-appointments')}>{appointmentsLabel}</div>
               <div className="text-[13px] text-neutral-500">{appointmentsHelp}</div>
             </div>
             <div className="flex gap-2">
-            <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleGenerateAppointments}>{generateMonthsLabel}</button>
-              <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleAddAppointment}>{addAppointmentLabel}</button>
+            <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleGenerateAppointments} {...help('pairing-generate-months')}>{generateMonthsLabel}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleAddAppointment} {...help('pairing-add-appointment')}>{addAppointmentLabel}</button>
             </div>
           </div>
           <div className="flex-1 flex flex-col gap-2 min-w-0">
@@ -24427,7 +24686,7 @@ function PairingInlineCard({
               <div key={ap.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start min-w-0">
                 <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)] gap-2">
                   <div className="flex flex-col gap-2">
-                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
+                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap" {...help('pairing-appointment-done')}>
                       <input
                         type="checkbox"
                         className="w-4 h-4"
@@ -24455,7 +24714,7 @@ function PairingInlineCard({
                       />
                       {appointmentStatusLabel}
                     </label>
-                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
+                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap" {...help('pairing-lock')}>
                       <input
                         type="checkbox"
                         className="w-4 h-4"
@@ -24486,6 +24745,7 @@ function PairingInlineCard({
                         type="date"
                         className="border rounded-lg px-2 py-1 text-xs min-w-[138px]"
                         value={ap.pairingDate || ''}
+                        {...help('pairing-date')}
                         onChange={e => {
                           const value = e.target.value;
                           const normalized = normalizeDateInput(value);
@@ -24513,6 +24773,7 @@ function PairingInlineCard({
                         type="date"
                         className="border rounded-lg px-2 py-1 text-xs min-w-[130px]"
                         value={ap.lockDate || ''}
+                        {...help('pairing-lock-date')}
                         onChange={e => {
                           const value = e.target.value;
                           const normalized = normalizeDateInput(value);
@@ -24533,6 +24794,7 @@ function PairingInlineCard({
                   </div>
                   <input
                     placeholder={notesLabel}
+                    {...help('pairing-appointment-notes')}
                     className="border rounded-lg px-2 py-1 text-xs min-w-0 lg:col-span-2"
                     value={ap.notes || ''}
                     onChange={e => {
@@ -24554,6 +24816,7 @@ function PairingInlineCard({
                       return { ...d, appointments: arr, startDate: arr[0]?.date || d.startDate || null };
                     });
                   }}
+                  {...help('pairing-appointment-remove')}
                 >
                   {removeLabel}
                 </button>
@@ -24586,6 +24849,7 @@ function PairingInlineCard({
           className="w-full border rounded-xl px-3 py-2 text-sm"
           value={edit.notes || ''}
           onChange={e => setEdit(d => ({ ...d, notes: e.target.value }))}
+          {...help('pairing-notes')}
         />
       </div>
 
@@ -24602,6 +24866,7 @@ function PairingInlineCard({
                   onOpenSnake ? 'hover:bg-amber-100 transition-colors' : 'cursor-default opacity-80'
                 )}
                 onClick={onOpenSnake ? () => onOpenSnake(h) : undefined}
+                {...help('pairing-hatchlings')}
                 title={h.name || h.id}
               >
                 <bdi>{h.name || h.id}</bdi>
@@ -24619,6 +24884,7 @@ function PairingInlineCard({
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-neutral-700"
               onClick={() => setShowCalculator(prev => !prev)}
               aria-expanded={showCalculator}
+              {...help('pairing-genetics-calculator')}
             >
               <span>{geneticsCalculatorLabel}</span>
               <span className="text-[11px] text-neutral-500">{showCalculator ? hideLabel : showLabel}</span>
@@ -24645,7 +24911,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
   const combined = odds?.combined || [];
   if (!perGene.length && !combined.length) return null;
   return (
-    <div className="mt-3">
+    <div className="mt-3" {...help('pairing-odds')}>
       {perGene.length > 0 && (
         <>
           <div className="text-xs font-medium mb-1.5">{t("pairing.odds.title", { defaultValue: "Genetics odds" })}</div>
@@ -25839,7 +26105,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
   return (
     <>
-      <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
+      <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden" {...help('breeding-cycle')}>
         {isWorkflowCompleted ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This pairing is marked completed. You can still record this event." })}</div>
@@ -25848,7 +26114,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep pairing completed and add event" })}
               </span>
               {typeof onReopenProject === 'function' ? (
-                <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
+                <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject} {...help('pairing-reopen-add-event')}>
                   {t("clutch.reopenAddEvent", { defaultValue: "Reopen pairing and add event" })}
                 </button>
               ) : null}
@@ -25877,11 +26143,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog}>
+                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog} {...help('pairing-log-ovulation')}>
                   {ovulationObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logOvulationLabel}
                 </button>
                 {ovulationObserved && (
-                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
+                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" {...help('pairing-clear-ovulation')} onClick={()=>{
                     setEdit(prev => {
                       const next = withPairingLifecycleDefaults({ ...prev });
                       next.ovulation = { observed: false, date: '', notes: '' };
@@ -25913,11 +26179,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog}>
+                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog} {...help('pairing-log-prelay')}>
                   {preLayObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logPreLayLabel}
                 </button>
                 {preLayObserved && (
-                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
+                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" {...help('pairing-clear-prelay')} onClick={()=>{
                     setEdit(prev => {
                       const next = withPairingLifecycleDefaults({ ...prev });
                       next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
@@ -25945,6 +26211,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                     className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
                     value={clutchDate}
                     onChange={e=>updateClutchField('date', e.target.value)}
+                    {...help('pairing-egg-date')}
                     disabled={!clutchRecorded}
                     placeholder={eggLayingPlaceholder}
                   />
@@ -25958,6 +26225,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
                       value={clutchFertileValue}
                       onChange={e=>updateClutchField('fertileEggs', e.target.value)}
+                      {...help('pairing-fertile-eggs')}
                       disabled={!clutchRecorded}
                     />
                   </div>
@@ -25969,6 +26237,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
                       value={clutchSlugsValue}
                       onChange={e=>updateClutchField('slugs', e.target.value)}
+                      {...help('pairing-slugs')}
                       disabled={!clutchRecorded}
                     />
                   </div>
@@ -25987,7 +26256,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   {!clutchRecorded && (
-                    <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>setActiveDialog('clutch')}>
+                    <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>setActiveDialog('clutch')} {...help('pairing-eggs-laid')}>
                       {eggsLaidLabel}
                     </button>
                   )}
@@ -25997,6 +26266,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         className="text-[11px] px-2.5 py-1 border rounded-lg"
                         onClick={() => onCreateClutchCard?.()}
                         disabled={!canGenerateClutchCard}
+                        {...help('pairing-clutch-card')}
                       >
                         {t("clutch.createClutchCard", { defaultValue: "Create clutch card" })}
                       </button>
@@ -26004,6 +26274,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         <button
                           className="text-[11px] px-2.5 py-1 border rounded-lg"
                           onClick={openHatchGate}
+                          {...help('hatch-eggs-hatched')}
                         >
                           {t("clutch.eggsHatched", { defaultValue: "Eggs hatched" })}
                         </button>
@@ -26011,6 +26282,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={() => toggleClutch(false)}
+                        {...help('pairing-clear-eggs')}
                       >
                         {t("clutch.clearEggRecord", { defaultValue: "Clear egg record" })}
                       </button>
@@ -26038,12 +26310,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg"
                         onClick={openHatchGate}
+                        {...help('hatch-view-edit')}
                       >
                         {t("clutch.viewEditHatch", { defaultValue: "View / edit hatch" })}
                       </button>
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={clearHatched}
+                        {...help('hatch-clear-record')}
                       >
                         {t("clutch.clearHatchRecord", { defaultValue: "Clear hatch record" })}
                       </button>
@@ -26061,6 +26335,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'ovulation' && (
         <FloatingDialog
+          {...help('pairing-ovulation-dialog')}
           title={t("clutch.ovulationDetails", { defaultValue: "Ovulation details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
@@ -26070,11 +26345,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium">{t("clutch.ovulationDate", { defaultValue: "Ovulation date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.date} onChange={e=>setOvulationDraft(d=>({...d, date:e.target.value}))} />
+              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" {...help('pairing-ovulation-date')} value={ovulationDraft.date} onChange={e=>setOvulationDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
               <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.notes} onChange={e=>setOvulationDraft(d=>({...d, notes:e.target.value}))} />
+              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" {...help('pairing-event-notes')} value={ovulationDraft.notes} onChange={e=>setOvulationDraft(d=>({...d, notes:e.target.value}))} />
             </div>
           </div>
         </FloatingDialog>
@@ -26082,6 +26357,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'preLay' && (
         <FloatingDialog
+          {...help('pairing-prelay-dialog')}
           title={t("clutch.preLayShedDetails", { defaultValue: "Pre-Lay shed details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
@@ -26091,11 +26367,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium">{t("clutch.preLayShedDate", { defaultValue: "Pre-Lay shed date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.date} onChange={e=>setPreLayDraft(d=>({...d, date:e.target.value}))} />
+              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" {...help('pairing-prelay-date')} value={preLayDraft.date} onChange={e=>setPreLayDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
               <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.notes} onChange={e=>setPreLayDraft(d=>({...d, notes:e.target.value}))} />
+              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" {...help('pairing-event-notes')} value={preLayDraft.notes} onChange={e=>setPreLayDraft(d=>({...d, notes:e.target.value}))} />
             </div>
           </div>
         </FloatingDialog>
@@ -26103,6 +26379,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'clutch' && (
         <FloatingDialog
+          {...help('pairing-eggs-dialog')}
           title={t("clutch.logEggsLaid", { defaultValue: "Log eggs laid" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
@@ -26117,6 +26394,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 min="0"
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={clutchDraft.fertileEggs}
+                {...help('pairing-fertile-eggs')}
                 onChange={e=>{
                   const raw = e.target.value;
                   if (raw === '') {
@@ -26137,6 +26415,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 min="0"
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={clutchDraft.slugs}
+                {...help('pairing-slugs')}
                 onChange={e=>{
                   const raw = e.target.value;
                   if (raw === '') {
@@ -26161,6 +26440,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'hatchGate' && (
         <ChoiceDialog
+          {...help('hatch-gate')}
           title={t('pairing.hatchGateTitle', { defaultValue: 'Have you logged hatch before for this clutch?' })}
           description={t('pairing.hatchGateDescription', {
             defaultValue: 'Hatchling cards are only created for hatchlings that are new to this clutch, so a repeat hatch log needs the old records cleared first.',
@@ -26170,6 +26450,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           options={[
             {
               key: 'no',
+              helpId: 'hatch-gate-first',
               tone: 'primary',
               label: t('pairing.hatchGateNo', { defaultValue: 'No — this is the first hatch log' }),
               hint: t('pairing.hatchGateNoHint', { defaultValue: 'Opens hatch logging, then one card per hatchling.' }),
@@ -26177,6 +26458,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
             },
             {
               key: 'yes',
+              helpId: 'hatch-gate-again',
               label: t('pairing.hatchGateYes', { defaultValue: 'Yes — I have logged hatch before' }),
               hint: hatchlingCount > 0
                 ? t('pairing.hatchGateYesHintCount', {
@@ -26192,6 +26474,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'hatchRedo' && (
         <ChoiceDialog
+          {...help('hatch-redo')}
           title={t('pairing.hatchRedoTitle', { defaultValue: 'Delete the old hatchling records?' })}
           description={hatchlingCount > 0
             ? t('pairing.hatchRedoDescription', {
@@ -26206,6 +26489,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           options={[
             {
               key: 'reset',
+              helpId: 'hatch-redo-delete',
               tone: 'danger',
               label: hatchlingCount > 0
                 ? t('pairing.hatchRedoConfirm', {
@@ -26218,6 +26502,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
             },
             {
               key: 'keep',
+              helpId: 'hatch-redo-keep',
               label: t('pairing.hatchRedoKeep', { defaultValue: 'Keep them — just edit the hatch details' }),
               hint: t('pairing.hatchRedoKeepHint', { defaultValue: 'No new hatchling cards will open.' }),
               onSelect: () => openHatchedDialog(),
@@ -26228,6 +26513,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'hatched' && (
         <FloatingDialog
+          {...help('hatch-details-dialog')}
           title={t("clutch.hatchDetails", { defaultValue: "Hatch details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
@@ -26237,7 +26523,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium">{t("clutch.hatchDate", { defaultValue: "Hatch date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.date} onChange={e=>setHatchedDraft(d=>({...d, date:e.target.value}))} />
+              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" {...help('hatch-details-dialog')} value={hatchedDraft.date} onChange={e=>setHatchedDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
               <label className="text-xs font-medium">{t("clutch.numberHatched", { defaultValue: "Number hatched" })}</label>
@@ -26245,6 +26531,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 type="number"
                 min="0"
                 max={hatchLimitForUi ?? undefined}
+                {...help('hatch-count')}
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={hatchedDraft.hatchedCount}
                 onChange={e=>{
@@ -26265,7 +26552,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
             </div>
             <div>
               <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.notes} onChange={e=>setHatchedDraft(d=>({...d, notes:e.target.value}))} />
+              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" {...help('pairing-event-notes')} value={hatchedDraft.notes} onChange={e=>setHatchedDraft(d=>({...d, notes:e.target.value}))} />
             </div>
           </div>
         </FloatingDialog>
@@ -26305,7 +26592,7 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
 
   if (isCycleComplete) {
     return (
-      <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
+      <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)} {...help('breeding-cycle-timers')}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
@@ -26323,7 +26610,7 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
   }
 
   return (
-    <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
+    <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)} {...help('breeding-cycle-timers')}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
@@ -26356,47 +26643,48 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
   );
 }
 
-function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel, disableConfirm = false }) {
+function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel, disableConfirm = false, 'data-help': helpId }) {
   const { t } = useTranslation();
   const resolvedConfirmLabel = confirmLabel ?? t("common.save", { defaultValue: "Save" });
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" data-dialog="form-dialog" aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="form-dialog" data-help={helpId} aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
           <div className="flex items-center gap-2">
             <DialogHelpButton />
-            <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+            <button {...help('app-dialog-close')} className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
           </div>
         </div>
         <div className="space-y-3 max-h-[60vh] overflow-auto pe-1">
           {children}
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{resolvedConfirmLabel}</button>
+          <button {...help('app-dialog-cancel')} className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          <button {...help('app-dialog-confirm')} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{resolvedConfirmLabel}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue' }) {
+function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue', 'data-help': helpId }) {
   const { t } = useTranslation();
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" data-dialog="choice" aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="choice" data-help={helpId} aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
           <div className="flex items-center gap-2">
             <DialogHelpButton />
-            <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+            <button {...help('app-dialog-close')} className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
           </div>
         </div>
         {description ? <div className="text-sm text-neutral-600">{description}</div> : null}
         <div className="mt-4 flex flex-col gap-2">
           {options.map((option, idx) => (
             <button
+              {...help('app-dialog-choice')}
               key={option.key || idx}
               className={cx(
                 'w-full text-start px-3 py-2 rounded-xl text-sm border',
@@ -26405,6 +26693,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
                 !option.tone && 'hover:bg-neutral-50'
               )}
               onClick={option.onSelect}
+              data-help={option.helpId}
             >
               <div className="font-medium">{option.label}</div>
               {option.hint ? (
@@ -26416,7 +26705,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
           ))}
         </div>
         <div className="mt-4 flex justify-end">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
+          <button {...help('app-dialog-cancel')} className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
         </div>
       </div>
     </div>
@@ -26454,7 +26743,7 @@ function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', s
     : 'px-3 py-1.5 rounded-full gap-2 text-xs';
 
   return (
-    <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')}>
+    <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')} {...help('breeding-countdown')}>
       {progressPercent !== null && <span className="countdown-progress" style={{ width: `${progressPercent}%` }} />}
       <span className="break-words leading-tight">{label}</span>
       {dayLabel ? <span className="break-words leading-tight">{dayLabel}</span> : null}
@@ -26670,7 +26959,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
 
   // Shown on both panels, because a MorphMarket file replaces the first one before its review.
   const arrivalChoice = (
-    <label className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
+    <label className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer" {...help('import-already-owned')}>
       <input
         type="checkbox"
         className="mt-0.5"
@@ -26726,7 +27015,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
       {morphMarketFileInput}
       {arrivalChoice}
       <div className="mb-4 p-3 border rounded-xl bg-neutral-50">
-        <div className="text-xs font-medium">
+        <div className="text-xs font-medium" {...help('import-source')}>
           {t("ui.animals.import.sourceLabel", { defaultValue: "Where are these animals coming from?" })}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -26735,6 +27024,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             className={cx('text-xs px-3 py-1.5 rounded-lg', primaryBtnClass(theme, true))}
             disabled={parsing}
             onClick={() => morphMarketInputRef.current?.click()}
+            {...help('import-morphmarket')}
           >
             {parsing ? parsingLabel : t("ui.animals.import.morphmarket.chooseFile", { defaultValue: "Import from MorphMarket" })}
           </button>
@@ -26743,6 +27033,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             className="text-xs px-3 py-1.5 rounded-lg border bg-white"
             disabled={parsing}
             onClick={() => sheetInputRef.current?.click()}
+            {...help('import-generic-csv')}
           >
             {t("ui.animals.import.genericCsv", { defaultValue: "Generic CSV / spreadsheet" })}
           </button>
@@ -26751,6 +27042,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             className="text-xs px-3 py-1.5 rounded-lg border bg-white"
             disabled={parsing}
             onClick={() => { const el = document.getElementById('import-pdf-input'); if (el) el.click(); }}
+            {...help('import-pdf')}
           >
             {t("ui.animals.import.uploadPdfButton", { defaultValue: "Upload PDF" })}
           </button>
@@ -26766,6 +27058,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
         <div>
           <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste your animal list (text copied from a PDF)" })}</label>
           <textarea className="mt-1 w-full h-64 border rounded-xl px-3 py-2"
+            {...help('import-paste')}
             value={importText} onChange={e=>setImportText(e.target.value.replace(/Ball Python\s*\(Python regius\)/ig, ''))} placeholder={t("ui.animals.import.pastePlaceholder", { defaultValue: "Paste content here..." })}/>
 
           <div className="mt-2">
@@ -27057,7 +27350,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-3" {...help('import-species')}>
             <label className="text-xs font-medium">
               {t("ui.animals.import.species", { defaultValue: "Species for this import" })}
             </label>
@@ -27075,18 +27368,20 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
 
           {importCapResult?.blocked ? <AnimalCapNotice result={importCapResult} context="paste" className="mt-3" /> : null}
           <div className="mt-3 flex gap-2">
-            <button className="px-3 py-2 rounded-xl text-sm border" onClick={runImportPreview}>
+            <button className="px-3 py-2 rounded-xl text-sm border" {...help('import-preview')} onClick={runImportPreview}>
               {t("ui.animals.import.previewButton", { defaultValue: "Preview" })}
             </button>
             <button
               className={cx("px-3 py-2 rounded-xl text-sm border", "bg-white")}
               onClick={() => { setImportText(''); setSelectedFile(null); setImportPreview([]); if (onCancel) onCancel(); }}
+              {...help('import-cancel')}
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
             <button
               className={cx("px-3 py-2 rounded-xl text-sm sk-on-accent", canImport ? primaryBtnClass(theme,true) : primaryBtnClass(theme,false))}
               disabled={!canImport}
+              {...help('import-submit')}
               onClick={applyImport}
             >
               {importButtonLabel}
@@ -27095,7 +27390,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
         </div>
 
         <div>
-          <div className="text-xs font-medium">{t("ui.animals.import.previewTitle", { defaultValue: "Preview" })}</div>
+          <div className="text-xs font-medium" {...help('import-preview')}>{t("ui.animals.import.previewTitle", { defaultValue: "Preview" })}</div>
           <div className="mt-1 border rounded-xl p-2 h-64 overflow-auto bg-neutral-50">
             {!importCount && (
               <div className="text-sm text-neutral-500">{t("ui.animals.import.previewHint", { defaultValue: "Click Preview to see the animals found." })}</div>
@@ -27182,11 +27477,11 @@ function GroupsSection({ groups, setGroups, snakes, onDeleteGroup, onOpenSnake, 
   const [newGroupName, setNewGroupName] = useState("");
   const { t } = useTranslation();
   return (
-    <Card title={t("groups.title", { defaultValue: "Groups" })}>
+    <Card title={<span {...help('animals-groups-screen')}>{t("groups.title", { defaultValue: "Groups" })}</span>}>
       <div className="flex gap-2">
-        <input className="flex-1 border rounded-xl px-3 py-2" placeholder={t("groups.newName", { defaultValue: "New group name" })}
+        <input {...help('animals-group-new')} className="flex-1 border rounded-xl px-3 py-2" placeholder={t("groups.newName", { defaultValue: "New group name" })}
           value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} />
-        <button className="px-3 py-2 rounded-xl text-sm border"
+        <button {...help('animals-group-new')} className="px-3 py-2 rounded-xl text-sm border"
           onClick={()=>{
             const g = newGroupName.trim();
             if (!g) return;
@@ -27205,7 +27500,7 @@ function GroupsSection({ groups, setGroups, snakes, onDeleteGroup, onOpenSnake, 
                   <div className="font-medium">{g} <span className="text-xs text-neutral-500">({snakesInGroup.length})</span></div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>onDeleteGroup(g)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+                  <button {...help('animals-group-delete')} className="text-xs px-2 py-1 border rounded-lg" onClick={()=>onDeleteGroup(g)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                 </div>
               </div>
 
@@ -27214,6 +27509,7 @@ function GroupsSection({ groups, setGroups, snakes, onDeleteGroup, onOpenSnake, 
                   <button
                     key={s.id}
                     type="button"
+                    {...help('animals-group-member')}
                     onClick={() => onOpenSnake && onOpenSnake(s)}
                     className="text-sm px-2 py-1 rounded-full border bg-neutral-50 flex items-center gap-2 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-200"
                   >
@@ -27326,7 +27622,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
   return (
     <div className="p-3 border rounded-xl bg-white">
       <div className="flex items-center justify-between mb-2">
-        <div className="font-medium text-sm">
+        <div className="font-medium text-sm" {...help('record-parentage')}>
           {t("snakeEdit.parentage.title", { defaultValue: "Parentage" })}
         </div>
         <div className="text-xs text-neutral-500">
@@ -27342,6 +27638,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
           <select
             className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
             value={selectedClutch?.pairingId || ''}
+            {...help('record-clutch')}
             onChange={e => applyClutch(e.target.value)}
           >
             <option value="">
@@ -27379,6 +27676,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
         </div>
 
         <ParentSelect
+          {...help('record-dam')}
           label={t("snakeEdit.parentage.dam", { defaultValue: "Dam" })}
           placeholder={t("snakeEdit.parentage.noDam", { defaultValue: "No dam selected" })}
           options={damOptions}
@@ -27389,6 +27687,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
           onChange={id => applyParent('dam', id)}
         />
         <ParentSelect
+          {...help('record-sire')}
           label={t("snakeEdit.parentage.sire", { defaultValue: "Sire" })}
           placeholder={t("snakeEdit.parentage.noSire", { defaultValue: "No sire selected" })}
           options={sireOptions}
@@ -27435,7 +27734,7 @@ function buildParentOptions(animals, sex, excludeId) {
   };
 }
 
-function ParentSelect({ label, placeholder, options, value, recordedName, disabled, fromName, onChange }) {
+function ParentSelect({ label, placeholder, options, value, recordedName, disabled, fromName, onChange, ...rest }) {
   const { t } = useTranslation();
   const describe = (animal) => {
     const name = animal.name || animal.id || '';
@@ -27448,7 +27747,7 @@ function ParentSelect({ label, placeholder, options, value, recordedName, disabl
   const missing = value && !options.all.some(animal => animal.id === value);
 
   return (
-    <div>
+    <div {...rest}>
       <label className="text-xs font-medium">{label}</label>
       <select
         className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white disabled:bg-neutral-100 disabled:text-neutral-500"
@@ -27515,7 +27814,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
       {/* Feeds */}
       <section>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.feeds")}</div>
+          <div className="font-medium text-sm" {...help('record-feeds')}>{t("logs.feeds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
@@ -27524,9 +27823,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               const method = def.form || 'Frozen/thawed';
               const methodDetail = def.formDetail || '';
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
-            }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-feeds')}>
           {editSnakeDraft.logs.feeds.map((x,i)=>{
             const isRefused = !!x.refused;
             if (isRefused) {
@@ -27543,10 +27842,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                     <button
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:false})}
+                      {...help('record-undo-refused')}
                     >
                       {t("logs.undoRefused", { defaultValue: "Undo refused" })}
                     </button>
-                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" {...help('record-log-delete')} onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                   </div>
                 </div>
               );
@@ -27597,10 +27897,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                   <button
                     className="text-xs px-2 py-1 border rounded-lg"
                     onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:true})}
+                    {...help('record-mark-refused')}
                   >
                     {t("logs.markRefused", { defaultValue: "Mark refused" })}
                   </button>
-                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" {...help('record-log-delete')} onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                 </div>
               </div>
             );
@@ -27612,14 +27913,14 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
       {/* Weights */}
       <section>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.weights")}</div>
+          <div className="font-medium text-sm" {...help('record-weights')}>{t("logs.weights")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{id:crypto.randomUUID(),date:today,grams:0,notes:""}]}}));
-            }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-weights')}>
           {editSnakeDraft.logs.weights.map((x,i)=>(
             <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
@@ -27628,7 +27929,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 value={x.grams} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{grams:Number(e.target.value)||0})}/>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" {...help('record-log-delete')} onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.weights.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27638,14 +27939,14 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
       {/* Sheds */}
       <section>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.sheds")}</div>
+          <div className="font-medium text-sm" {...help('record-sheds')}>{t("logs.sheds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => {
               const today = localYMD(new Date());
               setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { id: crypto.randomUUID(), date: today, complete: true, notes: '' }] } }));
-            }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-sheds')}>
           {editSnakeDraft.logs.sheds.map((x,i)=>(
             <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
@@ -27656,7 +27957,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {t("logs.complete", { defaultValue: "Complete" })}
               </label>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" {...help('record-log-delete')} onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.sheds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27666,14 +27967,14 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
       {/* Cleanings */}
       <section>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.cleanings")}</div>
+          <div className="font-medium text-sm" {...help('record-cleanings')}>{t("logs.cleanings")}</div>
         <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today = localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{id:crypto.randomUUID(),date:today,deep:false,notes:''}]}}));
-            }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-cleanings')}>
           {editSnakeDraft.logs.cleanings.map((x,i)=>(
             <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
@@ -27684,7 +27985,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {t("logs.deepClean", { defaultValue: "Deep clean" })}
               </label>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" {...help('record-log-delete')} onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.cleanings.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27694,14 +27995,14 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
       {/* Meds */}
       <section>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.meds")}</div>
+          <div className="font-medium text-sm" {...help('record-meds')}>{t("logs.meds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{id:crypto.randomUUID(),date:today,drug:"",dose:"",notes:""}]}}));
-            }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-meds')}>
           {editSnakeDraft.logs.meds.map((x,i)=>(
             <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
@@ -27712,7 +28013,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 value={x.dose||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{dose:e.target.value})}/>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" {...help('record-log-delete')} onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.meds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -28508,8 +28809,8 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   return (
     <div className="bg-white border rounded-2xl shadow-sm">
       <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
-        <div className="font-semibold me-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
-        <div className="flex items-center gap-1">
+        <div {...help('calendar-screen')} className="font-semibold me-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
+        <div className="flex items-center gap-1" {...help('calendar-month')}>
           <button
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
@@ -28532,7 +28833,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             ›
           </button>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" {...help('calendar-year')}>
           <button
             type="button"
             className="px-2 py-1 border rounded-lg text-xs"
@@ -28556,11 +28857,12 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             googleSignedIn ? (
               <>
                 <div className="flex items-center gap-2 border rounded-lg px-2 py-1 bg-white text-xs">
-                  <div className="leading-tight">
+                  <div className="leading-tight" {...help('calendar-google-account')}>
                     <div className="font-semibold text-[11px]">{googleUser?.name || googleUser?.email || t('calendar.googleAccount', { defaultValue: 'Google account' })}</div>
                     {googleUser?.email ? <div className="text-[10px] text-neutral-600">{googleUser.email}</div> : null}
                   </div>
                   <button
+                    {...help('calendar-google-sign-out')}
                     type="button"
                     className="text-[11px] text-rose-600 disabled:opacity-60"
                     onClick={googleSignOut}
@@ -28570,6 +28872,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   </button>
                 </div>
                 <select
+                  {...help('calendar-google-target')}
                   className="border rounded-lg px-2 py-1 text-sm min-w-[160px]"
                   value={googleCalendarId || 'primary'}
                   onChange={(e) => setGoogleCalendarId(e.target.value)}
@@ -28588,6 +28891,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 <button
                   type="button"
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true), googleSyncButtonDisabled ? 'opacity-60 cursor-not-allowed' : '')}
+                  {...help('calendar-google-sync')}
                   onClick={handleSyncGoogleCalendar}
                   disabled={googleSyncButtonDisabled}
                   title={googleSyncCandidates.length ? t('calendar.syncReady', { count: googleSyncCandidates.length, defaultValue: 'Ready to sync {{count}} event(s)' }) : undefined}
@@ -28597,6 +28901,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 <button
                   type="button"
                   className={cx('px-3 py-2 rounded-xl text-sm border bg-white', googleRangeSyncButtonDisabled ? 'opacity-60 cursor-not-allowed' : '')}
+                  {...help('calendar-google-sync-months')}
                   onClick={handleSyncGoogleCalendarRange}
                   disabled={googleRangeSyncButtonDisabled}
                   title={googleRangeSyncCandidates.length
@@ -28610,6 +28915,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true), googleConnectDisabled ? 'opacity-60 cursor-not-allowed' : '')}
+                {...help('calendar-google-connect')}
                 onClick={handleConnectGoogleCalendar}
                 disabled={googleConnectDisabled}
               >
@@ -28617,26 +28923,29 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
               </button>
             )
           ) : (
-            <div className="text-[11px] text-neutral-500 max-w-xs">
+            <div {...help('calendar-google-unavailable')} className="text-[11px] text-neutral-500 max-w-xs">
               {t('calendar.syncUnavailable', { defaultValue: 'Google Calendar sync is not available yet.' })}
             </div>
           )}
-          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>
+          <button {...help('calendar-refresh')} className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>
             {t('calendar.refresh', { defaultValue: 'Refresh' })}
           </button>
           <button
+            {...help('calendar-export-sheet')}
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportAppointmentSheet}
           >
             {t('calendar.exportAppointmentSheet', { defaultValue: 'Export appointment sheet' })}
           </button>
           <button
+            {...help('calendar-export-month')}
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportGoogleCalendar}
           >
             {t('calendar.exportGoogle', { defaultValue: 'Export Google Calendar' })}
           </button>
           <button
+            {...help('calendar-export-full')}
             className="px-3 py-2 rounded-xl text-sm border"
             onClick={handleExportFullCalendar}
             title={fullExportRangeLabel ? t('calendar.downloadAppointmentsFrom', { range: fullExportRangeLabel, defaultValue: 'Download appointments from {{range}}' }) : t('calendar.downloadAllAppointments', { defaultValue: 'Download all appointments' })}
@@ -28663,7 +28972,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
 
       {pairingReminders.length ? (
         <div className="px-4 py-2 border-b bg-amber-50 text-amber-800 text-xs">
-          <div className="text-[11px] uppercase tracking-wide font-semibold text-amber-700">{t('calendar.upcomingPairings', { defaultValue: 'Upcoming pairings' })}</div>
+          <div {...help('calendar-upcoming')} className="text-[11px] uppercase tracking-wide font-semibold text-amber-700">{t('calendar.upcomingPairings', { defaultValue: 'Upcoming pairings' })}</div>
           <ul className="mt-1 space-y-1">
             {pairingReminders.map(reminder => (
               <li key={reminder.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
@@ -28681,7 +28990,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       <div className="px-4 py-3 border-b bg-neutral-50">
         <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-700">
           {filterDefinitions.map(filter => (
-            <label key={filter.key} className={cx('flex items-center gap-2 rounded-lg border px-2 py-1 bg-white', filters[filter.key] ? 'border-sky-200 shadow-sm' : 'border-neutral-200 opacity-80')}>
+            <label key={filter.key} {...help('calendar-filters')} className={cx('flex items-center gap-2 rounded-lg border px-2 py-1 bg-white', filters[filter.key] ? 'border-sky-200 shadow-sm' : 'border-neutral-200 opacity-80')}>
               <input
                 type="checkbox"
                 className="w-4 h-4"
@@ -28698,7 +29007,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
         <div className="grid grid-cols-7 text-xs font-medium text-neutral-500">
           {['sun','mon','tue','wed','thu','fri','sat'].map(d=> <div key={d} className="p-2">{t(`calendar.weekdays.${d}`, { defaultValue: d.slice(0, 1).toUpperCase() + d.slice(1) })}</div>)}
         </div>
-        <div className="grid grid-cols-7 gap-px bg-neutral-200 rounded-lg overflow-hidden">
+        <div className="grid grid-cols-7 gap-px bg-neutral-200 rounded-lg overflow-hidden" {...help('calendar-grid')}>
           {grid.map((cell, i) => {
             const cellDate = ymd(cell.year, cell.month, cell.day);
             const isToday = cellDate === todayYmd;
@@ -28739,6 +29048,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     return (
                       <div
                         key={idx}
+                        {...help('calendar-feed-due')}
                         className="text-[11px] px-2 py-1 rounded-full border flex items-start gap-2 border-amber-200 bg-amber-50"
                       >
                         <div className="truncate">
@@ -28861,6 +29171,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     return (
                       <button
                         key={idx}
+                        {...help('calendar-clutch-event')}
                         onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
                         className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
                       >
@@ -28885,6 +29196,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   return (
                     <button
                       key={idx}
+                      {...help('calendar-pairing-event')}
                       onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
                       className="text-xs px-2 py-1 rounded-lg border flex items-center gap-2 text-start w-full"
                       style={{ borderColor: maleColors.border, background: maleColors.fill }}
@@ -28920,6 +29232,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
               <button
                 key={l.id}
                 type="button"
+                {...help('calendar-legend')}
                 onClick={() => handleMaleFilterToggle(l.id)}
                 className="text-xs px-2 py-1 border rounded-lg flex items-center gap-1 transition-opacity"
                 style={style}

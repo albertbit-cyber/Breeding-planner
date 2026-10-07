@@ -1,15 +1,30 @@
 import { CATEGORIES, type Category, type HelpTopic, type ResolvedTopic, type TopicDef, type Translator } from './helpTypes';
 import { gettingStarted } from './topics/gettingStarted';
+import { animals } from './topics/animals';
+import { record } from './topics/record';
+import { breeding } from './topics/breeding';
+import { logistics } from './topics/logistics';
+import { settings } from './topics/settings';
 
 // Every topic file, in category order. Files never import each other; the registry
 // merges them once. Kept as a list so the registry test can see a duplicate id that
 // the spread below would silently overwrite.
 export const TOPIC_SOURCES = [
   gettingStarted,
+  animals,
+  record,
+  breeding,
+  logistics,
+  settings,
 ] as const;
 
 const DEFS = {
   ...gettingStarted,
+  ...animals,
+  ...record,
+  ...breeding,
+  ...logistics,
+  ...settings,
 } satisfies Record<string, TopicDef>;
 
 // A typo in help('…') fails tsc in .ts files; .jsx is not type-checked here, so the

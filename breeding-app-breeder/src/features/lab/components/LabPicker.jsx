@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { help } from "../../help/help";
 import { fetchLabDirectory } from "../../../shared/apiClient";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 
@@ -72,6 +73,7 @@ export default function LabPicker({ onChosen, speciesId, speciesName }) {
             <li key={lab.organizationId}>
               <button
                 type="button"
+                {...help('lab-choose-lab')}
                 onClick={() => pick(lab)}
                 aria-pressed={isSelected}
                 className={`w-full rounded border p-3 text-start transition ${

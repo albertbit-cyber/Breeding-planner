@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 import { CHECK_FIELDS, getQuarantineDays, todayYmd } from '../../services/quarantine';
 import { CHECK_FIELD_LABELS, CHECK_VALUE_LABELS, makeLabeller } from './labels';
@@ -41,7 +42,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
         aria-label={t('quarantine.logCheck', { defaultValue: 'Log check' })}
       >
         <div className="sticky top-0 bg-white/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between rounded-t-2xl">
-          <div className="min-w-0">
+          <div className="min-w-0" {...help('quarantine-check-window')}>
             <div className="text-sm font-semibold truncate"><bdi>{snake?.name || snake?.id}</bdi></div>
             <div className="text-[11px] text-neutral-500">
               {day === null
@@ -51,7 +52,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             <DialogHelpButton />
-            <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
+            <button {...help('quarantine-check-cancel')} type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
               {t('common.cancel', { defaultValue: 'Cancel' })}
             </button>
           </div>
@@ -62,6 +63,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
             <label className="text-[11px] font-medium text-neutral-600">
               {t('quarantine.date', { defaultValue: 'Date' })}
               <input
+                {...help('quarantine-check-date')}
                 type="date"
                 className="mt-1 w-full rounded-xl border px-2 py-2 text-sm"
                 value={draft.date}
@@ -72,6 +74,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
               {t('quarantine.weightGrams', { defaultValue: 'Weight (g)' })}
               <input
                 type="number"
+                {...help('quarantine-check-weight')}
                 inputMode="numeric"
                 className="mt-1 w-full rounded-xl border px-2 py-2 text-sm"
                 value={draft.weightGrams}
@@ -95,6 +98,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
                     <button
                       key={option}
                       type="button"
+                      {...help('quarantine-check-observation')}
                       aria-pressed={active}
                       className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
                         active
@@ -116,6 +120,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
           <label className="text-[11px] font-medium text-neutral-600">
             {t('quarantine.notes', { defaultValue: 'Notes' })}
             <textarea
+              {...help('quarantine-check-notes')}
               rows={2}
               className="mt-1 w-full rounded-xl border px-2 py-2 text-sm"
               value={draft.notes}
@@ -129,6 +134,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
           <button
             type="button"
             className="w-full rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white"
+            {...help('quarantine-check-save')}
             onClick={() => { onSave?.(draft); onClose?.(); }}
           >
             {t('quarantine.saveCheck', { defaultValue: 'Save check' })}

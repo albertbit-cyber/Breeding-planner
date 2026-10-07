@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../../help/help';
 
 // Handles both local ('M'/'F') and pedigree ('male'/'female') formats
 const normSex = (s) => {
@@ -83,7 +84,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
   return (
     <div className="ft-left-panel flex flex-col gap-4 overflow-y-auto">
       {/* Snake avatar card */}
-      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4 flex flex-col gap-3">
+      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4 flex flex-col gap-3" {...help('tree-selected')}>
         <div className="h-32 w-full">
           <AvatarPlaceholder snake={snake} />
         </div>
@@ -121,7 +122,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
       </div>
 
       {/* Quick info */}
-      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
+      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4" {...help('tree-selected')}>
         <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
           {t('familyTree.quickInfo', { defaultValue: 'Quick Info' })}
         </div>
@@ -141,7 +142,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
 
       {/* Snake search / switch */}
       {allSnakes?.length > 1 && (
-        <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
+        <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4" {...help('tree-switch-snake')}>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
             {t('familyTree.switchSnake', { defaultValue: 'Switch Snake' })}
           </div>
@@ -151,6 +152,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
                 key={s.id}
                 type="button"
                 onClick={() => onSnakeSelect?.(s)}
+                {...help('tree-switch-snake')}
                 className={[
                   'w-full text-start rounded-lg px-2 py-1.5 text-xs transition-colors flex items-center gap-2',
                   s.id === snake.id || s.id === snake.localId
@@ -169,7 +171,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
       )}
 
       {/* Legend */}
-      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
+      <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4" {...help('tree-legend')}>
         <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
           {t('familyTree.legend.title', { defaultValue: 'Legend' })}
         </div>
