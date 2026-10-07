@@ -13,7 +13,17 @@ import { makeEnTranslator } from './enTranslator';
 const topics = resolveAll(makeEnTranslator());
 const topicText = (topic: (typeof topics)[number]) =>
   [topic.title, topic.short, topic.more, ...topic.tips, ...topic.words].join('\n');
-const allText = [topics.map(topicText).join('\n'), JSON.stringify((enHelp as { ui?: unknown }).ui || {})].join('\n');
+// Every string under a node, one per line, so a sentence never borrows its neighbour's words.
+const strings = (node: unknown): string[] =>
+  typeof node === 'string' ? [node]
+    : node && typeof node === 'object' ? Object.values(node as Record<string, unknown>).flatMap(strings)
+      : [];
+const allText = [
+  topics.map(topicText).join('\n'),
+  ...strings((enHelp as { ui?: unknown }).ui),
+  // Tour titles, steps, missing texts and the example offer.
+  ...strings((enHelp as { tour?: unknown }).tour),
+].join('\n');
 const sentences = allText.split(/(?<=[.!?])\s+|\n+/).filter(Boolean);
 const byId = (id: string) => topics.find(topic => topic.id === id);
 

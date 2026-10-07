@@ -64,6 +64,7 @@ export default function HelpPopover({ popover }) {
       role="dialog"
       aria-labelledby="help-popover-title"
       data-help-ui=""
+      data-side={position?.side}
       style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: 'hidden' }}
     >
       <h2 id="help-popover-title" className="help-popover__title">{title}</h2>

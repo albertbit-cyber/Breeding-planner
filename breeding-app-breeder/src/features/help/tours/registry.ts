@@ -1,9 +1,13 @@
 import type { Tour } from './tourTypes';
 import { helpStore } from '../helpStore';
+import { essentials } from './essentials';
 import { usingHelp } from './areas/usingHelp';
+import { AREA_TOURS } from './areas/screens';
 
 // Every tour, in the order the Help menu lists them. Essentials comes first.
 export const TOURS: Tour[] = [
+  essentials,
+  ...AREA_TOURS,
   usingHelp,
 ];
 

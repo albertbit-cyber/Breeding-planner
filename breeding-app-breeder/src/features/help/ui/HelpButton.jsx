@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { helpStore, useHelpState } from '../helpStore';
+import { HelpHint } from './Onboarding';
 
 // The ? in the top bar. Opens the Help menu; pressed while Help Mode is on.
 export function HelpButton({ className = '' }) {
@@ -8,6 +9,7 @@ export function HelpButton({ className = '' }) {
   const mode = useHelpState(state => state.mode);
   const label = t('ui.button');
   return (
+    <span className="help-hint-anchor">
     <button
       type="button"
       data-help-ui=""
@@ -21,6 +23,8 @@ export function HelpButton({ className = '' }) {
     >
       ?
     </button>
+    <HelpHint />
+    </span>
   );
 }
 

@@ -54,6 +54,10 @@ export interface TourStep {
   done?: (context: TourContext) => boolean;
   // Where the step lives, for "Take me there": [tab, sub-view?].
   route?: string[];
+  // Other controls the panel must keep clear of (the next thing the keeper presses).
+  avoid?: string[];
+  // Leave the page where it is: the keeper works top-down to the target (a form's Add).
+  noScroll?: boolean;
   offer?: TourOffer;
 }
 

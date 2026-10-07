@@ -3293,7 +3293,8 @@
   /* Scroll to top floats above the bottom bar; at bottom-6 it sat on the More item
      and swallowed every tap on it once the page had scrolled. */
   .bp-scroll-top {
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    /* Above the bottom bar and above the animals "+" (bottom 76px, 56px tall). */
+    bottom: calc(144px + env(safe-area-inset-bottom, 0px)) !important;
   }
   /* Body gets bottom padding so content isn't hidden under nav */
   .bp-app-body {
@@ -3644,6 +3645,16 @@
 /* ── FAB — floating action button ───────────────────────────── */
 .bp-fab {
   display: none;
+}
+/* The + glyph fills its button, so a tour step pointing at it rings the whole button. */
+.bp-fab__glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {

@@ -4,6 +4,6 @@ import type { HelpId } from './registry';
 // itself, or on the smallest wrapper that is the control (a card, a radio group).
 export const help = (id: HelpId): { 'data-help': HelpId } => ({ 'data-help': id });
 
-// Mark a tour target that is not a help topic: <div {...tour('species-card')}>.
+// Mark a tour target that is not a help topic: <div {...tour('main-nav')}>.
 // Every id used here must be listed in tours/ownTargets.ts.
 export const tour = (id: string): { 'data-tour': string } => ({ 'data-tour': id });

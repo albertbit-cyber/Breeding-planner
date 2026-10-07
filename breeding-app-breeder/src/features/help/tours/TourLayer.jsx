@@ -10,7 +10,7 @@ const RING_OUTSET = 6;
 // beside it. Neither blocks anything; the app stays fully usable.
 export default function TourLayer({ getAppContext, onNavigate, onOffer }) {
   const { t } = useTranslation('help');
-  const { tour, step, index, rect, missing, done } = useTourEngine(getAppContext);
+  const { tour, step, index, rect, avoidRects, missing, done } = useTourEngine(getAppContext);
   const panelRef = useRef(null);
   const headingRef = useRef(null);
   const [panelSize, setPanelSize] = useState({ width: 360, height: 220 });
@@ -53,7 +53,7 @@ export default function TourLayer({ getAppContext, onNavigate, onOffer }) {
 
   const total = tour.steps.length;
   const last = index === total - 1;
-  const placement = placePanel(rect, panelSize, viewport);
+  const placement = placePanel(rect, panelSize, viewport, avoidRects);
   const title = t(step.title.replace(/^help:/, ''));
   const text = t(step.text.replace(/^help:/, ''));
   const missingText = step.missing ? t(step.missing.replace(/^help:/, '')) : t('ui.tour.missing');

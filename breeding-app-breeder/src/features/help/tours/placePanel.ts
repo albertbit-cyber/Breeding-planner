@@ -44,7 +44,9 @@ export interface Placement {
   maxHeight?: number;
 }
 
-export const placePanel = (target: Rect | null, panel: Size, viewport: Size): Placement => {
+// `obstacles` are other controls the step needs free (a Save button the keeper must press
+// next); a placement that covers one is only used when nothing else clears the target.
+export const placePanel = (target: Rect | null, panel: Size, viewport: Size, obstacles: Rect[] = []): Placement => {
   const corners: Array<[string, Rect]> = [
     ['top-right', { top: MARGIN, left: viewport.width - MARGIN - panel.width, ...panel }],
     ['bottom-right', { top: viewport.height - MARGIN - panel.height, left: viewport.width - MARGIN - panel.width, ...panel }],
@@ -69,7 +71,14 @@ export const placePanel = (target: Rect | null, panel: Size, viewport: Size): Pl
     ['right', { top: centreY, left: target.left + target.width + GAP, ...panel }],
     ['left', { top: centreY, left: target.left - GAP - panel.width, ...panel }],
   ];
-  for (const [side, box] of [...sides, ...corners]) {
+  const clear = (box: Rect) => obstacles.every(obstacle => !overlaps(box, {
+    top: obstacle.top - HALO, left: obstacle.left - HALO, width: obstacle.width + HALO * 2, height: obstacle.height + HALO * 2,
+  }));
+  const candidates = [...sides, ...corners];
+  for (const [side, box] of candidates) {
+    if (fits(box, viewport) && !overlaps(box, halo) && clear(box)) return { top: box.top, left: box.left, side };
+  }
+  for (const [side, box] of candidates) {
     if (fits(box, viewport) && !overlaps(box, halo)) return { top: box.top, left: box.left, side };
   }
   // 5. Nothing clears it at full height (a small phone, a tall control mid-screen): take

@@ -30,6 +30,7 @@ export function useTourEngine(getAppContext) {
   const key = active ? `${active.id}:${active.index}` : null;
 
   const [rect, setRect] = useState(null);
+  const [avoidRects, setAvoidRects] = useState([]);
   const [missing, setMissing] = useState(false);
   const [doneKey, setDoneKey] = useState(null);
 
@@ -70,7 +71,7 @@ export function useTourEngine(getAppContext) {
     if (!step || !key) return;
     const element = step.target ? findTarget(step.target) : null;
 
-    if (element && scrolledFor.current !== key) {
+    if (element && scrolledFor.current !== key && !step.noScroll) {
       scrolledFor.current = key;
       const box = element.getBoundingClientRect();
       const offscreen = box.bottom < 0 || box.top > window.innerHeight || box.right < 0 || box.left > window.innerWidth;
@@ -80,6 +81,11 @@ export function useTourEngine(getAppContext) {
     const box = element ? element.getBoundingClientRect() : null;
     const next = box ? { top: box.top, left: box.left, width: box.width, height: box.height } : null;
     setRect(prev => (sameRect(prev, next) || (!prev && !next) ? prev : next));
+    const avoid = (step.avoid || [])
+      .map(id => findTarget(id))
+      .filter(Boolean)
+      .map(node => { const r = node.getBoundingClientRect(); return { top: r.top, left: r.left, width: r.width, height: r.height }; });
+    setAvoidRects(prev => (prev.length === avoid.length && prev.every((r, i) => sameRect(r, avoid[i])) ? prev : avoid));
 
     if (!step.target || element) {
       missingSince.current = Date.now();
@@ -130,6 +136,7 @@ export function useTourEngine(getAppContext) {
     step,
     index: active?.index ?? 0,
     rect,
+    avoidRects,
     missing,
     done: !!key && doneKey === key,
   };

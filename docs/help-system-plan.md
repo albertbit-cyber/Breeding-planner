@@ -1,6 +1,6 @@
 # Help system plan: breeding-app-breeder
 
-Status: **approved 2026-10-07**, building on `feature/help-system` (fast-forwarded to `5470aed`). Spec: [docs/handoff/help-system.md](handoff/help-system.md)
+Status: **built, 7/7 (2026-10-07)** on `feature/help-system`. Section 13 records the outcome. Spec: [docs/handoff/help-system.md](handoff/help-system.md)
 (repo copy of the "Serpentora Help System Handoff" doc). This file is the resumable record: later
 sessions read this file and the handoff copy, not the original doc.
 
@@ -438,3 +438,36 @@ plus the touched Playwright specs. Each step is one commit, "Help system N/7: <n
   consumer does not justify a shared API.
 - **Public site.** No Help Mode. Its only plausible reuse is the read-only manual and search as a
   public "How it works" page, filtered to topics that pass the honesty test.
+
+## 13. Outcome (2026-10-07)
+
+- 732 topics in 17 sections; 884 help ids in the source; every app window (39) is a dialog with its
+  own ?. 14 tours: essentials (18 steps, 6 parts), 12 area tours and "Using help".
+- English only, in `locales/en/help.json`; `check-app-locales.cjs` treats breeder `help` as an
+  English-only namespace until P2.9 translates it.
+- Changes from this plan made while building:
+  - The feed step of the essentials tour moved into the record (+ Add in Feeds, then Save
+    changes): a card's quick-add only opens from a tile that already has an entry.
+  - A tour step can name controls the panel must keep clear of (`avoid`) and can leave the page
+    unscrolled (`noScroll`); placePanel caps the panel to the free band on small phones.
+  - One "Take a short tour" link row above each screen, plus links inside the record and Feed
+    Prep windows, instead of one per screen header.
+- Reported by the coverage pass and NOT fixed here (each topic describes what the code does):
+  - Deleting an animal deletes its pairings, while the confirm says "detaches".
+  - The record's Open family tree discards unsaved edits; photos, publish, add status and new
+    group act at once and Cancel does not undo them.
+  - No confirm, no undo: status "−" (strips a status from every animal), pairing Delete, Generate
+    5 months, Clear egg/hatch record, appointment Remove, rack and terrarium Delete, quarantine
+    Remove record, lab queue Remove and Clear All, alias Delete, Restore and Import legacy JSON,
+    ID wizard / appearance / label resets.
+  - A restore is not a true replace while signed in: the next sync merges it with the account.
+  - Advisor Accept does nothing; Run Advisor's web search provider is inert in the browser build.
+  - Saving a hatchling deletes the whole demo collection.
+  - The QR preview window can never be opened; the phone status-filter chip's x does nothing; both
+    search clear buttons are labelled "Clear filters"; Breeder info Save saves nothing extra.
+  - Calendar: one male's appointments are shifted at least 3 days apart and exported shifted;
+    Upcoming misses next month; the Google connection is lost on reload.
+  - Spaces: tub numbers run left to right while the form hint says top-right downward; an
+    animal can sit in a rack and a terrarium at once; two RoomModal labels use the wrong keys.
+  - Generic CSV without headers reads unknown sex as Female.
+  - Visible app strings with em dashes (hatch window, quarantine editor help, source options).

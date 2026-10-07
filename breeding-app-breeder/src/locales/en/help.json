@@ -3511,7 +3511,18 @@
       "skip": "Skip this step",
       "takeMeThere": "Take me there",
       "exit": "Exit guide",
-      "announce": "Step {{current}} of {{total}}: {{title}}. {{text}}"
+      "announce": "Step {{current}} of {{total}}: {{title}}. {{text}}",
+      "link": "Take a short tour"
+    },
+    "invite": {
+      "title": "Let's get to know Serpentora.",
+      "text": "A short guided tour: you press the real controls, one at a time, and it never changes anything for you.",
+      "start": "Start guide",
+      "notNow": "Not now"
+    },
+    "hint": {
+      "text": "Help lives here: press ? to explore any control, read the manual or take a tour.",
+      "dismiss": "Dismiss"
     }
   },
   "tour": {
@@ -3529,6 +3540,441 @@
         "manual": {
           "title": "Open the manual",
           "text": "Press ?, then Open manual. Every explanation in Serpentora is in there, by section, with a search."
+        }
+      }
+    },
+    "essentials": {
+      "title": "Get to know Serpentora",
+      "description": "The core loop in a few minutes: a species, your first animal, its record and a feed, a pairing, and where help lives.",
+      "parts": {
+        "1": "1 · Finding your way",
+        "2": "2 · Your first animal",
+        "3": "3 · Its record",
+        "4": "4 · Breeding",
+        "5": "5 · Your records are yours",
+        "6": "6 · Help"
+      },
+      "offer": {
+        "label": "Add an example animal instead",
+        "note": "It adds one ordinary animal named “Example animal” to this species. Delete it any time from its card. While it exists, the built-in example animals step aside.",
+        "animalName": "Example animal",
+        "animalNotes": "Added by the guided tour as an example. Delete it any time."
+      },
+      "steps": {
+        "welcome": {
+          "title": "Welcome to Serpentora",
+          "text": "Serpentora keeps the record of your collection: animals, genetics, pairings and the care around them. This tour has you press the real controls, one at a time. It never changes anything for you."
+        },
+        "places": {
+          "title": "The main places",
+          "text": "Dashboard shows every species you keep. Feed Prep, Spaces, Quarantine, Calendar and Lab tests cover the whole collection. On a phone the same places sit in the bar at the bottom, the rest under More."
+        },
+        "open-species": {
+          "title": "Open a species",
+          "text": "Press a species card. Its animals, pairings, Breeding Advisor and family tree live inside it.",
+          "missing": "The species cards are on the Dashboard. Press Dashboard first."
+        },
+        "examples": {
+          "title": "The example animals",
+          "text": "Animals marked Demo are examples, so the app has something to show. They step aside as soon as you add or import an animal of your own."
+        },
+        "add": {
+          "title": "Press Add animal",
+          "text": "Press Add animal. On a phone, press + and then Add animal.",
+          "missing": "Add animal is on the Animals screen of an open species."
+        },
+        "add-real": {
+          "title": "Add one real animal",
+          "text": "Fill in one animal you really keep and press Add. A name and sex are enough; everything else can wait. This is your choice: close the window if you would rather not.",
+          "missing": "The Add animal window is closed. Press Add animal to open it again, or skip this step."
+        },
+        "open-record": {
+          "title": "Open its record",
+          "text": "Press Edit on an animal's card. Its record opens: details, genetics, logs and photos in one window.",
+          "missing": "The cards are on the Animals screen of an open species."
+        },
+        "genetics": {
+          "title": "Genetics",
+          "text": "Morphs, hets and possible hets live here. A visual trait shows on the animal; a het carries one hidden copy; “66% het” or “pos het” means it might. Every outcome Serpentora works out from these is a chance, never a promise."
+        },
+        "close-record": {
+          "title": "Close the record",
+          "text": "If the record is still open, press Save changes to keep what you changed, or Cancel to leave the animal as it was."
+        },
+        "feed": {
+          "title": "Log a feed",
+          "text": "Scroll to Feeds and press + Add: it fills in today's feed. Then press Save changes. Nothing in this window is kept until you do.",
+          "missing": "Feeds is in the animal's record, under its logs. Open the record with Edit first."
+        },
+        "open-breeding": {
+          "title": "Open Breeding",
+          "text": "Press Breeding. Every pairing of this species lives there, from the first lock to the hatchlings.",
+          "missing": "Breeding appears once a species is open. On a phone it is in the bottom bar."
+        },
+        "new-pairing": {
+          "title": "Press New pairing",
+          "text": "Press New pairing to see how a pairing starts.",
+          "missing": "New pairing is at the top of the Breeding screen."
+        },
+        "choosing": {
+          "title": "A male and a female",
+          "text": "A pairing joins a male and a female from the Breeders group. If no animal is in Breeders yet, Serpentora says so here. This is your choice: nothing here starts a pairing for you."
+        },
+        "close-pairing": {
+          "title": "Close the window",
+          "text": "Close it. If you do have a real pair to plan, you can pick them and add the pairing instead: that is your call."
+        },
+        "stages": {
+          "title": "From pairing to hatchling",
+          "text": "A pairing moves through its stages: locks, ovulation, pre-lay shed, eggs laid, the incubator, then the hatch. Each stage is a button you press when it happens."
+        },
+        "import": {
+          "title": "Bringing a collection in",
+          "text": "Import animals reads a MorphMarket CSV export, a spreadsheet or pasted text, and shows a preview before anything is added. This tour never does it for you."
+        },
+        "saving": {
+          "title": "Saved as you go",
+          "text": "What you change is saved in this browser as you go, and sent to your Serpentora account while you are signed in. Backups and the cloud sync button live in Settings."
+        },
+        "help": {
+          "title": "Help is always here",
+          "text": "Press ? any time. Explore the app explains any control without using it, the manual has every explanation, and every tour is listed there, this one included."
+        }
+      }
+    },
+    "tour-dashboard": {
+      "title": "The Dashboard",
+      "description": "Search everything, open a species, and read the breeding table.",
+      "parts": {
+        "1": "Dashboard"
+      },
+      "steps": {
+        "search": {
+          "title": "Search every animal",
+          "text": "Type part of a name, an ID or a gene in the search. It looks through every animal in every species.",
+          "missing": "The search is on the Dashboard. Press Dashboard first."
+        },
+        "species": {
+          "title": "Species cards",
+          "text": "Each card is one species you keep, with its count. Press one to open that species."
+        },
+        "breeding": {
+          "title": "The breeding table",
+          "text": "Shows each species' pairings by stage: what is overdue, what is due, what is coming up."
+        },
+        "add": {
+          "title": "New animal and species",
+          "text": "Starts the Add animal window. A species you do not keep yet appears here once you add an animal of it."
+        },
+        "import": {
+          "title": "Import your collection",
+          "text": "Brings animals in from a MorphMarket CSV export, a spreadsheet or pasted text, with a preview before anything is added. This tour never does it for you."
+        }
+      }
+    },
+    "tour-animals": {
+      "title": "Animals",
+      "description": "Switch views, search, and find the tools on the Animals screen.",
+      "parts": {
+        "1": "Animals"
+      },
+      "steps": {
+        "view": {
+          "title": "Males, Females, Groups",
+          "text": "Press Males, Females or Groups to narrow the list. All brings everyone back.",
+          "missing": "These views are on the Animals screen of an open species."
+        },
+        "search": {
+          "title": "Search the list",
+          "text": "Type in the search to filter the animals of this species.",
+          "missing": "The search is on the Animals screen of an open species."
+        },
+        "layout": {
+          "title": "Cards or a table",
+          "text": "Switch between cards and a list with sortable columns. Nothing about the animals changes.",
+          "missing": "On a phone the layout controls are in the toolbar above the list."
+        },
+        "filters": {
+          "title": "Status and groups",
+          "text": "Filter by status (Active, For sale, Holdback and your own) and by group. Filters only change what is shown.",
+          "missing": "On a phone the filters are under Filters."
+        },
+        "qr": {
+          "title": "QR labels",
+          "text": "Export QR makes printable labels; Scan QR finds an animal from a label with the camera or a USB scanner.",
+          "missing": "On a phone these are under the + button."
+        },
+        "import": {
+          "title": "Import animals",
+          "text": "Reads a MorphMarket CSV export, a spreadsheet or pasted text and shows a preview first. On a phone it is under +. This tour never does it for you."
+        }
+      }
+    },
+    "tour-record": {
+      "title": "An animal's record",
+      "description": "What lives in a record, and how saving works there.",
+      "parts": {
+        "1": "Animal record"
+      },
+      "steps": {
+        "open": {
+          "title": "Open a record",
+          "text": "Press Edit on an animal's card or row.",
+          "missing": "The cards are on the Animals screen of an open species."
+        },
+        "genetics": {
+          "title": "Genetics",
+          "text": "Morphs, hets and possible hets. Outcomes worked out from them are chances, never promises."
+        },
+        "parentage": {
+          "title": "Parentage",
+          "text": "Link the dam and sire, or a clutch, so the family tree can draw the line."
+        },
+        "logs": {
+          "title": "Logs",
+          "text": "Feeds, weights, sheds, cleanings and medications, each with its own Add. They are kept when you press Save changes."
+        },
+        "selling": {
+          "title": "For sale",
+          "text": "Marks the animal for sale with a price. What saving it does to a listing is explained in its own entry in the manual. This tour never publishes anything."
+        },
+        "close": {
+          "title": "Close the record",
+          "text": "Press Save changes to keep what you changed, or Cancel to leave the animal as it was."
+        }
+      }
+    },
+    "tour-breeding": {
+      "title": "Breeding",
+      "description": "The views of the Breeding screen and how a pairing moves.",
+      "parts": {
+        "1": "Breeding"
+      },
+      "steps": {
+        "incubator": {
+          "title": "Open the Incubator",
+          "text": "Press Incubator: every clutch with eggs still incubating, by egg box.",
+          "missing": "The views are at the top of the Breeding screen."
+        },
+        "dashboard": {
+          "title": "Back to the dashboard",
+          "text": "Press Dashboard: what needs doing now across your pairings.",
+          "missing": "The views are at the top of the Breeding screen."
+        },
+        "new": {
+          "title": "New pairing",
+          "text": "Starts a pairing between a male and a female from the Breeders group."
+        },
+        "stages": {
+          "title": "From lock to hatch",
+          "text": "A pairing moves through locks, ovulation, pre-lay shed, eggs, the incubator and the hatch. Each is a button you press when it happens. Deleting a pairing happens at once and cannot be undone."
+        }
+      }
+    },
+    "tour-advisor": {
+      "title": "Breeding Advisor",
+      "description": "Set a goal and read the suggestions.",
+      "parts": {
+        "1": "Breeding Advisor"
+      },
+      "steps": {
+        "goal": {
+          "title": "Your goal",
+          "text": "Choose the morph or combination you are working toward.",
+          "missing": "The goal is on the Breeding Advisor screen of an open species."
+        },
+        "run": {
+          "title": "Run Advisor",
+          "text": "Works out pairing suggestions toward the goal from the genetics recorded on your animals. Nothing is paired for you.",
+          "missing": "Run Advisor is on the Breeding Advisor screen."
+        },
+        "cards": {
+          "title": "Suggestions",
+          "text": "Each suggestion shows the chance of the goal per hatchling. A chance is an estimate, never a promise. Convert to Plan starts a pairing only when you press it."
+        }
+      }
+    },
+    "tour-family-tree": {
+      "title": "Family Tree",
+      "description": "The views, choosing an animal, and its passport.",
+      "parts": {
+        "1": "Family Tree"
+      },
+      "steps": {
+        "views": {
+          "title": "Views",
+          "text": "Tree, Horizontal, Lineage, Clutch and Universe draw the same family in different shapes.",
+          "missing": "The views are on the Family Tree screen of an open species."
+        },
+        "switch": {
+          "title": "Switch Snake",
+          "text": "Choose whose family is drawn.",
+          "missing": "Switch Snake is on the Family Tree screen."
+        },
+        "passport": {
+          "title": "Pedigree Passport",
+          "text": "The chosen animal's overview and history. Health and Files are not available yet.",
+          "missing": "The passport shows once an animal is chosen."
+        }
+      }
+    },
+    "tour-calendar": {
+      "title": "Calendar",
+      "description": "Move through months, filter events, and export.",
+      "parts": {
+        "1": "Calendar"
+      },
+      "steps": {
+        "month": {
+          "title": "Month and year",
+          "text": "Move between months and years.",
+          "missing": "The month controls are at the top of the Calendar."
+        },
+        "filters": {
+          "title": "What is shown",
+          "text": "Tick or untick kinds of events. Filters only change what is shown.",
+          "missing": "The filters are on the Calendar screen."
+        },
+        "exports": {
+          "title": "Exports",
+          "text": "Save the calendar as a file you keep: an appointment sheet or a calendar file.",
+          "missing": "The exports are on the Calendar screen."
+        },
+        "google": {
+          "title": "Google Calendar",
+          "text": "Connecting Google Calendar copies breeding appointments into a Google calendar you choose. This tour never connects it for you."
+        }
+      }
+    },
+    "tour-feed-prep": {
+      "title": "Feed Prep",
+      "description": "Plan what to thaw for the animals you pick.",
+      "parts": {
+        "1": "Feed Prep"
+      },
+      "steps": {
+        "open": {
+          "title": "Open Feed Prep",
+          "text": "Press Feed Prep. It covers the whole collection.",
+          "missing": "Feed Prep is in the top bar on a computer."
+        },
+        "pick": {
+          "title": "Pick the animals",
+          "text": "Tick the animals you will feed. The list of feeders to thaw adds up as you go."
+        },
+        "report": {
+          "title": "Copy report",
+          "text": "Copies the thaw list as text, ready to paste anywhere."
+        },
+        "close": {
+          "title": "Close it",
+          "text": "Close Feed Prep when you are done. Nothing here changes any record."
+        }
+      }
+    },
+    "tour-spaces": {
+      "title": "Spaces",
+      "description": "Rooms, racks and terrariums, and who lives where.",
+      "parts": {
+        "1": "Spaces"
+      },
+      "steps": {
+        "rooms": {
+          "title": "Rooms",
+          "text": "Create a room for each place you keep animals.",
+          "missing": "Spaces is in the top bar, or under More on a phone."
+        },
+        "inside": {
+          "title": "Racks and terrariums",
+          "text": "Open a room to add racks with tubs, or terrariums, and assign animals to them."
+        },
+        "delete": {
+          "title": "Deleting",
+          "text": "Deleting a room asks first. Deleting a rack or terrarium happens at once, with no confirmation. This tour never deletes anything."
+        }
+      }
+    },
+    "tour-quarantine": {
+      "title": "Quarantine",
+      "description": "Read the list, and the notice about what quarantine records.",
+      "parts": {
+        "1": "Quarantine"
+      },
+      "steps": {
+        "filter": {
+          "title": "Who is shown",
+          "text": "In quarantine, Cleared or All.",
+          "missing": "The filter is at the top of the Quarantine screen."
+        },
+        "record": {
+          "title": "Days and checks",
+          "text": "Each animal's day count, checks and what is still open before it can be cleared. Serpentora records what you see; it does not diagnose.",
+          "missing": "The summary is at the top of the Quarantine screen."
+        },
+        "notice": {
+          "title": "Read the notice",
+          "text": "Press it to read what quarantine records here, and what it cannot tell you.",
+          "missing": "The notice link is on the Quarantine screen."
+        },
+        "close": {
+          "title": "Close it",
+          "text": "Close the notice when you have read it."
+        }
+      }
+    },
+    "tour-lab": {
+      "title": "Lab tests",
+      "description": "Where genetic test orders and results live.",
+      "parts": {
+        "1": "Lab tests"
+      },
+      "steps": {
+        "screen": {
+          "title": "Lab tests",
+          "text": "Tests you save for an animal wait here as a batch, and past orders and their results are listed below.",
+          "missing": "Lab tests is in the top bar, or under More on a phone."
+        },
+        "ordering": {
+          "title": "Ordering",
+          "text": "Submitting an order sends it to the partner laboratory through Serpentora. This tour never orders anything."
+        },
+        "certificates": {
+          "title": "Results and certificates",
+          "text": "When a result is in, its certificate can be viewed or downloaded from the order."
+        }
+      }
+    },
+    "tour-settings": {
+      "title": "Settings",
+      "description": "Appearance, language, exports, backups and your account.",
+      "parts": {
+        "1": "Settings"
+      },
+      "steps": {
+        "appearance": {
+          "title": "Open Appearance",
+          "text": "Press Appearance: colours, type, density and motion for this app.",
+          "missing": "Appearance is a tab at the top of Settings."
+        },
+        "language": {
+          "title": "Language",
+          "text": "Choose the language of the app. Help texts are in English for now.",
+          "missing": "Language is a tab at the top of Settings."
+        },
+        "exports": {
+          "title": "Data exports",
+          "text": "PDFs, spreadsheets, catalogues and labels, saved as files you keep.",
+          "missing": "Data exports is a tab at the top of Settings."
+        },
+        "backups": {
+          "title": "Backups",
+          "text": "Download a full copy, keep copies in the vault, and run cloud sync. Restoring replaces what is here. This tour never restores or syncs for you.",
+          "missing": "Backups is a tab at the top of Settings."
+        },
+        "account": {
+          "title": "My Account",
+          "text": "Your email, password, plan, your data and signing out. Plans cannot be bought yet. This tour never changes any of it.",
+          "missing": "My Account is a tab at the top of Settings."
         }
       }
     }

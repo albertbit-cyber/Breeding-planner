@@ -66,3 +66,24 @@ describe('placePanel', () => {
     expect(pos.top + size.height).toBe(view.height - MARGIN);
   });
 });
+
+describe('placePanel obstacles', () => {
+  it('keeps clear of a control the keeper must press next when it can', () => {
+    const view = { width: 390, height: 844 };
+    const size = { width: 366, height: 200 };
+    const target = { top: 420, left: 40, width: 120, height: 36 };
+    const save = { top: 120, left: 200, width: 150, height: 44 };
+    const pos = placePanel(target, size, view, [save]);
+    const box = { top: pos.top, left: pos.left, width: size.width, height: Math.min(size.height, pos.maxHeight ?? Infinity) };
+    const overlap = box.left < save.left + save.width && save.left < box.left + box.width && box.top < save.top + save.height && save.top < box.top + box.height;
+    expect(overlap).toBe(false);
+  });
+
+  it('still places the panel when nothing clears both', () => {
+    const view = { width: 390, height: 844 };
+    const size = { width: 366, height: 200 };
+    const target = { top: 300, left: 40, width: 120, height: 36 };
+    const everywhere = { top: 0, left: 0, width: 390, height: 844 };
+    expect(placePanel(target, size, view, [everywhere]).side).not.toBe('fallback');
+  });
+});

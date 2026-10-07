@@ -92,8 +92,9 @@ import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import SpeciesGate from "./features/species/SpeciesGate";
 import HelpRoot from "./features/help/ui/HelpRoot";
 import { HelpButton, DialogHelpButton } from "./features/help/ui/HelpButton";
+import { ScreenTourLink, TourInvitation, TourLink } from "./features/help/ui/Onboarding";
 import { isHelpModeOn } from "./features/help/helpStore";
-import { help } from "./features/help/help";
+import { help, tour } from "./features/help/help";
 import { EXAMPLE_ANIMAL_ID } from "./features/help/tours/exampleAnimal";
 import {
   flattenGroupsBySpecies,
@@ -7448,7 +7449,12 @@ export default function BreedingPlannerApp() {
       : tab === 'pairings' ? [tab, pairingsView]
       : tab === 'setup' && setupTabRequest?.tab ? [tab, setupTabRequest.tab]
       : [tab],
-    view: { speciesOpen: !!speciesScope, feedPrepOpen: showFeedPrepModal },
+    view: {
+      speciesOpen: !!speciesScope,
+      feedPrepOpen: showFeedPrepModal,
+      dashboardSearch: dashboardQuery.trim() !== '',
+      animalSearch: String(query || '').trim() !== '',
+    },
   };
   const getTourContext = useCallback(() => tourContextRef.current, []);
 
@@ -8216,6 +8222,48 @@ export default function BreedingPlannerApp() {
     // site so it still happens when the quarantine notice defers the commit to its dialog.
     if (snakeToAdd.species !== speciesScope) openSpeciesWorkspace(snakeToAdd.species);
   }, [setSnakes, setGroups, speciesScope, openSpeciesWorkspace]);
+  // The guided tour's one real action, run only when the keeper presses its plainly labelled
+  // offer: one ordinary animal named so it is obviously an example, added the way the Add
+  // window adds one (an animal already kept, so no quarantine notice), deletable from its card.
+  const addExampleAnimal = useCallback(() => {
+    if (snakes.some(snake => snake?.id === EXAMPLE_ANIMAL_ID)) {
+      setShowAddModal(false);
+      return;
+    }
+    const species = resolveSpeciesId(speciesScope || newAnimal?.species || snakes[0]?.species);
+    const example = {
+      id: EXAMPLE_ANIMAL_ID,
+      name: t('help:tour.essentials.offer.animalName', { defaultValue: 'Example animal' }),
+      sex: 'F',
+      species,
+      morphs: [],
+      hets: [],
+      weight: 0,
+      price: '',
+      year: new Date().getFullYear(),
+      birthDate: null,
+      notes: t('help:tour.essentials.offer.animalNotes', { defaultValue: 'Added by the guided tour as an example. Delete it any time.' }),
+      tags: [],
+      groups: [],
+      status: 'Active',
+      morphHetInput: '',
+      imageUrl: undefined,
+      photos: [],
+      logs: cloneLogs(),
+      idSequence: null,
+      clutchId: null,
+      pairingId: null,
+      damId: null,
+      damName: '',
+      sireId: null,
+      sireName: '',
+      isDemo: false,
+    };
+    commitNewAnimal(admitAnimal(example, ARRIVAL.EXISTING, { today: quarantineTodayYmd() }));
+  }, [commitNewAnimal, newAnimal?.species, snakes, speciesScope, t]);
+  const handleTourOffer = useCallback((offerId) => {
+    if (offerId === 'add-example-animal') addExampleAnimal();
+  }, [addExampleAnimal]);
   // Single write path for the quarantine section, so every transition goes through the same
   // pure helpers rather than each button hand-rolling its own patch.
   const updateSnakeById = useCallback((snakeId, updater) => {
@@ -11601,7 +11649,7 @@ export default function BreedingPlannerApp() {
       style={{ '--breeder-logo-bg': breederLogoBackground }}
     >
       {appDialogOverlay}
-      <HelpRoot getTourContext={getTourContext} onNavigate={navigateForTour} />
+      <HelpRoot getTourContext={getTourContext} onNavigate={navigateForTour} onOffer={handleTourOffer} />
       {/* Desktop header — hidden on mobile via CSS */}
       <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto relative">
@@ -11623,7 +11671,7 @@ export default function BreedingPlannerApp() {
                 <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="mt-1" />
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 w-full" {...tour('main-nav')}>
               <TabButton theme={theme} active={tab==="dashboard"} onClick={leaveSpeciesWorkspace} className="header-nav-button" {...help('nav-dashboard')}>{t("nav.dashboard", { defaultValue: "Dashboard" })}</TabButton>
               {/* Genetics-shaped tabs. They only mean something inside one species, so they
                   are absent until a species is open rather than shown in a broken state. */}
@@ -11680,7 +11728,7 @@ export default function BreedingPlannerApp() {
 
       {/* Mobile bottom navigation — shown only on mobile via CSS */}
       <nav className="bp-mobile-bottom-nav">
-        <div className="bp-mobile-bottom-nav__items">
+        <div className="bp-mobile-bottom-nav__items" {...tour('main-nav')}>
           {[
             { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }), helpId: 'nav-dashboard' },
             { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }), helpId: 'nav-animals' },
@@ -11753,14 +11801,16 @@ export default function BreedingPlannerApp() {
                 label: speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" }),
                 run: startNewAnimalDraft,
                 helpId: 'animals-add',
+                tourId: 'add-animal',
               },
-              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true), helpId: 'animals-import' },
+              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true), helpId: 'animals-import', tourId: 'import-animals' },
               { key: 'exportQr', icon: '▦', label: t("actions.exportQr"), run: () => setShowExportModal(true), helpId: 'animals-export-qr' },
               { key: 'scanQr', icon: '⌖', label: t("actions.scanQr"), run: () => setShowScanner(true), helpId: 'animals-scan-qr' },
-            ].map(({ key, icon, label, run, helpId }) => (
+            ].map(({ key, icon, label, run, helpId, tourId }) => (
               <button
                 key={key}
                 data-help={helpId}
+                data-tour={tourId}
                 type="button"
                 className="bp-more-menu__row"
                 onClick={() => { setAnimalActionSheetOpen(false); run(); }}
@@ -11803,6 +11853,8 @@ export default function BreedingPlannerApp() {
 
       {/* body */}
       <div className="max-w-7xl mx-auto p-5">
+        {tab === "dashboard" ? <TourInvitation eligible={isDemoCollection} /> : null}
+        {!speciesGateActive ? <ScreenTourLink tab={tab} /> : null}
         {tab === "dashboard" && (
           <SpeciesDashboard
             summaries={speciesSummaries}
@@ -11937,6 +11989,7 @@ export default function BreedingPlannerApp() {
               <button
                 type="button"
                 {...help('animals-actions')}
+                {...tour('add-animal')}
                 className="bp-fab"
                 onClick={() => setAnimalActionSheetOpen(true)}
                 aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}
@@ -11944,7 +11997,8 @@ export default function BreedingPlannerApp() {
                 aria-expanded={animalActionSheetOpen}
                 title={t("actions.animalActions", { defaultValue: "Animal actions" })}
               >
-                +
+                {/* The + also stands for Import on a phone: the tour points here for both. */}
+                <span {...tour('import-animals')} className="bp-fab__glyph">+</span>
               </button>
               <div className="ms-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
                 {/* Adding animals comes first: it is what this row is mostly used for. The two
@@ -11952,12 +12006,13 @@ export default function BreedingPlannerApp() {
                     moved out to the header — it plans the whole collection, not this list. */}
                 <button
                   {...help('animals-add')}
+                  {...tour('add-animal')}
                   onClick={startNewAnimalDraft}
                   className={cx(toolbarControlClass, 'bp-toolbar-action')}
                 >
                   + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
-                <button {...help('animals-import')} onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                <button {...help('animals-import')} {...tour('import-animals')} onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
                 <button {...help('animals-export-qr')} onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
                 <button {...help('animals-scan-qr')} onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
@@ -12364,7 +12419,7 @@ export default function BreedingPlannerApp() {
         {tab === "pairings" && !speciesGateActive && (
           <div className="flex flex-col gap-4" {...help('breeding-screen')}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2" {...tour('pairings-subtabs')}>
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'dashboard'}
@@ -13573,7 +13628,10 @@ export default function BreedingPlannerApp() {
                         <div className="flex-1 min-w-0 flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="font-semibold text-lg leading-snug break-words min-w-0" title={editSnake.name} {...help('record-window')}>{editSnake.name}</div>
-                          <DialogHelpButton />
+                          <div className="flex items-center gap-3 shrink-0">
+                            <TourLink tour="tour-record" />
+                            <DialogHelpButton />
+                          </div>
                         </div>
                         <div className="snake-editor-actions">
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
@@ -17359,6 +17417,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
             <button {...help('feed-prep-copy')} type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
               {copied ? t('feedPrep.copied', { defaultValue: 'Copied' }) : t('feedPrep.copyReport', { defaultValue: 'Copy report' })}
             </button>
+            <TourLink tour="tour-feed-prep" />
             <DialogHelpButton />
             <button {...help('feed-prep-close')} type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
               {t('common.close', { defaultValue: 'Close' })}
@@ -27867,7 +27926,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               const method = def.form || 'Frozen/thawed';
               const methodDetail = def.formDetail || '';
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
-            }} {...help('record-log-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
+            }} {...help('record-log-add')} {...tour('animal-feed-add')}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
         <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto" {...help('record-feeds')}>
           {editSnakeDraft.logs.feeds.map((x,i)=>{
