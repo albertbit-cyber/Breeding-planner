@@ -105,6 +105,7 @@ const createHelpStore = () => {
   // What had focus when the menu or manual opened, so closing can hand it back. Kept out
   // of state: it is a DOM node, and nothing renders from it.
   let opener: Element | null = null;
+  let tourLength: (id: string) => number | null = () => null;
   const rememberOpener = () => {
     if (state.menuOpen || state.manualOpen || typeof document === 'undefined') return;
     opener = document.activeElement;
@@ -119,7 +120,7 @@ const createHelpStore = () => {
 
   const setFlags = (patch: Partial<HelpFlags>) => set({ flags: { ...state.flags, ...patch } });
 
-  return {
+  const api = {
     getState: () => state,
     subscribe: (listener: Listener) => {
       listeners.add(listener);
@@ -165,7 +166,70 @@ const createHelpStore = () => {
     closePopover: () => { if (state.popover) set({ popover: null }); },
 
     dismissHint: () => setFlags({ helpHintDismissed: true }),
+
+    // ── Tours ────────────────────────────────────────────────────────────
+    // The tour list registers how long each tour is, so the store never imports tours.
+    registerTours: (lookup: (id: string) => number | null) => { tourLength = lookup; },
+
+    // Help Mode and tours never run together: starting a tour leaves Help Mode and
+    // closes help's menu, manual and popover. Unknown ids change nothing.
+    startTour: (id: string, at = 0) => {
+      const length = tourLength(id);
+      if (!length) return;
+      const index = Math.min(Math.max(0, Math.floor(at) || 0), length - 1);
+      set({
+        mode: false,
+        menuOpen: false,
+        manualOpen: false,
+        popover: null,
+        tour: { id, index, base: {} },
+        flags: { ...state.flags, invited: true, paused: null },
+      });
+    },
+    nextStep: () => {
+      const tour = state.tour;
+      if (!tour) return;
+      const length = tourLength(tour.id) || 0;
+      if (tour.index + 1 >= length) {
+        set({
+          tour: null,
+          flags: {
+            ...state.flags,
+            paused: null,
+            completed: state.flags.completed.includes(tour.id) ? state.flags.completed : [...state.flags.completed, tour.id],
+          },
+        });
+        return;
+      }
+      set({ tour: { id: tour.id, index: tour.index + 1, base: {} } });
+    },
+    backStep: () => {
+      const tour = state.tour;
+      if (!tour || tour.index === 0) return;
+      set({ tour: { id: tour.id, index: tour.index - 1, base: {} } });
+    },
+    // Leaving keeps the place, so the Help menu can offer Resume.
+    exitTour: () => {
+      const tour = state.tour;
+      if (!tour) return;
+      set({ tour: null, flags: { ...state.flags, paused: { tour: tour.id, index: tour.index } } });
+    },
+    // The engine records what existed when a step began.
+    setTourBase: (base: Record<string, number>) => {
+      if (state.tour) set({ tour: { ...state.tour, base } });
+    },
+    dismissInvitation: () => setFlags({ invited: true }),
+    // Skip is Next by another name: a do step the keeper chooses not to do.
+    skipStep: () => api.nextStep(),
+    // Ends the tour as done: Next past the last step does the same.
+    finishTour: () => {
+      const tour = state.tour;
+      if (!tour) return;
+      set({ tour: { ...tour, index: (tourLength(tour.id) || 1) - 1 } });
+      api.nextStep();
+    },
   };
+  return api;
 };
 
 export const helpStore = createHelpStore();

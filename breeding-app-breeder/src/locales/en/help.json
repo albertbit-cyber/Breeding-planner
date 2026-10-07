@@ -3499,6 +3499,38 @@
       "moreFields": "More: {{count}} smaller controls",
       "contents": "Contents",
       "inSection": "Also in {{section}}"
+    },
+    "tour": {
+      "stepOf": "Step {{current}} of {{total}}",
+      "progress": "Tour progress",
+      "done": "✓ Done.",
+      "missing": "I can't see that on this screen.",
+      "back": "Back",
+      "next": "Next",
+      "finish": "Finish",
+      "skip": "Skip this step",
+      "takeMeThere": "Take me there",
+      "exit": "Exit guide",
+      "announce": "Step {{current}} of {{total}}: {{title}}. {{text}}"
+    }
+  },
+  "tour": {
+    "tour-help": {
+      "title": "Using help",
+      "description": "Where the ? is, and how to find any explanation in the manual.",
+      "parts": {
+        "1": "Help"
+      },
+      "steps": {
+        "button": {
+          "title": "The ? button",
+          "text": "The ? sits in the top bar on every screen, and every window has its own. Press it any time for Help Mode, the manual and the tours."
+        },
+        "manual": {
+          "title": "Open the manual",
+          "text": "Press ?, then Open manual. Every explanation in Serpentora is in there, by section, with a search."
+        }
+      }
     }
   }
 }

@@ -322,3 +322,69 @@ body.help-mode [data-help-active] {
 }
 /* The app's reset strips list markers; tips are a real list. */
 .help-popover__tips, .help-manual__tips { list-style: disc; }
+
+/* ── Guided tour ────────────────────────────────────────────────────────── */
+
+.help-tour-ring {
+  position: fixed;
+  z-index: var(--help-z-tour);
+  border-radius: 12px;
+  border: 2px solid var(--sk-focus);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sk-focus) 25%, transparent);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .help-tour-ring { animation: help-tour-pulse 1.8s ease-in-out infinite; }
+}
+@keyframes help-tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sk-focus) 25%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--sk-focus) 8%, transparent); }
+}
+
+.help-tour-panel {
+  position: fixed;
+  z-index: var(--help-z-tour);
+  width: min(360px, calc(100vw - 24px));
+  overflow: auto;
+  padding: 14px 16px 12px;
+  border-radius: var(--sk-radius, 12px);
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  box-shadow: var(--sk-shadow-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.help-tour-panel__top { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
+.help-tour-panel__part {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sk-text-muted);
+}
+.help-tour-panel__count { color: var(--sk-text-muted); white-space: nowrap; }
+.help-tour-panel__progress { margin: 8px 0 10px; height: 3px; border-radius: 999px; background: var(--sk-surface-3); overflow: hidden; }
+.help-tour-panel__progress > span { display: block; height: 100%; background: var(--sk-primary); }
+.help-tour-panel__title { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 1.35; outline: none; }
+.help-tour-panel__title:focus-visible { outline: 3px solid var(--sk-focus); outline-offset: 2px; border-radius: 4px; }
+.help-tour-panel__text { margin: 0; color: var(--sk-text-secondary); }
+.help-tour-panel__done { margin: 8px 0 0; font-weight: 600; color: var(--sk-success-text); }
+.help-tour-panel__missing {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sk-warning-bg);
+  color: var(--sk-warning-text);
+}
+.help-tour-panel__offer { margin-top: 10px; }
+.help-tour-panel__note { margin: 4px 0 0; font-size: 12px; color: var(--sk-text-muted); }
+.help-tour-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.help-tour-panel__exit { margin-inline-start: auto; }
+
+.help-tour-list { margin: 0; padding: 0; list-style: none; }
+.help-tour-list__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.help-tour-list__item + .help-tour-list__item { border-top: 1px solid var(--sk-border); }
+.help-tour-list__text { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.help-tour-list__title { font-size: 13px; font-weight: 600; }
+.help-tour-list__done { font-size: 11px; font-weight: 600; color: var(--sk-success-text); }
+.help-tour-list__desc { flex-basis: 100%; font-size: 12px; color: var(--sk-text-muted); }

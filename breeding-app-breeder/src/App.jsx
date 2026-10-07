@@ -94,6 +94,7 @@ import HelpRoot from "./features/help/ui/HelpRoot";
 import { HelpButton, DialogHelpButton } from "./features/help/ui/HelpButton";
 import { isHelpModeOn } from "./features/help/helpStore";
 import { help } from "./features/help/help";
+import { EXAMPLE_ANIMAL_ID } from "./features/help/tours/exampleAnimal";
 import {
   flattenGroupsBySpecies,
   mergeGroupsBySpecies,
@@ -7427,6 +7428,49 @@ export default function BreedingPlannerApp() {
     setTab('setup');
     setSetupTabRequest({ tab: setupTab, at: Date.now() });
   }, []);
+
+  // ── Guided tours ───────────────────────────────────────────────────────────
+  // What a tour step's done() may look at: counts and flags read from this app's own
+  // state, never from DOM events. Read through a ref, so the tour engine's 250ms tick
+  // always sees the latest render without re-subscribing.
+  const lastSpeciesRef = useRef(null);
+  if (speciesScope) lastSpeciesRef.current = speciesScope;
+  const tourContextRef = useRef(null);
+  tourContextRef.current = {
+    data: {
+      realAnimals: snakes.filter(snake => snake && !isDemoSnakeRecord(snake)).length,
+      demo: isDemoCollection,
+      feeds: snakes.reduce((sum, snake) => sum + (Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds.length : 0), 0),
+      pairings: Array.isArray(pairings) ? pairings.length : 0,
+      exampleAnimal: snakes.some(snake => snake?.id === EXAMPLE_ANIMAL_ID),
+    },
+    route: tab === 'animals' ? [tab, animalView]
+      : tab === 'pairings' ? [tab, pairingsView]
+      : tab === 'setup' && setupTabRequest?.tab ? [tab, setupTabRequest.tab]
+      : [tab],
+    view: { speciesOpen: !!speciesScope, feedPrepOpen: showFeedPrepModal },
+  };
+  const getTourContext = useCallback(() => tourContextRef.current, []);
+
+  // "Take me there": one adapter over the tab and sub-view setters. A species-scoped
+  // place reopens the species last open, else the first one in the collection.
+  const navigateForTour = useCallback((route = []) => {
+    const [destination, sub] = route;
+    if (!destination) return;
+    if (destination === 'dashboard') { leaveSpeciesWorkspace(); return; }
+    if (destination === 'setup') { openSetupTab(sub || 'info'); return; }
+    if (SPECIES_SCOPED_TABS.has(destination)) {
+      const species = speciesScope || lastSpeciesRef.current
+        || resolveSpeciesId((snakes.find(snake => snake && !isDemoSnakeRecord(snake)) || snakes[0])?.species);
+      if (species) openSpeciesWorkspace(species, destination);
+      else setTab(destination);
+    } else {
+      setTab(destination);
+    }
+    if (destination === 'animals' && sub) setAnimalView(sub);
+    if (destination === 'pairings' && sub) setPairingsView(sub);
+  }, [leaveSpeciesWorkspace, openSetupTab, openSpeciesWorkspace, snakes, speciesScope]);
+
   const { setUpgradeHandler, access: featureAccessMap } = useFeatureAccess();
   // Known from the access fetched at sign-in; unknown means "let the backend decide".
   const marketplaceListingDenied = featureAccessMap?.['marketplace.create_listing']?.allowed === false;
@@ -11557,7 +11601,7 @@ export default function BreedingPlannerApp() {
       style={{ '--breeder-logo-bg': breederLogoBackground }}
     >
       {appDialogOverlay}
-      <HelpRoot />
+      <HelpRoot getTourContext={getTourContext} onNavigate={navigateForTour} />
       {/* Desktop header — hidden on mobile via CSS */}
       <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto relative">

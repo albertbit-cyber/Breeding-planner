@@ -5,6 +5,9 @@ import HelpModePill from './HelpModePill';
 import HelpPopover from './HelpPopover';
 import HelpMenu from './HelpMenu';
 import HelpManual from './HelpManual';
+import TourLayer from '../tours/TourLayer';
+import { TOURS } from '../tours/registry';
+import { useTranslation } from 'react-i18next';
 import './help.css';
 
 // The window an explanation stays open through: a pressed control scrolls itself into
@@ -12,7 +15,10 @@ import './help.css';
 const SCROLL_GRACE_MS = 500;
 
 // Everything help draws, in one portal on <body>, above every app overlay.
-export default function HelpRoot({ tours, onStartTour }) {
+export default function HelpRoot({ getTourContext, onNavigate, onOffer }) {
+  const { t } = useTranslation('help');
+  const tours = TOURS.map(tour => ({ id: tour.id, title: t(tour.title), description: t(tour.description) }));
+  const touring = useHelpState(state => !!state.tour);
   const mode = useHelpState(state => state.mode);
   const menuOpen = useHelpState(state => state.menuOpen);
   const manualOpen = useHelpState(state => state.manualOpen);
@@ -79,8 +85,9 @@ export default function HelpRoot({ tours, onStartTour }) {
     <>
       {mode ? <HelpModePill /> : null}
       {popover ? <HelpPopover key="popover" popover={popover} /> : null}
-      {menuOpen ? <HelpMenu tours={tours} onStartTour={onStartTour} /> : null}
+      {menuOpen ? <HelpMenu tours={tours} onStartTour={(id, at) => helpStore.startTour(id, at)} /> : null}
       {manualOpen ? <HelpManual topicId={manualTopic} /> : null}
+      {touring ? <TourLayer getAppContext={getTourContext} onNavigate={onNavigate} onOffer={onOffer} /> : null}
     </>,
     document.body,
   );
