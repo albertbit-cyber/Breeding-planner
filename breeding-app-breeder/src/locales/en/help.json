@@ -159,6 +159,63 @@
       "short": "Offers the essentials tour on your first visit. Start it now or choose Not now; it is offered only once.",
       "more": "You can start the tour later from the ? button.",
       "words": "welcome first visit invitation"
+    },
+    "scroll-top": {
+      "title": "Scroll to top",
+      "short": "Jumps back to the top of the page. It appears once you have scrolled down.",
+      "words": "top up back"
+    }
+  },
+  "ui": {
+    "button": "Help & Manual",
+    "dialogButton": "Help for this window",
+    "menu": {
+      "title": "Help",
+      "explore": "Explore the app",
+      "exploreHint": "Press any control to learn what it does. Nothing is changed.",
+      "exit": "Exit Help Mode",
+      "manual": "Open manual",
+      "manualHint": "Every explanation, by section.",
+      "tours": "Guided tours",
+      "resume": "Resume: {{title}}",
+      "start": "Start",
+      "again": "Again",
+      "done": "Done",
+      "difference": "A tour has you do the real thing, one step at a time. Help Mode only explains.",
+      "close": "Close"
+    },
+    "pill": {
+      "label": "Help Mode",
+      "text": "Press anything to see what it does. Nothing will be changed.",
+      "exit": "Exit"
+    },
+    "popover": {
+      "label": "Help",
+      "gotIt": "Got it",
+      "more": "More",
+      "less": "Less",
+      "openManual": "Open in manual",
+      "tips": "Tips",
+      "seeAlso": "See also",
+      "noTopic": "There is no explanation for this one yet. Help Mode is on, so pressing it changed nothing.",
+      "noTopicManual": "Open manual",
+      "unnamed": "This control",
+      "disabled": "It cannot be used right now: something it needs is not filled in or not there yet."
+    },
+    "manual": {
+      "title": "Help Manual",
+      "close": "Close",
+      "back": "Back",
+      "allSections": "All sections",
+      "search": "Search the manual",
+      "searchPlaceholder": "Try \"het\", \"clutch\" or \"backup\"",
+      "found_one": "{{count}} topic found",
+      "found_other": "{{count}} topics found",
+      "nothing": "Nothing found for “{{query}}”. Try a simpler word.",
+      "tips": "Tips",
+      "related": "Related",
+      "moreFields": "More: {{count}} smaller controls",
+      "contents": "Contents"
     }
   }
 }

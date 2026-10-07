@@ -13,6 +13,8 @@ export interface HelpExplanation {
   element: Element;
   // The control's accessible name, for the fallback popover when it has no topic.
   name: string;
+  // A disabled control is still explained, with a word that it cannot be used right now.
+  disabled?: boolean;
 }
 
 export interface HelpGuardOptions {
@@ -90,13 +92,24 @@ export const accessibleName = (element: Element): string => {
     const placeholder = element.getAttribute('placeholder');
     if (placeholder?.trim()) return placeholder.trim();
   }
-  return (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  return visibleText(element).trim().replace(/\s+/g, ' ').slice(0, 80);
 };
+
+// Text a screen reader would read: decorative icons marked aria-hidden are skipped.
+const visibleText = (node: Node): string => {
+  if (node.nodeType === 3) return node.textContent || '';
+  if (node.nodeType !== 1 || (node as Element).getAttribute('aria-hidden') === 'true') return '';
+  return Array.from(node.childNodes).map(visibleText).join('');
+};
+
+const isDisabled = (control: Element): boolean =>
+  control.matches(':disabled') || control.getAttribute('aria-disabled') === 'true' || !!control.querySelector(':scope > :disabled');
 
 const explanationFor = (control: Element): HelpExplanation => ({
   id: control.getAttribute('data-help') || null,
   element: control,
   name: accessibleName(control),
+  disabled: isDisabled(control),
 });
 
 // In-app navigation: a same-page hash link only changes what is shown.
@@ -134,7 +147,10 @@ export const installHelpGuard = (target: EventTarget, { isActive, onExplain }: H
       return;
     }
     stop(event);
-    if (event.type === 'click' && control) onExplain(explanationFor(control));
+    if (!control) return;
+    // Browsers never fire click on a disabled control, so it is explained on release.
+    const explainOn = control.matches(':disabled') ? 'pointerup' : 'click';
+    if (event.type === explainOn) onExplain(explanationFor(control));
   };
 
   const onTouch = (event: Event) => {

@@ -90,6 +90,10 @@ import { syncGeneOverlay } from "./genetics/geneOverlaySync";
 import SpeciesSelect from "./components/SpeciesSelect";
 import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import SpeciesGate from "./features/species/SpeciesGate";
+import HelpRoot from "./features/help/ui/HelpRoot";
+import { HelpButton, DialogHelpButton } from "./features/help/ui/HelpButton";
+import { isHelpModeOn } from "./features/help/helpStore";
+import { help } from "./features/help/help";
 import {
   flattenGroupsBySpecies,
   mergeGroupsBySpecies,
@@ -295,8 +299,9 @@ function HeatRackFormModal({ open, mode, room, rack, onSubmit, onCancel }) {
 
   return (
     <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
-      <form className="w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-        <div>
+      <form role="dialog" aria-modal="true" data-dialog="rack-form" aria-label={mode === 'edit' ? t('spaces.editRackTitle', { defaultValue: 'Edit rack' }) : t('spaces.addRack', { defaultValue: 'Create rack' })} className="relative w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="pe-12">
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
           <div className="text-lg font-semibold">
             {mode === 'edit'
@@ -468,8 +473,9 @@ function TerrariumFormModal({ open, mode, room, terrarium, onSubmit, onCancel })
 
   return (
     <div className="sk-scrim fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onCancel}>
-      <form className="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-        <div>
+      <form role="dialog" aria-modal="true" data-dialog="terrarium-form" aria-label={mode === 'edit' ? t('spaces.editTerrariumTitle', { defaultValue: 'Edit terrarium' }) : t('spaces.addTerrarium', { defaultValue: 'Create terrarium' })} className="relative w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="pe-12">
           <div className="text-xs uppercase tracking-wide text-neutral-500">{room.name}</div>
           <div className="text-lg font-semibold">
             {mode === 'edit'
@@ -670,7 +676,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
 
   return (
     <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-5xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="rack-view" aria-label={rack.name} className="w-full max-w-5xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
           <div>
             <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.rack.name', { defaultValue: 'Rack' })}</div>
@@ -680,6 +686,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
           <div className="flex gap-2 text-sm">
             <button className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(rack.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
             <button className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(rack.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
+            <DialogHelpButton />
             <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
@@ -731,14 +738,17 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
         </div>
         {shouldShowAssignModal && activeSlot && (
           <div className="sk-scrim fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={dismissAssignModal}>
-            <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div role="dialog" aria-modal="true" data-dialog="rack-assign" aria-label={t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}-${activeSlot.columnIndex + 1}` })} className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}.${activeSlot.columnIndex + 1}` })}</div>
                   <div className="text-lg font-semibold text-neutral-900">{activeSlotOccupant?.name || t('spaces.emptySlot', { defaultValue: 'Empty' })}</div>
                   {activeSlotOccupant && <div className="text-xs text-neutral-500"><bdi>{activeSlotOccupant.id}</bdi></div>}
                 </div>
-                <button type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
+                <div className="flex items-center gap-2">
+                  <DialogHelpButton />
+                  <button type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
+                </div>
               </div>
               <div className="mt-4">
                 <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('common.search', { defaultValue: 'Search' })}</label>
@@ -818,7 +828,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
 
   return (
     <div className="sk-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="terrarium-view" aria-label={terrarium.name} className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 pb-4">
           <div>
             <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.terrarium.name', { defaultValue: 'Terrarium' })}</div>
@@ -830,6 +840,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
           <div className="flex gap-2 text-sm">
             <button className="px-3 py-2 rounded-2xl border" onClick={() => onEdit?.(terrarium.id)}>{t('common.edit', { defaultValue: 'Edit' })}</button>
             <button className="px-3 py-2 rounded-2xl border border-rose-200 text-rose-600" onClick={() => onDelete?.(terrarium.id)}>{t('common.delete', { defaultValue: 'Delete' })}</button>
+            <DialogHelpButton />
             <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
@@ -922,7 +933,7 @@ function RoomModal({
 
   return (
     <div className="sk-scrim fixed inset-0 z-40 flex items-start justify-center overflow-y-auto p-3 sm:p-4" onClick={onClose}>
-      <div className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="room-view" aria-label={room.name} className="my-3 w-full max-w-5xl max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl sm:rounded-[28px] bg-white p-4 sm:p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 bg-white px-4 pt-4 sm:px-6 sm:pt-6 flex flex-col gap-4 border-b border-neutral-100 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -939,6 +950,7 @@ function RoomModal({
               <button className="px-3 py-1.5 rounded-xl border" onClick={() => onCreateTerrarium?.(room)}>
                 + {t('spaces.addTerrarium', { defaultValue: 'Create Terrarium' })}
               </button>
+              <DialogHelpButton />
               <button className="px-3 py-1.5 rounded-xl border" onClick={onClose}>
                 {t('spaces.closeRoom', { defaultValue: 'Close room' })}
               </button>
@@ -7664,9 +7676,14 @@ export default function BreedingPlannerApp() {
         onClick={handleAppDialogBackdrop}
       >
         <div
+          role={appDialog.type === 'alert' ? 'alertdialog' : 'dialog'}
+          aria-modal="true"
+          data-dialog="app-dialog"
+          aria-label={appDialog.title || brandName}
           className="relative z-[10031] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5 space-y-4"
           onClick={e => e.stopPropagation()}
         >
+          <DialogHelpButton className="help-dialog-corner" />
           <div className="flex items-center gap-3">
             {breederInfo?.logoUrl ? (
               <img
@@ -11509,9 +11526,11 @@ export default function BreedingPlannerApp() {
       style={{ '--breeder-logo-bg': breederLogoBackground }}
     >
       {appDialogOverlay}
+      <HelpRoot />
       {/* Desktop header — hidden on mobile via CSS */}
       <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto relative">
+          <div className="help-header-slot"><HelpButton /></div>
           {/* Brand sits on its own centred row above the tabs. Side by side, the nav row was
               forced onto one line by lg:flex-nowrap while every label carries white-space:nowrap,
               so the row overflowed its box and painted over the logo and breeder name. Stacked,
@@ -11530,14 +11549,14 @@ export default function BreedingPlannerApp() {
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
-              <TabButton theme={theme} active={tab==="dashboard"} onClick={leaveSpeciesWorkspace} className="header-nav-button">{t("nav.dashboard", { defaultValue: "Dashboard" })}</TabButton>
+              <TabButton theme={theme} active={tab==="dashboard"} onClick={leaveSpeciesWorkspace} className="header-nav-button" {...help('nav-dashboard')}>{t("nav.dashboard", { defaultValue: "Dashboard" })}</TabButton>
               {/* Genetics-shaped tabs. They only mean something inside one species, so they
                   are absent until a species is open rather than shown in a broken state. */}
               {speciesScope && (<>
-                <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding" })}</TabButton>
-                <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
-                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
+                <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button" {...help('nav-animals')}>{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button" {...help('nav-pairings')}>{t("nav.pairings", { defaultValue: "Breeding" })}</TabButton>
+                <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button" {...help('nav-advisor')}>{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
+                <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button" {...help('nav-family-tree')}>{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
               </>)}
               {/* Logistics-shaped tabs, deliberately global: one feeding schedule, and racks
                   that hold whatever fits in them regardless of species. Quarantine sits here
@@ -11546,15 +11565,15 @@ export default function BreedingPlannerApp() {
                   lives here rather than in the animals toolbar it used to hang off: the defrost
                   list covers the whole collection, not the filtered list on screen. It opens a
                   modal, so it marks itself active while that modal is up. */}
-              <TabButton theme={theme} active={showFeedPrepModal} onClick={()=>setShowFeedPrepModal(true)} className="header-nav-button">{t("nav.feedPrep", { defaultValue: "Feed Prep" })}</TabButton>
-              <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
-              <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button">
+              <TabButton theme={theme} active={showFeedPrepModal} onClick={()=>setShowFeedPrepModal(true)} className="header-nav-button" {...help('nav-feed-prep')}>{t("nav.feedPrep", { defaultValue: "Feed Prep" })}</TabButton>
+              <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button" {...help('nav-spaces')}>{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
+              <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button" {...help('nav-quarantine')}>
                 {t("nav.quarantine", { defaultValue: "Quarantine" })}
                 {quarantineCount ? <span className="ms-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
               </TabButton>
-              <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
-              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Lab tests" })}</TabButton>
-              <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
+              <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button" {...help('nav-calendar')}>{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
+              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button" {...help('nav-lab-tests')}>{t("nav.shedTerminal", { defaultValue: "Lab tests" })}</TabButton>
+              <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button" {...help('nav-setup')}>{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
             </div>
             {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
                 in the global header made it look like it searched the whole app. */}
@@ -11579,6 +11598,7 @@ export default function BreedingPlannerApp() {
             )}
           </div>
           <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="shrink-0" />
+          <HelpButton />
         </div>
       </div>
       <NotSyncedToast failure={cloudSyncFailure} />
@@ -11587,15 +11607,16 @@ export default function BreedingPlannerApp() {
       <nav className="bp-mobile-bottom-nav">
         <div className="bp-mobile-bottom-nav__items">
           {[
-            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }) },
-            { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }) },
-            { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
-            { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
-            { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }) },
-            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }) },
-          ].map(({ key, icon, label }) => (
+            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }), helpId: 'nav-dashboard' },
+            { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }), helpId: 'nav-animals' },
+            { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }), helpId: 'nav-pairings' },
+            { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }), helpId: 'nav-calendar' },
+            { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }), helpId: 'nav-setup' },
+            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }), helpId: 'nav-more' },
+          ].map(({ key, icon, label, helpId }) => (
             <button
               key={key}
+              data-help={helpId}
               type="button"
               aria-current={tab === key ? 'page' : undefined}
               className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','quarantine','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
@@ -11619,14 +11640,15 @@ export default function BreedingPlannerApp() {
           <div className="bp-more-menu__backdrop" onClick={() => setMobileMoreOpen(false)} />
           <div className="bp-more-menu__panel">
             {[
-              { key: 'advisor', icon: '🧠', label: t("nav.advisor", { defaultValue: "Breeding Advisor" }) },
-              { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }) },
-              { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
-              { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }) },
-            ].map(({ key, icon, label }) => (
+              { key: 'advisor', icon: '🧠', label: t("nav.advisor", { defaultValue: "Breeding Advisor" }), helpId: 'nav-advisor' },
+              { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }), helpId: 'nav-quarantine' },
+              { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }), helpId: 'nav-family-tree' },
+              { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }), helpId: 'nav-spaces' },
+              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }), helpId: 'nav-lab-tests' },
+            ].map(({ key, icon, label, helpId }) => (
               <button
                 key={key}
+                data-help={helpId}
                 type="button"
                 className="bp-more-menu__btn"
                 onClick={() => { setTab(key); setMobileMoreOpen(false); }}
@@ -11642,9 +11664,13 @@ export default function BreedingPlannerApp() {
       {/* Animal action sheet: everything the desktop toolbar's right half offers, for the
           phone widths where that half is hidden. Export list CSV stays inline in list view. */}
       {animalActionSheetOpen && (
-        <div className="bp-more-menu" role="dialog" aria-modal="true" aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}>
+        <div className="bp-more-menu" role="dialog" aria-modal="true" data-dialog="animal-actions" aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}>
           <div className="bp-more-menu__backdrop" onClick={() => setAnimalActionSheetOpen(false)} />
           <div className="bp-more-menu__panel bp-more-menu__panel--list">
+            <div className="help-sheet-head">
+              <span>{t("actions.animalActions", { defaultValue: "Animal actions" })}</span>
+              <DialogHelpButton />
+            </div>
             {[
               {
                 key: 'add',
@@ -12634,7 +12660,8 @@ export default function BreedingPlannerApp() {
           className={cx("fixed inset-0 flex items-center justify-center p-4 z-[10040]", overlayClass(theme))}
           onClick={handleClosePhotoGallery}
         >
-          <div
+          <div role="dialog" aria-modal="true" data-dialog="photo-gallery"
+            aria-label={photoGallerySnake.name || t("photoGallery.unnamedSnake", { defaultValue: "Unnamed snake" })}
             className="relative z-[10041] w-full max-w-4xl bg-white text-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -12644,12 +12671,15 @@ export default function BreedingPlannerApp() {
                 <div className="text-xs text-neutral-500 mt-1"><bdi>{photoGallerySnake.id}</bdi></div>
                 <div className="text-xs text-neutral-500 mt-1">{t("photoGallery.storedCount", { count: photoGalleryPhotos.length, defaultValue_one: "{{count}} photo stored", defaultValue_other: "{{count}} photos stored" })}</div>
               </div>
-              <button
-                className="text-sm px-3 py-1.5 border rounded-lg"
-                onClick={handleClosePhotoGallery}
-              >
-                {t("common.close", { defaultValue: "Close" })}
-              </button>
+              <div className="flex items-center gap-2">
+                <DialogHelpButton />
+                <button
+                  className="text-sm px-3 py-1.5 border rounded-lg"
+                  onClick={handleClosePhotoGallery}
+                >
+                  {t("common.close", { defaultValue: "Close" })}
+                </button>
+              </div>
             </div>
             <div className="px-5 pb-5 overflow-y-auto max-h-[70vh] mt-4">
               {photoGalleryPhotos.length ? (
@@ -12730,10 +12760,13 @@ export default function BreedingPlannerApp() {
       {/* add animal modal (two-step wizard) */}
   {showAddModal && typeof document !== 'undefined' && createPortal((
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowAddModal(false)}>
-      <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="add-animal" aria-label={i18n.t("ui.animals.addAnimal.title")} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">{i18n.t("ui.animals.addAnimal.title")}</div>
-              <button className="text-sm px-2 py-1" onClick={()=>setShowAddModal(false)}>{i18n.t("common.close")}</button>
+              <div className="flex items-center gap-2">
+                <DialogHelpButton />
+                <button className="text-sm px-2 py-1" onClick={()=>setShowAddModal(false)}>{i18n.t("common.close")}</button>
+              </div>
             </div>
 
             {/* wizard state */}
@@ -12764,8 +12797,9 @@ export default function BreedingPlannerApp() {
 
       {showSpeciesBackfill && typeof document !== 'undefined' && createPortal((
         <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10060]", overlayClass(theme))}>
-          <div className="relative z-[10061] bg-white w-full max-w-lg rounded-2xl shadow-2xl border p-5 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="text-lg font-semibold">
+          <div role="dialog" aria-modal="true" data-dialog="species-backfill" aria-label={t("species.backfill.title", { defaultValue: "Confirm your animals' species" })} className="relative z-[10061] bg-white w-full max-w-lg rounded-2xl shadow-2xl border p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <DialogHelpButton className="help-dialog-corner" />
+            <div className="text-lg font-semibold pe-12">
               {t("species.backfill.title", { defaultValue: "Confirm your animals' species" })}
             </div>
             <p className="text-sm text-neutral-600">
@@ -12815,11 +12849,13 @@ export default function BreedingPlannerApp() {
           className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10050]", overlayClass(theme))}
           onClick={cancelLeucisticSelector}
         >
-          <div
+          <div role="dialog" aria-modal="true" data-dialog="leucistic"
+            aria-label={t("leucistic.title", { defaultValue: "Select Leucistic Type" })}
             className="relative z-[10051] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
             onClick={e => e.stopPropagation()}
           >
-            <div className="text-lg font-semibold">{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
+            <DialogHelpButton className="help-dialog-corner" />
+            <div className="text-lg font-semibold pe-12">{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
             <div className="text-sm text-neutral-600 space-y-3">
               <p>
                 {t("leucistic.intro", { defaultValue: "When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations." })}
@@ -12941,11 +12977,13 @@ export default function BreedingPlannerApp() {
             )}
             onClick={handlePairingGuardCancel}
           >
-            <div
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-6 space-y-4"
+            <div role="dialog" aria-modal="true" data-dialog="breeders-guard"
+              aria-label={t('modals.breedersOnly.breedersOnlyTitle', { defaultValue: 'Breeders only' })}
+              className="relative bg-white w-full max-w-md rounded-2xl shadow-xl border p-6 space-y-4"
               onClick={e => e.stopPropagation()}
             >
-              <div className="text-lg font-semibold text-center">
+              <DialogHelpButton className="help-dialog-corner" />
+              <div className="text-lg font-semibold text-center px-10">
                 {t('modals.breedersOnly.breedersOnlyTitle', { defaultValue: 'Breeders only' })}
               </div>
               <p className="text-sm text-neutral-600 text-center">
@@ -13005,7 +13043,8 @@ export default function BreedingPlannerApp() {
             )}
             onClick={handleWizardCancel}
           >
-            <div
+            <div role="dialog" aria-modal="true" data-dialog="hatch-wizard"
+              aria-label={t("hatchWizard.title", { defaultValue: "Hatching clutch" })}
               className="relative z-[10011] bg-white w-full max-w-3xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
@@ -13024,6 +13063,7 @@ export default function BreedingPlannerApp() {
                       <div className="text-2xl font-semibold leading-none">{savedCount}/{total}</div>
                       <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">{t("hatchWizard.saved", { defaultValue: "Saved" })}</div>
                     </div>
+                    <DialogHelpButton />
                     <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>{t("common.close", { defaultValue: "Close" })}</button>
                   </div>
                 </div>
@@ -13139,10 +13179,13 @@ export default function BreedingPlannerApp() {
 
           {showImportModal && typeof document !== 'undefined' && createPortal((
             <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowImportModal(false)}>
-              <div className="relative z-[10011] bg-white w-full max-w-5xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+              <div role="dialog" aria-modal="true" data-dialog="import-animals" aria-label={t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })} className="relative z-[10011] bg-white w-full max-w-5xl rounded-2xl shadow-2xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b flex items-center justify-between">
                   <div className="font-semibold">{t("ui.animals.import.modalTitle", { defaultValue: "Import animals" })}</div>
-                  <button className="text-sm px-2 py-1" onClick={()=>setShowImportModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
+                  <div className="flex items-center gap-2">
+                    <DialogHelpButton />
+                    <button className="text-sm px-2 py-1" onClick={()=>setShowImportModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
+                  </div>
                 </div>
                 <div className="p-4 overflow-auto max-h-[80vh]">
                   <ImportSection
@@ -13173,10 +13216,13 @@ export default function BreedingPlannerApp() {
       {/* create pairing modal — breeders only, male-first */}
     {showPairingModal && typeof document !== 'undefined' && createPortal((
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
-          <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" data-dialog="create-pairing" aria-label={t("pairing.modal.title", { defaultValue: "Create pairing" })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <div className="font-semibold">{t("pairing.modal.title", { defaultValue: "Create pairing" })}</div>
-              <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
+              <div className="flex items-center gap-2">
+                <DialogHelpButton />
+                <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
+              </div>
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-auto">
               {(() => {
@@ -13368,7 +13414,7 @@ export default function BreedingPlannerApp() {
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
-      <div className="relative z-[10001] bg-white w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="edit-animal" aria-label={editSnake.name} className="relative z-[10001] bg-white w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
             {/* Thumbnail on the left, name over one row of actions on the right. The name is no
                 longer truncated: which animal is open is the one thing the header has to say, and
                 a wrapped second line costs less than a name cut off mid-morph. */}
@@ -13387,7 +13433,10 @@ export default function BreedingPlannerApp() {
                           })()}
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col gap-3">
-                        <div className="font-semibold text-lg leading-snug break-words" title={editSnake.name}>{editSnake.name}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-lg leading-snug break-words min-w-0" title={editSnake.name}>{editSnake.name}</div>
+                          <DialogHelpButton />
+                        </div>
                         <div className="snake-editor-actions">
                           <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
                             onClick={()=>requestDeleteSnake(editSnake)}>
@@ -14446,13 +14495,16 @@ export {
 
       const scannerContent = (
         <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
-          <div className="relative z-[10011] bg-white p-4 rounded-lg shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" data-dialog="scan-qr" aria-label={t('scanQrCode')} className="relative z-[10011] bg-white p-4 rounded-lg shadow-2xl w-full max-w-md" onClick={e=>e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium text-lg">{t('scanQrCode')}</div>
                 <div className="text-xs text-neutral-500 mt-1">{t('chooseHow')}</div>
               </div>
-              <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>?</button>
+              <div className="flex items-center gap-2">
+                <DialogHelpButton />
+                <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+              </div>
             </div>
 
             <div className="mt-3">
@@ -14597,6 +14649,8 @@ function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInte
     };
 
     const handleKeyDown = (event) => {
+      // Help Mode explains instead of acting; its guard already stops keys, this is the backstop.
+      if (isHelpModeOn()) return;
       if (!enabled) return;
       const targetEditable = isEditableElement(event.target);
       if (targetEditable && !capturingScan) {
@@ -14686,6 +14740,7 @@ function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInte
     };
 
     const handlePaste = (event) => {
+      if (isHelpModeOn()) return;
       if (!enabled) return;
       if (isEditableElement(event.target)) return;
       const text = event.clipboardData?.getData('text');
@@ -14713,8 +14768,9 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
   if (typeof document === 'undefined') return null;
   return createPortal((
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
-      <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
+      <div role="alertdialog" aria-modal="true" data-dialog="delete-animal" aria-label={t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })} className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="font-semibold text-lg pe-12">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
         </p>
@@ -14824,9 +14880,10 @@ function useFitOneLine() {
   return ref;
 }
 
-function TabButton({ theme = 'blue', active, onClick, children, className }) {
+function TabButton({ theme = 'blue', active, onClick, children, className, ...rest }) {
   return (
     <button
+      {...rest}
       type="button"
       className={cx(
         'appearance-tab px-3 py-1.5 rounded-lg text-sm border transition-colors',
@@ -15361,8 +15418,9 @@ function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
   if (typeof document === 'undefined') return null;
   return createPortal((
         <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
-      <div className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
-        <div className="font-medium mb-2">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
+      <div role="dialog" aria-modal="true" data-dialog="qr-preview" aria-label={t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })} className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="font-medium mb-2 pe-12">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
         <div className="text-sm text-neutral-500 mb-2">{t("qrPreview.idLabel", { defaultValue: "ID:" })} <span className="font-mono">{id}</span></div>
         <div className="space-y-1 mb-3">
           {geneticsTokens.length ? <GeneLine label={t("qrPreview.genetics", { defaultValue: "Genetics" })} genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">{t("qrPreview.geneticsNone", { defaultValue: "Genetics: -" })}</div>}
@@ -15398,7 +15456,7 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
 
   return createPortal((
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onClose}>
-      <div className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="egg-box" aria-label={title} className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b flex items-start justify-between gap-3">
           <div>
             <div className="font-semibold text-lg">{title}</div>
@@ -15409,7 +15467,10 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
               </div>
             )}
           </div>
-          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          </div>
         </div>
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -15516,8 +15577,9 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
 
   return open && typeof document !== 'undefined' ? createPortal((
     <div className={cx("fixed inset-0 flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
-      <div className="relative z-[10011] bg-white p-4 rounded-lg shadow w-full max-w-2xl" onClick={e=>e.stopPropagation()}>
-        <div className="font-medium mb-2">{t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })}</div>
+      <div role="dialog" aria-modal="true" data-dialog="export-qr" aria-label={t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })} className="relative z-[10011] bg-white p-4 rounded-lg shadow w-full max-w-2xl" onClick={e=>e.stopPropagation()}>
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="font-medium mb-2 pe-12">{t("qrModal.title", { defaultValue: "Export QR to PDF (100mm x 50mm)" })}</div>
         <div className="space-y-3">
           <div>
             <label className="inline-flex items-center gap-2"><input type="radio" checked={mode==='all'} onChange={()=>setMode('all')} /> {t("qrModal.allSnakes", { defaultValue: "All snakes" })}</label>
@@ -15630,9 +15692,10 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
 
   return open && typeof document !== 'undefined' ? createPortal((
     <div className={cx('fixed inset-0 flex items-center justify-center p-4 z-[10010]', overlayClass(theme))} onClick={isGenerating ? undefined : onClose}>
-      <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b font-semibold">
-          {t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })}
+      <div role="dialog" aria-modal="true" data-dialog="pairing-qr" aria-label={t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })} className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b font-semibold flex items-center justify-between gap-3">
+          <span>{t('pairingQrModal.title', { defaultValue: 'Export pairing QR labels' })}</span>
+          <DialogHelpButton />
         </div>
         <div className="p-4 space-y-4">
           <label className="flex items-center gap-2 text-sm">
@@ -17096,7 +17159,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
 
   return createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]", overlayClass(theme))} onClick={onClose}>
-      <div className="relative z-[10021] bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border" onClick={event => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="feed-prep" aria-label={t('feedPrep.title', { defaultValue: 'Feed preparation' })} className="relative z-[10021] bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border" onClick={event => event.stopPropagation()}>
         <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-neutral-900">{t('feedPrep.title', { defaultValue: 'Feed preparation' })}</div>
@@ -17112,6 +17175,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
             <button type="button" className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, Boolean(reportText)))} onClick={copyReport} disabled={!reportText}>
               {copied ? t('feedPrep.copied', { defaultValue: 'Copied' }) : t('feedPrep.copyReport', { defaultValue: 'Copy report' })}
             </button>
+            <DialogHelpButton />
             <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>
               {t('common.close', { defaultValue: 'Close' })}
             </button>
@@ -17531,7 +17595,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             </button>
             {overflowMenuOpen && (
               <>
-                <div className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
+                <div data-backdrop="" className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
                 <div className="bp-overflow-menu z-[150]">
                   {hasFamilyTree && (
                     <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
@@ -17716,12 +17780,15 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             closeQuickAdd();
           }}
         >
-          <div
+          <div role="dialog" aria-modal="true" data-dialog="quick-add"
+            aria-label={`${t("actions.add", { defaultValue: "Add" })} ${quickTagOpen}`}
             className="pointer-events-auto w-full max-w-md bg-white border rounded-xl shadow-2xl p-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="text-base font-semibold">{t("actions.add", { defaultValue: "Add" })} {quickTagOpen}</div>
+              <span className="flex-1" />
+              <DialogHelpButton className="me-2" />
               <button
                 className="text-sm px-2 py-1 border rounded-lg text-neutral-500 hover:text-neutral-700"
                 onClick={(e)=>{ e.stopPropagation(); closeQuickAdd(); }}
@@ -18047,13 +18114,16 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   const { t } = useTranslation();
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[200]" onClick={onClose}>
-      <div className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="animal-pairings" aria-label={t("snakeEdit.pairingsFor", { defaultValue: "Pairings for {{name}}", name: snake.name })} className="bg-white p-4 rounded-lg shadow w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium">{t("snakeEdit.pairingsFor", { defaultValue: "Pairings for {{name}}", name: snake.name })}</div>
             <div className="text-xs text-neutral-500">{t("pairing.openHint", { defaultValue: "Click a pairing to open it." })}</div>
           </div>
-          <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t("actions.close", { defaultValue: "Close" })}</button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button className="text-sm px-2 py-1 border rounded" onClick={onClose}>{t("actions.close", { defaultValue: "Close" })}</button>
+          </div>
         </div>
         <div className="mt-3 space-y-2 max-h-72 overflow-auto">
           {pairings.length ? pairings.map(p => (
@@ -21599,11 +21669,13 @@ function BreederSection({
                     className={cx('fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10020]', overlayClass(theme))}
                     onClick={() => setAnimalTextListPreview(null)}
                   >
-                    <div
+                    <div role="dialog" aria-modal="true" data-dialog="text-list"
+                      aria-label={t('export.textList.title', { defaultValue: 'Animal list as text' })}
                       className="relative z-[10021] bg-white w-full max-w-xl rounded-2xl shadow-2xl border"
                       onClick={event => event.stopPropagation()}
                     >
-                      <div className="p-5 border-b">
+                      <DialogHelpButton className="help-dialog-corner" />
+                      <div className="p-5 pe-16 border-b">
                         <div className="text-lg font-semibold text-neutral-900">
                           {t('export.textList.title', { defaultValue: 'Animal list as text' })}
                         </div>
@@ -26289,10 +26361,13 @@ function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', c
   const resolvedConfirmLabel = confirmLabel ?? t("common.save", { defaultValue: "Save" });
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="form-dialog" aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          </div>
         </div>
         <div className="space-y-3 max-h-[60vh] overflow-auto pe-1">
           {children}
@@ -26310,10 +26385,13 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
   const { t } = useTranslation();
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" data-dialog="choice" aria-label={typeof title === 'string' ? title : undefined} className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+          </div>
         </div>
         {description ? <div className="text-sm text-neutral-600">{description}</div> : null}
         <div className="mt-4 flex flex-col gap-2">
@@ -29385,9 +29463,10 @@ function ScrollToTopButton({ theme = 'blue', className }) {
   return createPortal((
     <button
       type="button"
+      {...help('scroll-top')}
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       className={cx(
-        'fixed bottom-6 end-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
+        'bp-scroll-top fixed bottom-6 end-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         primaryBtnClass(theme, true),
         className

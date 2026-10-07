@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from "reactflow";
 import { useTranslation } from "react-i18next";
+import { DialogHelpButton } from "../../features/help/ui/HelpButton";
 import "reactflow/dist/style.css";
 
 const NODE_WIDTH = 260;
@@ -370,7 +371,7 @@ const BreedingPlanFlowchartCard = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" data-dialog="breeding-plan" aria-label={suggestionLabel || t("breedingPlan.eyebrow", { defaultValue: "Breeding Plan" })} className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4">
           <div className="min-w-[280px] flex-1">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{t("breedingPlan.eyebrow", { defaultValue: "Breeding Plan" })}</div>
@@ -418,6 +419,7 @@ const BreedingPlanFlowchartCard = ({
             >
               {t("breedingPlan.updatePlan", { defaultValue: "Update Plan" })}
             </button>
+            <DialogHelpButton />
             <button
               type="button"
               onClick={onClose}

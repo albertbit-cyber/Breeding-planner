@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
+import { DialogHelpButton } from "../../help/ui/HelpButton";
 import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
 import OrderProgressBar from "./OrderProgressBar";
@@ -174,7 +175,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
   const firstSample = printData.sampleLabels?.[0] || null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 p-4 print:static print:bg-white print:p-0">
+    <div data-dialog-layer="label-preview" className="fixed inset-0 z-50 bg-black/50 p-4 print:static print:bg-white print:p-0">
       {/*
         Print CSS rules injected into the document while the modal is open.
 
@@ -247,7 +248,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
         }
       `}</style>
 
-      <div className="mx-auto max-h-[92vh] max-w-5xl overflow-auto rounded-xl bg-white p-4 shadow-xl print:contents">
+      <div role="dialog" aria-modal="true" data-dialog="label-preview" aria-label={t("lab.orders.printPreviewTitle", { defaultValue: "Label print preview" })} className="mx-auto max-h-[92vh] max-w-5xl overflow-auto rounded-xl bg-white p-4 shadow-xl print:contents">
         {/* ── Header ── */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
           <div>
@@ -259,6 +260,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <DialogHelpButton />
             <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={onClose}>
               {t("modal.close", { defaultValue: "Close" })}
             </button>

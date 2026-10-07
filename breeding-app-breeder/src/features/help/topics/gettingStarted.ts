@@ -16,6 +16,7 @@ export const gettingStarted = {
   'nav-lab-tests': topic('getting-started', { title: 'common:nav.shedTerminal', see: ['main-nav'] }),
   'nav-setup': topic('getting-started', { title: 'common:nav.setup', see: ['saving', 'main-nav'] }),
   'nav-more': topic('getting-started', { title: 'common:nav.more', see: ['main-nav'] }),
+  'scroll-top': topic('getting-started', { see: ['main-nav'] }),
   'species-gate': topic('getting-started', { see: ['nav-dashboard', 'main-nav'] }),
   'saving': topic('getting-started', { see: ['serpentora', 'nav-setup'] }),
   'help-button': topic('getting-started', { see: ['help-mode', 'help-manual', 'guided-tours'] }),

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 import { CHECK_FIELDS, getQuarantineDays, todayYmd } from '../../services/quarantine';
 import { CHECK_FIELD_LABELS, CHECK_VALUE_LABELS, makeLabeller } from './labels';
 import CheckGuidanceDialog, { GuidanceButton } from './CheckGuidanceDialog';
@@ -36,6 +37,7 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
         onClick={event => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        data-dialog="quick-check"
         aria-label={t('quarantine.logCheck', { defaultValue: 'Log check' })}
       >
         <div className="sticky top-0 bg-white/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between rounded-t-2xl">
@@ -47,9 +49,12 @@ export default function QuickCheckSheet({ snake, onSave, onClose }) {
                 : t('quarantine.dayCount', { count: day, defaultValue: 'Day {{count}}' })}
             </div>
           </div>
-          <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
-            {t('common.cancel', { defaultValue: 'Cancel' })}
-          </button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
+              {t('common.cancel', { defaultValue: 'Cancel' })}
+            </button>
+          </div>
         </div>
 
         <div className="p-4 flex flex-col gap-4">

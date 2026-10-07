@@ -14,6 +14,8 @@ const html = `
   <div id="root">
     <button id="save" data-help="animal-save"><svg id="icon"></svg><span id="label">Save changes</span></button>
     <button id="untopiced" aria-label="Mystery">?</button>
+    <button id="off" data-help="animal-save" disabled>Save changes</button>
+    <button id="iconed"><span aria-hidden="true">📅</span><span>Calendar</span></button>
     <div id="clickable-div">plain clickable div</div>
     <p id="text">Just some text.</p>
     <form id="form"><input id="name" placeholder="Name" /><button id="submit" type="submit">Add</button></form>
@@ -94,6 +96,16 @@ describe('installHelpGuard, Help Mode on', () => {
     expect(explained[1]).toMatchObject({ id: null, name: 'Name' });
     press($('sex'));
     expect(explained[2]).toMatchObject({ id: null, name: 'Sex' });
+    press($('iconed'));
+    expect(explained[3]).toMatchObject({ id: null, name: 'Calendar' });
+  });
+
+  it('explains a disabled control on release, since browsers never click it', () => {
+    fire($('off'), 'pointerup');
+    expect(explained).toHaveLength(1);
+    expect(explained[0]).toMatchObject({ id: 'animal-save', disabled: true });
+    fire($('off'), 'click');
+    expect(explained).toHaveLength(1);
   });
 
   it('ignores plain text and empty space, but still lets nothing through', () => {

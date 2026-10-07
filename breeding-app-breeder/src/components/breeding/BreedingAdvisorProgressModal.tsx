@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { DialogHelpButton } from "../../features/help/ui/HelpButton";
 import type {
   AdvisorProgressStep,
   AdvisorProgressSummary,
@@ -295,6 +296,10 @@ export function BreedingAdvisorProgressModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        data-dialog="advisor-progress"
+        aria-label={t("progress.titleRunning", { ns: "advisor", defaultValue: "Breeding Advisor Running" })}
         className="bg-white w-full max-w-md rounded-2xl shadow-xl border flex flex-col"
         style={{ maxHeight: "min(90vh, 600px)" }}
         onClick={(e) => e.stopPropagation()}
@@ -315,14 +320,17 @@ export function BreedingAdvisorProgressModal({
               })}
             </span>
           </div>
-          <button
-            type="button"
-            className="text-sm px-2 py-1 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
-            onClick={onClose}
-            aria-label={t("actions.close", { ns: "common", defaultValue: "Close" })}
-          >
-            {t("actions.close", { ns: "common", defaultValue: "Close" })}
-          </button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button
+              type="button"
+              className="text-sm px-2 py-1 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
+              onClick={onClose}
+              aria-label={t("actions.close", { ns: "common", defaultValue: "Close" })}
+            >
+              {t("actions.close", { ns: "common", defaultValue: "Close" })}
+            </button>
+          </div>
         </div>
 
         {/* ── Step list ──────────────────────────────────────────────────── */}

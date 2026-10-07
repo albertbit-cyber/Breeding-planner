@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 import { CHECK_GUIDANCE, getGuidance } from './checkGuidance';
 import CheckDiagram from './CheckDiagrams';
 import SnakeCheckMap from './SnakeCheckMap';
@@ -32,6 +33,7 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
         onClick={event => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        data-dialog="check-guidance"
         aria-label={guidance.title}
       >
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-4 py-3 flex items-center justify-between gap-2 rounded-t-2xl">
@@ -41,9 +43,12 @@ export default function CheckGuidanceDialog({ checkKey, onClose }) {
               {t('quarantine.guide.subtitle', { defaultValue: 'How to check, and what you are looking for' })}
             </div>
           </div>
-          <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
-            {t('common.close', { defaultValue: 'Close' })}
-          </button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={onClose}>
+              {t('common.close', { defaultValue: 'Close' })}
+            </button>
+          </div>
         </div>
 
         <div className="p-4 flex flex-col gap-4">

@@ -6,8 +6,11 @@ import './i18n/index.js';
 import App from './AppEntry.jsx';
 import reportWebVitals from './reportWebVitals';
 import { initSentry } from './shared/sentry';
+import { installHelp } from './features/help/installHelp';
 
 initSentry();
+// Help Mode's guard must be registered before anything else listens on window.
+installHelp();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

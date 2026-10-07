@@ -3290,6 +3290,11 @@
   .bp-mobile-bottom-nav {
     display: flex !important;
   }
+  /* Scroll to top floats above the bottom bar; at bottom-6 it sat on the More item
+     and swallowed every tap on it once the page had scrolled. */
+  .bp-scroll-top {
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
   /* Body gets bottom padding so content isn't hidden under nav */
   .bp-app-body {
     padding-bottom: 80px !important;

@@ -226,7 +226,7 @@ function QuarantineCard({ snake, onCheck, onClear, onEnter, onRestart, onRemove,
           </button>
           {menuOpen ? (
             <>
-              <div className="fixed inset-0 z-10" role="presentation" onClick={() => setMenuOpen(false)} />
+              <div data-backdrop="" className="fixed inset-0 z-10" role="presentation" onClick={() => setMenuOpen(false)} />
               <div className="absolute end-0 bottom-full z-20 mb-1 w-56 rounded-xl border bg-white py-1 shadow-lg">
                 <button
                   type="button"

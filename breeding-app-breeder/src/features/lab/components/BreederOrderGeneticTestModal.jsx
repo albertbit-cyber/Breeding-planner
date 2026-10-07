@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { DialogHelpButton } from "../../help/ui/HelpButton";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 import LabPicker from "./LabPicker.jsx";
@@ -180,6 +181,10 @@ export default function BreederOrderGeneticTestModal({
       onClick={closeAndReset}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        data-dialog="order-genetic-test"
+        aria-label={t("lab.orders.addToBatchTitle", { defaultValue: "Add to Batch Order" })}
         className="relative z-[10021] w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
         style={{ zIndex: 10021 }}
         onClick={(e) => e.stopPropagation()}
@@ -197,13 +202,16 @@ export default function BreederOrderGeneticTestModal({
               })}
             </div>
           </div>
-          <button
-            type="button"
-            className="rounded-xl border px-3 py-1.5 text-sm"
-            onClick={closeAndReset}
-          >
-            {t("common.close", { defaultValue: "Close" })}
-          </button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button
+              type="button"
+              className="rounded-xl border px-3 py-1.5 text-sm"
+              onClick={closeAndReset}
+            >
+              {t("common.close", { defaultValue: "Close" })}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 px-5 py-4">

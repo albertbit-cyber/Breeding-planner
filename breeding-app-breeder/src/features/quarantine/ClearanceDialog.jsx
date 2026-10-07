@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 import { getClearanceChecklist } from '../../services/quarantine';
 import { CLEARANCE_LABELS, formatYmd, makeLabeller } from './labels';
 
@@ -56,12 +57,15 @@ export default function ClearanceDialog({ snake, onConfirm, onClose }) {
       role="presentation"
     >
       <div
-        className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border max-h-[92vh] overflow-y-auto"
+        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border max-h-[92vh] overflow-y-auto"
         onClick={event => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        data-dialog="quarantine-clearance"
+        aria-label={t('quarantine.clearTitle', { name: snake?.name || snake?.id, defaultValue: 'Clear {{name}} from quarantine?' })}
       >
-        <div className="px-5 py-4 border-b">
+        <DialogHelpButton className="help-dialog-corner" />
+        <div className="px-5 pe-16 py-4 border-b">
           <div className="text-base font-semibold">
             {t('quarantine.clearTitle', { name: snake?.name || snake?.id, defaultValue: 'Clear {{name}} from quarantine?' })}
           </div>
