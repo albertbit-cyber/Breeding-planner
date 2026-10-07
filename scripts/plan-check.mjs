@@ -198,7 +198,7 @@ const checks = {
     const src = 'breeding-app-breeder/src';
     const missing = [];
     if (!existsSync(path.join(root, src, 'features/help/registry.ts'))) missing.push('help registry (features/help/registry.ts)');
-    if (grep('export function installHelpGuard', [src]).length === 0) missing.push('installHelpGuard');
+    if (grep('export function installHelpGuard', [src]).length === 0 && grep('export const installHelpGuard', [src]).length === 0) missing.push('installHelpGuard');
     if (grep('export function useTourEngine', [src]).length === 0) missing.push('tour engine (useTourEngine)');
     if (grep('OWN_TARGETS', [src]).filter((f) => /\.test\.[jt]sx?$/.test(f)).length === 0) missing.push('OWN_TARGETS test');
     return missing.length === 0
