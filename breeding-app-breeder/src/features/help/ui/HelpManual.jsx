@@ -1,14 +1,23 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { getTopic, resolveTopic, topicsByCategory, categoryLabel } from '../registry';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getTopic, resolveAll, resolveTopic, topicsByCategory, categoryLabel } from '../registry';
+import { indexTopics, searchTopics } from '../search';
 import { helpStore } from '../helpStore';
 import { useHelpTranslator } from './useHelpTranslator';
 
-// The whole registry as a readable reference: contents, or one topic.
+const SECTION_PEERS = 6;
+
+// The whole registry as a readable, searchable reference. Three views: contents, one
+// topic, search results. Every jump pushes onto a history that Back pops. Typing a query
+// shows results over the topic; clearing the query returns to it.
 export default function HelpManual({ topicId }) {
   const { t, translator } = useHelpTranslator();
+  const [query, setQuery] = useState('');
+  const [history, setHistory] = useState([]);
   const headingRef = useRef(null);
-  const topic = getTopic(topicId);
-  const resolved = useMemo(() => (topic ? resolveTopic(topic, translator) : null), [topic, translator]);
+  const bodyRef = useRef(null);
+
+  const all = useMemo(() => resolveAll(translator), [translator]);
+  const index = useMemo(() => indexTopics(all), [all]);
   const sections = useMemo(
     () => topicsByCategory().map(group => ({
       category: group.category,
@@ -18,9 +27,41 @@ export default function HelpManual({ topicId }) {
     [translator],
   );
 
-  useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [topicId]);
+  const topic = getTopic(topicId);
+  const resolved = useMemo(() => (topic ? resolveTopic(topic, translator) : null), [topic, translator]);
+  const results = useMemo(() => searchTopics(index, query), [index, query]);
+  const searching = query.trim() !== '';
 
-  const open = id => helpStore.set({ manualTopic: id });
+  useEffect(() => {
+    bodyRef.current?.scrollTo?.({ top: 0 });
+    if (!searching) headingRef.current?.focus({ preventScroll: true });
+  }, [topicId, searching]);
+
+  const go = (id) => {
+    setHistory(stack => [...stack, topicId]);
+    setQuery('');
+    helpStore.set({ manualTopic: id });
+  };
+  const back = () => {
+    const previous = history[history.length - 1] ?? null;
+    setHistory(history.slice(0, -1));
+    setQuery('');
+    helpStore.set({ manualTopic: previous });
+  };
+
+  const titleOf = id => resolveTopic(getTopic(id), translator).title;
+  const peers = resolved
+    ? (sections.find(section => section.category === resolved.category)?.topics || [])
+      .filter(item => item.id !== resolved.id && !item.minor && !resolved.related.includes(item.id))
+      .slice(0, SECTION_PEERS)
+    : [];
+
+  const entry = item => (
+    <li key={item.id}>
+      <button type="button" className="help-link" onClick={() => go(item.id)}>{item.title}</button>
+      <span className="help-manual__desc">{item.short}</span>
+    </li>
+  );
 
   return (
     <div className="help-window-scrim sk-scrim" data-help-ui="" onClick={() => helpStore.closeManual()}>
@@ -32,13 +73,44 @@ export default function HelpManual({ topicId }) {
         onClick={event => event.stopPropagation()}
       >
         <div className="help-manual__head">
-          <h2 id="help-manual-title" className="help-window__title">{t('ui.manual.title')}</h2>
+          <div className="help-manual__head-start">
+            {history.length && !searching ? (
+              <button type="button" className="help-window__close appearance-btn appearance-btn--ghost" onClick={back}>
+                <span aria-hidden="true">&larr; </span>{t('ui.manual.back')}
+              </button>
+            ) : null}
+            <h2 id="help-manual-title" className="help-window__title">{t('ui.manual.title')}</h2>
+          </div>
           <button type="button" className="help-window__close appearance-btn appearance-btn--ghost" onClick={() => helpStore.closeManual()}>
             {t('ui.manual.close')}
           </button>
         </div>
-        <div className="help-manual__body">
-          {resolved ? (
+
+        <div className="help-manual__search">
+          <label htmlFor="help-manual-search" className="sr-only">{t('ui.manual.search')}</label>
+          <input
+            id="help-manual-search"
+            type="search"
+            className="help-manual__input"
+            value={query}
+            placeholder={t('ui.manual.searchPlaceholder')}
+            onChange={event => setQuery(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+
+        <div ref={bodyRef} className="help-manual__body" aria-live={searching ? 'polite' : undefined}>
+          {searching ? (
+            results.length ? (
+              <>
+                <p className="help-manual__count">{t('ui.manual.found', { count: results.length })}</p>
+                <ul className="help-manual__list">{results.map(entry)}</ul>
+              </>
+            ) : (
+              <p className="help-manual__empty">{t('ui.manual.nothing', { query: query.trim() })}</p>
+            )
+          ) : resolved ? (
             <article>
               <p className="help-manual__eyebrow">{resolved.categoryLabel}</p>
               <h3 ref={headingRef} tabIndex={-1} className="help-manual__topic-title">{resolved.title}</h3>
@@ -55,33 +127,40 @@ export default function HelpManual({ topicId }) {
                   <h4 className="help-manual__h">{t('ui.manual.related')}</h4>
                   <div className="help-chips">
                     {resolved.related.map(id => (
-                      <button key={id} type="button" className="help-chip" onClick={() => open(id)}>
-                        {resolveTopic(getTopic(id), translator).title}
-                      </button>
+                      <button key={id} type="button" className="help-chip" onClick={() => go(id)}>{titleOf(id)}</button>
                     ))}
                   </div>
                 </>
               ) : null}
+              {peers.length ? (
+                <>
+                  <h4 className="help-manual__h">{t('ui.manual.inSection', { section: resolved.categoryLabel })}</h4>
+                  <ul className="help-manual__list help-manual__list--compact">{peers.map(entry)}</ul>
+                </>
+              ) : null}
               <p className="help-manual__all">
-                <button type="button" className="help-link" onClick={() => open(null)}>{t('ui.manual.allSections')}</button>
+                <button type="button" className="help-link" onClick={() => go(null)}>{t('ui.manual.allSections')}</button>
               </p>
             </article>
           ) : (
             <nav aria-labelledby="help-manual-contents">
               <h3 id="help-manual-contents" ref={headingRef} tabIndex={-1} className="sr-only">{t('ui.manual.contents')}</h3>
-              {sections.map(section => (
-                <section key={section.category} className="help-manual__section">
-                  <h4 className="help-manual__section-title">{section.label}</h4>
-                  <ul className="help-manual__list">
-                    {section.topics.map(item => (
-                      <li key={item.id}>
-                        <button type="button" className="help-link" onClick={() => open(item.id)}>{item.title}</button>
-                        <span className="help-manual__desc">{item.short}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+              {sections.map((section) => {
+                const main = section.topics.filter(item => !item.minor);
+                const minor = section.topics.filter(item => item.minor);
+                return (
+                  <section key={section.category} className="help-manual__section">
+                    <h4 className="help-manual__section-title">{section.label}</h4>
+                    <ul className="help-manual__list">{main.map(entry)}</ul>
+                    {minor.length ? (
+                      <details className="help-manual__minor">
+                        <summary>{t('ui.manual.moreFields', { count: minor.length })}</summary>
+                        <ul className="help-manual__list help-manual__list--compact">{minor.map(entry)}</ul>
+                      </details>
+                    ) : null}
+                  </section>
+                );
+              })}
             </nav>
           )}
         </div>

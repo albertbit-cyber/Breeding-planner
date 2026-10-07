@@ -102,6 +102,13 @@ const createHelpStore = () => {
   };
   const listeners = new Set<Listener>();
   let seq = 0;
+  // What had focus when the menu or manual opened, so closing can hand it back. Kept out
+  // of state: it is a DOM node, and nothing renders from it.
+  let opener: Element | null = null;
+  const rememberOpener = () => {
+    if (state.menuOpen || state.manualOpen || typeof document === 'undefined') return;
+    opener = document.activeElement;
+  };
 
   const set = (patch: Partial<HelpState>) => {
     const flagsChanged = patch.flags && patch.flags !== state.flags;
@@ -134,16 +141,17 @@ const createHelpStore = () => {
       set(patch);
     },
 
-    openMenu: () => set({ menuOpen: true, popover: null }),
+    openMenu: () => { rememberOpener(); set({ menuOpen: true, popover: null }); },
     closeMenu: () => set({ menuOpen: false }),
 
-    openManual: (topicId: string | null = null) => set({
+    openManual: (topicId: string | null = null) => { rememberOpener(); set({
       manualOpen: true,
       manualTopic: topicId,
       menuOpen: false,
       popover: null,
       flags: state.flags.helpHintDismissed ? state.flags : { ...state.flags, helpHintDismissed: true },
-    }),
+    }); },
+    takeOpener: () => { const element = opener; opener = null; return element; },
     closeManual: () => set({ manualOpen: false }),
 
     explain: ({ id, name, element, disabled }: HelpExplanation) => {

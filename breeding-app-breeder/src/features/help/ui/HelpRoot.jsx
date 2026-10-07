@@ -64,16 +64,14 @@ export default function HelpRoot({ tours, onStartTour }) {
   }, [popover]);
 
   // Closing the menu or manual hands focus back to what opened it (the ?, usually).
-  const openerRef = useRef(null);
   const windowOpen = menuOpen || manualOpen;
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (windowOpen) {
-      if (!openerRef.current) openerRef.current = document.activeElement;
-      return;
+    if (wasOpen.current && !windowOpen) {
+      const opener = helpStore.takeOpener();
+      if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus({ preventScroll: true });
     }
-    const opener = openerRef.current;
-    openerRef.current = null;
-    if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus({ preventScroll: true });
+    wasOpen.current = windowOpen;
   }, [windowOpen]);
 
   if (typeof document === 'undefined') return null;

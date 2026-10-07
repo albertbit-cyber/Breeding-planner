@@ -205,7 +205,7 @@ body.help-mode [data-help-ui] [data-help]:hover { outline: none; }
   box-shadow: var(--sk-shadow-3);
 }
 .help-window--menu { max-width: 420px; padding: 20px; }
-.help-window--manual { max-width: 760px; height: min(720px, calc(100vh - 32px)); display: flex; flex-direction: column; }
+.help-window--manual { max-width: 760px; height: min(680px, calc(100vh - 32px)); display: flex; flex-direction: column; overflow: hidden; }
 .help-window__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .help-window__title { margin: 0; font-size: 18px; font-weight: 600; }
 .help-window__close { min-height: 34px; padding: 4px 12px; font-size: 13px; }
@@ -295,3 +295,30 @@ body.help-mode [data-help-active] {
   outline-offset: 3px;
 }
 .help-pill__status { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.help-manual__head-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.help-manual__search { padding: 12px 20px; border-bottom: 1px solid var(--sk-border); }
+.help-manual__input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--sk-radius, 8px);
+  border: 1.5px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  font-size: 14px;
+}
+.help-manual__input::placeholder { color: var(--sk-text-muted); }
+.help-manual__input:focus { outline: none; border-color: var(--sk-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sk-focus) 35%, transparent); }
+.help-manual__count { margin: 0 0 8px; font-size: 12px; color: var(--sk-text-muted); }
+.help-manual__empty { margin: 8px 0 0; font-size: 14px; color: var(--sk-text-secondary); }
+.help-manual__list--compact li { padding: 3px 0; }
+.help-manual__minor { margin-top: 6px; font-size: 13px; }
+.help-manual__minor > summary { cursor: pointer; color: var(--sk-text-secondary); padding: 4px 0; }
+.help-manual__minor > summary:focus-visible { outline: 3px solid var(--sk-focus); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .help-manual__head, .help-manual__search, .help-manual__body { padding-inline: 16px; }
+  .help-manual__input { min-height: 44px; font-size: 16px; }
+}
+/* The app's reset strips list markers; tips are a real list. */
+.help-popover__tips, .help-manual__tips { list-style: disc; }

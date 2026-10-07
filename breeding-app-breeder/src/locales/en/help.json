@@ -120,10 +120,10 @@
     "help-mode": {
       "title": "Help Mode",
       "short": "While it is on, pressing any control explains it instead of using it. Nothing is changed.",
-      "more": "Turn it on with ?, then Explore the app. A note at the top shows it is on, with an Exit button. Typing, pasting and saving are all stopped while it is on, so you can press anything safely. Turning it on pauses a guided tour; you can resume the tour from the Help menu.",
+      "more": "Turn it on with ?, then Explore the app. A note at the bottom of the screen shows it is on, with an Exit button. Typing, pasting and saving are all stopped while it is on, so you can press anything safely. Turning it on pauses a guided tour; you can resume the tour from the Help menu.",
       "tips": [
         "Keyboard: Tab to a control and press Enter or Space to hear about it. Escape closes an explanation.",
-        "Press Exit in the note at the top, or the ? again, to leave Help Mode."
+        "Press Exit in the note at the bottom, or press ? and choose Exit Help Mode. Inside a window, its own ? leaves Help Mode directly."
       ],
       "words": "explore explain what does this do safe"
     },
@@ -175,7 +175,7 @@
       "exploreHint": "Press any control to learn what it does. Nothing is changed.",
       "exit": "Exit Help Mode",
       "manual": "Open manual",
-      "manualHint": "Every explanation, by section.",
+      "manualHint": "Every explanation, by section, with a search.",
       "tours": "Guided tours",
       "resume": "Resume: {{title}}",
       "start": "Start",
@@ -208,14 +208,15 @@
       "back": "Back",
       "allSections": "All sections",
       "search": "Search the manual",
-      "searchPlaceholder": "Try \"het\", \"clutch\" or \"backup\"",
+      "searchPlaceholder": "Search, for example “het”, “clutch” or “backup”",
       "found_one": "{{count}} topic found",
       "found_other": "{{count}} topics found",
       "nothing": "Nothing found for “{{query}}”. Try a simpler word.",
       "tips": "Tips",
       "related": "Related",
       "moreFields": "More: {{count}} smaller controls",
-      "contents": "Contents"
+      "contents": "Contents",
+      "inSection": "Also in {{section}}"
     }
   }
 }

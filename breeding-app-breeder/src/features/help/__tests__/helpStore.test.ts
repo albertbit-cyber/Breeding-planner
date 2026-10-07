@@ -73,3 +73,17 @@ describe('helpStore', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('helpStore focus hand-back', () => {
+  it('remembers what had focus when the menu opened, through to the manual', async () => {
+    const { helpStore } = await freshStore();
+    document.body.innerHTML = '<button id="q">?</button><button id="other">x</button>';
+    document.getElementById('q')!.focus();
+    helpStore.openMenu();
+    document.getElementById('other')!.focus();
+    helpStore.openManual(null);
+    helpStore.closeManual();
+    expect(helpStore.takeOpener()?.id).toBe('q');
+    expect(helpStore.takeOpener()).toBeNull();
+  });
+});
