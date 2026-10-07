@@ -1,12 +1,33 @@
 # Help system plan: breeding-app-breeder
 
-Status: **0/7, waiting for approval.** Spec: [docs/handoff/help-system.md](handoff/help-system.md)
+Status: **approved 2026-10-07**, building on `feature/help-system` (fast-forwarded to `5470aed`). Spec: [docs/handoff/help-system.md](handoff/help-system.md)
 (repo copy of the "Serpentora Help System Handoff" doc). This file is the resumable record: later
 sessions read this file and the handoff copy, not the original doc.
 
 Scope: the breeder web app (`src/App.jsx`, `src/features/*`), at desktop and at 390px. Out of scope:
 the Android UI (`features/mobile/MobileApp.jsx`), and the lab, marketplace, admin and public apps.
 Section 12 covers how each of those could reuse this work later.
+
+### Approved 2026-10-07, with these changes
+
+The plan below was written on 2026-10-05. Four things landed before the build started; they override
+the text they contradict.
+
+1. **P3.2 ("One word for one thing") landed** (`69dcd73`). Topics use today's labels: "Breeding",
+   "Lab tests", "Status", "For sale", "Import animals", "Active pairings". Section 9 is history.
+2. **The phone-nav gap in 8.8 is fixed** (`5470aed`): the bottom bar has Dashboard, and a
+   species-scoped tab with no species open shows a SpeciesGate ("Open a species first") instead of
+   bouncing. No phone-nav change is part of this work; the essentials tour passes through the gate.
+3. **Certificate lookup exists** (`def666c`): `breeding-app-public` has `/verify` and an
+   unauthenticated backend route. Help may say a certificate carries a code that can be looked up on
+   the public `/verify` page; it must not present this as live for buyers or as campaign copy.
+4. **Billing exists in test mode** (`3ed0e32`): My Account can open Stripe checkout and the billing
+   portal, which answer "Plans are not purchasable yet." without keys. Help may say Change plan opens
+   a checkout page; it never says a plan can be bought or paid for today. Change plan stays explained
+   only.
+
+Line numbers in sections 1 and 2 predate these commits (App.jsx is now 27,623 lines); they are
+re-checked while building, not rewritten here.
 
 ## 0. Decisions at a glance
 
@@ -295,7 +316,7 @@ That is 13 tours in all, counting essentials.
 7. **"A new user: no data yet."** A Serpentora account is never empty; it starts with the demo
    collection. **Resolution:** "no data yet" means `isDemoCollection`. The invitation shows then,
    after 900ms, when no dialog is open, no tour is running and the keeper has not been invited.
-8. **Phone nav gaps (existing bugs).** The phone bottom nav has no Dashboard, and its Animals and
+8. **Phone nav gaps (fixed by `5470aed`, kept for history).** The phone bottom nav has no Dashboard, and its Animals and
    Breeding items bounce back to the dashboard when no species is open. The essentials tour at 390px
    would stick on those.
    - **Proposed, needs your yes:** in step 7, make the phone Animals and Breeding items open the
@@ -350,7 +371,9 @@ That is 13 tours in all, counting essentials.
 
 ## 9. Topics P3.2 ("One word for one thing") will rename
 
-P3.2 has not landed (`t-one-word` still fails). The topics use today's labels, and these are the ones
+*History: P3.2 landed in `69dcd73` before the build started; topics use the new labels.*
+
+At planning time P3.2 had not landed (`t-one-word` still failed). The topics use today's labels, and these are the ones
 whose titles or wording P3.2 will change:
 
 | Today | Topics affected |
