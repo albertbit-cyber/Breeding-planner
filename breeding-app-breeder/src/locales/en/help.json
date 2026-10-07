@@ -1,0 +1,164 @@
+{
+  "category": {
+    "getting-started": "Getting Started",
+    "dashboard": "Dashboard",
+    "animals": "Animals",
+    "animal-record": "Animal record",
+    "adding": "Adding and importing",
+    "breeding": "Breeding",
+    "advisor": "Breeding Advisor",
+    "family-tree": "Family Tree",
+    "calendar": "Calendar",
+    "feed-prep": "Feed Prep",
+    "spaces": "Spaces",
+    "quarantine": "Quarantine",
+    "lab": "Lab tests",
+    "selling": "Selling",
+    "account": "Account",
+    "settings": "Settings",
+    "data": "Data, Backups & Sync"
+  },
+  "topic": {
+    "serpentora": {
+      "title": "What Serpentora is for",
+      "short": "Keeps the record of your collection: each animal, its genetics and logs, your pairings from the first lock to the hatchlings, and the care around them.",
+      "more": "Everything is organised by species. Open a species from the Dashboard to see its animals, its pairings, the Breeding Advisor and its family tree. Feed Prep, Spaces, Quarantine, the Calendar and Lab tests cover the whole collection, whatever the species.",
+      "tips": [
+        "New here? Press ? and choose a guided tour. It has you do each thing once, for real.",
+        "Not sure what a button does? Press ?, then Explore the app, then press the button. Nothing happens except an explanation."
+      ],
+      "words": "about overview start introduction"
+    },
+    "main-nav": {
+      "title": "Navigation",
+      "short": "Moves between the parts of Serpentora. Nothing is lost when you switch.",
+      "more": "Animals, Breeding, Breeding Advisor and Family Tree belong to one species, so they appear once a species is open. The rest cover the whole collection. On a phone the same places sit in the bar at the bottom, and the less used ones are under More.",
+      "tips": [
+        "Keyboard: Tab moves along the tabs, Enter opens one."
+      ],
+      "words": "tabs menu screens bottom bar"
+    },
+    "nav-dashboard": {
+      "short": "Shows every species you keep, with totals, and closes the species that is open.",
+      "more": "Start here. Each species card opens that species. The search on the Dashboard looks through every animal in every species.",
+      "words": "home overview start species"
+    },
+    "nav-animals": {
+      "short": "Lists the animals of the open species, as cards or as a table.",
+      "more": "Add, find, filter and open animals here. With no species open, it asks you to pick one first.",
+      "words": "snakes collection list"
+    },
+    "nav-pairings": {
+      "short": "Follows the pairings of the open species, from planning to hatchlings.",
+      "more": "Each pairing is a card that moves through its stages: locks, ovulation, pre-lay shed, eggs, incubation and hatch. With no species open, it asks you to pick one first.",
+      "words": "pairings clutches projects breeding tracker"
+    },
+    "nav-advisor": {
+      "short": "Suggests pairings toward a goal you set, from the animals you have.",
+      "more": "The suggestions are estimates worked out from the genetics recorded on your animals. With no species open, it asks you to pick one first.",
+      "words": "suggestions advisor goal plan"
+    },
+    "nav-family-tree": {
+      "short": "Shows an animal's parents, grandparents and offspring.",
+      "more": "Parentage is read from what you recorded on each animal and pairing. With no species open, it asks you to pick one first.",
+      "words": "pedigree lineage parents ancestry"
+    },
+    "nav-feed-prep": {
+      "short": "Opens a list of which feeders to thaw for the animals you pick.",
+      "more": "It covers the whole collection, not only the species that is open. It opens as a window over the current screen.",
+      "words": "feeding defrost thaw rodents"
+    },
+    "nav-spaces": {
+      "short": "Lays out your rooms, racks and terrariums, and which animal lives where.",
+      "words": "racks tubs rooms enclosures housing"
+    },
+    "nav-quarantine": {
+      "short": "Tracks animals in quarantine: how long they have been in, their checks and when they are cleared.",
+      "more": "The number on the tab is how many animals are in quarantine right now.",
+      "words": "intake isolation new animals health"
+    },
+    "nav-calendar": {
+      "short": "Shows feeds, locks, due dates and other events by month.",
+      "words": "schedule dates appointments events"
+    },
+    "nav-lab-tests": {
+      "short": "Collects genetic test orders for your animals and shows the past orders and their results.",
+      "words": "genetic tests shed test lab orders terminal"
+    },
+    "nav-setup": {
+      "short": "Holds your breeder details, ID format, exports, appearance, language, backups and account.",
+      "words": "settings preferences options setup configuration"
+    },
+    "nav-more": {
+      "short": "On a phone, opens the places that do not fit in the bottom bar: Breeding Advisor, Quarantine, Family Tree, Spaces and Lab tests.",
+      "words": "menu phone mobile"
+    },
+    "species-gate": {
+      "title": "Open a species first",
+      "short": "Appears when you open a screen that belongs to one species and none is open yet. Pick a species to go on.",
+      "more": "Picking a species from the list opens it on the screen you asked for. If you have no species yet, it offers to add an animal or import a collection instead.",
+      "words": "choose species pick"
+    },
+    "saving": {
+      "title": "How saving works",
+      "short": "What you change is saved in this browser as you go. There is no Save button for the collection itself.",
+      "more": "While you are signed in, your changes are also sent to your Serpentora account on the server shortly after you make them, so another device signed in to the same account can fetch them. If sending fails, a Not synced note appears at the top. Forms that edit one animal or pairing keep nothing until you press their own Save button.",
+      "tips": [
+        "Settings, Backups lets you download a full copy to a file whenever you want one."
+      ],
+      "words": "save autosave storage sync where data stored"
+    },
+    "help-button": {
+      "title": "Help & Manual",
+      "short": "Opens the Help menu: explore the app, read the manual, or take a guided tour.",
+      "more": "The ? sits in the top bar on every screen, and every window has its own ? in its header. Inside a window, its ? turns Help Mode on or off directly.",
+      "tips": [
+        "Keyboard: Tab to the ? and press Enter."
+      ],
+      "words": "help question mark manual support"
+    },
+    "help-mode": {
+      "title": "Help Mode",
+      "short": "While it is on, pressing any control explains it instead of using it. Nothing is changed.",
+      "more": "Turn it on with ?, then Explore the app. A note at the top shows it is on, with an Exit button. Typing, pasting and saving are all stopped while it is on, so you can press anything safely. Turning it on pauses a guided tour; you can resume the tour from the Help menu.",
+      "tips": [
+        "Keyboard: Tab to a control and press Enter or Space to hear about it. Escape closes an explanation.",
+        "Press Exit in the note at the top, or the ? again, to leave Help Mode."
+      ],
+      "words": "explore explain what does this do safe"
+    },
+    "help-manual": {
+      "title": "Help Manual",
+      "short": "Lists every explanation in Serpentora by section, with a search.",
+      "more": "Each entry is the same text Help Mode shows for that control. Links inside an entry open related entries; Back returns to the one before.",
+      "words": "manual guide documentation reference"
+    },
+    "manual-search": {
+      "title": "Search the manual",
+      "short": "Finds entries whose words start with what you type.",
+      "more": "Every word you type must match the start of a word in the entry, so \"pair\" finds \"pairing\". Titles count most, then other names for the same thing, then the descriptions. Clear the search to return to where you were.",
+      "words": "find lookup query"
+    },
+    "guided-tours": {
+      "title": "Guided tours",
+      "short": "Walk you through Serpentora by having you press the real controls, one step at a time.",
+      "more": "A tour points at a control and waits until you have used it. It never acts for you, apart from one plainly labelled offer to add an example animal, and it only explains deleting, importing, syncing, ordering and anything that leaves the app. Exit any time; the Help menu keeps your place so you can resume.",
+      "tips": [
+        "Escape inside the tour panel leaves the tour.",
+        "Alt+G brings you back to the tour panel from anywhere."
+      ],
+      "words": "tour guide walkthrough tutorial onboarding learn"
+    },
+    "help-hint": {
+      "title": "Help hint",
+      "short": "A small note pointing at the ? button. Dismiss it once and it stays away.",
+      "words": "hint tip"
+    },
+    "tour-invitation": {
+      "title": "Get to know Serpentora",
+      "short": "Offers the essentials tour on your first visit. Start it now or choose Not now; it is offered only once.",
+      "more": "You can start the tour later from the ? button.",
+      "words": "welcome first visit invitation"
+    }
+  }
+}

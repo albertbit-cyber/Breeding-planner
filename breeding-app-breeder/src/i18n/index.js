@@ -8,6 +8,8 @@ import enAnimals from "../locales/en/animals.json";
 import enAdvisor from "../locales/en/advisor.json";
 import enAuth from "../locales/en/auth.json";
 import enElectron from "../locales/en/electron.json";
+// Help text is English-only until it is translated; other languages fall back to it.
+import enHelp from "../locales/en/help.json";
 
 import esCommon from "../locales/es/common.json";
 import esAnimals from "../locales/es/animals.json";
@@ -70,6 +72,7 @@ const resources = {
     advisor: enAdvisor,
     auth: enAuth,
     electron: enElectron,
+    help: enHelp,
   },
   es: {
     common: esCommon,
