@@ -30,12 +30,14 @@ Two further rows hold `admin` and are **not** from this repository —
 anywhere in the codebase, so their passwords are not published. That makes four
 owner rows on a database whose role model intends exactly one.
 
-> **Status, 22 September 2026: none of these accounts has been changed.** The
-> owner is reviewing each one and will delete or rotate them individually. So
-> the four published credentials above are still live on staging as this is
-> written — this runbook describes a hole that is closed *against recurrence*
-> (the seed guard below), not one that is closed on the live database. Re-run
-> the audit before believing otherwise.
+> **Status, 8 October 2026: re-audited, nothing has changed on the live
+> database.** `railway run npm run audit:staff` against `staging` still lists
+> the same four owner rows and the same four seeded addresses, all `active`.
+> `lab@proherper.dev` last logged in on 5 October, so it is in day-to-day use
+> as the test laboratory. The guard below closes the hole *against recurrence*;
+> the rows themselves wait on the owner's per-account decision, and
+> `npm run retire:seeded` (below) is the one command that carries it out.
+> Re-run the audit before believing otherwise.
 
 ## What the seed scripts do now
 
@@ -71,6 +73,10 @@ refused. The unconfirmed `npm run e2e:reset` deliberately does **not** carry it.
 five scripts still call it, so removing one fails the suite rather than quietly
 reopening the hole.
 
+`src/tests/retireSeededAccounts.test.ts` covers the retirement command: it must
+refuse a non-seeded address, write nothing without `--confirm`, never hash the
+published password again, and refuse to delete a row that owns anything.
+
 > `prisma/seed.ts` additionally cannot run at all today: it imports
 > `../../src/data/testCatalog`, a file deleted when the repository was
 > consolidated (commit `b49b954`). That is a separate pre-existing fault. The
@@ -104,8 +110,32 @@ To point it at the other environment, switch with
 
 ## How to neutralise a seeded account
 
-Prefer the API over SQL: it is audit-logged, reversible, and cannot get the
-foreign keys wrong.
+For an address a seed script writes, there is one command. It only accepts the
+addresses in `scripts/seededAccounts.ts`, it dry-runs unless told to apply, and
+it refuses to delete anything that owns orders or holds a lab organization
+together:
+
+```bash
+cd breeding-app-backend
+railway status                                   # confirm the environment first
+railway run npm run retire:seeded -- lab@proherper.dev admin@proherper.dev   # dry run, writes nothing
+railway run npm run retire:seeded -- lab@proherper.dev admin@proherper.dev --confirm
+railway run npm run retire:seeded -- admin@breedingplanner.dev --confirm --delete   # only if it owns nothing
+```
+
+`--confirm` without `--delete` **neutralises**: the password is replaced with a
+random value nobody is told, `status` becomes `suspended` and `isActive` false
+(so `loginUser` refuses it), `refreshToken` is cleared and every refresh session
+revoked, `deletionRequestedAt` is stamped, and an `AdminAuditLog` row records
+it with no actor (`adminUserId` null, because a script took the action). The
+row, its organization and its history stay where they are, and the admin
+console can set the status back to `active` later without the published
+password coming back.
+
+`--confirm --delete` removes the row, but is refused for an account that is a
+member of any organization, placed any lab order, or belongs to an organization
+that received one. The reasons are below. For a real person's account use the
+console instead, so the action is attributed to whoever took it:
 
 **Suspend** — `PATCH /api/admin/users/:id/status` with
 `{"status":"suspended","reason":"..."}`. This sets `isActive: false` and clears
@@ -188,8 +218,9 @@ the right address and a fresh password.
    Change that password from the account's own settings straight afterwards, so
    the one printed in a terminal stops being the live one. `refreshToken` is
    cleared so any session still open on the old address dies with the change.
-3. **Suspend every other `admin` row** that is not a person you recognise, and
-   rotate anything seeded, per the section above.
+3. **Retire the seeded rows** with `npm run retire:seeded -- <addresses> --confirm`,
+   and suspend from the console any other `admin` row that is not a person you
+   recognise, per the section above.
 4. **Re-run `railway run npm run audit:staff`.** It should report exactly one
    owner and no seeded addresses.
 

@@ -25,44 +25,9 @@
  * usable by anyone who has read it.
  */
 import { prisma } from "../src/lib/prisma";
+import { SEEDED_ACCOUNTS, isSeededAddress } from "./seededAccounts";
 
 const STAFF_ROLES = ["admin", "moderator", "support"] as const;
-
-/**
- * Addresses this repository's seed scripts create or reset, with the published
- * password each one sets and where it is written down. Keep this in step with
- * prisma/seed.ts, prisma/e2eReset.ts, seedAdminUser.ts, seedBreeder.js and
- * fixPasswords.js -- an address that drops off this list stops being flagged.
- */
-const SEEDED_ACCOUNTS: Record<string, { password: string; sources: string }> = {
-  "admin@breedingplanner.dev": {
-    password: "admin1234",
-    sources: "prisma/seed.ts, seedAdminUser.ts, prisma/e2eReset.ts",
-  },
-  "admin@proherper.dev": {
-    password: "demo1234",
-    sources: "seedBreeder.js, fixPasswords.js",
-  },
-  "lab@proherper.dev": {
-    password: "demo1234",
-    sources: "prisma/seed.ts, prisma/e2eReset.ts, seedBreeder.js, fixPasswords.js",
-  },
-  "lab-b@proherper.dev": {
-    password: "demo1234",
-    sources: "prisma/e2eReset.ts",
-  },
-  "breeder@proherper.dev": {
-    password: "breeder1234 / demo1234",
-    sources: "prisma/seed.ts, prisma/e2eReset.ts, seedBreeder.js, fixPasswords.js",
-  },
-  "buyer@breedingplanner.dev": {
-    password: "buyer1234",
-    sources: "prisma/seed.ts",
-  },
-};
-
-export const isSeededAddress = (email: string): boolean =>
-  Object.prototype.hasOwnProperty.call(SEEDED_ACCOUNTS, String(email || "").toLowerCase());
 
 const day = (value: unknown): string =>
   value ? new Date(value as string).toISOString().slice(0, 10) : "never";
