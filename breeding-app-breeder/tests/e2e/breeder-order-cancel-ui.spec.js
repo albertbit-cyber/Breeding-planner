@@ -17,7 +17,7 @@ test("breeder can cancel a submitted shed test order from the Shed Test Terminal
   const order = await createBreederOrderForSnake(request, token);
 
   await openAuthenticatedBreeder(page);
-  await page.getByRole("button", { name: /Shed Test Terminal/i }).first().click();
+  await page.getByRole("button", { name: /^Lab tests$/i }).first().click();
 
   const orderCard = page.locator("div.rounded-lg.border.bg-white", { hasText: order.orderNumber });
   await expect(orderCard).toBeVisible();
@@ -41,7 +41,7 @@ test("cancel order is not offered once the lab has received the sample", async (
   await patchOrderStatus(request, labToken, order.id, "received");
 
   await openAuthenticatedBreeder(page);
-  await page.getByRole("button", { name: /Shed Test Terminal/i }).first().click();
+  await page.getByRole("button", { name: /^Lab tests$/i }).first().click();
   const orderCard = page.locator("div.rounded-lg.border.bg-white", { hasText: order.orderNumber });
   await expect(orderCard).toBeVisible();
   await expect(orderCard.getByRole("button", { name: /^Cancel Order$/i })).toHaveCount(0);

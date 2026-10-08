@@ -87,7 +87,8 @@ test("a signed-out buyer searches, opens a listing, signs in and sends the first
 
   // 5. The thread opens in the inbox with the message in it.
   await expect(page).toHaveURL(/\/inbox\/[^/]+$/);
-  await expect(page.getByText(firstMessage)).toBeVisible();
+  // The text also shows as the thread's preview in the list; the bubble is the message itself.
+  await expect(page.locator(".mk-msg__bubble", { hasText: firstMessage })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Inbox" })).toContainText(VISUAL_CLOWN);
 
   // 6. And it reached the seller, which is the point.

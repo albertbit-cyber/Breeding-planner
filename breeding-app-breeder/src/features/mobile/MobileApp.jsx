@@ -359,6 +359,8 @@ const mergeLogs = (localLogs, backendLogs) => {
 const mergeAnimalRecord = (localAnimal, backendAnimal) => {
   if (!localAnimal) return backendAnimal;
   if (!backendAnimal) return localAnimal;
+  // A saved record replaces a demo with the same id whole; merged, it kept isDemo and was hidden.
+  if (isDemoAnimal(localAnimal) && !isDemoAnimal(backendAnimal)) return backendAnimal;
   const localTime = recordTimestamp(localAnimal);
   const backendTime = recordTimestamp(backendAnimal);
   const base = localTime >= backendTime ? localAnimal : backendAnimal;

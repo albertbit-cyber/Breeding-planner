@@ -3195,6 +3195,10 @@ function mergePlannerStates(localState, backendState) {
 function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
   if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
+  // A demo is a placeholder that is never saved. A saved record with the same id (a real
+  // 2025 "Athena" is 25Ath-1, like the demo) replaces it whole: merged, it kept isDemo and
+  // was hidden as a demo.
+  if (isDemoSnakeRecord(localAnimal) && !isDemoSnakeRecord(backendAnimal)) return sanitizeSnakeRecord(backendAnimal);
   const localTime = getSyncTimestamp(localAnimal);
   const backendTime = getSyncTimestamp(backendAnimal);
   const base = backendTime > localTime ? backendAnimal : localAnimal;
@@ -14210,6 +14214,7 @@ export {
   buildPairingDashboardItem,
   exportDatasetToCsv,
   formatCycleTimerDayLabel,
+  mergeBreederSnapshots,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
