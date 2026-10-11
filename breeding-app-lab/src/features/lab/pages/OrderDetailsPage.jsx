@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
+import { createLabApiClient, formatLabFindingLabel, formatLabTestNumber } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
 import InlineResultEntry, { ELIGIBLE_STATUSES as RESULT_ENTRY_STATUSES } from "../components/InlineResultEntry";
 import { getCurrentAppRole, canAccessLabApp } from "../auth/roleGuard";
@@ -62,7 +62,7 @@ const parseIntakeFromHistory = (history = []) => {
 
 const formatFindingSummary = (findings = []) =>
   (Array.isArray(findings) ? findings : [])
-    .map((entry) => `${entry.marker}: ${formatLabOutcomeLabel(entry.outcome)}`)
+    .map((entry) => `${entry.marker}: ${formatLabFindingLabel(entry)}`)
     .join("; ");
 
 const base64ToBlob = (base64, mimeType) => {
@@ -610,14 +610,6 @@ export default function OrderDetailsPage({ orderId }) {
               <div>
                 <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.orderDetails.intakeApproved", { defaultValue: "Intake Approved" })}</dt>
                 <dd>{formatDateTime(intakeInfo.approvedAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.intake.sampleCondition", { defaultValue: "Sample Condition" })}</dt>
-                <dd>{intakeInfo.condition || "-"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-neutral-500">{t("lab.intake.notes", { defaultValue: "Intake Notes" })}</dt>
-                <dd>{intakeInfo.notes || "-"}</dd>
               </div>
             </dl>
           </section>

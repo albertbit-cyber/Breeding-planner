@@ -20,6 +20,13 @@ const openSeededOrderDetail = async (page: Page, orderId: string) => {
 
 const resultEntrySection = (page: Page) => page.locator("section").filter({ hasText: "Enter Results" });
 
+const openSheetDetails = async (section: ReturnType<typeof resultEntrySection>) => {
+  const details = section.locator("details");
+  if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open))) {
+    await details.locator("summary").click();
+  }
+};
+
 test("lab result draft can be saved and loaded again", async ({ page, request }) => {
   const consoleErrors = collectConsoleErrors(page);
   const token = await loginViaApi(request);
@@ -29,9 +36,15 @@ test("lab result draft can be saved and loaded again", async ({ page, request })
   await openSeededOrderDetail(page, order.id);
   const section = resultEntrySection(page);
   await expect(section.getByRole("heading", { name: /enter results/i })).toBeVisible();
+  // Test number, method, summary and notes sit behind one disclosure now; the
+  // answers are the whole of the sheet's main path.
+  await openSheetDetails(section);
   await section.locator('input[placeholder="260424PH1061"]').fill(testCode);
   await section.locator('input[placeholder="PCR"]').fill("PCR");
+  // The first seeded test is a recessive gene, so "heterozygous" is on offer.
   await section.locator("select").first().selectOption("heterozygous");
+  await expect(section.getByText(/breeder sees:/i).first()).toBeVisible();
+  await section.getByRole("button", { name: /^add note$/i }).first().click();
   await section.getByPlaceholder(/per-gene notes/i).first().fill("Playwright draft note");
   await section.getByPlaceholder(/short technical summary/i).fill("Playwright draft result");
 
@@ -50,6 +63,7 @@ test("lab result draft can be saved and loaded again", async ({ page, request })
   await page.reload();
   const reloadedSection = resultEntrySection(page);
   await expect(reloadedSection.getByRole("heading", { name: /enter results/i })).toBeVisible();
+  await openSheetDetails(reloadedSection);
   await expect(reloadedSection.locator('input[placeholder="260424PH1061"]')).toHaveValue(testCode);
   await expect(reloadedSection.locator("select").first()).toHaveValue("heterozygous");
   await expect(reloadedSection.getByPlaceholder(/short technical summary/i)).toHaveValue("Playwright draft result");
@@ -65,14 +79,20 @@ test("lab result submission completes the seeded order", async ({ page, request 
   await openSeededOrderDetail(page, order.id);
   const section = resultEntrySection(page);
   await expect(section.getByRole("heading", { name: /enter results/i })).toBeVisible();
+  await openSheetDetails(section);
   await section.locator('input[placeholder="260424PH1061"]').fill(testCode);
   await section.locator('input[placeholder="PCR"]').fill("PCR");
 
+  // Each dropdown speaks its gene's inheritance: a gene test has a negative
+  // answer, a sex test has only Male / Female.
   const selects = section.locator("select");
   const selectCount = await selects.count();
   expect(selectCount).toBeGreaterThan(0);
   for (let index = 0; index < selectCount; index += 1) {
-    await selects.nth(index).selectOption("not_detected");
+    const values = await selects.nth(index).locator("option").evaluateAll((options) =>
+      options.map((option) => (option as HTMLOptionElement).value)
+    );
+    await selects.nth(index).selectOption(values.includes("not_detected") ? "not_detected" : "female");
   }
   await section.getByPlaceholder(/short technical summary/i).fill("Playwright submitted result");
 

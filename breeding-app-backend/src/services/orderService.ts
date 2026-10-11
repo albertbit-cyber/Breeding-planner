@@ -6,6 +6,7 @@ import { calculateOrderBreakdown, splitAnimalTestPrices, toPublicBreakdown } fro
 import { buildNextOrderNumber, ensureSharedOrderNumbers, getOrderMonthToken } from "./orderNumberService";
 import type { AppRole } from "../types/auth";
 import { isAdminRole, isLabRole } from "../auth/identity";
+import { attachTestInheritance, attachTestInheritanceToAll } from "./geneInheritanceService";
 
 const toPrice = (value: number) => Number(value.toFixed(2));
 // Prisma's unstated default is a 5 second budget, which an order covering a season's worth of
@@ -45,6 +46,26 @@ export const LAB_IDENTITY_SELECT = {
     },
   },
 } as const;
+
+/**
+ * An order's animals with their ordered tests and, on each test, the offering
+ * it was bought from. The offering carries the gene the test reads and the
+ * species it serves, which is what decides the answers a laboratory may record
+ * (see geneInheritanceService). The relation is replaced by `inheritance` on
+ * the way out, so clients never see the raw offering row.
+ */
+export const ORDER_ANIMALS_INCLUDE = {
+  include: {
+    tests: {
+      include: {
+        offering: {
+          select: { id: true, name: true, geneTarget: true, testKind: true, speciesIds: true, aliases: true },
+        },
+      },
+    },
+  },
+} as const;
+
 type OrderActor = { id?: string; role: AppRole };
 
 /**
@@ -307,16 +328,18 @@ export const listOrdersForUser = async (
 
   // Platform admins see every tenant's queue; that is the oversight console.
   if (isAdminRole(user.role)) {
-    return prisma.shedTestOrder.findMany({
-      where: archiveWhere(scope),
-      include: {
-        breeder: { select: { id: true, email: true, fullName: true, role: true } },
-        labOrganization: { select: LAB_IDENTITY_SELECT },
-        animals: { include: { tests: true } },
-        results: { orderBy: { updatedAt: "desc" } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    return attachTestInheritanceToAll(
+      await prisma.shedTestOrder.findMany({
+        where: archiveWhere(scope),
+        include: {
+          breeder: { select: { id: true, email: true, fullName: true, role: true } },
+          labOrganization: { select: LAB_IDENTITY_SELECT },
+          animals: ORDER_ANIMALS_INCLUDE,
+          results: { orderBy: { updatedAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    );
   }
 
   // A lab sees the orders addressed to it, and nothing else. This used to be an
@@ -325,26 +348,30 @@ export const listOrdersForUser = async (
     if (!org?.organizationId) {
       throw new HttpError(403, "This account does not belong to a laboratory.");
     }
-    return prisma.shedTestOrder.findMany({
-      where: { labOrganizationId: org.organizationId, ...archiveWhere(scope) },
+    return attachTestInheritanceToAll(
+      await prisma.shedTestOrder.findMany({
+        where: { labOrganizationId: org.organizationId, ...archiveWhere(scope) },
+        include: {
+          breeder: { select: { id: true, email: true, fullName: true, role: true } },
+          animals: ORDER_ANIMALS_INCLUDE,
+          results: { orderBy: { updatedAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    );
+  }
+
+  return attachTestInheritanceToAll(
+    await prisma.shedTestOrder.findMany({
+      where: { breederId: user.id },
       include: {
-        breeder: { select: { id: true, email: true, fullName: true, role: true } },
-        animals: { include: { tests: true } },
+        labOrganization: { select: LAB_IDENTITY_SELECT },
+        animals: ORDER_ANIMALS_INCLUDE,
         results: { orderBy: { updatedAt: "desc" } },
       },
       orderBy: { createdAt: "desc" },
-    });
-  }
-
-  return prisma.shedTestOrder.findMany({
-    where: { breederId: user.id },
-    include: {
-      labOrganization: { select: LAB_IDENTITY_SELECT },
-      animals: { include: { tests: true } },
-      results: { orderBy: { updatedAt: "desc" } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+    })
+  );
 };
 
 export const getOrderByIdForUser = async (
@@ -360,7 +387,7 @@ export const getOrderByIdForUser = async (
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
       labOrganization: { select: LAB_IDENTITY_SELECT },
-      animals: { include: { tests: true } },
+      animals: ORDER_ANIMALS_INCLUDE,
       results: { orderBy: { updatedAt: "desc" } },
     },
   });
@@ -375,7 +402,7 @@ export const getOrderByIdForUser = async (
     assertLabOwnsOrder(user, org, order);
   }
 
-  return order;
+  return attachTestInheritance(order);
 };
 
 export const updateOrderStatus = async (
@@ -393,9 +420,13 @@ export const updateOrderStatus = async (
   if (!existing) throw new HttpError(404, "Order not found.");
   assertLabOwnsOrder(user, org, existing);
 
-  // When samples are marked as received, record that a payment request is now due.
+  // The payment request falls due the moment the sample is in the lab's hands.
+  // A scan at the bench moves a submitted order straight into testing without
+  // pausing at "received", so the stamp has to follow the first move out of
+  // "submitted", whichever status that is, and must not be reset by a later one.
   const extraData: Record<string, unknown> = {};
-  if (status === "received" && existing.status !== "received") {
+  const leavingSubmitted = existing.status === "submitted" && (status === "received" || status === "in_progress");
+  if (leavingSubmitted && !existing.paymentRequestedAt) {
     extraData.paymentRequestedAt = new Date();
   }
 
@@ -441,7 +472,7 @@ export const updateOrderPayment = async (
     },
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
-      animals: { include: { tests: true } },
+      animals: ORDER_ANIMALS_INCLUDE,
       results: { orderBy: { updatedAt: "desc" } },
     },
   });
@@ -557,7 +588,7 @@ export const setOrderArchived = async (
       include: {
         breeder: { select: { id: true, email: true, fullName: true, role: true } },
         labOrganization: { select: LAB_IDENTITY_SELECT },
-        animals: { include: { tests: true } },
+        animals: ORDER_ANIMALS_INCLUDE,
         results: { orderBy: { updatedAt: "desc" } },
       },
     });
@@ -571,7 +602,7 @@ export const setOrderArchived = async (
     include: {
       breeder: { select: { id: true, email: true, fullName: true, role: true } },
       labOrganization: { select: LAB_IDENTITY_SELECT },
-      animals: { include: { tests: true } },
+      animals: ORDER_ANIMALS_INCLUDE,
       results: { orderBy: { updatedAt: "desc" } },
     },
   });

@@ -401,6 +401,27 @@ export const formatLabOutcomeLabel = (value: unknown): string => {
   return RESULT_OUTCOME_LABELS[normalized] || normalized || "-";
 };
 
+/**
+ * The genotype the breeder reads for a finding: "het Clown", "Super Fire",
+ * "Negative". Stored on the finding by the backend; the outcome words are only
+ * for findings from before that existed.
+ */
+export const formatLabFindingLabel = (finding: any): string => {
+  const stored = String(finding?.label || "").trim();
+  if (stored) return stored;
+  return formatLabOutcomeLabel(finding?.outcome);
+};
+
+/**
+ * A confirmed marker on the animal: the gene the laboratory found, written
+ * the way it sits on the animal ("het Piebald", "Super Fire").
+ */
+export const formatLabConfirmedMarker = (entry: any): string => {
+  const marker = String(entry?.marker || "").trim();
+  if (!marker) return "-";
+  return String(entry?.outcome || "").trim() === "carrierDetected" ? `het ${marker}` : marker;
+};
+
 export const formatLabTestNumber = (value: unknown, seed: unknown, dateLike?: string): string =>
   resolveLabTestNumber(value, seed, dateLike);
 
@@ -424,11 +445,20 @@ const getSharedOrderedAnimalGroups = (order: any) => {
     const tests = Array.isArray(animal?.tests) ? animal.tests : [];
     const items = tests.map((test: any, index: number) => {
       const sourceOrderedName = String(test?.testNameSnapshot || test?.testId || "").trim();
+      const inheritance = test?.inheritance && typeof test.inheritance === "object"
+        ? {
+            kind: String(test.inheritance.kind || "unknown"),
+            gene: String(test.inheritance.gene || sourceOrderedName).trim() || sourceOrderedName,
+            superGeneName: test.inheritance.superGeneName || null,
+            speciesId: test.inheritance.speciesId || null,
+          }
+        : { kind: "unknown", gene: sourceOrderedName, superGeneName: null, speciesId: null };
       return {
         orderedTestKey: `${orderId}:${sanitizeFilePart(animalId)}:${index + 1}`,
         geneName: sourceOrderedName,
         sourceOrderedName,
         catalogTestId: String(test?.testId || "").trim() || undefined,
+        inheritance,
       };
     });
     return { animalId, animalName, items };
@@ -448,6 +478,10 @@ const parseSharedResultFindings = (result: any) => {
       sourceOrderedName: String(entry?.sourceOrderedName || "").trim() || undefined,
       catalogTestId: String(entry?.catalogTestId || "").trim() || undefined,
       outcome: String(entry?.outcome || "").trim(),
+      resultStatus: String(entry?.resultStatus || "").trim() || undefined,
+      label: String(entry?.label || "").trim() || undefined,
+      genotype: String(entry?.genotype || "").trim() || undefined,
+      inheritance: String(entry?.inheritance || "").trim() || undefined,
       confidence: typeof entry?.confidence === "number" ? entry.confidence : undefined,
       notes: String(entry?.notes || "").trim() || undefined,
     }))
@@ -559,7 +593,9 @@ const buildSharedTemplateExistingResult = (result: any) => {
 
   const items = parseSharedResultFindings(result)
     .map((finding: any) => {
-      const resultStatus = OUTCOME_TO_RESULT_STATUS[finding.outcome as keyof typeof OUTCOME_TO_RESULT_STATUS];
+      const resultStatus =
+        finding.resultStatus
+        || OUTCOME_TO_RESULT_STATUS[finding.outcome as keyof typeof OUTCOME_TO_RESULT_STATUS];
       if (!resultStatus || !finding.orderedTestKey) {
         return null;
       }

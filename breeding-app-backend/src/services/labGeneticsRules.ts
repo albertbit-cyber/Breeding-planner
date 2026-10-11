@@ -71,31 +71,45 @@ export const normalizeGeneKey = (raw: unknown): string =>
     .replace(/\s+/g, " ");
 
 /**
- * Strip the qualifiers a breeder writes around a gene name so "66% poss het
- * Piebald", "het Piebald" and "Piebald" all compare equal.
+ * The words a breeder writes in front of a gene name. Any number of them, in
+ * any order: "66% poss het Clown", "possible Fire", "ph Pinstripe", "Super Fire".
  */
-export const parseGeneToken = (raw: unknown): { key: string; canonical: string } => {
-  const normalized = String(raw ?? "").trim();
-  if (!normalized) return { key: "", canonical: "" };
+const QUALIFIER_PREFIX =
+  /^(?:\d{1,3}\s*%\s*|(?:pos(?:s|sible|siable|ible)?|probable|maybe|ph|p\.h\.)\s+|het(?:ero(?:zygous)?)?\s+|super\s+)+/i;
 
-  const stripped = normalized
-    .replace(/^\d{1,3}%\s*/i, "")
-    .replace(/^(?:pos(?:s|sible|siable|ible)?\s+)?het\s+/i, "")
-    .replace(/\(possible\)/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
+/**
+ * Strip the qualifiers a breeder writes around a gene name so "66% poss het
+ * Piebald", "het Piebald", "possible Fire", "Super Fire" and "Fire" all share
+ * one key. The qualifiers apply to every inheritance type: a breeder writes
+ * "possible Pinstripe" for a dominant gene as readily as "66% het Clown" for a
+ * recessive one, and a test of that gene settles all of them.
+ *
+ * `canonical` keeps a super form's "Super " prefix, because that is a different
+ * genotype to write onto the animal; every other qualifier is dropped.
+ */
+export const parseGeneToken = (raw: unknown): { key: string; canonical: string; isSuper: boolean } => {
+  const normalized = String(raw ?? "").replace(/\(possible\)/gi, "").replace(/\s+/g, " ").trim();
+  if (!normalized) return { key: "", canonical: "", isSuper: false };
 
-  return { key: normalizeGeneKey(stripped), canonical: stripped };
+  const prefix = normalized.match(QUALIFIER_PREFIX)?.[0] || "";
+  const isSuper = /\bsuper\s/i.test(prefix);
+  const base = normalized.slice(prefix.length).trim();
+  const key = normalizeGeneKey(base);
+  if (!key) return { key: "", canonical: "", isSuper: false };
+  return { key, canonical: isSuper ? `Super ${base}` : base, isSuper };
 };
 
-/** A het the breeder is guessing at, rather than one they know. */
-export const isUncertainHetToken = (raw: unknown): boolean => {
+/** A gene the breeder is guessing at, rather than one they know. */
+export const isUncertainToken = (raw: unknown): boolean => {
   const normalized = String(raw ?? "").replace(/\s+/g, " ").trim().toLowerCase();
   if (!normalized) return false;
-  if (/^\d{1,3}%/.test(normalized)) return true;
-  if (/^(?:pos(?:sible|siable|ible)?|probable|maybe|ph)\b/.test(normalized)) return true;
+  if (/^\d{1,3}\s*%/.test(normalized)) return true;
+  if (/^(?:pos(?:s|sible|siable|ible)?|probable|maybe|ph|p\.h\.)\b/.test(normalized)) return true;
   return /\(possible\)/.test(normalized);
 };
+
+/** @deprecated Use isUncertainToken; kept for callers that predate dominant-gene guesses. */
+export const isUncertainHetToken = isUncertainToken;
 
 export const normalizeTokenList = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -148,7 +162,11 @@ export const collectDecisions = (
     const marker = String((finding as any)?.marker ?? "").trim();
     if (!marker) return;
 
-    const resolved = resolveGene(marker);
+    // `genotype` is what the laboratory says the animal carries, written the
+    // way it goes onto the animal ("Super Fire"). Older findings have only the
+    // marker, which is the test name mapped onto the gene it reads.
+    const genotype = String((finding as any)?.genotype ?? "").trim();
+    const resolved = genotype || resolveGene(marker);
     const parsed = parseGeneToken(resolved || marker);
     if (!parsed.key) return;
 
@@ -166,10 +184,16 @@ export const collectDecisions = (
 };
 
 /**
- * A positive makes the animal visual for that gene, a carrier makes it a known
- * het, and a negative clears only what the breeder was *guessing* — a het they
- * recorded as certain is theirs and is left alone. Removing a keeper's own
- * stated fact because one test disagreed is not ours to do.
+ * The laboratory's answer replaces whatever the breeder had written for that
+ * gene, certain or not. A positive makes the animal visual (or super) for the
+ * gene, a carrier makes it a known het, and a negative removes the gene from
+ * the animal entirely: "Fire", "possible Fire", "66% het Clown" and "100% het
+ * Clown" all go when the test says the gene is not there.
+ *
+ * This used to spare a het the breeder had recorded as certain. The owner
+ * decided on 2026-10-08 that a test of exactly that gene is the stronger fact:
+ * a breeder who disagrees can re-add it, and the result history still shows
+ * what the laboratory found.
  */
 export const applyDecisions = (
   snapshot: GeneticsSnapshot,
@@ -183,28 +207,21 @@ export const applyDecisions = (
     tokens.filter((token) => parseGeneToken(token).key !== key);
 
   decisions.forEach((decision) => {
+    morphs = withoutKey(morphs, decision.key);
+    hets = withoutKey(hets, decision.key);
+    possibleHets = withoutKey(possibleHets, decision.key);
+
     if (decision.outcome === "positive") {
-      morphs = withoutKey(morphs, decision.key);
-      hets = withoutKey(hets, decision.key);
-      possibleHets = withoutKey(possibleHets, decision.key);
       morphs.push(decision.gene);
       return;
     }
 
     if (decision.outcome === "carrierDetected") {
-      const alreadyVisual = morphs.some((token) => parseGeneToken(token).key === decision.key);
-      hets = withoutKey(hets, decision.key);
-      possibleHets = withoutKey(possibleHets, decision.key);
-      if (!alreadyVisual) hets.push(decision.gene);
-      return;
+      // The het list holds bare gene names; the apps add "het" when they show it.
+      hets.push(parseGeneToken(decision.gene).canonical || decision.gene);
     }
 
-    // notDetected / negative
-    hets = hets.filter((token) => {
-      if (parseGeneToken(token).key !== decision.key) return true;
-      return !isUncertainHetToken(token);
-    });
-    possibleHets = withoutKey(possibleHets, decision.key);
+    // notDetected / negative: the removal above is the whole decision.
   });
 
   return {

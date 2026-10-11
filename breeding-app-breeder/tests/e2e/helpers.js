@@ -216,7 +216,8 @@ export const submitCompleteNegativeResult = async (request, labToken, orderId, t
       items: tests.map((test, index) => ({
         orderedTestKey: `${orderId}:${animal.animalId}:${index + 1}`,
         geneName: String(test?.testNameSnapshot || test?.testId || `Test ${index + 1}`),
-        resultStatus: "not_detected",
+        // A sex test has no "negative"; the backend tells us which kind each test is.
+        resultStatus: String(test?.inheritance?.kind || "") === "sex" ? "female" : "not_detected",
       })),
     };
   });

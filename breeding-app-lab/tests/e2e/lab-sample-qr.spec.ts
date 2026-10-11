@@ -37,8 +37,9 @@ test("sample intake resolves a seeded sample ID and submits intake", async ({ pa
     response.request().method() === "PATCH" &&
     response.status() === 200
   );
-  await page.getByPlaceholder(/tube label verified/i).fill("Playwright sample lookup intake");
-  await page.getByRole("button", { name: /^submit intake decision$/i }).click();
+  // One tap: the receipt is the start of testing. The old intake form asked for
+  // a condition and notes that were never stored.
+  await page.getByRole("button", { name: /^received, start testing$/i }).click();
   const statusResponse = await statusResponsePromise;
   const body = await statusResponse.json();
   expect(body?.order?.status).toBe("in_progress");

@@ -22,41 +22,17 @@ const formatDate = (value) => {
   return parsed.toLocaleString();
 };
 
-const StatusBadge = ({ status }) => {
-  const { t } = useTranslation();
-  const label = orderStatusLabel(t, status);
-  const tone = ORDER_STATUS_TONES[status] || "neutral";
-  return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
-      {label}
-    </span>
-  );
-};
+const Badge = ({ label, tone }) => (
+  <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
+    {label}
+  </span>
+);
 
-const PaymentBadge = ({ paymentStatus }) => {
-  const { t } = useTranslation();
-  const normalized = paymentStatus || "pending";
-  const label = paymentStatusLabel(t, normalized);
-  const tone = ORDER_PAYMENT_STATUS_TONES[normalized] || "neutral";
-  return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
-      {label}
-    </span>
-  );
-};
-
-const SampleBadge = ({ status }) => {
-  const { t } = useTranslation();
-  const normalized = status || "expected";
-  const label = sampleStatusLabel(t, normalized);
-  const tone = SAMPLE_STATUS_TONES[normalized] || "neutral";
-  return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
-      {label}
-    </span>
-  );
-};
-
+/**
+ * The manual way in, for a tube whose code will not scan: type the sample id
+ * or paste the token, then do what the scan would have done. The scan button
+ * is the normal path (GlobalScanOverlay).
+ */
 export default function SampleIntakePage({ presetToken }) {
   const { t } = useTranslation();
   const [qrToken, setQrToken] = useState("");
@@ -64,33 +40,21 @@ export default function SampleIntakePage({ presetToken }) {
   const [lookupError, setLookupError] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
 
-  const [received, setReceived] = useState(true);
-  const [sampleCondition, setSampleCondition] = useState("acceptable");
-  const [intakeNotes, setIntakeNotes] = useState("");
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [submitSuccess, setSubmitSuccess] = useState("");
+  const [actionLoading, setActionLoading] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
 
-  const canLookup = useMemo(() => {
-    const normalized = String(qrToken || "").trim();
-    return canResolveLabQrInput(normalized);
-  }, [qrToken]);
-
-  const resetIntakeFeedback = useCallback(() => {
-    setSubmitError("");
-    setSubmitSuccess("");
-  }, []);
+  const canLookup = useMemo(() => canResolveLabQrInput(String(qrToken || "").trim()), [qrToken]);
 
   const resolveSingleValue = useCallback(async (rawValue) => {
     const normalized = String(rawValue || "").trim();
-    resetIntakeFeedback();
+    setActionError("");
+    setActionSuccess("");
     setLookupError("");
     setResolved(null);
 
-    let lookupModeLabel = "";
     try {
-      const parsed = toLabQrResolvePayload(normalized);
-      lookupModeLabel = parsed.qrToken ? "token" : parsed.sampleId ? "sampleId" : "payload";
+      toLabQrResolvePayload(normalized);
     } catch (err) {
       setLookupError(
         err instanceof Error
@@ -103,28 +67,18 @@ export default function SampleIntakePage({ presetToken }) {
     setLookupLoading(true);
     try {
       const api = createLabApiClient();
-      const result = await api.resolveLabSampleByQrToken(normalized);
-      setResolved(result);
-      setReceived(true);
-      setSampleCondition("acceptable");
-      setIntakeNotes("");
+      setResolved(await api.resolveLabSampleByQrToken(normalized));
     } catch (error) {
       setLookupError(
         error instanceof Error
           ? error.message
-          : t("lab.intake.resolveFailed", {
-              defaultValue: "Unable to resolve QR {{mode}}.",
-              mode: lookupModeLabel || "input",
-            })
+          : t("lab.intake.resolveFailed", { defaultValue: "Unable to resolve QR {{mode}}.", mode: "input" })
       );
     } finally {
       setLookupLoading(false);
     }
-  }, [resetIntakeFeedback]);
+  }, [t]);
 
-  // Arrived here from the global Scan action, which already knows this
-  // sample hasn't been received yet — resolve it immediately instead of
-  // making the tech scan a second time.
   useEffect(() => {
     const normalized = String(presetToken || "").trim();
     if (!normalized) return;
@@ -141,75 +95,53 @@ export default function SampleIntakePage({ presetToken }) {
 
   const handleResolve = async (event) => {
     event?.preventDefault?.();
-    const normalized = String(qrToken || "").trim();
-    resolveSingleValue(normalized);
+    resolveSingleValue(String(qrToken || "").trim());
   };
 
-  const handleSubmitIntake = async (event) => {
-    event.preventDefault();
-    resetIntakeFeedback();
+  const refresh = async () => {
+    const sampleId = String(resolved?.sample?.id || "").trim();
+    if (!sampleId) return;
+    const api = createLabApiClient();
+    setResolved(await api.resolveLabSampleBySampleId(sampleId));
+  };
 
-    if (!resolved?.testOrder?.id) {
-      setSubmitError(
-        t("lab.intake.resolveFirst", { defaultValue: "Resolve a sample token before submitting intake." })
-      );
-      return;
-    }
-    if (!received) {
-      setSubmitError(t("lab.intake.markReceived", { defaultValue: "Mark sample as received to continue." }));
-      return;
-    }
-
-    setSubmitLoading(true);
+  const startTesting = async () => {
+    const orderId = String(resolved?.testOrder?.id || "").trim();
+    if (!orderId) return;
+    setActionLoading("start");
+    setActionError("");
+    setActionSuccess("");
     try {
       const api = createLabApiClient();
-      const sampleId = String(resolved.sample.id || "").trim();
-      const updatedOrder = await api.submitLabSampleIntake({
-        orderId: resolved.testOrder.id,
-        sampleCondition,
-        notes: String(intakeNotes || "").trim() || undefined,
-        received,
-      });
-      const refreshed = sampleId
-        ? await api.resolveLabSampleBySampleId(sampleId)
-        : null;
-
-      if (refreshed) {
-        setResolved(refreshed);
-      } else {
-        setResolved((prev) => prev ? {
-          ...prev,
-          testOrder: {
-            ...prev.testOrder,
-            ...updatedOrder,
-          },
-        } : prev);
-      }
-
-      if (updatedOrder.status === "in_progress") {
-        setSubmitSuccess(
-          t("lab.intake.successTesting", { defaultValue: "Sample received and moved into testing." })
-        );
-      } else if (updatedOrder.status === "received") {
-        setSubmitSuccess(
-          t("lab.intake.successInsufficient", {
-            defaultValue: "Sample received. Intake remains pending because the sample was marked insufficient.",
-          })
-        );
-      } else {
-        setSubmitSuccess(
-          t("lab.intake.successUpdated", {
-            defaultValue: "Sample intake updated. Order status is now {{status}}.",
-            status: updatedOrder.status,
-          })
-        );
-      }
+      await api.updateLabOrderWorkflowStatus({ orderId, status: "in_progress" });
+      await refresh();
+      setActionSuccess(t("lab.intake.successTesting", { defaultValue: "Sample received and moved into testing." }));
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : t("lab.intake.submitFailed", { defaultValue: "Intake submission failed." })
-      );
+      setActionError(error instanceof Error ? error.message : t("lab.intake.submitFailed", { defaultValue: "Intake submission failed." }));
     } finally {
-      setSubmitLoading(false);
+      setActionLoading("");
+    }
+  };
+
+  const holdAtReceived = async () => {
+    const orderId = String(resolved?.testOrder?.id || "").trim();
+    if (!orderId) return;
+    setActionLoading("hold");
+    setActionError("");
+    setActionSuccess("");
+    try {
+      const api = createLabApiClient();
+      await api.holdSampleAtReceived(orderId);
+      await refresh();
+      setActionSuccess(
+        t("lab.intake.successHeld", {
+          defaultValue: "Sample marked received and held. Nothing will be tested until you move the order on.",
+        })
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("lab.intake.submitFailed", { defaultValue: "Intake submission failed." }));
+    } finally {
+      setActionLoading("");
     }
   };
 
@@ -219,23 +151,34 @@ export default function SampleIntakePage({ presetToken }) {
     window.location.hash = `/lab/orders/${encodeURIComponent(orderId)}`;
   };
 
+  const openResults = () => {
+    const orderId = String(resolved?.testOrder?.id || "").trim();
+    if (!orderId || typeof window === "undefined") return;
+    const query = new URLSearchParams({ orderId });
+    const animalId = String(resolved?.animal?.id || "").trim();
+    if (animalId) query.set("animalId", animalId);
+    window.location.hash = `/lab/result-entry?${query.toString()}`;
+  };
+
+  const status = String(resolved?.testOrder?.status || "").trim();
+  const paymentStatus = resolved?.testOrder?.paymentStatus || "pending";
+  const sampleStatus = resolved?.sample?.status || "expected";
+
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold text-neutral-900">
         {t("lab.shell.nav.sampleIntake", { defaultValue: "Sample Intake" })}
       </h1>
       <p className="text-sm text-neutral-600">
-        {t("lab.intake.subtitle", {
+        {t("lab.intake.subtitleManual", {
           defaultValue:
-            "Resolve a QR token, verify linked order context, and submit intake outcome. Scanner hookup can plug into this token field later.",
+            "The Scan button does this in one step. Use this page when a label will not scan: type the sample ID, then start testing.",
         })}
       </p>
 
       <form className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm" onSubmit={handleResolve}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-wide text-neutral-500">
-            {t("lab.intake.lookupTitle", { defaultValue: "QR Token Lookup" })}
-          </div>
+        <div className="text-xs uppercase tracking-wide text-neutral-500">
+          {t("lab.intake.lookupTitle", { defaultValue: "QR Token Lookup" })}
         </div>
         <div className="mt-2">
           <LabQrScanner onScan={handleScanResult} />
@@ -264,11 +207,6 @@ export default function SampleIntakePage({ presetToken }) {
               : t("lab.intake.resolve", { defaultValue: "Resolve Token" })}
           </button>
         </div>
-        <div className="mt-2 text-xs text-neutral-500">
-          {t("lab.intake.tokenHelp", {
-            defaultValue: "Accepts normalized 64-char QR token, raw QR payload string, or manual sample ID.",
-          })}
-        </div>
         {lookupError ? (
           <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {lookupError}
@@ -283,10 +221,10 @@ export default function SampleIntakePage({ presetToken }) {
               <div className="text-sm font-semibold text-neutral-900">
                 {t("lab.intake.linkedOrder", { defaultValue: "Linked Order Context" })}
               </div>
-              <div className="flex items-center gap-1.5">
-                <StatusBadge status={resolved.testOrder?.status} />
-                <PaymentBadge paymentStatus={resolved.testOrder?.paymentStatus || "pending"} />
-                <SampleBadge status={resolved.sample?.status} />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge label={orderStatusLabel(t, status)} tone={ORDER_STATUS_TONES[status] || "neutral"} />
+                <Badge label={paymentStatusLabel(t, paymentStatus)} tone={ORDER_PAYMENT_STATUS_TONES[paymentStatus] || "neutral"} />
+                <Badge label={sampleStatusLabel(t, sampleStatus)} tone={SAMPLE_STATUS_TONES[sampleStatus] || "neutral"} />
               </div>
             </div>
 
@@ -311,12 +249,6 @@ export default function SampleIntakePage({ presetToken }) {
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  {t("lab.intake.sampleStatus", { defaultValue: "Sample Status" })}
-                </dt>
-                <dd>{sampleStatusLabel(t, resolved.sample?.status || "expected") || "-"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   {t("lab.intake.receivedAt", { defaultValue: "Received At" })}
                 </dt>
                 <dd>{formatDate(resolved.sample?.receivedAt)}</dd>
@@ -327,7 +259,7 @@ export default function SampleIntakePage({ presetToken }) {
                 </dt>
                 <dd>
                   {resolved.animal?.name || t("lab.intake.unknownAnimal", { defaultValue: "Unknown" })}
-                  <span className="ms-2 text-xs text-neutral-500">(<bdi>{resolved.animal?.id || resolved.testOrder?.animalId || "-"}</bdi>)</span>
+                  <span className="ms-2 text-xs text-neutral-500">(<bdi>{resolved.animal?.id || "-"}</bdi>)</span>
                 </dd>
               </div>
               <div>
@@ -353,78 +285,75 @@ export default function SampleIntakePage({ presetToken }) {
             </button>
           </section>
 
-          <form className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm" onSubmit={handleSubmitIntake}>
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-semibold text-neutral-900">
-              {t("lab.intake.decisionTitle", { defaultValue: "Intake Decision" })}
+              {t("lab.intake.nextStepTitle", { defaultValue: "Next step" })}
             </div>
 
-            <label className="mt-3 flex items-center gap-2 text-sm text-neutral-800">
-              <input
-                type="checkbox"
-                checked={received}
-                onChange={(event) => setReceived(event.target.checked)}
-              />
-              {t("lab.intake.sampleReceived", { defaultValue: "Sample received" })}
-            </label>
-
-            <label className="mt-3 block text-sm">
-              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
-                {t("lab.intake.sampleCondition", { defaultValue: "Sample Condition" })}
-              </span>
-              <select
-                className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                value={sampleCondition}
-                onChange={(event) => setSampleCondition(event.target.value)}
-              >
-                <option value="acceptable">{t("lab.intake.conditionAcceptable", { defaultValue: "Acceptable" })}</option>
-                <option value="borderline">{t("lab.intake.conditionBorderline", { defaultValue: "Borderline" })}</option>
-                <option value="degraded">{t("lab.intake.conditionDegraded", { defaultValue: "Degraded" })}</option>
-                <option value="insufficient">{t("lab.intake.conditionInsufficient", { defaultValue: "Insufficient" })}</option>
-              </select>
-            </label>
-
-            <label className="mt-3 block text-sm">
-              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
-                {t("lab.intake.notes", { defaultValue: "Intake Notes" })}
-              </span>
-              <textarea
-                className="min-h-[96px] w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                placeholder={t("lab.intake.notesPlaceholder", {
-                  defaultValue: "Tube label verified, sample volume, contamination notes, etc.",
+            {status === "submitted" || status === "received" ? (
+              <div className="mt-3 space-y-3">
+                <button
+                  type="button"
+                  onClick={startTesting}
+                  disabled={Boolean(actionLoading)}
+                  className="w-full rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {actionLoading === "start"
+                    ? t("lab.intake.submitting", { defaultValue: "Submitting Intake..." })
+                    : t("lab.intake.startTesting", { defaultValue: "Received, start testing" })}
+                </button>
+                {status === "submitted" ? (
+                  <button
+                    type="button"
+                    onClick={holdAtReceived}
+                    disabled={Boolean(actionLoading)}
+                    className="w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {actionLoading === "hold"
+                      ? t("lab.scan.holding", { defaultValue: "Holding…" })
+                      : t("lab.intake.holdSample", { defaultValue: "Received, but hold it (problem with sample)" })}
+                  </button>
+                ) : null}
+                <p className="text-xs text-neutral-500">
+                  {t("lab.scan.problemHelp", {
+                    defaultValue:
+                      "Problem with sample keeps the order at Sample Received so nothing is tested until you have followed up with the breeder.",
+                  })}
+                </p>
+              </div>
+            ) : status === "in_progress" ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-neutral-700">
+                  {t("lab.intake.alreadyTesting", { defaultValue: "This sample is already in testing." })}
+                </p>
+                <button
+                  type="button"
+                  onClick={openResults}
+                  className="w-full rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-3 text-sm font-medium text-white"
+                >
+                  {t("lab.intake.enterResults", { defaultValue: "Enter results" })}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-neutral-700">
+                {t("lab.intake.nothingToDo", {
+                  defaultValue: "This order is {{status}}. There is nothing to receive.",
+                  status: orderStatusLabel(t, status),
                 })}
-                value={intakeNotes}
-                onChange={(event) => setIntakeNotes(event.target.value)}
-              />
-            </label>
+              </p>
+            )}
 
-            <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-              {t("lab.intake.conditionHelp", {
-                defaultValue:
-                  "Acceptable, borderline, and degraded samples move the hosted order into active processing. Insufficient samples stay at received so the lab can follow up before testing.",
-              })}
-            </div>
-
-            {submitError ? (
+            {actionError ? (
               <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {submitError}
+                {actionError}
               </div>
             ) : null}
-            {submitSuccess ? (
+            {actionSuccess ? (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                {submitSuccess}
+                {actionSuccess}
               </div>
             ) : null}
-
-            <button
-              type="submit"
-              disabled={submitLoading || !received}
-              className="mt-3 rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitLoading
-                ? t("lab.intake.submitting", { defaultValue: "Submitting Intake..." })
-                : t("lab.intake.submit", { defaultValue: "Submit Intake Decision" })}
-            </button>
-          </form>
+          </section>
         </div>
       ) : null}
     </section>

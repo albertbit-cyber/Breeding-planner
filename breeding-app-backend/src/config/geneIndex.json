@@ -1,0 +1,5372 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-10",
+  "source": "MorphMarket Morphpedia (morphmarket.com/morphpedia/), compiled 2026-08-10",
+  "species": {
+    "ball-python": [
+      {
+        "geneName": "210 Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Hollywood"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Acid",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "ACD"
+        ]
+      },
+      {
+        "geneName": "Adder",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Black Adder"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "AHI",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ajax",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Amelanistic"
+        ],
+        "shorthand": [
+          "Alb"
+        ]
+      },
+      {
+        "geneName": "Alloy",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ambush",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Arcane",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Arid",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Arroyo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "het Rio"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ashen",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Asphalt",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Asphalt",
+        "aliases": [
+          "401 Ball"
+        ],
+        "shorthand": [
+          "Asp"
+        ]
+      },
+      {
+        "geneName": "Astro",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Astro",
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Atomic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Eclipse"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Axanthic (GCR)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Gateway City Reptiles Axanthic"
+        ],
+        "shorthand": [
+          "GCR"
+        ]
+      },
+      {
+        "geneName": "Axanthic (Jolliff)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Jolliff"
+        ]
+      },
+      {
+        "geneName": "Axanthic (MJ)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Markus Jayne Axanthic"
+        ],
+        "shorthand": [
+          "MJ"
+        ]
+      },
+      {
+        "geneName": "Axanthic (TSK)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Ax TSK",
+          "Black Axanthic (same allele)"
+        ],
+        "shorthand": [
+          "TSK"
+        ]
+      },
+      {
+        "geneName": "Axanthic (VPI)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "VPI Axanthic"
+        ],
+        "shorthand": [
+          "VPI"
+        ]
+      },
+      {
+        "geneName": "Bald",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bambino",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bamboo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Banana",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Banana",
+        "aliases": [
+          "Coral Glow",
+          "Whitesmoke"
+        ],
+        "shorthand": [
+          "Ban"
+        ]
+      },
+      {
+        "geneName": "Bang",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Tangerine Nightmare",
+          "Orange Bang"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bengal",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Belly",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Head",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "BH"
+        ]
+      },
+      {
+        "geneName": "Black Lace",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Pastel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Black Pastel",
+        "aliases": [
+          "Blk Pastel"
+        ],
+        "shorthand": [
+          "BP"
+        ]
+      },
+      {
+        "geneName": "Blade",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bongo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Brown Back",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Butter",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Blue-Eyed Leucistic",
+        "aliases": [],
+        "shorthand": [
+          "But"
+        ]
+      },
+      {
+        "geneName": "Cafe",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Calico",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Biancaball"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Candy",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Toffee"
+        ],
+        "shorthand": [
+          "Can"
+        ]
+      },
+      {
+        "geneName": "Caramel Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Caramel",
+          "T+ Albino",
+          "Tyrosinase-Positive Albino",
+          "Axanthic Albino"
+        ],
+        "shorthand": [
+          "Car Alb"
+        ]
+      },
+      {
+        "geneName": "Carbon",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Carnivore",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Champagne",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Champ"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Chino",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Chocolate",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cinder",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cinnamon",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Cinnamon",
+        "aliases": [
+          "Cinny",
+          "Cinnamon Pastel"
+        ],
+        "shorthand": [
+          "Cin",
+          "Cinn"
+        ]
+      },
+      {
+        "geneName": "Circle",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Citron",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Clown",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Cln",
+          "Cl"
+        ]
+      },
+      {
+        "geneName": "Coffee",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Confusion",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Congo",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Copper",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Creed",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cryptic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Amur",
+          "Gizmo"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cypress",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Cyp"
+        ]
+      },
+      {
+        "geneName": "Dark Angel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dark Viking",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Dark Togo",
+          "DV"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Desert",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Desert Ghost",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "DG",
+          "Bell Line DG"
+        ],
+        "shorthand": [
+          "DG"
+        ]
+      },
+      {
+        "geneName": "Diesel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Diesel",
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dinker",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Unproven"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Disco",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Disco",
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dot",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "EMG",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Evil Morph God"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Enchi",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Enchi",
+        "aliases": [],
+        "shorthand": [
+          "En"
+        ]
+      },
+      {
+        "geneName": "Enhancer",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Epic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Eramosa",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Mutation X"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Exo-lbb",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Fader",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Fire",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Black-Eyed Leucistic",
+        "aliases": [],
+        "shorthand": [
+          "Fir"
+        ]
+      },
+      {
+        "geneName": "Flame",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "FNR Vanilla",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Frost",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Furrow",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Fusion",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gaia",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gallium",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Mercury"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Genetic Black Back",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Genetic Reduced",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Genetic Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "G-Stripe"
+        ],
+        "shorthand": [
+          "GS"
+        ]
+      },
+      {
+        "geneName": "GeneX",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "GHI",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Gotta Have It"
+        ],
+        "shorthand": [
+          "GHI"
+        ]
+      },
+      {
+        "geneName": "Ghost (Vesper)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Vesper Ghost",
+          "Hypo (Vesper)"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Glossy",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gobi",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gold Blush",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Granite",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gravel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Gra"
+        ]
+      },
+      {
+        "geneName": "Grim",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Harlequin",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Het Daddy",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Het Red Axanthic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Red Axanthic",
+        "aliases": [
+          "HRA",
+          "Green Pastel",
+          "Lace Black Back",
+          "Lori"
+        ],
+        "shorthand": [
+          "HRA"
+        ]
+      },
+      {
+        "geneName": "Hidden Gene Woma",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "HGW"
+        ],
+        "shorthand": [
+          "HGW"
+        ]
+      },
+      {
+        "geneName": "Hieroglyphic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "High Intensity OD",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "HIOD",
+          "High Intensity Orange Dream"
+        ],
+        "shorthand": [
+          "HIOD"
+        ]
+      },
+      {
+        "geneName": "High Orange Gene",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Honey",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Huffman",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hybrid",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hydra",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Hypomelanistic"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jaguar",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Java",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jedi",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jolliff Tiger",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jolt",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Joppa",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Josie",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jungle Woma",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kosmos",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "KRG",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lace",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Lav"
+        ]
+      },
+      {
+        "geneName": "LC Black Magic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lemonback",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Brite",
+          "Lucifer",
+          "Mota",
+          "Sauce"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Leopard",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Leo"
+        ]
+      },
+      {
+        "geneName": "Lesser",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Blue-Eyed Leucistic",
+        "aliases": [
+          "Bug Eyes"
+        ],
+        "shorthand": [
+          "Les"
+        ]
+      },
+      {
+        "geneName": "Mahogany",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Mah"
+        ]
+      },
+      {
+        "geneName": "Maple",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "New"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mario",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Marvel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mckenzie",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Melt",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Metal Flake",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Gold Flake",
+          "MF"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Microscale",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Scaleless",
+        "aliases": [
+          "Micro"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Migraine",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mocha",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Latte"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mojave",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Blue-Eyed Leucistic",
+        "aliases": [],
+        "shorthand": [
+          "Moj"
+        ]
+      },
+      {
+        "geneName": "Monarch",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Monsoon",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Fractal"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Moray",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mordor",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mosaic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Motley",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mystic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Suspected Phantom"
+        ],
+        "shorthand": [
+          "Mys"
+        ]
+      },
+      {
+        "geneName": "Nanny",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Carnage"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nico",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Wild Type",
+          "Classic",
+          "Royal Python"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nova",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nr Mandarin",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Nuyten Reptiles Mandarin"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nyala",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Odium",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "OFY",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Orange Fire Yellow"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Crush",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Dream",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Orange Dream",
+        "aliases": [],
+        "shorthand": [
+          "OD"
+        ]
+      },
+      {
+        "geneName": "Orange Ghost",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orbit",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Oriole",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paint",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Panther",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Mosaic",
+          "Chimera"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pastel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Pastel",
+        "aliases": [
+          "Type 2 Jungle"
+        ],
+        "shorthand": [
+          "PS",
+          "P"
+        ]
+      },
+      {
+        "geneName": "Patternless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Peach",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Phantom",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Blue-Eyed Leucistic",
+        "aliases": [
+          "Suspected Mystic"
+        ],
+        "shorthand": [
+          "Phan"
+        ]
+      },
+      {
+        "geneName": "Phenomenon",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Piebald",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Pied"
+        ],
+        "shorthand": [
+          "Pied",
+          "Pb"
+        ]
+      },
+      {
+        "geneName": "Pinstripe",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Pin"
+        ],
+        "shorthand": [
+          "Pin"
+        ]
+      },
+      {
+        "geneName": "Pixel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "J2"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Puzzle",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Puz"
+        ]
+      },
+      {
+        "geneName": "Quake",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Rain",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Amber"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Rainbow",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "RAR",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Raven",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Razor",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Reaper",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Buchman line Granite"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "RECO",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "RECO Anerythristic"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Gene",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Stripe",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "RS"
+        ]
+      },
+      {
+        "geneName": "Redhead",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Envy"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Rhino",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ringer",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ringer Mark",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Russo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "White Diamond",
+        "aliases": [
+          "Lemon Het Leucistic",
+          "Het White Diamond",
+          "Lemon Ball"
+        ],
+        "shorthand": [
+          "Rus"
+        ]
+      },
+      {
+        "geneName": "Saar",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sable",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Super Sable",
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sahara",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sandblast",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sandstorm",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sapphire",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Satin",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Scaleless Head",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Scrambler",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sentinel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Shadow",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Shatter",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sherg",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Shrapnel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Shredder",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Smuggler",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Spark",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Special",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Spec"
+        ]
+      },
+      {
+        "geneName": "Specter",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Whirlwind"
+        ],
+        "shorthand": [
+          "Spc"
+        ]
+      },
+      {
+        "geneName": "Spider",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Bee"
+        ],
+        "shorthand": [
+          "Spi"
+        ]
+      },
+      {
+        "geneName": "Splash",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Splatter",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Spotnose",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Powerball",
+        "aliases": [],
+        "shorthand": [
+          "SN"
+        ]
+      },
+      {
+        "geneName": "Static",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stranger",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Striker",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sugar",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sulfur",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [
+          "Ember"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sunrise",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sunset",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Surge",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Taronja",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "The Darkling",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tornado",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tri-stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Trick",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [
+          "Hurricane",
+          "Blitz"
+        ],
+        "shorthand": []
+      },
+      {
+        "geneName": "Trident",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Trojan",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Twister",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Typhoon",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ultramel",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "UM"
+        ]
+      },
+      {
+        "geneName": "Vanilla",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": [
+          "Van"
+        ]
+      },
+      {
+        "geneName": "Vesper",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Volta",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Vudoo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Web",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Whitewash",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Woma",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Pearl",
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Wookie",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Wrecking Ball",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "X-treme Gene",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "X-tremist",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow Belly",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": true,
+        "superGeneName": "Ivory",
+        "aliases": [
+          "YB"
+        ],
+        "shorthand": [
+          "YB"
+        ]
+      },
+      {
+        "geneName": "Zebra",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zip Belly",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zuwadi",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "reticulated-python": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Purple Phase)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (White Phase)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Amelanistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anthrax",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bacan",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bali",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blonde Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Genetic Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Golden Child",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hybrid",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Indo Caramel Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jaguar",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jampea (Dwarf)",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kalaotoa (Super Dwarf)",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kayuadi (Super Dwarf)",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Motley",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Ghost Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Phantom",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pied",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Platinum (Ultra)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Selayer (Dwarf)",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sulawesi",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sunfire",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tiger",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Titanium",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "burmese-python": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dwarf",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Enigma",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Granite",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hybrid",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Labyrinth",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Patternless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Piebald",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "short-tailed-python": [
+      {
+        "geneName": "Albino (T+)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (T-) (Blood)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Batik",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel Albino (VPI)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Golden Eye",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Matrix",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pollen",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "green-tree-python": [
+      {
+        "geneName": "Aru",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Biak",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Calico",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "High Blue",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jayapura",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kofiau",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lereh",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Manokwari",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sorong",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Wamena",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "carpet-python": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Granite",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jaguar",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Coastal",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tiger",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zebra",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "boa-constrictor": [
+      {
+        "geneName": "Albino (Argentine)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (BWC)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Kahl)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Prodigy)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Sharp)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (VPI)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic (Carbon)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic (RDR Black Eye)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic (Type 1)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic (Type 2)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Arabesque",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Aztec",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blood",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Coral Albino",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Fire",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Harlequin",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "IMG",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Inca",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Indy",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jaguar (Colombian)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jungle",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Key West",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kubsch Pastel",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Leopard",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Motley (Central American)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Motley (Colombian)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Onyx",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "PK Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Raptor",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Roswell Laddertail",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Salmon Hypo",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Square Tail",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sterling",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "rainbow-boa": [
+      {
+        "geneName": "Albino (Caramel)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Outback)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anery (Seib)",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anery (Sharp)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bulls Eye",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Calico",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Candy Stripe",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo (Lockwood)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pied",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pinstripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Wipeout",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "sand-boa": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anery",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dodoma",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gene X",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stripe",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "hognose-snake": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Arctic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Conda",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Evans Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lemon Hypo",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "RBE Pastel",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Shadow",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "kingsnake": [
+      {
+        "geneName": "Amelanistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Corwin Hypo",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Erythristic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hyperxanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Long Beach Hypermelanistic",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mosaic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "New England Axanthic",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Peanut Butter",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sulfur",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Brooks",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Sided",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Whittier Mud",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "milk-snake": [
+      {
+        "geneName": "Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Striped",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tangerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "corn-snake": [
+      {
+        "geneName": "Amelanistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Anerythristic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Buf",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Charcoal",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Christmas",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cinder",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Diffused",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dilute",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Halo",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hybrid",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypomelanistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kastanie",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lava",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Masque",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Miami",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Microscale",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Motley",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Palmetto",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Peach",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pied Sided",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Factor",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Scaleless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stargazer",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Strawberry",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sunkissed",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tequila Sunrise",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Terrazzo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tessera",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ultra",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zigzag",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "crested-gecko": [
+      {
+        "geneName": "Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bi-color",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Base",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blushing",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Brindle",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Buckskin",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cappuccino",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Chevron",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cluster Spots",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cold Fusion",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cream",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Creamsicle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Crowned",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dalmatian",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Drippy",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Empty Back",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Extreme Harlequin",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Flame",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Fringing",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Furred",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Halloween",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Harlequin",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hybrid",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ink Spot",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Kneecaps",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lilly White",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Monochrome",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Obscurial Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Oil Spot",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Olive",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Patterning",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Patternless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Phantom",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pinstripe",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Portholes",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Quad-stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Base",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Sable",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snowflake",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Soft Scale",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Solid Back",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Super Dalmatian",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Super Stripe",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tailless",
+        "geneType": "physical",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tangerine",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tiger",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tri-color",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Patterning",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Tip",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Wall",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow Base",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "leopard-gecko": [
+      {
+        "geneName": "Abyssinian",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Afghan Tangerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Bell)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Rainwater)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Albino (Tremper)",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Atomic",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "BAE",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Baldy",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bandit",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Night",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Black Pearl",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blizzard",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blood",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blood Emerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bold",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bold Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Carrot Head",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Carrot Tail",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Cipher",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Clown",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Eclipse",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Electric",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Emerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Enigma",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Extreme Bold",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Firebold",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "G Project",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ggg",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ghost",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Giant",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Glow Madness",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Green & Tangerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Halloween",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "High Yellow",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hyper Xanthic",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Inferno",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jungle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lavender",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lemon Frost",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Marble Eye",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Murphy Patternless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "NDBE",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nieves Tangerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pacific Green",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pastel",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Patternless Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Purple Head",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Rainbow Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Reverse Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snake Eyes",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snow (Gem)",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snow (LBS)",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snow (Mack)",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Snow (Tug)",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Super Hypo",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tangerine",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tangerine Tornado",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Tango Crush",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White & Yellow",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "gargoyle-gecko": [
+      {
+        "geneName": "Aberrant Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Alterna",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Bacon",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Banded",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blue Eye",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Blush",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Brown Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dorsal Blotch",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Exaggerated Horns",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Eyebrows",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ghost",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Lipstick",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mosaic",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mottled",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange Spectacle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pastel",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Phantom Eye",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pink Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red Spectacle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Reticulated",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Skeleton",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Super Blotch",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Super Stripe",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow Base",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow Spectacle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "leachianus-gecko": [
+      {
+        "geneName": "Bayonnaise",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Brosse",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caanawa",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Conley Dark Morph",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Friedel (Mt Koghis)",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "GT Type A",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "GT Type B",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "GT Type C",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Isle Of Pines",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Moro",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mt Humboldt",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Mt Koghis",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nuu Ami",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Nuu Ana",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Poindimie",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Troger (Mt Koghis)",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yate",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "african-fat-tailed-gecko": [
+      {
+        "geneName": "Amelanistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Caramel",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Ghost",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Jungle",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Oreo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Patternless",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stinger",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Stripe",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Whiteout",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zero",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zulu",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "chahoua-gecko": [
+      {
+        "geneName": "High White",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Pine Island",
+        "geneType": "locality",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Collar",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White Shoulder",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "bearded-dragon": [
+      {
+        "geneName": "Brown/tan/sand",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dunner",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Genetic Stripe",
+        "geneType": "dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Hypo",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Leatherback",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Orange",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Paradox",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Purple/blue",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Recessive Leatherback",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Red",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Translucent",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Witblits",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Yellow/citrus",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Zero",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ],
+    "axolotl": [
+      {
+        "geneName": "Axanthic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Copper",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Dirty Leucistic",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Gfp",
+        "geneType": "incomplete_dominant",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Golden Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "High Iridophores",
+        "geneType": "polygenic",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Leucistic",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Melanoid",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Melanoid Albino",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "Normal",
+        "geneType": "other",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      },
+      {
+        "geneName": "White",
+        "geneType": "recessive",
+        "hasSuperForm": false,
+        "superGeneName": null,
+        "aliases": [],
+        "shorthand": []
+      }
+    ]
+  }
+}

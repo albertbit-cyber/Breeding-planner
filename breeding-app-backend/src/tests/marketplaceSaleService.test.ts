@@ -284,7 +284,7 @@ describe("markSold", () => {
     });
     expect(certificate.results).toEqual(
       expect.arrayContaining([
-        { test: "Pied", result: "Het Pied" },
+        { test: "Pied", result: "het Pied" },
         { test: "Hypo", result: "Negative" },
       ])
     );

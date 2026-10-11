@@ -280,8 +280,39 @@ writeFileSync(
   ) + '\n'
 );
 
+// The backend also decides which answers a laboratory may record for a test
+// (recessive: negative / het / homozygous; incomplete dominant: negative /
+// single / super; dominant: not present / present), and how a confirmed result
+// is written onto the animal. That needs the inheritance type and super-form
+// name per gene, so a compact gene index travels with the taxonomy. Written
+// from here for the same reason as the taxonomy: so it can never drift.
+const BACKEND_GENE_INDEX = join(REPO, "breeding-app-backend", "src", "config", "geneIndex.json");
+const geneIndex = {};
+for (const s of speciesIndex) {
+  if (!s.traitsFile) continue;
+  const doc = JSON.parse(readFileSync(join(OUT_DIR, s.traitsFile), "utf8"));
+  geneIndex[s.id] = doc.genes.map((g) => ({
+    geneName: g.geneName,
+    geneType: g.geneType,
+    hasSuperForm: Boolean(g.hasSuperForm),
+    superGeneName: g.superGeneName || null,
+    aliases: g.aliases || [],
+    shorthand: g.shorthand || [],
+  }));
+}
+writeFileSync(
+  BACKEND_GENE_INDEX,
+  JSON.stringify(
+    { version: indexDocument.version, generatedAt: indexDocument.generatedAt, source: indexDocument.source, species: geneIndex },
+    null,
+    2
+  ) + "
+"
+);
+
 const withTraits = speciesIndex.filter((s) => s.traitsFile);
 console.log(`Wrote ${readdirSync(OUT_DIR).length} files to ${OUT_DIR}`);
 console.log(`  + backend taxonomy at ${BACKEND_INDEX}`);
+console.log(`  + backend gene index at ${BACKEND_GENE_INDEX}`);
 console.log(`  ${speciesIndex.length} species in taxonomy, ${withTraits.length} with trait tables`);
 console.log(`  ${withTraits.reduce((n, s) => n + s.traitCount, 0)} traits total`);
