@@ -16,6 +16,21 @@ import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
 import { ReproductiveIntelligencePanel } from "./features/animals/ReproductiveIntelligencePanel.jsx";
+import { BreedingWorkspace, buildBreedingCalendarEvents } from "./features/breeding/BreedingWorkspace.jsx";
+import { FemaleBreedingPanel, MaleBreedingPanel } from "./features/breeding/components/AnimalBreedingPanels.jsx";
+import { useBreedingActions } from "./features/breeding/useBreedingActions";
+import {
+  sanitizeBreedingCycleRecord,
+  sanitizeFollicleExamRecord,
+  mergeBreedingCycleRecords,
+  mergeFollicleExamRecords,
+  stripLargeAttachments,
+} from "./features/breeding/domain/sync";
+import { planLegacyMigration } from "./features/breeding/domain/legacyMigration";
+import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
+import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE } from "./features/breeding/domain/cycleModel";
+import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
+import { timelineKindLabel as breedingTimelineKindLabel, certaintyLabel as breedingCertaintyLabel } from "./features/breeding/components/labels";
 import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
 import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
 import {
@@ -1120,6 +1135,9 @@ function getLockRecordedDate(appointment = {}) {
 const STORAGE_KEYS = {
   snakes: 'breedingPlannerSnakes',
   pairings: 'breedingPlannerPairings',
+  breedingCycles: 'breedingPlannerBreedingCycles',
+  follicleExams: 'breedingPlannerFollicleExams',
+  breedingSettings: 'breedingPlannerBreedingSettings',
   groups: 'breedingPlannerGroups',
   groupsBySpecies: 'breedingPlannerGroupsBySpecies',
   showGroups: 'breedingPlannerShowGroups',
@@ -2925,10 +2943,15 @@ function getPersistablePlannerSnapshot(snakes = [], pairings = []) {
 
 function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {}) {
   const syncedSnakes = normalizeSnakeListForDisplay(syncedSnapshot.snakes);
+  const breedingCollections = {
+    breedingCycles: Array.isArray(syncedSnapshot.breedingCycles) ? syncedSnapshot.breedingCycles : [],
+    follicleExams: Array.isArray(syncedSnapshot.follicleExams) ? syncedSnapshot.follicleExams : [],
+  };
   if (syncedSnakes.some(snake => !isDemoSnakeRecord(snake))) {
     return {
       snakes: syncedSnakes,
       pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+      ...breedingCollections,
       plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
     };
   }
@@ -2942,6 +2965,7 @@ function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {
   return {
     snakes: !localHasRealSnakes && localDemoSnakes.length ? localDemoSnakes : [],
     pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+    ...breedingCollections,
     plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
   };
 }
@@ -2999,14 +3023,22 @@ function prepareAnimalForBackend(snake) {
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
-function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}) {
+function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}, breeding = {}) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
   const snakeTombstones = Object.values(tombstones?.snakes || {});
   const pairingTombstones = Object.values(tombstones?.pairings || {});
+  const cycleTombstones = Object.values(tombstones?.breedingCycles || {});
+  const examTombstones = Object.values(tombstones?.follicleExams || {});
+  // Cards and examinations that belong to a demo animal are placeholders and never leave the device.
+  const demoSnakeIds = getDemoSnakeIds(Array.isArray(animals) ? animals : []);
+  const cycles = (Array.isArray(breeding.breedingCycles) ? breeding.breedingCycles : []).filter(cycle => cycle && !demoSnakeIds.has(cycle.femaleId));
+  const exams = (Array.isArray(breeding.follicleExams) ? breeding.follicleExams : []).filter(exam => exam && !demoSnakeIds.has(exam.femaleId)).map(exam => stripLargeAttachments(exam));
   const payload = {
     animals: [...persistable.snakes.map(prepareAnimalForBackend).filter(Boolean), ...snakeTombstones],
     pairings: [...persistable.pairings, ...pairingTombstones],
     clutches: [],
+    breedingCycles: [...cycles, ...cycleTombstones],
+    follicleExams: [...exams, ...examTombstones],
   };
   const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
   if (normalizedPlannerState) {
@@ -3129,6 +3161,8 @@ function plannerSnapshotSignature(snapshot = {}) {
   return JSON.stringify({
     snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
     pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
+    breedingCycles: Array.isArray(snapshot.breedingCycles) ? snapshot.breedingCycles : [],
+    follicleExams: Array.isArray(snapshot.follicleExams) ? snapshot.follicleExams : [],
     plannerState: plannerStateComparable(snapshot.plannerState),
   });
 }
@@ -3301,6 +3335,8 @@ function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}, tombsto
     pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
       ? filterPairingsLinkedToDemoSnakes(mergedPairings, demoSnakeIds)
       : mergedPairings,
+    breedingCycles: mergeRecordsByKey(localSnapshot.breedingCycles, backendSnapshot.breedingCycles, sanitizeBreedingCycleRecord, 'cycle', mergeBreedingCycleRecords, tombstones?.breedingCycles),
+    follicleExams: mergeRecordsByKey(localSnapshot.follicleExams, backendSnapshot.follicleExams, sanitizeFollicleExamRecord, 'exam', mergeFollicleExamRecords, tombstones?.follicleExams),
     plannerState: mergePlannerStates(localSnapshot.plannerState, backendSnapshot.plannerState),
   };
 }
@@ -3364,6 +3400,18 @@ function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) 
       sanitizePairingRecord,
       'pairing'
     ),
+    breedingCycles: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.breedingCycles) ? localSnapshot.breedingCycles : [],
+      Array.isArray(baselineSnapshot.breedingCycles) ? baselineSnapshot.breedingCycles : [],
+      sanitizeBreedingCycleRecord,
+      'cycle'
+    ),
+    follicleExams: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.follicleExams) ? localSnapshot.follicleExams : [],
+      Array.isArray(baselineSnapshot.follicleExams) ? baselineSnapshot.follicleExams : [],
+      sanitizeFollicleExamRecord,
+      'exam'
+    ),
     plannerState: stampPlannerStateForSync(localSnapshot.plannerState, baselineSnapshot.plannerState),
   };
 }
@@ -3374,6 +3422,8 @@ function normalizeBackendBreederSnapshot(snapshot = {}) {
   return {
     snakes: snakes.filter(snake => !isDemoSnakeRecord(snake)),
     pairings: filterPairingsLinkedToDemoSnakes(snapshot?.pairings, demoSnakeIds),
+    breedingCycles: Array.isArray(snapshot?.breedingCycles) ? snapshot.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean) : [],
+    follicleExams: Array.isArray(snapshot?.follicleExams) ? snapshot.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean) : [],
     plannerState: normalizePlannerStateRecord(snapshot?.plannerState),
   };
 }
@@ -6852,6 +6902,38 @@ export default function BreedingPlannerApp() {
   const setSyncedPairings = useCallback((nextPairings) => {
     setPairingsState(Array.isArray(nextPairings) ? nextPairings.map(sanitizePairingRecord).filter(Boolean) : []);
   }, []);
+  // Female breeding cards and follicle examinations (SBR-01..SBR-11). Stored and synced like
+  // pairings: a sanitizer on every read, a local change stamp on every write, tombstones on delete.
+  const [breedingCycles, setBreedingCyclesState] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.breedingCycles, null);
+    return Array.isArray(stored) ? stored.map(sanitizeBreedingCycleRecord).filter(Boolean) : [];
+  });
+  const [follicleExams, setFollicleExamsState] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.follicleExams, null);
+    return Array.isArray(stored) ? stored.map(sanitizeFollicleExamRecord).filter(Boolean) : [];
+  });
+  const [breedingSettings, setBreedingSettings] = useState(() => normalizeBreedingSettings(loadStoredJson(STORAGE_KEYS.breedingSettings, null) || {}));
+  const setSyncedBreedingCycles = useCallback((next) => {
+    setBreedingCyclesState(Array.isArray(next) ? next.map(sanitizeBreedingCycleRecord).filter(Boolean) : []);
+  }, []);
+  const setSyncedFollicleExams = useCallback((next) => {
+    setFollicleExamsState(Array.isArray(next) ? next.map(sanitizeFollicleExamRecord).filter(Boolean) : []);
+  }, []);
+  const setBreedingCycles = useCallback((updater) => {
+    setBreedingCyclesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizeBreedingCycleRecord, 'cycle');
+    });
+  }, []);
+  const setFollicleExams = useCallback((updater) => {
+    setFollicleExamsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizeFollicleExamRecord, 'exam');
+    });
+  }, []);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.breedingCycles, breedingCycles); }, [breedingCycles]);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.follicleExams, follicleExams); }, [follicleExams]);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.breedingSettings, breedingSettings); }, [breedingSettings]);
   const setSnakes = useCallback((updater) => {
     setSnakesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -6882,8 +6964,10 @@ export default function BreedingPlannerApp() {
   }, [snakes, setSnakes]);
 
   const [syncTombstones, setSyncTombstones] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}'); }
-    catch { return { snakes: {}, pairings: {} }; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}');
+      return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {}, ...parsed };
+    } catch { return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {} }; }
   });
   const syncTombstonesRef = useRef(syncTombstones);
   useEffect(() => {
@@ -7108,7 +7192,10 @@ export default function BreedingPlannerApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, [animalActionSheetOpen]);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [pairingsView, setPairingsView] = useState('dashboard');
+  // Breeding cards are the default view; the legacy pairing records stay reachable during rollout.
+  const [pairingsView, setPairingsView] = useState('cards');
+  const [focusedCycleId, setFocusedCycleId] = useState(null);
+  const [breedingDialogRequest, setBreedingDialogRequest] = useState(null);
   // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
   // Only the dashboard asks for a return trip; every other entry point leaves this null.
   const [pairingsReturnView, setPairingsReturnView] = useState(null);
@@ -7833,8 +7920,8 @@ export default function BreedingPlannerApp() {
   }, [hydrateAppearance]);
 
   useEffect(() => {
-    latestPlannerSnapshotRef.current = { snakes, pairings, plannerState: plannerSyncState };
-  }, [snakes, pairings, plannerSyncState]);
+    latestPlannerSnapshotRef.current = { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState };
+  }, [snakes, pairings, breedingCycles, follicleExams, plannerSyncState]);
 
   const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
@@ -7884,7 +7971,11 @@ export default function BreedingPlannerApp() {
           selectRecordsToUpload(merged.snakes, remoteState.snakes),
           selectRecordsToUpload(merged.pairings, remoteState.pairings),
           merged.plannerState,
-          syncTombstonesRef.current
+          syncTombstonesRef.current,
+          {
+            breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
+            follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
+          }
         ),
         { changedOnly: true }
       );
@@ -7899,6 +7990,8 @@ export default function BreedingPlannerApp() {
 
       setSyncedSnakes(syncedSnapshot.snakes);
       setSyncedPairings(syncedSnapshot.pairings);
+      setSyncedBreedingCycles(syncedSnapshot.breedingCycles);
+      setSyncedFollicleExams(syncedSnapshot.follicleExams);
       applyPlannerSyncState(syncedSnapshot.plannerState);
       latestPlannerSnapshotRef.current = syncedSnapshot;
 
@@ -7919,7 +8012,7 @@ export default function BreedingPlannerApp() {
       setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
       throw error;
     }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
@@ -7989,6 +8082,9 @@ export default function BreedingPlannerApp() {
           const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
           setSyncedPairings(sanitizedPairings);
         }
+        if (Array.isArray(payload.breedingCycles)) setSyncedBreedingCycles(payload.breedingCycles);
+        if (Array.isArray(payload.follicleExams)) setSyncedFollicleExams(payload.follicleExams);
+        if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
         if (payload.groupsBySpecies || Array.isArray(payload.groups)) {
           setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
         }
@@ -8338,6 +8434,9 @@ export default function BreedingPlannerApp() {
       autoBackupSnapshot,
       backupVault,
       lastFeedDefaults,
+      breedingCycles,
+      follicleExams,
+      breedingSettings,
     };
 
     const saveTimer = setTimeout(() => {
@@ -8360,6 +8459,9 @@ export default function BreedingPlannerApp() {
     hiddenGroups,
     lastFeedDefaults,
     pairings,
+    breedingCycles,
+    follicleExams,
+    breedingSettings,
     removedStatusTags,
     showGroups,
     snakes,
@@ -8401,7 +8503,7 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (!backendPlannerSyncRef.current.seeded) return;
 
-    const signature = plannerSnapshotSignature({ snakes, pairings, plannerState: plannerSyncState });
+    const signature = plannerSnapshotSignature({ snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState });
     const saveRequestId = ++cloudSaveRequestIdRef.current;
     if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
       backendPlannerSyncRef.current.status = 'ready';
@@ -8412,7 +8514,7 @@ export default function BreedingPlannerApp() {
       if (saveRequestId !== cloudSaveRequestIdRef.current) return;
       backendPlannerSyncRef.current.status = 'loading';
       const localSnapshot = stampChangedSnapshotForSync(
-        { snakes, pairings, plannerState: plannerSyncState },
+        { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState },
         cloudBaselineSnapshotRef.current
       );
 
@@ -8436,7 +8538,11 @@ export default function BreedingPlannerApp() {
               selectRecordsToUpload(mergedForSave.snakes, remoteStateForSave.snakes),
               selectRecordsToUpload(mergedForSave.pairings, remoteStateForSave.pairings),
               mergedForSave.plannerState,
-              syncTombstonesRef.current
+              syncTombstonesRef.current,
+              {
+                breedingCycles: selectRecordsToUpload(mergedForSave.breedingCycles, remoteStateForSave.breedingCycles),
+                follicleExams: selectRecordsToUpload(mergedForSave.follicleExams, remoteStateForSave.follicleExams),
+              }
             ),
             { changedOnly: true }
           );
@@ -8450,6 +8556,8 @@ export default function BreedingPlannerApp() {
           const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
           setSyncedSnakes(currentSnapshot.snakes);
           setSyncedPairings(currentSnapshot.pairings);
+          setSyncedBreedingCycles(currentSnapshot.breedingCycles);
+          setSyncedFollicleExams(currentSnapshot.follicleExams);
           applyPlannerSyncState(currentSnapshot.plannerState);
           latestPlannerSnapshotRef.current = currentSnapshot;
           backendPlannerSyncRef.current.status = 'ready';
@@ -8479,7 +8587,7 @@ export default function BreedingPlannerApp() {
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [applyPlannerSyncState, electronDataReady, pairings, plannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
+  }, [applyPlannerSyncState, electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -8550,6 +8658,9 @@ export default function BreedingPlannerApp() {
     generatedAt: new Date().toISOString(),
     snakes,
     pairings,
+    breedingCycles,
+    follicleExams,
+    breedingSettings,
     groups,
     morphAliases: normalizeMorphAliasDatabase(morphAliases),
     geneAliases: mergeGeneAliasRows(geneAliases),
@@ -8561,7 +8672,7 @@ export default function BreedingPlannerApp() {
     heatRacks,
     terrariums,
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
-  }), [snakes, pairings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
+  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
   const handleRestoreBackup = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') {
@@ -8581,6 +8692,9 @@ export default function BreedingPlannerApp() {
 
     setSnakes(incomingSnakes);
     setPairings(incomingPairings);
+    if (Array.isArray(payload.breedingCycles)) setBreedingCycles(payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean));
+    if (Array.isArray(payload.follicleExams)) setFollicleExams(payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean));
+    if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
     setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
 
     if (Array.isArray(payload.morphAliases)) {
@@ -9559,7 +9673,7 @@ export default function BreedingPlannerApp() {
     if (/^#billing=/.test(window.location.hash)) openSetupTab('account');
   }, [openSetupTab]);
 
-  // open pairing if URL contains #pairing=id
+  // open pairing if URL contains #pairing=id (legacy records; #cycle= opens a breeding card)
   useEffect(()=>{
     const h = window.location.hash.match(/#pairing=(.+)/);
     if (h) {
@@ -10958,6 +11072,183 @@ export default function BreedingPlannerApp() {
       openHatchWizardForPayload(payload);
     }, [pendingHatchWizardTick, openHatchWizardForPayload]);
 
+  // ── Female breeding cards (SBR-01..SBR-11) ─────────────────────────────────
+  // Animals as the breeding domain sees them: species id and whether the species lays eggs.
+  const breedingSnakesById = useMemo(() => new Map(snakes.map(snake => {
+    const speciesId = resolveSpeciesId(snake?.species);
+    return [snake.id, { ...snake, speciesId, reproductionMode: getSpeciesById(speciesId)?.reproduction || 'egg_laying' }];
+  })), [snakes]);
+  const addBreedingTombstone = useCallback((collection, id, deletedAt) => {
+    setSyncTombstones(prev => ({ ...prev, [collection]: { ...(prev[collection] || {}), [id]: { id, deletedAt } } }));
+  }, []);
+  const breedingActions = useBreedingActions({
+    cycles: breedingCycles,
+    exams: follicleExams,
+    settings: breedingSettings,
+    setCycles: setBreedingCycles,
+    setExams: setFollicleExams,
+    setSettings: setBreedingSettings,
+    addTombstone: addBreedingTombstone,
+    snakesById: breedingSnakesById,
+  });
+  const breedingGeneticsTokensFor = useCallback((snake) => (
+    snake ? combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets) : []
+  ), []);
+  const breedingLocationById = useMemo(() => {
+    const map = new Map();
+    (heatRacks || []).forEach(rack => (rack?.slots || []).forEach(slot => {
+      if (!slot?.snakeId) return;
+      const level = Number.isFinite(slot.levelIndex) ? ` L${slot.levelIndex + 1}` : '';
+      const column = Number.isFinite(slot.columnIndex) ? `-${slot.columnIndex + 1}` : '';
+      map.set(slot.snakeId, `${rack.name || t('breeding.location.rack', { defaultValue: 'Rack' })}${level}${column}`);
+    }));
+    (terrariums || []).forEach(terrarium => (terrarium?.occupantIds || []).forEach(id => {
+      map.set(id, terrarium.name || t('breeding.location.terrarium', { defaultValue: 'Terrarium' }));
+    }));
+    return map;
+  }, [heatRacks, terrariums, t]);
+  const breedingLocationFor = useCallback((animalId) => breedingLocationById.get(animalId) || '', [breedingLocationById]);
+  const breedingSpeciesOptions = useMemo(() => {
+    const ids = Array.from(new Set(snakes.map(snake => resolveSpeciesId(snake?.species))));
+    return ids.map(id => ({ id, name: getSpeciesById(id)?.name || id }));
+  }, [snakes]);
+  const openBreedingCycle = useCallback((cycleId, femaleId = null) => {
+    let target = cycleId || null;
+    if (!target && femaleId) {
+      target = breedingCyclesForFemale(breedingCycles, femaleId).find(c => c.status !== BREEDING_CYCLE_STATUS.CLOSED)?.id || null;
+    }
+    setTab('pairings');
+    setPairingsView('cards');
+    setFocusedCycleId(target);
+  }, [breedingCycles]);
+  const requestBreedingDialog = useCallback((request) => {
+    setTab('pairings');
+    setPairingsView('cards');
+    setBreedingDialogRequest({ ...request, at: Date.now() });
+  }, []);
+
+  // Legacy pairing records → breeding cards. Deterministic ids make this rerun-safe; a card the
+  // keeper deleted (tombstoned) is not recreated. Runs on every change so records arriving from
+  // another device or the legacy UI are mapped too.
+  useEffect(() => {
+    if (!Array.isArray(pairings) || !pairings.length) return;
+    const tombstoned = new Set(Object.keys(syncTombstonesRef.current?.breedingCycles || {}));
+    const { cycles: planned, report } = planLegacyMigration(pairings, breedingCycles);
+    const fresh = planned.filter(cycle => !tombstoned.has(cycle.id));
+    if (!fresh.length) return;
+    console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
+    setBreedingCycles(prev => [...prev, ...fresh.filter(cycle => !prev.some(existing => existing?.id === cycle.id))]);
+  }, [pairings, breedingCycles, setBreedingCycles]);
+
+  // Pre-pairing scans join the female's card once it exists; their dates never move.
+  useEffect(() => {
+    const open = breedingCycles.filter(cycle => cycle && !cycle.deletedAt && cycle.status !== BREEDING_CYCLE_STATUS.CLOSED);
+    if (!open.length) return;
+    let next = follicleExams;
+    let changed = false;
+    open.forEach(cycle => {
+      const earlier = breedingCyclesForFemale(breedingCycles, cycle.femaleId)
+        .filter(other => other.id !== cycle.id && other.status === BREEDING_CYCLE_STATUS.CLOSED && other.startDate && cycle.startDate && other.startDate < cycle.startDate)[0];
+      const previousCycleEnd = earlier ? (earlier.closure?.biologicalCompletionDate || String(earlier.closure?.closedAt || '').slice(0, 10) || earlier.startDate) : null;
+      const result = associateExamsWithCycle(next, cycle, { previousCycleEnd, now: nowIsoString() });
+      if (result.associated.length) { next = result.exams; changed = true; }
+    });
+    if (changed) setFollicleExams(() => next);
+  }, [breedingCycles, follicleExams, setFollicleExams]);
+
+  // Hatchlings created for a card (or for the legacy pairing it came from) are linked to it as
+  // offspring. Parentage stays unresolved unless exactly one male participated.
+  useEffect(() => {
+    const byId = new Map();
+    const byLegacyPairing = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle || cycle.deletedAt) return;
+      byId.set(cycle.id, cycle);
+      (cycle.legacy?.pairingIds || []).forEach(pairingId => byLegacyPairing.set(pairingId, cycle));
+    });
+    if (!byId.size) return;
+    const updates = new Map();
+    snakes.forEach(snake => {
+      const ref = snake?.pairingId || snake?.metadata?.pairingId;
+      if (!ref) return;
+      const cycle = byId.get(ref) || byLegacyPairing.get(ref);
+      if (!cycle) return;
+      const current = updates.get(cycle.id) || cycle;
+      if (current.offspring.some(item => item.animalId === snake.id)) return;
+      updates.set(cycle.id, linkCycleOffspring(current, snake.id, { now: nowIsoString() }));
+    });
+    if (!updates.size) return;
+    setBreedingCycles(prev => prev.map(cycle => updates.get(cycle?.id) || cycle));
+  }, [snakes, breedingCycles, setBreedingCycles]);
+
+  // The existing hatch wizard creates the hatchling animals; the card supplies the parents. With
+  // more than one participating male the sire is left empty, so parentage stays unresolved.
+  const createHatchlingsForCycle = useCallback((cycle) => {
+    const female = snakeById(snakes, cycle.femaleId);
+    const participated = cycle.males.filter(m => m.state === BREEDING_MALE_STATE.PARTICIPATED);
+    const soleMaleId = participated.length === 1 ? participated[0].maleId : null;
+    const male = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const linkedIds = new Set([cycle.id, ...(cycle.legacy?.pairingIds || [])]);
+    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId)).length;
+    const total = Number(cycle.clutch?.hatchlingsRecorded || 0);
+    const count = total - existing;
+    if (count <= 0) {
+      showAppAlert(t('breeding.notice.hatchlingsUpToDate', { defaultValue: 'Hatchling records already exist for every recorded hatchling on this card ({{count}}). Raise the hatchling count first.', count: total }));
+      return;
+    }
+    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const hatchedOn = cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate || localYMD(new Date());
+    openHatchWizardForPayload({
+      pairing: withPairingLifecycleDefaults({
+        id: cycle.legacy?.pairingIds?.[0] || cycle.id,
+        femaleId: cycle.femaleId,
+        maleId: soleMaleId,
+        label: `${female?.name || cycle.femaleId} × ${male?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' }))}`,
+        clutch: { recorded: !!layDate, date: layDate, eggsTotal: cycle.clutch.eggsTotal ?? '', fertileEggs: cycle.clutch.fertileEggs ?? '', slugs: cycle.clutch.slugs ?? '' },
+        hatch: { recorded: true, date: hatchedOn, hatchedCount: total },
+      }),
+      count,
+      hatchedDate: hatchedOn,
+      existingCount: existing,
+      previousHatch: {},
+    });
+  }, [snakes, openHatchWizardForPayload, showAppAlert, t]);
+
+  // Ultrasound stills and clips attached to an examination. Images are downscaled the way animal
+  // photos are; anything over 8 MB is refused rather than silently dropped later by the sync.
+  const attachBreedingFiles = useCallback(async (files) => {
+    const out = [];
+    for (const file of files) {
+      if (file.size > 8 * 1024 * 1024) {
+        throw new Error(t('breeding.notice.fileTooLarge', { defaultValue: '{{name}} is larger than 8 MB. Reduce it before attaching.', name: file.name }));
+      }
+      let url = await readFileAsDataURL(file);
+      if (file.type.startsWith('image/')) {
+        try {
+          const image = await loadImageFromUrl(url);
+          const scaled = scaleDimensions(image.width, image.height, 1280);
+          const canvas = document.createElement('canvas');
+          canvas.width = scaled.width;
+          canvas.height = scaled.height;
+          canvas.getContext('2d').drawImage(image, 0, 0, scaled.width, scaled.height);
+          url = canvas.toDataURL('image/jpeg', 0.82);
+        } catch (err) {
+          console.warn('Attachment kept at original size', err);
+        }
+      }
+      out.push({ id: uid('fa'), kind: file.type.startsWith('video/') ? 'video' : 'image', name: file.name, url, addedAt: nowIsoString() });
+    }
+    return out;
+  }, [t]);
+
+  // Deep link: #cycle=<id> (or ?focusCycle=<id> from a reminder email) opens that card.
+  useEffect(() => {
+    const match = window.location.hash.match(/#cycle=([^&]+)/) || window.location.hash.match(/focusCycle=([^&]+)/);
+    if (!match) return;
+    const id = decodeURIComponent(match[1]);
+    if (breedingCycles.some(cycle => cycle?.id === id)) openBreedingCycle(id);
+  }, [breedingCycles, openBreedingCycle]);
+
     const regenerateWizardIdInState = useCallback((state, index, sexOverride) => {
       if (!state) return state;
       const entries = Array.isArray(state.entries) ? state.entries : [];
@@ -12243,6 +12534,28 @@ export default function BreedingPlannerApp() {
               <div className="flex flex-wrap items-center gap-2">
                 <TabButton
                   theme={theme}
+                  active={pairingsView === 'cards'}
+                  onClick={() => {
+                    setPairingsView('cards');
+                    setFocusedPairingId(null);
+                    setPairingsReturnView(null);
+                  }}
+                >
+                  {t('breeding.tabs.cards', { defaultValue: 'Breeding cards' })}
+                </TabButton>
+                <TabButton
+                  theme={theme}
+                  active={pairingsView === 'follicles'}
+                  onClick={() => {
+                    setPairingsView('follicles');
+                    setFocusedPairingId(null);
+                    setPairingsReturnView(null);
+                  }}
+                >
+                  {t('breeding.tabs.follicles', { defaultValue: 'Follicle tracking' })}
+                </TabButton>
+                <TabButton
+                  theme={theme}
                   active={pairingsView === 'dashboard'}
                   onClick={() => {
                     setPairingsView('dashboard');
@@ -12378,7 +12691,32 @@ export default function BreedingPlannerApp() {
                 </div>
               </div>
             )}
-            {pairingsView === 'dashboard' ? (
+            {pairingsView === 'cards' || pairingsView === 'follicles' ? (
+              <BreedingWorkspace
+                view={pairingsView}
+                cycles={breedingCycles}
+                exams={follicleExams}
+                settings={breedingSettings}
+                actions={breedingActions}
+                snakes={scopedSnakes}
+                females={females}
+                males={males}
+                snakesById={breedingSnakesById}
+                geneticsTokensFor={breedingGeneticsTokensFor}
+                locationFor={breedingLocationFor}
+                onOpenSnake={openSnakeCard}
+                focusedCycleId={focusedCycleId}
+                onFocusCycle={(cycleId) => openBreedingCycle(cycleId)}
+                onCreateHatchlings={createHatchlingsForCycle}
+                showAppAlert={showAppAlert}
+                onAttachFiles={attachBreedingFiles}
+                speciesOptions={breedingSpeciesOptions}
+                searchQuery={pairingsSearchQuery}
+                scopedFemaleIds={speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null}
+                dialogRequest={breedingDialogRequest}
+                onDialogRequestHandled={() => setBreedingDialogRequest(null)}
+              />
+            ) : pairingsView === 'dashboard' ? (
               <BreedingDashboardSection
                 items={breedingDashboardItems}
                 initialUrgencyFilter={breedingUrgencyFocus}
@@ -12552,8 +12890,11 @@ export default function BreedingPlannerApp() {
           <CalendarSection
             snakes={snakes}
             pairings={pairings}
+            breedingCycles={breedingCycles}
+            follicleExams={follicleExams}
             theme={theme}
-            onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
+            onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setPairingsView(isPairingCompleted(p) ? 'completed' : 'active'); setFocusedPairingId(p.id); } }}
+            onOpenCycle={openBreedingCycle}
             showAppAlert={showAppAlert}
           />
         )}
@@ -14048,6 +14389,26 @@ export default function BreedingPlannerApp() {
                 {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
                 <AcquisitionRecordPanel snake={editSnake} />
                 <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+
+                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
+                  <FemaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    exams={follicleExams}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
+                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
+                  />
+                )}
+                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
+                  <MaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
+                  />
+                )}
 
                 {/* Reproductive Intelligence — females only */}
                 {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
@@ -27650,7 +28011,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 }
 
 // calendar
-function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAppAlert }) {
+function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams = [], theme='blue', onOpenPairing, onOpenCycle, showAppAlert }) {
   const { t } = useTranslation();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -27663,6 +28024,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     sheds: true,
     meds: true,
     breeding: true,
+    breedingCards: true,
     clutch: true,
     quarantine: true,
   });
@@ -27717,6 +28079,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     { key: 'sheds', label: t('calendar.filters.sheds', { defaultValue: 'Sheds' }) },
     { key: 'meds', label: t('calendar.filters.meds', { defaultValue: 'Meds' }) },
     { key: 'breeding', label: t('calendar.filters.breeding', { defaultValue: 'Breeding appointments' }) },
+    { key: 'breedingCards', label: t('calendar.filters.breedingCards', { defaultValue: 'Breeding cards' }) },
     { key: 'clutch', label: t('calendar.filters.clutch', { defaultValue: 'Clutch actions' }) },
     { key: 'quarantine', label: t('calendar.filters.quarantine', { defaultValue: 'Quarantine' }) },
   ]), [t]);
@@ -27901,8 +28264,13 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       });
     });
 
+    // Breeding cards: actual sessions, observed locks, planned pairings, milestones, scans and
+    // due checks. Planned and suspected entries carry their certainty so the cell can say so.
+    buildBreedingCalendarEvents({ cycles: breedingCycles, exams: follicleExams, year: targetYear, month: targetMonth })
+      .forEach(event => newEvents.push(event));
+
     return newEvents;
-  }, [pairings, femalesById, snakes]);
+  }, [pairings, femalesById, snakes, breedingCycles, follicleExams]);
 
   const loadAppointmentsIntoCalendar = useCallback(() => {
     setEvents(buildEventsForMonth(year, month));
@@ -27926,6 +28294,11 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     }
     if (ev.type === 'clutch') {
       if (filters.clutch === false) return false;
+      if (activeMaleId && ev.maleId && ev.maleId !== activeMaleId) return false;
+      return true;
+    }
+    if (ev.type === 'breedingCard') {
+      if (filters.breedingCards === false) return false;
       if (activeMaleId && ev.maleId && ev.maleId !== activeMaleId) return false;
       return true;
     }
@@ -28652,6 +29025,30 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   {isToday ? <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{t('calendar.today', { defaultValue: 'Today' })}</div> : null}
                 </div>
                 {filteredEvents.filter(e => e.date === cellDate).map((e, idx) => {
+                  if (e.type === 'breedingCard') {
+                    const femaleName = femalesById[e.femaleId]?.name || snakesById[e.femaleId]?.name || e.femaleId;
+                    const maleName = e.maleId ? (malesById[e.maleId]?.name || e.maleId) : '';
+                    const kindLabel = e.kind === 'scan_review'
+                      ? t('breeding.calendar.scanReview', { defaultValue: 'Follicle check due' })
+                      : breedingTimelineKindLabel(t, e.kind);
+                    const toneClass = e.certainty === 'planned'
+                      ? 'border-dashed border-neutral-300 bg-neutral-50'
+                      : e.certainty === 'suspected' || e.certainty === 'estimated'
+                        ? 'border-dashed border-amber-200 bg-amber-50'
+                        : 'border-violet-200 bg-violet-50';
+                    const measurement = typeof e.valueMm === 'number' ? ` · ${e.isEstimate ? '~' : ''}${e.valueMm} mm` : '';
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => { if (onOpenCycle) onOpenCycle(e.cycleId, e.femaleId); }}
+                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full', toneClass)}
+                      >
+                        <div className="font-medium truncate">{kindLabel} · {breedingCertaintyLabel(t, e.certainty)}</div>
+                        <div className="text-[11px] text-neutral-500 truncate">{femaleName}{maleName ? ` × ${maleName}` : ''}{measurement}</div>
+                      </button>
+                    );
+                  }
                   if (e.type === 'feedDue') {
                     const s = snakes.find(x => x.id === e.snakeId);
                     const profile = e.profile || getSnakeFeederProfile(s);

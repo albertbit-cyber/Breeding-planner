@@ -44,6 +44,8 @@ vi.mock("../lib/prisma", () => {
     pairing: { findMany: vi.fn(), createMany: vi.fn(), update: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     clutch: { findMany: vi.fn(), createMany: vi.fn(), update: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     breederPlannerState: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    breedingCycle: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn(), update: vi.fn() },
+    follicleExamination: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn(), update: vi.fn() },
   };
   db.$transaction = vi.fn(async (callback: any) => callback(db));
   return { prisma: db };

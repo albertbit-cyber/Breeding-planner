@@ -128,6 +128,18 @@ const EXPORT_ENTRIES: ExportEntry[] = [
     group: "animals",
     query: (userId) => (prisma as any).reproductiveCycle.findMany({ where: { ownerId: userId } }),
   },
+  {
+    key: "breedingCycles",
+    section: "records",
+    group: "animals",
+    query: (userId) => (prisma as any).breedingCycle.findMany({ where: { ownerId: userId } }),
+  },
+  {
+    key: "follicleExaminations",
+    section: "records",
+    group: "animals",
+    query: (userId) => (prisma as any).follicleExamination.findMany({ where: { ownerId: userId } }),
+  },
 
   // Lab orders.
   {

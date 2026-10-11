@@ -490,6 +490,8 @@ const normalizeMobileSnapshot = (snapshot = {}) => {
   return {
     animals: animals.filter((animal) => !isDemoAnimal(animal)),
     pairings: filterDemoPairings(snapshot?.pairings, demoIds),
+    // Breeding cards travel with the snapshot read-only here; the desktop app owns their edits.
+    breedingCycles: Array.isArray(snapshot?.breedingCycles) ? snapshot.breedingCycles.filter((c) => c && !c.deletedAt && !demoIds.has(c.femaleId)) : [],
     plannerState: extractMobilePlannerState(snapshot),
   };
 };
@@ -502,6 +504,7 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normal
     mergeAnimalRecord
   ),
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing", mergePairingRecord),
+  breedingCycles: backendSnapshot.breedingCycles || localSnapshot.breedingCycles || [],
   plannerState: backendSnapshot.plannerState || localSnapshot.plannerState,
 });
 
@@ -1392,7 +1395,32 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
 }
 
 // ג”€ג”€ג”€ BREEDING PANEL ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
+function BreedingCardSummary({ cycle, animalMap }) {
+  const { t } = useTranslation();
+  const sessions = (cycle.sessions || []).filter((s) => s.introductionDate).length;
+  const locks = (cycle.sessions || []).reduce((n, s) => n + (s.locks || []).filter((l) => l.status === "observed" && l.observationDate).length, 0);
+  const pending = (cycle.plannedPairings || []).filter((p) => p.status === "pending" && p.date).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const males = (cycle.males || []).map((m) => animalMap.get(m.maleId)?.name || m.maleId).join(", ");
+  return (
+    <div className="mbl-bp-card">
+      <div className="mbl-bp-header">
+        <div>
+          <strong>{t("mobile.breedingCard.title", { season: cycle.seasonLabel || "", defaultValue: "Breeding card {{season}}" })}</strong>
+          <small className="mbl-bp-meta">{t("mobile.breedingCard.males", { males: males || "—", defaultValue: "Males: {{males}}" })}</small>
+        </div>
+        <span className={`mbl-bp-status mbl-bp-status--${cycle.status || "active"}`}>{cycle.status}</span>
+      </div>
+      <div className="mbl-cs-entry-detail">
+        <span>{t("mobile.breedingCard.sessions", { n: sessions, defaultValue: "{{n}} sessions" })}</span>
+        <span>{t("mobile.breedingCard.locks", { n: locks, defaultValue: "{{n}} observed locks" })}</span>
+        {pending ? <span>{t("mobile.breedingCard.nextPlanned", { date: fmtDate(pending.date), defaultValue: "Next planned pairing {{date}}" })}</span> : null}
+      </div>
+      <div className="mbl-cs-entry-notes">{t("mobile.breedingCard.editHint", { defaultValue: "Record sessions, locks and scans in the full app; this view is read-only." })}</div>
+    </div>
+  );
+}
+
+function BreedingPanel({ animal, pairings, allAnimals, onSavePairing, breedingCycles = [] }) {
   const animalId = animal?.id || animal?.appAnimalId;
   const related  = useMemo(
     () => (pairings || []).filter((p) => p.femaleId === animalId || p.maleId === animalId),
@@ -1404,12 +1432,18 @@ function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
   );
   const { t } = useTranslation();
 
-  if (!related.length) {
+  const cards = useMemo(
+    () => (breedingCycles || []).filter((c) => c && (c.femaleId === animalId || (c.males || []).some((m) => m.maleId === animalId))),
+    [breedingCycles, animalId]
+  );
+
+  if (!related.length && !cards.length) {
     return <p className="mbl-empty">{t("mobile.breeding.noPairingsForAnimal", { defaultValue: "No pairings found for this animal." })}</p>;
   }
 
   return (
     <div className="mbl-breeding-list">
+      {cards.map((cycle) => <BreedingCardSummary key={cycle.id} cycle={cycle} animalMap={animalMap} />)}
       {related.map((pairing) => {
         const isFemale    = pairing.femaleId === animalId;
         const partnerId   = isFemale ? pairing.maleId : pairing.femaleId;
@@ -1839,6 +1873,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const [recent, setRecent]       = useState(() => readJson(RECENT_KEY, []));
   const [localAnimals, setLocalAnimals] = useState(() => normalizeMobileSnapshot({ animals: readJson(ANIMALS_CACHE, []) }).animals);
   const [pairings, setPairings]   = useState([]);
+  const [breedingCycles, setBreedingCycles] = useState([]);
   const { t } = useTranslation();
 
   useEffect(() => { writeJson(RECENT_KEY, recent); }, [recent]);
@@ -1850,6 +1885,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         const normalizedSnapshot = normalizeMobileSnapshot(snap);
         setLocalAnimals(normalizedSnapshot.animals);
         setPairings(normalizedSnapshot.pairings);
+        setBreedingCycles(normalizedSnapshot.breedingCycles || []);
         writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
       })
       .catch(() => {});
@@ -2124,7 +2160,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
             <AnimalEditForm animal={animal} onSave={saveEdit} onCancel={() => { setScreen("scan"); setAnimal(null); }} busy={editBusy} />
           )}
           {cardTab === "breeding" && (
-            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} />
+            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} breedingCycles={breedingCycles} />
           )}
         </div>
       )}

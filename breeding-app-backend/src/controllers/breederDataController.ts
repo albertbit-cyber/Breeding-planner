@@ -12,7 +12,8 @@ const logUploadSize = (req: Request, body: Record<string, unknown>): void => {
   const count = (value: unknown): number => (Array.isArray(value) ? value.length : 0);
   const summary =
     `[cloud-sync] upload user=${req.user?.id || "unknown"} bytes=${bytes} ` +
-    `animals=${count(body.animals)} pairings=${count(body.pairings)} clutches=${count(body.clutches)}`;
+    `animals=${count(body.animals)} pairings=${count(body.pairings)} clutches=${count(body.clutches)} ` +
+    `breedingCycles=${count(body.breedingCycles)} follicleExams=${count(body.follicleExams)}`;
 
   if (bytes >= SNAPSHOT_WARN_BYTES) {
     console.warn(`${summary} OVER-THRESHOLD (>=${Math.round(SNAPSHOT_WARN_BYTES / 1024 / 1024)}MB)`);

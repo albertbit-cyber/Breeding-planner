@@ -13,6 +13,8 @@ const tx = {
   pairing: { createMany: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   clutch: { createMany: vi.fn(), update: vi.fn() },
   breederPlannerState: { create: vi.fn(), update: vi.fn() },
+  breedingCycle: { createMany: vi.fn(), update: vi.fn() },
+  follicleExamination: { createMany: vi.fn(), update: vi.fn() },
 };
 
 // A row as the bulk pre-load sees it: the app-side id is what keys the lookup, so a row without
@@ -31,6 +33,8 @@ vi.mock("../lib/prisma", () => ({
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
     breederPlannerState: { findUnique: vi.fn() },
+    breedingCycle: { findMany: vi.fn() },
+    follicleExamination: { findMany: vi.fn() },
   },
 }));
 
@@ -61,6 +65,10 @@ beforeEach(() => {
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
+  vi.mocked((prisma as any).breedingCycle.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).follicleExamination.findMany).mockResolvedValue([]);
+  tx.breedingCycle.createMany.mockResolvedValue({ count: 0 });
+  tx.follicleExamination.createMany.mockResolvedValue({ count: 0 });
   vi.mocked(canAccessFeature).mockResolvedValue({ allowed: true, featureKey: "animals.create", source: "unconfigured", tier: "Unconfigured" } as any);
 });
 
@@ -663,6 +671,8 @@ describe("breederDataService", () => {
       animals: [],
       pairings: [],
       clutches: [],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
       serverTime: expect.any(String),
     });
@@ -677,6 +687,8 @@ describe("breederDataService", () => {
       animals: [{ id: "snake-1" }],
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: null,
       serverTime: expect.any(String),
     });

@@ -3,6 +3,17 @@ import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
+import {
+  validateBreedingReferences,
+  cycleAppId as breedingCycleAppId,
+  examAppId as follicleExamAppId,
+  cycleColumns,
+  examColumns,
+  mergeBreedingCyclePayload,
+  mergeFollicleExamPayload,
+  resolveActiveCycleConflicts,
+  syncPlannedPairingReminders,
+} from "./breedingCycleSyncService";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -11,6 +22,10 @@ export type BreederSnapshotInput = {
   pairings?: unknown[];
   clutches?: unknown[];
   plannerState?: unknown;
+  /** Female breeding cards (SBR-02). Same sync contract as pairings: app ids, tombstones, timestamps. */
+  breedingCycles?: unknown[];
+  /** Follicle examinations, owned by the female and optionally linked to a cycle. */
+  follicleExams?: unknown[];
 };
 
 const db = prisma as any;
@@ -430,11 +445,13 @@ export const listBreederSnapshot = async (ownerId: string, options: { since?: Da
     ? { ownerId, deletedAt: null, updatedAt: { gt: since } }
     : { ownerId, deletedAt: null };
 
-  const [animals, pairings, clutches, plannerState] = await Promise.all([
+  const [animals, pairings, clutches, plannerState, breedingCycles, follicleExams] = await Promise.all([
     db.animal.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.pairing.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.clutch.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.breederPlannerState.findUnique({ where: { ownerId } }),
+    db.breedingCycle.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
+    db.follicleExamination.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
   ]);
 
   const snapshot: JsonRecord = {
@@ -442,6 +459,8 @@ export const listBreederSnapshot = async (ownerId: string, options: { since?: Da
     pairings: pairings.map(withBackendSyncMetadata),
     clutches: clutches.map(withBackendSyncMetadata),
     plannerState: plannerState ? withBackendSyncMetadata(plannerState) : null,
+    breedingCycles: breedingCycles.map(withBackendSyncMetadata),
+    follicleExams: follicleExams.map(withBackendSyncMetadata),
     serverTime,
   };
 
@@ -449,10 +468,12 @@ export const listBreederSnapshot = async (ownerId: string, options: { since?: Da
 
   // A full snapshot conveys a deletion by omission; an incremental one cannot, so tombstones
   // raised inside the window have to be named explicitly.
-  const [deletedAnimals, deletedPairings, deletedClutches] = await Promise.all([
+  const [deletedAnimals, deletedPairings, deletedClutches, deletedCycles, deletedExams] = await Promise.all([
     db.animal.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appAnimalId: true } }),
     db.pairing.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appPairingId: true } }),
     db.clutch.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appClutchId: true } }),
+    db.breedingCycle.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appCycleId: true } }),
+    db.follicleExamination.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appExamId: true } }),
   ]);
 
   snapshot.since = since.toISOString();
@@ -461,6 +482,8 @@ export const listBreederSnapshot = async (ownerId: string, options: { since?: Da
     animals: deletedAnimals.map((row: any) => row.appAnimalId).filter(Boolean),
     pairings: deletedPairings.map((row: any) => row.appPairingId).filter(Boolean),
     clutches: deletedClutches.map((row: any) => row.appClutchId).filter(Boolean),
+    breedingCycles: deletedCycles.map((row: any) => row.appCycleId).filter(Boolean),
+    follicleExams: deletedExams.map((row: any) => row.appExamId).filter(Boolean),
   };
   return snapshot;
 };
@@ -555,7 +578,10 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   // transaction budget: Prisma closed the transaction mid-flight and the next query failed with
   // P2028, surfacing to the app as a bare 500. Almost all of those reads were wasted anyway --
   // on a routine sync nothing has changed, and the row was read only to decide not to write it.
-  const [existingAnimals, existingPairings, existingClutches, existingPlannerState] = await Promise.all([
+  const breedingCycles = normalizeArray(input.breedingCycles, "breedingCycles");
+  const follicleExams = normalizeArray(input.follicleExams, "follicleExams");
+
+  const [existingAnimals, existingPairings, existingClutches, existingPlannerState, existingCycles, existingExams] = await Promise.all([
     loadExistingByAppId(db.animal, ownerId, "appAnimalId"),
     loadExistingByAppId(db.pairing, ownerId, "appPairingId"),
     loadExistingByAppId(db.clutch, ownerId, "appClutchId"),
@@ -563,7 +589,87 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       where: { ownerId },
       select: { id: true, payload: true, updatedAt: true },
     }),
+    loadExistingByAppId(db.breedingCycle, ownerId, "appCycleId"),
+    loadExistingByAppId(db.follicleExamination, ownerId, "appExamId"),
   ]);
+
+  // Cross-account relationships cannot be forged: every animal a card names has to be one of
+  // this owner's rows (deleted rows count, so archiving an animal keeps its breeding history).
+  // Animals arriving in this very request are known too.
+  const knownAnimalAppIds = new Set<string>(existingAnimals.keys());
+  animals.forEach((animal, index) => knownAnimalAppIds.add(requireRecordId(animal, "animal", index)));
+  validateBreedingReferences(breedingCycles, follicleExams, knownAnimalAppIds);
+
+  const cycleCreates: JsonRecord[] = [];
+  const cycleUpdates: PlannedUpdate[] = [];
+  // The payload each live cycle will hold after this save, keyed by app id, so the
+  // one-active-cycle rule can be judged over the whole account rather than this request.
+  const resultingCyclePayloads = new Map<string, JsonRecord>();
+  existingCycles.forEach((row, appId) => {
+    const payload = asRecord(row.payload);
+    if (payload && !payload.deletedAt) resultingCyclePayloads.set(appId, payload);
+  });
+  for (const [index, cycle] of breedingCycles.entries()) {
+    const appId = breedingCycleAppId(cycle) || `cycle-${index + 1}`;
+    const existing = existingCycles.get(appId) || null;
+    const tombstoneAt = isoDateValue(cycle.deletedAt);
+    if (tombstoneAt) {
+      if (existing) {
+        cycleUpdates.push({ id: existing.id, appId, data: { deletedAt: new Date(tombstoneAt) } });
+      } else {
+        cycleCreates.push({ ownerId, appCycleId: appId, femaleAnimalAppId: textValue(cycle.femaleId) || "", payload: { ...cycle }, deletedAt: new Date(tombstoneAt) });
+      }
+      resultingCyclePayloads.delete(appId);
+      continue;
+    }
+    const payload = existing ? mergeBreedingCyclePayload(existing.payload, cycle) : cycle;
+    if (!existing) {
+      cycleCreates.push({ ownerId, appCycleId: appId, ...cycleColumns(payload), payload });
+      resultingCyclePayloads.set(appId, payload);
+    } else if (shouldApplyIncomingPayload(cycle, existing)) {
+      cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload, deletedAt: null } });
+      resultingCyclePayloads.set(appId, payload);
+    }
+  }
+  // Two devices can each start a card for the same female while offline. The earlier card stays
+  // active; the other is paused with a review flag so the keeper decides, and the save succeeds.
+  const conflictChanges = resolveActiveCycleConflicts(Array.from(resultingCyclePayloads.values()));
+  conflictChanges.forEach((payload, appId) => {
+    const planned = cycleCreates.find((row) => row.appCycleId === appId);
+    if (planned) {
+      Object.assign(planned, cycleColumns(payload), { payload });
+      return;
+    }
+    const update = cycleUpdates.find((row) => row.appId === appId);
+    if (update) {
+      update.data = { ...update.data, ...cycleColumns(payload), payload };
+      return;
+    }
+    const existing = existingCycles.get(appId);
+    if (existing) cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload } });
+  });
+
+  const examCreates: JsonRecord[] = [];
+  const examUpdates: PlannedUpdate[] = [];
+  for (const [index, exam] of follicleExams.entries()) {
+    const appId = follicleExamAppId(exam) || `exam-${index + 1}`;
+    const existing = existingExams.get(appId) || null;
+    const tombstoneAt = isoDateValue(exam.deletedAt);
+    if (tombstoneAt) {
+      if (existing) {
+        examUpdates.push({ id: existing.id, appId, data: { deletedAt: new Date(tombstoneAt) } });
+      } else {
+        examCreates.push({ ownerId, appExamId: appId, femaleAnimalAppId: textValue(exam.femaleId) || "", payload: { ...exam }, deletedAt: new Date(tombstoneAt) });
+      }
+      continue;
+    }
+    const payload = existing ? mergeFollicleExamPayload(existing.payload, exam) : exam;
+    if (!existing) {
+      examCreates.push({ ownerId, appExamId: appId, ...examColumns(payload), payload });
+    } else if (shouldApplyIncomingPayload(exam, existing)) {
+      examUpdates.push({ id: existing.id, appId, data: { ...examColumns(payload), payload, deletedAt: null } });
+    }
+  }
 
   const animalCreates: JsonRecord[] = [];
   const animalUpdates: PlannedUpdate[] = [];
@@ -659,6 +765,15 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       await tx.pairing.update({ where: { id: update.id }, data: update.data });
     }
 
+    await createManyChunked(tx.breedingCycle, cycleCreates);
+    for (const update of cycleUpdates) {
+      await tx.breedingCycle.update({ where: { id: update.id }, data: update.data });
+    }
+    await createManyChunked(tx.follicleExamination, examCreates);
+    for (const update of examUpdates) {
+      await tx.follicleExamination.update({ where: { id: update.id }, data: update.data });
+    }
+
     if (createdPairingAppIds.length) {
       const insertedPairings = await tx.pairing.findMany({
         where: { ownerId, appPairingId: { in: createdPairingAppIds } },
@@ -733,6 +848,27 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     console.error("[reproductive] ingestion error:", err);
   });
 
+  // Planned-pairing reminders ride on the email queue, idempotent per planned entry. Only run
+  // when this request carried cards; fire-and-forget like the ingestion above.
+  if (cycleCreates.length || cycleUpdates.length) {
+    const animalNames = new Map<string, string>();
+    (Array.isArray(savedSnapshot.animals) ? savedSnapshot.animals : []).forEach((animal: any) => {
+      const record = asRecord(animal);
+      const id = record ? textValue(record.id) : null;
+      if (id) animalNames.set(id, textValue(record?.name) || id);
+    });
+    const touchedCycleIds = new Set<string>([
+      ...cycleCreates.map((row) => String(row.appCycleId)),
+      ...cycleUpdates.map((row) => row.appId),
+    ]);
+    const touchedCycles = (Array.isArray(savedSnapshot.breedingCycles) ? savedSnapshot.breedingCycles : [])
+      .map(asRecord)
+      .filter((record): record is JsonRecord => !!record && touchedCycleIds.has(String(record.id)));
+    syncPlannedPairingReminders(ownerId, touchedCycles, animalNames).catch((err) => {
+      console.error("[breeding] planned pairing reminder sync failed:", err);
+    });
+  }
+
   // The rows this request actually wrote, in the same shape as a snapshot so a caller can treat
   // either response the same way. On a routine sync this is a handful of records instead of the
   // account's entire dataset; callers opt in with ?ack=changed so older installed builds, which
@@ -746,6 +882,14 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     ...pairingUpdates.map((row) => row.appId),
   ]);
   const touchedClutches = new Set<string>(clutchAppIdsWritten);
+  const touchedBreedingCycles = new Set<string>([
+    ...cycleCreates.map((row) => String(row.appCycleId)),
+    ...cycleUpdates.map((row) => row.appId),
+  ]);
+  const touchedFollicleExams = new Set<string>([
+    ...examCreates.map((row) => String(row.appExamId)),
+    ...examUpdates.map((row) => row.appId),
+  ]);
 
   const pickTouched = (records: unknown, touched: Set<string>): JsonRecord[] => (
     (Array.isArray(records) ? records : [])
@@ -757,6 +901,8 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     animals: pickTouched(savedSnapshot.animals, touchedAnimals),
     pairings: pickTouched(savedSnapshot.pairings, touchedPairings),
     clutches: pickTouched(savedSnapshot.clutches, touchedClutches),
+    breedingCycles: pickTouched(savedSnapshot.breedingCycles, touchedBreedingCycles),
+    follicleExams: pickTouched(savedSnapshot.follicleExams, touchedFollicleExams),
     plannerState: plannerStateWritten ? savedSnapshot.plannerState : null,
     serverTime: savedSnapshot.serverTime,
     partial: true,
