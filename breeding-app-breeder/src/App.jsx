@@ -20955,7 +20955,7 @@ function BreederSection({
     if (!file) return;
     try {
       const allowLegacyJson = event?.target?.dataset?.allowLegacyJson === 'true';
-      assertBackupFileSelectable(file, { allowLegacyJson });
+      assertBackupFileSelectable(file, { allowLegacyJson, lenient: isNativeShell });
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (typeof onRestoreBackup !== 'function') {
@@ -22645,14 +22645,17 @@ function BreederSection({
               <input
                 ref={restoreInputRef}
                 type="file"
-                accept={`${BACKUP_FILE_MIME},${BACKUP_FILE_DOT_EXTENSION}`}
+                // Android's picker filters by MIME type and knows neither the backup MIME nor the
+                // .bpbackup extension, so a transferred backup shows up greyed out. On the phone the
+                // picker shows every file and the name and contents are checked after picking.
+                accept={isNativeShell ? '*/*' : `${BACKUP_FILE_MIME},${BACKUP_FILE_DOT_EXTENSION}`}
                 className="hidden"
                 onChange={handleRestoreFileSelected}
               />
               <input
                 ref={legacyRestoreInputRef}
                 type="file"
-                accept="application/json,.json"
+                accept={isNativeShell ? '*/*' : 'application/json,.json'}
                 data-allow-legacy-json="true"
                 className="hidden"
                 onChange={handleRestoreFileSelected}

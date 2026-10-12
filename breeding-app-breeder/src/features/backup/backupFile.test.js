@@ -70,6 +70,13 @@ describe("assertBackupFileSelectable", () => {
     expect(assertBackupFileSelectable({ name: "x.json", type: "application/json" }, { allowLegacyJson: true }).isLegacyJson).toBe(true);
   });
 
+  it("on the phone accepts unknown names and types and refuses only obvious non-backups", () => {
+    expect(assertBackupFileSelectable({ name: "serpentora-backup", type: "application/octet-stream" }, { lenient: true }).isNativeBackup).toBe(true);
+    expect(assertBackupFileSelectable({ name: "backup.bpbackup", type: "text/plain" }, { lenient: true }).isNativeBackup).toBe(true);
+    expect(assertBackupFileSelectable({ name: "export.json", type: "" }, { lenient: true })).toEqual({ isNativeBackup: false, isLegacyJson: true });
+    expect(() => assertBackupFileSelectable({ name: "photo.jpg", type: "image/jpeg" }, { lenient: true })).toThrow(/not a \.bpbackup backup/);
+  });
+
   it("rejects other extensions and types", () => {
     expect(() => assertBackupFileSelectable({ name: "x.txt", type: "text/plain" }, { allowLegacyJson: true })).toThrow(/Select a/);
     expect(() => assertBackupFileSelectable({ name: "x.bpbackup", type: "text/plain" })).toThrow(/Unsupported backup file type/);

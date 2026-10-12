@@ -61,12 +61,26 @@ export const assertRestorableBackup = (payload) => {
   return payload;
 };
 
-// Validates a picked file's name and declared type before it is read.
-export const assertBackupFileSelectable = (file, { allowLegacyJson = false } = {}) => {
+// Validates a picked file's name and declared type before it is read. `lenient` is for the
+// phone: Android content providers report names and MIME types unreliably (a transferred
+// backup may arrive as application/octet-stream, text/plain, or with a mangled name), so there
+// only an obviously wrong extension is refused and the contents decide on parse.
+export const assertBackupFileSelectable = (file, { allowLegacyJson = false, lenient = false } = {}) => {
   const name = typeof file?.name === "string" ? file.name : "";
   const lowerName = name.toLowerCase();
-  const isNativeBackup = !!name && lowerName.endsWith(BACKUP_FILE_DOT_EXTENSION);
+  let isNativeBackup = !!name && lowerName.endsWith(BACKUP_FILE_DOT_EXTENSION);
   const isLegacyJson = !!name && lowerName.endsWith(".json");
+  if (lenient) {
+    if (!isNativeBackup && !isLegacyJson) {
+      const extension = lowerName.includes(".") ? lowerName.slice(lowerName.lastIndexOf(".") + 1) : "";
+      const obviouslyWrong = ["jpg", "jpeg", "png", "gif", "webp", "heic", "mp4", "mov", "pdf", "apk", "zip"];
+      if (obviouslyWrong.includes(extension)) {
+        throw new Error(`That is a .${extension} file, not a ${BACKUP_FILE_DOT_EXTENSION} backup.`);
+      }
+      isNativeBackup = true;
+    }
+    return { isNativeBackup: isNativeBackup || !isLegacyJson, isLegacyJson };
+  }
   if (!isNativeBackup && !(allowLegacyJson && isLegacyJson)) {
     throw new Error(`Select a ${BACKUP_FILE_DOT_EXTENSION} backup${allowLegacyJson ? " or legacy .json file" : ""}.`);
   }
