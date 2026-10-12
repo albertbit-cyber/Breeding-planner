@@ -3,7 +3,10 @@ import {
   applyChangedRecords,
   applyRemoteDeletions,
   backfillLogIds,
+  cursorForRequest,
   mergeGeneticsLists,
+  pendingTombstones,
+  reconcileTombstones,
   selectRecordsToUpload,
 } from "./cloudSyncPayload";
 
@@ -147,5 +150,30 @@ describe("mergeGeneticsLists", () => {
 
   it("trims and de-duplicates whatever it keeps", () => {
     expect(mergeGeneticsLists([" Pastel ", "pastel", ""], [])).toEqual(["Pastel"]);
+  });
+});
+
+describe("cursor and tombstones", () => {
+  it("asks for a delta from a little before the cursor", () => {
+    expect(cursorForRequest("2026-10-12T10:02:00.000Z")).toBe("2026-10-12T10:00:00.000Z");
+    expect(cursorForRequest(null)).toBeNull();
+  });
+
+  it("records the server's deletions as confirmed and stops re-sending ones it now has", () => {
+    const local = {
+      snakes: { a1: { id: "a1", appAnimalId: "a1", deletedAt: "2026-10-12T09:00:00.000Z" } },
+      pairings: {},
+    };
+    const next = reconcileTombstones(local, { animals: { a1: "2026-10-12T09:00:01.000Z", a2: "2026-10-12T08:00:00.000Z" } });
+
+    expect(next.snakes.a1.confirmed).toBe(true);
+    expect(next.snakes.a2).toMatchObject({ id: "a2", confirmed: true });
+    expect(pendingTombstones(next.snakes)).toEqual([]);
+    expect(pendingTombstones(local.snakes)).toEqual([local.snakes.a1]);
+  });
+
+  it("returns the same map when the server reports nothing new", () => {
+    const local = { snakes: { a1: { id: "a1", deletedAt: "2026-10-12T09:00:00.000Z", confirmed: true } } };
+    expect(reconcileTombstones(local, { animals: { a1: "2026-10-12T09:00:00.000Z" } })).toBe(local);
   });
 });
