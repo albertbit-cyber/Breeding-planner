@@ -183,7 +183,7 @@ export default function AuthGate({ children }) {
 
   useEffect(() => {
     setAuthState(loadStoredAuth(authScope));
-    setView("chooser");
+    setView("login");
     setLoginError("");
     setLoginMessage("");
     setIsRecoveringPassword(false);
@@ -222,7 +222,7 @@ export default function AuthGate({ children }) {
 
     if (authScope !== "public") clearAuthToken(authScope);
     persistAuth({ isAuthenticated: false });
-    setView("chooser");
+    setView("login");
     setIsRecoveringPassword(false);
     setIsResendingVerification(false);
     setLoginValues((prev) => ({
