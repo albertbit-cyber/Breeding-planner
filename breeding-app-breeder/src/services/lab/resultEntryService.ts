@@ -48,30 +48,6 @@ const assertNonEmpty = (value: unknown, field: string): string => {
   return normalized;
 };
 
-const normalizeFindings = (value: unknown): ResultFinding[] => {
-  if (!Array.isArray(value) || !value.length) {
-    throw new Error("Invalid findings: at least one finding is required.");
-  }
-
-  const normalized: ResultFinding[] = value.map((entry, index) => {
-    const marker = assertNonEmpty((entry as ResultEntryFindingInput)?.marker, `findings[${index}].marker`);
-    const outcome = assertNonEmpty((entry as ResultEntryFindingInput)?.outcome, `findings[${index}].outcome`) as ResultFinding["outcome"];
-    const confidenceRaw = (entry as ResultEntryFindingInput)?.confidence;
-    const confidenceNum = typeof confidenceRaw === "number" ? confidenceRaw : Number(confidenceRaw);
-
-    return {
-      marker,
-      outcome,
-      value: String((entry as ResultEntryFindingInput)?.value ?? "").trim() || undefined,
-      units: String((entry as ResultEntryFindingInput)?.units ?? "").trim() || undefined,
-      confidence: Number.isFinite(confidenceNum) ? confidenceNum : undefined,
-      notes: String((entry as ResultEntryFindingInput)?.notes ?? "").trim() || undefined,
-    };
-  });
-
-  return normalized;
-};
-
 const normalizeOrderedGeneName = (value: unknown): string => {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "";

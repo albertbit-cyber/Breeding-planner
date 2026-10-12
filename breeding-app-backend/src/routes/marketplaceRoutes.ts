@@ -1,10 +1,12 @@
 import { Router } from "express";
 import {
   acceptOffer,
+  acquiredAnimals,
   addMessage,
   adminMarketplace,
   adminStore,
   blockUser,
+  completeSale,
   browseListings,
   conversationDetail,
   conversationRead,
@@ -18,10 +20,12 @@ import {
   listingComparables,
   listingDetail,
   listingStatus,
+  markListingSold,
   mediaObject,
   myFavorites,
   myBlocks,
   myMedia,
+  reportListing,
   reportMessage,
   reviewableSales,
   saveStore,
@@ -43,11 +47,15 @@ export const marketplaceRoutes = Router();
 // to know which animals this account has already saved.
 marketplaceRoutes.get("/listings", optionalAuth, asyncHandler(browseListings));
 marketplaceRoutes.get("/favorites", requireAuth, asyncHandler(myFavorites));
+// Animals this account received through a sale, with the record that came with them.
+marketplaceRoutes.get("/acquired", requireAuth, asyncHandler(acquiredAnimals));
 marketplaceRoutes.get("/listings/:id", optionalAuth, asyncHandler(listingDetail));
 marketplaceRoutes.get("/listings/:id/comparables", asyncHandler(listingComparables));
 marketplaceRoutes.post("/listings", marketplaceMutationLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(createListing));
 marketplaceRoutes.patch("/listings/:id", marketplaceMutationLimiter, requireAuth, asyncHandler(editListing));
 marketplaceRoutes.patch("/listings/:id/status", marketplaceMutationLimiter, requireAuth, asyncHandler(listingStatus));
+marketplaceRoutes.post("/listings/:id/sold", marketplaceMutationLimiter, requireAuth, asyncHandler(markListingSold));
+marketplaceRoutes.post("/listings/:id/report", marketplaceMessageLimiter, requireAuth, asyncHandler(reportListing));
 marketplaceRoutes.post("/listings/:id/favorite", marketplaceMutationLimiter, requireAuth, asyncHandler(favoriteListing));
 
 marketplaceRoutes.get("/stores/:userId", asyncHandler(storeDetail));
@@ -74,6 +82,7 @@ marketplaceRoutes.get("/blocks", requireAuth, asyncHandler(myBlocks));
 marketplaceRoutes.delete("/blocks/:blockedUserId", marketplaceMessageLimiter, requireAuth, asyncHandler(unblockUser));
 
 marketplaceRoutes.post("/sales", marketplaceMutationLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(createSale));
+marketplaceRoutes.post("/sales/:id/complete", marketplaceMutationLimiter, requireAuth, asyncHandler(completeSale));
 marketplaceRoutes.post("/reviews", marketplaceMutationLimiter, requireAuth, asyncHandler(createReview));
 marketplaceRoutes.get("/reviews/pending", requireAuth, asyncHandler(reviewableSales));
 

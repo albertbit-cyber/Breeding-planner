@@ -9,7 +9,8 @@
     "sell": "Nabídnout zvíře",
     "signIn": "Přihlásit se",
     "skip": "Přejít na obsah",
-    "language": "Jazyk"
+    "language": "Jazyk",
+    "myAnimals": "Moje zvířata"
   },
   "footer": {
     "tagline": "Zvířata i s jejich dokumentací — hmotnosti, krmení, původ a genetika ověřená v laboratoři."
@@ -72,7 +73,6 @@
   },
   "browse": {
     "title": "Procházet zvířata",
-    "searchPlaceholder": "Přidejte gen, morfu, chovatele nebo město …",
     "searchLabel": "Hledat zvířata",
     "saveSearch": "Uložit toto hledání",
     "searching": "Hledání …",
@@ -83,7 +83,12 @@
     "emptyTitle": "Těmto filtrům neodpovídá žádné zvíře",
     "emptyBody": "Rozšiřte cenové rozpětí, odeberte gen, nebo zahrňte prodaná zvířata jako srovnání cen.",
     "pagination": "Stránky",
-    "pageOf": "Strana {{page}} z {{total}}"
+    "pageOf": "Strana {{page}} z {{total}}",
+    "searchPlaceholderHobby": "Morph, het, chovatel nebo město: „clown“, „het pied“…",
+    "emptyVisualBody": "Samotný gen znamená visual. Klepnutím na gen znovu budete místo toho hledat hety, nebo rozšiřte cenu či si hledání uložte a vraťte se později.",
+    "catalogueEmptyTitle": "Zatím tu nic není",
+    "catalogueEmptyBody": "Žádný chovatel zatím nezveřejnil zvíře. Podívejte se brzy znovu.",
+    "matchCount_few": "zvířata odpovídají"
   },
   "filters": {
     "title": "Filtry",
@@ -93,11 +98,6 @@
     "apply": "Použít filtry",
     "showCount_one": "Zobrazit {{count}} zvíře",
     "showCount_other": "Zobrazit {{count}} zvířat",
-    "genes": "Geny",
-    "genesHint": "Klepněte jednou, chcete-li gen vyžadovat, podruhé, chcete-li ho vyloučit.",
-    "geneIncluded": "Vyžadováno — klepnutím vyloučíte",
-    "geneExcluded": "Vyloučeno — klepnutím vymažete",
-    "geneOff": "Klepnutím vyžádáte",
     "removeGene": "Odebrat {{gene}}",
     "without": "bez {{gene}}",
     "sex": "Pohlaví",
@@ -121,7 +121,16 @@
     "pickup": "Osobní odběr",
     "availableOnly": "Jen dostupná",
     "includeSold": "Zahrnout prodaná jako srovnání cen",
-    "showingSold": "Včetně prodaných"
+    "showingSold": "Včetně prodaných",
+    "geneVisual": "Vyžadován visual. Klepněte pro het.",
+    "geneHet": "Vyžadován het. Klepněte pro vyloučení visualů.",
+    "geneVisualExcluded": "Visualy vyloučeny. Klepněte pro zrušení.",
+    "geneVisualOff": "Klepněte pro vyžadování visualu.",
+    "species": "Druh",
+    "allSpecies": "Všechny druhy",
+    "morphsAndHets": "Morphy a hety",
+    "morphsHint": "Klepněte jednou pro visual, dvakrát pro het, třikrát pro vyloučení visualů. Zbytek zadejte do hledání, např. „66% het hypo“ nebo „pos het ghost“.",
+    "showCount_few": "Zobrazit {{count}} zvířata"
   },
   "listing": {
     "untitled": "Inzerát bez názvu",
@@ -144,7 +153,7 @@
     "soldNotice": "Toto zvíře je prodané",
     "seeOthers": "Zobrazit další zvířata tohoto chovatele",
     "sex": "Pohlaví",
-    "hatched": "Vylíhnutí",
+    "hatched": "Vylíhnuto",
     "weight": "Hmotnost",
     "location": "Místo",
     "delivery": "Předání",
@@ -155,13 +164,23 @@
     "feedingNotes": "Krmení",
     "report": "Nahlásit tento inzerát",
     "reportedShort": "Nahlášeno",
-    "reported": "Děkujeme — moderace se na inzerát podívá."
+    "reported": "Děkujeme — moderace se na inzerát podívá.",
+    "reportTitle": "Nahlásit tento inzerát",
+    "sendReport": "Odeslat moderátorům",
+    "reportWhat": "Co je špatně?",
+    "reportNote": "Co by moderátoři měli vědět (volitelné)",
+    "reportTypes": {
+      "incorrect_genetics": "Genetika je špatně nebo nadsazená",
+      "fake_listing": "Zvíře nebo fotky nejsou skutečné",
+      "scam_suspicion": "Vypadá to jako podvod",
+      "animal_welfare_concern": "Obava o welfare zvířete",
+      "other": "Něco jiného"
+    },
+    "views_few": "{{count}} zobrazení"
   },
   "record": {
     "title": "Dokumentace — zveřejněná prodejcem",
-    "geneticsConfirmed": "Genetika potvrzena testem ze svlečky",
     "certificate": "cert. {{number}}",
-    "verified": "Ověřeno",
     "weights": "Historie hmotností — z {{from}} g na {{to}} g ve {{count}} záznamech",
     "feeding_one": "Krmení — {{count}} zaznamenané krmení",
     "feeding_other": "Krmení — {{count}} zaznamenaných krmení",
@@ -173,7 +192,12 @@
     "lineage_other": "Původ — {{count}} rodičů zaznamenáno",
     "clutch": "snůška {{id}}",
     "kept": "Nezveřejněno: {{list}}.",
-    "none": "Tento prodejce nezveřejnil nic z dokumentace. Před koupí si o ni můžete říct."
+    "none": "Tento prodejce nezveřejnil nic z dokumentace. Před koupí si o ni můžete říct.",
+    "labCertificate": "Laboratorní certifikát (test svleku)",
+    "checkCertificate": "Ověřit tento certifikát",
+    "feeding_few": "Krmení — {{count}} zaznamenaná krmení",
+    "refusals_few": "{{count}} odmítnutí zaznamenána",
+    "lineage_few": "Původ — {{count}} rodiče zaznamenáni"
   },
   "seller": {
     "verified": "Ověřený chovatel",
@@ -245,7 +269,22 @@
     "reportTitle": "Nahlásit tuto konverzaci",
     "reportReason": "Co je špatně?",
     "reportPlaceholder": "Pokus o podvod, urážlivé vyjadřování, platba mimo platformu …",
-    "sendReport": "Odeslat hlášení"
+    "sendReport": "Odeslat hlášení",
+    "unblocked": "Odblokováno. Můžete si opět psát.",
+    "nothingToReport": "Zatím nic nenapsali.",
+    "unblock": "Odblokovat",
+    "youBlocked": "Zablokovali jste uživatele {{name}}. Dokud ho neodblokujete, nikdo z vás zde nemůže posílat zprávy.",
+    "closedThread": "Tato konverzace je uzavřena. Nové zprávy nelze posílat.",
+    "reportGoesTo": "Odejde moderátorům s přiloženou jejich poslední zprávou.",
+    "reportWhat": "Co je špatně?",
+    "reportNote": "Podrobnosti (volitelné)",
+    "reportTypes": {
+      "scam_suspicion": "Podvod nebo žádost o platbu mimo platformu",
+      "abusive_message": "Urážlivé nebo výhrůžné",
+      "spam": "Spam",
+      "other": "Něco jiného"
+    },
+    "needsReply_few": "{{count}} nepřečtené"
   },
   "deal": {
     "title": "Jak to stojí",
@@ -264,7 +303,15 @@
     "acceptedToast": "Nabídka přijata. Zvíře je nyní rezervované.",
     "depositOptional": "Přijatá záloha (nepovinné)",
     "depositHint": "Zapište ji sem, pokud kupující už zálohu zaplatil.",
-    "acceptExplainer": "Přijetí nabídky nastaví zvíře na Rezervováno a vytvoří záznam prodeje. Zůstane viditelné s označením Rezervováno, dokud ho neoznačíte jako převzaté."
+    "acceptExplainer": "Přijetí nabídky nastaví zvíře na Rezervováno a vytvoří záznam prodeje. Zůstane viditelné s označením Rezervováno, dokud ho neoznačíte jako převzaté.",
+    "markHandedOver": "Označit jako předané",
+    "reviewPrompt": "Prodej je dokončen. Jak proběhl s {{name}}?",
+    "reviewed": "Tento prodej jste ohodnotili. Hodnocení se zobrazuje na stránce obchodu chovatele.",
+    "completeTitle": "Označit toto zvíře jako předané?",
+    "completeConfirm": "Označit jako předané",
+    "completedPill": "Prodej dokončen",
+    "completedRecordToast": "Prodej dokončen. Zvíře i jeho dokumentace jsou nyní v účtu kupujícího.",
+    "completeRecordBody": "Prodej je zaznamenán jako dokončený a inzerát se zobrazuje jako prodaný. Kupující obdrží dokumentaci zvířete (genetiku s jejími zdroji, hmotnosti, krmení, zdraví, původ a kódy certifikátů) a bude vyzván, aby vás ohodnotil. Vaše vlastní kopie zůstane s označením Prodáno. Zde to nelze vrátit."
   },
   "sell": {
     "title": "Nabídnout zvíře",
@@ -312,7 +359,9 @@
     "saveDraft": "Uložit jako koncept",
     "publish": "Zveřejnit inzerát",
     "published": "Inzerát zveřejněn.",
-    "savedDraft": "Uloženo jako koncept."
+    "savedDraft": "Uloženo jako koncept.",
+    "categoryPlaceholder": "Juvenil",
+    "photoCount_few": "{{count}} fotografie"
   },
   "publish": {
     "title": "Co mají kupující vidět?",
@@ -394,7 +443,8 @@
     "storeBody": "Tohle vidí kupující, když si otevřou váš obchod z inzerátu.",
     "storeName": "Název obchodu",
     "about": "O vašem chovu",
-    "storeSaved": "Profil obchodu uložen."
+    "storeSaved": "Profil obchodu uložen.",
+    "needsYou_few": "Čeká na vás — {{count}} věci"
   },
   "saved": {
     "title": "Uložené",
@@ -404,19 +454,21 @@
     "noAnimals": "Zatím nic uloženého",
     "noAnimalsBody": "Klepněte u zvířete na srdce a zůstane tu, dokud se rozmýšlíte.",
     "noSearches": "Žádná uložená hledání",
-    "noSearchesBody": "Nastavte filtry, které opravdu chcete — gen, pohlaví, cenový strop — uložte je a napíšeme vám, jakmile se něco objeví.",
     "startSearch": "Začít hledání",
     "run": "Spustit hledání",
     "remove": "Odebrat uložené hledání",
     "noFilters": "Žádné filtry",
-    "alertNote": "Napíšeme vám, jakmile bude nové zvíře odpovídat.",
     "saveTitle": "Uložit toto hledání",
-    "saveBody": "Napíšeme vám, jakmile bude nabídnuto zvíře odpovídající těmto filtrům.",
     "name": "Pojmenujte hledání",
     "save": "Uložit hledání",
     "searchDefaultName": "Moje hledání",
-    "searchSaved": "Uloženo. Napíšeme vám, jakmile se něco objeví.",
-    "searchRemoved": "Uložené hledání odebráno."
+    "searchRemoved": "Uložené hledání odebráno.",
+    "searchSavedCount": "Uloženo. Na stránce Uložené uvidíte při každé návštěvě, kolik nových zvířat odpovídá.",
+    "saveBodyCount": "Uloží se na stránku Uložené, která ukazuje, kolik nových zvířat odpovídá od posledního spuštění.",
+    "newCount": "{{count}} nových",
+    "matchSummary": "Nyní odpovídá {{count}} · {{fresh}} přidáno od posledního spuštění.",
+    "matchUnknown": "Spusťte ho a uvidíte, co teď odpovídá.",
+    "noSearchesBodyCount": "Nastavte filtry, které opravdu chcete — visual, het, pohlaví, cenový strop — a uložte je. Tato stránka pak při každé návštěvě ukáže, kolik nových zvířat odpovídá."
   },
   "reviews": {
     "aria": "Hodnoceno {{rating}} z 5",
@@ -434,7 +486,9 @@
     "write": "Napsat hodnocení",
     "writeTitle": "Ohodnotit tohoto chovatele",
     "publish": "Zveřejnit hodnocení",
-    "thanks": "Děkujeme — vaše hodnocení je zveřejněno."
+    "thanks": "Děkujeme — vaše hodnocení je zveřejněno.",
+    "count_few": "{{count}} hodnocení",
+    "starLabel_few": "{{count}} hvězdičky"
   },
   "gate": {
     "signIn": "Přihlásit se",
@@ -443,18 +497,69 @@
     "favoriteTitle": "Přihlaste se, abyste si zvíře uložili",
     "favoriteBody": "Necháme ho ve vašem seznamu a vrátíme vás přesně sem.",
     "messageTitle": "Přihlaste se, abyste napsali prodejci",
-    "messageBody": "Vaši zprávu podržíme a odešleme hned po přihlášení.",
     "offerTitle": "Přihlaste se, abyste učinili nabídku",
     "offerBody": "Nabídky jdou prodejci s vaším účtem.",
     "searchTitle": "Přihlaste se, abyste hledání uložili",
-    "searchBody": "Napíšeme vám, jakmile bude nabídnuto zvíře odpovídající těmto filtrům.",
     "defaultTitle": "Přihlaste se a pokračujte",
     "defaultBody": "Tato část tržiště vyžaduje účet.",
     "sellerTitle": "Prodej vyžaduje chovatelský účet",
-    "sellerBody": "Jste přihlášeni, ale tento účet nemůže nabízet zvířata. Požádejte správce o zapnutí prodeje nebo použijte chovatelský účet."
+    "sellerBody": "Jste přihlášeni, ale tento účet nemůže nabízet zvířata. Požádejte správce o zapnutí prodeje nebo použijte chovatelský účet.",
+    "messageBody": "Vrátíme vás k tomuto zvířeti se zprávou připravenou k odeslání.",
+    "searchBody": "Vrátíme vás k těmto filtrům, abyste mohli hledání pojmenovat a uložit."
   },
   "notFound": {
     "title": "Taková stránka tu není",
     "body": "Inzerát mohl být prodán a archivován, nebo je odkaz zastaralý."
+  },
+  "genes": {
+    "none": "Prodejce neuvedl genetiku. Zeptejte se před koupí.",
+    "labDisagrees": "Laboratorní výsledek na certifikátu uvádí „{{result}}“. Před koupí se na to zeptejte prodejce.",
+    "labInconclusive": "Testováno, výsledek neprůkazný: „{{result}}“.",
+    "labOnly": "Zjištěno laboratoří; není v popisu prodejce.",
+    "legendObserved": "Pozorováno: visual, který prodejce vidí.",
+    "legendPredicted": "Odhadnuto: odvozeno od rodičů, netestováno.",
+    "legendLab": "Potvrzeno laboratoří: na certifikátu testu svleku.",
+    "title": "Genetika a odkud pochází každé tvrzení",
+    "hetToken": "het {{gene}}",
+    "posHetToken": "pos het {{gene}}",
+    "visualToken": "visual {{gene}}",
+    "labConfirmedCert": "Potvrzeno laboratoří, certifikát {{number}}",
+    "labConfirmed": "Potvrzeno laboratoří",
+    "predictedPercent": "Odhad z párování, pravděpodobnost {{percent}} %",
+    "predicted": "Odhad z párování, netestováno",
+    "observed": "Pozorováno prodejcem, netestováno",
+    "het": "het",
+    "possibleHet": "possible het",
+    "super": "visual (super)",
+    "visual": "visual"
+  },
+  "sold": {
+    "title": "Kdo koupil {{title}}?",
+    "body": "Kupující dostane dokumentaci zvířete do svého účtu: genetiku s uvedením, odkud každé tvrzení pochází, hmotnosti, krmení, svleky, zdravotní záznamy, původ a certifikáty. Vaše vlastní kopie zůstane s označením Prodáno.",
+    "confirmOffPlatform": "Označit jako prodané",
+    "confirm": "Označit jako prodané a poslat dokumentaci",
+    "buyer": "Kupující",
+    "offered": "nabídl(a) {{amount}}",
+    "offPlatform": "Někdo bez účtu Serpentora",
+    "noThreads": "Ohledně tohoto zvířete vám zde nikdo nenapsal, takže není účet, kam dokumentaci poslat.",
+    "offPlatformNote": "Inzerát je označen jako prodaný. Žádná dokumentace se nepřenáší, protože není účet, který by ji přijal.",
+    "price": "Prodejní cena ({{currency}})",
+    "done": "Prodáno. {{buyer}} má nyní zvíře i jeho dokumentaci.",
+    "theBuyer": "Kupující",
+    "doneOffPlatform": "Označeno jako prodané.",
+    "bodyNoBuyers": "Dokumentaci zvířete může přijmout jen kupující s účtem Serpentora."
+  },
+  "acquired": {
+    "from": "Získáno od {{seller}} dne {{date}}",
+    "store": "Obchod prodejce",
+    "labDisagrees": "Prodejce toto zaznamenal, ale certifikát uvádí „{{result}}“.",
+    "noGenetics": "U tohoto zvířete nebyla zaznamenána žádná genetika.",
+    "certificates": "Laboratorní certifikáty",
+    "code": "Ověřovací kód",
+    "counts": "Hmotnosti: {{weights}} · krmení: {{feeds}} · svleky: {{sheds}} · zdravotní záznamy: {{meds}}",
+    "emptyTitle": "Zatím jste zde nekoupili žádná zvířata",
+    "emptyBody": "Když prodejce označí zvíře jako prodané vám, objeví se zde i s dokumentací a certifikáty.",
+    "title": "Zvířata, která jste zde koupili",
+    "breederAppNote": "S účtem chovatele se stejná zvířata po synchronizaci objeví ve vaší sbírce v aplikaci Serpentora."
   }
 }

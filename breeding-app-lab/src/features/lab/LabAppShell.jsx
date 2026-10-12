@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { fetchMyLabProfile } from "../../shared/apiClient";
 import { canAccessLabApp, getCurrentAppRole } from "./auth/roleGuard";
 import LabDashboardPage from "./pages/LabDashboardPage.jsx";
@@ -167,20 +168,32 @@ const parseRoute = (path) => {
   return { route: "/lab/not-found" };
 };
 
-const navItems = [
-  { path: "/lab/dashboard", label: "Dashboard" },
-  { path: "/lab/incoming-orders", label: "All Shed Orders" },
-  { path: "/lab/sample-intake", label: "Sample Intake" },
-  { path: "/lab/result-entry", label: "Result Entry" },
-  { path: "/lab/completed-tests", label: "Completed Tests" },
-  { path: "/lab/archive", label: "Archive" },
-  { path: "/lab/test-catalog", label: "Test Catalog", roles: ["lab_staff", "admin"] },
-  { path: "/lab/catalogue-import", label: "Import Catalogue", roles: ["lab_staff", "admin"] },
-  { path: "/lab/pricing-logic", label: "Pricing & Logic", roles: ["lab_staff", "admin"] },
-  { path: "/lab/settings", label: "Laboratory Settings", roles: ["lab_staff", "admin"] },
-  { path: "/lab/team", label: "Team", roles: ["lab_staff", "admin"] },
-  { path: "/lab/account", label: "My Account" },
-  { path: "/lab/orders/placeholder-order-id", label: "Order Details" },
+const buildNavItems = (t) => [
+  { path: "/lab/dashboard", label: t("lab.shell.nav.dashboard", { defaultValue: "Dashboard" }) },
+  { path: "/lab/incoming-orders", label: t("lab.shell.nav.allShedOrders", { defaultValue: "All Shed Orders" }) },
+  { path: "/lab/sample-intake", label: t("lab.shell.nav.sampleIntake", { defaultValue: "Sample Intake" }) },
+  { path: "/lab/result-entry", label: t("lab.shell.nav.resultEntry", { defaultValue: "Result Entry" }) },
+  { path: "/lab/completed-tests", label: t("lab.shell.nav.completedTests", { defaultValue: "Completed Tests" }) },
+  { path: "/lab/archive", label: t("lab.shell.nav.archive", { defaultValue: "Archive" }) },
+  {
+    path: "/lab/test-catalog",
+    label: t("lab.catalog.title", { defaultValue: "Test Catalog" }),
+    roles: ["lab_staff", "admin"],
+  },
+  {
+    path: "/lab/catalogue-import",
+    label: t("lab.shell.nav.importCatalogue", { defaultValue: "Import Catalogue" }),
+    roles: ["lab_staff", "admin"],
+  },
+  { path: "/lab/pricing-logic", label: t("lab.shell.nav.pricing", { defaultValue: "Pricing" }), roles: ["lab_staff", "admin"] },
+  {
+    path: "/lab/settings",
+    label: t("lab.shell.nav.settings", { defaultValue: "Laboratory Settings" }),
+    roles: ["lab_staff", "admin"],
+  },
+  { path: "/lab/team", label: t("lab.shell.nav.team", { defaultValue: "Team" }), roles: ["lab_staff", "admin"] },
+  { path: "/lab/account", label: t("lab.shell.nav.account", { defaultValue: "My Account" }) },
+  { path: "/lab/orders/placeholder-order-id", label: t("lab.shell.nav.orderDetails", { defaultValue: "Order Details" }) },
 ];
 
 const navigateToHashPath = (path) => {
@@ -188,7 +201,7 @@ const navigateToHashPath = (path) => {
   window.location.hash = path;
 };
 
-const pageForRoute = (parsedRoute, role) => {
+const pageForRoute = (parsedRoute, role, t) => {
   switch (parsedRoute.route) {
     case "/lab/dashboard":
       return <LabDashboardPage />;
@@ -206,8 +219,14 @@ const pageForRoute = (parsedRoute, role) => {
       if (role !== "lab_staff" && role !== "admin") {
         return (
           <section className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700">Test Catalog Restricted</h1>
-            <p className="text-sm text-neutral-700">Only lab staff or admin users can manage the test catalog.</p>
+            <h1 className="text-2xl font-semibold text-rose-700">
+              {t("lab.shell.catalogRestrictedTitle", { defaultValue: "Test Catalog Restricted" })}
+            </h1>
+            <p className="text-sm text-neutral-700">
+              {t("lab.shell.catalogRestrictedBody", {
+                defaultValue: "Only lab staff or admin users can manage the test catalog.",
+              })}
+            </p>
           </section>
         );
       }
@@ -218,8 +237,14 @@ const pageForRoute = (parsedRoute, role) => {
       if (role !== "lab_staff" && role !== "admin") {
         return (
           <section className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700">Catalogue Import Restricted</h1>
-            <p className="text-sm text-neutral-700">Only lab staff or admin users can publish a catalogue.</p>
+            <h1 className="text-2xl font-semibold text-rose-700">
+              {t("lab.shell.importRestrictedTitle", { defaultValue: "Catalogue Import Restricted" })}
+            </h1>
+            <p className="text-sm text-neutral-700">
+              {t("lab.shell.importRestrictedBody", {
+                defaultValue: "Only lab staff or admin users can publish a catalogue.",
+              })}
+            </p>
           </section>
         );
       }
@@ -228,8 +253,12 @@ const pageForRoute = (parsedRoute, role) => {
       if (role !== "lab_staff" && role !== "admin") {
         return (
           <section className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700">Pricing &amp; Logic Restricted</h1>
-            <p className="text-sm text-neutral-700">Only lab staff or admin users can access pricing logic.</p>
+            <h1 className="text-2xl font-semibold text-rose-700">
+              {t("lab.shell.pricingRestrictedTitle", { defaultValue: "Pricing Restricted" })}
+            </h1>
+            <p className="text-sm text-neutral-700">
+              {t("lab.shell.pricingRestrictedBody", { defaultValue: "Only lab staff or admin users can manage pricing." })}
+            </p>
           </section>
         );
       }
@@ -247,14 +276,18 @@ const pageForRoute = (parsedRoute, role) => {
     default:
       return (
         <section className="space-y-3">
-          <h1 className="text-2xl font-semibold text-neutral-900">Lab Route Not Found</h1>
-          <p className="text-sm text-neutral-600">This route is not defined in the initial lab shell.</p>
+          <h1 className="text-2xl font-semibold text-neutral-900">
+            {t("lab.shell.notFoundTitle", { defaultValue: "Lab Route Not Found" })}
+          </h1>
+          <p className="text-sm text-neutral-600">
+            {t("lab.shell.notFoundBody", { defaultValue: "This route is not defined in the initial lab shell." })}
+          </p>
           <button
             type="button"
             className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm"
             onClick={() => navigateToHashPath("/lab/dashboard")}
           >
-            Back to Lab Dashboard
+            {t("lab.shell.backToDashboard", { defaultValue: "Back to Lab Dashboard" })}
           </button>
         </section>
       );
@@ -273,6 +306,7 @@ const getLabUserName = () => {
 };
 
 export default function LabAppShell() {
+  const { t } = useTranslation();
   const [hashPath, setHashPath] = useState(() => normalizeHashPath(window?.location?.hash));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
@@ -328,27 +362,34 @@ export default function LabAppShell() {
     window.location.reload();
   }, []);
   const visibleNavItems = useMemo(
-    () => navItems.filter((item) => !Array.isArray(item.roles) || item.roles.includes(role)),
-    [role]
+    () => buildNavItems(t).filter((item) => !Array.isArray(item.roles) || item.roles.includes(role)),
+    [role, t]
   );
 
   if (!isAllowed) {
     return (
       <div className="min-h-screen bg-neutral-100 p-6 text-neutral-900">
         <div className="mx-auto max-w-3xl rounded-2xl border border-rose-200 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold text-rose-700">Lab Access Restricted</h1>
+          <h1 className="text-2xl font-semibold text-rose-700">
+            {t("lab.shell.accessRestrictedTitle", { defaultValue: "Lab Access Restricted" })}
+          </h1>
           <p className="mt-2 text-sm text-neutral-700">
-            Only <code>lab_staff</code> or <code>admin</code> roles can access the laboratory portal.
+            <Trans
+              i18nKey="lab.shell.accessRestrictedBody"
+              defaults="Only <0>{{staffRole}}</0> or <1>{{adminRole}}</1> roles can access the laboratory portal."
+              values={{ staffRole: "lab_staff", adminRole: "admin" }}
+              components={[<code key="staff" />, <code key="admin" />]}
+            />
           </p>
           <p className="mt-2 text-sm text-neutral-600">
-            Current role: <span className="font-mono">{role}</span>
+            {t("lab.shell.currentRole", { defaultValue: "Current role:" })} <span className="font-mono">{role}</span>
           </p>
           <button
             type="button"
             className="mt-4 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm"
             onClick={() => navigateToHashPath("/")}
           >
-            Return to Breeder App
+            {t("lab.shell.returnToBreeder", { defaultValue: "Return to Breeder App" })}
           </button>
         </div>
       </div>
@@ -364,7 +405,7 @@ export default function LabAppShell() {
         <button
           type="button"
           onClick={() => onNavigate("/lab/dev-tools")}
-          className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+          className={`w-full rounded-xl border px-3 py-2 text-start text-sm transition ${
             parsedRoute.route === "/lab/dev-tools"
               ? "border-amber-600 bg-amber-600 text-white"
               : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300"
@@ -383,7 +424,7 @@ export default function LabAppShell() {
             key={item.path}
             type="button"
             onClick={() => onNavigate(item.path)}
-            className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+            className={`w-full rounded-xl border px-3 py-2 text-start text-sm transition ${
               isActive
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300"
@@ -396,15 +437,16 @@ export default function LabAppShell() {
       <div className="mt-3 border-t border-neutral-200 pt-3">
         {getLabUserName() ? (
           <div className="mb-2 px-1 text-xs text-neutral-500 truncate">
-            Signed in as <span className="font-medium text-neutral-700">{getLabUserName()}</span>
+            {t("lab.shell.signedInAs", { defaultValue: "Signed in as" })}{" "}
+            <span className="font-medium text-neutral-700">{getLabUserName()}</span>
           </div>
         ) : null}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent("lab:logout"))}
-          className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+          className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-start text-sm text-neutral-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
         >
-          Sign Out
+          {t("lab.shell.signOut", { defaultValue: "Sign Out" })}
         </button>
       </div>
     </>
@@ -419,8 +461,12 @@ export default function LabAppShell() {
       {/* Compact mobile title bar — navigation itself lives in the bottom tab
           bar below, kept off this row so it doesn't compete for space. */}
       <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 lg:hidden">
-        <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
-        <div className="text-base font-semibold text-neutral-900">{labName || "Laboratory"}</div>
+        <div className="text-xs uppercase tracking-wide text-neutral-500">
+          {t("lab.shell.laboratory", { defaultValue: "Laboratory" })}
+        </div>
+        <div className="text-base font-semibold text-neutral-900">
+          {labName || t("lab.shell.laboratory", { defaultValue: "Laboratory" })}
+        </div>
       </div>
 
       {/* "More" bottom sheet — the rest of the nav list (Sample Intake without
@@ -430,7 +476,7 @@ export default function LabAppShell() {
         <>
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label={t("lab.shell.closeMenu", { defaultValue: "Close menu" })}
             className="fixed inset-0 z-30 bg-neutral-950/40 lg:hidden"
             onClick={() => setMobileNavOpen(false)}
           />
@@ -452,7 +498,7 @@ export default function LabAppShell() {
             }`}
           >
             <span className="text-lg leading-none">🏠</span>
-            Dashboard
+            {t("lab.shell.nav.dashboard", { defaultValue: "Dashboard" })}
           </button>
           <button
             type="button"
@@ -462,7 +508,7 @@ export default function LabAppShell() {
             }`}
           >
             <span className="text-lg leading-none">📋</span>
-            Orders
+            {t("lab.shell.tab.orders", { defaultValue: "Orders" })}
           </button>
           <button
             type="button"
@@ -472,7 +518,7 @@ export default function LabAppShell() {
             <span className="-mt-4 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg text-white shadow-lg">
               📷
             </span>
-            Scan
+            {t("lab.shell.tab.scan", { defaultValue: "Scan" })}
           </button>
           <button
             type="button"
@@ -482,7 +528,7 @@ export default function LabAppShell() {
             }`}
           >
             <span className="text-lg leading-none">🧪</span>
-            Results
+            {t("lab.shell.tab.results", { defaultValue: "Results" })}
           </button>
           <button
             type="button"
@@ -493,7 +539,7 @@ export default function LabAppShell() {
             }`}
           >
             <span className="text-lg leading-none">⋯</span>
-            More
+            {t("lab.shell.tab.more", { defaultValue: "More" })}
           </button>
         </div>
       </nav>
@@ -503,8 +549,12 @@ export default function LabAppShell() {
       <div className="mx-auto flex max-w-7xl gap-4 p-4 lg:p-6">
         <aside className="hidden w-64 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm lg:block">
           <div className="px-2 py-2">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">Laboratory</div>
-            <div className="text-lg font-semibold text-neutral-900">{labName || "Laboratory"}</div>
+            <div className="text-xs uppercase tracking-wide text-neutral-500">
+              {t("lab.shell.laboratory", { defaultValue: "Laboratory" })}
+            </div>
+            <div className="text-lg font-semibold text-neutral-900">
+              {labName || t("lab.shell.laboratory", { defaultValue: "Laboratory" })}
+            </div>
           </div>
           <nav className="mt-2 flex flex-col gap-1">
             {navButtons(navigateToHashPath)}
@@ -514,15 +564,17 @@ export default function LabAppShell() {
         <main className="min-w-0 flex-1 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:p-6">
           <div className="mb-4 hidden items-center justify-between gap-2 border-b border-neutral-100 pb-3 lg:flex">
             <div>
-              <div className="text-xs uppercase tracking-wide text-neutral-500">Lab Workflow</div>
+              <div className="text-xs uppercase tracking-wide text-neutral-500">
+                {t("lab.shell.workflow", { defaultValue: "Lab Workflow" })}
+              </div>
               <div className="text-lg font-semibold text-neutral-900">{parsedRoute.route}</div>
             </div>
           </div>
-          <SharedBackendGuard featureName="Lab workflow pages">
+          <SharedBackendGuard featureName={t("lab.shell.workflowPages", { defaultValue: "Lab workflow pages" })}>
             {parsedRoute.route === "/lab/dev-tools" ? (
               <LabDevToolsPanel onReset={handleLabReset} />
             ) : (
-              pageForRoute(parsedRoute, role)
+              pageForRoute(parsedRoute, role, t)
             )}
           </SharedBackendGuard>
         </main>

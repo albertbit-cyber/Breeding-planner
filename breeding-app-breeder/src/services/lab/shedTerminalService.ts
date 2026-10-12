@@ -174,7 +174,6 @@ export const listPendingShedTests = (actor: ServiceActor): PendingShedTestItem[]
 export const addPendingShedTest = (actor: ServiceActor, input: PendingShedCreateInput): PendingShedTestItem => {
   assertBreederActor(actor);
   const normalized = normalizePendingCreateInput(input);
-  const timestamp = nowIso();
   const catalogMap = resolveCatalogMap();
   const selectedTestNames = normalized.selectedTestIds.map((testId) => {
     const test = catalogMap.get(testId);

@@ -1,72 +1,85 @@
 ﻿{
-	"title": "Breeding Advisor",
-	"description": "We only look at animals tagged in the <strong>Breeders</strong> group and surface pairings that have a very high chance of producing your selected morph goal.",
+	"title": "Chovatelský poradce",
+	"description": "Bereme v úvahu jen zvířata zařazená do skupiny <strong>Breeders</strong> a nabízíme párování, která mají velmi vysokou šanci přinést zvolený cílový morph.",
 	"goal": {
-		"label": "Goal (Name and Traits)",
+		"label": "Cíl (název a znaky)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
-		"tip": "Format tip: \"Goal Name: trait one, trait two\". If you only list traits, we’ll build a generic goal.",
-		"defaultName": "Custom goal"
+		"tip": "Tip k formátu: \"Název cíle: znak jedna, znak dva\". Pokud uvedete jen znaky, vytvoříme obecný cíl.",
+		"defaultName": "Vlastní cíl",
+		"freeTextPlaceholder": "Chci vytvořit clown desert ghost s pastel a possible het pied",
+		"freeTextTip": "Napište svůj cíl přirozeně. Poradce automaticky rozpozná názvy morphů a aliasy z databáze morphů, takže čárky nejsou nutné."
 	},
 	"status": {
 		"heading": "Status"
 	},
 	"summary": {
-		"loading": "Crunching punnett squares…",
-		"ready": "Run the advisor to discover promising pairings.",
-		"supportingOnly": "No pairs meet the high-confidence bar yet, but here are {{count}} options to review.",
-		"noConfidence": "No pairings crossed the confidence bar. Try adjusting your collections or goals.",
-		"confidentCount": "{{count}} pairing(s) meet the ≥ {{threshold}} goal confidence target."
+		"loading": "Počítáme Punnettovy čtverce…",
+		"ready": "Spusťte poradce a objevte slibná párování.",
+		"supportingOnly": "Zatím žádný pár nesplňuje hranici vysoké spolehlivosti, ale tady je {{count}} možností k posouzení.",
+		"noConfidence": "Žádné párování nepřekročilo hranici spolehlivosti. Zkuste upravit sbírky nebo cíle.",
+		"confidentCount": "Párování splňující cílovou spolehlivost ≥ {{threshold}}: {{count}}."
 	},
 	"stats": {
-		"males": "{{count}} breeder male",
-		"males_plural": "{{count}} breeder males",
-		"females": "{{count}} breeder female",
-		"females_plural": "{{count}} breeder females",
-		"confidenceBar": "Confidence bar ≥ {{threshold}}"
+		"males": "{{count}} chovný samec",
+		"males_plural": "Chovní samci: {{count}}",
+		"females": "{{count}} chovná samice",
+		"females_plural": "Chovné samice: {{count}}",
+		"confidenceBar": "Hranice spolehlivosti ≥ {{threshold}}",
+		"femalesFiltered": "{{filtered}}/{{total}} chovných samic odpovídá cíli",
+		"malesFiltered": "{{filtered}}/{{total}} chovných samců odpovídá cíli"
 	},
 	"buttons": {
-		"run": "Run Advisor",
-		"generating": "Generating...",
-		"reset": "Reset Advisor"
+		"run": "Spustit poradce",
+		"generating": "Generování...",
+		"reset": "Resetovat poradce",
+		"exportPairingsByMale": "Export podle párování (samec → samice)"
 	},
 	"errors": {
-		"noBreeders": "Add animals to the Breeders group to see advisor recommendations.",
-		"noGoals": "Add goal traits before running the advisor.",
-		"failure": "Failed to generate suggestions."
+		"noBreeders": "Přidejte zvířata do skupiny Breeders, abyste viděli doporučení poradce.",
+		"noGoals": "Před spuštěním poradce přidejte cílové znaky.",
+		"failure": "Návrhy se nepodařilo vytvořit.",
+		"noRelevantAnimals": "Žádné chovné zvíře nenese geny související s tímto cílem. Přidejte zvířata s cílovou genetikou do skupiny Breeders."
 	},
 	"cards": {
-		"goalSuccessLabel": "Goal success chance:",
-		"belowTarget": "(below confidence target)",
-		"demandSignals": "Demand signals:",
-		"priceRange": "Price guidance: {{range}}",
-		"sources": "Sources:",
-		"additionalHeading": "Additional pairings worth reviewing",
-		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
+		"goalSuccessLabel": "Šance na splnění cíle:",
+		"belowTarget": "(pod cílovou spolehlivostí)",
+		"demandSignals": "Signály poptávky:",
+		"priceRange": "Cenové vodítko: {{range}}",
+		"sources": "Zdroje:",
+		"additionalHeading": "Další párování, která stojí za posouzení",
+		"readyCallout": "Až budete připraveni, klikněte na <strong>Spustit poradce</strong> a objevte svá nejsilnější chovná párování.",
+		"actions": {
+			"accept": "Přijmout",
+			"ignore": "Ignorovat",
+			"plan": "Vytvořit plán",
+			"showPlan": "Zobrazit plán"
+		},
+		"successLabel": "úspěšnost"
 	},
 	"genes": {
-		"goalVisuals": "Goal Visuals",
-		"goalHets": "Goal Hets",
-		"projectedVisuals": "Projected Visuals",
-		"projectedHets": "Projected Hets",
-		"holdbackVisuals": "Holdback Visuals",
-		"holdbackHets": "Holdback Hets",
-		"nextVisuals": "Next-Gen Visuals",
-		"nextHets": "Next-Gen Hets",
-		"focusVisuals": "Focus Visuals",
-		"focusHets": "Focus Hets"
+		"goalVisuals": "Cílové visual",
+		"goalHets": "Cílové het",
+		"projectedVisuals": "Očekávané visual",
+		"projectedHets": "Očekávané het",
+		"holdbackVisuals": "Holdback visual",
+		"holdbackHets": "Holdback het",
+		"nextVisuals": "Visual další generace",
+		"nextHets": "Het další generace",
+		"focusVisuals": "Klíčové visual",
+		"focusHets": "Klíčové het"
 	},
 	"plan": {
-		"title": "Multi-generation plan ({{strategy}})",
+		"title": "Vícegenerační plán ({{strategy}})",
 		"strategy": {
-			"multi": "2-step",
-			"direct": "direct"
+			"multi": "2 kroky",
+			"direct": "přímý"
 		},
-		"combinedProbability": "Combined ≈ {{value}}",
-		"generationLabel": "Generation {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
-		"goalProbability": "Goal ≈ {{value}}",
+		"combinedProbability": "Celkem ≈ {{value}}",
+		"generationLabel": "Generace {{generation}}",
+		"prereqProbability": "Předpoklad ≈ {{value}}",
+		"goalProbability": "Cíl ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
-		"holdbackGenes": "Holdback genes: {{genes}}",
+		"holdbackGenes": "Geny holdbacku: {{genes}}",
 		"hetNote": "{{gene}}: {{maleStatus}} × {{femaleStatus}} → {{expectation}}",
 		"status": {
 			"visual": "Visual",
@@ -78,71 +91,88 @@
 			"none-visual": "100% het",
 			"het-het": "≈66% het",
 			"het-none": "≈50% het"
-		}
+		},
+		"flowchartUnavailable": "Pro tento návrh se nepodařilo vytvořit chovný diagram."
 	},
 	"labels": {
-		"unknownAnimal": "Unknown",
-		"holdbackMale": "Holdback Male",
-		"holdbackFemale": "Holdback Female",
+		"unknownAnimal": "Neznámé",
+		"holdbackMale": "Holdback samec",
+		"holdbackFemale": "Holdback samice",
 		"holdback": "Holdback"
 	},
 	"outcomes": {
-		"none": "No projection available.",
-		"unknownMorph": "Unknown morph",
-		"probability": "{{genotype}} ({{chance}} appearance chance)"
+		"none": "Odhad není k dispozici.",
+		"unknownMorph": "Neznámý morph",
+		"probability": "{{genotype}} (šance na výskyt {{chance}})"
 	},
 	"goals": {
-		"title": "Goals",
-		"add": "Add Goal",
-		"empty": "No goals yet. Add one to tailor suggestions.",
-		"namePlaceholder": "Goal name",
-		"remove": "Remove",
+		"title": "Cíle",
+		"add": "Přidat cíl",
+		"empty": "Zatím žádné cíle. Přidejte cíl a návrhy se mu přizpůsobí.",
+		"namePlaceholder": "Název cíle",
+		"remove": "Odebrat",
 		"requireAll": {
-			"label": "Require all",
-			"placeholder": "Add trait and press Enter"
+			"label": "Vyžadovat vše",
+			"placeholder": "Přidejte znak a stiskněte Enter"
 		},
 		"requireAny": {
-			"label": "Require any",
-			"placeholder": "Optional traits"
+			"label": "Vyžadovat kterýkoli",
+			"placeholder": "Volitelné znaky"
 		},
 		"avoid": {
-			"label": "Avoid",
-			"placeholder": "Problem traits"
+			"label": "Vyhnout se",
+			"placeholder": "Problematické znaky"
 		},
 		"recessiveState": {
-			"label": "Recessive state",
-			"any": "Any",
+			"label": "Recesivní stav",
+			"any": "Jakýkoli",
 			"visual": "Visual",
 			"het": "Het",
 			"possibleHet": "Possible het"
 		},
-		"minProbability": "Min probability ({{percent}}%)",
-		"weight": "Weight ({{value}})",
+		"minProbability": "Min. pravděpodobnost ({{percent}} %)",
+		"weight": "Váha ({{value}})",
 		"idLabel": "ID: {{id}}",
-		"loadPreset": "Load Preset",
+		"loadPreset": "Načíst předvolbu",
 		"presets": {
-			"title": "Presets",
-			"close": "Close"
+			"title": "Předvolby",
+			"close": "Zavřít"
 		},
-		"defaultName": "New goal"
+		"defaultName": "Nový cíl"
 	},
 	"api": {
-		"rationaleSummary": "Projected score {{score}} with demand index {{demand}}. {{goalSummary}}",
-		"noGoalTargets": "No specific goal targets.",
-		"goalSummary": "{{prob}}% chance to hit goal '{{goal}}'.",
-		"watchouts": " Watchouts: {{list}}.",
-		"sources": " Sources: {{list}}.",
+		"rationaleSummary": "Odhadované skóre {{score}} s indexem poptávky {{demand}}. {{goalSummary}}",
+		"noGoalTargets": "Žádné konkrétní cíle.",
+		"goalSummary": "Šance {{prob}} % na dosažení cíle '{{goal}}'.",
+		"watchouts": " Na co si dát pozor: {{list}}.",
+		"sources": " Zdroje: {{list}}.",
 		"plan": {
-			"stepTitle": "Generation {{generation}}: {{male}} × {{female}}",
-			"directSummary": "Direct chance to reach the goal is {{chance}}%.",
-			"holdbackSummary": "No direct visual expected; produce holdbacks carrying {{traits}}.",
-			"adjustedSummary": "Direct goal chance {{chance}}%. Prioritize producing holdbacks carrying {{holdback}}.",
-			"secondTitle": "Generation {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Retain the {{sex}} holdback ({{holdback}}). Pair with {{partner}} for {{chance}}% chance at the goal.",
+			"stepTitle": "Generace {{generation}}: {{male}} × {{female}}",
+			"directSummary": "Přímá šance na dosažení cíle je {{chance}} %.",
+			"holdbackSummary": "Přímý visual se neočekává; odchovejte holdbacky nesoucí {{traits}}.",
+			"adjustedSummary": "Přímá šance na cíl {{chance}} %. Přednostně odchovejte holdbacky nesoucí {{holdback}}.",
+			"secondTitle": "Generace {{generation}}: holdback × {{partner}}",
+			"secondSummary": "Ponechte si holdback ({{sex}}, {{holdback}}). Spárujte ho s {{partner}} se šancí {{chance}} % na cíl.",
 			"holdbackSex": {
-				"female": "female",
-				"male": "male"
+				"female": "samice",
+				"male": "samec"
 			}
+		}
+	},
+	"progress": {
+		"relevant": "{{count}} relevantních kandidátů",
+		"retry": "Zkusit znovu",
+		"running": "Probíhá analýza...",
+		"scanned": "Zpracováno {{count}} hadů",
+		"strongPairings": "Nalezeno {{count}} silných párování",
+		"titleRunning": "Chovatelský poradce pracuje",
+		"viewResults": "Zobrazit výsledky",
+		"waiting": "Čeká se na spuštění analýzy...",
+		"stepStatus": {
+			"completed": "Dokončeno",
+			"failed": "Selhalo",
+			"pending": "Čeká",
+			"running": "Probíhá"
 		}
 	}
 }

@@ -1,16 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
-import {
-  ORDER_PAYMENT_STATUSES,
-  ORDER_PAYMENT_STATUS_LABELS,
-  ORDER_PAYMENT_STATUS_TONES,
-} from "../../../types/labStatus";
-import {
-  ORDER_STATUS_LIST,
-  ORDER_STATUS_LABELS,
-  ORDER_STATUS_TONES,
-} from "../constants/orderStatuses";
+import { ORDER_PAYMENT_STATUSES, ORDER_PAYMENT_STATUS_TONES } from "../../../types/labStatus";
+import { ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { orderStatusLabel, paymentStatusLabel } from "../constants/statusLabelsI18n";
 
 const toneClass = {
   neutral: "border-neutral-300 bg-neutral-50 text-neutral-700",
@@ -49,8 +43,9 @@ const toRecentTs = (row) => {
 };
 
 const PaymentBadge = ({ status }) => {
+  const { t } = useTranslation();
   const tone = ORDER_PAYMENT_STATUS_TONES[status] || "neutral";
-  const label = ORDER_PAYMENT_STATUS_LABELS[status] || status;
+  const label = paymentStatusLabel(t, status);
   return (
     <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
       {label}
@@ -62,6 +57,7 @@ const PaymentBadge = ({ status }) => {
 const KANBAN_COLUMNS = ["submitted", "received", "in_progress", "completed", "cancelled"];
 
 function KanbanCard({ entry, onOpen }) {
+  const { t } = useTranslation();
   const order = entry.order;
   const paymentValue = order.paymentStatus || "pending";
   const tests = Array.isArray(order.requestedTests) ? order.requestedTests : [];
@@ -70,7 +66,7 @@ function KanbanCard({ entry, onOpen }) {
     <div className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-semibold text-neutral-900 leading-tight truncate">
-          {order.orderNumber || order.id}
+          <bdi>{order.orderNumber || order.id}</bdi>
         </div>
         <PaymentBadge status={paymentValue} />
       </div>
@@ -89,7 +85,7 @@ function KanbanCard({ entry, onOpen }) {
           className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs hover:border-neutral-500"
           onClick={() => onOpen(order.id)}
         >
-          Open →
+          {t("lab.incoming.openArrow", { defaultValue: "Open →" })}
         </button>
       </div>
     </div>
@@ -97,7 +93,8 @@ function KanbanCard({ entry, onOpen }) {
 }
 
 function KanbanColumn({ status, entries, onOpen }) {
-  const label = ORDER_STATUS_LABELS[status] || status;
+  const { t } = useTranslation();
+  const label = orderStatusLabel(t, status);
   const bg = columnBg[status] || "bg-neutral-50";
   const header = columnHeader[status] || "border-neutral-200 text-neutral-700";
   const tone = ORDER_STATUS_TONES[status] || "neutral";
@@ -113,7 +110,7 @@ function KanbanColumn({ status, entries, onOpen }) {
       <div className={`flex-1 space-y-2 overflow-y-auto p-2 ${bg} rounded-b-2xl`} style={{ maxHeight: "70vh" }}>
         {entries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-200 px-3 py-4 text-center text-xs text-neutral-400">
-            No orders
+            {t("lab.incoming.noOrders", { defaultValue: "No orders" })}
           </div>
         ) : (
           entries.map((entry) => (
@@ -126,6 +123,7 @@ function KanbanColumn({ status, entries, onOpen }) {
 }
 
 export default function IncomingOrdersPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -173,7 +171,9 @@ export default function IncomingOrdersPage() {
       setRows(hydrated);
     } catch (err) {
       setRows([]);
-      setError(err instanceof Error ? err.message : "Failed to load shed test orders.");
+      setError(
+        err instanceof Error ? err.message : t("lab.incoming.loadFailed", { defaultValue: "Failed to load shed test orders." })
+      );
     } finally {
       setLoading(false);
     }
@@ -222,39 +222,57 @@ export default function IncomingOrdersPage() {
   return (
     <section className="space-y-4">
       <header>
-        <h1 className="text-2xl font-semibold text-neutral-900">All Shed Test Orders</h1>
-        <p className="mt-1 text-sm text-neutral-600">Manage shed testing orders grouped by workflow status.</p>
+        <h1 className="text-2xl font-semibold text-neutral-900">
+          {t("lab.incoming.title", { defaultValue: "All Shed Test Orders" })}
+        </h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          {t("lab.incoming.subtitle", { defaultValue: "Manage shed testing orders grouped by workflow status." })}
+        </p>
       </header>
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-sm">
-            <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Search</span>
+            <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+              {t("lab.incoming.search", { defaultValue: "Search" })}
+            </span>
             <input
               className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Order number, snake, breeder"
+              placeholder={t("lab.incoming.searchPlaceholder", { defaultValue: "Order number, snake, breeder" })}
             />
           </label>
 
           <label className="text-sm">
-            <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Payment Status</span>
+            <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+              {t("lab.incoming.paymentStatus", { defaultValue: "Payment Status" })}
+            </span>
             <select
               className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={paymentFilter}
               onChange={(event) => setPaymentFilter(event.target.value)}
             >
-              <option value="all">All payment statuses</option>
+              <option value="all">{t("lab.incoming.allPayments", { defaultValue: "All payment statuses" })}</option>
               {ORDER_PAYMENT_STATUSES.map((status) => (
-                <option key={status} value={status}>{ORDER_PAYMENT_STATUS_LABELS[status] || status}</option>
+                <option key={status} value={status}>
+                  {paymentStatusLabel(t, status)}
+                </option>
               ))}
             </select>
           </label>
 
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">Showing</div>
-            <div className="font-semibold text-neutral-900">{filteredRows.length} / {rows.length} orders</div>
+            <div className="text-xs uppercase tracking-wide text-neutral-500">
+              {t("lab.incoming.showing", { defaultValue: "Showing" })}
+            </div>
+            <div className="font-semibold text-neutral-900">
+              {t("lab.incoming.showingCount", {
+                defaultValue: "{{shown}} / {{total}} orders",
+                shown: filteredRows.length,
+                total: rows.length,
+              })}
+            </div>
           </div>
 
           <div className="flex items-end">
@@ -265,14 +283,16 @@ export default function IncomingOrdersPage() {
                 checked={showCancelled}
                 onChange={(e) => setShowCancelled(e.target.checked)}
               />
-              Show cancelled
+              {t("lab.incoming.showCancelled", { defaultValue: "Show cancelled" })}
             </label>
           </div>
         </div>
       </section>
 
       {loading ? (
-        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Loading shed test orders...</div>
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
+          {t("lab.incoming.loading", { defaultValue: "Loading shed test orders..." })}
+        </div>
       ) : null}
 
       {!loading && error ? (

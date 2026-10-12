@@ -1,32 +1,32 @@
 {
 	"window": {
-		"title": "Breeding Planner"
+		"title": "Serpentora"
 	},
 	"dialogs": {
 		"storageReadFailed": {
-			"title": "Unable to open data",
-			"message": "Breeding Planner could not read your local data file. A new workspace will be created."
+			"title": "Não foi possível abrir os dados",
+			"message": "O Serpentora não conseguiu ler o seu ficheiro de dados local. Será criado um novo espaço de trabalho."
 		},
 		"storageWriteFailed": {
-			"title": "Unable to save data",
-			"message": "Breeding Planner could not save your latest changes. Try again or export a manual backup."
+			"title": "Não foi possível guardar os dados",
+			"message": "O Serpentora não conseguiu guardar as suas alterações mais recentes. Tente novamente ou exporte uma cópia de segurança manual."
 		}
 	},
 	"locale": {
-		"set": "Language switched to {{language}}"
+		"set": "Idioma alterado para {{language}}"
 	},
 	"prompts": {
 		"backupName": {
-			"title": "Name this backup file"
+			"title": "Dê um nome a esta cópia de segurança"
 		},
 		"backupRename": {
-			"title": "Rename backup"
+			"title": "Renomear cópia"
 		},
 		"backupDelete": {
-			"message": "Delete \"{{name}}\"? This cannot be undone."
+			"message": "Eliminar \"{{name}}\"? Esta ação não pode ser anulada."
 		},
 		"photoRemove": {
-			"message": "Remove this photo?"
+			"message": "Remover esta fotografia?"
 		}
 	}
 }

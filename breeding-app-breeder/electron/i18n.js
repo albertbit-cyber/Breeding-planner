@@ -14,7 +14,7 @@ const resolveAssetPath = (...segments) => {
 
 const SETTINGS_PATH = isPackaged
   ? resolveAssetPath("i18n-settings.json")
-  : path.resolve(__dirname, "../src/i18n/settings.json");
+  : path.resolve(__dirname, "../../breeding-app-shared/src/i18n/settings.json");
 
 const LOCALES_DIR = isPackaged
   ? resolveAssetPath("locales")

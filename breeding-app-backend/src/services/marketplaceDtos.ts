@@ -1,54 +1,27 @@
+import { parseGeneticClaims, withLabResults } from "./marketplaceGenetics";
+
 const compactObject = <T extends Record<string, unknown>>(input: T): T =>
   Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 
-export const toLegacyListingDto = (row: any) => {
+/**
+ * A listing as the breeder profile surface shows it. Built from
+ * `marketplace_listings`; the field names are the ones the legacy `listings`
+ * table used, so the profile response kept its shape when its source moved.
+ */
+export const toProfileListingDto = (row: any) => {
   if (!row) return null;
+  const price = row.price === null || row.price === undefined ? null : Number(row.price);
   return compactObject({
-    id: row.appListingId,
+    id: row.id,
     rowId: row.id,
-    ownerId: row.ownerId,
-    animalAppId: row.animalAppId,
+    ownerId: row.sellerUserId,
+    animalAppId: row.animalId ?? undefined,
     title: row.title,
     status: row.status,
-    priceCents: row.priceCents,
+    price: price === null || !Number.isFinite(price) ? undefined : price,
+    priceCents: price === null || !Number.isFinite(price) ? undefined : Math.round(price * 100),
     currency: row.currency,
     updatedAt: row.updatedAt,
-  });
-};
-
-export const toLegacyPublicListingDto = (row: any) => {
-  const listing = toLegacyListingDto(row);
-  if (!listing) return null;
-  return compactObject({
-    ...listing,
-    breeder: row.owner?.profile
-      ? {
-          userId: row.owner.id,
-          breederName: row.owner.profile.breederName || row.owner.fullName,
-          location: row.owner.profile.location,
-          publicContactEmail: row.owner.profile.publicContactEmail,
-          publicContactPhone: row.owner.profile.publicContactPhone,
-          contactPreference: row.owner.profile.contactPreference,
-        }
-      : undefined,
-  });
-};
-
-export const toLegacyModerationListingDto = (row: any) => {
-  const listing = toLegacyListingDto(row);
-  if (!listing) return null;
-  return compactObject({
-    ...listing,
-    breeder: row.owner
-      ? {
-          userId: row.owner.id,
-          fullName: row.owner.fullName,
-          email: row.owner.email,
-          role: row.owner.role,
-          breederName: row.owner.profile?.breederName || row.owner.fullName,
-          isPublic: row.owner.profile?.isPublic === true,
-        }
-      : undefined,
   });
 };
 
@@ -66,6 +39,13 @@ export const toMarketplaceListingDto = (row: any, record?: any) => {
           certificate: record.certificate || null,
         }
       : undefined,
+    // Each claim with its own provenance. The certificate only counts where the
+    // seller published it, which is exactly when the record carries it.
+    geneticClaims: withLabResults(
+      parseGeneticClaims(row.genetics),
+      record?.certificate?.lines,
+      record?.certificate?.certificateNumber || null
+    ),
     id: row.id,
     sellerUserId: row.sellerUserId,
     animalId: row.animalId,
@@ -177,8 +157,14 @@ export const toMarketplaceConversationDto = (row: any, viewerId?: string) => {
             row.sale.depositAmount === null || row.sale.depositAmount === undefined ? null : Number(row.sale.depositAmount),
           handoverMethod: row.sale.handoverMethod,
           handoverDate: row.sale.handoverDate,
+          // Only the buyer can review, so only the buyer's view needs to know.
+          reviewed: Array.isArray(row.sale.reviews) ? row.sale.reviews.length > 0 : false,
+          isBuyer: Boolean(viewerId && row.sale.buyerUserId === viewerId),
         }
       : null,
+    // "by_me" lets the blocker undo it. "by_them" is shown only as a closed
+    // thread: who blocked whom is not the blocked party's to know in detail.
+    blocked: row.blocked || null,
     lastMessageAt: row.lastMessageAt,
     updatedAt: row.updatedAt,
   });

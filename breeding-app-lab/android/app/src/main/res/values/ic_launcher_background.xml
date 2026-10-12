@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The Serpentora ground. The Lab app inverts the breeder's cream #F5F0E8
+         so the two apps, which are meant to sit side by side on one phone, can
+         be told apart at a glance in the launcher. -->
+    <color name="ic_launcher_background">#07110D</color>
 </resources>

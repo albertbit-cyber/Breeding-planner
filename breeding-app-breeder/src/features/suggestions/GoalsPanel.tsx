@@ -47,7 +47,7 @@ const TokenEditor = ({ label, tokens, onChange, placeholder }) => {
             onClick={() => onChange(tokens.filter((t) => t !== token))}
           >
             <span>{token}</span>
-            <span className="ml-2 text-slate-300">×</span>
+            <span className="ms-2 text-slate-300">×</span>
           </button>
         ))}
       </div>
@@ -88,7 +88,7 @@ const GoalCard = ({ goal, onUpdate, onRemove, requestPreset }) => {
         <button
           type="button"
           onClick={onRemove}
-          className="ml-3 text-sm text-slate-300 hover:text-red-300"
+          className="ms-3 text-sm text-slate-300 hover:text-red-300"
         >
           {t("advisor.goals.remove", { defaultValue: "Remove" })}
         </button>
@@ -251,7 +251,7 @@ export const GoalsPanel = ({ goals, onChange }) => {
               }
             />
             {presetMenu.openFor === goal.id && (
-              <div className="absolute right-4 top-16 z-10 w-56 rounded border border-slate-600 bg-slate-800 shadow-lg">
+              <div className="absolute end-4 top-16 z-10 w-56 rounded border border-slate-600 bg-slate-800 shadow-lg">
                 <div className="flex items-center justify-between border-b border-slate-700 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
                   {t("advisor.goals.presets.title", { defaultValue: "Presets" })}
                   <button
@@ -268,7 +268,7 @@ export const GoalsPanel = ({ goals, onChange }) => {
                       <button
                         type="button"
                         onClick={() => applyPreset(goal.id, preset.id)}
-                        className="flex w-full items-start px-3 py-2 text-left hover:bg-slate-700"
+                        className="flex w-full items-start px-3 py-2 text-start hover:bg-slate-700"
                       >
                         <div>
                           <div className="font-medium">{preset.name}</div>

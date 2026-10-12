@@ -8,12 +8,8 @@ import {
   fetchOrders,
   fetchBreederSnapshot,
   fetchMarketplaceProfiles,
-  fetchMarketplaceListings,
-  fetchModerationAudit,
-  fetchModerationListings,
   fetchMyBreederProfile,
   fetchMyInquiries,
-  fetchMyListings,
   fetchNotifications,
   fetchSavedSearches,
   getHealth,
@@ -26,9 +22,7 @@ import {
   markNotificationRead,
   saveBreederSnapshot,
   saveMyBreederProfile,
-  saveMyListings,
   updateInquiry,
-  updateListingStatus,
   clearAuthToken,
   SharedApiError,
 } from "./apiClient";
@@ -286,57 +280,6 @@ describe("shared api client", () => {
     });
   });
 
-  it("loads and saves marketplace listings", async () => {
-    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
-    setAuthToken("access-token");
-
-    const fetchMock = vi.fn(async (url, options = {}) => {
-      const normalizedUrl = String(url);
-      const method = String(options.method || "GET").toUpperCase();
-      const headers = new Headers(options.headers || {});
-
-      expect(headers.get("Authorization")).toBe("Bearer access-token");
-
-      if (normalizedUrl.endsWith("/listings/me") && method === "GET") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ listings: [{ id: "listing-1", title: "Banana Clown" }] }),
-        };
-      }
-
-      if (normalizedUrl.endsWith("/listings/me") && method === "PUT") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ listings: JSON.parse(String(options.body)).listings }),
-        };
-      }
-
-      if (normalizedUrl.endsWith("/listings/marketplace") && method === "GET") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ listings: [{ id: "listing-1", title: "Banana Clown" }] }),
-        };
-      }
-
-      throw new Error(`Unexpected URL ${normalizedUrl}`);
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(fetchMyListings()).resolves.toEqual({
-      listings: [{ id: "listing-1", title: "Banana Clown" }],
-    });
-    await expect(saveMyListings([{ id: "listing-2", title: "Pied" }])).resolves.toEqual({
-      listings: [{ id: "listing-2", title: "Pied" }],
-    });
-    await expect(fetchMarketplaceListings()).resolves.toEqual({
-      listings: [{ id: "listing-1", title: "Banana Clown" }],
-    });
-  });
-
   it("creates and loads marketplace inquiries", async () => {
     import.meta.env.VITE_API_URL = "https://lab.example.com/api";
     setAuthToken("access-token");
@@ -402,57 +345,6 @@ describe("shared api client", () => {
         status: "contacted",
         breederResponseNote: "Email sent.",
       },
-    });
-  });
-
-  it("loads moderation listings and updates listing status", async () => {
-    import.meta.env.VITE_API_URL = "https://lab.example.com/api";
-    setAuthToken("access-token");
-
-    const fetchMock = vi.fn(async (url, options = {}) => {
-      const normalizedUrl = String(url);
-      const method = String(options.method || "GET").toUpperCase();
-      const headers = new Headers(options.headers || {});
-
-      expect(headers.get("Authorization")).toBe("Bearer access-token");
-
-      if (normalizedUrl.endsWith("/listings/moderation") && method === "GET") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ listings: [{ id: "listing-1", status: "draft" }] }),
-        };
-      }
-
-      if (normalizedUrl.endsWith("/listings/moderation/audit") && method === "GET") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ audits: [{ id: "audit-1", newStatus: "hidden" }] }),
-        };
-      }
-
-      if (normalizedUrl.endsWith("/listings/listing-1/status") && method === "PATCH") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ listing: { id: "listing-1", ...JSON.parse(String(options.body)) } }),
-        };
-      }
-
-      throw new Error(`Unexpected URL ${normalizedUrl}`);
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(fetchModerationListings()).resolves.toEqual({
-      listings: [{ id: "listing-1", status: "draft" }],
-    });
-    await expect(fetchModerationAudit()).resolves.toEqual({
-      audits: [{ id: "audit-1", newStatus: "hidden" }],
-    });
-    await expect(updateListingStatus("listing-1", "hidden", "Policy review.")).resolves.toEqual({
-      listing: { id: "listing-1", status: "hidden", note: "Policy review." },
     });
   });
 

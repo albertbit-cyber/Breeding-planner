@@ -24,9 +24,21 @@ This APK includes the full mobile redesign plus the canonical Android entry/styl
 
 Most recent **lab** app build (`com.breedingplanner.lab`, separate app, installs side-by-side with the breeder app):
 
-`app-debug-2026-07-10-lab-staging-sampleid-fix.apk`
+`app-debug-2026-09-19-lab-offline-css-branding.apk`
+SHA256: `A874222B471A54EB00D6F07AA2627BE0AFDD3D3A133132A66714FBD43D69E496`
 
-Fourth build of the Laboratory portal's mobile companion. Two fixes: sample IDs/QR codes now derive from the human-readable order number (`07AA00001-1`, `07AA00001-2`, ...) instead of the internal database ID; and the app is now built against the **staging** backend (`breeding-planner-staging.up.railway.app`), not production — confirmed via the deployed web app's JS bundle that staging is where the user's test orders actually live, which is why they weren't showing up in the mobile dashboard before (different database, not a bug). Debug-signed only. See `APK_CHANGELOG.md` for full details and known caveats. (Superseded: `app-debug-2026-07-10-lab-bottom-nav-scan-routing.apk`, `app-debug-2026-07-10-lab-mobile-nav-scan-fix.apk`, `app-debug-2026-07-10-lab-mobile-app.apk`.)
+Fifth build, and the one that unparks the app after seven weeks. Three things changed and one was found on the way.
+
+1. **It renders without the network now.** The app used to fetch Tailwind from `cdn.tailwindcss.com` on every launch, so a cold start with no connectivity showed an unstyled page. Tailwind is compiled at build time now. It is pinned to **v3 on purpose** — the CDN served v3, and v4 (which the breeder uses) silently changes bare `border` colour, `ring` width and the `shadow-sm`/`rounded-sm`/`outline-none` names. `index.html` was also pulling `html5-qrcode` — the QR scanner itself — from `unpkg.com`, which is useless offline; it was already an npm dependency, so the tag simply went.
+2. **It looks like the product.** It was still shipping the stock Capacitor blue-X icon and white splash. It now has the Serpentora ouroboros on `#07110D`, regenerable via `breeding-app-lab/scripts/generate-lab-icons.ps1`. The Lab keeps the breeder's mark but inverts its cream ground, so the two are distinguishable in the launcher when installed together.
+3. **Names/colours corrected** from the breeder's generic "Breeding Planner" to "Breeding Planner Lab".
+4. **Found while doing the above:** `.gitignore` ignored `android/key.properties` anchored to the repo root only, so a lab or breeder `key.properties` — signing passwords in cleartext — would have been committed to this public repo. Fixed; nothing of that kind had ever been tracked.
+
+The Tailwind swap was proved rather than eyeballed: all 340 CSS rules the CDN generated at runtime were diffed against the build-time output — 0 missing, 0 differing. Also driven live at 390px and 1280px, signed in with real order data.
+
+**Still open, and needing you:** push notifications are not implemented (a `pushToken` column exists, but nothing generates or sends one — it needs a Firebase project and FCM credentials only the account owner can create), there is no release keystore for `com.breedingplanner.lab` so this is debug-signed, and **nothing has been confirmed on real hardware** — no device or emulator was available, so the icon, splash and on-device camera scan are unverified. Install it and click through login → scan → result entry before trusting it.
+
+See `APK_CHANGELOG.md` for the full entry. (Superseded: `app-debug-2026-07-10-lab-staging-sampleid-fix.apk`, `app-debug-2026-07-10-lab-bottom-nav-scan-routing.apk`, `app-debug-2026-07-10-lab-mobile-nav-scan-fix.apk`, `app-debug-2026-07-10-lab-mobile-app.apk`.)
 
 Note: `breeding-app-lab` now has both `.env.android-production` and `.env.android-staging`. `npm run android:debug` now defaults to **staging** (matches where the user's actual test data is); use `npm run android:debug:prod` for a production-pointed debug build, and `npm run android:release:apk` for a production release build.
 
@@ -38,6 +50,7 @@ Latest committed baseline before this APK:
 
 | APK | Type | Size bytes | SHA256 | Notes |
 | --- | --- | ---: | --- | --- |
+| `app-debug-2026-09-19-lab-offline-css-branding.apk` | Debug | 14249945 | `A874222B471A54EB00D6F07AA2627BE0AFDD3D3A133132A66714FBD43D69E496` | **Lab app** (`com.breedingplanner.lab`) — current lab build. Build-time Tailwind instead of the runtime CDN, `html5-qrcode` off unpkg, real Serpentora branding. Staging backend. Debug-signed; not yet run on hardware. |
 | `app-debug-2026-07-27-serpentora-logo-splash.apk` | Debug | 20493009 | `17B3153111F7E293885DE41FCB8392F91AF2DD0B669CCAA09D628EB479D1ACA6` | Built from `breeding-app-breeder/android/` (not the legacy root project). Verifies the new Serpentora ouroboros logo across app icons and native splash screens. On-device appearance not yet confirmed. |
 | `app-release-2026-07-09-mobile-cloud-animal-sync.apk` | Release | 25248521 | `447C7EB55D954A73A2D320EE04BF9CE48768A1FF6E60477E4E24846D63EA9969` | Most recent. Restores native mobile routing and the full mobile stylesheet after consolidation, keeps account-specific cached snapshots, reports actual cloud read errors, and blocks unsafe writes when cloud loading fails. |
 | `app-release-2026-07-07-mobile-full-redesign.apk` | Release | 24849810 | `1D54F0B5EB0D2C039EEEEB044A2EB8BC1D01C869C8D312CB803E38441839CAB6` | Prior July 7 build after the mobile full-version redesign: planner-state preservation, desktop spaces/racks/terrariums in mobile rack view, full animal details, Feed Cycle tab, full log category display, settings data summary, and automatic mobile sync refresh/queued-action upload. |

@@ -61,236 +61,22 @@ const getAuthSurfaceForHash = (hashValue) => {
   if (path.startsWith("/pricing")) return "public";
   return getAuthScopeForHash(hashValue);
 };
-const COUNTRY_OPTIONS_FALLBACK = [
-  "Afghanistan",
-  "Albania",
-  "Algeria",
-  "Andorra",
-  "Angola",
-  "Antigua and Barbuda",
-  "Argentina",
-  "Armenia",
-  "Australia",
-  "Austria",
-  "Azerbaijan",
-  "Bahamas",
-  "Bahrain",
-  "Bangladesh",
-  "Barbados",
-  "Belarus",
-  "Belgium",
-  "Belize",
-  "Benin",
-  "Bhutan",
-  "Bolivia",
-  "Bosnia and Herzegovina",
-  "Botswana",
-  "Brazil",
-  "Brunei",
-  "Bulgaria",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cambodia",
-  "Cameroon",
-  "Canada",
-  "Central African Republic",
-  "Chad",
-  "Chile",
-  "China",
-  "Colombia",
-  "Comoros",
-  "Congo (Congo-Brazzaville)",
-  "Costa Rica",
-  "Cote d'Ivoire",
-  "Croatia",
-  "Cuba",
-  "Cyprus",
-  "Czechia",
-  "Democratic Republic of the Congo",
-  "Denmark",
-  "Djibouti",
-  "Dominica",
-  "Dominican Republic",
-  "Ecuador",
-  "Egypt",
-  "El Salvador",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Estonia",
-  "Eswatini",
-  "Ethiopia",
-  "Fiji",
-  "Finland",
-  "France",
-  "Gabon",
-  "Gambia",
-  "Georgia",
-  "Germany",
-  "Ghana",
-  "Greece",
-  "Grenada",
-  "Guatemala",
-  "Guinea",
-  "Guinea-Bissau",
-  "Guyana",
-  "Haiti",
-  "Holy See",
-  "Honduras",
-  "Hungary",
-  "Iceland",
-  "India",
-  "Indonesia",
-  "Iran",
-  "Iraq",
-  "Ireland",
-  "Israel",
-  "Italy",
-  "Jamaica",
-  "Japan",
-  "Jordan",
-  "Kazakhstan",
-  "Kenya",
-  "Kiribati",
-  "Kuwait",
-  "Kyrgyzstan",
-  "Laos",
-  "Latvia",
-  "Lebanon",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Liechtenstein",
-  "Lithuania",
-  "Luxembourg",
-  "Madagascar",
-  "Malawi",
-  "Malaysia",
-  "Maldives",
-  "Mali",
-  "Malta",
-  "Marshall Islands",
-  "Mauritania",
-  "Mauritius",
-  "Mexico",
-  "Micronesia",
-  "Moldova",
-  "Monaco",
-  "Mongolia",
-  "Montenegro",
-  "Morocco",
-  "Mozambique",
-  "Myanmar",
-  "Namibia",
-  "Nauru",
-  "Nepal",
-  "Netherlands",
-  "New Zealand",
-  "Nicaragua",
-  "Niger",
-  "Nigeria",
-  "North Korea",
-  "North Macedonia",
-  "Norway",
-  "Oman",
-  "Pakistan",
-  "Palau",
-  "Panama",
-  "Papua New Guinea",
-  "Paraguay",
-  "Peru",
-  "Philippines",
-  "Poland",
-  "Portugal",
-  "Qatar",
-  "Romania",
-  "Russia",
-  "Rwanda",
-  "Saint Kitts and Nevis",
-  "Saint Lucia",
-  "Saint Vincent and the Grenadines",
-  "Samoa",
-  "San Marino",
-  "Sao Tome and Principe",
-  "Saudi Arabia",
-  "Senegal",
-  "Serbia",
-  "Seychelles",
-  "Sierra Leone",
-  "Singapore",
-  "Slovakia",
-  "Slovenia",
-  "Solomon Islands",
-  "Somalia",
-  "South Africa",
-  "South Korea",
-  "South Sudan",
-  "Spain",
-  "Sri Lanka",
-  "Sudan",
-  "Suriname",
-  "Sweden",
-  "Switzerland",
-  "Syria",
-  "Tajikistan",
-  "Tanzania",
-  "Thailand",
-  "Timor-Leste",
-  "Togo",
-  "Tonga",
-  "Trinidad and Tobago",
-  "Tunisia",
-  "Turkey",
-  "Turkmenistan",
-  "Tuvalu",
-  "Uganda",
-  "Ukraine",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Uruguay",
-  "Uzbekistan",
-  "Vanuatu",
-  "Venezuela",
-  "Vietnam",
-  "Yemen",
-  "Zambia",
-  "Zimbabwe",
-];
-const DEVICE_OPTIONS_FALLBACK = [
-  { value: "desktop", label: "Desktop only" },
-  { value: "mobile", label: "Mobile only" },
-  { value: "both", label: "Both desktop and mobile" },
-];
-const DATA_BACKUP_OPTIONS_FALLBACK = [
-  { value: "automatic", label: "Automatic" },
-  { value: "manual", label: "Manual" },
-];
-const EXPERIENCE_OPTIONS_FALLBACK = [
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced breeder" },
-  { value: "professional", label: "Professional" },
-];
 const ROLE_OPTIONS_FALLBACK = [
   { value: "breeder", label: "Breeder" },
   { value: "buyer", label: "Buyer" },
 ];
 
+// Buyer accounts belong to the marketplace, which is a separate deploy. This app
+// refuses them at sign-in, so a buyer is sent there before an account exists
+// rather than after they have verified one they cannot use here.
+const MARKETPLACE_URL = (
+  import.meta.env.VITE_MARKETPLACE_URL || "https://albertbit-cyber.github.io/Breeding-planner/"
+).replace(/\/+$/, "/");
+
 const DEFAULT_REGISTRATION_TEMPLATE = {
   fullName: "",
-  displayName: "",
   email: "",
-  phone: "",
   password: "",
-  confirmPassword: "",
-  country: "",
-  enableCloudSync: true,
-  devicePreference: "both",
-  dataBackupPreference: "automatic",
-  reptileCount: "",
-  experienceLevel: "intermediate",
-  enableAutomaticReptileSync: true,
   consentDataProcessing: false,
   acceptTerms: false,
   role: "breeder",
@@ -301,19 +87,12 @@ const createDefaultRegistrationData = () =>
 
 const createDefaultPasswordRecoveryData = (email = "") => ({ email });
 
+/**
+ * Registration is one screen: the four things the backend actually stores, plus the
+ * two consents. It used to be four steps whose preferences and keeper-profile answers
+ * were never sent anywhere, which is effort asked for and thrown away.
+ */
 const buildRegistrationSteps = (t, optionSets = {}) => {
-  const countries = Array.isArray(optionSets.countries) && optionSets.countries.length
-    ? optionSets.countries
-    : COUNTRY_OPTIONS_FALLBACK;
-  const devicePreferences = Array.isArray(optionSets.devicePreferences) && optionSets.devicePreferences.length
-    ? optionSets.devicePreferences
-    : DEVICE_OPTIONS_FALLBACK;
-  const dataBackup = Array.isArray(optionSets.dataBackup) && optionSets.dataBackup.length
-    ? optionSets.dataBackup
-    : DATA_BACKUP_OPTIONS_FALLBACK;
-  const experienceLevels = Array.isArray(optionSets.experienceLevels) && optionSets.experienceLevels.length
-    ? optionSets.experienceLevels
-    : EXPERIENCE_OPTIONS_FALLBACK;
   const roleOptions = (Array.isArray(optionSets.roleOptions) && optionSets.roleOptions.length
     ? optionSets.roleOptions
     : ROLE_OPTIONS_FALLBACK
@@ -329,152 +108,47 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
   return [
     {
       key: "account",
-      title: t("auth.steps.account.title", { defaultValue: "Account basics" }),
-      description: t("auth.steps.account.description", {
-        defaultValue: "Create your keeper profile and secure your login.",
+      title: t("auth:register.title", { defaultValue: "Create your account" }),
+      description: t("auth:register.description", {
+        defaultValue: "Four fields. Your collection comes next.",
       }),
       fields: [
         {
           name: "fullName",
-          label: t("auth.fields.fullName", { defaultValue: "Full name" }),
+          label: t("auth:fields.fullName", { defaultValue: "Full name" }),
           type: "text",
-          required: true,
-        },
-        {
-          name: "displayName",
-          label: t("auth.fields.displayName", {
-            defaultValue: "Preferred username / display name",
-          }),
-          type: "text",
+          autoComplete: "name",
           required: true,
         },
         {
           name: "email",
-          label: t("auth.fields.email", { defaultValue: "Email address" }),
+          label: t("auth:fields.email", { defaultValue: "Email address" }),
           type: "email",
+          autoComplete: "email",
           required: true,
-        },
-        {
-          name: "phone",
-          label: t("auth.fields.phone", { defaultValue: "Phone number (optional)" }),
-          type: "tel",
         },
         {
           name: "password",
-          label: t("auth.fields.password", { defaultValue: "Password" }),
+          label: t("auth:fields.passwordWithHint", { defaultValue: "Password (8+ characters)" }),
           type: "password",
+          autoComplete: "new-password",
           required: true,
         },
-        {
-          name: "confirmPassword",
-          label: t("auth.fields.confirmPassword", { defaultValue: "Confirm password" }),
-          type: "password",
-          required: true,
-        },
-      ],
-      validate: (data) => {
-        if (data.password.trim().length < 8) {
-          return t("auth.errors.passwordLength", {
-            defaultValue: "Choose a password with at least 8 characters.",
-          });
-        }
-        if (data.password !== data.confirmPassword) {
-          return t("auth.errors.passwordMismatch", {
-            defaultValue: "Passwords do not match.",
-          });
-        }
-        return null;
-      },
-    },
-    {
-      key: "preferences",
-      title: t("auth.steps.preferences.title", { defaultValue: "Preferences" }),
-      description: t("auth.steps.preferences.description", {
-        defaultValue: "Tell us how you want to use Serpentora.",
-      }),
-      fields: [
-        {
-          name: "country",
-          label: t("auth.fields.country", { defaultValue: "Country" }),
-          type: "select",
-          options: countries,
-          required: true,
-        },
-        {
-          name: "enableCloudSync",
-          label: t("auth.fields.enableCloudSync", { defaultValue: "Enable cloud sync" }),
-          type: "checkbox",
-        },
-        {
-          name: "devicePreference",
-          label: t("auth.fields.devicePreference", { defaultValue: "Device preference" }),
-          type: "select",
-          options: devicePreferences,
-          required: true,
-        },
-        {
-          name: "dataBackupPreference",
-          label: t("auth.fields.dataBackupPreference", {
-            defaultValue: "Data backup preference",
-          }),
-          type: "select",
-          options: dataBackup,
-          required: true,
-        },
-      ],
-    },
-    {
-      key: "keeper",
-      title: t("auth.steps.keeper.title", { defaultValue: "Reptile keeper profile" }),
-      description: t("auth.steps.keeper.description", {
-        defaultValue: "Share a bit about your collection and processes.",
-      }),
-      fields: [
         {
           name: "role",
-          label: t("auth.fields.userRole", { defaultValue: "User role" }),
+          label: t("auth:fields.userRole", { defaultValue: "User role" }),
           type: "select",
           options: roleOptions,
           required: true,
         },
         {
-          name: "reptileCount",
-          label: t("auth.fields.reptileCount", {
-            defaultValue: "How many reptiles do you currently keep?",
-          }),
-          type: "number",
-          required: true,
-        },
-        {
-          name: "experienceLevel",
-          label: t("auth.fields.experienceLevel", { defaultValue: "Experience level" }),
-          type: "select",
-          options: experienceLevels,
-          required: true,
-        },
-        {
-          name: "enableAutomaticReptileSync",
-          label: t("auth.fields.enableAutomaticReptileSync", {
-            defaultValue: "Enable automatic reptile-data syncing",
-          }),
-          type: "checkbox",
-        },
-      ],
-    },
-    {
-      key: "consent",
-      title: t("auth.steps.consent.title", { defaultValue: "Consent & finish" }),
-      description: t("auth.steps.consent.description", {
-        defaultValue: "Review the legal bits so we can activate your account.",
-      }),
-      fields: [
-        {
           name: "consentDataProcessing",
-          label: t("auth.fields.consentDataProcessing", {
+          label: t("auth:fields.consentDataProcessing", {
             defaultValue: "I consent to data processing for sync & backup services.",
           }),
           type: "checkbox",
           required: true,
+          shouldDisplay: (data) => data.role !== "buyer",
         },
         {
           name: "acceptTerms",
@@ -484,21 +158,30 @@ const buildRegistrationSteps = (t, optionSets = {}) => {
           // flagged; the translated strings stay translatable around the links.
           label: (
             <>
-              {t("auth.fields.acceptTermsPrefix", { defaultValue: "I agree to the" })}{" "}
+              {t("auth:fields.acceptTermsPrefix", { defaultValue: "I agree to the" })}{" "}
               <a href={`${LEGAL_SITE_URL}/terms`} target="_blank" rel="noopener noreferrer">
-                {t("auth.fields.termsOfService", { defaultValue: "Terms of Service" })}
+                {t("auth:fields.termsOfService", { defaultValue: "Terms of Service" })}
               </a>{" "}
-              {t("auth.common.and", { defaultValue: "and" })}{" "}
+              {t("auth:common.and", { defaultValue: "and" })}{" "}
               <a href={`${LEGAL_SITE_URL}/privacy`} target="_blank" rel="noopener noreferrer">
-                {t("auth.fields.privacyPolicy", { defaultValue: "Privacy Policy" })}
+                {t("auth:fields.privacyPolicy", { defaultValue: "Privacy Policy" })}
               </a>
               .
             </>
           ),
           type: "checkbox",
           required: true,
+          shouldDisplay: (data) => data.role !== "buyer",
         },
       ],
+      validate: (data) => {
+        if (data.password.trim().length < 8) {
+          return t("auth:errors.passwordLength", {
+            defaultValue: "Choose a password with at least 8 characters.",
+          });
+        }
+        return null;
+      },
     },
   ];
 };
@@ -588,41 +271,17 @@ export default function AuthGate({ children }) {
   const [registrationData, setRegistrationData] = useState(
     createDefaultRegistrationData(),
   );
-  const [registerStep, setRegisterStep] = useState(0);
   const [registrationError, setRegistrationError] = useState("");
   const registrationSteps = useMemo(() => {
-    const countries = t("auth.options.countries", {
-      returnObjects: true,
-      defaultValue: COUNTRY_OPTIONS_FALLBACK,
-    });
-    const devicePreferences = t("auth.options.devicePreferences", {
-      returnObjects: true,
-      defaultValue: DEVICE_OPTIONS_FALLBACK,
-    });
-    const dataBackup = t("auth.options.dataBackup", {
-      returnObjects: true,
-      defaultValue: DATA_BACKUP_OPTIONS_FALLBACK,
-    });
-    const experienceLevels = t("auth.options.experienceLevels", {
-      returnObjects: true,
-      defaultValue: EXPERIENCE_OPTIONS_FALLBACK,
-    });
-    const roleOptions = t("auth.options.roles", {
+    const roleOptions = t("auth:options.roles", {
       returnObjects: true,
       defaultValue: ROLE_OPTIONS_FALLBACK,
     });
 
-    return buildRegistrationSteps(t, {
-      countries,
-      devicePreferences,
-      dataBackup,
-      experienceLevels,
-      roleOptions,
-    });
+    return buildRegistrationSteps(t, { roleOptions });
   }, [t, i18n.language]);
 
-  const currentStep = registrationSteps[registerStep] || registrationSteps[0];
-  const totalSteps = registrationSteps.length || 1;
+  const currentStep = registrationSteps[0];
 
   useEffect(() => {
     const onHashChange = () => {
@@ -649,17 +308,17 @@ export default function AuthGate({ children }) {
         if (linkFlow.type === "verify-email") {
           const result = await verifyEmailApi({ token: linkFlow.token });
           if (cancelled) return;
-          setLinkFlowResult({ status: "success", message: result?.message || t("auth.verifyEmail.success", { defaultValue: "Your email address is verified." }) });
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth:verifyEmail.success", { defaultValue: "Your email address is verified." }) });
         } else if (linkFlow.type === "confirm-email-change") {
           const result = await confirmEmailChangeApi({ token: linkFlow.token });
           if (cancelled) return;
-          setLinkFlowResult({ status: "success", message: result?.message || t("auth.confirmEmailChange.success", { defaultValue: "Your new email address is confirmed." }) });
+          setLinkFlowResult({ status: "success", message: result?.message || t("auth:confirmEmailChange.success", { defaultValue: "Your new email address is confirmed." }) });
         }
       } catch (error) {
         if (cancelled) return;
         setLinkFlowResult({
           status: "error",
-          message: error instanceof Error ? error.message : t("auth.linkFlow.error", { defaultValue: "This link is invalid or has expired." }),
+          message: error instanceof Error ? error.message : t("auth:linkFlow.error", { defaultValue: "This link is invalid or has expired." }),
         });
       }
     };
@@ -702,7 +361,6 @@ export default function AuthGate({ children }) {
     setPendingVerificationEmail("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData());
-    setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
   }, [authScope, persistAuth]);
 
@@ -721,14 +379,13 @@ export default function AuthGate({ children }) {
       password: "",
     }));
     setLoginError(
-      t("auth.sharedBackend.sessionExpiredMessage", {
+      t("auth:sharedBackend.sessionExpiredMessage", {
         defaultValue: "Your shared backend session expired. Sign in again.",
       })
     );
     setLoginMessage("");
     setPasswordRecoveryError("");
     setPasswordRecoveryData(createDefaultPasswordRecoveryData(authState.profile?.email || ""));
-    setRegisterStep(0);
     setRegistrationData(createDefaultRegistrationData());
     setRegistrationError("");
   }, [authScope, authState.isAuthenticated, authState.profile?.email, persistAuth, snapshot.state, t]);
@@ -739,7 +396,7 @@ export default function AuthGate({ children }) {
     setLoginMessage("");
     const { username, password } = loginValues;
     if (!username.trim() || !password.trim()) {
-      setLoginError(t("auth.errors.missingCredentials", { defaultValue: "Enter both username and password." }));
+      setLoginError(t("auth:errors.missingCredentials", { defaultValue: "Enter both username and password." }));
       return;
     }
     try {
@@ -747,7 +404,7 @@ export default function AuthGate({ children }) {
       const loginEmail = String(normalizedInput.includes("@") ? normalizedInput : "").trim();
 
       if (!loginEmail) {
-        setLoginError(t("auth.errors.emailRequired", { defaultValue: "Use your account email address to sign in." }));
+        setLoginError(t("auth:errors.emailRequired", { defaultValue: "Use your account email address to sign in." }));
         return;
       }
 
@@ -783,7 +440,7 @@ export default function AuthGate({ children }) {
         authenticatedAt: new Date().toISOString(),
       });
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : t("auth.errors.badPassword", { defaultValue: "Login failed." }));
+      setLoginError(error instanceof Error ? error.message : t("auth:errors.badPassword", { defaultValue: "Login failed." }));
     }
   };
 
@@ -818,7 +475,7 @@ export default function AuthGate({ children }) {
 
     const recoveryEmail = normalizeIdentifier(passwordRecoveryData.email);
     if (!recoveryEmail || !recoveryEmail.includes("@")) {
-      setPasswordRecoveryError(t("auth.errors.emailRequired", {
+      setPasswordRecoveryError(t("auth:errors.accountEmailRequired", {
         defaultValue: "Enter the email address on your account.",
       }));
       return;
@@ -831,7 +488,7 @@ export default function AuthGate({ children }) {
       setPasswordRecoveryError(
         error instanceof Error
           ? error.message
-          : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
+          : t("auth:recovery.error", { defaultValue: "Something went wrong. Please try again." })
       );
     }
   };
@@ -841,11 +498,11 @@ export default function AuthGate({ children }) {
     setResetPasswordError("");
     const { newPassword, confirmPassword } = resetPasswordValues;
     if (newPassword.trim().length < 8) {
-      setResetPasswordError(t("auth.errors.passwordLength", { defaultValue: "Choose a password with at least 8 characters." }));
+      setResetPasswordError(t("auth:errors.passwordLength", { defaultValue: "Choose a password with at least 8 characters." }));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setResetPasswordError(t("auth.errors.passwordMismatch", { defaultValue: "Passwords do not match." }));
+      setResetPasswordError(t("auth:errors.passwordMismatch", { defaultValue: "Passwords do not match." }));
       return;
     }
     try {
@@ -853,7 +510,7 @@ export default function AuthGate({ children }) {
       setResetPasswordDone(true);
     } catch (error) {
       setResetPasswordError(
-        error instanceof Error ? error.message : t("auth.resetPassword.error", { defaultValue: "This link is invalid or has expired." })
+        error instanceof Error ? error.message : t("auth:resetPassword.error", { defaultValue: "This link is invalid or has expired." })
       );
     }
   };
@@ -877,7 +534,7 @@ export default function AuthGate({ children }) {
     setResendVerificationError("");
     const email = normalizeIdentifier(resendVerificationEmail);
     if (!email || !email.includes("@")) {
-      setResendVerificationError(t("auth.errors.emailRequired", { defaultValue: "Enter the email address on your account." }));
+      setResendVerificationError(t("auth:errors.accountEmailRequired", { defaultValue: "Enter the email address on your account." }));
       return;
     }
     setResendVerificationBusy(true);
@@ -886,7 +543,7 @@ export default function AuthGate({ children }) {
       setResendVerificationSent(true);
     } catch (error) {
       setResendVerificationError(
-        error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." })
+        error instanceof Error ? error.message : t("auth:recovery.error", { defaultValue: "Something went wrong. Please try again." })
       );
     } finally {
       setResendVerificationBusy(false);
@@ -900,9 +557,13 @@ export default function AuthGate({ children }) {
     }));
   };
 
+  const isBuyerRegistration = registrationData.role === "buyer";
+
   const handleRegistrationStepSubmit = async (event) => {
     event.preventDefault();
     setRegistrationError("");
+    // A buyer account is made on the marketplace; the form offers the link instead of a submit.
+    if (isBuyerRegistration) return;
     const missingField = currentStep.fields.find((field) => {
       if (field.shouldDisplay && !field.shouldDisplay(registrationData)) {
         return false;
@@ -917,7 +578,10 @@ export default function AuthGate({ children }) {
     });
 
     if (missingField) {
-      setRegistrationError(t("auth.errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
+      // The terms label is a node with links in it, so it cannot be quoted back as text.
+      setRegistrationError(missingField.type === "checkbox"
+        ? t("auth:errors.consentRequired", { defaultValue: "Tick both consent boxes to create your account." })
+        : t("auth:errors.requiredField", { defaultValue: 'Please complete "{{field}}".', field: missingField.label }));
       return;
     }
 
@@ -929,36 +593,30 @@ export default function AuthGate({ children }) {
       }
     }
 
-    if (registerStep === totalSteps - 1) {
-      const desiredEmail = registrationData.email.trim();
-      const desiredFullName = registrationData.fullName.trim();
+    const desiredEmail = registrationData.email.trim();
+    const desiredFullName = registrationData.fullName.trim();
 
-      try {
-        const registration = await registerApi({
-          fullName: desiredFullName || registrationData.fullName,
-          email: desiredEmail,
-          password: registrationData.password,
-          role: String(registrationData.role || "breeder").trim().toLowerCase() === "buyer" ? "buyer" : "breeder",
-        });
+    try {
+      const registration = await registerApi({
+        fullName: desiredFullName || registrationData.fullName,
+        email: desiredEmail,
+        password: registrationData.password,
+        role: "breeder",
+      });
 
-        // Registration isn't complete until the emailed link is clicked — no session is
-        // created here. Show the "check your inbox" card instead of logging the user in.
-        setResendVerificationSent(false);
-        setResendVerificationError("");
-        // Older backends do not report this; absence means "assume it was sent".
-        setVerificationEmailQueued(registration?.user?.verificationEmailQueued !== false);
-        setPendingVerificationEmail(desiredEmail);
-      } catch (error) {
-        setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
-      }
-      return;
+      // Registration isn't complete until the emailed link is clicked — no session is
+      // created here. Show the "check your inbox" card instead of logging the user in.
+      setResendVerificationSent(false);
+      setResendVerificationError("");
+      // Older backends do not report this; absence means "assume it was sent".
+      setVerificationEmailQueued(registration?.user?.verificationEmailQueued !== false);
+      setPendingVerificationEmail(desiredEmail);
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : "Registration failed.");
     }
-
-    setRegisterStep((prev) => Math.min(prev + 1, totalSteps - 1));
   };
 
   const resetRegistration = () => {
-    setRegisterStep(0);
     setRegistrationError("");
     setRegistrationData(createDefaultRegistrationData());
   };
@@ -1032,6 +690,7 @@ export default function AuthGate({ children }) {
             {label}
             <input
               type={field.type || "text"}
+              autoComplete={field.autoComplete}
               value={value}
               onChange={(e) =>
                 handleRegistrationChange(field.name, e.target.value)
@@ -1045,14 +704,14 @@ export default function AuthGate({ children }) {
   const loginCard = (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
+        <img src={logoSrc} alt={t("auth:logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth:title", { defaultValue: "Serpentora" })}</h1>
         <p className="auth-card-tagline">
-          {t("auth.tagline", { defaultValue: "Complete Reptile Management App" })}
+          {t("auth:tagline", { defaultValue: "Complete Reptile Management App" })}
         </p>
       </div>
       <p className="auth-subtitle">
-        {t("auth.subtitle", {
+        {t("auth:subtitle", {
           defaultValue:
             "Keep your reptiles synced across desktop and mobile with one secure account.",
         })}
@@ -1068,7 +727,7 @@ export default function AuthGate({ children }) {
             resetRegistration();
           }}
         >
-          {t("auth.actions.register", { defaultValue: "Register" })}
+          {t("auth:actions.register", { defaultValue: "Register" })}
         </button>
         <button
           type="button"
@@ -1080,7 +739,7 @@ export default function AuthGate({ children }) {
             setPasswordRecoveryError("");
           }}
         >
-          {t("auth.actions.login", { defaultValue: "Log in" })}
+          {t("auth:actions.login", { defaultValue: "Log in" })}
         </button>
       </div>
       {view === "login" && (
@@ -1088,20 +747,20 @@ export default function AuthGate({ children }) {
             <form className="auth-login-form" onSubmit={handlePasswordRecoverySubmit}>
               {recoveryEmailSent ? (
                 <p className="auth-helper-copy">
-                  {t("auth.recovery.emailSent", {
+                  {t("auth:recovery.emailSent", {
                     defaultValue: "Check your email — we sent a reset link. It expires in 1 hour.",
                   })}
                 </p>
               ) : (
                 <>
                   <p className="auth-helper-copy">
-                    {t("auth.recovery.instructions", {
+                    {t("auth:recovery.instructions", {
                       defaultValue: "Enter your account email and we'll send you a reset link.",
                     })}
                   </p>
                   <label className="auth-field">
                     <span className="auth-field-label">
-                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                      {t("auth:fields.email", { defaultValue: "Email address" })}
                     </span>
                     <input
                       type="email"
@@ -1112,13 +771,13 @@ export default function AuthGate({ children }) {
                   </label>
                   {passwordRecoveryError && <p className="auth-error">{passwordRecoveryError}</p>}
                   <button type="submit" className="primary wide">
-                    {t("auth.actions.sendResetLink", { defaultValue: "Send reset link" })}
+                    {t("auth:actions.sendResetLink", { defaultValue: "Send reset link" })}
                   </button>
                 </>
               )}
               <div className="auth-secondary-action">
                 <button type="button" className="text-button" onClick={closePasswordRecovery}>
-                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+                  {t("auth:actions.backToLogin", { defaultValue: "Back to login" })}
                 </button>
               </div>
             </form>
@@ -1126,20 +785,20 @@ export default function AuthGate({ children }) {
             <form className="auth-login-form" onSubmit={handleResendVerificationSubmit}>
               {resendVerificationSent ? (
                 <p className="auth-helper-copy">
-                  {t("auth.resendVerification.sent", {
+                  {t("auth:resendVerification.sent", {
                     defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
                   })}
                 </p>
               ) : (
                 <>
                   <p className="auth-helper-copy">
-                    {t("auth.resendVerification.instructions", {
+                    {t("auth:resendVerification.instructions", {
                       defaultValue: "Enter your account email and we'll send a new verification link.",
                     })}
                   </p>
                   <label className="auth-field">
                     <span className="auth-field-label">
-                      {t("auth.fields.email", { defaultValue: "Email address" })}
+                      {t("auth:fields.email", { defaultValue: "Email address" })}
                     </span>
                     <input
                       type="email"
@@ -1152,13 +811,13 @@ export default function AuthGate({ children }) {
                   <button type="submit" className="primary wide" disabled={resendVerificationBusy}>
                     {resendVerificationBusy
                       ? t("common.sending", { defaultValue: "Sending..." })
-                      : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+                      : t("auth:actions.resendVerification", { defaultValue: "Resend verification email" })}
                   </button>
                 </>
               )}
               <div className="auth-secondary-action">
                 <button type="button" className="text-button" onClick={closeResendVerification}>
-                  {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+                  {t("auth:actions.backToLogin", { defaultValue: "Back to login" })}
                 </button>
               </div>
             </form>
@@ -1166,7 +825,7 @@ export default function AuthGate({ children }) {
             <form className="auth-login-form" onSubmit={handleLoginSubmit}>
               <label className="auth-field">
                 <span className="auth-field-label">
-                  {t("auth.fields.email", { defaultValue: "Email address" })}
+                  {t("auth:fields.email", { defaultValue: "Email address" })}
                 </span>
                 <input
                   type="email"
@@ -1178,7 +837,7 @@ export default function AuthGate({ children }) {
               </label>
               <label className="auth-field">
                 <span className="auth-field-label">
-                  {t("auth.fields.password", { defaultValue: "Password" })}
+                  {t("auth:fields.password", { defaultValue: "Password" })}
                 </span>
                 <input
                   type="password"
@@ -1190,14 +849,14 @@ export default function AuthGate({ children }) {
               </label>
               <div className="auth-inline-link-row">
                 <button type="button" className="text-button" onClick={openPasswordRecovery}>
-                  {t("auth.actions.forgotPassword", { defaultValue: "Forgot password?" })}
+                  {t("auth:actions.forgotPassword", { defaultValue: "Forgot password?" })}
                 </button>
                 <button
                   type="button"
                   className="text-button"
                   onClick={() => openResendVerification(normalizeIdentifier(loginValues.username).includes("@") ? loginValues.username : "")}
                 >
-                  {t("auth.actions.resendVerificationLink", { defaultValue: "Resend verification email" })}
+                  {t("auth:actions.resendVerificationLink", { defaultValue: "Resend verification email" })}
                 </button>
               </div>
               {loginMessage && <p className="auth-success">{loginMessage}</p>}
@@ -1217,31 +876,29 @@ export default function AuthGate({ children }) {
         <button type="button" className="text-button" onClick={() => setView("chooser")}>
           {t("common.back", { defaultValue: "Back" })}
         </button>
-        <div>
-          {t("auth.steps.progress", { defaultValue: "Step {{current}} of {{total}}", current: registerStep + 1, total: totalSteps, })}
-        </div>
       </div>
       <h2>{currentStep.title}</h2>
       <p className="auth-subtitle">{currentStep.description}</p>
       <form className="auth-registration-form" onSubmit={handleRegistrationStepSubmit}>
         {currentStep.fields.map((field) => renderField(field))}
+        {isBuyerRegistration && (
+          <p className="auth-helper-copy" role="status">
+            {t("auth:register.buyerElsewhere", {
+              defaultValue: "Buyer accounts live on the Serpentora Marketplace, not in this breeder app. Create yours there; this form won't make one.",
+            })}
+          </p>
+        )}
         {registrationError && <p className="auth-error">{registrationError}</p>}
         <div className="auth-registration-actions">
-          <button
-            type="button"
-            className="ghost"
-            disabled={registerStep === 0}
-            onClick={() =>
-              setRegisterStep((prev) => Math.max(0, prev - 1))
-            }
-          >
-            {t("common.previous", { defaultValue: "Previous" })}
-          </button>
-          <button type="submit" className="primary">
-            {registerStep === totalSteps - 1
-              ? t("auth.actions.createAccount", { defaultValue: "Create account" })
-              : t("common.next", { defaultValue: "Next" })}
-          </button>
+          {isBuyerRegistration ? (
+            <a className="primary" href={MARKETPLACE_URL} target="_blank" rel="noopener noreferrer">
+              {t("auth:actions.goToMarketplace", { defaultValue: "Go to the Marketplace" })}
+            </a>
+          ) : (
+            <button type="submit" className="primary">
+              {t("auth:actions.createAccount", { defaultValue: "Create account" })}
+            </button>
+          )}
         </div>
       </form>
     </div>
@@ -1250,13 +907,13 @@ export default function AuthGate({ children }) {
   const signedInChip = authState.isAuthenticated ? (
     <div className="auth-floating-chip">
       <span>
-        {t("auth.status.signedInAs", { defaultValue: "Signed in as" })}{" "}
+        {t("auth:status.signedInAs", { defaultValue: "Signed in as" })}{" "}
         {authState.profile?.displayName ||
           authState.profile?.fullName ||
-          t("auth.status.defaultName", { defaultValue: "Keeper" })}
+          t("auth:status.defaultName", { defaultValue: "Keeper" })}
       </span>
       <button type="button" onClick={handleLogout}>
-        {t("auth.actions.signOut", { defaultValue: "Sign out" })}
+        {t("auth:actions.signOut", { defaultValue: "Sign out" })}
       </button>
     </div>
   ) : null;
@@ -1271,26 +928,26 @@ export default function AuthGate({ children }) {
   const linkFlowCard = linkFlow ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.title", { defaultValue: "Serpentora" })}</h1>
+        <img src={logoSrc} alt={t("auth:logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth:title", { defaultValue: "Serpentora" })}</h1>
       </div>
       {linkFlow.type === "reset-password" ? (
         resetPasswordDone ? (
           <>
             <p className="auth-helper-copy">
-              {t("auth.resetPassword.success", { defaultValue: "Your password has been updated. You can now sign in with your new password." })}
+              {t("auth:resetPassword.success", { defaultValue: "Your password has been updated. You can now sign in with your new password." })}
             </p>
             <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
-              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+              {t("auth:actions.backToLogin", { defaultValue: "Back to login" })}
             </button>
           </>
         ) : (
           <form className="auth-login-form" onSubmit={handleResetPasswordSubmit}>
             <p className="auth-helper-copy">
-              {t("auth.resetPassword.instructions", { defaultValue: "Choose a new password for your account." })}
+              {t("auth:resetPassword.instructions", { defaultValue: "Choose a new password for your account." })}
             </p>
             <label className="auth-field">
-              <span className="auth-field-label">{t("auth.fields.newPassword", { defaultValue: "New password" })}</span>
+              <span className="auth-field-label">{t("auth:fields.newPassword", { defaultValue: "New password" })}</span>
               <input
                 type="password"
                 value={resetPasswordValues.newPassword}
@@ -1299,7 +956,7 @@ export default function AuthGate({ children }) {
               />
             </label>
             <label className="auth-field">
-              <span className="auth-field-label">{t("auth.fields.confirmPassword", { defaultValue: "Confirm password" })}</span>
+              <span className="auth-field-label">{t("auth:fields.confirmPassword", { defaultValue: "Confirm password" })}</span>
               <input
                 type="password"
                 value={resetPasswordValues.confirmPassword}
@@ -1309,7 +966,7 @@ export default function AuthGate({ children }) {
             </label>
             {resetPasswordError && <p className="auth-error">{resetPasswordError}</p>}
             <button type="submit" className="primary wide">
-              {t("auth.actions.setNewPassword", { defaultValue: "Set new password" })}
+              {t("auth:actions.setNewPassword", { defaultValue: "Set new password" })}
             </button>
           </form>
         )
@@ -1317,12 +974,12 @@ export default function AuthGate({ children }) {
         <>
           <p className={linkFlowResult.status === "error" ? "auth-error" : "auth-helper-copy"}>
             {linkFlowResult.status === "pending"
-              ? t("auth.linkFlow.working", { defaultValue: "Working..." })
+              ? t("auth:linkFlow.working", { defaultValue: "Working..." })
               : linkFlowResult.message}
           </p>
           {linkFlowResult.status !== "pending" && (
             <button type="button" className="primary wide" onClick={() => { window.location.href = "/"; }}>
-              {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+              {t("auth:actions.backToLogin", { defaultValue: "Back to login" })}
             </button>
           )}
         </>
@@ -1334,18 +991,18 @@ export default function AuthGate({ children }) {
   const unverifiedGateCard = unverifiedGateActive ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.unverified.title", { defaultValue: "Verify your email address" })}</h1>
+        <img src={logoSrc} alt={t("auth:logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth:unverified.title", { defaultValue: "Verify your email address" })}</h1>
       </div>
       <p className="auth-subtitle">
-        {t("auth.unverified.description", {
+        {t("auth:unverified.description", {
           defaultValue: "Your email address ({{email}}) has not been verified yet. Check your inbox for the verification link, or request a new one.",
           email: maskEmailForDisplay(authState.profile?.email),
         })}
       </p>
       {resendVerificationSent ? (
         <p className="auth-helper-copy">
-          {t("auth.resendVerification.sent", {
+          {t("auth:resendVerification.sent", {
             defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
           })}
         </p>
@@ -1363,7 +1020,7 @@ export default function AuthGate({ children }) {
                 await resendVerificationApi({ email: authState.profile?.email });
                 setResendVerificationSent(true);
               } catch (error) {
-                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+                setResendVerificationError(error instanceof Error ? error.message : t("auth:recovery.error", { defaultValue: "Something went wrong. Please try again." }));
               } finally {
                 setResendVerificationBusy(false);
               }
@@ -1371,13 +1028,13 @@ export default function AuthGate({ children }) {
           >
             {resendVerificationBusy
               ? t("common.sending", { defaultValue: "Sending..." })
-              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+              : t("auth:actions.resendVerification", { defaultValue: "Resend verification email" })}
           </button>
         </>
       )}
       <div className="auth-secondary-action">
         <button type="button" className="text-button" onClick={handleLogout}>
-          {t("auth.actions.signOut", { defaultValue: "Sign out" })}
+          {t("auth:actions.signOut", { defaultValue: "Sign out" })}
         </button>
       </div>
     </div>
@@ -1389,16 +1046,16 @@ export default function AuthGate({ children }) {
   const pendingVerificationCard = pendingVerificationEmail ? (
     <div className="auth-card">
       <div className="auth-card-brand">
-        <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
-        <h1 className="auth-card-title">{t("auth.pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
+        <img src={logoSrc} alt={t("auth:logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+        <h1 className="auth-card-title">{t("auth:pendingVerification.title", { defaultValue: "Check your inbox" })}</h1>
       </div>
       <p className="auth-subtitle">
         {verificationEmailQueued
-          ? t("auth.pendingVerification.description", {
+          ? t("auth:pendingVerification.description", {
               defaultValue: "We sent a verification link to {{email}}. Click it to finish creating your account, then sign in below.",
               email: maskEmailForDisplay(pendingVerificationEmail),
             })
-          : t("auth.pendingVerification.notSent", {
+          : t("auth:pendingVerification.notSent", {
               defaultValue:
                 "Your account was created, but we could not send the verification link to {{email}} just now. Use the button below to try again.",
               email: maskEmailForDisplay(pendingVerificationEmail),
@@ -1406,7 +1063,7 @@ export default function AuthGate({ children }) {
       </p>
       {resendVerificationSent ? (
         <p className="auth-helper-copy">
-          {t("auth.resendVerification.sent", {
+          {t("auth:resendVerification.sent", {
             defaultValue: "If that email is registered and unverified, a new verification link has been sent. Check your inbox (and spam folder).",
           })}
         </p>
@@ -1424,7 +1081,7 @@ export default function AuthGate({ children }) {
                 await resendVerificationApi({ email: pendingVerificationEmail });
                 setResendVerificationSent(true);
               } catch (error) {
-                setResendVerificationError(error instanceof Error ? error.message : t("auth.recovery.error", { defaultValue: "Something went wrong. Please try again." }));
+                setResendVerificationError(error instanceof Error ? error.message : t("auth:recovery.error", { defaultValue: "Something went wrong. Please try again." }));
               } finally {
                 setResendVerificationBusy(false);
               }
@@ -1432,7 +1089,7 @@ export default function AuthGate({ children }) {
           >
             {resendVerificationBusy
               ? t("common.sending", { defaultValue: "Sending..." })
-              : t("auth.actions.resendVerification", { defaultValue: "Resend verification email" })}
+              : t("auth:actions.resendVerification", { defaultValue: "Resend verification email" })}
           </button>
         </>
       )}
@@ -1448,7 +1105,7 @@ export default function AuthGate({ children }) {
             setView("login");
           }}
         >
-          {t("auth.actions.backToLogin", { defaultValue: "Back to login" })}
+          {t("auth:actions.backToLogin", { defaultValue: "Back to login" })}
         </button>
       </div>
     </div>
@@ -1468,26 +1125,37 @@ export default function AuthGate({ children }) {
           {showBackendBlocker ? (
             <div className="auth-card">
               <div className="auth-card-brand">
-                <img src={logoSrc} alt={t("auth.logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
+                <img src={logoSrc} alt={t("auth:logoAlt", { defaultValue: "Serpentora logo" })} className="auth-logo" />
                 <h1 className="auth-card-title">
-                  {snapshot.state === "config-error"
-                    ? t("auth.sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
-                    : snapshot.state === "unauthorized"
-                      ? t("auth.sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
-                      : t("auth.sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
+                  {!import.meta.env.DEV
+                    ? t("auth:sharedBackend.offlineTitle", { defaultValue: "Can't connect right now" })
+                    : snapshot.state === "config-error"
+                      ? t("auth:sharedBackend.configTitle", { defaultValue: "Shared backend configuration error" })
+                      : snapshot.state === "unauthorized"
+                        ? t("auth:sharedBackend.unauthorizedTitle", { defaultValue: "Shared backend session expired" })
+                        : t("auth:sharedBackend.unavailableTitle", { defaultValue: "Shared backend unavailable" })}
                 </h1>
               </div>
-              <p className="auth-subtitle">{snapshot.message}</p>
-              <div className="text-xs text-neutral-500">
-                {t("auth.sharedBackend.requirements", {
-                  defaultValue: "Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.",
-                })}
-              </div>
-              {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  {snapshot.config.warnings.join(" ")}
-                </div>
-              ) : null}
+              {/* Backend diagnostics are for developers; users get one plain sentence. */}
+              {import.meta.env.DEV ? (
+                <>
+                  <p className="auth-subtitle">{snapshot.message}</p>
+                  <div className="text-xs text-neutral-500">
+                    Cross-computer sync requires a running backend server, a shared database, the same VITE_API_URL in both apps, valid authentication, and network reachability from each device.
+                  </div>
+                  {Array.isArray(snapshot.config.warnings) && snapshot.config.warnings.length ? (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      {snapshot.config.warnings.join(" ")}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p className="auth-subtitle">
+                  {t("auth:sharedBackend.offlineMessage", {
+                    defaultValue: "Serpentora can't reach its server. Check your internet connection and try again.",
+                  })}
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" className="primary" onClick={retry}>
                   {t("common.retry", { defaultValue: "Retry" })}

@@ -46,7 +46,7 @@ const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Respons
     return await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "BreedingPlanner/1.0 (Demand Extractor)",
+        "User-Agent": "Serpentora/1.0 (Demand Extractor)",
         Accept: "text/html,application/xhtml+xml",
       },
     });

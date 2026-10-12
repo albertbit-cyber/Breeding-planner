@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Handles both local ('M'/'F') and pedigree ('male'/'female') formats
 const normSex = (s) => {
@@ -19,13 +20,13 @@ const STATUS_CHIP = {
   retired:   'bg-gray-100   text-gray-500   border-gray-200',
 };
 
-const LEGEND_ITEMS = [
-  { color: 'bg-violet-400', label: 'Selected snake' },
-  { color: 'bg-sky-400',    label: 'Sire (male parent)' },
-  { color: 'bg-pink-400',   label: 'Dam (female parent)' },
-  { color: 'bg-amber-400',  label: 'Clutch sibling' },
-  { color: 'bg-emerald-400',label: 'Offspring' },
-  { color: 'bg-neutral-300',label: 'Unknown parent' },
+const legendItems = (t) => [
+  { color: 'bg-violet-400', label: t('familyTree.legend.selectedSnake', { defaultValue: 'Selected snake' }) },
+  { color: 'bg-sky-400',    label: t('familyTree.legend.sire', { defaultValue: 'Sire (male parent)' }) },
+  { color: 'bg-pink-400',   label: t('familyTree.legend.dam', { defaultValue: 'Dam (female parent)' }) },
+  { color: 'bg-amber-400',  label: t('familyTree.legend.clutchSibling', { defaultValue: 'Clutch sibling' }) },
+  { color: 'bg-emerald-400',label: t('familyTree.legend.offspring', { defaultValue: 'Offspring' }) },
+  { color: 'bg-neutral-300',label: t('familyTree.legend.unknownParent', { defaultValue: 'Unknown parent' }) },
 ];
 
 const AvatarPlaceholder = ({ snake }) => {
@@ -59,17 +60,18 @@ const InfoRow = ({ label, value, mono }) => (
     <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400 flex-shrink-0">
       {label}
     </span>
-    <span className={`text-xs text-neutral-700 text-right ${mono ? 'font-mono' : ''}`}>
+    <span className={`text-xs text-neutral-700 text-end ${mono ? 'font-mono' : ''}`}>
       {value || '—'}
     </span>
   </div>
 );
 
 const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
+  const { t } = useTranslation();
   if (!snake) {
     return (
       <div className="ft-left-panel flex items-center justify-center">
-        <p className="text-sm text-neutral-400">Select a snake to view details.</p>
+        <p className="text-sm text-neutral-400">{t('familyTree.selectSnake', { defaultValue: 'Select a snake to view details.' })}</p>
       </div>
     );
   }
@@ -121,18 +123,18 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
       {/* Quick info */}
       <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
         <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
-          Quick Info
+          {t('familyTree.quickInfo', { defaultValue: 'Quick Info' })}
         </div>
         <div className="space-y-0">
-          <InfoRow label="Species"   value={snake.species} />
-          <InfoRow label="Hatch"     value={snake.hatchDate} mono />
-          <InfoRow label="Breeder"   value={snake.breederName} />
+          <InfoRow label={t('familyTree.info.species', { defaultValue: 'Species' })} value={snake.species} />
+          <InfoRow label={t('familyTree.info.hatch', { defaultValue: 'Hatch' })} value={snake.hatchDate} mono />
+          <InfoRow label={t('familyTree.info.breeder', { defaultValue: 'Breeder' })} value={snake.breederName} />
           <InfoRow label="ID"        value={snake.globalId || snake.localId} mono />
           {snake.clutchId && (
-            <InfoRow label="Clutch ID" value={snake.clutchId} mono />
+            <InfoRow label={t('familyTree.clutchId', { defaultValue: 'Clutch ID' })} value={snake.clutchId} mono />
           )}
-          <InfoRow label="Parents"   value={
-            [parents?.sire?.name, parents?.dam?.name].filter(Boolean).join(' × ') || 'Unknown'
+          <InfoRow label={t('familyTree.passport.parents', { defaultValue: 'Parents' })} value={
+            [parents?.sire?.name, parents?.dam?.name].filter(Boolean).join(' × ') || t('familyTree.info.unknown', { defaultValue: 'Unknown' })
           } />
         </div>
       </div>
@@ -141,7 +143,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
       {allSnakes?.length > 1 && (
         <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
-            Switch Snake
+            {t('familyTree.switchSnake', { defaultValue: 'Switch Snake' })}
           </div>
           <div className="space-y-1 max-h-36 overflow-y-auto">
             {allSnakes.map(s => (
@@ -150,7 +152,7 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
                 type="button"
                 onClick={() => onSnakeSelect?.(s)}
                 className={[
-                  'w-full text-left rounded-lg px-2 py-1.5 text-xs transition-colors flex items-center gap-2',
+                  'w-full text-start rounded-lg px-2 py-1.5 text-xs transition-colors flex items-center gap-2',
                   s.id === snake.id || s.id === snake.localId
                     ? 'bg-violet-100 text-violet-800 font-semibold'
                     : 'text-neutral-600 hover:bg-neutral-50',
@@ -169,10 +171,10 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
       {/* Legend */}
       <div className="rounded-2xl bg-white border border-violet-100 shadow-sm p-4">
         <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-2">
-          Legend
+          {t('familyTree.legend.title', { defaultValue: 'Legend' })}
         </div>
         <div className="space-y-1.5">
-          {LEGEND_ITEMS.map(({ color, label }) => (
+          {legendItems(t).map(({ color, label }) => (
             <div key={label} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-sm flex-shrink-0 ${color}`} />
               <span className="text-[11px] text-neutral-600">{label}</span>
@@ -180,11 +182,11 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
           ))}
           <div className="flex items-center gap-2 mt-1">
             <div className="w-3 h-0.5 border-t-2 border-dashed border-neutral-300 flex-shrink-0" />
-            <span className="text-[11px] text-neutral-600">Unconfirmed link</span>
+            <span className="text-[11px] text-neutral-600">{t('familyTree.legend.unconfirmedLink', { defaultValue: 'Unconfirmed link' })}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-0.5 border-t-2 border-solid border-violet-400 flex-shrink-0" />
-            <span className="text-[11px] text-neutral-600">Confirmed link</span>
+            <span className="text-[11px] text-neutral-600">{t('familyTree.legend.confirmedLink', { defaultValue: 'Confirmed link' })}</span>
           </div>
         </div>
       </div>

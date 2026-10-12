@@ -68,7 +68,7 @@ const GenLabelOverlay = ({ nodes, orientation }) => {
       ) : (
         <div
           key={label}
-          className="absolute left-3 flex items-center gap-1.5"
+          className="absolute start-3 flex items-center gap-1.5"
           style={{ top: value * viewport.zoom + viewport.y + 14 }}
         >
           <div className="w-1 h-6 rounded-full bg-violet-300 opacity-60" />

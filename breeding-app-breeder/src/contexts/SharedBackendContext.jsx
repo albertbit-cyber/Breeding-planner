@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { getHealth, getCurrentUser, hasStoredAuthSession, normalizeSharedApiError, resetSharedBackendState } from "../shared/apiClient";
-import { getSharedApiConfig } from "../shared/config/api";
+import { getSharedApiConfig } from "../shared/apiConfig";
 import { getSharedBackendSnapshot, subscribeSharedBackendStatus } from "../shared/backendStatus";
 
 const SharedBackendContext = createContext({

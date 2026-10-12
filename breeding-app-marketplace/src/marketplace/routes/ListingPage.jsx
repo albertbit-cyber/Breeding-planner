@@ -1,19 +1,93 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { comparables as fetchComparables, favorite, listingDetail, startConversation } from "../api";
+import { comparables as fetchComparables, favorite, listingDetail, reportListing, startConversation } from "../api";
 import { grams, initials, listingLocation, money, primaryImage, shortDate } from "../format";
-import { useAuthAction } from "../session";
+import { claimsOf, provenanceText, zygosityText } from "../genetics";
+import { useAuthAction, useResumeIntent } from "../session";
 import { SignInPrompt } from "../components/RequireAuth";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
-import GeneTags from "../ui/GeneTags";
+import GeneTags, { GeneTag } from "../ui/GeneTags";
 import Icon from "../ui/Icon";
 import { AvailabilityPill, Pill } from "../ui/Pill";
 import ProvenanceMeter from "../ui/ProvenanceMeter";
 import StarRating from "../ui/StarRating";
 import { ErrorPanel, Spinner } from "../ui/States";
 import { useToast } from "../ui/Toast";
+
+/**
+ * Where a buyer checks a certificate without trusting us: the same public page
+ * the certificate PDF links to.
+ */
+const VERIFY_BASE = String(import.meta.env?.VITE_CERTIFICATE_VERIFICATION_URL || "https://serpentora.com").replace(/\/$/, "");
+
+const LISTING_REPORT_TYPES = ["incorrect_genetics", "fake_listing", "scam_suspicion", "animal_welfare_concern", "other"];
+const REPORT_LABELS = {
+  incorrect_genetics: "The genetics are wrong or overstated",
+  fake_listing: "The animal or photos aren't real",
+  scam_suspicion: "Looks like a scam",
+  animal_welfare_concern: "Animal welfare concern",
+  other: "Something else",
+};
+
+/**
+ * The genetics, one claim per row, each with where it comes from. The rule
+ * this page keeps: a lab-confirmed het, a 66% possible het and a visual the
+ * seller can see are three different statements, and they are shown as three.
+ */
+function GeneticClaims({ listing, t }) {
+  const claims = claimsOf(listing);
+  if (!claims.length) {
+    return (
+      <p className="mk-muted mk-sm" style={{ margin: 0 }}>
+        {t("genes.none", { defaultValue: "The seller has not listed genetics. Ask before buying." })}
+      </p>
+    );
+  }
+  return (
+    <>
+      <ul className="mk-claims">
+        {claims.map((claim, index) => (
+          <li className="mk-claim" key={`${claim.label}-${index}`}>
+            <span className="mk-claim__what">
+              <GeneTag
+                label={claim.label}
+                het={claim.zygosity !== "visual"}
+                provenance={claim.provenance}
+                disputed={claim.labDisagrees}
+              />
+            </span>
+            <span className="mk-claim__how">
+              <b>{zygosityText(claim, t)}</b> · {provenanceText(claim, t)}
+            </span>
+            {claim.lab && claim.labDisagrees ? (
+              <span className="mk-claim__lab mk-claim__lab--disputed">
+                {t("genes.labDisagrees", {
+                  defaultValue: "The lab result on the certificate reads “{{result}}”. Ask the seller about this before buying.",
+                  result: claim.lab.result,
+                })}
+              </span>
+            ) : claim.lab && claim.lab.call === "inconclusive" ? (
+              <span className="mk-claim__lab">
+                {t("genes.labInconclusive", { defaultValue: "Tested, result inconclusive: “{{result}}”.", result: claim.lab.result })}
+              </span>
+            ) : claim.source === "lab" ? (
+              <span className="mk-claim__lab">
+                {t("genes.labOnly", { defaultValue: "Found by the lab; not in the seller's description." })}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <p className="mk-claim-legend">
+        <span>{t("genes.legendObserved", { defaultValue: "Observed: a visual the seller can see." })}</span>
+        <span>{t("genes.legendPredicted", { defaultValue: "Predicted: inferred from the parents, not tested." })}</span>
+        <span>{t("genes.legendLab", { defaultValue: "Lab-confirmed: on a shed-test certificate." })}</span>
+      </p>
+    </>
+  );
+}
 
 /** A weight curve, drawn to one scale, with the latest point called out. */
 function WeightSpark({ weights }) {
@@ -61,6 +135,14 @@ export default function ListingPage() {
   const navigate = useNavigate();
   const auth = useAuthAction();
 
+  const messageDraft = (item) =>
+    t("contact.messageDraft", {
+      defaultValue: "Hi — is {{title}} still available? I'd love to know more.",
+      title: item?.title || "",
+    });
+  const offerDraft = (item) =>
+    t("contact.offerDraft", { defaultValue: "I'd like to make an offer for {{title}}.", title: item?.title || "" });
+
   const [state, setState] = useState({ status: "loading" });
   const [comps, setComps] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -70,6 +152,10 @@ export default function ListingPage() {
   const [sending, setSending] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [reported, setReported] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportType, setReportType] = useState("incorrect_genetics");
+  const [reportNote, setReportNote] = useState("");
+  const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +180,29 @@ export default function ListingPage() {
   }, [id]);
 
   const listing = state.listing;
+
+  // A visitor who signed in mid-action lands back here; finish what they started.
+  useResumeIntent(
+    (intent) => intent.listingId === id && ["message", "offer", "favorite", "report"].includes(intent.kind),
+    (intent) => {
+      if (intent.kind === "favorite") {
+        if (!listing?.isFavorited) {
+          setFavorited(true);
+          favorite(id).catch(() => setFavorited(false));
+        }
+        return;
+      }
+      if (intent.kind === "report") {
+        setReportOpen(true);
+        return;
+      }
+      setMessage(intent.kind === "offer" ? offerDraft(listing) : messageDraft(listing));
+      setOffer("");
+      setContact(intent.kind);
+    },
+    state.status === "ready"
+  );
+
   const images = useMemo(() => {
     if (!listing) return [];
     const list = (listing.images || []).map((image) => image.imageUrl).filter(Boolean);
@@ -118,20 +227,27 @@ export default function ListingPage() {
 
   const openContact = (mode) =>
     auth.run({ kind: mode === "offer" ? "offer" : "message", listingId: listing.id }, () => {
-      setMessage(
-        mode === "offer"
-          ? t("contact.offerDraft", {
-              defaultValue: "I'd like to make an offer for {{title}}.",
-              title: listing.title,
-            })
-          : t("contact.messageDraft", {
-              defaultValue: "Hi — is {{title}} still available? I'd love to know more.",
-              title: listing.title,
-            })
-      );
+      setMessage(mode === "offer" ? offerDraft(listing) : messageDraft(listing));
       setOffer("");
       setContact(mode);
     });
+
+  const openReport = () => auth.run({ kind: "report", listingId: listing.id }, () => setReportOpen(true));
+
+  const submitReport = async () => {
+    setReporting(true);
+    try {
+      await reportListing(listing.id, { type: reportType, note: reportNote });
+      setReportOpen(false);
+      setReportNote("");
+      setReported(true);
+      notify(t("listing.reported", { defaultValue: "Thanks — our moderators will look at this listing." }));
+    } catch (error) {
+      notify(error?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
+    } finally {
+      setReporting(false);
+    }
+  };
 
   const send = async () => {
     setSending(true);
@@ -215,6 +331,13 @@ export default function ListingPage() {
             ) : null}
           </div>
 
+          <section aria-labelledby="mk-genetics-title">
+            <h2 id="mk-genetics-title" className="mk-label" style={{ margin: "6px 0 10px" }}>
+              {t("genes.title", { defaultValue: "Genetics, and where each claim comes from" })}
+            </h2>
+            <GeneticClaims listing={listing} t={t} />
+          </section>
+
           <section>
             <h2 className="mk-label" style={{ margin: "6px 0 10px" }}>
               {t("record.title", { defaultValue: "The record — published by the seller" })}
@@ -227,7 +350,7 @@ export default function ListingPage() {
                   </span>
                   <span className="mk-record__text">
                     <b className="mk-record__title">
-                      {t("record.geneticsConfirmed", { defaultValue: "Genetics confirmed by shed test" })}
+                      {t("record.labCertificate", { defaultValue: "Lab certificate (shed test)" })}
                     </b>
                     <span className="mk-record__sub">
                       {[
@@ -242,9 +365,16 @@ export default function ListingPage() {
                         .join(" · ")}
                     </span>
                   </span>
-                  <Pill tone="sky" icon="shield">
-                    {t("record.verified", { defaultValue: "Verified" })}
-                  </Pill>
+                  {record.certificate.verificationCode ? (
+                    <a
+                      className="mk-xs"
+                      href={`${VERIFY_BASE}/verify/${encodeURIComponent(record.certificate.verificationCode)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t("record.checkCertificate", { defaultValue: "Check this certificate" })}
+                    </a>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -380,7 +510,7 @@ export default function ListingPage() {
 
         <div className="mk-detail__rail">
           <div className="mk-card" style={{ padding: 20, boxShadow: "var(--mk-lift)" }}>
-            <GeneTags genetics={listing.genetics} />
+            <GeneTags listing={listing} max={4} />
             <h1 className="mk-h1" style={{ marginTop: 10 }}>
               {listing.title}
             </h1>
@@ -505,18 +635,7 @@ export default function ListingPage() {
             icon="flag"
             style={{ alignSelf: "flex-start" }}
             disabled={reported}
-            onClick={() =>
-              auth.run({ kind: "message", listingId: listing.id }, () => {
-                // Reporting a listing opens a thread with the moderation team
-                // rather than doing nothing, which is what the old button did.
-                setReported(true);
-                notify(
-                  t("listing.reported", {
-                    defaultValue: "Thanks — our moderators will look at this listing.",
-                  })
-                );
-              })
-            }
+            onClick={openReport}
           >
             {reported
               ? t("listing.reportedShort", { defaultValue: "Reported" })
@@ -587,6 +706,44 @@ export default function ListingPage() {
             defaultValue: "This opens a thread in your inbox — the seller's reply lands there.",
           })}
         </p>
+      </Dialog>
+
+      <Dialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        size="sm"
+        title={t("listing.reportTitle", { defaultValue: "Report this listing" })}
+        description={listing.title}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setReportOpen(false)}>
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button variant="ink" busy={reporting} onClick={submitReport}>
+              {t("listing.sendReport", { defaultValue: "Send to moderators" })}
+            </Button>
+          </>
+        }
+      >
+        <fieldset className="mk-field">
+          <legend className="mk-label">{t("listing.reportWhat", { defaultValue: "What's wrong?" })}</legend>
+          {LISTING_REPORT_TYPES.map((value) => (
+            <label key={value} className="mk-row" style={{ gap: 8 }}>
+              <input
+                type="radio"
+                name="listing-report-type"
+                value={value}
+                checked={reportType === value}
+                onChange={() => setReportType(value)}
+              />
+              <span className="mk-sm">{t(`listing.reportTypes.${value}`, { defaultValue: REPORT_LABELS[value] })}</span>
+            </label>
+          ))}
+        </fieldset>
+        <label className="mk-field">
+          <span className="mk-label">{t("listing.reportNote", { defaultValue: "Anything moderators should know (optional)" })}</span>
+          <textarea className="mk-textarea" rows={3} value={reportNote} onChange={(event) => setReportNote(event.target.value)} />
+        </label>
       </Dialog>
 
       <SignInPrompt intent={auth.pending} onClose={auth.dismiss} />

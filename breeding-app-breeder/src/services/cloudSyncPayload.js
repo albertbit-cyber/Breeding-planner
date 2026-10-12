@@ -93,11 +93,15 @@ export function applyRemoteDeletions(snapshot = {}, deleted = null) {
   if (!deleted) return snapshot;
   const deadSnakes = new Set(Array.isArray(deleted.animals) ? deleted.animals : []);
   const deadPairings = new Set(Array.isArray(deleted.pairings) ? deleted.pairings : []);
-  if (!deadSnakes.size && !deadPairings.size) return snapshot;
+  const deadCycles = new Set(Array.isArray(deleted.breedingCycles) ? deleted.breedingCycles : []);
+  const deadExams = new Set(Array.isArray(deleted.follicleExams) ? deleted.follicleExams : []);
+  if (!deadSnakes.size && !deadPairings.size && !deadCycles.size && !deadExams.size) return snapshot;
   return {
     ...snapshot,
     snakes: (snapshot.snakes || []).filter(record => !deadSnakes.has(record?.id)),
     pairings: (snapshot.pairings || []).filter(record => !deadPairings.has(record?.id)),
+    breedingCycles: (snapshot.breedingCycles || []).filter(record => !deadCycles.has(record?.id)),
+    follicleExams: (snapshot.follicleExams || []).filter(record => !deadExams.has(record?.id)),
   };
 }
 
@@ -116,6 +120,8 @@ export function applyChangedRecords(snapshot = {}, changed = {}) {
     ...snapshot,
     snakes: overlay(snapshot.snakes, changed.snakes),
     pairings: overlay(snapshot.pairings, changed.pairings),
+    breedingCycles: overlay(snapshot.breedingCycles, changed.breedingCycles),
+    follicleExams: overlay(snapshot.follicleExams, changed.follicleExams),
     plannerState: changed.plannerState || snapshot.plannerState,
   };
 }

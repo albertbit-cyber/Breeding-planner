@@ -59,7 +59,7 @@ export default function HousingPanel({ snakes = [], spaces = {}, onMoveToQuarant
           {conflicts.map(({ snake, location }) => (
             <li key={snake.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-white px-2.5 py-1.5">
               <span className="min-w-0 text-[11px]">
-                <span className="font-medium text-neutral-900">{snake.name || snake.id}</span>
+                <span className="font-medium text-neutral-900"><bdi>{snake.name || snake.id}</bdi></span>
                 <span className="text-neutral-500">
                   {' — '}
                   {location.assetName || t('quarantine.housing.unnamedAsset', { defaultValue: 'unnamed' })}

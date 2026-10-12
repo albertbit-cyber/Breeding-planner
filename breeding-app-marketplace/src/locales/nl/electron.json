@@ -1,15 +1,15 @@
 {
 	"window": {
-		"title": "Breeding Planner"
+		"title": "Serpentora"
 	},
 	"dialogs": {
 		"storageReadFailed": {
 			"title": "Gegevens kunnen niet worden geopend",
-			"message": "Breeding Planner kon je lokale gegevensbestand niet lezen. Er wordt een nieuwe werkruimte aangemaakt."
+			"message": "Serpentora kon je lokale gegevensbestand niet lezen. Er wordt een nieuwe werkruimte aangemaakt."
 		},
 		"storageWriteFailed": {
 			"title": "Gegevens kunnen niet worden opgeslagen",
-			"message": "Breeding Planner kon je laatste wijzigingen niet opslaan. Probeer het opnieuw of exporteer een handmatige back-up."
+			"message": "Serpentora kon je laatste wijzigingen niet opslaan. Probeer het opnieuw of exporteer een handmatige back-up."
 		}
 	},
 	"locale": {

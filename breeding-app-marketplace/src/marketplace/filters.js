@@ -1,4 +1,6 @@
+// i18n-namespace: marketplace (callers pass the t from useTranslation("marketplace"))
 import { geneTokens, joinTokens } from "./format";
+import { geneToken, normalizeGeneToken, parseGeneToken, tokenLabel } from "./genetics";
 
 /**
  * The browse filter model.
@@ -56,33 +58,46 @@ export const toSearchParams = (filters) => {
 };
 
 /**
- * Gene tokens are a set, not a text field. Clicking a gene includes it,
- * clicking again excludes it, clicking a third time clears it -- which is what
- * replaced two comma-separated free-text boxes labelled "Include genes" and
- * "Exclude genes".
+ * Gene tokens are a set, not a text field, and they speak the hobby's
+ * language: a bare gene is a visual, "het Clown" is a het. A quick gene cycles
+ * visual -> het -> ruled out -> off, which replaced two comma-separated
+ * free-text boxes labelled "Include genes" and "Exclude genes" -- and a filter
+ * that could not tell a visual Clown from a het one.
  */
+const sameGene = (token, gene) => parseGeneToken(token)?.gene.toLowerCase() === gene.toLowerCase();
+
 export const geneState = (filters, gene) => {
-  const needle = gene.toLowerCase();
-  if (geneTokens(filters.includeGenes).some((token) => token.toLowerCase() === needle)) return "include";
-  if (geneTokens(filters.excludeGenes).some((token) => token.toLowerCase() === needle)) return "exclude";
+  const included = geneTokens(filters.includeGenes).find((token) => sameGene(token, gene));
+  if (included) return parseGeneToken(included)?.zygosity === "visual" ? "visual" : "het";
+  if (geneTokens(filters.excludeGenes).some((token) => sameGene(token, gene))) return "exclude";
   return "off";
 };
 
 export const cycleGene = (filters, gene) => {
   const state = geneState(filters, gene);
-  const needle = gene.toLowerCase();
-  const without = (value) => geneTokens(value).filter((token) => token.toLowerCase() !== needle);
+  const includes = geneTokens(filters.includeGenes).filter((token) => !sameGene(token, gene));
+  const excludes = geneTokens(filters.excludeGenes).filter((token) => !sameGene(token, gene));
 
   if (state === "off") {
-    return { includeGenes: joinTokens([...geneTokens(filters.includeGenes), gene]), excludeGenes: filters.excludeGenes };
+    return { includeGenes: joinTokens([...includes, geneToken(gene, "visual")]), excludeGenes: joinTokens(excludes) };
   }
-  if (state === "include") {
-    return {
-      includeGenes: joinTokens(without(filters.includeGenes)),
-      excludeGenes: joinTokens([...geneTokens(filters.excludeGenes), gene]),
-    };
+  if (state === "visual") {
+    return { includeGenes: joinTokens([...includes, geneToken(gene, "het")]), excludeGenes: joinTokens(excludes) };
   }
-  return { includeGenes: filters.includeGenes, excludeGenes: joinTokens(without(filters.excludeGenes)) };
+  if (state === "het") {
+    return { includeGenes: joinTokens(includes), excludeGenes: joinTokens([...excludes, geneToken(gene, "visual")]) };
+  }
+  return { includeGenes: joinTokens(includes), excludeGenes: joinTokens(excludes) };
+};
+
+/** Adds a typed token ("het clown", "Pastel") to the required genes, once. */
+export const addGeneToken = (filters, value) => {
+  const token = normalizeGeneToken(value);
+  if (!token) return {};
+  const parsed = parseGeneToken(token);
+  const includes = geneTokens(filters.includeGenes).filter((existing) => !sameGene(existing, parsed.gene));
+  const excludes = geneTokens(filters.excludeGenes).filter((existing) => !sameGene(existing, parsed.gene));
+  return { includeGenes: joinTokens([...includes, token]), excludeGenes: joinTokens(excludes) };
 };
 
 /** Everything currently narrowing the results, as removable chips. */
@@ -91,12 +106,12 @@ export const activeChips = (filters, t) => {
   const push = (key, label, patch) => chips.push({ key, label, patch });
 
   geneTokens(filters.includeGenes).forEach((gene) =>
-    push(`gene-in-${gene}`, gene, {
+    push(`gene-in-${gene}`, tokenLabel(gene, t), {
       includeGenes: joinTokens(geneTokens(filters.includeGenes).filter((token) => token !== gene)),
     })
   );
   geneTokens(filters.excludeGenes).forEach((gene) =>
-    push(`gene-out-${gene}`, t("filters.without", { defaultValue: "no {{gene}}", gene }), {
+    push(`gene-out-${gene}`, t("filters.without", { defaultValue: "no {{gene}}", gene: tokenLabel(gene, t) }), {
       excludeGenes: joinTokens(geneTokens(filters.excludeGenes).filter((token) => token !== gene)),
     })
   );

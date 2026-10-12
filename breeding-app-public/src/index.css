@@ -190,6 +190,10 @@ img { max-width: 100%; }
 .grid-2    { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .grid-3    { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
+/* Five feature cards: three across, then two wider ones, so no card sits alone on a row. */
+.feat-grid-5 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.feat-grid-5 > * { grid-column: span 2; }
+.feat-grid-5 > :nth-child(n+4) { grid-column: span 3; }
 
 /* ── Auth card ─────────────────────────────────────── */
 .auth-card {
@@ -202,10 +206,95 @@ img { max-width: 100%; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { display: inline-block; animation: spin .8s linear infinite; }
 
+/* Radio choices drawn as outline buttons (/waitlist): the input is visually
+   hidden, so its keyboard focus has to show on the label. */
+.choice-chip { position: relative; }
+.choice-chip:focus-within { box-shadow: 0 0 0 3px rgba(14,165,233,0.35); }
+
+/* ── Certificate verification (/verify) ────────────── */
+/* Tab Gold is the lab module's hue, and a certificate is that module's output,
+   so a confirmed result sits on it. "Not found" is not a module: it gets a
+   neutral surface. Neither card is clickable, so both stay at Rest. */
+.verify-page {
+  --tab-gold-surface: #f5edcc; --tab-gold-border: #e0d090; --tab-gold-mark: #c8a840;
+  --tab-gold-title: #3c2c08;   --tab-gold-text: #5a4010;
+  --gene-violet-wash: #e8dff8; --gene-violet-deep: #5a2896;
+  --gene-coral-wash: #fbd5d5;  --gene-coral-deep: #a03030;
+  --shadow-rest: 0 1px 2px rgba(15,23,42,0.06);
+  --focus-ring: 0 0 0 3px rgba(14,165,233,0.35);
+  min-height: calc(100vh - 140px);
+}
+.verify-wrap  { max-width: 560px; margin: 0 auto; }
+.verify-title { font-size: 26px; font-weight: 500; line-height: 1.3; color: var(--dark); }
+.verify-sub   { font-size: 15px; line-height: 1.7; color: var(--muted); margin-top: 8px; max-width: 60ch; }
+
+.verify-form {
+  margin-top: 1.5rem; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 24px; box-shadow: var(--shadow-rest);
+}
+.verify-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: .04em;
+}
+.field input.verify-input:focus { border-color: var(--gold); box-shadow: var(--focus-ring); }
+.field input.verify-input[aria-invalid="true"] { border-color: #9f1239; }
+.verify-form .field-error { color: #9f1239; }
+.verify-form .btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.verify-result {
+  margin-top: 16px; border-radius: 12px; padding: 24px;
+  border: 1px solid var(--border); box-shadow: var(--shadow-rest);
+}
+.verify-result-valid   { background: var(--tab-gold-surface); border-color: var(--tab-gold-border); }
+.verify-result-missing { background: var(--bg-card); }
+.verify-result-head  { display: flex; gap: 16px; align-items: flex-start; }
+.verify-result-head .feat-icon { margin-bottom: 0; flex-shrink: 0; }
+.verify-chip-lab     { background: var(--tab-gold-mark); }
+.verify-chip-neutral { background: var(--border); }
+.verify-chip-neutral .ti { color: var(--muted); }
+.verify-result-title { font-size: 15px; font-weight: 500; line-height: 1.4; color: var(--dark); }
+.verify-result-valid .verify-result-title { color: var(--tab-gold-title); }
+.verify-result-sub   { font-size: 13px; line-height: 1.6; color: var(--muted); margin-top: 4px; }
+.verify-result-valid .verify-result-sub { color: var(--tab-gold-text); }
+
+.verify-facts {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--tab-gold-border);
+}
+.verify-fact dt {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tab-gold-text);
+}
+.verify-fact dd   { font-size: 14px; font-weight: 500; color: var(--tab-gold-title); margin-top: 2px; overflow-wrap: anywhere; }
+.verify-mono      { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; }
+
+.verify-results-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tab-gold-text); margin-top: 20px;
+}
+.verify-lines { list-style: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--tab-gold-border); border-radius: 8px; }
+.verify-line  {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 14px; font-size: 14px; color: var(--dark);
+}
+.verify-line + .verify-line { border-top: 1px solid var(--border); }
+.verify-tag         { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+.verify-tag-het     { background: var(--gene-violet-wash); color: var(--gene-violet-deep); }
+.verify-tag-visual  { background: var(--gene-coral-wash); color: var(--gene-coral-deep); }
+.verify-tag-neutral { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+.verify-alert { margin-top: 16px; margin-bottom: 0; }
+.verify-note  { font-size: 13px; line-height: 1.6; color: var(--muted); margin-top: 24px; }
+
 /* ── Responsive ────────────────────────────────────── */
 @media (max-width: 640px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .feat-grid-5 { grid-template-columns: 1fr; }
+  .feat-grid-5 > *, .feat-grid-5 > :nth-child(n+4) { grid-column: auto; }
   .section-title, .section-title-light { font-size: 20px; }
   .hero-pills { display: none; }
   .animal-grid { grid-template-columns: 1fr; }
+  .verify-title { font-size: 20px; }
+  .verify-facts { grid-template-columns: 1fr; }
+  .verify-form, .verify-result { padding: 18px; }
 }

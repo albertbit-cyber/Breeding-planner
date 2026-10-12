@@ -18,8 +18,13 @@ import { getMarketplaceComparables, listMarketplaceListings } from "../services/
 
 const db = prisma as any;
 
-/** The `where` the browse query actually sent to Prisma. */
-const whereFor = () => db.marketplaceListing.findMany.mock.calls[0][0].where;
+/**
+ * The `where` the browse query actually sent to Prisma. Gene filters run a
+ * narrow candidate query first (it selects, rather than includes), so the
+ * browse query is the one carrying `include`.
+ */
+const whereFor = () =>
+  db.marketplaceListing.findMany.mock.calls.find((call: any[]) => call[0]?.include)[0].where;
 const andClauses = () => whereFor().AND || [];
 
 beforeEach(() => {
@@ -39,15 +44,68 @@ describe("browse filters", () => {
   });
 
   it("runs gene include and exclude in the query rather than on the fetched page", async () => {
+    db.marketplaceListing.findMany.mockImplementation(async (args: any) =>
+      args?.select
+        ? [
+            { id: "both", genetics: "Clown, Pied" },
+            { id: "het-only", genetics: "Clown het Pied" },
+            { id: "spider", genetics: "Spider Clown, Pied" },
+          ]
+        : []
+    );
+
     await listMarketplaceListings({ includeGenes: "Clown, Pied", excludeGenes: "Spider" });
 
-    expect(andClauses()).toEqual(
+    // The candidate query narrows by mention; the parser decides the match.
+    const candidate = db.marketplaceListing.findMany.mock.calls.find((call: any[]) => call[0]?.select)[0];
+    expect(candidate.where.OR).toEqual(
       expect.arrayContaining([
         { genetics: { contains: "Clown", mode: "insensitive" } },
         { genetics: { contains: "Pied", mode: "insensitive" } },
-        { NOT: { genetics: { contains: "Spider", mode: "insensitive" } } },
+        { genetics: { contains: "Spider", mode: "insensitive" } },
       ])
     );
+    expect(andClauses()).toEqual(
+      expect.arrayContaining([
+        // "het Pied" is not a visual Pied, so the het-only animal is out.
+        { id: { in: ["both", "spider"] } },
+        { id: { notIn: ["spider"] } },
+      ])
+    );
+  });
+
+  it("reads a het filter as a het, and never finds a gene inside another gene", async () => {
+    db.marketplaceListing.findMany.mockImplementation(async (args: any) =>
+      args?.select
+        ? [
+            { id: "visual", genetics: "Clown" },
+            { id: "het", genetics: "Pastel het Clown" },
+            { id: "lavender", genetics: "Lavender Albino" },
+            { id: "albino", genetics: "Albino" },
+          ]
+        : []
+    );
+
+    await listMarketplaceListings({ includeGenes: "het Clown" });
+    expect(andClauses()).toEqual(expect.arrayContaining([{ id: { in: ["het"] } }]));
+
+    db.marketplaceListing.findMany.mockClear();
+    await listMarketplaceListings({ includeGenes: "Albino" });
+    expect(andClauses()).toEqual(expect.arrayContaining([{ id: { in: ["albino"] } }]));
+  });
+
+  it("offers the species actually listed, for the species filter", async () => {
+    db.marketplaceListing.groupBy = vi.fn().mockResolvedValue([
+      { species: "Corn snake", _count: { _all: 2 } },
+      { species: "Ball python", _count: { _all: 9 } },
+      { species: null, _count: { _all: 1 } },
+    ]);
+    const result = await listMarketplaceListings({});
+    expect(result.facets.species).toEqual([
+      { species: "Ball python", count: 9 },
+      { species: "Corn snake", count: 2 },
+    ]);
+    delete db.marketplaceListing.groupBy;
   });
 
   it("runs the weight and verified-breeder filters in the query too", async () => {

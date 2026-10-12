@@ -19,6 +19,8 @@ vi.mock("../lib/prisma", () => {
     pairing: listModel(),
     clutch: listModel(),
     reproductiveCycle: listModel(),
+    breedingCycle: listModel(),
+    follicleExamination: listModel(),
     listing: listModel(),
     savedSearch: listModel(),
     notificationPreference: listModel(),

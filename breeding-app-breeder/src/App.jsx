@@ -13,10 +13,25 @@ import SuggestionsTab from "./features/suggestions/SuggestionsTab";
 import FamilyTreePage from "./features/familyTree/index.jsx";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
 import BatchOrderCart from "./features/lab/components/BatchOrderCart.jsx";
-import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 import { SampleLabelPreview, ShippingLabelPreview } from "./features/lab/components/LabLabelPreview.jsx";
 import BreederShedTestingPanel from "./features/lab/components/BreederShedTestingPanel.jsx";
 import { ReproductiveIntelligencePanel } from "./features/animals/ReproductiveIntelligencePanel.jsx";
+import { BreedingWorkspace, buildBreedingCalendarEvents } from "./features/breeding/BreedingWorkspace.jsx";
+import { FemaleBreedingPanel, MaleBreedingPanel } from "./features/breeding/components/AnimalBreedingPanels.jsx";
+import { useBreedingActions } from "./features/breeding/useBreedingActions";
+import {
+  sanitizeBreedingCycleRecord,
+  sanitizeFollicleExamRecord,
+  mergeBreedingCycleRecords,
+  mergeFollicleExamRecords,
+  stripLargeAttachments,
+} from "./features/breeding/domain/sync";
+import { planLegacyMigration } from "./features/breeding/domain/legacyMigration";
+import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
+import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE } from "./features/breeding/domain/cycleModel";
+import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
+import { timelineKindLabel as breedingTimelineKindLabel, certaintyLabel as breedingCertaintyLabel } from "./features/breeding/components/labels";
+import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
 import ShedTestTerminalPanel from "./features/lab/components/ShedTestTerminalPanel.jsx";
 import {
   getActiveLabelSize,
@@ -31,6 +46,12 @@ import { LAB_LABEL_DEBUG_STORAGE_KEY } from "./features/lab/utils/labelLayout";
 import { useGoogleCalendarIntegration } from "./hooks/useGoogleCalendarIntegration";
 import { useAppearance, HIGH_CONTRAST_SKIN, materialStatus } from "./contexts/AppearanceContext.jsx";
 import { useSharedBackend } from "./contexts/SharedBackendContext.jsx";
+import BackendStatusDot from "./components/BackendStatusDot.jsx";
+import { useFeatureAccess } from "./features/subscriptions/FeatureAccessContext.jsx";
+import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx";
+import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
+import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
+import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -40,6 +61,9 @@ import {
   cancelAccountDeletion,
   downloadAccountDataExport,
   changeMySubscription,
+  createBillingCheckout,
+  createBillingPortal,
+  fetchBillingStatus,
   checkFeatureAccess,
   clearAuthToken,
   createMarketplaceListing,
@@ -48,11 +72,9 @@ import {
   updateMarketplaceListing,
   uploadMarketplaceMedia,
   fetchMySubscription,
-  fetchMyListings,
   fetchPublicSubscriptionTiers,
   getCurrentUser,
   saveBreederSnapshot,
-  saveMyListings,
 } from "./shared/apiClient";
 import {
   getSyncTimestamp,
@@ -82,6 +104,7 @@ import { DEFAULT_SPECIES_ID, getSpeciesById, resolveSpeciesId, speciesHasGeneDat
 import { syncGeneOverlay } from "./genetics/geneOverlaySync";
 import SpeciesSelect from "./components/SpeciesSelect";
 import SpeciesDashboard from "./features/species/SpeciesDashboard";
+import SpeciesGate from "./features/species/SpeciesGate";
 import {
   flattenGroupsBySpecies,
   mergeGroupsBySpecies,
@@ -110,9 +133,13 @@ import { parseCsvToRows, detectHeaderKey } from "./utils/csvRows";
 import { detectImportSource, IMPORT_SOURCES } from "./features/animals/import/importSource";
 import { buildMorphMarketImportPlan, selectRowsToCommit } from "./features/animals/import/morphmarketAdapter";
 import MorphMarketImportReview from "./features/animals/import/MorphMarketImportReview.jsx";
+import { BreedersGroupGate } from "./features/animals/BreedersGroupPicker.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
+import { FOR_SALE_STATUS, canonicalStatusValue } from "./features/animals/statusValue";
+import { ARRIVAL, IMPORT_DEFAULT_ARRIVAL, MANUAL_ADD_DEFAULT_ARRIVAL, admitAnimal } from "./features/animals/quarantineDefault";
 import {
   buildMarketplaceListingPayload,
+  withListingPhoto,
   listingNeedsPhoto,
   listingUpdatePayloadFromListing,
   reconcileDraftWithListing,
@@ -133,7 +160,6 @@ import {
 } from "./features/animals/exportScope";
 import {
   CATALOG_COLORS,
-  CATALOG_METRICS,
   catalogBirthValue,
   catalogPhotoBox,
   catalogSexWord,
@@ -153,9 +179,7 @@ import { recordQuarantineStart } from "./services/quarantineNotice";
 import { QUARANTINE_ROOM_NAME, findQuarantineRoom, isQuarantineRoom } from "./services/quarantineHousing";
 import {
   QUARANTINE_SOURCES,
-  QUARANTINE_STATUS,
   QUARANTINE_TAG,
-  applyQuarantineStatus,
   countQuarantined,
   deriveQuarantineEvents,
   getQuarantineDays,
@@ -674,7 +698,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
             <button className="px-3 py-2 rounded-2xl border" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
           </div>
         </div>
-        <div className="mt-5 space-y-4 max-h-[65vh] overflow-auto pr-1">
+        <div className="mt-5 space-y-4 max-h-[65vh] overflow-auto pe-1">
           {grouped.map(group => (
             <div key={group.levelIndex} className="rounded-3xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="mb-2 text-xs uppercase tracking-wide text-neutral-500">{t('spaces.levelLabel', { defaultValue: 'Level {{index}}', index: group.levelIndex + 1 })}</div>
@@ -688,20 +712,20 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                       key={slotKey}
                       type="button"
                       className={cx(
-                        'relative rounded-2xl border px-3 py-3 text-left transition-colors flex flex-col justify-between overflow-hidden',
+                        'relative rounded-2xl border px-3 py-3 text-start transition-colors flex flex-col justify-between overflow-hidden',
                         occupant ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400' : 'border-neutral-200 bg-white hover:border-neutral-300'
                       )}
                       style={{ height: `${slotHeight}px` }}
                       onClick={() => handleOpenSlot(slot)}
                     >
-                      <span className="absolute top-2 right-2 text-[11px] font-semibold text-neutral-600 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
+                      <span className="absolute top-2 end-2 text-[11px] font-semibold text-neutral-600 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
                         {slotNumber}
                       </span>
                       {occupant ? (
                         <div>
                           <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.slotLabel', { defaultValue: 'Slot {{slot}}', slot: `${slot.levelIndex + 1}.${slot.columnIndex + 1}` })}</div>
                           <div className="text-sm font-semibold text-neutral-900 truncate">{occupant?.name}</div>
-                          <div className="text-xs text-neutral-500 truncate">{occupant.id}</div>
+                          <div className="text-xs text-neutral-500 truncate"><bdi>{occupant.id}</bdi></div>
                         </div>
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center text-neutral-400">
@@ -727,7 +751,7 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                 <div>
                   <div className="text-xs uppercase tracking-wide text-neutral-500">{t('spaces.assignSlot', { defaultValue: 'Assign tub {{slot}}', slot: `${activeSlot.levelIndex + 1}.${activeSlot.columnIndex + 1}` })}</div>
                   <div className="text-lg font-semibold text-neutral-900">{activeSlotOccupant?.name || t('spaces.emptySlot', { defaultValue: 'Empty' })}</div>
-                  {activeSlotOccupant && <div className="text-xs text-neutral-500">{activeSlotOccupant.id}</div>}
+                  {activeSlotOccupant && <div className="text-xs text-neutral-500"><bdi>{activeSlotOccupant.id}</bdi></div>}
                 </div>
                 <button type="button" className="px-3 py-2 rounded-2xl border" onClick={dismissAssignModal}>{t('common.close', { defaultValue: 'Close' })}</button>
               </div>
@@ -753,13 +777,13 @@ function RackView({ rack, snakeOptions, snakeMap, occupiedSnakeIds = new Set(), 
                         key={option.id}
                         type="button"
                         className={cx(
-                          'w-full px-4 py-3 text-left text-sm transition-colors',
+                          'w-full px-4 py-3 text-start text-sm transition-colors',
                           optionSelected ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-neutral-50'
                         )}
                         onClick={() => handleAssignForSlot(option.id)}
                       >
                         <div className="font-semibold text-neutral-900">{option.label}</div>
-                        <div className="text-xs text-neutral-500">{option.id}</div>
+                        <div className="text-xs text-neutral-500"><bdi>{option.id}</bdi></div>
                         {optionSelected && <div className="text-[11px] font-semibold text-emerald-600 mt-1">{t('spaces.assign.current', { defaultValue: 'Currently assigned' })}</div>}
                       </button>
                     );
@@ -828,7 +852,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
           <div>
             <div className="text-sm font-semibold text-neutral-700 mb-2">
               {t('spaces.currentOccupants', { defaultValue: 'Animals inside: {{count}}', count: occupants.length })}
-              <span className="ml-2 text-xs text-neutral-500">{t('spaces.capacitySummary', { defaultValue: '{{count}} / {{capacity}} slots', count: occupants.length, capacity: capacityValue })}</span>
+              <span className="ms-2 text-xs text-neutral-500">{t('spaces.capacitySummary', { defaultValue: '{{count}} / {{capacity}} slots', count: occupants.length, capacity: capacityValue })}</span>
             </div>
             {occupants.length ? (
               <div className="flex flex-wrap gap-2">
@@ -866,7 +890,7 @@ function TerrariumView({ terrarium, snakeOptions, snakeMap, onEdit, onDelete, on
                 setDraft('');
               }}
             >
-              {t('spaces.addOccupant', { defaultValue: 'Assign snake' })}
+              {t('spaces.assignSnake', { defaultValue: 'Assign snake' })}
             </button>
             {!availableOptions.length && (
               <div className="text-xs text-neutral-500">
@@ -1108,10 +1132,12 @@ function getLockRecordedDate(appointment = {}) {
   return null;
 }
 
-const PENDING_ANIMAL_VIEW_KEY = 'breedingPlannerPendingAnimalView';
 const STORAGE_KEYS = {
   snakes: 'breedingPlannerSnakes',
   pairings: 'breedingPlannerPairings',
+  breedingCycles: 'breedingPlannerBreedingCycles',
+  follicleExams: 'breedingPlannerFollicleExams',
+  breedingSettings: 'breedingPlannerBreedingSettings',
   groups: 'breedingPlannerGroups',
   groupsBySpecies: 'breedingPlannerGroupsBySpecies',
   showGroups: 'breedingPlannerShowGroups',
@@ -1485,8 +1511,8 @@ export const ANIMAL_EXPORT_FIELD_DEFS = [
   },
   {
     key: 'projects',
-    label: 'Projects',
-    section: 'Projects',
+    label: 'Pairings',
+    section: 'Pairings',
     getter: (snake, ctx = {}) => {
       const pairings = ctx.pairingsBySnakeId?.get(snake?.id) || [];
       const labels = pairings.map(item => item?.label).filter(Boolean);
@@ -1537,7 +1563,7 @@ export const DEFAULT_ANIMAL_EXPORT_FIELDS = [
 export const PAIRING_EXPORT_FIELD_DEFS = [
   {
     key: 'label',
-    label: 'Project label',
+    label: 'Pairing label',
     section: 'Summary',
     getter: (pairing, ctx = {}) => ctx.displayLabel || pairing?.label || pairing?.id || '',
   },
@@ -1555,7 +1581,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
   },
   {
     key: 'status',
-    label: 'Project status',
+    label: 'Pairing status',
     section: 'Summary',
     getter: (pairing, ctx = {}) => summarizePairingStatus(ctx.derived),
   },
@@ -1752,7 +1778,7 @@ function buildAnimalListDataset(snakesSubset = [], options = {}) {
     { key: 'lastFeed', label: columnLabel('lastFeed', 'Last feed') },
     { key: 'groups', label: columnLabel('groups', 'Groups') },
     { key: 'tags', label: columnLabel('tags', 'Tags') },
-    { key: 'projects', label: columnLabel('projects', 'Projects') },
+    { key: 'projects', label: columnLabel('projects', 'Pairings') },
   ];
 
   const snakeMap = makeSnakeMap(allSnakes);
@@ -2830,6 +2856,10 @@ function sanitizeSnakeRecord(raw) {
           .filter(Boolean)
       : []);
   snake.tags = Array.isArray(raw.tags) ? raw.tags.map(token => String(token || '').trim()).filter(Boolean) : [];
+  // The old status list offered the misspelt "for sell" and the phone app writes "For Sale"; both
+  // are read as "For sale". Only that status is rewritten, the same way on every device, so the
+  // sync never churns over it.
+  if (canonicalStatusValue(raw.status) === FOR_SALE_STATUS) snake.status = FOR_SALE_STATUS;
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
@@ -2913,10 +2943,15 @@ function getPersistablePlannerSnapshot(snakes = [], pairings = []) {
 
 function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {}) {
   const syncedSnakes = normalizeSnakeListForDisplay(syncedSnapshot.snakes);
+  const breedingCollections = {
+    breedingCycles: Array.isArray(syncedSnapshot.breedingCycles) ? syncedSnapshot.breedingCycles : [],
+    follicleExams: Array.isArray(syncedSnapshot.follicleExams) ? syncedSnapshot.follicleExams : [],
+  };
   if (syncedSnakes.some(snake => !isDemoSnakeRecord(snake))) {
     return {
       snakes: syncedSnakes,
       pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+      ...breedingCollections,
       plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
     };
   }
@@ -2930,6 +2965,7 @@ function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {
   return {
     snakes: !localHasRealSnakes && localDemoSnakes.length ? localDemoSnakes : [],
     pairings: Array.isArray(syncedSnapshot.pairings) ? syncedSnapshot.pairings : [],
+    ...breedingCollections,
     plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
   };
 }
@@ -2987,14 +3023,22 @@ function prepareAnimalForBackend(snake) {
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
 }
 
-function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}) {
+function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}, breeding = {}) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
   const snakeTombstones = Object.values(tombstones?.snakes || {});
   const pairingTombstones = Object.values(tombstones?.pairings || {});
+  const cycleTombstones = Object.values(tombstones?.breedingCycles || {});
+  const examTombstones = Object.values(tombstones?.follicleExams || {});
+  // Cards and examinations that belong to a demo animal are placeholders and never leave the device.
+  const demoSnakeIds = getDemoSnakeIds(Array.isArray(animals) ? animals : []);
+  const cycles = (Array.isArray(breeding.breedingCycles) ? breeding.breedingCycles : []).filter(cycle => cycle && !demoSnakeIds.has(cycle.femaleId));
+  const exams = (Array.isArray(breeding.follicleExams) ? breeding.follicleExams : []).filter(exam => exam && !demoSnakeIds.has(exam.femaleId)).map(exam => stripLargeAttachments(exam));
   const payload = {
     animals: [...persistable.snakes.map(prepareAnimalForBackend).filter(Boolean), ...snakeTombstones],
     pairings: [...persistable.pairings, ...pairingTombstones],
     clutches: [],
+    breedingCycles: [...cycles, ...cycleTombstones],
+    follicleExams: [...exams, ...examTombstones],
   };
   const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
   if (normalizedPlannerState) {
@@ -3117,6 +3161,8 @@ function plannerSnapshotSignature(snapshot = {}) {
   return JSON.stringify({
     snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
     pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
+    breedingCycles: Array.isArray(snapshot.breedingCycles) ? snapshot.breedingCycles : [],
+    follicleExams: Array.isArray(snapshot.follicleExams) ? snapshot.follicleExams : [],
     plannerState: plannerStateComparable(snapshot.plannerState),
   });
 }
@@ -3183,6 +3229,10 @@ function mergePlannerStates(localState, backendState) {
 function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (!localAnimal) return sanitizeSnakeRecord(backendAnimal);
   if (!backendAnimal) return sanitizeSnakeRecord(localAnimal);
+  // A demo is a placeholder that is never saved. A saved record with the same id (a real
+  // 2025 "Athena" is 25Ath-1, like the demo) replaces it whole: merged, it kept isDemo and
+  // was hidden as a demo.
+  if (isDemoSnakeRecord(localAnimal) && !isDemoSnakeRecord(backendAnimal)) return sanitizeSnakeRecord(backendAnimal);
   const localTime = getSyncTimestamp(localAnimal);
   const backendTime = getSyncTimestamp(backendAnimal);
   const base = backendTime > localTime ? backendAnimal : localAnimal;
@@ -3285,6 +3335,8 @@ function mergeBreederSnapshots(localSnapshot = {}, backendSnapshot = {}, tombsto
     pairings: displaySnakes.some(snake => !isDemoSnakeRecord(snake))
       ? filterPairingsLinkedToDemoSnakes(mergedPairings, demoSnakeIds)
       : mergedPairings,
+    breedingCycles: mergeRecordsByKey(localSnapshot.breedingCycles, backendSnapshot.breedingCycles, sanitizeBreedingCycleRecord, 'cycle', mergeBreedingCycleRecords, tombstones?.breedingCycles),
+    follicleExams: mergeRecordsByKey(localSnapshot.follicleExams, backendSnapshot.follicleExams, sanitizeFollicleExamRecord, 'exam', mergeFollicleExamRecords, tombstones?.follicleExams),
     plannerState: mergePlannerStates(localSnapshot.plannerState, backendSnapshot.plannerState),
   };
 }
@@ -3348,6 +3400,18 @@ function stampChangedSnapshotForSync(localSnapshot = {}, baselineSnapshot = {}) 
       sanitizePairingRecord,
       'pairing'
     ),
+    breedingCycles: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.breedingCycles) ? localSnapshot.breedingCycles : [],
+      Array.isArray(baselineSnapshot.breedingCycles) ? baselineSnapshot.breedingCycles : [],
+      sanitizeBreedingCycleRecord,
+      'cycle'
+    ),
+    follicleExams: stampChangedSyncRecords(
+      Array.isArray(localSnapshot.follicleExams) ? localSnapshot.follicleExams : [],
+      Array.isArray(baselineSnapshot.follicleExams) ? baselineSnapshot.follicleExams : [],
+      sanitizeFollicleExamRecord,
+      'exam'
+    ),
     plannerState: stampPlannerStateForSync(localSnapshot.plannerState, baselineSnapshot.plannerState),
   };
 }
@@ -3358,6 +3422,8 @@ function normalizeBackendBreederSnapshot(snapshot = {}) {
   return {
     snakes: snakes.filter(snake => !isDemoSnakeRecord(snake)),
     pairings: filterPairingsLinkedToDemoSnakes(snapshot?.pairings, demoSnakeIds),
+    breedingCycles: Array.isArray(snapshot?.breedingCycles) ? snapshot.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean) : [],
+    follicleExams: Array.isArray(snapshot?.follicleExams) ? snapshot.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean) : [],
     plannerState: normalizePlannerStateRecord(snapshot?.plannerState),
   };
 }
@@ -3735,13 +3801,21 @@ const DEFAULT_GROUPS = ["Breeders", "Holdbacks", "Hatchlings 2024", "Hatchlings 
 
 // QUARANTINE_TAG rather than a literal: this tag drives the whole quarantine section, so the two
 // must never drift apart.
-const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, 'For sell', 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
+// What a failed cloud save keeps for the "Not synced" state: enough to word the reason.
+const syncErrorDetails = (error) => ({
+  status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+  kind: typeof error?.kind === 'string' ? error.kind : '',
+  message: typeof error?.message === 'string' ? error.message : '',
+});
+
+const DEFAULT_STATUS_TAGS = ['Active', 'Holdback', 'Grow-out', 'Breeder', QUARANTINE_TAG, FOR_SALE_STATUS, 'Sold', 'On loan', 'MorphMarket', 'On hold', 'Retired', 'Deceased'];
 const STATUS_TAG_TRANSLATIONS = Object.freeze({
   'active': 'ui.animals.addAnimal.active',
   'holdback': 'ui.animals.addAnimal.holdback',
   'grow-out': 'ui.animals.addAnimal.growOut',
   'breeder': 'ui.animals.addAnimal.breeder',
   'quarantine': 'ui.animals.addAnimal.quarantine',
+  'for sale': 'ui.animals.addAnimal.forSale',
   'sold': 'ui.animals.addAnimal.sold',
   'on loan': 'ui.animals.addAnimal.onLoan',
   'morphmarket': 'ui.animals.addAnimal.morphMarket',
@@ -3752,7 +3826,7 @@ const STATUS_TAG_TRANSLATIONS = Object.freeze({
 
 function getStatusTagTranslationKey(value) {
   if (!value) return null;
-  const normalized = String(value).trim().toLowerCase();
+  const normalized = canonicalStatusValue(String(value)).toLowerCase();
   return STATUS_TAG_TRANSLATIONS[normalized] || null;
 }
 const SCAN_MODE_STORAGE_KEY = 'breedingPlannerScanMode';
@@ -4036,15 +4110,6 @@ function normalizeFeederProfileForSave(profile) {
   };
 }
 
-function getLatestAcceptedFeedEntry(snake) {
-  const feeds = Array.isArray(snake?.logs?.feeds) ? snake.logs.feeds : [];
-  for (let i = feeds.length - 1; i >= 0; i -= 1) {
-    const entry = feeds[i];
-    if (entry && !entry.refused) return entry;
-  }
-  return null;
-}
-
 function getSnakeFeederProfile(snake) {
   return normalizeFeederProfileForDraft(snake?.feederProfile);
 }
@@ -4151,7 +4216,7 @@ const QUICK_ADD_EXAMPLE_GENES = {
 };
 
 /** Status tags worth a chip on a species card, in the order they appear. */
-const DASHBOARD_STATUS_TAGS = ['Breeder', 'Holdback', 'Grow-out', QUARANTINE_TAG, 'For sell'];
+const DASHBOARD_STATUS_TAGS = ['Breeder', 'Holdback', 'Grow-out', QUARANTINE_TAG, FOR_SALE_STATUS];
 
 /** Lower rank wins when choosing the one event a species card shows. */
 const DASHBOARD_URGENCY_RANK = { overdue: 0, due: 1, soon: 2, upcoming: 3, none: 4 };
@@ -4189,9 +4254,9 @@ function createEmptyNewAnimalDraft() {
     groups: [],
     logs: cloneLogs(),
     feederProfile: createEmptyFeederProfile(),
-    // Animals added by hand are almost always ones just brought in, so this starts ticked. It is a
-    // suggestion, not a rule -- untick it for an animal already settled in the collection.
-    newlyAcquired: true,
+    // Animals added by hand are almost always ones just brought in, so this starts on "new
+    // arrival". It is a suggestion, not a rule -- "already in my collection" skips quarantine.
+    arrival: MANUAL_ADD_DEFAULT_ARRIVAL,
     // Risk is not uniform, and this is the field that sets the suggested quarantine length.
     quarantineSource: 'known-breeder',
     quarantineSourceName: '',
@@ -4798,12 +4863,15 @@ function splitSegmentIntoTokens(segment) {
   return entries.map(entry => entry.token);
 }
 
+// Separators between genes in a free-text genetics field.
+const GENE_TOKEN_SPLIT_REGEX = /[\n\r,;|/+]+/;
+
 function splitMorphHetInput(value) {
   const raw = String(value || '').trim();
   if (!raw) return { morphs: [], hets: [] };
 
   const segments = raw
-    .split(/[\n\r,;|/+]+/)
+    .split(GENE_TOKEN_SPLIT_REGEX)
     .map(segment => segment.trim())
     .filter(Boolean);
 
@@ -6157,32 +6225,13 @@ function deriveQuickAddName(text, parsed = {}) {
   return candidate;
 }
 
-function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], theme='blue' }) {
+function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOptions = [], customStatusTags = [], onCreateStatusTag, onDeleteStatusTag, onCancel, onAdd, onGenerateIdFromWizard, onResolveLeucisticText, onResolveLeucisticLists, availableGenetics = [], onGeneticsForSpecies, animals = [], clutchOptions = [], capResult = null, theme='blue' }) {
   const { t } = useTranslation();
-  const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
-  const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
-  const collapseLabel = t('clutch.collapse', { defaultValue: 'Collapse' });
-  const labelLabel = t('clutch.label', { defaultValue: 'Label' });
-  const startingDateLabel = t('clutch.startingDate', { defaultValue: 'Starting date' });
-  const appointmentsLabel = t('clutch.appointments', { defaultValue: 'Appointments' });
-  const appointmentsHelp = t('clutch.appointmentsHelp', { defaultValue: 'Manage pairing touchpoints' });
-  const generateMonthsLabel = t('clutch.generate5Months', { defaultValue: 'Generate 5 months' });
-  const addAppointmentLabel = t('clutch.addAppointment', { defaultValue: '+ Add appointment' });
-  const appointmentStatusLabel = t('clutch.appointmentStatus', { defaultValue: 'Appointment' });
-  const pairingDateLabel = t('clutch.pairingDate', { defaultValue: 'Date of Pairing' });
-  const lockLabel = t('clutch.lock', { defaultValue: 'Lock' });
-  const lockDateLabel = t('clutch.lockDate', { defaultValue: 'Date of Lock' });
-  const notesLabel = t('clutch.notes', { defaultValue: 'Notes' });
-  const removeLabel = t('clutch.remove', { defaultValue: 'Remove' });
-  const notesFieldLabel = t('clutch.notesField', { defaultValue: 'Notes' });
-  const geneticsCalculatorLabel = t('clutch.geneticsCalculator', { defaultValue: 'Genetics calculator' });
-  const showLabel = t('clutch.show', { defaultValue: 'Show' });
-  const hideLabel = t('common.hide', { defaultValue: 'Hide' });
-  const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal) && Boolean((newAnimal && newAnimal.species) || '');
+  // Past the plan's animal cap the animal is not added; the notice says so and offers the next plan.
+  const capBlocked = Boolean(capResult?.blocked);
+  const canSubmit = hasMeaningfulAnimalDraftContent(newAnimal) && Boolean((newAnimal && newAnimal.species) || '') && !capBlocked;
   const selectedGroup = (Array.isArray(newAnimal.groups) && newAnimal.groups.length ? newAnimal.groups[0] : '') || '';
-  const [statusTagInput, setStatusTagInput] = useState('');
   const [quickAddText, setQuickAddText] = useState('');
-  const customTagLookup = useMemo(() => new Set(customStatusTags.map(tag => tag.toLowerCase())), [customStatusTags]);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef(null);
 
@@ -6337,15 +6386,6 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [statusMenuOpen]);
 
-  const handleAddStatusTag = useCallback(() => {
-    const trimmed = (statusTagInput || '').trim();
-    if (!trimmed) return;
-    const created = typeof onCreateStatusTag === 'function' ? onCreateStatusTag(trimmed) : trimmed;
-    if (!created) return;
-    setNewAnimal(a => ({ ...a, status: created }));
-    setStatusTagInput('');
-  }, [statusTagInput, onCreateStatusTag, setNewAnimal]);
-
   const handleSelectStatus = useCallback((tag) => {
     setNewAnimal(a => ({ ...a, status: tag }));
     setStatusMenuOpen(false);
@@ -6490,7 +6530,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
     });
   }, [draftSpeciesId, t]);
 
-  const noTagText = t("snakeEdit.noTag", { defaultValue: "No tag" });
+  const noTagText = t("snakeEdit.noTag", { defaultValue: "No status" });
   const quarantineLabel = useMemo(() => makeQuarantineLabeller(t), [t]);
   const resolveStatusLabel = useCallback((value) => {
     if (!value) return noTagText;
@@ -6577,7 +6617,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
             className="mt-1 w-full border rounded-xl px-2 py-1 text-sm font-mono"
             value={(newAnimal && newAnimal.id) || ''}
             onChange={handleNewAnimalIdChange}
-            placeholder="Optional: custom ID (e.g., 25Ath-2)"
+            placeholder={t("ui.animals.addAnimal.customIdPlaceholder", { defaultValue: "Optional: custom ID (e.g., 25Ath-2)" })}
           />
           <div className="mt-1 text-[11px] text-neutral-500">
             {t("ui.animals.addAnimal.idHelp", {
@@ -6601,10 +6641,10 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
 
 
         <div ref={statusMenuRef} className="relative">
-              <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Tag" })}</label>
+              <label className="text-xs font-medium">{t("ui.animals.addAnimal.tag", { defaultValue: "Status" })}</label>
               <button
                 type="button"
-                className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                className="status-tag-neutral-button mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
                 onClick={() => setStatusMenuOpen(open => !open)}
               >
                 <span>{(newAnimal.status || '').trim() ? resolveStatusLabel(newAnimal.status) : noTagText}</span>
@@ -6614,7 +6654,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
                   <button
                     type="button"
-                    className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                    className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
                     onClick={handleClearStatus}
                   >
                     {noTagText}
@@ -6625,23 +6665,23 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                       <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
                         <button
                           type="button"
-                          className="status-tag-menu-button flex-1 text-left"
+                          className="status-tag-menu-button flex-1 text-start"
                           onClick={() => handleSelectStatus(option)}
                         >
                           {resolveStatusLabel(option)}
                         </button>
                         <button
                           type="button"
-                          className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                          className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                           onClick={() => handleDeleteStatus(option)}
-                          title="Delete tag"
+                          title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                         >
                           -
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet", { defaultValue: "No tags available yet." })}</div>
+                    <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet", { defaultValue: "No statuses yet." })}</div>
                   )}
                 </div>
               )}
@@ -6687,7 +6727,7 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 type="text"
                 className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
                 value={newAnimal.birthDate || ''}
-                placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
+                placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                 onChange={e => {
                   const raw = e.target.value;
                   setNewAnimal(prev => {
@@ -6743,24 +6783,36 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                 autoDetectFromName
               />
             </div>
-            <div className="sm:col-span-2">
-              <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={newAnimal.newlyAcquired !== false}
-                  onChange={e => setNewAnimal(a => ({ ...a, newlyAcquired: e.target.checked }))}
-                />
-                <span className="text-xs">
-                  <span className="font-medium text-amber-800">
-                    {t("quarantine.newlyAcquired", { defaultValue: "Newly acquired animal (bought, traded or imported)" })}
+            <fieldset className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <legend className="sr-only">{t("quarantine.arrivalLegend", { defaultValue: "Is this animal new to your collection?" })}</legend>
+              {[
+                {
+                  value: ARRIVAL.NEW,
+                  label: t("quarantine.newlyAcquired", { defaultValue: "New arrival (bought, traded or on loan)" }),
+                  help: t("quarantine.newlyAcquiredHelp", { defaultValue: "Sets its status to Quarantine and starts a quarantine record from today." }),
+                },
+                {
+                  value: ARRIVAL.EXISTING,
+                  label: t("quarantine.alreadyOwned", { defaultValue: "Already in my collection" }),
+                  help: t("quarantine.alreadyOwnedHelp", { defaultValue: "Keeps the status you picked. Nothing is quarantined." }),
+                },
+              ].map(option => (
+                <label key={option.value} className="flex items-start gap-2 py-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="add-animal-arrival"
+                    className="mt-0.5"
+                    value={option.value}
+                    checked={(newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL) === option.value}
+                    onChange={() => setNewAnimal(a => ({ ...a, arrival: option.value }))}
+                  />
+                  <span className="text-xs">
+                    <span className="font-medium text-amber-800">{option.label}</span>
+                    <span className="block mt-0.5 text-amber-700">{option.help}</span>
                   </span>
-                  <span className="block mt-0.5 text-amber-700">
-                    {t("quarantine.newlyAcquiredHelp", { defaultValue: "Tags it Quarantine and starts a quarantine record from today. Untick for an animal already settled in your collection." })}
-                  </span>
-                </span>
-              </label>
-              {newAnimal.newlyAcquired !== false && (
+                </label>
+              ))}
+              {(newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL) === ARRIVAL.NEW && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="text-xs font-medium">
                     {t("quarantine.source", { defaultValue: "Where it came from" })}
@@ -6791,9 +6843,10 @@ function AddAnimalWizard({ newAnimal, setNewAnimal, groups, setGroups, statusOpt
                   </p>
                 </div>
               )}
-            </div>
+            </fieldset>
       </div>
 
+      {capResult ? <AnimalCapNotice result={capResult} context="add" className="mx-4 mt-3" /> : null}
       <div className="p-4 border-t flex items-center justify-between">
         <div className="text-xs text-neutral-500">{t("ui.animals.addAnimal.localData", { defaultValue: "This animal is saved in your planner on this device." })}</div>
         <div className="flex gap-2">
@@ -6849,6 +6902,38 @@ export default function BreedingPlannerApp() {
   const setSyncedPairings = useCallback((nextPairings) => {
     setPairingsState(Array.isArray(nextPairings) ? nextPairings.map(sanitizePairingRecord).filter(Boolean) : []);
   }, []);
+  // Female breeding cards and follicle examinations (SBR-01..SBR-11). Stored and synced like
+  // pairings: a sanitizer on every read, a local change stamp on every write, tombstones on delete.
+  const [breedingCycles, setBreedingCyclesState] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.breedingCycles, null);
+    return Array.isArray(stored) ? stored.map(sanitizeBreedingCycleRecord).filter(Boolean) : [];
+  });
+  const [follicleExams, setFollicleExamsState] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.follicleExams, null);
+    return Array.isArray(stored) ? stored.map(sanitizeFollicleExamRecord).filter(Boolean) : [];
+  });
+  const [breedingSettings, setBreedingSettings] = useState(() => normalizeBreedingSettings(loadStoredJson(STORAGE_KEYS.breedingSettings, null) || {}));
+  const setSyncedBreedingCycles = useCallback((next) => {
+    setBreedingCyclesState(Array.isArray(next) ? next.map(sanitizeBreedingCycleRecord).filter(Boolean) : []);
+  }, []);
+  const setSyncedFollicleExams = useCallback((next) => {
+    setFollicleExamsState(Array.isArray(next) ? next.map(sanitizeFollicleExamRecord).filter(Boolean) : []);
+  }, []);
+  const setBreedingCycles = useCallback((updater) => {
+    setBreedingCyclesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizeBreedingCycleRecord, 'cycle');
+    });
+  }, []);
+  const setFollicleExams = useCallback((updater) => {
+    setFollicleExamsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return stampLocallyChangedSyncRecords(next, prev, sanitizeFollicleExamRecord, 'exam');
+    });
+  }, []);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.breedingCycles, breedingCycles); }, [breedingCycles]);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.follicleExams, follicleExams); }, [follicleExams]);
+  useEffect(() => { saveStoredJson(STORAGE_KEYS.breedingSettings, breedingSettings); }, [breedingSettings]);
   const setSnakes = useCallback((updater) => {
     setSnakesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -6879,8 +6964,10 @@ export default function BreedingPlannerApp() {
   }, [snakes, setSnakes]);
 
   const [syncTombstones, setSyncTombstones] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}'); }
-    catch { return { snakes: {}, pairings: {} }; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}');
+      return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {}, ...parsed };
+    } catch { return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {} }; }
   });
   const syncTombstonesRef = useRef(syncTombstones);
   useEffect(() => {
@@ -6953,7 +7040,7 @@ export default function BreedingPlannerApp() {
       if (sex === 'F') bucket.females += 1;
       else if (sex === 'M') bucket.males += 1;
       else bucket.unsexed += 1;
-      const status = String(snake.status || '').trim();
+      const status = canonicalStatusValue(String(snake.status || ''));
       if (DASHBOARD_STATUS_TAGS.includes(status)) {
         bucket.statusCounts[status] = (bucket.statusCounts[status] || 0) + 1;
       }
@@ -7052,7 +7139,7 @@ export default function BreedingPlannerApp() {
   }, [speciesScope]);
 
   // `destinationTab` exists for the dashboard's breeding table, which sends a keeper straight
-  // to a species' Breeding Tracker. Everything else lands on Animals, as it always did.
+  // to a species' Breeding tab. Everything else lands on Animals, as it always did.
   const openSpeciesWorkspace = useCallback((speciesId, destinationTab = 'animals') => {
     const resolved = resolveSpeciesId(speciesId);
     setSpeciesScope(resolved);
@@ -7065,12 +7152,12 @@ export default function BreedingPlannerApp() {
     setTab('dashboard');
   }, []);
 
-  // Several flows (scan, deep link, "back to animals") set a per-species tab directly. Landing
-  // on one with no species open would show every species mixed into one list, which is the
-  // thing the workspaces exist to prevent -- so fall back to the dashboard instead.
-  useEffect(() => {
-    if (!speciesScope && SPECIES_SCOPED_TABS.has(tab)) setTab('dashboard');
-  }, [speciesScope, tab]);
+  // Several flows (scan, deep link, "back to animals", the phone bottom bar) land on a
+  // per-species tab with no species open. Drawing it would mix every species into one list,
+  // which is the thing the workspaces exist to prevent. It used to bounce silently to the
+  // dashboard, which on a phone read as a dead button; now the tab explains itself and offers
+  // the species list instead (SpeciesGate), and picking one keeps the tab that was asked for.
+  const speciesGateActive = !speciesScope && SPECIES_SCOPED_TABS.has(tab);
 
   const animalsMissingSpecies = useMemo(
     () => snakes.filter(snake => snake && !isDemoSnakeRecord(snake) && !String(snake.species || '').trim()),
@@ -7095,8 +7182,20 @@ export default function BreedingPlannerApp() {
     dismissSpeciesBackfill();
   }, [animalsMissingSpecies, dismissSpeciesBackfill]);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  // The phone-width stand-in for the animals toolbar's right half. Under 768px those buttons
+  // do not fit beside the filters, so the "+" opens this sheet with every one of them.
+  const [animalActionSheetOpen, setAnimalActionSheetOpen] = useState(false);
+  useEffect(() => {
+    if (!animalActionSheetOpen) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setAnimalActionSheetOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [animalActionSheetOpen]);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [pairingsView, setPairingsView] = useState('dashboard');
+  // Breeding cards are the default view; the legacy pairing records stay reachable during rollout.
+  const [pairingsView, setPairingsView] = useState('cards');
+  const [focusedCycleId, setFocusedCycleId] = useState(null);
+  const [breedingDialogRequest, setBreedingDialogRequest] = useState(null);
   // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
   // Only the dashboard asks for a return trip; every other entry point leaves this null.
   const [pairingsReturnView, setPairingsReturnView] = useState(null);
@@ -7342,6 +7441,7 @@ export default function BreedingPlannerApp() {
   // collection listing, not a mixed catalogue. Asking once per batch beats asking per row,
   // and beats guessing, which would scatter animals into the wrong workspaces silently.
   const [importSpecies, setImportSpecies] = useState('');
+  const [importArrival, setImportArrival] = useState(IMPORT_DEFAULT_ARRIVAL);
   const [testOrderSnake, setTestOrderSnake] = useState(null);
   const [panelRefreshToken, setPanelRefreshToken] = useState(0);
   const [returnToGroupsAfterEdit, setReturnToGroupsAfterEdit] = useState(false);
@@ -7367,6 +7467,32 @@ export default function BreedingPlannerApp() {
     lastSyncedAt: null,
     message: '',
   });
+  // A failed cloud save is a state the keeper can see, not a console line: the header
+  // carries a "Not synced" pill until a save succeeds, and the first failure toasts once.
+  const cloudSyncFailure = useMemo(() => (cloudSyncStatus.state === 'error'
+    ? describeCloudSyncFailure(cloudSyncStatus.error || { message: cloudSyncStatus.message }, { t })
+    : null), [cloudSyncStatus.error, cloudSyncStatus.message, cloudSyncStatus.state, t]);
+  // Settings opens on a given tab when something elsewhere asks for it: "See plans" goes to
+  // My Account, where the plan is chosen, and the "Not synced" pill to the cloud sync panel.
+  const [setupTabRequest, setSetupTabRequest] = useState(null);
+  const openSetupTab = useCallback((setupTab) => {
+    setTab('setup');
+    setSetupTabRequest({ tab: setupTab, at: Date.now() });
+  }, []);
+  const { setUpgradeHandler, access: featureAccessMap } = useFeatureAccess();
+  // Known from the access fetched at sign-in; unknown means "let the backend decide".
+  const marketplaceListingDenied = featureAccessMap?.['marketplace.create_listing']?.allowed === false;
+  const addAnimalCap = useAnimalCap(Array.isArray(snakes) ? snakes.length : 0, 1);
+  useEffect(() => {
+    setUpgradeHandler(() => {
+      // The add and import dialogs sit over the page; My Account has to be in view.
+      // The add draft is kept in state, so reopening the dialog brings it back.
+      setShowAddModal(false);
+      setShowImportModal(false);
+      openSetupTab('account');
+    });
+    return () => setUpgradeHandler(null);
+  }, [openSetupTab, setUpgradeHandler]);
   const sharedBreederDataReady = sharedBackendSnapshot?.state === 'connected'
     && sharedBackendSnapshot?.authStatus === 'authorized';
   const handleAnimalViewTabChange = useCallback((nextView) => {
@@ -7620,7 +7746,7 @@ export default function BreedingPlannerApp() {
       .map(part => part?.[0]?.toUpperCase())
       .filter(Boolean)
       .slice(0, 2)
-      .join('') || 'BP';
+      .join('') || 'S';
     const confirmLabel = appDialog.confirmLabel || t('common.ok', { defaultValue: 'OK' });
     if (typeof document === 'undefined') return null;
     return createPortal((
@@ -7794,13 +7920,22 @@ export default function BreedingPlannerApp() {
   }, [hydrateAppearance]);
 
   useEffect(() => {
-    latestPlannerSnapshotRef.current = { snakes, pairings, plannerState: plannerSyncState };
-  }, [snakes, pairings, plannerSyncState]);
+    latestPlannerSnapshotRef.current = { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState };
+  }, [snakes, pairings, breedingCycles, follicleExams, plannerSyncState]);
 
   const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
       const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
-      if (!silent) setCloudSyncStatus({ state: 'error', lastSyncedAt: null, message });
+      if (!silent) {
+        setCloudSyncStatus({
+          state: 'error',
+          lastSyncedAt: null,
+          message,
+          error: sharedBackendSnapshot?.authStatus === 'unauthorized'
+            ? { status: 401, kind: 'unauthorized', message }
+            : { kind: 'connection', message },
+        });
+      }
       throw new Error(message);
     }
     if (backendPlannerSyncRef.current.status === 'loading') {
@@ -7836,7 +7971,11 @@ export default function BreedingPlannerApp() {
           selectRecordsToUpload(merged.snakes, remoteState.snakes),
           selectRecordsToUpload(merged.pairings, remoteState.pairings),
           merged.plannerState,
-          syncTombstonesRef.current
+          syncTombstonesRef.current,
+          {
+            breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
+            follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
+          }
         ),
         { changedOnly: true }
       );
@@ -7851,6 +7990,8 @@ export default function BreedingPlannerApp() {
 
       setSyncedSnakes(syncedSnapshot.snakes);
       setSyncedPairings(syncedSnapshot.pairings);
+      setSyncedBreedingCycles(syncedSnapshot.breedingCycles);
+      setSyncedFollicleExams(syncedSnapshot.follicleExams);
       applyPlannerSyncState(syncedSnapshot.plannerState);
       latestPlannerSnapshotRef.current = syncedSnapshot;
 
@@ -7868,10 +8009,10 @@ export default function BreedingPlannerApp() {
     } catch (error) {
       backendPlannerSyncRef.current.status = 'idle';
       const message = error?.message || 'Cloud sync failed.';
-      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message }));
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
       throw error;
     }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
@@ -7941,6 +8082,9 @@ export default function BreedingPlannerApp() {
           const sanitizedPairings = rawPairings.map(sanitizePairingRecord).filter(Boolean);
           setSyncedPairings(sanitizedPairings);
         }
+        if (Array.isArray(payload.breedingCycles)) setSyncedBreedingCycles(payload.breedingCycles);
+        if (Array.isArray(payload.follicleExams)) setSyncedFollicleExams(payload.follicleExams);
+        if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
         if (payload.groupsBySpecies || Array.isArray(payload.groups)) {
           setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
         }
@@ -8090,11 +8234,11 @@ export default function BreedingPlannerApp() {
   const statusTagOptions = useMemo(() => {
     const set = new Set(DEFAULT_STATUS_TAGS);
     customStatusTags.forEach(tag => {
-      const trimmed = (tag || '').trim();
+      const trimmed = canonicalStatusValue(tag || '');
       if (trimmed) set.add(trimmed);
     });
     snakes.forEach(s => {
-      const value = typeof s?.status === 'string' ? s.status.trim() : '';
+      const value = typeof s?.status === 'string' ? canonicalStatusValue(s.status) : '';
       if (value) set.add(value);
     });
     const newDraftTag = typeof newAnimal?.status === 'string' ? newAnimal.status.trim() : '';
@@ -8290,6 +8434,9 @@ export default function BreedingPlannerApp() {
       autoBackupSnapshot,
       backupVault,
       lastFeedDefaults,
+      breedingCycles,
+      follicleExams,
+      breedingSettings,
     };
 
     const saveTimer = setTimeout(() => {
@@ -8312,6 +8459,9 @@ export default function BreedingPlannerApp() {
     hiddenGroups,
     lastFeedDefaults,
     pairings,
+    breedingCycles,
+    follicleExams,
+    breedingSettings,
     removedStatusTags,
     showGroups,
     snakes,
@@ -8353,7 +8503,7 @@ export default function BreedingPlannerApp() {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (!backendPlannerSyncRef.current.seeded) return;
 
-    const signature = plannerSnapshotSignature({ snakes, pairings, plannerState: plannerSyncState });
+    const signature = plannerSnapshotSignature({ snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState });
     const saveRequestId = ++cloudSaveRequestIdRef.current;
     if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
       backendPlannerSyncRef.current.status = 'ready';
@@ -8364,7 +8514,7 @@ export default function BreedingPlannerApp() {
       if (saveRequestId !== cloudSaveRequestIdRef.current) return;
       backendPlannerSyncRef.current.status = 'loading';
       const localSnapshot = stampChangedSnapshotForSync(
-        { snakes, pairings, plannerState: plannerSyncState },
+        { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState },
         cloudBaselineSnapshotRef.current
       );
 
@@ -8388,7 +8538,11 @@ export default function BreedingPlannerApp() {
               selectRecordsToUpload(mergedForSave.snakes, remoteStateForSave.snakes),
               selectRecordsToUpload(mergedForSave.pairings, remoteStateForSave.pairings),
               mergedForSave.plannerState,
-              syncTombstonesRef.current
+              syncTombstonesRef.current,
+              {
+                breedingCycles: selectRecordsToUpload(mergedForSave.breedingCycles, remoteStateForSave.breedingCycles),
+                follicleExams: selectRecordsToUpload(mergedForSave.follicleExams, remoteStateForSave.follicleExams),
+              }
             ),
             { changedOnly: true }
           );
@@ -8402,6 +8556,8 @@ export default function BreedingPlannerApp() {
           const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
           setSyncedSnakes(currentSnapshot.snakes);
           setSyncedPairings(currentSnapshot.pairings);
+          setSyncedBreedingCycles(currentSnapshot.breedingCycles);
+          setSyncedFollicleExams(currentSnapshot.follicleExams);
           applyPlannerSyncState(currentSnapshot.plannerState);
           latestPlannerSnapshotRef.current = currentSnapshot;
           backendPlannerSyncRef.current.status = 'ready';
@@ -8416,10 +8572,13 @@ export default function BreedingPlannerApp() {
         .catch((error) => {
           if (saveRequestId !== cloudSaveRequestIdRef.current) return;
           backendPlannerSyncRef.current.status = 'ready';
+          // Shown as a "Not synced" pill in the header and one toast, with the reason
+          // in plain words (see cloudSyncFailure). The console line stays for diagnosis.
           setCloudSyncStatus(prev => ({
             ...prev,
             state: 'error',
             message: error?.message || 'Failed to save shared breeder snapshot.',
+            error: syncErrorDetails(error),
           }));
           console.warn('Failed to save shared breeder snapshot', error);
         });
@@ -8428,7 +8587,7 @@ export default function BreedingPlannerApp() {
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [applyPlannerSyncState, electronDataReady, pairings, plannerSyncState, setSyncedPairings, setSyncedSnakes, sharedBreederDataReady, snakes]);
+  }, [applyPlannerSyncState, electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -8499,6 +8658,9 @@ export default function BreedingPlannerApp() {
     generatedAt: new Date().toISOString(),
     snakes,
     pairings,
+    breedingCycles,
+    follicleExams,
+    breedingSettings,
     groups,
     morphAliases: normalizeMorphAliasDatabase(morphAliases),
     geneAliases: mergeGeneAliasRows(geneAliases),
@@ -8510,7 +8672,7 @@ export default function BreedingPlannerApp() {
     heatRacks,
     terrariums,
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
-  }), [snakes, pairings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
+  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
   const handleRestoreBackup = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') {
@@ -8530,6 +8692,9 @@ export default function BreedingPlannerApp() {
 
     setSnakes(incomingSnakes);
     setPairings(incomingPairings);
+    if (Array.isArray(payload.breedingCycles)) setBreedingCycles(payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean));
+    if (Array.isArray(payload.follicleExams)) setFollicleExams(payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean));
+    if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
     setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
 
     if (Array.isArray(payload.morphAliases)) {
@@ -9111,7 +9276,7 @@ export default function BreedingPlannerApp() {
   }, [activePairings, snakes]);
 
   /**
-   * The same urgency counts the Breeding Tracker dashboard shows, but for every species at
+   * The same urgency counts the Breeding dashboard shows, but for every species at
    * once. Built from all pairings rather than the scoped ones on purpose -- this is the view
    * that cannot be had from inside a single species workspace, which is why it earns the
    * dashboard's lower half.
@@ -9147,7 +9312,7 @@ export default function BreedingPlannerApp() {
 
   /**
    * Set only when a keeper presses an urgency count on the dashboard, and read only as the
-   * Breeding Tracker dashboard's opening filter. That view unmounts whenever the tab or the
+   * Breeding dashboard's opening filter. That view unmounts whenever the tab or the
    * sub-view changes, so it picks this up on mount and owns the filter from then on -- the
    * keeper can clear it in place without the dashboard reimposing it.
    */
@@ -9485,24 +9650,30 @@ export default function BreedingPlannerApp() {
     if (h) {
       const id = decodeURIComponent(h[1]);
       const s = snakes.find(x=>x.id===id);
+      if (s) { openSnakeEditor(s); }
+    }
+  }, [snakes]);
 
   useEffect(() => {
     const value = lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel';
     saveStoredJson(STORAGE_KEYS.leucisticType, value);
   }, [lastLeucisticType]);
-      if (s) { openSnakeEditor(s); }
-    }
-  }, [snakes]);
 
-  // Land on the Shed Test Terminal when a laboratory email links here. Without
+  // Land on Lab tests when a laboratory email links here. Without
   // it, "View your order" opened the collection and left the reader to find the
   // tab themselves.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (/^#shed-terminal/.test(window.location.hash)) setTab('shedTerminal');
+    if (/^#shed-terminal\b/.test(window.location.hash)) setTab('shedTerminal');
   }, []);
 
-  // open pairing if URL contains #pairing=id
+  // Stripe's checkout and billing portal return to #billing=...; My Account shows the outcome.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (/^#billing=/.test(window.location.hash)) openSetupTab('account');
+  }, [openSetupTab]);
+
+  // open pairing if URL contains #pairing=id (legacy records; #cycle= opens a breeding card)
   useEffect(()=>{
     const h = window.location.hash.match(/#pairing=(.+)/);
     if (h) {
@@ -9609,7 +9780,7 @@ export default function BreedingPlannerApp() {
       lastFeed: t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }),
       groups: t('animals.list.columns.groups', { defaultValue: 'Groups' }),
       tags: t('animals.list.columns.tags', { defaultValue: 'Tags' }),
-      projects: t('animals.list.columns.projects', { defaultValue: 'Projects' }),
+      projects: t('animals.list.columns.projects', { defaultValue: 'Pairings' }),
       noData: t('logs.noData', { defaultValue: 'No data' }),
       refused: t('logs.refused', { defaultValue: 'Refused feed' }),
       feedDefault: t('logs.feed', { defaultValue: 'Feed' }),
@@ -9643,7 +9814,6 @@ export default function BreedingPlannerApp() {
     }
   }, [sortedAnimalList, pairings, snakes, t]);
 
-  const snakesById = useMemo(() => Object.fromEntries(snakes.map(snake => [snake.id, snake])), [snakes]);
   const malesById = useMemo(() => Object.fromEntries(snakes.filter(isMaleSnake).map(snake => [snake.id, snake])), [snakes]);
   const femalesById = useMemo(() => Object.fromEntries(snakes.filter(isFemaleSnake).map(snake => [snake.id, snake])), [snakes]);
 
@@ -9657,7 +9827,7 @@ export default function BreedingPlannerApp() {
         const panel = document.getElementById('bp-legend-tooltip');
         if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
       }}>
-        ? Gene colors
+        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
       </button>
       <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: 'var(--sk-surface)', border: '1px solid var(--sk-border)', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--sk-shadow-2)'}}>
         <GeneLegend />
@@ -9713,6 +9883,35 @@ export default function BreedingPlannerApp() {
     setPairingGuard(null);
     proceedWithPairing(updatedSnake);
   }, [pairingGuard, setSnakes, setGroups, proceedWithPairing]);
+
+  /**
+   * Moves the chosen animals into the Breeders group, the one place pairing and the Advisor
+   * look for parents. Only ever called from a keeper's explicit choice in BreedersGroupPicker.
+   * An animal holds one group, as everywhere else in this file, so this is a move.
+   */
+  const addAnimalsToBreeders = useCallback((ids) => {
+    const wanted = new Set(Array.isArray(ids) ? ids : []);
+    if (!wanted.size) return;
+    setSnakes(prev => prev.map(s => (
+      !s || !wanted.has(s.id) || isBreederGroupMember(s) ? s : { ...s, groups: ['Breeders'] }
+    )));
+    const touchedSpecies = new Set(snakes.filter(s => s && wanted.has(s.id)).map(s => s.species));
+    touchedSpecies.forEach(species => setGroupsForSpecies(
+      species,
+      prev => (prev.includes('Breeders') ? prev : [...prev, 'Breeders'])
+    ));
+  }, [isBreederGroupMember, setGroupsForSpecies, snakes]);
+
+  // Who the Breeders gate in pairing and the Advisor can offer: sexed animals of the open
+  // species that are not breeders yet.
+  const breederCandidateMales = useMemo(
+    () => scopedSnakes.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedSnakes, isBreederGroupMember]
+  );
+  const breederCandidateFemales = useMemo(
+    () => scopedSnakes.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedSnakes, isBreederGroupMember]
+  );
 
   const handleAddSnakePhotos = useCallback(async (snakeId, files, options = {}) => {
     if (!snakeId) return { newEntries: [], combined: null, imageUrl: null };
@@ -9931,10 +10130,6 @@ export default function BreedingPlannerApp() {
     const femaleId = suggestion.femaleId || "";
     if (!maleId || !femaleId) return;
 
-    const maleSnake = snakeById(snakes, maleId);
-    const femaleSnake = snakeById(snakes, femaleId);
-    const maleName = maleSnake?.name || maleId;
-    const femaleName = femaleSnake?.name || femaleId;
     const goalChance = Number.isFinite(suggestion?.goalProb) ? `${(suggestion.goalProb * 100).toFixed(1)}%` : null;
     const autoNoteParts = [
       t('advisor.convertedFromSuggestion', { defaultValue: 'Converted from Breeding Advisor suggestion.' }),
@@ -10054,54 +10249,44 @@ export default function BreedingPlannerApp() {
   }, [returnToGroupsAfterEdit]);
 
   /**
-   * The one write that actually puts a snake in front of buyers.
+   * Gets one animal's cover photo to where a listing can carry it, without
+   * writing the listing. Returns the images and media ids to send with the
+   * listing itself, and a record of what went up so the next save does not
+   * upload the same few megabytes again.
    *
-   * `POST /marketplace/listings` is upsert-by-animal on the server, so this is
-   * safe to call on every save: the first call creates the card, the rest keep
-   * its price, genetics and description in step with the animal record.
+   * The upload is made unattached: it is private to the seller until the
+   * listing request names it in `mediaIds`, and the server attaches it in the
+   * same transaction that sets the status. That is what lets a publish be one
+   * write instead of "create, then upload, then patch the photo on".
    */
-  /**
-   * Gets one animal's photo onto one listing.
-   *
-   * Shared by publishing and by the catch-up pass below, because both need the
-   * same two things right: the upload has to name its listing, since media is
-   * only served to a signed-out visitor when it belongs to a published listing;
-   * and the whole listing body has to go back alongside the images, because the
-   * update rebuilds every column from what it is sent.
-   */
-  const attachListingPhoto = useCallback(async (snake, listingId, payload) => {
-    if (!snake || !listingId || !payload) return null;
+  const prepareListingPhoto = useCallback(async (snake) => {
+    const none = { images: [], mediaIds: [], record: null };
+    if (!snake) return none;
     try {
       const plan = planPhotoUpload(snake);
-      if (plan.action === 'none') return null;
-
-      let imageUrl = plan.action === 'link' || plan.action === 'reuse' ? plan.imageUrl : '';
-      let record = null;
-
-      if (plan.action === 'upload') {
-        const parts = splitDataUri(await shrinkToFit(plan.dataUri));
-        if (parts) {
-          const uploaded = await uploadMarketplaceMedia({
-            dataBase64: parts.dataBase64,
-            originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
-            listingId,
-          });
-          imageUrl = uploaded?.media?.publicUrl || '';
-          if (imageUrl) record = { imageUrl, fingerprint: plan.fingerprint };
-        }
+      if (plan.action === 'none') return none;
+      if (plan.action === 'link' || plan.action === 'reuse') {
+        return { images: [{ imageUrl: plan.imageUrl, isPrimary: true, sortOrder: 0 }], mediaIds: [], record: null };
       }
 
-      if (imageUrl) {
-        await updateMarketplaceListing(listingId, {
-          ...payload,
-          images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
-        });
-      }
-      return record;
+      const parts = splitDataUri(await shrinkToFit(plan.dataUri));
+      if (!parts) return none;
+      const uploaded = await uploadMarketplaceMedia({
+        dataBase64: parts.dataBase64,
+        originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
+      });
+      const imageUrl = uploaded?.media?.publicUrl || '';
+      const mediaId = uploaded?.media?.id || '';
+      if (!imageUrl || !mediaId) return none;
+      return {
+        images: [{ imageUrl, isPrimary: true, sortOrder: 0 }],
+        mediaIds: [mediaId],
+        record: { imageUrl, fingerprint: plan.fingerprint },
+      };
     } catch (err) {
       // A listing without its photo still sells; a failed publish sells nothing.
-      console.warn('Listing photo could not be attached', err);
-      return null;
+      console.warn('Listing photo could not be prepared', err);
+      return none;
     }
   }, []);
 
@@ -10131,22 +10316,40 @@ export default function BreedingPlannerApp() {
         photoBackfillTried.current.add(animalId);
         const snake = snakes.find((item) => item.id === animalId);
         if (!snake) continue;
+        // The whole body goes back with the images: the update rebuilds every
+        // column from what it is sent.
         const payload = listingUpdatePayloadFromListing(listing);
         if (!payload) continue;
-        const record = await attachListingPhoto(snake, listing.id, payload);
-        if (cancelled || !record) continue;
+        const photo = await prepareListingPhoto(snake);
+        if (cancelled || !photo.images.length) continue;
+        try {
+          await updateMarketplaceListing(listing.id, { ...payload, images: photo.images, mediaIds: photo.mediaIds });
+        } catch (err) {
+          console.warn('Listing photo could not be attached', err);
+          continue;
+        }
+        if (!photo.record) continue;
         setSnakes(prev => prev.map(item => item.id === animalId ? {
           ...item,
-          marketplaceImageUrl: record.imageUrl,
-          marketplaceImageFingerprint: record.fingerprint,
+          marketplaceImageUrl: photo.record.imageUrl,
+          marketplaceImageFingerprint: photo.record.fingerprint,
         } : item));
       }
       if (!cancelled) refreshMarketplaceListings();
     })();
 
     return () => { cancelled = true; };
-  }, [marketplaceListingsByAnimal, snakes, attachListingPhoto, refreshMarketplaceListings]);
+  }, [marketplaceListingsByAnimal, snakes, prepareListingPhoto, refreshMarketplaceListings]);
 
+  /**
+   * The one write that puts a snake in front of buyers, or takes it back off.
+   *
+   * One request: `POST /marketplace/listings` carries the status, the price and
+   * currency, the photo and the id of the upload behind it, and the server
+   * writes them together. It is upsert-by-animal, so it is safe on every save.
+   * Status rules: docs/marketplace-listings.md. There is no second store to
+   * keep in step any more -- the breeder profile reads this same listing.
+   */
   const syncSnakeToMarketplace = useCallback(async (snake, { published = true } = {}) => {
     const tokens = getDisplayedSnakeGeneticsTokens(snake);
     const genetics = tokens.map((tok) =>
@@ -10155,62 +10358,16 @@ export default function BreedingPlannerApp() {
     const speciesName = getSpeciesById(resolveSpeciesId(snake?.species))?.name || '';
 
     const payload = buildMarketplaceListingPayload(snake, { genetics, species: speciesName, published });
-    if (!payload) return;
-    const created = await createMarketplaceListing(payload);
-    const listingId = created?.listing?.id || '';
+    if (!payload) return null;
 
-    /**
-     * The photo. A breeder's pictures live on this device as data URIs and are
-     * stripped out of every snapshot sync, so the marketplace has never had one
-     * to show. Upload it against the listing -- media is only public when it
-     * belongs to a published listing -- and then attach it.
-     *
-     * The whole payload goes back with the images because the update rebuilds
-     * every column from what it is sent: a patch carrying images alone would
-     * blank the title, the genetics and the price.
-     */
-    let photoRecord = null;
-    if (listingId) {
-      photoRecord = await attachListingPhoto(snake, listingId, payload);
-    }
+    // Taking a snake off sale needs no photo; putting it up does.
+    const photo = published ? await prepareListingPhoto(snake) : { images: [], mediaIds: [], record: null };
+    await createMarketplaceListing(withListingPhoto(payload, photo));
 
     // Keep the editor's view of what is listed in step with what was just written.
     refreshMarketplaceListings();
-
-    // The breeder's own public profile page still reads the older listings
-    // table, so it is kept in step too. It is not what the marketplace shows.
-    try {
-      const data = await fetchMyListings();
-      const existing = Array.isArray(data?.listings) ? data.listings : [];
-      const coverUrl = snake.imageUrl
-        || (Array.isArray(snake.photos) && snake.photos.length
-          ? snake.photos[snake.photos.length - 1]?.url || ''
-          : '');
-      const legacy = {
-        id: existing.find((l) => l.animalAppId === snake.id)?.id || `listing-${Date.now()}`,
-        animalAppId: snake.id,
-        title: payload.title,
-        status: published ? 'available' : 'draft',
-        price: String(snake.price ?? ''),
-        currency: payload.currency,
-        description: payload.description,
-        imageUrl: coverUrl,
-        sex: payload.sex,
-        hatchDate: snake.birthDate || '',
-        genetics,
-      };
-      await saveMyListings([
-        ...existing.filter((l) => l.animalAppId !== snake.id),
-        legacy,
-      ]);
-    } catch (err) {
-      // The marketplace write is the one that matters; the profile page catching
-      // up on the next save is not worth failing the publish over.
-      console.warn('Profile listing mirror failed', err);
-    }
-
-    return photoRecord;
-  }, [refreshMarketplaceListings]);
+    return photo.record;
+  }, [prepareListingPhoto, refreshMarketplaceListings]);
 
   const publishEditSnakeToMarketplace = useCallback(async () => {
     if (!editSnakeDraft || editForSalePublishing) return;
@@ -10241,7 +10398,7 @@ export default function BreedingPlannerApp() {
         currency: editSnakeDraft.currency || x.currency,
       } : x));
     } catch (err) {
-      setEditForSalePublishError(err instanceof Error ? err.message : 'Could not publish to Marketplace.');
+      setEditForSalePublishError(err instanceof Error ? err.message : t("snakeEdit.publishFailed", { defaultValue: "Could not publish to Marketplace." }));
     } finally {
       setEditForSalePublishing(false);
     }
@@ -10326,7 +10483,7 @@ export default function BreedingPlannerApp() {
   });
 
   const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
-  const passiveScannerLabel = passiveScanNotice?.text ?? 'Scanner ready';
+  const passiveScannerLabel = passiveScanNotice?.text ?? t("animals.scanner.ready", { defaultValue: "Scanner ready" });
 
   const performSnakeDeletion = useCallback((id) => {
     if (!id) return;
@@ -10542,14 +10699,13 @@ export default function BreedingPlannerApp() {
 
     // The tag the breeder picked is parked as previousStatus, so clearing quarantine later hands
     // the animal back the status they actually chose rather than a generic default.
-    const goesIntoQuarantine = newAnimal.newlyAcquired !== false;
-    const snakeToAdd = goesIntoQuarantine
-      ? applyQuarantineStatus(snake, QUARANTINE_STATUS.IN, {
-        today: quarantineTodayYmd(),
-        source: newAnimal.quarantineSource || 'known-breeder',
-        sourceName: newAnimal.quarantineSourceName || '',
-      })
-      : snake;
+    const arrival = newAnimal.arrival || MANUAL_ADD_DEFAULT_ARRIVAL;
+    const goesIntoQuarantine = arrival === ARRIVAL.NEW;
+    const snakeToAdd = admitAnimal(snake, arrival, {
+      today: quarantineTodayYmd(),
+      source: newAnimal.quarantineSource || 'known-breeder',
+      sourceName: newAnimal.quarantineSourceName || '',
+    });
 
     if (goesIntoQuarantine) {
       const { state, show } = recordQuarantineStart(loadStoredJson(STORAGE_KEYS.quarantineNotice, null));
@@ -10654,10 +10810,12 @@ export default function BreedingPlannerApp() {
       const normalizedGroups = normalizeSingleGroupValue(
         (converted.groups || []).map(normalizeImportedGroup).filter(Boolean)
       );
-      // An import is an existing collection moving in, so nothing is quarantined wholesale. A row
-      // that explicitly carries the Quarantine tag is honoured and gets a record opened for it.
-      normalizedToAdd.push(reconcileQuarantineWithStatus(
+      // An import is usually an existing collection moving in, so by default nothing is
+      // quarantined wholesale; a row that carries the Quarantine status is still honoured. The
+      // keeper can say these are new arrivals instead, and then each one starts quarantine.
+      normalizedToAdd.push(admitAnimal(
         { ...converted, sex, species: resolveSpeciesId(importSpecies), groups: normalizedGroups, isDemo: false },
+        importArrival,
         { today: quarantineTodayYmd() }
       ));
     }
@@ -10728,7 +10886,7 @@ export default function BreedingPlannerApp() {
       );
       existingIds.push(converted.id);
       existingRecords.push({ id: converted.id, idSequence: converted.idSequence });
-      return reconcileQuarantineWithStatus(
+      return admitAnimal(
         {
           ...converted,
           // convertParsedToSnake strips a leading year off a name to seed the id generator,
@@ -10746,6 +10904,7 @@ export default function BreedingPlannerApp() {
           importRawTraits: draft.importRawTraits,
           isDemo: false,
         },
+        importArrival,
         { today }
       );
     });
@@ -10795,11 +10954,27 @@ export default function BreedingPlannerApp() {
     const landingSpecies = plan?.summary?.bySpecies?.[0]?.speciesId;
     if (landingSpecies) openSpeciesWorkspace(landingSpecies);
 
+    // What the result panel can offer for the Breeders group: every sexed animal this import
+    // wrote that is not a breeder already. Updated rows carry the sex the file just gave them.
+    const touched = [
+      ...created,
+      ...update
+        .map(row => {
+          const existing = snakes.find(snake => snake.id === row.conflictWithId);
+          return existing ? { ...existing, sex: row.animal.sex } : null;
+        })
+        .filter(Boolean),
+    ].filter(animal => !isBreederGroupMember(animal));
+
     return {
       created: created.length,
       updated: update.length,
       skipped: skipped.length,
       failed: failed.length,
+      breederCandidates: {
+        males: touched.filter(isMaleSnake),
+        females: touched.filter(isFemaleSnake),
+      },
     };
   }
 
@@ -10896,6 +11071,183 @@ export default function BreedingPlannerApp() {
       pendingHatchWizardPayloadRef.current = null;
       openHatchWizardForPayload(payload);
     }, [pendingHatchWizardTick, openHatchWizardForPayload]);
+
+  // ── Female breeding cards (SBR-01..SBR-11) ─────────────────────────────────
+  // Animals as the breeding domain sees them: species id and whether the species lays eggs.
+  const breedingSnakesById = useMemo(() => new Map(snakes.map(snake => {
+    const speciesId = resolveSpeciesId(snake?.species);
+    return [snake.id, { ...snake, speciesId, reproductionMode: getSpeciesById(speciesId)?.reproduction || 'egg_laying' }];
+  })), [snakes]);
+  const addBreedingTombstone = useCallback((collection, id, deletedAt) => {
+    setSyncTombstones(prev => ({ ...prev, [collection]: { ...(prev[collection] || {}), [id]: { id, deletedAt } } }));
+  }, []);
+  const breedingActions = useBreedingActions({
+    cycles: breedingCycles,
+    exams: follicleExams,
+    settings: breedingSettings,
+    setCycles: setBreedingCycles,
+    setExams: setFollicleExams,
+    setSettings: setBreedingSettings,
+    addTombstone: addBreedingTombstone,
+    snakesById: breedingSnakesById,
+  });
+  const breedingGeneticsTokensFor = useCallback((snake) => (
+    snake ? combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets) : []
+  ), []);
+  const breedingLocationById = useMemo(() => {
+    const map = new Map();
+    (heatRacks || []).forEach(rack => (rack?.slots || []).forEach(slot => {
+      if (!slot?.snakeId) return;
+      const level = Number.isFinite(slot.levelIndex) ? ` L${slot.levelIndex + 1}` : '';
+      const column = Number.isFinite(slot.columnIndex) ? `-${slot.columnIndex + 1}` : '';
+      map.set(slot.snakeId, `${rack.name || t('breeding.location.rack', { defaultValue: 'Rack' })}${level}${column}`);
+    }));
+    (terrariums || []).forEach(terrarium => (terrarium?.occupantIds || []).forEach(id => {
+      map.set(id, terrarium.name || t('breeding.location.terrarium', { defaultValue: 'Terrarium' }));
+    }));
+    return map;
+  }, [heatRacks, terrariums, t]);
+  const breedingLocationFor = useCallback((animalId) => breedingLocationById.get(animalId) || '', [breedingLocationById]);
+  const breedingSpeciesOptions = useMemo(() => {
+    const ids = Array.from(new Set(snakes.map(snake => resolveSpeciesId(snake?.species))));
+    return ids.map(id => ({ id, name: getSpeciesById(id)?.name || id }));
+  }, [snakes]);
+  const openBreedingCycle = useCallback((cycleId, femaleId = null) => {
+    let target = cycleId || null;
+    if (!target && femaleId) {
+      target = breedingCyclesForFemale(breedingCycles, femaleId).find(c => c.status !== BREEDING_CYCLE_STATUS.CLOSED)?.id || null;
+    }
+    setTab('pairings');
+    setPairingsView('cards');
+    setFocusedCycleId(target);
+  }, [breedingCycles]);
+  const requestBreedingDialog = useCallback((request) => {
+    setTab('pairings');
+    setPairingsView('cards');
+    setBreedingDialogRequest({ ...request, at: Date.now() });
+  }, []);
+
+  // Legacy pairing records → breeding cards. Deterministic ids make this rerun-safe; a card the
+  // keeper deleted (tombstoned) is not recreated. Runs on every change so records arriving from
+  // another device or the legacy UI are mapped too.
+  useEffect(() => {
+    if (!Array.isArray(pairings) || !pairings.length) return;
+    const tombstoned = new Set(Object.keys(syncTombstonesRef.current?.breedingCycles || {}));
+    const { cycles: planned, report } = planLegacyMigration(pairings, breedingCycles);
+    const fresh = planned.filter(cycle => !tombstoned.has(cycle.id));
+    if (!fresh.length) return;
+    console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
+    setBreedingCycles(prev => [...prev, ...fresh.filter(cycle => !prev.some(existing => existing?.id === cycle.id))]);
+  }, [pairings, breedingCycles, setBreedingCycles]);
+
+  // Pre-pairing scans join the female's card once it exists; their dates never move.
+  useEffect(() => {
+    const open = breedingCycles.filter(cycle => cycle && !cycle.deletedAt && cycle.status !== BREEDING_CYCLE_STATUS.CLOSED);
+    if (!open.length) return;
+    let next = follicleExams;
+    let changed = false;
+    open.forEach(cycle => {
+      const earlier = breedingCyclesForFemale(breedingCycles, cycle.femaleId)
+        .filter(other => other.id !== cycle.id && other.status === BREEDING_CYCLE_STATUS.CLOSED && other.startDate && cycle.startDate && other.startDate < cycle.startDate)[0];
+      const previousCycleEnd = earlier ? (earlier.closure?.biologicalCompletionDate || String(earlier.closure?.closedAt || '').slice(0, 10) || earlier.startDate) : null;
+      const result = associateExamsWithCycle(next, cycle, { previousCycleEnd, now: nowIsoString() });
+      if (result.associated.length) { next = result.exams; changed = true; }
+    });
+    if (changed) setFollicleExams(() => next);
+  }, [breedingCycles, follicleExams, setFollicleExams]);
+
+  // Hatchlings created for a card (or for the legacy pairing it came from) are linked to it as
+  // offspring. Parentage stays unresolved unless exactly one male participated.
+  useEffect(() => {
+    const byId = new Map();
+    const byLegacyPairing = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle || cycle.deletedAt) return;
+      byId.set(cycle.id, cycle);
+      (cycle.legacy?.pairingIds || []).forEach(pairingId => byLegacyPairing.set(pairingId, cycle));
+    });
+    if (!byId.size) return;
+    const updates = new Map();
+    snakes.forEach(snake => {
+      const ref = snake?.pairingId || snake?.metadata?.pairingId;
+      if (!ref) return;
+      const cycle = byId.get(ref) || byLegacyPairing.get(ref);
+      if (!cycle) return;
+      const current = updates.get(cycle.id) || cycle;
+      if (current.offspring.some(item => item.animalId === snake.id)) return;
+      updates.set(cycle.id, linkCycleOffspring(current, snake.id, { now: nowIsoString() }));
+    });
+    if (!updates.size) return;
+    setBreedingCycles(prev => prev.map(cycle => updates.get(cycle?.id) || cycle));
+  }, [snakes, breedingCycles, setBreedingCycles]);
+
+  // The existing hatch wizard creates the hatchling animals; the card supplies the parents. With
+  // more than one participating male the sire is left empty, so parentage stays unresolved.
+  const createHatchlingsForCycle = useCallback((cycle) => {
+    const female = snakeById(snakes, cycle.femaleId);
+    const participated = cycle.males.filter(m => m.state === BREEDING_MALE_STATE.PARTICIPATED);
+    const soleMaleId = participated.length === 1 ? participated[0].maleId : null;
+    const male = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const linkedIds = new Set([cycle.id, ...(cycle.legacy?.pairingIds || [])]);
+    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId)).length;
+    const total = Number(cycle.clutch?.hatchlingsRecorded || 0);
+    const count = total - existing;
+    if (count <= 0) {
+      showAppAlert(t('breeding.notice.hatchlingsUpToDate', { defaultValue: 'Hatchling records already exist for every recorded hatchling on this card ({{count}}). Raise the hatchling count first.', count: total }));
+      return;
+    }
+    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const hatchedOn = cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate || localYMD(new Date());
+    openHatchWizardForPayload({
+      pairing: withPairingLifecycleDefaults({
+        id: cycle.legacy?.pairingIds?.[0] || cycle.id,
+        femaleId: cycle.femaleId,
+        maleId: soleMaleId,
+        label: `${female?.name || cycle.femaleId} × ${male?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' }))}`,
+        clutch: { recorded: !!layDate, date: layDate, eggsTotal: cycle.clutch.eggsTotal ?? '', fertileEggs: cycle.clutch.fertileEggs ?? '', slugs: cycle.clutch.slugs ?? '' },
+        hatch: { recorded: true, date: hatchedOn, hatchedCount: total },
+      }),
+      count,
+      hatchedDate: hatchedOn,
+      existingCount: existing,
+      previousHatch: {},
+    });
+  }, [snakes, openHatchWizardForPayload, showAppAlert, t]);
+
+  // Ultrasound stills and clips attached to an examination. Images are downscaled the way animal
+  // photos are; anything over 8 MB is refused rather than silently dropped later by the sync.
+  const attachBreedingFiles = useCallback(async (files) => {
+    const out = [];
+    for (const file of files) {
+      if (file.size > 8 * 1024 * 1024) {
+        throw new Error(t('breeding.notice.fileTooLarge', { defaultValue: '{{name}} is larger than 8 MB. Reduce it before attaching.', name: file.name }));
+      }
+      let url = await readFileAsDataURL(file);
+      if (file.type.startsWith('image/')) {
+        try {
+          const image = await loadImageFromUrl(url);
+          const scaled = scaleDimensions(image.width, image.height, 1280);
+          const canvas = document.createElement('canvas');
+          canvas.width = scaled.width;
+          canvas.height = scaled.height;
+          canvas.getContext('2d').drawImage(image, 0, 0, scaled.width, scaled.height);
+          url = canvas.toDataURL('image/jpeg', 0.82);
+        } catch (err) {
+          console.warn('Attachment kept at original size', err);
+        }
+      }
+      out.push({ id: uid('fa'), kind: file.type.startsWith('video/') ? 'video' : 'image', name: file.name, url, addedAt: nowIsoString() });
+    }
+    return out;
+  }, [t]);
+
+  // Deep link: #cycle=<id> (or ?focusCycle=<id> from a reminder email) opens that card.
+  useEffect(() => {
+    const match = window.location.hash.match(/#cycle=([^&]+)/) || window.location.hash.match(/focusCycle=([^&]+)/);
+    if (!match) return;
+    const id = decodeURIComponent(match[1]);
+    if (breedingCycles.some(cycle => cycle?.id === id)) openBreedingCycle(id);
+  }, [breedingCycles, openBreedingCycle]);
 
     const regenerateWizardIdInState = useCallback((state, index, sexOverride) => {
       if (!state) return state;
@@ -11462,13 +11814,14 @@ export default function BreedingPlannerApp() {
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-3 min-w-0 max-w-full">
               {breederInfo.logoUrl ? (
-                <img src={breederInfo.logoUrl} alt="logo" className="w-16 h-16 rounded-full object-cover border shadow-sm" />
+                <img src={breederInfo.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="w-16 h-16 rounded-full object-cover border shadow-sm" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-600 border shadow-sm">Logo</div>
+                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center text-sm text-neutral-600 border shadow-sm">{t("setup.logo", { defaultValue: "Logo" })}</div>
               )}
               <div className="min-w-0">
                 <div className="mt-wordmark text-[28px] leading-tight tracking-tight">{t("app.title")}</div>
                 <div className="text-sm text-neutral-600 truncate">{breederInfo.businessName ? `${breederInfo.businessName} | ${breederInfo.name || ''}` : (breederInfo.name || '')}</div>
+                <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="mt-1" />
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
@@ -11477,7 +11830,7 @@ export default function BreedingPlannerApp() {
                   are absent until a species is open rather than shown in a broken state. */}
               {speciesScope && (<>
                 <TabButton theme={theme} active={tab==="animals"} onClick={()=>setTab("animals")} className="header-nav-button">{t("nav.animals", { defaultValue: "Animals" })}</TabButton>
-                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding Tracker" })}</TabButton>
+                <TabButton theme={theme} active={tab==="pairings"} onClick={()=>setTab("pairings")} className="header-nav-button">{t("nav.pairings", { defaultValue: "Breeding" })}</TabButton>
                 <TabButton theme={theme} active={tab==="advisor"} onClick={()=>setTab("advisor")} className="header-nav-button">{t("nav.advisor", { defaultValue: "Breeding Advisor" })}</TabButton>
                 <TabButton theme={theme} active={tab==="familyTree"} onClick={()=>setTab("familyTree")} className="header-nav-button">{t("nav.familyTree", { defaultValue: "Family Tree" })}</TabButton>
               </>)}
@@ -11492,10 +11845,10 @@ export default function BreedingPlannerApp() {
               <TabButton theme={theme} active={tab==="spaces"} onClick={()=>setTab("spaces")} className="header-nav-button">{t("nav.spaces", { defaultValue: "Spaces" })}</TabButton>
               <TabButton theme={theme} active={tab==="quarantine"} onClick={()=>setTab("quarantine")} className="header-nav-button">
                 {t("nav.quarantine", { defaultValue: "Quarantine" })}
-                {quarantineCount ? <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
+                {quarantineCount ? <span className="ms-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700">{quarantineCount}</span> : null}
               </TabButton>
               <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button">{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
-              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}</TabButton>
+              <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button">{t("nav.shedTerminal", { defaultValue: "Lab tests" })}</TabButton>
               <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button">{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
             </div>
             {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
@@ -11508,9 +11861,9 @@ export default function BreedingPlannerApp() {
       <div className="bp-header-mobile">
         <div className="bp-header-mobile__top">
           {breederInfo.logoUrl ? (
-            <img src={breederInfo.logoUrl} alt="logo" className="bp-header-mobile__logo" />
+            <img src={breederInfo.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="bp-header-mobile__logo" />
           ) : (
-            <div className="bp-header-mobile__logo-placeholder">BP</div>
+            <div className="bp-header-mobile__logo-placeholder">S</div>
           )}
           <div className="min-w-0 flex-1">
             <div className="bp-header-mobile__title">{t("app.title")}</div>
@@ -11520,29 +11873,35 @@ export default function BreedingPlannerApp() {
               </div>
             )}
           </div>
+          <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="shrink-0" />
         </div>
       </div>
+      <NotSyncedToast failure={cloudSyncFailure} />
 
       {/* Mobile bottom navigation — shown only on mobile via CSS */}
       <nav className="bp-mobile-bottom-nav">
         <div className="bp-mobile-bottom-nav__items">
           {[
+            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }) },
             { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }) },
             { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
             { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
             { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }) },
-            { key: '__more', icon: '☰', label: 'More' },
+            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }) },
           ].map(({ key, icon, label }) => (
             <button
               key={key}
               type="button"
+              aria-current={tab === key ? 'page' : undefined}
               className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','quarantine','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
               onClick={() => {
                 if (key === '__more') { setMobileMoreOpen(prev => !prev); }
+                // Dashboard closes any open species, exactly like the desktop tab does.
+                else if (key === 'dashboard') { leaveSpeciesWorkspace(); setMobileMoreOpen(false); }
                 else { setTab(key); setMobileMoreOpen(false); }
               }}
             >
-              <span className="bp-mobile-bottom-nav__icon">{icon}</span>
+              <span className="bp-mobile-bottom-nav__icon" aria-hidden="true">{icon}</span>
               <span className="bp-mobile-bottom-nav__label">{label}</span>
             </button>
           ))}
@@ -11559,7 +11918,7 @@ export default function BreedingPlannerApp() {
               { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }) },
               { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
               { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminal", { defaultValue: "Shed Test" }) },
+              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }) },
             ].map(({ key, icon, label }) => (
               <button
                 key={key}
@@ -11567,7 +11926,38 @@ export default function BreedingPlannerApp() {
                 className="bp-more-menu__btn"
                 onClick={() => { setTab(key); setMobileMoreOpen(false); }}
               >
-                <span className="bp-more-menu__btn-icon">{icon}</span>
+                <span className="bp-more-menu__btn-icon" aria-hidden="true">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Animal action sheet: everything the desktop toolbar's right half offers, for the
+          phone widths where that half is hidden. Export list CSV stays inline in list view. */}
+      {animalActionSheetOpen && (
+        <div className="bp-more-menu" role="dialog" aria-modal="true" aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}>
+          <div className="bp-more-menu__backdrop" onClick={() => setAnimalActionSheetOpen(false)} />
+          <div className="bp-more-menu__panel bp-more-menu__panel--list">
+            {[
+              {
+                key: 'add',
+                icon: '+',
+                label: speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" }),
+                run: startNewAnimalDraft,
+              },
+              { key: 'import', icon: '↓', label: t("actions.importAnimals"), run: () => setShowImportModal(true) },
+              { key: 'exportQr', icon: '▦', label: t("actions.exportQr"), run: () => setShowExportModal(true) },
+              { key: 'scanQr', icon: '⌖', label: t("actions.scanQr"), run: () => setShowScanner(true) },
+            ].map(({ key, icon, label, run }) => (
+              <button
+                key={key}
+                type="button"
+                className="bp-more-menu__row"
+                onClick={() => { setAnimalActionSheetOpen(false); run(); }}
+              >
+                <span className="bp-more-menu__row-icon" aria-hidden="true">{icon}</span>
                 {label}
               </button>
             ))}
@@ -11591,7 +11981,7 @@ export default function BreedingPlannerApp() {
             {getSpeciesById(speciesScope)?.scientificName && (
               <span className="text-xs text-neutral-500 italic">{getSpeciesById(speciesScope).scientificName}</span>
             )}
-            <span className="ml-auto text-xs text-neutral-600 tabular-nums">
+            <span className="ms-auto text-xs text-neutral-600 tabular-nums">
               {t('species.scope.summary', {
                 defaultValue: '{{animals}} animals · {{genes}} genes',
                 animals: scopedSnakes.length,
@@ -11611,6 +12001,7 @@ export default function BreedingPlannerApp() {
             isDemoCollection={isDemoCollection}
             onOpenSpecies={openSpeciesWorkspace}
             onAddAnimal={startNewAnimalDraft}
+            onImportCollection={() => setShowImportModal(true)}
             searchQuery={dashboardQuery}
             onSearchQueryChange={setDashboardQuery}
             searchResults={dashboardSearch.matches}
@@ -11624,7 +12015,17 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "animals" && (
+        {speciesGateActive && (
+          <SpeciesGate
+            summaries={speciesSummaries}
+            onOpenSpecies={(speciesId) => openSpeciesWorkspace(speciesId, tab)}
+            onAddAnimal={startNewAnimalDraft}
+            onImportCollection={() => setShowImportModal(true)}
+            t={t}
+          />
+        )}
+
+        {tab === "animals" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
             <div className="bp-toolbar flex flex-wrap items-center gap-2">
               <div className="bp-filter-tabs flex flex-wrap items-center gap-2">
@@ -11715,29 +12116,33 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
               )}
-              {/* Mobile FAB for Add Animal — only visible via CSS on mobile */}
+              {/* Phone-width FAB, only visible via CSS under 768px. It opens the action sheet
+                  rather than adding straight away: the toolbar buttons it stands in for are
+                  hidden at that width, and Import must not go with them. */}
               <button
                 type="button"
                 className="bp-fab"
-                onClick={() => { setNewAnimal(createEmptyNewAnimalDraft()); setShowAddModal(true); }}
-                aria-label={t("actions.addAnimal")}
-                title={t("actions.addAnimal")}
+                onClick={() => setAnimalActionSheetOpen(true)}
+                aria-label={t("actions.animalActions", { defaultValue: "Animal actions" })}
+                aria-haspopup="dialog"
+                aria-expanded={animalActionSheetOpen}
+                title={t("actions.animalActions", { defaultValue: "Animal actions" })}
               >
                 +
               </button>
-              <div className="ml-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
+              <div className="ms-auto flex flex-wrap items-center gap-2 bp-toolbar-right">
                 {/* Adding animals comes first: it is what this row is mostly used for. The two
                     QR actions sit last, next to the scanner status they belong with. Feed prep
                     moved out to the header — it plans the whole collection, not this list. */}
                 <button
                   onClick={startNewAnimalDraft}
-                  className={toolbarControlClass}
+                  className={cx(toolbarControlClass, 'bp-toolbar-action')}
                 >
                   + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
                 </button>
-                <button onClick={() => setShowImportModal(true)} className={toolbarControlClass}>{t("actions.importAnimals")}</button>
-                <button onClick={()=>setShowExportModal(true)} className={toolbarControlClass}>{t("actions.exportQr")}</button>
-                <button onClick={()=>setShowScanner(true)} className={toolbarControlClass}>{t("actions.scanQr")}</button>
+                <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                <button onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
                 {isAnimalScannerView && (
@@ -11776,7 +12181,7 @@ export default function BreedingPlannerApp() {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder={t("header.search")}
-                  className="header-search-input w-full pr-11"
+                  className="header-search-input w-full pe-11"
                 />
                 {query ? (
                   <button
@@ -11843,10 +12248,10 @@ export default function BreedingPlannerApp() {
                       <div className="relative" ref={tagFilterMenuRef}>
                         <button
                           type="button"
-                          className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-left flex items-center justify-between"
+                          className="status-tag-neutral-button min-w-[200px] px-2.5 py-1.5 border rounded-lg text-[12px] bg-white text-start flex items-center justify-between"
                           onClick={() => setTagFilterMenuOpen(prev => !prev)}
                         >
-                          <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No tag" })}</span>
+                          <span>{selectedStatusTags[0] || t("snakeEdit.noTag", { defaultValue: "No status" })}</span>
                           <span className="text-[10px] text-neutral-500">v</span>
                         </button>
                         {tagFilterMenuOpen && (
@@ -11854,7 +12259,7 @@ export default function BreedingPlannerApp() {
                             <button
                               type="button"
                               className={cx(
-                                'status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                'status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                 !selectedStatusTags.length ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
                               )}
                               onClick={() => {
@@ -11862,7 +12267,7 @@ export default function BreedingPlannerApp() {
                                 setTagFilterMenuOpen(false);
                               }}
                             >
-                              {t("snakeEdit.noTag", { defaultValue: "No tag" })}
+                              {t("snakeEdit.noTag", { defaultValue: "No status" })}
                             </button>
                             {statusTagOptions.map(option => {
                               const selected = selectedStatusTags[0] === option;
@@ -11871,7 +12276,7 @@ export default function BreedingPlannerApp() {
                                   <button
                                     type="button"
                                     className={cx(
-                                      'status-tag-menu-button flex-1 px-3 py-2 text-left text-sm hover:bg-neutral-100',
+                                      'status-tag-menu-button flex-1 px-3 py-2 text-start text-sm hover:bg-neutral-100',
                                       selected ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700'
                                     )}
                                     onClick={() => {
@@ -11884,7 +12289,7 @@ export default function BreedingPlannerApp() {
                                   <button
                                     type="button"
                                     className="status-tag-menu-button px-2 py-2 text-sm font-semibold text-neutral-500 hover:text-rose-500"
-                                    title="Delete tag"
+                                    title={t("snakeEdit.deleteTag", { defaultValue: "Delete status" })}
                                     onClick={() => handleDeleteStatusTag(option)}
                                   >
                                     -
@@ -12102,8 +12507,18 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "advisor" && (
+        {tab === "advisor" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
+            <BreedersGroupGate
+              purpose="advisor"
+              breederMaleCount={males.length}
+              breederFemaleCount={females.length}
+              candidateMales={breederCandidateMales}
+              candidateFemales={breederCandidateFemales}
+              onAdd={addAnimalsToBreeders}
+              onAddAnimal={startNewAnimalDraft}
+              primaryButtonClass={cx('sk-on-accent', primaryBtnClass(theme, true))}
+            />
             <SuggestionsTab
               males={males}
               females={females}
@@ -12113,10 +12528,32 @@ export default function BreedingPlannerApp() {
           </div>
         )}
 
-        {tab === "pairings" && (
+        {tab === "pairings" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
+                <TabButton
+                  theme={theme}
+                  active={pairingsView === 'cards'}
+                  onClick={() => {
+                    setPairingsView('cards');
+                    setFocusedPairingId(null);
+                    setPairingsReturnView(null);
+                  }}
+                >
+                  {t('breeding.tabs.cards', { defaultValue: 'Breeding cards' })}
+                </TabButton>
+                <TabButton
+                  theme={theme}
+                  active={pairingsView === 'follicles'}
+                  onClick={() => {
+                    setPairingsView('follicles');
+                    setFocusedPairingId(null);
+                    setPairingsReturnView(null);
+                  }}
+                >
+                  {t('breeding.tabs.follicles', { defaultValue: 'Follicle tracking' })}
+                </TabButton>
                 <TabButton
                   theme={theme}
                   active={pairingsView === 'dashboard'}
@@ -12170,11 +12607,11 @@ export default function BreedingPlannerApp() {
                   {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
                 </TabButton>
               </div>
-              <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <div className="flex flex-wrap items-center gap-2 ms-auto">
                 <div className="relative w-full sm:w-64">
                   <input
                     type="text"
-                    className="w-full border rounded-xl px-3 py-2 text-sm pr-8"
+                    className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
                     placeholder={t('pairing.searchPlaceholder', { defaultValue: 'Search pairings or snakes' })}
                     value={pairingsSearchQuery}
                     onChange={e => setPairingsSearchQuery(e.target.value)}
@@ -12182,7 +12619,7 @@ export default function BreedingPlannerApp() {
                   {pairingsSearchQuery && (
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-2 text-neutral-500 text-lg leading-none"
+                      className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
                       onClick={() => setPairingsSearchQuery('')}
                       aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
                     >
@@ -12214,7 +12651,7 @@ export default function BreedingPlannerApp() {
                     active={completedYearFilter === 'All'}
                     onClick={() => setCompletedYearFilter('All')}
                   >
-                    All years
+                    {t("pairing.filters.allYears", { defaultValue: "All years" })}
                   </TabButton>
                   {completedYearOptions.map(year => (
                     <TabButton
@@ -12233,14 +12670,14 @@ export default function BreedingPlannerApp() {
                     active={completedOutcomeFilter === 'all'}
                     onClick={() => setCompletedOutcomeFilter('all')}
                   >
-                    All outcomes
+                    {t("pairing.filters.allOutcomes", { defaultValue: "All outcomes" })}
                   </TabButton>
                   {[
-                    ['productive', 'Eggs or live birth'],
-                    ['no_ovulation_observed', 'No ovulation observed'],
-                    ['follicles_reabsorbed', 'Follicles reabsorbed'],
-                    ['late_outcome', 'Late outcome'],
-                    ['reopened', 'Reopened'],
+                    ['productive', t("pairing.filters.outcome.productive", { defaultValue: "Eggs or live birth" })],
+                    ['no_ovulation_observed', t("pairing.filters.outcome.noOvulationObserved", { defaultValue: "No ovulation observed" })],
+                    ['follicles_reabsorbed', t("pairing.filters.outcome.folliclesReabsorbed", { defaultValue: "Follicles reabsorbed" })],
+                    ['late_outcome', t("pairing.filters.outcome.lateOutcome", { defaultValue: "Late outcome" })],
+                    ['reopened', t("pairing.filters.outcome.reopened", { defaultValue: "Reopened" })],
                   ].map(([key, label]) => (
                     <TabButton
                       key={key}
@@ -12254,7 +12691,32 @@ export default function BreedingPlannerApp() {
                 </div>
               </div>
             )}
-            {pairingsView === 'dashboard' ? (
+            {pairingsView === 'cards' || pairingsView === 'follicles' ? (
+              <BreedingWorkspace
+                view={pairingsView}
+                cycles={breedingCycles}
+                exams={follicleExams}
+                settings={breedingSettings}
+                actions={breedingActions}
+                snakes={scopedSnakes}
+                females={females}
+                males={males}
+                snakesById={breedingSnakesById}
+                geneticsTokensFor={breedingGeneticsTokensFor}
+                locationFor={breedingLocationFor}
+                onOpenSnake={openSnakeCard}
+                focusedCycleId={focusedCycleId}
+                onFocusCycle={(cycleId) => openBreedingCycle(cycleId)}
+                onCreateHatchlings={createHatchlingsForCycle}
+                showAppAlert={showAppAlert}
+                onAttachFiles={attachBreedingFiles}
+                speciesOptions={breedingSpeciesOptions}
+                searchQuery={pairingsSearchQuery}
+                scopedFemaleIds={speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null}
+                dialogRequest={breedingDialogRequest}
+                onDialogRequestHandled={() => setBreedingDialogRequest(null)}
+              />
+            ) : pairingsView === 'dashboard' ? (
               <BreedingDashboardSection
                 items={breedingDashboardItems}
                 initialUrgencyFilter={breedingUrgencyFocus}
@@ -12276,15 +12738,15 @@ export default function BreedingPlannerApp() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Clutches</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.clutches", { defaultValue: "Clutches" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.clutches}</div>
                       </div>
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Egg boxes</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.eggBoxes", { defaultValue: "Egg boxes" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.boxes}</div>
                       </div>
                       <div className="rounded-xl border bg-white px-3 py-2 shadow-sm">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Total eggs</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t("pairing.incubator.totalEggs", { defaultValue: "Total eggs" })}</div>
                         <div className="mt-1 text-2xl font-semibold text-neutral-900">{incubatorSummary.eggs}</div>
                       </div>
                     </div>
@@ -12309,8 +12771,8 @@ export default function BreedingPlannerApp() {
                           </div>
                           {box.clutchId && (
                             <div className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
-                              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
-                              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{box.clutchId}</span>
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
+                              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate"><bdi>{box.clutchId}</bdi></span>
                             </div>
                           )}
                           <div className="text-xs text-neutral-500">
@@ -12319,7 +12781,7 @@ export default function BreedingPlannerApp() {
                           <div className="text-xs font-medium">{t("pairing.eggBox.eggs", { count: box.eggs })}</div>
                           {box.badEggs > 0 ? (
                             <div className="text-xs text-rose-600">
-                              Bad eggs: {box.badEggs} of {box.originalEggs}
+                              {t("pairing.incubator.badEggs", { bad: box.badEggs, original: box.originalEggs, defaultValue: "Bad eggs: {{bad}} of {{original}}" })}
                             </div>
                           ) : null}
                           {typeof box.remaining === 'number' && (
@@ -12329,7 +12791,7 @@ export default function BreedingPlannerApp() {
                           )}
                           {box.notes ? (
                             <div className="text-xs text-neutral-500 line-clamp-2">
-                              Notes: {box.notes}
+                              {t("pairing.incubator.notes", { notes: box.notes, defaultValue: "Notes: {{notes}}" })}
                             </div>
                           ) : null}
                           <button
@@ -12337,7 +12799,7 @@ export default function BreedingPlannerApp() {
                             className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
                             onClick={() => setEggBoxModal(box)}
                           >
-                            View / edit egg box
+                            {t("pairing.incubator.viewEditBox", { defaultValue: "View / edit egg box" })}
                           </button>
                           <button
                             type="button"
@@ -12359,11 +12821,11 @@ export default function BreedingPlannerApp() {
                                 });
                               } catch (err) {
                                 console.error('Failed to generate clutch card from incubator', err);
-                                await showAppAlert('Unable to generate clutch card PDF.');
+                                await showAppAlert(t("pairing.incubator.clutchCardFailed", { defaultValue: "Unable to generate clutch card PDF." }));
                               }
                             }}
                           >
-                            Print clutch card
+                            {t("pairing.incubator.printClutchCard", { defaultValue: "Print clutch card" })}
                           </button>
                         </div>
                       ))}
@@ -12415,8 +12877,8 @@ export default function BreedingPlannerApp() {
                 ? t('pairing.searchEmpty', { defaultValue: 'No pairings match your search.' })
                 : (pairingsView === 'completed'
                   ? (completedYearFilter === 'All'
-                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed projects yet. Hatchlings will land here once the cycle is marked finished.' })
-                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed projects recorded for {{year}}.', year: completedYearFilter }))
+                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed pairings yet. Hatchlings will land here once the cycle is marked finished.' })
+                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed pairings recorded for {{year}}.', year: completedYearFilter }))
                   : t('pairing.emptyDefault'))}
               variant="collapsed"
             />
@@ -12428,8 +12890,11 @@ export default function BreedingPlannerApp() {
           <CalendarSection
             snakes={snakes}
             pairings={pairings}
+            breedingCycles={breedingCycles}
+            follicleExams={follicleExams}
             theme={theme}
-            onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
+            onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setPairingsView(isPairingCompleted(p) ? 'completed' : 'active'); setFocusedPairingId(p.id); } }}
+            onOpenCycle={openBreedingCycle}
             showAppAlert={showAppAlert}
           />
         )}
@@ -12457,7 +12922,8 @@ export default function BreedingPlannerApp() {
         )}
 
         {tab === "shedTerminal" && (
-          <Card title={t("nav.shedTerminal", { defaultValue: "Shed Test Terminal" })}>
+          <Card>
+            {/* Untitled: the panel inside carries the "Lab tests" title and its explanation. */}
             <ShedTestTerminalPanel snakes={snakes} />
           </Card>
         )}
@@ -12486,6 +12952,8 @@ export default function BreedingPlannerApp() {
             pairings={pairings}
             sharedBackendSnapshot={sharedBackendSnapshot}
             cloudSyncStatus={cloudSyncStatus}
+            cloudSyncFailure={cloudSyncFailure}
+            setupTabRequest={setupTabRequest}
             onSyncCloudDatabase={runCloudBreederSync}
             animalExportFields={animalExportFields}
             setAnimalExportFields={setAnimalExportFields}
@@ -12501,7 +12969,7 @@ export default function BreedingPlannerApp() {
           />
         )}
 
-        {tab === "familyTree" && (
+        {tab === "familyTree" && !speciesGateActive && (
           <FamilyTreePage snakes={scopedSnakes} pairings={scopedPairings} focusSnakeId={familyTreeFocusSnakeId} />
         )}
       </div>
@@ -12517,15 +12985,15 @@ export default function BreedingPlannerApp() {
           >
             <div className="flex items-start justify-between gap-4 px-5 pt-5">
               <div>
-                <div className="text-base font-semibold">{photoGallerySnake.name || 'Unnamed snake'}</div>
-                <div className="text-xs text-neutral-500 mt-1">{photoGallerySnake.id}</div>
-                <div className="text-xs text-neutral-500 mt-1">{photoGalleryPhotos.length} photo{photoGalleryPhotos.length === 1 ? '' : 's'} stored</div>
+                <div className="text-base font-semibold">{photoGallerySnake.name || t("photoGallery.unnamedSnake", { defaultValue: "Unnamed snake" })}</div>
+                <div className="text-xs text-neutral-500 mt-1"><bdi>{photoGallerySnake.id}</bdi></div>
+                <div className="text-xs text-neutral-500 mt-1">{t("photoGallery.storedCount", { count: photoGalleryPhotos.length, defaultValue_one: "{{count}} photo stored", defaultValue_other: "{{count}} photos stored" })}</div>
               </div>
               <button
                 className="text-sm px-3 py-1.5 border rounded-lg"
                 onClick={handleClosePhotoGallery}
               >
-                Close
+                {t("common.close", { defaultValue: "Close" })}
               </button>
             </div>
             <div className="px-5 pb-5 overflow-y-auto max-h-[70vh] mt-4">
@@ -12541,24 +13009,24 @@ export default function BreedingPlannerApp() {
                         <div className="relative bg-neutral-100">
                           <img
                             src={photo.url}
-                            alt={photo.name || `${photoGallerySnake.name || 'Snake'} photo`}
+                            alt={photo.name || t("photoGallery.photoAlt", { name: photoGallerySnake.name || t("photoGallery.snakeFallback", { defaultValue: "Snake" }), defaultValue: "{{name}} photo" })}
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
                           {isCover && (
-                            <div className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 sk-on-accent shadow">Cover</div>
+                            <div className="absolute top-2 start-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500 sk-on-accent shadow">{t("photoGallery.cover", { defaultValue: "Cover" })}</div>
                           )}
                         </div>
                         <div className="p-3 flex-1 flex flex-col gap-2 text-sm">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="font-medium truncate" title={photo.name || fileName}>{photo.name || 'Untitled photo'}</div>
+                            <div className="font-medium truncate" title={photo.name || fileName}>{photo.name || t("photoGallery.untitledPhoto", { defaultValue: "Untitled photo" })}</div>
                           </div>
                           <div className="text-xs text-neutral-500">
-                            {photo.source === 'camera' ? 'Captured on device' : 'Uploaded file'}
+                            {photo.source === 'camera' ? t("photoGallery.sourceCamera", { defaultValue: "Captured on device" }) : t("photoGallery.sourceUpload", { defaultValue: "Uploaded file" })}
                             {sizeLabel ? ` — ${sizeLabel}` : ''}
                           </div>
                           {addedLabel && (
-                            <div className="text-xs text-neutral-500">Added {addedLabel}</div>
+                            <div className="text-xs text-neutral-500">{t("photoGallery.addedAt", { date: addedLabel, defaultValue: "Added {{date}}" })}</div>
                           )}
                           <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
                             <a
@@ -12568,14 +13036,14 @@ export default function BreedingPlannerApp() {
                               rel="noopener noreferrer"
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100"
                             >
-                              Open
+                              {t("actions.open", { defaultValue: "Open" })}
                             </a>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100 disabled:opacity-60"
                               onClick={() => handleSetSnakeCoverPhoto(photoGallerySnake.id, photo.id)}
                               disabled={isCover}
                             >
-                              {isCover ? 'Current cover' : 'Set as cover'}
+                              {isCover ? t("photoGallery.currentCover", { defaultValue: "Current cover" }) : t("photoGallery.setAsCover", { defaultValue: "Set as cover" })}
                             </button>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg text-rose-600 hover:bg-rose-50"
@@ -12588,7 +13056,7 @@ export default function BreedingPlannerApp() {
                                 if (ok) handleRemoveSnakePhoto(photoGallerySnake.id, photo.id);
                               }}
                             >
-                              Remove
+                              {t("common.remove", { defaultValue: "Remove" })}
                             </button>
                           </div>
                         </div>
@@ -12597,7 +13065,7 @@ export default function BreedingPlannerApp() {
                   })}
                 </div>
               ) : (
-                <div className="text-sm text-neutral-500">No photos saved for this snake yet. Use the card buttons to add some.</div>
+                <div className="text-sm text-neutral-500">{t("photoGallery.empty", { defaultValue: "No photos saved for this snake yet. Use the card buttons to add some." })}</div>
               )}
             </div>
           </div>
@@ -12632,6 +13100,7 @@ export default function BreedingPlannerApp() {
               onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
               onCancel={()=>setShowAddModal(false)}
               onAdd={addAnimalFromForm}
+              capResult={addAnimalCap}
               theme={theme}
             />
           </div>
@@ -12695,49 +13164,49 @@ export default function BreedingPlannerApp() {
             className="relative z-[10051] bg-white w-full max-w-2xl rounded-2xl shadow-2xl border p-5 space-y-4 max-h-[90vh] overflow-auto"
             onClick={e => e.stopPropagation()}
           >
-            <div className="text-lg font-semibold">Select Leucistic Type</div>
+            <div className="text-lg font-semibold">{t("leucistic.title", { defaultValue: "Select Leucistic Type" })}</div>
             <div className="text-sm text-neutral-600 space-y-3">
               <p>
-                When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations.
+                {t("leucistic.intro", { defaultValue: "When entering BEL in genetics, the app requires the exact genes that create the leucistic animal. BEL is not a standalone gene; it is a visual outcome produced by specific gene combinations." })}
               </p>
               <div>
-                <div className="font-medium text-neutral-800">Blue Eyed Leucistic (BEL)</div>
+                <div className="font-medium text-neutral-800">{t("leucistic.belHeading", { defaultValue: "Blue Eyed Leucistic (BEL)" })}</div>
                 <p className="mt-1">
-                  A Blue Eyed Leucistic is produced when two compatible genes from the BEL complex are combined. Common BEL complex genes include Mojave, Lesser, Butter, Russo, Mystic, Phantom, and Special.
+                  {t("leucistic.belBody", { defaultValue: "A Blue Eyed Leucistic is produced when two compatible genes from the BEL complex are combined. Common BEL complex genes include Mojave, Lesser, Butter, Russo, Mystic, Phantom, and Special." })}
                 </p>
                 <p className="mt-1">
-                  Example combinations: Mojave + Lesser, Mojave + Butter, Lesser + Russo, Mystic + Mojave, Phantom + Mojave.
+                  {t("leucistic.belExamples", { defaultValue: "Example combinations: Mojave + Lesser, Mojave + Butter, Lesser + Russo, Mystic + Mojave, Phantom + Mojave." })}
                 </p>
               </div>
               <div>
-                <div className="font-medium text-neutral-800">Black Eyed Leucistic</div>
+                <div className="font-medium text-neutral-800">{t("leucistic.blackEye", { defaultValue: "Black Eyed Leucistic" })}</div>
                 <p className="mt-1">
-                  Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically.
+                  {t("leucistic.blackEyeBody", { defaultValue: "Black-eyed leucistics are created as super forms of certain genes. Select one gene and the app records it as the correct super form automatically." })}
                 </p>
                 <p className="mt-1">
-                  Examples: Fire + Fire creates Super Fire, Lesser + Lesser creates Super Lesser, Butter + Butter creates Super Butter.
+                  {t("leucistic.blackEyeExamples", { defaultValue: "Examples: Fire + Fire creates Super Fire, Lesser + Lesser creates Super Lesser, Butter + Butter creates Super Butter." })}
                 </p>
               </div>
               <p>
-                Defining the exact genes keeps genetics records accurate, preserves breeding outcomes, and ensures pairing predictions are correct.
+                {t("leucistic.why", { defaultValue: "Defining the exact genes keeps genetics records accurate, preserves breeding outcomes, and ensures pairing predictions are correct." })}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium">Leucistic Type</label>
+              <label className="text-xs font-medium">{t("leucistic.typeLabel", { defaultValue: "Leucistic Type" })}</label>
               <select
                 className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                 value={leucisticTypeChoice}
                 onChange={e => setLeucisticTypeChoice(e.target.value === 'blackEye' ? 'blackEye' : 'bel')}
               >
-                <option value="bel">Blue Eyed Leucistic</option>
-                <option value="blackEye">Black Eyed Leucistic</option>
+                <option value="bel">{t("leucistic.bel", { defaultValue: "Blue Eyed Leucistic" })}</option>
+                <option value="blackEye">{t("leucistic.blackEye", { defaultValue: "Black Eyed Leucistic" })}</option>
               </select>
             </div>
 
             {leucisticTypeChoice === 'bel' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium">BEL Gene 1</label>
+                  <label className="text-xs font-medium">{t("leucistic.belGene1", { defaultValue: "BEL Gene 1" })}</label>
                   <select
                     className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                     value={leucisticBelGene1}
@@ -12749,7 +13218,7 @@ export default function BreedingPlannerApp() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium">BEL Gene 2</label>
+                  <label className="text-xs font-medium">{t("leucistic.belGene2", { defaultValue: "BEL Gene 2" })}</label>
                   <select
                     className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                     value={leucisticBelGene2}
@@ -12762,13 +13231,13 @@ export default function BreedingPlannerApp() {
                 </div>
                 {String(leucisticBelGene1 || '').trim() && String(leucisticBelGene2 || '').trim() && String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() && (
                   <div className="sm:col-span-2 text-xs text-red-600">
-                    Select two different genes for Blue Eyed Leucistic.
+                    {t("leucistic.belSameGene", { defaultValue: "Select two different genes for Blue Eyed Leucistic." })}
                   </div>
                 )}
               </div>
             ) : (
               <div>
-                <label className="text-xs font-medium">Black Eye Complex Gene</label>
+                <label className="text-xs font-medium">{t("leucistic.blackEyeGene", { defaultValue: "Black Eye Complex Gene" })}</label>
                 <select
                   className="mt-1 w-full border rounded-xl px-3 py-2 bg-white text-sm"
                   value={leucisticBlackGene}
@@ -12782,14 +13251,14 @@ export default function BreedingPlannerApp() {
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>Cancel</button>
+              <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={cancelLeucisticSelector}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
               <button
                 type="button"
                 className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
                 onClick={confirmLeucisticSelector}
                 disabled={leucisticTypeChoice === 'bel' ? !(leucisticBelGene1 && leucisticBelGene2) || String(leucisticBelGene1 || '').trim().toLowerCase() === String(leucisticBelGene2 || '').trim().toLowerCase() : !leucisticBlackGene}
               >
-                Apply
+                {t("filters.apply", { defaultValue: "Apply" })}
               </button>
             </div>
           </div>
@@ -12866,7 +13335,7 @@ export default function BreedingPlannerApp() {
         const total = Array.isArray(hatchWizard.entries) ? hatchWizard.entries.length : 0;
         const safeIndex = total ? Math.min(total - 1, Math.max(0, hatchWizard.currentIndex || 0)) : 0;
         const entry = total ? hatchWizard.entries[safeIndex] : null;
-        const pairingName = hatchWizard.context?.pairingName || 'Hatchling';
+        const pairingName = hatchWizard.context?.pairingName || t("hatchWizard.pairingFallback", { defaultValue: "Hatchling" });
         const groupName = hatchWizard.context?.groupName || '';
         const isLast = safeIndex === total - 1;
         const canAdvance = entry && String(entry.id || '').trim().length > 0;
@@ -12888,19 +13357,19 @@ export default function BreedingPlannerApp() {
               <div className="p-4 border-b bg-neutral-50">
                 <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Hatching clutch</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("hatchWizard.title", { defaultValue: "Hatching clutch" })}</div>
                     <div className="mt-1 font-semibold text-neutral-900 truncate">{pairingName}</div>
                     <div className="text-xs text-neutral-500 mt-0.5">
-                      {total > 0 ? `Hatchling ${safeIndex + 1} of ${total}` : 'No hatchlings to record'}
+                      {total > 0 ? t("hatchWizard.progress", { current: safeIndex + 1, total, defaultValue: "Hatchling {{current}} of {{total}}" }) : t("hatchWizard.noneToRecordShort", { defaultValue: "No hatchlings to record" })}
                       {groupName ? ` - ${groupName}` : ''}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="text-right">
+                    <div className="text-end">
                       <div className="text-2xl font-semibold leading-none">{savedCount}/{total}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">Saved</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500">{t("hatchWizard.saved", { defaultValue: "Saved" })}</div>
                     </div>
-                    <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>Close</button>
+                    <button type="button" className="text-sm px-2 py-1" onClick={handleWizardCancel}>{t("common.close", { defaultValue: "Close" })}</button>
                   </div>
                 </div>
               </div>
@@ -12908,15 +13377,20 @@ export default function BreedingPlannerApp() {
                 {entry ? (
                   <div className="space-y-4">
                     <div className="text-sm text-neutral-600">
-                      Pairing: <span className="font-medium text-neutral-800">{pairingName}</span>
+                      {t("hatchWizard.pairingLabel", { defaultValue: "Pairing:" })} <span className="font-medium text-neutral-800">{pairingName}</span>
                     </div>
-                    {groupName && (
-                      <div className="text-xs text-neutral-500">
-                        New hatchlings will be placed in <span className="font-medium text-neutral-700">{groupName}</span>.
-                      </div>
-                    )}
+                    {groupName && (() => {
+                      const groupToken = '__GROUP__';
+                      const placedIn = t("hatchWizard.placedIn", { group: groupToken, defaultValue: "New hatchlings will be placed in {{group}}." });
+                      const [placedBefore, placedAfter = ''] = placedIn.split(groupToken);
+                      return (
+                        <div className="text-xs text-neutral-500">
+                          {placedBefore}<span className="font-medium text-neutral-700">{groupName}</span>{placedAfter}
+                        </div>
+                      );
+                    })()}
                     <div>
-                      <label className="text-xs font-medium">Hatchling ID</label>
+                      <label className="text-xs font-medium">{t("hatchWizard.hatchlingId", { defaultValue: "Hatchling ID" })}</label>
                       <div className="mt-1 flex gap-2">
                         <input
                           className="flex-1 border rounded-xl px-3 py-2 text-sm"
@@ -12928,50 +13402,50 @@ export default function BreedingPlannerApp() {
                           className={cx('px-3 py-2 rounded-xl text-sm border', entry.autoId ? 'text-neutral-600' : 'text-neutral-700')}
                           onClick={() => handleWizardRegenerateId(safeIndex)}
                         >
-                          Regenerate
+                          {t("hatchWizard.regenerate", { defaultValue: "Regenerate" })}
                         </button>
                       </div>
                       <div className="text-xs text-neutral-500 mt-1">
                         {entry.saved
-                          ? `Saved as ${entry.savedId || entry.id}.`
-                          : (entry.autoId ? 'Generated automatically based on pairing.' : 'ID locked—edit to override or regenerate.')}
+                          ? t("hatchWizard.savedAs", { id: entry.savedId || entry.id, defaultValue: "Saved as {{id}}." })
+                          : (entry.autoId ? t("hatchWizard.idAuto", { defaultValue: "Generated automatically based on pairing." }) : t("hatchWizard.idLocked", { defaultValue: "ID locked—edit to override or regenerate." }))}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-medium">Sex</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.sex", { defaultValue: "Sex" })}</label>
                         <select
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm bg-white"
                           value={entry.sex || 'U'}
                           onChange={e => handleWizardSexChange(safeIndex, e.target.value)}
                         >
-                          <option value="U">Unknown</option>
-                          <option value="F">Female</option>
-                          <option value="M">Male</option>
+                          <option value="U">{t("ui.animals.addAnimal.unknown", { defaultValue: "Unknown" })}</option>
+                          <option value="F">{t("ui.animals.addAnimal.female", { defaultValue: "Female" })}</option>
+                          <option value="M">{t("ui.animals.addAnimal.male", { defaultValue: "Male" })}</option>
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs font-medium">Weight (g)</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.weight", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.weight}
                           onChange={e => handleWizardWeightChange(safeIndex, e.target.value)}
-                          placeholder="e.g., 75"
+                          placeholder={t("hatchWizard.weightPlaceholder", { defaultValue: "e.g., 75" })}
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="text-xs font-medium">Morph / het notes</label>
+                        <label className="text-xs font-medium">{t("hatchWizard.morphNotes", { defaultValue: "Morph / het notes" })}</label>
                         <input
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
                           value={entry.morph || ''}
                           onChange={e => handleWizardMorphChange(safeIndex, e.target.value)}
-                          placeholder="e.g., Pastel Clown 66% Het Hypo"
+                          placeholder={t("hatchWizard.morphPlaceholder", { defaultValue: "e.g., Pastel Clown 66% Het Hypo" })}
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium">Birth date</label>
+                        <label className="text-xs font-medium">{t("snakeEdit.birthDate", { defaultValue: "Birth date" })}</label>
                         <input
                           type="date"
                           className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
@@ -12982,7 +13456,7 @@ export default function BreedingPlannerApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-neutral-500">No hatchlings to record.</div>
+                  <div className="text-sm text-neutral-500">{t("hatchWizard.noneToRecord", { defaultValue: "No hatchlings to record." })}</div>
                 )}
               </div>
               <div className="p-4 border-t flex items-center justify-between gap-3">
@@ -12990,7 +13464,7 @@ export default function BreedingPlannerApp() {
                 <div className="flex items-center gap-2">
                   {safeIndex > 0 && (
                     <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleWizardPrev}>
-                      Previous
+                      {t("common.previous", { defaultValue: "Previous" })}
                     </button>
                   )}
                   <button
@@ -12999,7 +13473,7 @@ export default function BreedingPlannerApp() {
                     onClick={handleWizardSaveCurrent}
                     disabled={!canAdvance}
                   >
-                    {isLast ? 'Save hatchling' : 'Save & next'}
+                    {isLast ? t("hatchWizard.saveHatchling", { defaultValue: "Save hatchling" }) : t("hatchWizard.saveNext", { defaultValue: "Save & next" })}
                   </button>
                 </div>
               </div>
@@ -13025,6 +13499,8 @@ export default function BreedingPlannerApp() {
                     applyImport={applyImport}
                     importSpecies={importSpecies}
                     setImportSpecies={setImportSpecies}
+                    importArrival={importArrival}
+                    setImportArrival={setImportArrival}
                     onResolveLeucisticLists={resolveLeucisticInMorphHetLists}
                     theme={theme}
                     onCancel={()=>setShowImportModal(false)}
@@ -13032,6 +13508,7 @@ export default function BreedingPlannerApp() {
                     existingAnimals={snakes}
                     onGeneticsForSpecies={geneticsForSpecies}
                     onCommitMorphMarketImport={applyMorphMarketImport}
+                    onAddToBreeders={addAnimalsToBreeders}
                   />
                 </div>
               </div>
@@ -13043,8 +13520,8 @@ export default function BreedingPlannerApp() {
   <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center p-4 z-[10010]", overlayClass(theme))} onClick={() => setShowPairingModal(false)}>
           <div className="relative z-[10011] bg-white w-full max-w-2xl rounded-2xl shadow-xl border overflow-hidden max-h-[92vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">Create pairing</div>
-              <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>Close</button>
+              <div className="font-semibold">{t("pairing.modal.title", { defaultValue: "Create pairing" })}</div>
+              <button className="text-sm px-2 py-1" onClick={()=>setShowPairingModal(false)}>{t("common.close", { defaultValue: "Close" })}</button>
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-auto">
               {(() => {
@@ -13054,12 +13531,20 @@ export default function BreedingPlannerApp() {
                 return (
                   <>
                     {showBreederHint && (
-                      <div className="sm:col-span-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        Add at least one male and one female to the Breeders group to enable pairing.
+                      <div className="sm:col-span-2">
+                        <BreedersGroupGate
+                          breederMaleCount={breederMales.length}
+                          breederFemaleCount={breederFemales.length}
+                          candidateMales={breederCandidateMales}
+                          candidateFemales={breederCandidateFemales}
+                          onAdd={addAnimalsToBreeders}
+                          onAddAnimal={() => { setShowPairingModal(false); startNewAnimalDraft(); }}
+                          primaryButtonClass={cx('sk-on-accent', primaryBtnClass(theme, true))}
+                        />
                       </div>
                     )}
                     <div>
-                      <label className="text-xs font-medium">Male</label>
+                      <label className="text-xs font-medium">{t("pairing.modal.male", { defaultValue: "Male" })}</label>
                       <div className="mt-1 space-y-2">
                         <input
                           ref={maleSearchInputRef}
@@ -13067,17 +13552,17 @@ export default function BreedingPlannerApp() {
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={maleSearchQuery}
                           onChange={e => setMaleSearchQuery(e.target.value)}
-                          placeholder={breederMales.length ? "Search breeder males (name, ID, genetics...)" : "No breeder males available"}
+                          placeholder={breederMales.length ? t("pairing.modal.searchMales", { defaultValue: "Search breeder males (name, ID, genetics...)" }) : t("pairing.modal.noMales", { defaultValue: "No breeder males available" })}
                           disabled={!breederMales.length}
                         />
                         {currentMale && (
                           <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
                             <div className="min-w-0 text-xs">
-                              <div className="font-medium text-sm truncate">{currentMale.name || currentMale.id}</div>
-                              <div className="text-[11px] text-neutral-500 truncate">{currentMale.id}</div>
+                              <div className="font-medium text-sm truncate"><bdi>{currentMale.name || currentMale.id}</bdi></div>
+                              <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentMale.id}</bdi></div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, maleId: "" }))}>
-                              Clear
+                              {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
                         )}
@@ -13095,7 +13580,7 @@ export default function BreedingPlannerApp() {
                                   key={m.id}
                                   type="button"
                                   className={cx(
-                                    "w-full text-left px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
+                                    "w-full text-start px-3 py-2 text-sm hover:bg-sky-50 focus:bg-sky-50 focus:outline-none",
                                     selected && "bg-sky-50/80"
                                   )}
                                   onClick={() => {
@@ -13104,24 +13589,24 @@ export default function BreedingPlannerApp() {
                                     setPairingSearchTarget("female");
                                   }}
                                 >
-                                  <div className="font-medium truncate">{m.name || m.id}</div>
-                                  <div className="text-[11px] text-neutral-500 truncate">{m.id}</div>
+                                  <div className="font-medium truncate"><bdi>{m.name || m.id}</bdi></div>
+                                  <div className="text-[11px] text-neutral-500 truncate"><bdi>{m.id}</bdi></div>
                                   <div className="text-[11px] text-neutral-500 truncate">
-                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
                                 </button>
                               );
                             })
                           ) : (
                             <div className="px-3 py-2 text-xs text-neutral-500">
-                              No breeder males match that search.
+                              {t("pairing.modal.noMaleMatch", { defaultValue: "No breeder males match that search." })}
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium">Female</label>
+                      <label className="text-xs font-medium">{t("pairing.modal.female", { defaultValue: "Female" })}</label>
                       <div className="mt-1 space-y-2">
                         <input
                           ref={femaleSearchInputRef}
@@ -13129,17 +13614,17 @@ export default function BreedingPlannerApp() {
                           className="w-full border rounded-xl px-3 py-2 bg-white disabled:bg-neutral-100"
                           value={femaleSearchQuery}
                           onChange={e => setFemaleSearchQuery(e.target.value)}
-                          placeholder={breederFemales.length ? "Search breeder females (name, ID, genetics...)" : "No breeder females available"}
+                          placeholder={breederFemales.length ? t("pairing.modal.searchFemales", { defaultValue: "Search breeder females (name, ID, genetics...)" }) : t("pairing.modal.noFemales", { defaultValue: "No breeder females available" })}
                           disabled={!breederFemales.length}
                         />
                         {currentFemale && (
                           <div className="flex items-center justify-between rounded-xl border bg-neutral-50 px-3 py-2">
                             <div className="min-w-0 text-xs">
-                              <div className="font-medium text-sm truncate">{currentFemale.name || currentFemale.id}</div>
-                              <div className="text-[11px] text-neutral-500 truncate">{currentFemale.id}</div>
+                              <div className="font-medium text-sm truncate"><bdi>{currentFemale.name || currentFemale.id}</bdi></div>
+                              <div className="text-[11px] text-neutral-500 truncate"><bdi>{currentFemale.id}</bdi></div>
                             </div>
                             <button type="button" className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => setDraft(d => ({ ...d, femaleId: "" }))}>
-                              Clear
+                              {t("pairing.modal.clear", { defaultValue: "Clear" })}
                             </button>
                           </div>
                         )}
@@ -13157,7 +13642,7 @@ export default function BreedingPlannerApp() {
                                   key={f.id}
                                   type="button"
                                   className={cx(
-                                    "w-full text-left px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
+                                    "w-full text-start px-3 py-2 text-sm hover:bg-rose-50 focus:bg-rose-50 focus:outline-none",
                                     selected && "bg-rose-50/80"
                                   )}
                                   onClick={() => {
@@ -13166,17 +13651,17 @@ export default function BreedingPlannerApp() {
                                     setPairingSearchTarget(null);
                                   }}
                                 >
-                                  <div className="font-medium truncate">{f.name || f.id}</div>
-                                  <div className="text-[11px] text-neutral-500 truncate">{f.id}</div>
+                                  <div className="font-medium truncate"><bdi>{f.name || f.id}</bdi></div>
+                                  <div className="text-[11px] text-neutral-500 truncate"><bdi>{f.id}</bdi></div>
                                   <div className="text-[11px] text-neutral-500 truncate">
-                                    {geneticsTokens.length ? geneticsTokens.join(", ") : "Normal"}
+                                    {geneticsTokens.length ? geneticsTokens.join(", ") : t("pairing.modal.normal", { defaultValue: "Normal" })}
                                   </div>
                                 </button>
                               );
                             })
                           ) : (
                             <div className="px-3 py-2 text-xs text-neutral-500">
-                              No breeder females match that search.
+                              {t("pairing.modal.noFemaleMatch", { defaultValue: "No breeder females match that search." })}
                             </div>
                           )}
                         </div>
@@ -13188,18 +13673,18 @@ export default function BreedingPlannerApp() {
 
               {draft.maleId && draft.femaleId && (
                 <div className="sm:col-span-2 text-xs text-neutral-500">
-                  Pairing label will be saved as {(currentFemale?.name || draft.femaleId)} × {(currentMale?.name || draft.maleId)}.
+                  {t("pairing.modal.labelPreview", { female: currentFemale?.name || draft.femaleId, male: currentMale?.name || draft.maleId, defaultValue: "Pairing label will be saved as {{female}} × {{male}}." })}
                 </div>
               )}
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium">Starting date</label>
+                <label className="text-xs font-medium">{t("pairing.modal.startDate", { defaultValue: "Starting date" })}</label>
                 <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2"
                   value={draft.startDate || ""}
                   onChange={e=>setDraft(d=>({...d,startDate:e.target.value}))} />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium">Notes</label>
-                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder="Ultrasound size, rotation plan, etc."/>
+                <label className="text-xs font-medium">{t("pairing.modal.notes", { defaultValue: "Notes" })}</label>
+                <textarea className="mt-1 w-full border rounded-xl px-3 py-2" rows={3} value={draft.notes||""} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} placeholder={t("pairing.modal.notesPlaceholder", { defaultValue: "Ultrasound size, rotation plan, etc." })}/>
               </div>
             </div>
             <div className="p-5 border-t flex items-center justify-between">
@@ -13211,7 +13696,7 @@ export default function BreedingPlannerApp() {
                   disabled={!draft.femaleId || !draft.maleId}
                   onClick={async () => {
                     if (!draft.maleId || !draft.femaleId) {
-                      await showAppAlert('Choose a breeder male and female first.');
+                      await showAppAlert(t("pairing.modal.chooseBoth", { defaultValue: "Choose a breeder male and female first." }));
                       return;
                     }
                     addPairingFromDraft();
@@ -13378,7 +13863,10 @@ export default function BreedingPlannerApp() {
                               tone: 'danger',
                             });
                           };
-                          if (savedSnake.forSale) {
+                          if (savedSnake.forSale && marketplaceListingDenied) {
+                            // The plan has no marketplace listings; the editor's For sale panel
+                            // already says so, and a publish here would only come back refused.
+                          } else if (savedSnake.forSale) {
                             syncSnakeToMarketplace(savedSnake)
                               .then((photo) => setSnakes(prev => prev.map(x => x.id === newId
                                 ? {
@@ -13418,7 +13906,7 @@ export default function BreedingPlannerApp() {
                   <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
                   <button
                     type="button"
-                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-left flex items-center justify-between"
+                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
                     onClick={() => setEditStatusMenuOpen(open => !open)}
                   >
                     <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
@@ -13428,7 +13916,7 @@ export default function BreedingPlannerApp() {
                     <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
                       <button
                         type="button"
-                        className="status-tag-menu-button w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
+                        className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
                         onClick={handleClearEditStatus}
                       >
                         {t("snakeEdit.noTag")}
@@ -13439,14 +13927,14 @@ export default function BreedingPlannerApp() {
                           <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
                             <button
                               type="button"
-                              className="status-tag-menu-button flex-1 text-left"
+                              className="status-tag-menu-button flex-1 text-start"
                               onClick={() => handleSelectEditStatus(option)}
                             >
                               {option}
                             </button>
                             <button
                               type="button"
-                              className="status-tag-menu-button ml-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
+                              className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
                               onClick={() => handleDeleteEditStatus(option)}
                               title={t("snakeEdit.deleteTag")}
                             >
@@ -13565,7 +14053,7 @@ export default function BreedingPlannerApp() {
                   <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
                   <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
                     value={editSnakeDraft.birthDate || ''}
-                    placeholder="YYYY-MM-DD, YYYY-MM, or YYYY"
+                    placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                     onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
                   <div className="text-xs text-neutral-500 mt-0.5">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
                 </div>
@@ -13695,7 +14183,7 @@ export default function BreedingPlannerApp() {
                 {/* For Sale */}
                 <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">For Sale</label>
+                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
                     <button
                       type="button"
                       role="switch"
@@ -13733,7 +14221,7 @@ export default function BreedingPlannerApp() {
                           />
                         </div>
                         <div className="flex flex-col gap-0.5 w-20">
-                          <label className="text-xs font-medium text-neutral-600">Currency</label>
+                          <label className="text-xs font-medium text-neutral-600">{t("snakeEdit.currency", { defaultValue: "Currency" })}</label>
                           <select
                             className="border rounded-lg px-2 py-1 text-sm bg-white"
                             value={editSnakeDraft.currency || 'EUR'}
@@ -13746,13 +14234,13 @@ export default function BreedingPlannerApp() {
                         </div>
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        <label className="text-xs font-medium text-neutral-600">Description for buyers</label>
+                        <label className="text-xs font-medium text-neutral-600">{t("snakeEdit.saleDescription", { defaultValue: "Description for buyers" })}</label>
                         <textarea
                           rows={2}
                           className="border rounded-lg px-2 py-1 text-sm resize-none w-full"
                           value={editSnakeDraft.saleDescription || ''}
                           onChange={e => setEditSnakeDraft(d => ({ ...d, saleDescription: e.target.value }))}
-                          placeholder="Optional details..."
+                          placeholder={t("snakeEdit.saleDescriptionPlaceholder", { defaultValue: "Optional details..." })}
                         />
                       </div>
                       {editForSalePublishError && (
@@ -13760,9 +14248,15 @@ export default function BreedingPlannerApp() {
                       )}
                       {editSnakeDraft.marketplacePublished ? (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5">
-                          <span>✓</span><span>Published to Marketplace</span>
+                          <span>✓</span><span>{t("snakeEdit.publishedToMarketplace", { defaultValue: "Published to Marketplace" })}</span>
                         </div>
                       ) : (
+                        <FeatureAccessGuard
+                          feature="marketplace.create_listing"
+                          featureName={t("snakeEdit.marketplaceListingsFeature", { defaultValue: "Marketplace listings" })}
+                          // No "See plans" here: leaving the editor would drop its unsaved changes.
+                          showUpgrade={false}
+                        >
                         <button
                           type="button"
                           disabled={editForSalePublishing}
@@ -13774,8 +14268,9 @@ export default function BreedingPlannerApp() {
                               : 'bg-amber-500 hover:bg-amber-600 sk-on-accent'
                           )}
                         >
-                          {editForSalePublishing ? 'Publishing...' : 'Publish to Marketplace'}
+                          {editForSalePublishing ? t("snakeEdit.publishing", { defaultValue: "Publishing..." }) : t("snakeEdit.publishToMarketplace", { defaultValue: "Publish to Marketplace" })}
                         </button>
+                        </FeatureAccessGuard>
                       )}
                     </div>
                   )}
@@ -13891,7 +14386,29 @@ export default function BreedingPlannerApp() {
                   animals={snakes}
                   clutchOptions={clutchOptions}
                 />
+                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
+                <AcquisitionRecordPanel snake={editSnake} />
                 <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+
+                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
+                  <FemaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    exams={follicleExams}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
+                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
+                  />
+                )}
+                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
+                  <MaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
+                  />
+                )}
 
                 {/* Reproductive Intelligence — females only */}
                 {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
@@ -13926,7 +14443,7 @@ export default function BreedingPlannerApp() {
                         const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
                         return (
                           <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
-                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#{pairing.id})</div>
+                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
                             <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
                             <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
                             {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
@@ -14058,6 +14575,7 @@ export {
   buildPairingDashboardItem,
   exportDatasetToCsv,
   formatCycleTimerDayLabel,
+  mergeBreederSnapshots,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
@@ -14336,7 +14854,7 @@ export {
                 )}
               >
                 {isCameraMode ? (
-                  <div className="text-center text-sm text-neutral-500 px-4">Align the QR inside the box</div>
+                  <div className="text-center text-sm text-neutral-500 px-4">{t("scanner.alignQr", { defaultValue: "Align the QR inside the box" })}</div>
                 ) : (
                   <div className="text-center text-sm text-neutral-500 px-4">{t('cameraDisabled')}</div>
                 )}
@@ -14562,9 +15080,9 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
   return createPortal((
     <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
       <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="font-semibold text-lg">Delete {snake.name || 'this snake'}?</div>
+        <div className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-          This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added.
+          {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
@@ -14572,7 +15090,7 @@ function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
             className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
             onClick={onConfirm}
           >
-            Delete
+            {t("common.delete", { defaultValue: "Delete" })}
           </button>
         </div>
       </div>
@@ -14693,7 +15211,7 @@ function Card({ title, children }) {
   // materials) its own ink. On `flat` it resolves to today's surface + border.
   return (
     <div className="mt-card border">
-      <div className="px-4 py-3 border-b mt-display font-semibold">{title}</div>
+      {title ? <div className="px-4 py-3 border-b mt-display font-semibold">{title}</div> : null}
       <div className="p-4">{children}</div>
     </div>
   );
@@ -15052,7 +15570,7 @@ function SpacesSection({
               return (
                 <div
                   key={room.id}
-                  className="text-left rounded-[28px] border border-neutral-200 bg-white p-5 shadow-sm hover:border-neutral-400 transition cursor-pointer"
+                  className="text-start rounded-[28px] border border-neutral-200 bg-white p-5 shadow-sm hover:border-neutral-400 transition cursor-pointer"
                   onClick={openRoom}
                   onKeyDown={event => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -15203,21 +15721,22 @@ function SpacesSection({
 }
 
 function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
+  const { t } = useTranslation();
   if (!id) return null;
   const geneticsTokens = combineMorphsAndHetsForDisplay(morphs, hets, possibleHets);
   if (typeof document === 'undefined') return null;
   return createPortal((
         <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
       <div className="relative z-[10011] bg-white p-4 rounded-lg shadow" onClick={e=>e.stopPropagation()}>
-        <div className="font-medium mb-2">QR for {name || id}</div>
-        <div className="text-sm text-neutral-500 mb-2">ID: <span className="font-mono">{id}</span></div>
+        <div className="font-medium mb-2">{t("qrPreview.title", { name: name || id, defaultValue: "QR for {{name}}" })}</div>
+        <div className="text-sm text-neutral-500 mb-2">{t("qrPreview.idLabel", { defaultValue: "ID:" })} <span className="font-mono">{id}</span></div>
         <div className="space-y-1 mb-3">
-          {geneticsTokens.length ? <GeneLine label="Genetics" genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">Genetics: -</div>}
+          {geneticsTokens.length ? <GeneLine label={t("qrPreview.genetics", { defaultValue: "Genetics" })} genes={geneticsTokens} size="md" /> : <div className="text-xs text-neutral-500 uppercase tracking-wide">{t("qrPreview.geneticsNone", { defaultValue: "Genetics: -" })}</div>}
         </div>
-        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">Generating…</div>}
+        {dataUrl ? <img src={dataUrl} className="w-64 h-64" alt={`QR ${id}`} /> : <div className="w-64 h-64 flex items-center justify-center">{t("qrPreview.generating", { defaultValue: "Generating…" })}</div>}
         <div className="mt-3 flex gap-2">
-          {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>Download</a>}
-          <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>Close</button>
+          {dataUrl && <a className="px-3 py-2 rounded-lg text-sm border" download={`snake-${id}.png`} href={dataUrl}>{t("actions.download", { defaultValue: "Download" })}</a>}
+          <button className="px-3 py-2 rounded-lg text-sm border" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
       </div>
     </div>
@@ -15225,6 +15744,7 @@ function QRModal({ id, name, morphs, hets, possibleHets, dataUrl, onClose }) {
 }
 
 function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
+  const { t } = useTranslation();
   const [notes, setNotes] = useState('');
   const [badEggs, setBadEggs] = useState('0');
 
@@ -15236,8 +15756,8 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
   if (!box || typeof document === 'undefined') return null;
 
   const title = box.eggBoxCount > 1
-    ? `Egg box #${box.eggBoxNumber} (${box.eggBoxIndexInClutch} of ${box.eggBoxCount})`
-    : `Egg box #${box.eggBoxNumber}`;
+    ? t("pairing.eggBox.splitTitle", { number: box.eggBoxNumber, box: box.eggBoxIndexInClutch, total: box.eggBoxCount, defaultValue: "Egg box #{{number}} ({{box}} of {{total}})" })
+    : t("pairing.eggBox.title", { number: box.eggBoxNumber, defaultValue: "Egg box #{{number}}" });
   const originalEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
   const badEggsCount = Math.max(0, Math.min(originalEggs, Math.floor(Number(badEggs) || 0)));
   const goodEggsCount = Math.max(0, originalEggs - badEggsCount);
@@ -15250,42 +15770,42 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
             <div className="font-semibold text-lg">{title}</div>
             {box.clutchId && (
               <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5">
-                <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">Clutch ID</span>
-                <span className="text-[10px] font-mono font-semibold text-violet-700">{box.clutchId}</span>
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
+                <span className="text-[10px] font-mono font-semibold text-violet-700"><bdi>{box.clutchId}</bdi></span>
               </div>
             )}
           </div>
-          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Close</button>
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Pairing</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.pairing", { defaultValue: "Pairing" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.pairingLabel}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Good eggs in this box</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.goodEggs", { defaultValue: "Good eggs in this box" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{goodEggsCount}</div>
-              <div className="mt-1 text-xs text-neutral-500">Started with {originalEggs}</div>
+              <div className="mt-1 text-xs text-neutral-500">{t("eggBoxModal.startedWith", { eggs: originalEggs, defaultValue: "Started with {{eggs}}" })}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Laid</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.laid", { defaultValue: "Laid" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.laidLabel || '-'}</div>
             </div>
             <div className="rounded-xl border bg-neutral-50 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500">Due</div>
+              <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.due", { defaultValue: "Due" })}</div>
               <div className="mt-1 font-medium text-neutral-900">{box.dueLabel || '-'}</div>
             </div>
             {typeof box.remaining === 'number' ? (
               <div className="rounded-xl border bg-neutral-50 p-3 sm:col-span-2">
-                <div className="text-[11px] uppercase tracking-wide text-neutral-500">Remaining</div>
-                <div className="mt-1 font-medium text-neutral-900">{box.remaining} days</div>
+                <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t("eggBoxModal.remaining", { defaultValue: "Remaining" })}</div>
+                <div className="mt-1 font-medium text-neutral-900">{t("eggBoxModal.remainingDays", { days: box.remaining, defaultValue: "{{days}} days" })}</div>
               </div>
             ) : null}
           </div>
 
           <div>
-            <label className="text-xs font-medium">Bad eggs</label>
+            <label className="text-xs font-medium">{t("eggBoxModal.badEggs", { defaultValue: "Bad eggs" })}</label>
             <input
               type="number"
               min="0"
@@ -15295,28 +15815,28 @@ function EggBoxModal({ box, onClose, onSave, theme = 'blue' }) {
               onChange={e => setBadEggs(e.target.value)}
             />
             <div className="mt-1 text-xs text-neutral-500">
-              Enter eggs that went bad. The egg box count will reduce to {goodEggsCount}.
+              {t("eggBoxModal.badEggsHelp", { good: goodEggsCount, defaultValue: "Enter eggs that went bad. The egg box count will reduce to {{good}}." })}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium">Egg box notes</label>
+            <label className="text-xs font-medium">{t("eggBoxModal.notes", { defaultValue: "Egg box notes" })}</label>
             <textarea
               className="mt-1 w-full min-h-32 border rounded-xl px-3 py-2 text-sm"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Add incubation notes, egg condition, movement, or reminders."
+              placeholder={t("eggBoxModal.notesPlaceholder", { defaultValue: "Add incubation notes, egg condition, movement, or reminders." })}
             />
           </div>
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>Cancel</button>
+          <button type="button" className="px-3 py-2 rounded-xl border text-sm" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
           <button
             type="button"
             className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
             onClick={() => onSave?.(box, { notes, badEggs: badEggsCount })}
           >
-            Save egg box
+            {t("eggBoxModal.save", { defaultValue: "Save egg box" })}
           </button>
         </div>
       </div>
@@ -15393,7 +15913,7 @@ function ExportQrModal({ open, onClose, snakes, groups, onGenerate, theme='blue'
                     const on = e.target.checked; setSelectedSnakesLocal(prev=>{
                       const set = new Set(prev||[]); on?set.add(s.id):set.delete(s.id); return [...set];
                     });
-                  }} />{s.name} <span className="text-xs text-neutral-500">{s.id}</span></label>;
+                  }} />{s.name} <span className="text-xs text-neutral-500"><bdi>{s.id}</bdi></span></label>;
                 })}
               </div>
             )}
@@ -16591,7 +17111,7 @@ async function exportSnakeToPdf(snake, breederInfo = {}, theme='blue', pairings 
 
     const sectionHeading = () => {
       doc.setFontSize(12);
-      doc.text(t("pairing.breedingCycles", { defaultValue: "Breeding cycles" }), left, y);
+      doc.text(i18n.t("pairing.breedingCycles", { defaultValue: "Breeding cycles" }), left, y);
       y += 7;
     };
 
@@ -16999,10 +17519,10 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                   <table className="min-w-full text-sm">
                     <thead className="bg-white border-b text-xs uppercase text-neutral-500">
                       <tr>
-                        <th className="text-left px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
-                        <th className="text-left px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
-                        <th className="text-left px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
-                        <th className="text-right px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
+                        <th className="text-start px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
+                        <th className="text-end px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -17011,7 +17531,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                           <td className="px-4 py-3 font-medium">{row.feedType}</td>
                           <td className="px-4 py-3">{row.sizeClass || '-'}</td>
                           <td className="px-4 py-3">{row.weightText || '-'}</td>
-                          <td className="px-4 py-3 text-right font-semibold">{row.quantity}</td>
+                          <td className="px-4 py-3 text-end font-semibold">{row.quantity}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -17039,7 +17559,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium truncate">{row.name}</span>
-                      <span className="block text-xs text-neutral-500 truncate">{row.id}</span>
+                      <span className="block text-xs text-neutral-500 truncate"><bdi>{row.id}</bdi></span>
                       {row.excluded ? (
                         <span className="block text-xs text-sky-700">{row.excludedReason}</span>
                       ) : row.complete ? (
@@ -17319,7 +17839,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-medium text-base truncate">{s.name}</div>
-              <div className="text-xs font-mono text-neutral-500 mt-1 truncate">{s.id}</div>
+              <div className="text-xs font-mono text-neutral-500 mt-1 truncate"><bdi>{s.id}</bdi></div>
               <div className="text-xs text-neutral-500">{s.birthDate ? formatDateForDisplay(s.birthDate) : ''}</div>
             </div>
             <div className="shrink-0">
@@ -17362,16 +17882,16 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
               color: 'var(--sk-warning-text, #166534)',
             }}
           >
-            For Sale
+            {t("snakeEdit.forSale", { defaultValue: "For sale" })}
           </span>
         )}
         {(hasFamilyTree || hasDelete) && (
-          <div className="relative ml-auto" ref={overflowMenuRef}>
+          <div className="relative ms-auto" ref={overflowMenuRef}>
             <button
               className="bp-card-overflow-btn bp-card-btn-primary text-[11px] px-2.5 py-1.5 border rounded-lg font-bold text-neutral-500 hover:bg-neutral-50 transition-colors"
               onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(prev => !prev); }}
-              title="More actions"
-              aria-label="More actions"
+              title={t("actions.moreActions", { defaultValue: "More actions" })}
+              aria-label={t("actions.moreActions", { defaultValue: "More actions" })}
             >
               ⋮
             </button>
@@ -17686,7 +18206,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       {normalizedSex === 'F' && breedingCyclesByYear.length > 0 && (
         <div className="mt-2">
         <div className="text-xs text-neutral-500 mb-1">{t("pairing.breedingCycles", { defaultValue: "Breeding cycles" })}</div>
-          <div className="flex flex-col gap-1 max-h-40 overflow-auto pr-1">
+          <div className="flex flex-col gap-1 max-h-40 overflow-auto pe-1">
             {breedingCyclesByYear.map(group => (
               <div key={group.year} className="rounded-lg border bg-neutral-50 p-2 space-y-1">
                 <div className="text-[10px] font-semibold uppercase text-neutral-500">{group.year}</div>
@@ -17699,31 +18219,31 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                           className="text-[10px] px-1.5 py-0.5 border rounded-lg"
                           onClick={() => onOpenPairing(cycle.id)}
                         >
-                          Open
+                          {t("actions.open", { defaultValue: "Open" })}
                         </button>
                       )}
                     </div>
                     <div className="space-y-0.5 text-neutral-700">
                       {cycle.locks && cycle.locks.length ? (
                         <div>
-                          <span className="font-semibold text-neutral-600">Locks:</span>{' '}
+                          <span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.locks", { defaultValue: "Locks:" })}</span>{' '}
                           <span>{cycle.locks.map(lock => lock.display || formatDateTimeForDisplay(lock.iso)).filter(Boolean).join(', ')}</span>
                         </div>
                       ) : null}
                       {cycle.ovulationDate ? (
-                        <div><span className="font-semibold text-neutral-600">Ovulation:</span> <span>{formatDateForDisplay(cycle.ovulationDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.ovulation", { defaultValue: "Ovulation:" })}</span> <span>{formatDateForDisplay(cycle.ovulationDate)}</span></div>
                       ) : null}
                       {cycle.preLayDate ? (
-                        <div><span className="font-semibold text-neutral-600">Pre-Lay Shed:</span> <span>{formatDateForDisplay(cycle.preLayDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.preLayShed", { defaultValue: "Pre-Lay Shed:" })}</span> <span>{formatDateForDisplay(cycle.preLayDate)}</span></div>
                       ) : null}
                       {cycle.clutchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Eggs laid:</span> <span>{formatDateForDisplay(cycle.clutchDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.eggsLaid", { defaultValue: "Eggs laid:" })}</span> <span>{formatDateForDisplay(cycle.clutchDate)}</span></div>
                       ) : null}
                       {cycle.hatchDate ? (
-                        <div><span className="font-semibold text-neutral-600">Hatched:</span> <span>{formatDateForDisplay(cycle.hatchDate)}</span></div>
+                        <div><span className="font-semibold text-neutral-600">{t("pairing.cycleEvents.hatched", { defaultValue: "Hatched:" })}</span> <span>{formatDateForDisplay(cycle.hatchDate)}</span></div>
                       ) : null}
                       {!cycle.locks?.length && !cycle.ovulationDate && !cycle.preLayDate && !cycle.clutchDate && !cycle.hatchDate ? (
-                        <div className="text-neutral-500">No cycle events recorded.</div>
+                        <div className="text-neutral-500">{t("pairing.cycleEvents.none", { defaultValue: "No cycle events recorded." })}</div>
                       ) : null}
                     </div>
                   </div>
@@ -17743,7 +18263,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
           return (
             <div className="flex flex-col gap-1 max-h-36 overflow-auto">
               {visible.map(p => (
-                <button key={p.id} className="text-sm text-left px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
+                <button key={p.id} className="text-sm text-start px-2 py-1 rounded-lg border hover:bg-neutral-50 min-w-0" onClick={()=> onOpenPairing ? onOpenPairing(p.id) : null}>
                   <div className="font-medium truncate">{p.label || `${p.femaleId} × ${p.maleId}`}</div>
                   <div className="text-xs text-neutral-500">{t("pairing.startDate", { defaultValue: "Start" })}: {p.startDate ? formatDateForDisplay(p.startDate) : '—'}</div>
                 </button>
@@ -17818,7 +18338,7 @@ function WeightTrendMiniChart({ data = [] }) {
       <svg
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         role="img"
-        aria-label="Weight trend chart"
+        aria-label={t("snakeEdit.weightTrendChart", { defaultValue: "Weight trend chart" })}
         className="w-full h-32"
       >
         <defs>
@@ -17870,7 +18390,7 @@ function WeightTrendMiniChart({ data = [] }) {
         <div>
           <span className="font-semibold text-neutral-700">{t("logs.latest", { defaultValue: "Latest" })}:</span> {formatNumber(latest.grams)} g
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <span className="font-semibold text-neutral-700">{t("logs.change", { defaultValue: "Change" })}:</span> {diffLabel}
         </div>
         <div className="col-span-2 text-neutral-500">
@@ -17937,7 +18457,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
     const isActive = sortBy === field;
     const arrow = isActive ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
     return (
-      <th className="text-left px-3 py-2 font-semibold">
+      <th className="text-start px-3 py-2 font-semibold">
         <button
           type="button"
           className={cx('flex items-center gap-1 hover:text-neutral-900', isActive ? 'text-neutral-900' : 'text-neutral-500')}
@@ -18030,12 +18550,12 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
         <thead className="text-xs uppercase tracking-wide text-neutral-500 bg-neutral-50">
           <tr>
             {renderSortableHeader('name', t('animals.list.columns.animal', { defaultValue: 'Animal' }))}
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.genetics', { defaultValue: 'Genetics' })}</th>
             {renderSortableHeader('status', t('animals.list.columns.status', { defaultValue: 'Status' }))}
             {renderSortableHeader('weight', t('animals.list.columns.weight', { defaultValue: 'Weight' }))}
             {renderSortableHeader('lastFeed', t('animals.list.columns.lastFeed', { defaultValue: 'Last feed' }))}
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
-            <th className="text-left px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.groups', { defaultValue: 'Groups & tags' })}</th>
+            <th className="text-start px-3 py-2 font-semibold">{t('animals.list.columns.actions', { defaultValue: 'Actions' })}</th>
           </tr>
         </thead>
         <tbody>
@@ -18056,7 +18576,7 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
               <tr key={snake.id || `snake-row-${index}`} className="border-t border-neutral-100">
                 <td className="px-3 py-3 align-top">
                   <div className="font-medium text-base">{snake.name || t('snakeEdit.unnamed', { defaultValue: 'Unnamed' })}</div>
-                  <div className="text-xs font-mono text-neutral-500">{snake.id || '—'}</div>
+                  <div className="text-xs font-mono text-neutral-500"><bdi>{snake.id || '—'}</bdi></div>
                   <div className="mt-1 inline-flex items-center gap-2 text-xs text-neutral-600">
                     <span className="font-semibold">{sexSummary.symbol}</span>
                     <span>{sexSummary.label}</span>
@@ -18180,17 +18700,18 @@ function filterSnakes(list, query, tag) {
 }
 
 function AddGroupInline({ onAdd }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState("");
   return (
     <div className="flex gap-2 px-2">
-      <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder="Add new group"
+      <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
         value={val} onChange={e=>setVal(e.target.value)} />
       <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
         const g = val.trim();
         if (!g) return;
         onAdd(g);
         setVal("");
-      }}>Add</button>
+      }}>{t("actions.add", { defaultValue: "Add" })}</button>
     </div>
   );
 }
@@ -18223,6 +18744,8 @@ function BreederSection({
   pairings,
   sharedBackendSnapshot,
   cloudSyncStatus,
+  cloudSyncFailure = null,
+  setupTabRequest = null,
   onSyncCloudDatabase,
   animalExportFields,
   setAnimalExportFields,
@@ -18325,7 +18848,11 @@ function BreederSection({
     lastTemplateSelectionRef.current = { start, end };
   }, []);
 
-  const [setupTab, setSetupTab] = useState('info');
+  const [setupTab, setSetupTab] = useState(() => setupTabRequest?.tab || 'info');
+  useEffect(() => {
+    if (setupTabRequest?.tab) setSetupTab(setupTabRequest.tab);
+  }, [setupTabRequest]);
+  const { refresh: refreshFeatureAccess } = useFeatureAccess();
   const isDevEnvironment = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
   const [aliasDraftAlias, setAliasDraftAlias] = useState('');
   const [aliasDraftGenes, setAliasDraftGenes] = useState('');
@@ -18351,8 +18878,12 @@ function BreederSection({
     user: null,
     tiers: [],
     subscription: null,
+    billing: null,
     access: {},
   });
+  // Set on the way back from Stripe. It reports what happened at checkout, never a plan
+  // change: the plan moves only when Stripe's webhook reaches the backend.
+  const [billingReturnNotice, setBillingReturnNotice] = useState('');
   const [accountForms, setAccountForms] = useState({
     email: '',
     emailPassword: '',
@@ -18511,20 +19042,20 @@ function BreederSection({
   const animalFieldSet = useMemo(() => new Set(normalizedAnimalExportFields), [normalizedAnimalExportFields]);
   const pairingFieldSet = useMemo(() => new Set(normalizedPairingExportFields), [normalizedPairingExportFields]);
   const accountFeatureLabels = useMemo(() => ({
-    'animals.create': 'Animal records',
-    'breeding.pairings': 'Pairings',
-    'mobile.scan': 'Mobile QR scan',
-    'mobile.profile': 'Mobile animal profile',
-    'mobile.quick_feed': 'Mobile feeding logs',
-    'lab.orders': 'Lab orders',
-    'marketplace.create_listing': 'Marketplace listings',
-  }), []);
+    'animals.create': t("setup.account.feature.animalRecords", { defaultValue: "Animal records" }),
+    'breeding.pairings': t("setup.account.feature.pairings", { defaultValue: "Pairings" }),
+    'mobile.scan': t("setup.account.feature.mobileScan", { defaultValue: "Mobile QR scan" }),
+    'mobile.profile': t("setup.account.feature.mobileProfile", { defaultValue: "Mobile animal profile" }),
+    'mobile.quick_feed': t("setup.account.feature.mobileFeeding", { defaultValue: "Mobile feeding logs" }),
+    'lab.orders': t("setup.account.feature.labOrders", { defaultValue: "Lab orders" }),
+    'marketplace.create_listing': t("setup.account.feature.marketplaceListings", { defaultValue: "Marketplace listings" }),
+  }), [t]);
   const vaultLimitValue = typeof normalizedBackupSettings.maxVaultEntries === 'number' && normalizedBackupSettings.maxVaultEntries > 0
     ? String(normalizedBackupSettings.maxVaultEntries)
     : 'unlimited';
   const vaultLimitDescription = normalizedBackupSettings.maxVaultEntries
-    ? `Keeping the latest ${normalizedBackupSettings.maxVaultEntries} backups. Oldest entries are pruned automatically.`
-    : 'Keeping all backups (no limit).';
+    ? t("setup.backup.retentionKeeping", { n: normalizedBackupSettings.maxVaultEntries, defaultValue: "Keeping the latest {{n}} backups. Oldest entries are pruned automatically." })
+    : t("setup.backup.retentionKeepingAll", { defaultValue: "Keeping all backups (no limit)." });
   const autoBackupStats = useMemo(() => {
     if (!autoBackupSnapshot || typeof autoBackupSnapshot !== 'object') return null;
     const payload = autoBackupSnapshot.payload || {};
@@ -18536,7 +19067,7 @@ function BreederSection({
   }, [autoBackupSnapshot]);
   const lastAutoBackupDisplay = normalizedBackupSettings.lastRun
     ? formatDateTimeForDisplay(normalizedBackupSettings.lastRun)
-    : 'Never';
+    : t("setup.backup.never", { defaultValue: "Never" });
   const manualFeedback = backupFeedback?.context === 'manual' ? backupFeedback : null;
   const autoFeedback = backupFeedback && typeof backupFeedback.context === 'string'
     && backupFeedback.context.startsWith('auto')
@@ -19577,13 +20108,13 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToPdf(dataset, {
         title: pairingExportType === 'byPairing'
           ? t('export.pairingsByMaleTitle', { defaultValue: 'Pairings by male' })
-          : t('export.pairingsTitle', { defaultValue: 'Breeding projects export' }),
+          : t('export.pairingsTitle', { defaultValue: 'Pairings export' }),
         subtitle: t('export.rowsSubtitle', { defaultValue: '{{rows}} rows - {{fields}} fields', rows: dataset.rows.length, fields: dataset.columns.length }),
         fileName: `${pairingExportType === 'byPairing' ? 'pairings-by-male' : 'pairings-export'}-${safeStamp}.pdf`,
       });
@@ -19591,7 +20122,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsPdf', { defaultValue: 'Exported {{count}} pairing rows to PDF.', count: dataset.rows.length })
-          : t('export.feedback.projectsPdf', { defaultValue: 'Exported {{count}} projects to PDF.', count: dataset.rows.length }),
+          : t('export.feedback.projectsPdf', { defaultValue: 'Exported {{count}} pairings to PDF.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19599,7 +20130,7 @@ function BreederSection({
       console.error('Pairings PDF export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsPdfFailed', { defaultValue: 'Failed to export breeding projects to PDF.' }),
+        message: err?.message || t('export.feedback.projectsPdfFailed', { defaultValue: 'Failed to export pairings to PDF.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19614,7 +20145,7 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToXlsx(dataset, {
@@ -19627,7 +20158,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsSheet', { defaultValue: 'Exported {{count}} pairing rows to spreadsheet.', count: dataset.rows.length })
-          : t('export.feedback.projectsSheet', { defaultValue: 'Exported {{count}} projects to spreadsheet.', count: dataset.rows.length }),
+          : t('export.feedback.projectsSheet', { defaultValue: 'Exported {{count}} pairings to spreadsheet.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19635,7 +20166,7 @@ function BreederSection({
       console.error('Pairings sheet export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsSheetFailed', { defaultValue: 'Failed to export breeding projects to spreadsheet.' }),
+        message: err?.message || t('export.feedback.projectsSheetFailed', { defaultValue: 'Failed to export pairings to spreadsheet.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19650,7 +20181,7 @@ function BreederSection({
         throw new Error(t('export.errors.selectField', { defaultValue: 'Select at least one field before exporting.' }));
       }
       if (!dataset.rows.length) {
-        throw new Error(t('export.errors.noPairings', { defaultValue: 'No breeding projects available to export.' }));
+        throw new Error(t('export.errors.noPairings', { defaultValue: 'No pairings available to export.' }));
       }
       const safeStamp = timestamp.replace(/[:.]/g, '-');
       await exportDatasetToCsv(dataset, {
@@ -19660,7 +20191,7 @@ function BreederSection({
         type: 'success',
         message: pairingExportType === 'byPairing'
           ? t('export.feedback.pairingRowsCsv', { defaultValue: 'Exported {{count}} pairing rows to CSV.', count: dataset.rows.length })
-          : t('export.feedback.projectsCsv', { defaultValue: 'Exported {{count}} projects to CSV.', count: dataset.rows.length }),
+          : t('export.feedback.projectsCsv', { defaultValue: 'Exported {{count}} pairings to CSV.', count: dataset.rows.length }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19668,7 +20199,7 @@ function BreederSection({
       console.error('Pairings CSV export failed', err);
       setExportFeedback({
         type: 'error',
-        message: err?.message || t('export.feedback.projectsCsvFailed', { defaultValue: 'Failed to export breeding projects to CSV.' }),
+        message: err?.message || t('export.feedback.projectsCsvFailed', { defaultValue: 'Failed to export pairings to CSV.' }),
         context: 'pairings',
         timestamp: new Date().toISOString(),
       });
@@ -19679,12 +20210,15 @@ function BreederSection({
     setAccountState(prev => ({ ...prev, loading: true, error: '', message: '' }));
     const featureKeys = Object.keys(accountFeatureLabels);
     try {
-      const [userResult, tiersResult, subscriptionResult, ...accessResults] = await Promise.allSettled([
+      const [userResult, tiersResult, subscriptionResult, billingResult, ...accessResults] = await Promise.allSettled([
         getCurrentUser(),
         fetchPublicSubscriptionTiers(),
         fetchMySubscription(),
+        fetchBillingStatus(),
         ...featureKeys.map(featureKey => checkFeatureAccess(featureKey)),
       ]);
+      // A backend without billing answers this with an error; that means "not purchasable", not a failure to show.
+      const billing = billingResult.status === 'fulfilled' ? billingResult.value || null : null;
       const user = userResult.status === 'fulfilled' ? userResult.value?.user || null : null;
       const tiers = tiersResult.status === 'fulfilled' && Array.isArray(tiersResult.value?.tiers)
         ? tiersResult.value.tiers
@@ -19708,6 +20242,7 @@ function BreederSection({
         user,
         tiers,
         subscription,
+        billing,
         access,
       });
       setAccountForms(prev => ({
@@ -19821,8 +20356,41 @@ function BreederSection({
   const exportSelectionComplete = exportGroups.length === OPTIONAL_EXPORT_GROUP_IDS.length;
 
   const exportButtonLabel = exportSelectionComplete
-    ? 'Download my data'
-    : `Download selected (${exportGroups.length + 1})`;
+    ? t("setup.account.downloadMyData", { defaultValue: "Download my data" })
+    : t("setup.account.downloadSelected", { n: exportGroups.length + 1, defaultValue: "Download selected ({{n}})" });
+
+  // Labels for ACCOUNT_EXPORT_GROUPS (shared/apiClient.ts), which keeps the
+  // English as the id's fallback for anything not listed here.
+  const exportGroupText = useMemo(() => ({
+    account: {
+      label: t("setup.account.exportGroup.account.label", { defaultValue: "Account & profile" }),
+      hint: t("setup.account.exportGroup.account.hint", { defaultValue: "Your login details, breeder profile and notification settings" }),
+    },
+    animals: {
+      label: t("setup.account.exportGroup.animals.label", { defaultValue: "Animals & breeding" }),
+      hint: t("setup.account.exportGroup.animals.hint", { defaultValue: "Animals, pairings, clutches, reproductive cycles and planner state" }),
+    },
+    lab: {
+      label: t("setup.account.exportGroup.lab.label", { defaultValue: "Lab orders" }),
+      hint: t("setup.account.exportGroup.lab.hint", { defaultValue: "Shed test orders, the animals on them and their results" }),
+    },
+    marketplace: {
+      label: t("setup.account.exportGroup.marketplace.label", { defaultValue: "Marketplace" }),
+      hint: t("setup.account.exportGroup.marketplace.hint", { defaultValue: "Listings, stores, favourites, saved searches, sales and purchases" }),
+    },
+    messages: {
+      label: t("setup.account.exportGroup.messages.label", { defaultValue: "Messages & inquiries" }),
+      hint: t("setup.account.exportGroup.messages.hint", { defaultValue: "Marketplace conversations and listing inquiries" }),
+    },
+    reviews: {
+      label: t("setup.account.exportGroup.reviews.label", { defaultValue: "Reviews" }),
+      hint: t("setup.account.exportGroup.reviews.hint", { defaultValue: "Reviews you wrote and reviews you received" }),
+    },
+    security: {
+      label: t("setup.account.exportGroup.security.label", { defaultValue: "Security & activity" }),
+      hint: t("setup.account.exportGroup.security.hint", { defaultValue: "Sign-in history, emails we sent you, devices, usage and subscriptions" }),
+    },
+  }), [t]);
 
   const toggleExportGroup = useCallback((groupId) => {
     setExportGroups(prev => (
@@ -19937,21 +20505,67 @@ function BreederSection({
     }
   }, []);
 
+  // Stripe's own pages (checkout and the billing portal) are left to, not embedded.
+  const openBillingPortal = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, actionLoading: 'billing:portal', error: '', message: '' }));
+    try {
+      const { url } = await createBillingPortal();
+      window.location.assign(url);
+    } catch (error) {
+      setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to open billing.', message: '' }));
+    }
+  }, []);
+
   const handleChangeAccountPlan = useCallback(async (tier) => {
     const tierId = tier?.id;
     if (!tierId) return;
-    let confirmed = true;
-    if (typeof showAppConfirm === 'function') {
-      confirmed = await showAppConfirm(`Change your account plan to ${tier.name || tier.key || 'this plan'}?`, {
-        confirmLabel: 'Change plan',
-        cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
-      });
+    const tierName = tier.name || tier.key || 'this plan';
+    const billing = accountState.billing;
+    const isPaidTier = Boolean(tier.customPrice) || Number(tier.monthlyPrice || 0) > 0;
+    const confirmAction = async (text, confirmLabel) => {
+      if (typeof showAppConfirm !== 'function') return true;
+      return showAppConfirm(text, { confirmLabel, cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }) });
+    };
+
+    if (isPaidTier) {
+      if (!billing?.configured || !billing.purchasableTierKeys?.includes(tier.key)) {
+        setAccountState(prev => ({ ...prev, error: '', message: `${tierName} is not purchasable yet.` }));
+        return;
+      }
+      if (billing.hasActivePaidSubscription) {
+        // Switching between paid plans happens on the subscription Stripe already holds.
+        if (await confirmAction(`Your paid plan is managed in Stripe's billing page. Open it to switch to ${tierName}?`, 'Manage billing')) {
+          await openBillingPortal();
+        }
+        return;
+      }
+      const testNote = billing.mode === 'test' ? ' This is Stripe test mode: no real card is charged.' : '';
+      if (!(await confirmAction(`Continue to Stripe checkout for ${tierName}?${testNote}`, 'Go to checkout'))) return;
+      setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
+      try {
+        const { url } = await createBillingCheckout(tier.key);
+        window.location.assign(url);
+      } catch (error) {
+        setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to start checkout.', message: '' }));
+      }
+      return;
     }
-    if (!confirmed) return;
+
+    if (billing?.hasActivePaidSubscription) {
+      if (await confirmAction(
+        `Cancel your paid plan in Stripe's billing page. The account then moves to ${tierName} and keeps every animal.`,
+        'Manage billing',
+      )) {
+        await openBillingPortal();
+      }
+      return;
+    }
+
+    if (!(await confirmAction(`Change your account plan to ${tierName}?`, 'Change plan'))) return;
     setAccountState(prev => ({ ...prev, actionLoading: `plan:${tierId}`, error: '', message: '' }));
     try {
       const result = await changeMySubscription(tierId);
-      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tier.name || 'selected plan'}.`;
+      const successMessage = `Plan changed to ${result?.subscription?.tier?.name || tierName}.`;
       setAccountState(prev => ({
         ...prev,
         actionLoading: '',
@@ -19961,10 +20575,28 @@ function BreederSection({
       }));
       await loadAccountData();
       setAccountState(prev => ({ ...prev, message: successMessage }));
+      // The new plan's limits apply everywhere at once, not after the next sign-in.
+      refreshFeatureAccess();
     } catch (error) {
       setAccountState(prev => ({ ...prev, actionLoading: '', error: error?.message || 'Unable to change plan.', message: '' }));
     }
-  }, [loadAccountData, showAppConfirm, t]);
+  }, [accountState.billing, loadAccountData, openBillingPortal, refreshFeatureAccess, showAppConfirm, t]);
+
+  // Back from Stripe. The hash says which page sent the keeper here; it is cleared at once so a
+  // reload does not repeat the notice. Nothing here changes the plan.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const match = window.location.hash.match(/^#billing=(success|cancelled|portal)\b/);
+    if (!match) return;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (match[1] === 'success') {
+      setBillingReturnNotice('Stripe has your payment details. Your plan changes here once Stripe confirms the payment, usually within a minute. Reload this tab if it has not.');
+    } else if (match[1] === 'cancelled') {
+      setBillingReturnNotice('Checkout was cancelled. Nothing was charged and your plan is unchanged.');
+    }
+    setAccountState(prev => ({ ...prev, loaded: false }));
+    refreshFeatureAccess();
+  }, [refreshFeatureAccess]);
 
   const handleBackupFrequencyChange = useCallback((event) => {
     const nextValue = event?.target?.value || 'off';
@@ -20294,12 +20926,13 @@ function BreederSection({
         <TabButton theme={theme} active={setupTab === 'export'} onClick={() => setSetupTab('export')}>{t("setup.exports")}</TabButton>
         <TabButton theme={theme} active={setupTab === 'appearance'} onClick={() => setSetupTab('appearance')}>{t("setup.appearance", { defaultValue: "Appearance" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'backup'} onClick={() => setSetupTab('backup')}>{t("setup.backups")}</TabButton>
-        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>My Account</TabButton>
+        <TabButton theme={theme} active={setupTab === 'account'} onClick={() => setSetupTab('account')}>{t("setup.account.tab", { defaultValue: "My Account" })}</TabButton>
         <TabButton theme={theme} active={setupTab === 'language'} onClick={() => setSetupTab('language')}>{t("setup.language")}</TabButton>
         {isDevEnvironment && (
           <TabButton theme={theme} active={setupTab === 'devTools'} onClick={() => setSetupTab('devTools')}>Developer Tools</TabButton>
         )}
       </div>
+      <BackendStatusDot failure={cloudSyncFailure} />
 
       {setupTab === 'info' && (
         <div className="space-y-6">
@@ -20405,7 +21038,7 @@ function BreederSection({
                 >
                   {t('setup.uploadLogo', { defaultValue: 'Upload logo' })}
                 </button>
-                {info.logoUrl && <img src={info.logoUrl} alt="logo" className="w-20 h-20 object-cover rounded-md border" />}
+                {info.logoUrl && <img src={info.logoUrl} alt={t("header.logoAlt", { defaultValue: "logo" })} className="w-20 h-20 object-cover rounded-md border" />}
               </div>
             </div>
           </div>
@@ -20415,9 +21048,9 @@ function BreederSection({
               className={cx('px-3 py-2 rounded-lg sk-on-accent', primaryBtnClass(theme,true))}
               onClick={() => {
                 if (typeof showAppAlert === 'function') {
-                  showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
+                  showAppAlert(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved' }));
                 } else {
-                  console.warn(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved locally for this demo' }));
+                  console.warn(t('setup.saveInfoNotice', { defaultValue: 'Breeder info saved' }));
                 }
                 if (typeof onSaved === 'function') onSaved();
               }}
@@ -20585,7 +21218,7 @@ function BreederSection({
                     aria-pressed={hasToken}
                     onClick={() => handleTemplateTokenToggle(token)}
                     className={cx(
-                      'status-tag-neutral-button w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-left transition',
+                      'status-tag-neutral-button w-full flex items-center gap-3 rounded-lg border px-2 py-1.5 text-start transition',
                       hasToken
                         ? 'border-blue-500/60 text-blue-700 shadow-sm'
                         : 'border-neutral-200 bg-white hover:border-blue-400'
@@ -20665,7 +21298,7 @@ function BreederSection({
                 className="mt-1 w-full border rounded-xl px-3 py-2"
                 value={aliasDraftNotes}
                 onChange={e => setAliasDraftNotes(e.target.value)}
-                placeholder="BEL complex combinations"
+                placeholder={t("setup.aliases.notesPlaceholder", { defaultValue: "BEL complex combinations" })}
               />
             </div>
           </div>
@@ -20808,7 +21441,7 @@ function BreederSection({
             <div>
               <div className="font-semibold text-sm">{t('setup.dataExports', { defaultValue: 'Data exports' })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and breeding projects.' })}
+                {t('setup.dataExportsHelp', { defaultValue: 'Choose the columns to include and download PDF or spreadsheet summaries for animals and pairings.' })}
               </div>
             </div>
             <div className="border rounded-xl bg-white p-3 shadow-sm space-y-4">
@@ -21269,10 +21902,10 @@ function BreederSection({
                                 checked={!excludedAnimalIds.has(String(snake.id))}
                                 onChange={() => toggleAnimalScopeSelection(snake.id)}
                               />
-                              <span className="font-medium">{snake.name || snake.id}</span>
-                              <span className="text-neutral-500">{snake.id}</span>
+                              <span className="font-medium"><bdi>{snake.name || snake.id}</bdi></span>
+                              <span className="text-neutral-500"><bdi>{snake.id}</bdi></span>
                               {isAnimalForSale(snake) && (
-                                <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-700">
+                                <span className="ms-auto text-[10px] uppercase tracking-wide text-emerald-700">
                                   {t('export.scope.forSaleFlag', { defaultValue: 'For sale' })}
                                 </span>
                               )}
@@ -21424,7 +22057,7 @@ function BreederSection({
               <div className="border rounded-xl bg-white p-3 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-sm">{t('setup.breedingProjects', { defaultValue: 'Breeding projects' })}</div>
+                    <div className="font-semibold text-sm">{t('setup.breedingProjects', { defaultValue: 'Pairings' })}</div>
                     <div className="text-xs text-neutral-500">
                       {t('export.selectedFields', { defaultValue: 'Selected {{selected}} of {{total}} fields.', selected: normalizedPairingExportFields.length, total: PAIRING_EXPORT_FIELD_DEFS.length })}
                     </div>
@@ -21596,27 +22229,25 @@ function BreederSection({
         <div className="border-t pt-4 space-y-6">
           <div className="space-y-3">
             <div>
-              <div className="font-semibold text-sm">Compress stored photos</div>
+              <div className="font-semibold text-sm">{t("setup.backup.compressTitle", { defaultValue: "Compress stored photos" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Photos added from now on are shrunk automatically as you upload them. This is a
-                one-time pass over the ones already saved, for accounts that filled up before that
-                existed. Originals are replaced, so download a backup first if you want them kept.
+                {t("setup.backup.compressHelp", { defaultValue: "Photos added from now on are shrunk automatically as you upload them. This is a one-time pass over the ones already saved, for accounts that filled up before that existed. Originals are replaced, so download a backup first if you want them kept." })}
               </div>
             </div>
             <div className="text-xs text-neutral-500">
               {photoCompressionWork.photos
                 ? (
                   <>
-                    {photoCompressionWork.photos} photo{photoCompressionWork.photos === 1 ? '' : 's'} over budget
-                    {' '}across {photoCompressionWork.animals} animal{photoCompressionWork.animals === 1 ? '' : 's'}
-                    {' '}— {formatByteSize(photoCompressionWork.bytes)} stored today.
+                    {t("setup.backup.photosOverBudget", { count: photoCompressionWork.photos, defaultValue_one: "{{count}} photo over budget", defaultValue_other: "{{count}} photos over budget" })}
+                    {' '}{t("setup.backup.acrossAnimals", { count: photoCompressionWork.animals, defaultValue_one: "across {{count}} animal", defaultValue_other: "across {{count}} animals" })}
+                    {' '}{t("setup.backup.storedToday", { size: formatByteSize(photoCompressionWork.bytes), defaultValue: "— {{size}} stored today." })}
                   </>
                 )
-                : 'Every stored photo is already within budget. Nothing to do.'}
+                : t("setup.backup.allWithinBudget", { defaultValue: "Every stored photo is already within budget. Nothing to do." })}
               {lastPhotoCompression?.completedAt && (
                 <span className="block mt-1">
-                  Last run: {formatDateTimeForDisplay(lastPhotoCompression.completedAt)}
-                  {lastPhotoCompression.savedBytes ? ` — saved ${formatByteSize(lastPhotoCompression.savedBytes)}.` : '.'}
+                  {t("setup.backup.lastRun", { date: formatDateTimeForDisplay(lastPhotoCompression.completedAt), defaultValue: "Last run: {{date}}" })}
+                  {lastPhotoCompression.savedBytes ? t("setup.backup.lastRunSaved", { size: formatByteSize(lastPhotoCompression.savedBytes), defaultValue: " — saved {{size}}." }) : '.'}
                 </span>
               )}
             </div>
@@ -21631,19 +22262,19 @@ function BreederSection({
                 onClick={handleCompressPhotos}
                 disabled={photoCompressionRunning || !photoCompressionWork.photos}
               >
-                {photoCompressionRunning ? 'Compressing…' : 'Compress existing photos'}
+                {photoCompressionRunning ? t("setup.backup.compressing", { defaultValue: "Compressing…" }) : t("setup.backup.compressButton", { defaultValue: "Compress existing photos" })}
               </button>
               {photoCompressionRunning && (
                 <>
                   <span className="text-xs text-neutral-500">
-                    {photoCompressionProgress.done} of {photoCompressionProgress.total}
+                    {t("setup.backup.progress", { done: photoCompressionProgress.done, total: photoCompressionProgress.total, defaultValue: "{{done}} of {{total}}" })}
                   </span>
                   <button
                     type="button"
                     className="px-3 py-2 rounded-lg border text-sm"
                     onClick={() => { photoCompressionCancelRef.current = true; }}
                   >
-                    Stop
+                    {t("setup.backup.stop", { defaultValue: "Stop" })}
                   </button>
                 </>
               )}
@@ -21657,9 +22288,9 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Manual backup</div>
+              <div className="font-semibold text-sm">{t("setup.backup.manualTitle", { defaultValue: "Manual backup" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings.
+                {t("setup.backup.manualHelp", { defaultValue: "Download a Serpentora backup containing all animals, pairings, groups, breeder info, and settings." })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -21668,14 +22299,14 @@ function BreederSection({
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleManualBackupDownload}
               >
-                Download backup ({BACKUP_FILE_DOT_EXTENSION})
+                {t("setup.backup.downloadButton", { extension: BACKUP_FILE_DOT_EXTENSION, defaultValue: "Download backup ({{extension}})" })}
               </button>
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border text-sm"
                 onClick={handleSaveBackupToVault}
               >
-                Save to vault
+                {t("setup.backup.saveToVault", { defaultValue: "Save to vault" })}
               </button>
             </div>
             {manualFeedback && (
@@ -21688,29 +22319,29 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Automatic backups</div>
+              <div className="font-semibold text-sm">{t("setup.backup.autoTitle", { defaultValue: "Automatic backups" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Keep an automatic snapshot while the planner is open in your browser.
+                {t("setup.backup.autoHelp", { defaultValue: "Keep an automatic snapshot while the planner is open in your browser." })}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
-              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Schedule</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.schedule", { defaultValue: "Schedule" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm"
                 value={normalizedBackupSettings.frequency}
                 onChange={handleBackupFrequencyChange}
               >
-                <option value="off">Off</option>
-                <option value="nightly">Every night</option>
-                <option value="weekly">Every week</option>
-                <option value="monthly">Every month</option>
+                <option value="off">{t("setup.backup.frequency.off", { defaultValue: "Off" })}</option>
+                <option value="nightly">{t("setup.backup.frequency.nightly", { defaultValue: "Every night" })}</option>
+                <option value="weekly">{t("setup.backup.frequency.weekly", { defaultValue: "Every week" })}</option>
+                <option value="monthly">{t("setup.backup.frequency.monthly", { defaultValue: "Every month" })}</option>
               </select>
             </div>
             <div className="text-xs text-neutral-500">
-              Last automatic backup: {lastAutoBackupDisplay}.
+              {t("setup.backup.lastAuto", { date: lastAutoBackupDisplay, defaultValue: "Last automatic backup: {{date}}." })}
               {autoBackupStats && (autoBackupStats.snakes || autoBackupStats.pairings || autoBackupStats.groups) ? (
                 <span>
-                  {' '}Includes {autoBackupStats.snakes} snakes, {autoBackupStats.pairings} pairings, {autoBackupStats.groups} groups.
+                  {' '}{t("setup.backup.autoIncludes", { snakes: autoBackupStats.snakes, pairings: autoBackupStats.pairings, groups: autoBackupStats.groups, defaultValue: "Includes {{snakes}} snakes, {{pairings}} pairings, {{groups}} groups." })}
                 </span>
               ) : null}
             </div>
@@ -21720,7 +22351,7 @@ function BreederSection({
                 className={cx('px-3 py-2 rounded-lg text-sm sk-on-accent', primaryBtnClass(theme, true))}
                 onClick={handleRunAutoBackupNow}
               >
-                Run now
+                {t("setup.backup.runNow", { defaultValue: "Run now" })}
               </button>
               <button
                 type="button"
@@ -21728,7 +22359,7 @@ function BreederSection({
                 onClick={handleAutoBackupDownload}
                 disabled={!autoBackupSnapshot}
               >
-                Download latest snapshot
+                {t("setup.backup.downloadSnapshot", { defaultValue: "Download latest snapshot" })}
               </button>
             </div>
             {autoFeedback && (
@@ -21741,28 +22372,28 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Cloud database sync</div>
+              <div className="font-semibold text-sm">{t("setup.backup.cloudTitle", { defaultValue: "Cloud database sync" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places.
+                {t("setup.backup.cloudHelp", { defaultValue: "Compare local animals and pairings with the shared backend, merge newer records and log entries, then save the merged database to both places." })}
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Connection</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.connection", { defaultValue: "Connection" })}</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendStateLabel}</div>
               </div>
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Authentication</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.authentication", { defaultValue: "Authentication" })}</div>
                 <div className="mt-1 capitalize text-neutral-800">{backendAuthLabel}</div>
               </div>
               <div className="rounded-lg border bg-white p-3">
-                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">Last cloud sync</div>
+                <div className="font-semibold text-neutral-500 uppercase tracking-wide text-[10px]">{t("setup.backup.lastCloudSync", { defaultValue: "Last cloud sync" })}</div>
                 <div className="mt-1 text-neutral-800">{cloudLastSyncDisplay}</div>
               </div>
             </div>
             <div className="text-xs text-neutral-500">
-              Ready to sync {Array.isArray(snakes) ? snakes.length : 0} snakes and {Array.isArray(pairings) ? pairings.length : 0} pairings.
-              {cloudSyncStatus?.message ? <span>{' '}Latest status: {cloudSyncStatus.message}</span> : null}
+              {t("setup.backup.readyToSync", { snakes: Array.isArray(snakes) ? snakes.length : 0, pairings: Array.isArray(pairings) ? pairings.length : 0, defaultValue: "Ready to sync {{snakes}} snakes and {{pairings}} pairings." })}
+              {cloudSyncStatus?.message ? <span>{' '}{t("setup.backup.latestStatus", { status: cloudSyncStatus.message, defaultValue: "Latest status: {{status}}" })}</span> : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -21771,7 +22402,7 @@ function BreederSection({
                 onClick={handleCloudSyncNow}
                 disabled={cloudSyncStatus?.state === 'loading'}
               >
-                {cloudSyncStatus?.state === 'loading' ? 'Syncing...' : 'Sync cloud database'}
+                {cloudSyncStatus?.state === 'loading' ? t("setup.backup.syncing", { defaultValue: "Syncing..." }) : t("setup.backup.syncButton", { defaultValue: "Sync cloud database" })}
               </button>
             </div>
             {cloudFeedback && (
@@ -21784,13 +22415,13 @@ function BreederSection({
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Backup vault</div>
+              <div className="font-semibold text-sm">{t("setup.backup.vaultTitle", { defaultValue: "Backup vault" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Stored backups with unique identifiers. Rename, download, restore, or remove them here.
+                {t("setup.backup.vaultHelp", { defaultValue: "Stored backups with unique identifiers. Rename, download, restore, or remove them here." })}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Retention limit</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">{t("setup.backup.retentionLimit", { defaultValue: "Retention limit" })}</label>
               <select
                 className="border rounded-lg px-3 py-2 bg-white text-sm w-full sm:w-auto"
                 value={vaultLimitValue}
@@ -21799,8 +22430,8 @@ function BreederSection({
                 {VAULT_LIMIT_OPTIONS.map(option => {
                   const value = option === 'unlimited' ? 'unlimited' : String(option);
                   const label = option === 'unlimited'
-                    ? 'Unlimited (no pruning)'
-                    : `Keep last ${option}`;
+                    ? t("setup.backup.retentionUnlimited", { defaultValue: "Unlimited (no pruning)" })
+                    : t("setup.backup.retentionKeepLast", { n: option, defaultValue: "Keep last {{n}}" });
                   return (
                     <option key={value} value={value}>{label}</option>
                   );
@@ -21809,7 +22440,7 @@ function BreederSection({
             </div>
             <div className="text-[11px] text-neutral-500">{vaultLimitDescription}</div>
             <div className="text-xs text-neutral-500">
-              {vaultEntries.length ? `${vaultEntries.length} backup${vaultEntries.length === 1 ? '' : 's'} saved.` : 'No backups saved yet.'}
+              {vaultEntries.length ? t("setup.backup.vaultCount", { count: vaultEntries.length, defaultValue_one: "{{count}} backup saved.", defaultValue_other: "{{count}} backups saved." }) : t("setup.backup.vaultEmpty", { defaultValue: "No backups saved yet." })}
             </div>
             {vaultFeedback && (
               <div className={cx('text-xs', vaultFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
@@ -21836,10 +22467,10 @@ function BreederSection({
                       <div>
                         <div className="font-medium text-sm text-neutral-800">{entry.name}</div>
                         <div className="text-[11px] text-neutral-500 space-x-2">
-                          <span>{entry.source === 'auto' ? 'Auto backup' : 'Manual backup'}</span>
-                          <span>Created {createdDisplay}</span>
-                          {updatedDisplay && <span>Updated {updatedDisplay}</span>}
-                          {approxSizeKb && <span>~{approxSizeKb} KB</span>}
+                          <span>{entry.source === 'auto' ? t("setup.backup.entryAuto", { defaultValue: "Auto backup" }) : t("setup.backup.entryManual", { defaultValue: "Manual backup" })}</span>
+                          <span>{t("setup.backup.entryCreated", { date: createdDisplay, defaultValue: "Created {{date}}" })}</span>
+                          {updatedDisplay && <span>{t("setup.backup.entryUpdated", { date: updatedDisplay, defaultValue: "Updated {{date}}" })}</span>}
+                          {approxSizeKb && <span>{t("setup.backup.entrySize", { kb: approxSizeKb, defaultValue: "~{{kb}} KB" })}</span>}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -21848,47 +22479,47 @@ function BreederSection({
                           className="px-3 py-1.5 rounded-lg border text-xs"
                           onClick={() => handleDownloadVaultEntry(entry.id)}
                         >
-                          Download
+                          {t("setup.backup.download", { defaultValue: "Download" })}
                         </button>
                         <button
                           type="button"
                           className={cx('px-3 py-1.5 rounded-lg text-xs sk-on-accent', primaryBtnClass(theme, true))}
                           onClick={() => handleRestoreVaultEntry(entry.id)}
                         >
-                          Restore
+                          {t("setup.backup.restore", { defaultValue: "Restore" })}
                         </button>
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs"
                           onClick={() => handleRenameVaultEntry(entry.id)}
                         >
-                          Rename
+                          {t("setup.backup.rename", { defaultValue: "Rename" })}
                         </button>
                         <button
                           type="button"
                           className="px-3 py-1.5 rounded-lg border text-xs text-red-600"
                           onClick={() => handleDeleteVaultEntry(entry.id)}
                         >
-                          Delete
+                          {t("setup.backup.delete", { defaultValue: "Delete" })}
                         </button>
                       </div>
                     </div>
                     <div className="text-[10px] text-neutral-400 break-words">
-                      ID: {entry.id}
+                      {t("setup.backup.entryId", { id: entry.id, defaultValue: "ID: {{id}}" })}
                     </div>
                   </div>
                 );
               }) : (
-                <div className="text-xs text-neutral-500">Create a manual or automatic backup to populate the vault.</div>
+                <div className="text-xs text-neutral-500">{t("setup.backup.vaultEmptyHelp", { defaultValue: "Create a manual or automatic backup to populate the vault." })}</div>
               )}
             </div>
           </div>
 
           <div className="space-y-3 border-t pt-4">
             <div>
-              <div className="font-semibold text-sm">Restore from backup</div>
+              <div className="font-semibold text-sm">{t("setup.backup.restoreTitle", { defaultValue: "Restore from backup" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Upload a Serpentora backup file or import a legacy JSON export to replace the current data.
+                {t("setup.backup.restoreHelp", { defaultValue: "Upload a Serpentora backup file or import a legacy JSON export to replace the current data." })}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -21914,7 +22545,7 @@ function BreederSection({
                   if (restoreInputRef.current) restoreInputRef.current.click();
                 }}
               >
-                Choose backup file
+                {t("setup.backup.chooseFile", { defaultValue: "Choose backup file" })}
               </button>
               <button
                 type="button"
@@ -21923,9 +22554,9 @@ function BreederSection({
                   if (legacyRestoreInputRef.current) legacyRestoreInputRef.current.click();
                 }}
               >
-                Import legacy JSON
+                {t("setup.backup.importLegacy", { defaultValue: "Import legacy JSON" })}
               </button>
-              <span className="text-xs text-neutral-500">{BACKUP_FILE_DOT_EXTENSION} or .json files</span>
+              <span className="text-xs text-neutral-500">{t("setup.backup.fileTypes", { extension: BACKUP_FILE_DOT_EXTENSION, defaultValue: "{{extension}} or .json files" })}</span>
             </div>
             {restoreFeedback && (
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
@@ -21934,7 +22565,7 @@ function BreederSection({
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
-              Restoring replaces everything in the app. Download a backup first to stay safe.
+              {t("setup.backup.restoreWarning", { defaultValue: "Restoring replaces everything in the app. Download a backup first to stay safe." })}
             </div>
           </div>
         </div>
@@ -21944,9 +22575,9 @@ function BreederSection({
         <div className="border-t pt-4 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">My Account</div>
+              <div className="text-sm font-semibold text-neutral-800">{t("setup.account.title", { defaultValue: "My Account" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features.
+                {t("setup.account.help", { defaultValue: "Manage the backend account used for cloud sync, mobile access, lab orders, and subscription features." })}
               </div>
             </div>
             <button
@@ -21955,68 +22586,68 @@ function BreederSection({
               onClick={loadAccountData}
               disabled={accountState.loading}
             >
-              {accountState.loading ? 'Refreshing...' : 'Refresh account'}
+              {accountState.loading ? t("setup.account.refreshing", { defaultValue: "Refreshing..." }) : t("setup.account.refresh", { defaultValue: "Refresh account" })}
             </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className="rounded-xl border bg-white p-4 space-y-3">
               <div>
-                <div className="font-semibold text-sm">Login information</div>
-                <div className="text-xs text-neutral-500 mt-1">This is the account connected to the shared backend.</div>
+                <div className="font-semibold text-sm">{t("setup.account.loginTitle", { defaultValue: "Login information" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">{t("setup.account.loginHelp", { defaultValue: "This is the account connected to the shared backend." })}</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Email</div>
-                  <div className="mt-1 break-words">{accountState.user?.email || 'Not signed in'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.email", { defaultValue: "Email" })}</div>
+                  <div className="mt-1 break-words">{accountState.user?.email || t("setup.account.notSignedIn", { defaultValue: "Not signed in" })}</div>
                   {accountState.user && (
                     <div className={`mt-1 text-xs ${accountState.user.emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {accountState.user.emailVerified ? 'Verified' : 'Not verified'}
+                      {accountState.user.emailVerified ? t("setup.account.verified", { defaultValue: "Verified" }) : t("setup.account.notVerified", { defaultValue: "Not verified" })}
                     </div>
                   )}
                   {accountState.user?.pendingEmail && (
                     <div className="mt-1 text-xs text-amber-600 break-words">
-                      Pending confirmation for {accountState.user.pendingEmail} — check that inbox for a confirmation link. Your current email stays active until confirmed.
+                      {t("setup.account.pendingEmail", { email: accountState.user.pendingEmail, defaultValue: "Pending confirmation for {{email}} — check that inbox for a confirmation link. Your current email stays active until confirmed." })}
                     </div>
                   )}
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.name", { defaultValue: "Name" })}</div>
                   <div className="mt-1">{accountState.user?.fullName || '-'}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Role</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.role", { defaultValue: "Role" })}</div>
                   <div className="mt-1 capitalize">{accountState.user?.role || '-'}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">User ID</div>
-                  <div className="mt-1 break-words text-xs">{accountState.user?.id || '-'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.userId", { defaultValue: "User ID" })}</div>
+                  <div className="mt-1 break-words text-xs"><bdi>{accountState.user?.id || '-'}</bdi></div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={handleAccountSignOut}>
-                  Sign out on this device
+                  {t("setup.account.signOut", { defaultValue: "Sign out on this device" })}
                 </button>
               </div>
             </section>
 
             <section className="rounded-xl border bg-white p-4 space-y-3">
               <div>
-                <div className="font-semibold text-sm">Backend connection</div>
-                <div className="text-xs text-neutral-500 mt-1">Cloud sync and subscription checks use this backend session.</div>
+                <div className="font-semibold text-sm">{t("setup.account.backendTitle", { defaultValue: "Backend connection" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">{t("setup.account.backendHelp", { defaultValue: "Cloud sync and subscription checks use this backend session." })}</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Connection</div>
-                  <div className="mt-1 capitalize">{String(sharedBackendSnapshot?.state || 'unknown').replace(/-/g, ' ')}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.connection", { defaultValue: "Connection" })}</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.state ? String(sharedBackendSnapshot.state).replace(/-/g, ' ') : t("setup.account.unknownLower", { defaultValue: "unknown" })}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Authentication</div>
-                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || 'unknown'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.authentication", { defaultValue: "Authentication" })}</div>
+                  <div className="mt-1 capitalize">{sharedBackendSnapshot?.authStatus || t("setup.account.unknownLower", { defaultValue: "unknown" })}</div>
                 </div>
                 <div className="rounded-lg border bg-neutral-50 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Sync readiness</div>
-                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? 'Ready' : 'Needs sign-in/configuration'}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t("setup.account.syncReadiness", { defaultValue: "Sync readiness" })}</div>
+                  <div className="mt-1">{sharedBackendSnapshot?.backendModeEnabled && sharedBackendSnapshot?.authStatus === 'authorized' ? t("setup.account.ready", { defaultValue: "Ready" }) : t("setup.account.needsSignIn", { defaultValue: "Needs sign-in/configuration" })}</div>
                 </div>
               </div>
             </section>
@@ -22025,16 +22656,19 @@ function BreederSection({
           <section className="rounded-xl border bg-white p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <div className="font-semibold text-sm">Subscription and feature access</div>
+                <div className="font-semibold text-sm">{t("setup.account.subscriptionTitle", { defaultValue: "Subscription and feature access" })}</div>
                 <div className="text-xs text-neutral-500 mt-1">
-                  Feature access is checked against the backend subscription tier for this account.
+                  {t("setup.account.subscriptionHelp", { defaultValue: "Feature access is checked against the backend subscription tier for this account." })}
                 </div>
               </div>
               <div className="text-xs text-neutral-500">
-                Current tier: {accountState.subscription?.tier?.name
-                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
-                  || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
-                  || 'Unknown'}
+                {t("setup.account.currentTier", {
+                  tier: accountState.subscription?.tier?.name
+                    || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.tier
+                    || Object.values(accountState.access || {}).find(access => access?.tier || access?.currentTier)?.currentTier
+                    || t("setup.account.unknown", { defaultValue: "Unknown" }),
+                  defaultValue: "Current tier: {{tier}}",
+                })}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
@@ -22049,12 +22683,11 @@ function BreederSection({
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium">{label}</div>
                       <span className={cx('text-[11px] px-2 py-0.5 rounded-full border', allowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700')}>
-                        {allowed ? 'Included' : 'Limited'}
+                        {allowed ? t("setup.account.included", { defaultValue: "Included" }) : t("setup.account.limited", { defaultValue: "Limited" })}
                       </span>
                     </div>
-                    <div className="mt-1 text-[11px] text-neutral-500">{featureKey}</div>
                     {access.reason ? <div className="mt-1 text-xs text-amber-700">{access.reason}</div> : null}
-                    {usageText ? <div className="mt-1 text-xs text-neutral-600">Usage: {usageText}</div> : null}
+                    {usageText ? <div className="mt-1 text-xs text-neutral-600">{t("setup.account.usage", { usage: usageText, defaultValue: "Usage: {{usage}}" })}</div> : null}
                   </div>
                 );
               })}
@@ -22062,72 +22695,111 @@ function BreederSection({
           </section>
 
           <section className="rounded-xl border bg-white p-4 space-y-3">
-            <div>
-              <div className="font-semibold text-sm">Plans</div>
-              <div className="text-xs text-neutral-500 mt-1">
-                Available public plans from the backend. Changing a plan updates the subscription tier used by feature access and cloud sync.
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <div>
+                <div className="font-semibold text-sm">{t("setup.account.plansTitle", { defaultValue: "Plans" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {accountState.billing?.configured
+                    ? t("setup.account.plansStripe", { defaultValue: "Paid plans are bought through Stripe checkout. Your plan here changes once Stripe confirms the payment." })
+                    : t("setup.account.plansUnavailable", { defaultValue: "Plans are not purchasable yet." })}
+                </div>
+                {accountState.billing?.configured && accountState.billing.mode === 'test' ? (
+                  <div className="text-xs text-amber-700 mt-1">{t("setup.account.stripeTestMode", { defaultValue: "Stripe test mode: checkout takes test cards only and nobody is charged." })}</div>
+                ) : null}
+                {accountState.billing?.configured && accountState.billing.foundingMember ? (
+                  <div className="text-xs text-emerald-700 mt-1">{t("setup.account.foundingMember", { defaultValue: "Founding member: checkout charges your founding-member price." })}</div>
+                ) : null}
               </div>
+              {accountState.billing?.configured && accountState.billing.hasBillingAccount ? (
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border text-sm bg-white hover:bg-neutral-50 shrink-0"
+                  disabled={Boolean(accountState.actionLoading)}
+                  onClick={openBillingPortal}
+                >
+                  {accountState.actionLoading === 'billing:portal' ? t("setup.account.opening", { defaultValue: "Opening..." }) : t("setup.account.manageBilling", { defaultValue: "Manage billing" })}
+                </button>
+              ) : null}
             </div>
+            {billingReturnNotice ? (
+              <div role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm flex items-start justify-between gap-3">
+                <span>{billingReturnNotice}</span>
+                <button type="button" className="text-xs text-neutral-500 hover:text-neutral-800" onClick={() => setBillingReturnNotice('')}>{t("setup.account.dismiss", { defaultValue: "Dismiss" })}</button>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {(Array.isArray(accountState.tiers) ? accountState.tiers : []).map(tier => {
                 const isCurrentTier = Boolean(accountState.subscription?.tier?.id && tier.id === accountState.subscription.tier.id);
                 const isChangingThisPlan = accountState.actionLoading === `plan:${tier.id}`;
+                const isPaidTier = Boolean(tier.customPrice) || Number(tier.monthlyPrice || 0) > 0;
+                const isPurchasable = !isPaidTier || Boolean(
+                  accountState.billing?.configured && accountState.billing.purchasableTierKeys?.includes(tier.key)
+                );
+                const planButtonLabel = isChangingThisPlan
+                  ? (isPaidTier ? t("setup.account.openingCheckout", { defaultValue: "Opening checkout..." }) : t("setup.account.changing", { defaultValue: "Changing..." }))
+                  : isCurrentTier
+                    ? t("setup.account.currentPlan", { defaultValue: "Current plan" })
+                    : isPurchasable
+                      ? t("setup.account.changePlan", { defaultValue: "Change plan" })
+                      : t("setup.account.notPurchasable", { defaultValue: "Not purchasable yet" });
                 return (
                   <div key={tier.id || tier.key || tier.name} className={cx('rounded-xl border p-3 space-y-2', isCurrentTier ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50')}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-semibold text-sm">{tier.name || tier.key || 'Plan'}</div>
+                        <div className="font-semibold text-sm">{tier.name || tier.key || t("setup.account.plan", { defaultValue: "Plan" })}</div>
                         {tier.shortDescription ? <div className="text-xs text-neutral-500 mt-1">{tier.shortDescription}</div> : null}
                       </div>
-                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">Current</span> : null}
-                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">Recommended</span> : null}
+                      {isCurrentTier ? <span className="text-[10px] rounded-full border border-emerald-200 bg-white text-emerald-700 px-2 py-0.5">{t("setup.account.current", { defaultValue: "Current" })}</span> : null}
+                      {!isCurrentTier && tier.isRecommended ? <span className="text-[10px] rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5">{t("setup.account.recommended", { defaultValue: "Recommended" })}</span> : null}
                     </div>
                     <div className="text-sm">
-                      {tier.customPrice ? 'Custom pricing' : `${tier.currency || 'EUR'} ${Number(tier.monthlyPrice || 0).toFixed(2)} / month`}
+                      {tier.customPrice
+                        ? t("setup.account.customPricing", { defaultValue: "Custom pricing" })
+                        : t("setup.account.pricePerMonth", { currency: tier.currency || 'EUR', price: Number(tier.monthlyPrice || 0).toFixed(2), defaultValue: "{{currency}} {{price}} / month" })}
                     </div>
                     <button
                       type="button"
-                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
-                      disabled={isCurrentTier || Boolean(accountState.actionLoading)}
+                      className={cx('px-3 py-2 rounded-lg border text-sm', isCurrentTier || !isPurchasable ? 'opacity-60 cursor-not-allowed' : 'bg-white hover:bg-neutral-50')}
+                      disabled={isCurrentTier || !isPurchasable || Boolean(accountState.actionLoading)}
                       onClick={() => handleChangeAccountPlan(tier)}
                     >
-                      {isChangingThisPlan ? 'Changing...' : isCurrentTier ? 'Current plan' : 'Change plan'}
+                      {planButtonLabel}
                     </button>
                   </div>
                 );
               })}
               {accountState.loaded && !accountState.tiers.length ? (
-                <div className="text-sm text-neutral-500">No public subscription plans are available from the backend.</div>
+                <div className="text-sm text-neutral-500">{t("setup.account.noPlans", { defaultValue: "No public subscription plans are available from the backend." })}</div>
               ) : null}
             </div>
           </section>
 
           <section className="rounded-xl border bg-white p-4 space-y-3">
             <div>
-              <div className="font-semibold text-sm">Email and password</div>
+              <div className="font-semibold text-sm">{t("setup.account.securityTitle", { defaultValue: "Email and password" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Account security changes require your current password.
+                {t("setup.account.securityHelp", { defaultValue: "Account security changes require your current password." })}
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-                <div className="text-sm font-semibold">Change email</div>
+                <div className="text-sm font-semibold">{t("setup.account.changeEmail", { defaultValue: "Change email" })}</div>
                 <div className="text-xs text-neutral-500">
-                  The new address must be confirmed via an emailed link before it becomes active.
+                  {t("setup.account.changeEmailHelp", { defaultValue: "The new address must be confirmed via an emailed link before it becomes active." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="email"
                   value={accountForms.email}
                   onChange={event => handleAccountFormChange('email', event.target.value)}
-                  placeholder="New email"
+                  placeholder={t("setup.account.newEmail", { defaultValue: "New email" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.emailPassword}
                   onChange={event => handleAccountFormChange('emailPassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <button
                   type="button"
@@ -22135,34 +22807,34 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountEmail}
                 >
-                  {accountState.actionLoading === 'email' ? 'Saving...' : 'Change email'}
+                  {accountState.actionLoading === 'email' ? t("setup.account.saving", { defaultValue: "Saving..." }) : t("setup.account.changeEmail", { defaultValue: "Change email" })}
                 </button>
               </div>
               <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-                <div className="text-sm font-semibold">Change password</div>
+                <div className="text-sm font-semibold">{t("setup.account.changePassword", { defaultValue: "Change password" })}</div>
                 <div className="text-xs text-neutral-500">
-                  We'll email a confirmation once your password is changed.
+                  {t("setup.account.changePasswordHelp", { defaultValue: "We'll email a confirmation once your password is changed." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.currentPassword}
                   onChange={event => handleAccountFormChange('currentPassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.newPassword}
                   onChange={event => handleAccountFormChange('newPassword', event.target.value)}
-                  placeholder="New password"
+                  placeholder={t("setup.account.newPassword", { defaultValue: "New password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="password"
                   value={accountForms.confirmPassword}
                   onChange={event => handleAccountFormChange('confirmPassword', event.target.value)}
-                  placeholder="Confirm new password"
+                  placeholder={t("setup.account.confirmNewPassword", { defaultValue: "Confirm new password" })}
                 />
                 <button
                   type="button"
@@ -22170,7 +22842,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleChangeAccountPassword}
                 >
-                  {accountState.actionLoading === 'password' ? 'Saving...' : 'Change password'}
+                  {accountState.actionLoading === 'password' ? t("setup.account.saving", { defaultValue: "Saving..." }) : t("setup.account.changePassword", { defaultValue: "Change password" })}
                 </button>
               </div>
             </div>
@@ -22178,18 +22850,16 @@ function BreederSection({
 
           <section className="space-y-3">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">Your data</div>
+              <div className="text-sm font-semibold text-neutral-800">{t("setup.account.dataTitle", { defaultValue: "Your data" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
-                Download what we hold about you — all of it, or just the parts you pick — or close
-                your account for good.
+                {t("setup.account.dataHelp", { defaultValue: "Download what we hold about you — all of it, or just the parts you pick — or close your account for good." })}
               </div>
             </div>
 
             <div className="rounded-xl border bg-neutral-50 p-3 space-y-2">
-              <div className="text-sm font-semibold">Download my data</div>
+              <div className="text-sm font-semibold">{t("setup.account.downloadMyData", { defaultValue: "Download my data" })}</div>
               <div className="text-xs text-neutral-500">
-                A JSON file containing the categories you pick below. Everything is included by
-                default. Records shared with another person identify them only by an internal id.
+                {t("setup.account.downloadHelp", { defaultValue: "A JSON file containing the categories you pick below. Everything is included by default. Records shared with another person identify them only by an internal id." })}
               </div>
 
               <div className="space-y-1 pt-1">
@@ -22209,10 +22879,10 @@ function BreederSection({
                       />
                       <span className="min-w-0">
                         <span className="block text-xs font-medium text-neutral-800">
-                          {group.label}
-                          {group.always ? ' (always included)' : ''}
+                          {exportGroupText[group.id]?.label || group.label}
+                          {group.always ? t("setup.account.alwaysIncluded", { defaultValue: " (always included)" }) : ''}
                         </span>
-                        <span className="block text-[11px] text-neutral-500">{group.hint}</span>
+                        <span className="block text-[11px] text-neutral-500">{exportGroupText[group.id]?.hint || group.hint}</span>
                       </span>
                     </label>
                   );
@@ -22226,7 +22896,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleDownloadMyData}
                 >
-                  {accountState.actionLoading === 'export' ? 'Preparing...' : exportButtonLabel}
+                  {accountState.actionLoading === 'export' ? t("setup.account.preparing", { defaultValue: "Preparing..." }) : exportButtonLabel}
                 </button>
                 {/* status-tag-neutral-button opts out of `.app-root button`, which
                     themes every button as the primary colour with !important.
@@ -22237,7 +22907,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={selectAllExportGroups}
                 >
-                  Select all
+                  {t("setup.account.selectAll", { defaultValue: "Select all" })}
                 </button>
                 <button
                   type="button"
@@ -22245,26 +22915,25 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={clearExportGroups}
                 >
-                  Clear
+                  {t("setup.account.clear", { defaultValue: "Clear" })}
                 </button>
               </div>
 
               {!exportSelectionComplete ? (
                 <div className="text-[11px] text-amber-700">
-                  This will be a partial export. The file is marked as partial so it is not mistaken
-                  for the complete record we hold about you.
+                  {t("setup.account.partialExport", { defaultValue: "This will be a partial export. The file is marked as partial so it is not mistaken for the complete record we hold about you." })}
                 </div>
               ) : null}
             </div>
 
             {deletionState.pending ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2">
-                <div className="text-sm font-semibold text-amber-900">This account is scheduled for deletion</div>
+                <div className="text-sm font-semibold text-amber-900">{t("setup.account.deletionScheduled", { defaultValue: "This account is scheduled for deletion" })}</div>
                 <div className="text-xs text-amber-800">
                   {deletionState.scheduledAt
-                    ? `Everything will be permanently erased on ${formatDateTimeForDisplay(deletionState.scheduledAt)}.`
-                    : 'Everything will be permanently erased when the grace period ends.'}
-                  {' '}Download your data before then if you want to keep a copy.
+                    ? t("setup.account.erasedOn", { date: formatDateTimeForDisplay(deletionState.scheduledAt), defaultValue: "Everything will be permanently erased on {{date}}." })
+                    : t("setup.account.erasedAfterGrace", { defaultValue: "Everything will be permanently erased when the grace period ends." })}
+                  {' '}{t("setup.account.downloadBeforeThen", { defaultValue: "Download your data before then if you want to keep a copy." })}
                 </div>
                 <button
                   type="button"
@@ -22272,17 +22941,14 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleCancelAccountDeletion}
                 >
-                  {accountState.actionLoading === 'cancelDelete' ? 'Cancelling...' : 'Keep my account'}
+                  {accountState.actionLoading === 'cancelDelete' ? t("setup.account.cancelling", { defaultValue: "Cancelling..." }) : t("setup.account.keepAccount", { defaultValue: "Keep my account" })}
                 </button>
               </div>
             ) : (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
-                <div className="text-sm font-semibold text-red-900">Delete my account</div>
+                <div className="text-sm font-semibold text-red-900">{t("setup.account.deleteTitle", { defaultValue: "Delete my account" })}</div>
                 <div className="text-xs text-red-800">
-                  This erases your account and every record in it — animals, pairings, clutches,
-                  photos, notes, lab orders and messages. Nothing is kept. You have{' '}
-                  {deletionState.gracePeriodDays} days to change your mind by signing back in; after
-                  that it cannot be undone.
+                  {t("setup.account.deleteHelp", { days: deletionState.gracePeriodDays, defaultValue: "This erases your account and every record in it — animals, pairings, clutches, photos, notes, lab orders and messages. Nothing is kept. You have {{days}} days to change your mind by signing back in; after that it cannot be undone." })}
                 </div>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -22290,14 +22956,14 @@ function BreederSection({
                   autoComplete="current-password"
                   value={accountForms.deletePassword}
                   onChange={event => handleAccountFormChange('deletePassword', event.target.value)}
-                  placeholder="Current password"
+                  placeholder={t("setup.account.currentPassword", { defaultValue: "Current password" })}
                 />
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   type="text"
                   value={accountForms.deleteConfirmation}
                   onChange={event => handleAccountFormChange('deleteConfirmation', event.target.value)}
-                  placeholder="Type DELETE to confirm"
+                  placeholder={t("setup.account.typeDelete", { defaultValue: "Type DELETE to confirm" })}
                 />
                 <button
                   type="button"
@@ -22305,7 +22971,7 @@ function BreederSection({
                   disabled={Boolean(accountState.actionLoading)}
                   onClick={handleRequestAccountDeletion}
                 >
-                  {accountState.actionLoading === 'delete' ? 'Scheduling...' : 'Delete my account'}
+                  {accountState.actionLoading === 'delete' ? t("setup.account.scheduling", { defaultValue: "Scheduling..." }) : t("setup.account.deleteTitle", { defaultValue: "Delete my account" })}
                 </button>
               </div>
             )}
@@ -22581,7 +23247,7 @@ function AppearanceSettingsPanel() {
         <AppearancePreview density={appearanceState.layoutDensity} mode={effectiveThemeMode} />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto pe-1 space-y-6">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -22620,7 +23286,7 @@ function AppearanceSettingsPanel() {
                         style={{ background: `var(${role})`, borderColor: 'var(--sk-border)' }}
                       />
                     ))}
-                    <span className="text-[9px] uppercase tracking-wide text-neutral-500 ml-0.5">
+                    <span className="text-[9px] uppercase tracking-wide text-neutral-500 ms-0.5">
                       {preset.tone === 'light'
                         ? t('appearance.presets.toneLight', { defaultValue: 'Light' })
                         : preset.tone === 'dark'
@@ -22666,7 +23332,7 @@ function AppearanceSettingsPanel() {
                     type="button"
                     onClick={() => applyMaterial(material.key)}
                     className={cx(
-                      'text-left rounded-lg border p-2 transition-colors',
+                      'text-start rounded-lg border p-2 transition-colors',
                       active ? 'border-neutral-400 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50'
                     )}
                   >
@@ -22877,8 +23543,8 @@ function AppearancePreview({ density, mode }) {
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="border rounded-xl p-3 bg-white space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.preview.card', { defaultValue: 'Card surface' })}</div>
-          <div className="font-semibold text-sm">Demo project</div>
-          <p className="text-xs text-neutral-500">Task timeline, feed reminders, QR workflows.</p>
+          <div className="font-semibold text-sm">{t('appearance.preview.demoProject', { defaultValue: 'Demo pairing' })}</div>
+          <p className="text-xs text-neutral-500">{t('appearance.preview.demoProjectBody', { defaultValue: 'Task timeline, feed reminders, QR workflows.' })}</p>
           <div className="flex gap-2">
             <button type="button" className="px-3 py-1.5 rounded-lg text-xs border appearance-btn appearance-btn--ghost">{t('appearance.preview.secondary', { defaultValue: 'Secondary' })}</button>
             <button type="button" className="px-3 py-1.5 rounded-lg text-xs appearance-btn appearance-btn--filled" style={buttonStyle}>{t('appearance.preview.primary', { defaultValue: 'Primary' })}</button>
@@ -22888,7 +23554,7 @@ function AppearancePreview({ density, mode }) {
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('appearance.preview.list', { defaultValue: 'List sample' })}</div>
           {['Females', 'Males', 'Holdbacks'].map((label, index) => (
             <div key={label} className="flex items-center justify-between text-sm border rounded-lg px-2 py-1 bg-white/80">
-              <span>{label}</span>
+              <span>{label === 'Females' ? t('appearance.preview.females', { defaultValue: 'Females' }) : label === 'Males' ? t('appearance.preview.males', { defaultValue: 'Males' }) : t('appearance.preview.holdbacks', { defaultValue: 'Holdbacks' })}</span>
               <span className="text-xs text-neutral-500">{t('appearance.preview.count', { defaultValue: '{{count}} entries', count: sampleCounts[index] })}</span>
             </div>
           ))}
@@ -23031,7 +23697,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                         const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);
                         return dashClutchId ? (
                           <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 max-w-full">
-                            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                             <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{dashClutchId}</span>
                           </div>
                         ) : null;
@@ -23195,6 +23861,7 @@ function ProjectCompletionPanel({
   onComplete,
   onReopen,
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('season_ended');
   const [confidence, setConfidence] = useState('likely');
   const [note, setNote] = useState('');
@@ -23209,43 +23876,43 @@ function ProjectCompletionPanel({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold uppercase text-neutral-500">Completed</div>
+              <div className="text-xs font-semibold uppercase text-neutral-500">{t("pairing.completion.completed", { defaultValue: "Completed" })}</div>
               <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
             </div>
             <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
-              Reopen project
+              {t("pairing.completion.reopen", { defaultValue: "Reopen pairing" })}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
-            <div><span className="font-semibold">Date:</span> {completedAtLabel || 'Unknown'}</div>
-            <div><span className="font-semibold">Confidence:</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
-            <div><span className="font-semibold">Final outcome:</span> {finalOutcomeLabel}</div>
+            <div><span className="font-semibold">{t("pairing.completion.date", { defaultValue: "Date:" })}</span> {completedAtLabel || t("pairing.completion.unknown", { defaultValue: "Unknown" })}</div>
+            <div><span className="font-semibold">{t("pairing.completion.confidence", { defaultValue: "Confidence:" })}</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
+            <div><span className="font-semibold">{t("pairing.completion.finalOutcome", { defaultValue: "Final outcome:" })}</span> {finalOutcomeLabel}</div>
           </div>
           {completion.completionNote ? (
-            <div className="text-xs text-neutral-700"><span className="font-semibold">Note:</span> {completion.completionNote}</div>
+            <div className="text-xs text-neutral-700"><span className="font-semibold">{t("pairing.completion.note", { defaultValue: "Note:" })}</span> {completion.completionNote}</div>
           ) : null}
           {lateOutcomeRecorded ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              A reproductive event was recorded after completion. The original completion record is preserved.
+              {t("pairing.completion.lateOutcome", { defaultValue: "A reproductive event was recorded after completion. The original completion record is preserved." })}
             </div>
           ) : null}
           {completion.reopenedAt ? (
-            <div className="text-xs text-neutral-600">Previously reopened {formatDateTimeForDisplay(completion.reopenedAt) || 'after completion'}.</div>
+            <div className="text-xs text-neutral-600">{t("pairing.completion.previouslyReopened", { when: formatDateTimeForDisplay(completion.reopenedAt) || t("pairing.completion.afterCompletion", { defaultValue: "after completion" }), defaultValue: "Previously reopened {{when}}." })}</div>
           ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {completion.completedAt ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Previously completed as {getCompletionReasonLabel(completion.completionReason)}. Reopening preserved that history.
+              {t("pairing.completion.previouslyCompleted", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Previously completed as {{reason}}. Reopening preserved that history." })}
             </div>
           ) : null}
           <div className="text-xs text-neutral-600">
-            Completing a project ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later.
+            {t("pairing.completion.help", { defaultValue: "Completing a pairing ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later." })}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Completion reason</span>
+              <span className="text-xs font-medium">{t("pairing.completion.reason", { defaultValue: "Completion reason" })}</span>
               <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
                 {COMPLETION_REASON_GROUPS.map(group => (
                   <optgroup key={group.key} label={group.label}>
@@ -23257,7 +23924,7 @@ function ProjectCompletionPanel({
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Outcome confidence</span>
+              <span className="text-xs font-medium">{t("pairing.completion.outcomeConfidence", { defaultValue: "Outcome confidence" })}</span>
               <select
                 className="border rounded-xl px-3 py-2 bg-white text-sm"
                 value={requiresConfidence ? confidence : 'confirmed'}
@@ -23271,7 +23938,7 @@ function ProjectCompletionPanel({
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Completion note</span>
+            <span className="text-xs font-medium">{t("pairing.completion.completionNote", { defaultValue: "Completion note" })}</span>
             <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
           </label>
           <button
@@ -23279,7 +23946,7 @@ function ProjectCompletionPanel({
             className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
             onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
           >
-            Mark completed
+            {t("pairing.completion.markCompleted", { defaultValue: "Mark completed" })}
           </button>
         </div>
       )}
@@ -23290,10 +23957,21 @@ function ProjectCompletionPanel({
 const PAIRING_STAGE_LABELS = ['Paired', 'Locked', 'Ovulated', 'Pre-lay Shed', 'Clutch Laid', 'Incubating', 'Hatched'];
 
 function PairingStageTracker({ reached }) {
+  const { t } = useTranslation();
   const lastReachedIdx = reached.reduce((acc, isReached, idx) => (isReached ? idx : acc), -1);
   const activeIdx = lastReachedIdx === -1 ? 0 : lastReachedIdx;
+  // Display labels, index-aligned with PAIRING_STAGE_LABELS (which stays English: it is the React key).
+  const stageDisplayLabels = [
+    t("pairing.stageTracker.paired", { defaultValue: "Paired" }),
+    t("pairing.stageTracker.locked", { defaultValue: "Locked" }),
+    t("pairing.stageTracker.ovulated", { defaultValue: "Ovulated" }),
+    t("pairing.stageTracker.preLayShed", { defaultValue: "Pre-lay Shed" }),
+    t("pairing.stageTracker.clutchLaid", { defaultValue: "Clutch Laid" }),
+    t("pairing.stageTracker.incubating", { defaultValue: "Incubating" }),
+    t("pairing.stageTracker.hatched", { defaultValue: "Hatched" }),
+  ];
   return (
-    <div className="flex items-center" role="list" aria-label="Pairing stage progress">
+    <div className="flex items-center" role="list" aria-label={t("pairing.stageTracker.ariaLabel", { defaultValue: "Pairing stage progress" })}>
       {PAIRING_STAGE_LABELS.map((label, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
@@ -23312,7 +23990,7 @@ function PairingStageTracker({ reached }) {
               />
               <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
             </div>
-            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{label}</div>
+            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{stageDisplayLabels[i] || label}</div>
           </div>
         );
       })}
@@ -23409,7 +24087,7 @@ function PairingInlineCard({
   const doneEditingParticipantsLabel = t('pairing.editParticipantsDone', { defaultValue: 'Done' });
   const maleSelectPlaceholder = t('pairing.selectMalePlaceholder', { defaultValue: 'Choose a male' });
   const femaleSelectPlaceholder = t('pairing.selectFemalePlaceholder', { defaultValue: 'Choose a female' });
-  const femaleRuleHelper = t('pairing.femaleUniqueRule', { defaultValue: 'Each female can only be in one active pairing. Update or remove the other project first.' });
+  const femaleRuleHelper = t('pairing.femaleUniqueRule', { defaultValue: 'Each female can only be in one active pairing. Update or remove the other pairing first.' });
   const clutchCardTitleLabel = t('clutchCard.clutch', { defaultValue: clutchTitleLabel });
   const clutchCardMaleLabel = t('clutchCard.male', { defaultValue: maleLabel });
   const clutchCardFemaleLabel = t('clutchCard.female', { defaultValue: femaleLabel });
@@ -23705,7 +24383,7 @@ function PairingInlineCard({
         ref={cardRef}
         role="button"
         tabIndex={0}
-        className={cx(cardClasses, 'text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400')}
+        className={cx(cardClasses, 'text-start cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400')}
         onClick={handleExpand}
         onKeyDown={handleCollapsedKey}
         aria-expanded={false}
@@ -23718,20 +24396,20 @@ function PairingInlineCard({
               </div>
               {buildClutchId(femaleName, maleName, cycleYear) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]">
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
                   <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
                 </span>
               )}
               {edit?.clutch?.allEggsLost && (
                 <span className="inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
-                  Clutch lost
+                  {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
                 </span>
               )}
             </div>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
               {isWorkflowCompleted && (
                 <span className="inline-flex items-center rounded-full border bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  Completed
+                  {t("pairing.completion.completed", { defaultValue: "Completed" })}
                 </span>
               )}
               <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
@@ -23744,7 +24422,7 @@ function PairingInlineCard({
               {typeof onOpenSnake === 'function' && maleSnake ? (
                 <button
                   type="button"
-                  className="truncate font-medium text-sm text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenMale}
                 >
                   {maleName}
@@ -23758,7 +24436,7 @@ function PairingInlineCard({
               {typeof onOpenSnake === 'function' && femaleSnake ? (
                 <button
                   type="button"
-                  className="truncate font-medium text-sm text-left text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                   onClick={handleOpenFemale}
                 >
                   {femaleName}
@@ -23790,13 +24468,13 @@ function PairingInlineCard({
           </div>
           {buildClutchId(femaleName, maleName, cycleYear) && (
             <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">Clutch ID</span>
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
               <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
             </div>
           )}
           {edit?.clutch?.allEggsLost && (
             <div className="mt-1.5 inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-              Clutch lost
+              {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
             </div>
           )}
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -23813,13 +24491,13 @@ function PairingInlineCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
                   <SexBadge sex="M" label={maleLabel} showText={false} />
-                  <span>Sire</span>
+                  <span>{t("snakeEdit.parentage.sire", { defaultValue: "Sire" })}</span>
                 </div>
                 <div className="truncate text-[13px] font-semibold text-neutral-800">
                   {typeof onOpenSnake === 'function' && maleSnake ? (
                     <button
                       type="button"
-                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                       style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenMale}
                     >
@@ -23849,13 +24527,13 @@ function PairingInlineCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
                   <SexBadge sex="F" label={femaleLabel} showText={false} />
-                  <span>Dam</span>
+                  <span>{t("snakeEdit.parentage.dam", { defaultValue: "Dam" })}</span>
                 </div>
                 <div className="truncate text-[13px] font-semibold text-neutral-800">
                   {typeof onOpenSnake === 'function' && femaleSnake ? (
                     <button
                       type="button"
-                      className="truncate text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                       style={{ color: 'var(--sk-primary, #0284c7)' }}
                       onClick={handleOpenFemale}
                     >
@@ -23878,8 +24556,8 @@ function PairingInlineCard({
           </div>
           {isWorkflowCompleted && (
             <div className="mt-2 text-[11px] text-neutral-600">
-              Completed: {getCompletionReasonLabel(completion.completionReason)}
-              {lateOutcomeRecorded ? ' - late outcome recorded' : ''}
+              {t("pairing.completion.completedWithReason", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Completed: {{reason}}" })}
+              {lateOutcomeRecorded ? t("pairing.completion.lateOutcomeSuffix", { defaultValue: " - late outcome recorded" }) : ''}
             </div>
           )}
         </div>
@@ -23929,7 +24607,7 @@ function PairingInlineCard({
         className="mt-3 border rounded-2xl p-3"
         style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
       >
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">Stage</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">{t("pairing.stageTracker.title", { defaultValue: "Stage" })}</div>
         <PairingStageTracker
           reached={[
             (edit.appointments || []).some(ap => ap && ap.pairingObserved),
@@ -24175,7 +24853,7 @@ function PairingInlineCard({
                 </button>
               </div>
             ))}
-            {!(edit.appointments || []).length && <div className="text-xs text-neutral-500">No appointments yet.</div>}
+            {!(edit.appointments || []).length && <div className="text-xs text-neutral-500">{t("pairing.noAppointments", { defaultValue: "No appointments yet." })}</div>}
           </div>
           </div>
           <CycleTimersFrame lifecycle={lifecycle} theme={theme} />
@@ -24207,7 +24885,7 @@ function PairingInlineCard({
 
       {hatchlings.length > 0 && (
         <div className="mt-4">
-          <div className="text-xs font-medium mb-1">Hatchlings</div>
+          <div className="text-xs font-medium mb-1">{t("pairing.hatchlings", { defaultValue: "Hatchlings" })}</div>
           <div className="flex flex-wrap gap-1">
             {hatchlings.map(h => (
               <button
@@ -24220,7 +24898,7 @@ function PairingInlineCard({
                 onClick={onOpenSnake ? () => onOpenSnake(h) : undefined}
                 title={h.name || h.id}
               >
-                {h.name || h.id}
+                <bdi>{h.name || h.id}</bdi>
               </button>
             ))}
           </div>
@@ -24252,6 +24930,7 @@ function PairingInlineCard({
 }
 
 function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
+  const { t } = useTranslation();
   const odds = useMemo(() => {
     if (providedOdds) return providedOdds;
     return computePairingGenetics(male, female);
@@ -24263,7 +24942,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
     <div className="mt-3">
       {perGene.length > 0 && (
         <>
-          <div className="text-xs font-medium mb-1.5">Genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.title", { defaultValue: "Genetics odds" })}</div>
           <div className="flex flex-col gap-2">
             {perGene.map(item => {
               const visualOutcomes = item.outcomes.filter(out => !/^het\s/i.test(out.label));
@@ -24277,7 +24956,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                   <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
                   <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Visual outcomes</div>
+                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.visualOutcomes", { defaultValue: "Visual outcomes" })}</div>
                       <div className="flex flex-col gap-1.5">
                         {visualOutcomes.map(out => (
                           <div key={`${item.gene}-v-${out.label}`}>
@@ -24297,7 +24976,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
                     </div>
                     {hetOutcomes.length > 0 && (
                       <div>
-                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">Het outcomes (carried, non-visual)</div>
+                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.hetOutcomes", { defaultValue: "Het outcomes (carried, non-visual)" })}</div>
                         <div className="flex flex-col gap-1.5">
                           {hetOutcomes.map(out => (
                             <div key={`${item.gene}-h-${out.label}`}>
@@ -24330,7 +25009,7 @@ function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
       )}
       {combined.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs font-medium mb-1.5">Combined genetics odds</div>
+          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.combined", { defaultValue: "Combined genetics odds" })}</div>
           <div className="flex flex-col gap-1.5">
             {combined.map(item => {
               const breakdownItems = (item.breakdown || []).filter(detail => detail.label && detail.label !== 'Normal');
@@ -25457,14 +26136,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
       <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
         {isWorkflowCompleted ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <div className="font-semibold">This project is marked completed. You can still record this event.</div>
+            <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This pairing is marked completed. You can still record this event." })}</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
-                Keep project completed and add event
+                {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep pairing completed and add event" })}
               </span>
               {typeof onReopenProject === 'function' ? (
                 <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
-                  Reopen project and add event
+                  {t("clutch.reopenAddEvent", { defaultValue: "Reopen pairing and add event" })}
                 </button>
               ) : null}
             </div>
@@ -25474,7 +26153,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{breedingCycleLabel}</div>
           <div className="text-[12px] text-neutral-500">{breedingCycleHelper}</div>
         </div>
-        <div className="flex flex-col gap-2.5 min-w-0 overflow-auto pr-1">
+        <div className="flex flex-col gap-2.5 min-w-0 overflow-auto pe-1">
           <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:items-stretch">
             <div className={cx(tileClass, 'flex-1 lg:h-full')}>
               <div className="flex-1 text-center space-y-1">
@@ -25488,12 +26167,12 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                   </div>
                 ) : null}
                 {ovulationObserved && preLayWindowTarget && (
-                  <div className="text-[11px] text-neutral-500">Pre-lay window {formatDateForDisplay(preLayWindowTarget)}</div>
+                  <div className="text-[11px] text-neutral-500">{t("clutch.preLayWindow", { date: formatDateForDisplay(preLayWindowTarget), defaultValue: "Pre-lay window {{date}}" })}</div>
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog}>
-                  {ovulationObserved ? 'Edit details' : logOvulationLabel}
+                  {ovulationObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logOvulationLabel}
                 </button>
                 {ovulationObserved && (
                   <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
@@ -25503,7 +26182,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
                       return next;
                     });
-                  }}>Clear</button>
+                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
                 )}
               </div>
             </div>
@@ -25515,7 +26194,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 </div>
                 {preLayObserved && Number.isFinite(edit?.preLayShed?.intervalFromOvulation) && (
                   <div className="text-[11px] text-neutral-500">
-                    {edit.preLayShed.intervalFromOvulation} days after ovulation
+                    {t("clutch.daysAfterOvulation", { days: edit.preLayShed.intervalFromOvulation, defaultValue: "{{days}} days after ovulation" })}
                   </div>
                 )}
                 {preLayObserved && edit?.preLayShed?.notes ? (
@@ -25524,12 +26203,12 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                   </div>
                 ) : null}
                 {preLayObserved && eggLayingTarget && (
-                  <div className="text-[11px] text-neutral-500">Egg window {formatDateForDisplay(eggLayingTarget)}</div>
+                  <div className="text-[11px] text-neutral-500">{t("clutch.eggWindow", { date: formatDateForDisplay(eggLayingTarget), defaultValue: "Egg window {{date}}" })}</div>
                 )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog}>
-                  {preLayObserved ? 'Edit details' : logPreLayLabel}
+                  {preLayObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logPreLayLabel}
                 </button>
                 {preLayObserved && (
                   <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
@@ -25538,7 +26217,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                       next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
                       return next;
                     });
-                  }}>Clear</button>
+                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
                 )}
               </div>
             </div>
@@ -25552,7 +26231,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 </div>
               </div>
 
-              <div className="mt-3 w-full text-left space-y-3">
+              <div className="mt-3 w-full text-start space-y-3">
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{eggLayingDateLabel}</label>
                   <input
@@ -25613,21 +26292,21 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         onClick={() => onCreateClutchCard?.()}
                         disabled={!canGenerateClutchCard}
                       >
-                        Create clutch card
+                        {t("clutch.createClutchCard", { defaultValue: "Create clutch card" })}
                       </button>
                       {!hatchedRecorded && (
                         <button
                           className="text-[11px] px-2.5 py-1 border rounded-lg"
                           onClick={openHatchGate}
                         >
-                          Eggs hatched
+                          {t("clutch.eggsHatched", { defaultValue: "Eggs hatched" })}
                         </button>
                       )}
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={() => toggleClutch(false)}
                       >
-                        Clear egg record
+                        {t("clutch.clearEggRecord", { defaultValue: "Clear egg record" })}
                       </button>
                     </>
                   )}
@@ -25635,14 +26314,14 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
               </div>
 
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 mt-2 flex items-start justify-between gap-3 w-full">
-                <div className="space-y-1 text-left">
+                <div className="space-y-1 text-start">
                   <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">{hatchedLabel}</div>
                   <div className="text-[13px] text-neutral-700">
                     {hatchedRecorded && edit?.hatch?.date ? `${hatchedLabel} ${formatDateForDisplay(edit.hatch.date)}` : notYetLabel}
                   </div>
                   {hatchedRecorded && (
                     <div className="text-[11px] text-neutral-500 space-y-1">
-                      <div>Hatched count: {edit?.hatch?.hatchedCount || 0}</div>
+                      <div>{t("clutch.hatchedCount", { hatched: edit?.hatch?.hatchedCount || 0, defaultValue: "Hatched count: {{hatched}}" })}</div>
                       {edit?.hatch?.notes ? <div>{notesFieldLabel}: {edit.hatch.notes}</div> : null}
                     </div>
                   )}
@@ -25654,13 +26333,13 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                         className="text-[11px] px-2.5 py-1 border rounded-lg"
                         onClick={openHatchGate}
                       >
-                        View / edit hatch
+                        {t("clutch.viewEditHatch", { defaultValue: "View / edit hatch" })}
                       </button>
                       <button
                         className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
                         onClick={clearHatched}
                       >
-                        Clear hatch record
+                        {t("clutch.clearHatchRecord", { defaultValue: "Clear hatch record" })}
                       </button>
                     </div>
                   )}
@@ -25676,7 +26355,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'ovulation' && (
         <FloatingDialog
-          title="Ovulation details"
+          title={t("clutch.ovulationDetails", { defaultValue: "Ovulation details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveOvulationDraft}
@@ -25684,7 +26363,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Ovulation date</label>
+              <label className="text-xs font-medium">{t("clutch.ovulationDate", { defaultValue: "Ovulation date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.date} onChange={e=>setOvulationDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
@@ -25697,7 +26376,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'preLay' && (
         <FloatingDialog
-          title="Pre-Lay shed details"
+          title={t("clutch.preLayShedDetails", { defaultValue: "Pre-Lay shed details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={savePreLayDraft}
@@ -25705,7 +26384,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Pre-Lay shed date</label>
+              <label className="text-xs font-medium">{t("clutch.preLayShedDate", { defaultValue: "Pre-Lay shed date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.date} onChange={e=>setPreLayDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
@@ -25718,7 +26397,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'clutch' && (
         <FloatingDialog
-          title="Log eggs laid"
+          title={t("clutch.logEggsLaid", { defaultValue: "Log eggs laid" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveClutchDraft}
@@ -25765,7 +26444,9 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 }}
               />
               <div className="mt-1 text-[11px] text-neutral-500">
-                Total eggs laid will be saved as fertile eggs + slugs{typeof clutchDraftTotal === 'number' ? ` = ${clutchDraftTotal}` : ''}.
+                {typeof clutchDraftTotal === 'number'
+                  ? t("clutch.totalEggsFormulaWithTotal", { total: clutchDraftTotal, defaultValue: "Total eggs laid will be saved as fertile eggs + slugs = {{total}}." })
+                  : t("clutch.totalEggsFormula", { defaultValue: "Total eggs laid will be saved as fertile eggs + slugs." })}
               </div>
             </div>
           </div>
@@ -25841,7 +26522,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 
       {activeDialog === 'hatched' && (
         <FloatingDialog
-          title="Hatch details"
+          title={t("clutch.hatchDetails", { defaultValue: "Hatch details" })}
           theme={theme}
           onClose={() => setActiveDialog(null)}
           onConfirm={saveHatchedDraft}
@@ -25849,11 +26530,11 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
         >
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium">Hatch date</label>
+              <label className="text-xs font-medium">{t("clutch.hatchDate", { defaultValue: "Hatch date" })}</label>
               <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.date} onChange={e=>setHatchedDraft(d=>({...d, date:e.target.value}))} />
             </div>
             <div>
-              <label className="text-xs font-medium">Number hatched</label>
+              <label className="text-xs font-medium">{t("clutch.numberHatched", { defaultValue: "Number hatched" })}</label>
               <input
                 type="number"
                 min="0"
@@ -25873,7 +26554,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
                 }}
               />
               {hatchLimitForUi !== null && (
-                <div className="mt-1 text-[11px] text-neutral-500">Maximum allowed: {hatchLimitForUi} ({hatchLimitLabel})</div>
+                <div className="mt-1 text-[11px] text-neutral-500">{t("clutch.maxAllowed", { max: hatchLimitForUi, basis: hatchLimitLabel, defaultValue: "Maximum allowed: {{max}} ({{basis}})" })}</div>
               )}
             </div>
             <div>
@@ -25888,6 +26569,7 @@ function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchC
 }
 
 function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
+  const { t } = useTranslation();
   const timerQueue = lifecycle?.timerQueue || [];
   const hasTimers = timerQueue.length > 0;
   const [now, setNow] = useState(new Date());
@@ -25920,14 +26602,14 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
       <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Cycle timers</div>
-            <div className="text-sm text-neutral-600">Breeding cycle status</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
+            <div className="text-sm text-neutral-600">{t("clutch.timers.statusSubtitle", { defaultValue: "Breeding cycle status" })}</div>
           </div>
         </div>
         <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div className="font-medium text-neutral-700">This breeding cycle is over.</div>
+          <div className="font-medium text-neutral-700">{t("clutch.timers.cycleOver", { defaultValue: "This breeding cycle is over." })}</div>
           {hatchDate ? (
-            <div className="text-xs text-neutral-500">Hatched on {formatDateForDisplay(hatchDate)}</div>
+            <div className="text-xs text-neutral-500">{t("clutch.timers.hatchedOn", { date: formatDateForDisplay(hatchDate), defaultValue: "Hatched on {{date}}" })}</div>
           ) : null}
         </div>
       </div>
@@ -25938,11 +26620,11 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
     <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Cycle timers</div>
-          <div className="text-sm text-neutral-600">Upcoming breeding milestones</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
+          <div className="text-sm text-neutral-600">{t("clutch.timers.upcomingSubtitle", { defaultValue: "Upcoming breeding milestones" })}</div>
         </div>
         {hasTimers && (
-          <div className="text-xs text-neutral-500">{timerQueue.length} active</div>
+          <div className="text-xs text-neutral-500">{t("clutch.timers.activeCount", { active: timerQueue.length, defaultValue: "{{active}} active" })}</div>
         )}
       </div>
       {hasTimers ? (
@@ -25960,29 +26642,30 @@ function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
         </div>
       ) : (
         <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div>No active timers yet. Log ovulation, pre-lay, or clutch events to start tracking milestones.</div>
-          <div className="text-xs font-medium text-neutral-500">Current time: {formatDateTimeForDisplay(now)}</div>
+          <div>{t("clutch.timers.none", { defaultValue: "No active timers yet. Log ovulation, pre-lay, or clutch events to start tracking milestones." })}</div>
+          <div className="text-xs font-medium text-neutral-500">{t("clutch.timers.currentTime", { time: formatDateTimeForDisplay(now), defaultValue: "Current time: {{time}}" })}</div>
         </div>
       )}
     </div>
   );
 }
 
-function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel = 'Save', disableConfirm = false }) {
+function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel, disableConfirm = false }) {
   const { t } = useTranslation();
+  const resolvedConfirmLabel = confirmLabel ?? t("common.save", { defaultValue: "Save" });
   return (
     <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>Close</button>
+          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
-        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
+        <div className="space-y-3 max-h-[60vh] overflow-auto pe-1">
           {children}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{confirmLabel}</button>
+          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{resolvedConfirmLabel}</button>
         </div>
       </div>
     </div>
@@ -25996,7 +26679,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>Close</button>
+          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         </div>
         {description ? <div className="text-sm text-neutral-600">{description}</div> : null}
         <div className="mt-4 flex flex-col gap-2">
@@ -26004,7 +26687,7 @@ function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue
             <button
               key={option.key || idx}
               className={cx(
-                'w-full text-left px-3 py-2 rounded-xl text-sm border',
+                'w-full text-start px-3 py-2 rounded-xl text-sm border',
                 option.tone === 'danger' && 'border-rose-300 text-rose-600',
                 option.tone === 'primary' && primaryBtnClass(theme, true),
                 !option.tone && 'hover:bg-neutral-50'
@@ -26119,7 +26802,7 @@ function parseYmd(dateStr) {
 }
 
 // import tab
-function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport }) {
+function ImportSection({ importText, setImportText, importPreview, setImportPreview, runImportPreview, applyImport, importSpecies = '', setImportSpecies, importArrival = IMPORT_DEFAULT_ARRIVAL, setImportArrival, onResolveLeucisticLists, theme='blue', onCancel, showAppAlert, existingAnimals = [], onGeneticsForSpecies, onCommitMorphMarketImport, onAddToBreeders }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const sheetInputRef = useRef();
@@ -26196,7 +26879,10 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   }, []);
   const importCount = Array.isArray(importPreview) ? importPreview.length : 0;
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
-  const canImport = importCount > 0 && Boolean(importSpecies);
+  // Duplicates of animals already here are dropped on apply, so this can count a few too many;
+  // erring that way never lets an import past the plan's cap.
+  const importCapResult = useAnimalCap(Array.isArray(existingAnimals) ? existingAnimals.length : 0, importCount);
+  const canImport = importCount > 0 && Boolean(importSpecies) && !importCapResult?.blocked;
   const importButtonLabel = importCount
     ? t("ui.animals.import.importButtonWithCount", { count: importCount, defaultValue: "Import ({{count}})" })
     : t("ui.animals.import.importButton", { defaultValue: "Import" });
@@ -26270,17 +26956,40 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
     />
   );
 
+  // Shown on both panels, because a MorphMarket file replaces the first one before its review.
+  const arrivalChoice = (
+    <label className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
+      <input
+        type="checkbox"
+        className="mt-0.5"
+        checked={importArrival !== ARRIVAL.NEW}
+        onChange={e => setImportArrival?.(e.target.checked ? ARRIVAL.EXISTING : ARRIVAL.NEW)}
+      />
+      <span className="text-xs">
+        <span className="font-medium text-amber-800">
+          {t("ui.animals.import.alreadyOwned", { defaultValue: "These animals are already in my collection" })}
+        </span>
+        <span className="block mt-0.5 text-amber-700">
+          {t("ui.animals.import.alreadyOwnedHelp", { defaultValue: "Nothing is put into quarantine. Untick if they are new arrivals: each one then starts quarantine from today." })}
+        </span>
+      </span>
+    </label>
+  );
+
   // A recognised MorphMarket file replaces the panel wholesale: reviewing 26 rows needs the
   // room, and none of the manual mapping controls apply to it.
   if (morphMarketPlan || morphMarketResult) {
     return (
       <Card title={t("ui.animals.import.morphmarket.title", { defaultValue: "Import from MorphMarket" })}>
+        {!morphMarketResult && arrivalChoice}
         <MorphMarketImportReview
           plan={morphMarketPlan}
           result={morphMarketResult}
           busy={parsing}
+          existingAnimalCount={Array.isArray(existingAnimals) ? existingAnimals.length : 0}
           primaryButtonClass={primaryBtnClass(theme, true)}
           onChangeResolution={setRowResolution}
+          onAddToBreeders={onAddToBreeders}
           onConfirm={() => {
             if (typeof onCommitMorphMarketImport !== 'function') return;
             const result = onCommitMorphMarketImport(morphMarketPlan);
@@ -26299,8 +27008,11 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   }
 
   return (
-    <Card title={t("ui.animals.import.title", { defaultValue: "Import snakes from text" })}>
+    // No title of its own: the modal around it already says "Import animals", and one flow
+    // gets one title.
+    <Card>
       {morphMarketFileInput}
+      {arrivalChoice}
       <div className="mb-4 p-3 border rounded-xl bg-neutral-50">
         <div className="text-xs font-medium">
           {t("ui.animals.import.sourceLabel", { defaultValue: "Where are these animals coming from?" })}
@@ -26340,7 +27052,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste text exported from the PDF" })}</label>
+          <label className="text-xs font-medium">{t("ui.animals.import.pasteLabel", { defaultValue: "Paste your animal list (text copied from a PDF)" })}</label>
           <textarea className="mt-1 w-full h-64 border rounded-xl px-3 py-2"
             value={importText} onChange={e=>setImportText(e.target.value.replace(/Ball Python\s*\(Python regius\)/ig, ''))} placeholder={t("ui.animals.import.pastePlaceholder", { defaultValue: "Paste content here..." })}/>
 
@@ -26468,9 +27180,9 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                     } catch (err) {
                       console.error('xlsx import failed', err);
                       if (typeof showAppAlert === 'function') {
-                        await showAppAlert(t("ui.animals.import.installXlsxPrompt", { defaultValue: "To import Excel files please install the \"xlsx\" package: npm install xlsx" }));
+                        await showAppAlert(t("ui.animals.import.installXlsxPrompt", { defaultValue: "This Excel file could not be opened. Save it as CSV and import that instead." }));
                       } else {
-                        console.warn(t("ui.animals.import.installXlsxPrompt", { defaultValue: "To import Excel files please install the \"xlsx\" package: npm install xlsx" }));
+                        console.warn(t("ui.animals.import.installXlsxPrompt", { defaultValue: "This Excel file could not be opened. Save it as CSV and import that instead." }));
                       }
                       return;
                     }
@@ -26590,8 +27302,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
                       let sex = 'F';
                       if (/^f$/.test(g) || /\bfemale\b/.test(g)) sex = 'F';
                       else if (/^m$/.test(g) || /\bmale\b/.test(g)) sex = 'M';
-                      const tokens = geneticsRaw ? geneticsRaw.split(GENE_TOKEN_SPLIT_REGEX).map(x => x.trim()).filter(Boolean) : [];
-                      const normalized = normalizeMorphHetLists(tokens);
+                      const normalized = splitMorphHetInput(geneticsRaw);
                       const groups = groupsRaw ? groupsRaw.split(/[;,|]/).map(x=>x.trim()).filter(Boolean) : [];
                       const tags = tagsRaw ? tagsRaw.split(/[;,|]/).map(x=>x.trim()).filter(Boolean) : [];
                       return (name || normalized.morphs.length || normalized.hets.length || groups.length || tags.length)
@@ -26650,6 +27361,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
             </div>
           </div>
 
+          {importCapResult?.blocked ? <AnimalCapNotice result={importCapResult} context="paste" className="mt-3" /> : null}
           <div className="mt-3 flex gap-2">
             <button className="px-3 py-2 rounded-xl text-sm border" onClick={runImportPreview}>
               {t("ui.animals.import.previewButton", { defaultValue: "Preview" })}
@@ -26674,7 +27386,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
           <div className="text-xs font-medium">{t("ui.animals.import.previewTitle", { defaultValue: "Preview" })}</div>
           <div className="mt-1 border rounded-xl p-2 h-64 overflow-auto bg-neutral-50">
             {!importCount && (
-              <div className="text-sm text-neutral-500">{t("ui.animals.import.previewHint", { defaultValue: "Click Preview to see parsed snakes." })}</div>
+              <div className="text-sm text-neutral-500">{t("ui.animals.import.previewHint", { defaultValue: "Click Preview to see the animals found." })}</div>
             )}
             {importPreview.map((s,i)=> (
               <div key={i} className="text-sm py-1 border-b last:border-b-0">
@@ -26936,7 +27648,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
               <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">
                 {t("snakeEdit.parentage.clutchIdLabel", { defaultValue: "Clutch ID" })}
               </span>
-              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{selectedClutch.clutchId}</span>
+              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate"><bdi>{selectedClutch.clutchId}</bdi></span>
             </div>
           )}
           {unlistedClutchId && (
@@ -26949,7 +27661,7 @@ function ParentagePanel({ draft, setDraft, animals = [], clutchOptions = [], aut
           )}
           {!clutchOptions.length && (
             <div className="mt-1 text-[11px] text-neutral-500">
-              {t("snakeEdit.parentage.noClutchesYet", { defaultValue: "No clutches recorded in the breeding tracker yet." })}
+              {t("snakeEdit.parentage.noClutchesYet", { defaultValue: "No clutches recorded under Breeding yet." })}
             </div>
           )}
         </div>
@@ -27120,9 +27832,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                       className="text-xs px-2 py-1 border rounded-lg"
                       onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:false})}
                     >
-                      Undo refused
+                      {t("logs.undoRefused", { defaultValue: "Undo refused" })}
                     </button>
-                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>Delete</button>
+                    <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                   </div>
                 </div>
               );
@@ -27136,9 +27848,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {/* feed type */}
                 <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
-                  <option value="Mouse">Mouse</option>
-                  <option value="Rat">Rat</option>
-                  <option value="Multimammate">Multimammate</option>
+                  <option value="Mouse">{t("logs.mouse", { defaultValue: "Mouse" })}</option>
+                  <option value="Rat">{t("logs.rat", { defaultValue: "Rat" })}</option>
+                  <option value="Multimammate">{t("logs.multimammate", { defaultValue: "Multimammate" })}</option>
                 </select>
 
                 {/* weight class */}
@@ -27155,18 +27867,18 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 {/* method of feed */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:col-span-2">
                   <select className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
-                      <option value="Live">Live</option>
-                      <option value="Freshly killed">Freshly killed</option>
-                      <option value="Frozen/thawed">Frozen/thawed</option>
-                      <option value="Other">Other</option>
+                      <option value="Live">{t("logs.live", { defaultValue: "Live" })}</option>
+                      <option value="Freshly killed">{t("logs.freshKilled", { defaultValue: "Freshly killed" })}</option>
+                      <option value="Frozen/thawed">{t("logs.frozenThawed", { defaultValue: "Frozen/thawed" })}</option>
+                      <option value="Other">{t("logs.other", { defaultValue: "Other" })}</option>
                   </select>
                   {x.method === 'Other' && (
-                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder="Method details" value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
+                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
                   )}
                 </div>
 
                 <div className="sm:col-span-7">
-                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder="Notes" value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
+                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
                 </div>
 
                 <div className="sm:col-span-7 flex justify-end items-center gap-2 flex-wrap">
@@ -27174,9 +27886,9 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                     className="text-xs px-2 py-1 border rounded-lg"
                     onClick={()=>updateLog(setEditSnakeDraft,'feeds',i,{refused:true})}
                   >
-                    Mark refused
+                    {t("logs.markRefused", { defaultValue: "Mark refused" })}
                   </button>
-                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>Delete</button>
+                  <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('feeds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
                 </div>
               </div>
             );
@@ -27200,11 +27912,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
             <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
               <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{date:e.target.value})}/>
-              <input type="number" className="border rounded-lg px-2 py-1" placeholder="grams"
+              <input type="number" className="border rounded-lg px-2 py-1" placeholder={t("logs.grams", { defaultValue: "grams" })}
                 value={x.grams} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{grams:Number(e.target.value)||0})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes"
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>Delete</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.weights.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27231,8 +27943,8 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                   onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{complete:e.target.checked})}/>
                 {t("logs.complete", { defaultValue: "Complete" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes" value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>Delete</button>
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.sheds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27259,8 +27971,8 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                   onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{deep:e.target.checked})}/>
                 {t("logs.deepClean", { defaultValue: "Deep clean" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder="Notes" value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>Delete</button>
+              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.cleanings.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27288,7 +28000,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 value={x.dose||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{dose:e.target.value})}/>
               <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>Delete</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.meds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
@@ -27299,7 +28011,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 }
 
 // calendar
-function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAppAlert }) {
+function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams = [], theme='blue', onOpenPairing, onOpenCycle, showAppAlert }) {
   const { t } = useTranslation();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -27312,6 +28024,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     sheds: true,
     meds: true,
     breeding: true,
+    breedingCards: true,
     clutch: true,
     quarantine: true,
   });
@@ -27366,6 +28079,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     { key: 'sheds', label: t('calendar.filters.sheds', { defaultValue: 'Sheds' }) },
     { key: 'meds', label: t('calendar.filters.meds', { defaultValue: 'Meds' }) },
     { key: 'breeding', label: t('calendar.filters.breeding', { defaultValue: 'Breeding appointments' }) },
+    { key: 'breedingCards', label: t('calendar.filters.breedingCards', { defaultValue: 'Breeding cards' }) },
     { key: 'clutch', label: t('calendar.filters.clutch', { defaultValue: 'Clutch actions' }) },
     { key: 'quarantine', label: t('calendar.filters.quarantine', { defaultValue: 'Quarantine' }) },
   ]), [t]);
@@ -27550,8 +28264,13 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
       });
     });
 
+    // Breeding cards: actual sessions, observed locks, planned pairings, milestones, scans and
+    // due checks. Planned and suspected entries carry their certainty so the cell can say so.
+    buildBreedingCalendarEvents({ cycles: breedingCycles, exams: follicleExams, year: targetYear, month: targetMonth })
+      .forEach(event => newEvents.push(event));
+
     return newEvents;
-  }, [pairings, femalesById, snakes]);
+  }, [pairings, femalesById, snakes, breedingCycles, follicleExams]);
 
   const loadAppointmentsIntoCalendar = useCallback(() => {
     setEvents(buildEventsForMonth(year, month));
@@ -27575,6 +28294,11 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     }
     if (ev.type === 'clutch') {
       if (filters.clutch === false) return false;
+      if (activeMaleId && ev.maleId && ev.maleId !== activeMaleId) return false;
+      return true;
+    }
+    if (ev.type === 'breedingCard') {
+      if (filters.breedingCards === false) return false;
       if (activeMaleId && ev.maleId && ev.maleId !== activeMaleId) return false;
       return true;
     }
@@ -27962,7 +28686,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t("calendar.syncNotConfigured", { defaultValue: "Google Calendar sync is not configured. Add VITE_GOOGLE_CLIENT_ID and reload." }),
+        text: t("calendar.syncUnavailable", { defaultValue: "Google Calendar sync is not available yet." }),
       });
       return;
     }
@@ -28007,7 +28731,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t('calendar.syncNotConfigured', { defaultValue: 'Google Calendar sync is not available. Add VITE_GOOGLE_CLIENT_ID and reload.' }),
+        text: t('calendar.syncUnavailable', { defaultValue: 'Google Calendar sync is not available yet.' }),
       });
       return;
     }
@@ -28030,7 +28754,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
     if (!googleSupported) {
       setGoogleSyncFeedback({
         kind: 'error',
-        text: t("calendar.syncNotConfigured", { defaultValue: "Google Calendar sync is not configured. Add VITE_GOOGLE_CLIENT_ID and reload." }),
+        text: t("calendar.syncUnavailable", { defaultValue: "Google Calendar sync is not available yet." }),
       });
       return;
     }
@@ -28084,7 +28808,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
   return (
     <div className="bg-white border rounded-2xl shadow-sm">
       <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
-        <div className="font-semibold mr-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
+        <div className="font-semibold me-2">{t('calendar.title', { defaultValue: 'Monthly calendar' })}</div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -28127,7 +28851,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             ›
           </button>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
           {googleSupported ? (
             googleSignedIn ? (
               <>
@@ -28194,7 +28918,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
             )
           ) : (
             <div className="text-[11px] text-neutral-500 max-w-xs">
-              {t('calendar.setClientIdPrefix', { defaultValue: 'Set' })} <code>VITE_GOOGLE_CLIENT_ID</code> {t('calendar.setClientIdSuffix', { defaultValue: 'to enable Google Calendar sync.' })}
+              {t('calendar.syncUnavailable', { defaultValue: 'Google Calendar sync is not available yet.' })}
             </div>
           )}
           <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme,true))} onClick={loadAppointmentsIntoCalendar}>
@@ -28301,6 +29025,30 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                   {isToday ? <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{t('calendar.today', { defaultValue: 'Today' })}</div> : null}
                 </div>
                 {filteredEvents.filter(e => e.date === cellDate).map((e, idx) => {
+                  if (e.type === 'breedingCard') {
+                    const femaleName = femalesById[e.femaleId]?.name || snakesById[e.femaleId]?.name || e.femaleId;
+                    const maleName = e.maleId ? (malesById[e.maleId]?.name || e.maleId) : '';
+                    const kindLabel = e.kind === 'scan_review'
+                      ? t('breeding.calendar.scanReview', { defaultValue: 'Follicle check due' })
+                      : breedingTimelineKindLabel(t, e.kind);
+                    const toneClass = e.certainty === 'planned'
+                      ? 'border-dashed border-neutral-300 bg-neutral-50'
+                      : e.certainty === 'suspected' || e.certainty === 'estimated'
+                        ? 'border-dashed border-amber-200 bg-amber-50'
+                        : 'border-violet-200 bg-violet-50';
+                    const measurement = typeof e.valueMm === 'number' ? ` · ${e.isEstimate ? '~' : ''}${e.valueMm} mm` : '';
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => { if (onOpenCycle) onOpenCycle(e.cycleId, e.femaleId); }}
+                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full', toneClass)}
+                      >
+                        <div className="font-medium truncate">{kindLabel} · {breedingCertaintyLabel(t, e.certainty)}</div>
+                        <div className="text-[11px] text-neutral-500 truncate">{femaleName}{maleName ? ` × ${maleName}` : ''}{measurement}</div>
+                      </button>
+                    );
+                  }
                   if (e.type === 'feedDue') {
                     const s = snakes.find(x => x.id === e.snakeId);
                     const profile = e.profile || getSnakeFeederProfile(s);
@@ -28383,7 +29131,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       <div
                         key={idx}
                         className={cx(
-                          'text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full',
+                          'text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full',
                           entered ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'
                         )}
                       >
@@ -28438,7 +29186,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                       <button
                         key={idx}
                         onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
-                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-left w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
+                        className={cx('text-xs px-2 py-1 rounded-lg border flex flex-col text-start w-full', stageStyles[e.stage] || 'border-neutral-200 bg-neutral-50')}
                       >
                         <div className="font-medium truncate">{stageLabels[e.stage] || t('calendar.filters.clutch', { defaultValue: 'Clutch action' })}</div>
                         <div className="text-[11px] text-neutral-500 truncate">{maleName} × {femaleName}</div>
@@ -28462,11 +29210,11 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                     <button
                       key={idx}
                       onClick={()=>{ if (onOpenPairing) onOpenPairing(e.pairingId); }}
-                      className="text-xs px-2 py-1 rounded-lg border flex items-center gap-2 text-left w-full"
+                      className="text-xs px-2 py-1 rounded-lg border flex items-center gap-2 text-start w-full"
                       style={{ borderColor: maleColors.border, background: maleColors.fill }}
                     >
                       <span
-                        className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                        className="inline-block w-2 h-2 rounded-full me-1 align-middle"
                         style={{ backgroundColor: maleColors.dot }}
                       ></span>
                       <div className="truncate">
@@ -28502,7 +29250,7 @@ function CalendarSection({ snakes, pairings, theme='blue', onOpenPairing, showAp
                 aria-pressed={l.isActive}
               >
                 <span
-                  className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                  className="inline-block w-2 h-2 rounded-full me-1 align-middle"
                   style={l.colors ? { backgroundColor: l.colors.dot } : undefined}
                 ></span>
                 {l.name}
@@ -28565,7 +29313,7 @@ function prepareCalendarEventExport(event, context) {
     if (typeof event.spanOffset === 'number' && event.spanOffset > 0) return null;
     durationDays = 3;
     summary = `Breeding: ${maleName || 'Male'} × ${femaleName || 'Female'}`;
-    if (pairing?.label) descriptionParts.push(`Project: ${pairing.label}`);
+    if (pairing?.label) descriptionParts.push(`Pairing: ${pairing.label}`);
     const lockRecordedAt = event.lockDate || event.lockLoggedAt || null;
     if (event.lockObserved && lockRecordedAt) descriptionParts.push(buildLockLogLine(lockRecordedAt));
     if (event.notes) descriptionParts.push(event.notes);
@@ -28975,7 +29723,7 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
   const styles = GENE_LINE_SIZE_STYLES[size] || GENE_LINE_SIZE_STYLES.sm;
   return (
     <div className={cx('flex flex-wrap items-center gap-1 leading-snug', styles.container, className)}>
-      {label && <span className={cx('uppercase tracking-wide text-neutral-500 mr-1', styles.label)}>{label}:</span>}
+      {label && <span className={cx('uppercase tracking-wide text-neutral-500 me-1', styles.label)}>{label}:</span>}
       {list.map((gene, idx) => {
         const rawGroup = getGeneDisplayGroup(gene);
         const superInfo = getSuperGeneInfo(gene);
@@ -29000,12 +29748,21 @@ function GeneLine({ label, genes = [], size = 'sm', className }) {
 }
 
 function GeneLegend({ className }) {
+  const { t } = useTranslation();
+  const legendLabels = {
+    Recessive: t("geneLegend.recessive", { defaultValue: "Recessive" }),
+    Het: t("geneLegend.het", { defaultValue: "Het / Possible Het" }),
+    SuperCodominant: t("geneLegend.superCodominant", { defaultValue: "Super (homozygous co-dom)" }),
+    'Incomplete Dominant': t("geneLegend.incompleteDominant", { defaultValue: "Incomplete Dominant" }),
+    Dominant: t("geneLegend.dominant", { defaultValue: "Dominant" }),
+    Other: t("geneLegend.other", { defaultValue: "Other / Polygenic" }),
+  };
   return (
     <div className={cx('flex flex-wrap items-center justify-center gap-3 text-[11px] font-normal', className)}>
       {GENE_LEGEND_ITEMS.map(item => (
         <div key={item.key} className="flex items-center gap-1">
           <span className={cx('inline-block h-3 w-3 rounded-sm', GENE_GROUP_COLOR_CLASSES[item.key])}></span>
-          <span className="text-neutral-600 whitespace-nowrap">{item.label}</span>
+          <span className="text-neutral-600 whitespace-nowrap">{legendLabels[item.key] || item.label}</span>
         </div>
       ))}
     </div>
@@ -29013,6 +29770,7 @@ function GeneLegend({ className }) {
 }
 
 function ScrollToTopButton({ theme = 'blue', className }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -29031,12 +29789,12 @@ function ScrollToTopButton({ theme = 'blue', className }) {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       className={cx(
-        'fixed bottom-6 right-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
+        'fixed bottom-6 end-6 z-[9990] rounded-full shadow-lg border backdrop-blur-sm transition-opacity duration-200 flex items-center justify-center h-12 w-12 sk-on-accent',
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         primaryBtnClass(theme, true),
         className
       )}
-      aria-label="Scroll to top"
+      aria-label={t("common.scrollToTop", { defaultValue: "Scroll to top" })}
     >
       <svg
         aria-hidden="true"

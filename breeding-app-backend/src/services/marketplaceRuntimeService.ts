@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { isListingPublic } from "./marketplaceVisibility";
 import type { AuthenticatedUser } from "../types/auth";
 import { HttpError } from "../utils/errors";
 import { assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
@@ -122,9 +123,9 @@ export const readMarketplaceMediaObject = async (
   });
   if (!media) throw new HttpError(404, "Marketplace media not found.");
 
-  const listingIsPublic = Boolean(
-    media.listing && media.listing.archivedAt === null && media.listing.status !== "draft"
-  );
+  // The same rule as the listing's own page: a hidden listing's photos used to
+  // stay public because only "draft" was excluded here.
+  const listingIsPublic = isListingPublic(media.listing);
   const isOwner = Boolean(actor && (actor.id === media.ownerUserId || actor.role === "admin"));
   if (!listingIsPublic && !isOwner) throw new HttpError(404, "Marketplace media not found.");
   if (media.status !== "ready" || media.scanStatus === "infected") {
@@ -145,6 +146,31 @@ export const listMyMarketplaceMedia = async (actor: AuthenticatedUser) => {
   return { media: rows.map(toMarketplaceMediaDto) };
 };
 
+/**
+ * The categories a marketplace user can report under, mapped onto the admin
+ * console's report types so the moderation queue can filter them.
+ */
+const MESSAGE_REPORT_TYPES = new Set(["abusive_message", "scam_suspicion", "spam", "other"]);
+const LISTING_REPORT_TYPES = new Set([
+  "fake_listing",
+  "incorrect_genetics",
+  "scam_suspicion",
+  "animal_welfare_concern",
+  "spam",
+  "other",
+]);
+
+const reportType = (value: unknown, allowed: Set<string>, fallback: string): string => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return allowed.has(normalized) ? normalized : fallback;
+};
+
+/**
+ * A reported message used to be written to `marketplace_message_reports` and
+ * nowhere else -- a table no screen reads, so a buyer reporting a scam was
+ * reporting it to nobody. It now also opens a case in the admin console's
+ * report queue, which is where moderators actually work.
+ */
 export const reportMarketplaceMessage = async (
   actor: AuthenticatedUser,
   messageId: string,
@@ -156,17 +182,37 @@ export const reportMarketplaceMessage = async (
   });
   if (!message) throw new HttpError(404, "Marketplace message not found.");
   assertMessageParticipant(actor, message.conversation);
+  if (message.senderUserId === actor.id) throw new HttpError(400, "You cannot report your own message.");
 
-  const reason = text(payload.reason || payload.type, 240);
-  if (!reason) throw new HttpError(400, "reason is required.");
+  const type = reportType(payload.type || payload.category, MESSAGE_REPORT_TYPES, "other");
+  const note = text(payload.note || payload.description, 2000);
+  const reason = text(payload.reason, 240) || type;
 
   const report = await db.marketplaceMessageReport.create({
     data: {
       messageId,
       reporterUserId: actor.id,
       reason,
-      note: text(payload.note || payload.description, 2000),
+      note,
       status: "open",
+    },
+  });
+
+  const moderation = await db.report.create({
+    data: {
+      reporterUserId: actor.id,
+      reportedUserId: message.senderUserId || null,
+      relatedMessageId: messageId,
+      type,
+      status: "open",
+      description: [
+        `Marketplace message in conversation ${message.conversationId} (listing ${message.conversation?.listingId || "unknown"}).`,
+        `Reason: ${reason}.`,
+        note ? `Reporter's note: ${note}` : null,
+        `Reported message: "${String(message.messageText || "").slice(0, 500)}"`,
+      ]
+        .filter(Boolean)
+        .join(" "),
     },
   });
 
@@ -174,10 +220,67 @@ export const reportMarketplaceMessage = async (
     type: "marketplace_message_reported",
     actorUserId: actor.id,
     outcome: "success",
-    metadata: { messageId, reportId: report.id, conversationId: message.conversationId },
+    metadata: { messageId, reportId: report.id, moderationReportId: moderation.id, conversationId: message.conversationId },
   });
 
-  return { report };
+  return { report: { id: report.id, status: report.status, moderationReportId: moderation.id } };
+};
+
+/**
+ * Reporting a listing. The button used to thank the visitor and record
+ * nothing. The case names the listing and its seller, so the console's
+ * "remove listing" action has a live listing to take down.
+ */
+export const reportMarketplaceListing = async (
+  actor: AuthenticatedUser,
+  listingId: string,
+  payload: Record<string, unknown>
+) => {
+  const listing = await db.marketplaceListing.findUnique({
+    where: { id: listingId },
+    select: { id: true, title: true, sellerUserId: true, genetics: true },
+  });
+  if (!listing) throw new HttpError(404, "Marketplace listing not found.");
+  if (listing.sellerUserId === actor.id) throw new HttpError(400, "You cannot report your own listing.");
+
+  const type = reportType(payload.type || payload.category, LISTING_REPORT_TYPES, "other");
+  const note = text(payload.note || payload.description, 2000);
+
+
+  // One open case per reporter per listing; pressing the button twice is not
+  // two reports.
+  const existing = await db.report.findFirst({
+    where: { reporterUserId: actor.id, status: "open", relatedMarketplaceListingId: listing.id },
+    select: { id: true, status: true },
+  });
+  if (existing) return { report: existing, duplicate: true };
+
+  const report = await db.report.create({
+    data: {
+      reporterUserId: actor.id,
+      reportedUserId: listing.sellerUserId,
+      relatedMarketplaceListingId: listing.id,
+      type,
+      status: "open",
+      description: [
+        `Marketplace listing "${listing.title}" (${listing.id}).`,
+        listing.genetics ? `Listed genetics: ${listing.genetics}.` : null,
+        note ? `Reporter's note: ${note}` : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    },
+    select: { id: true, status: true },
+  });
+
+  await recordSecurityEvent({
+    type: "marketplace_listing_reported",
+    actorUserId: actor.id,
+    outcome: "success",
+    metadata: { listingId, reportId: report.id, type },
+  });
+
+  return { report, duplicate: false };
 };
 
 export const blockMarketplaceUser = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiRequest, getCurrentUser } from "../../../shared/apiClient";
 
 /**
@@ -12,6 +13,7 @@ import { apiRequest, getCurrentUser } from "../../../shared/apiClient";
  * page all act on the authenticated user (`/auth/me/...`) and take no user id.
  */
 export default function MyAccountPage() {
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,7 +33,9 @@ export default function MyAccountPage() {
         setUser(data?.user || null);
         setEmailForm((prev) => ({ ...prev, email: String(data?.user?.email || "") }));
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load your account."))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("lab.account.loadFailed", { defaultValue: "Unable to load your account." }))
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -50,10 +54,16 @@ export default function MyAccountPage() {
       });
       // The change only takes effect once the new address is confirmed, so the
       // page must not pretend it already has.
-      setMessage("Check your new address for a confirmation link. Your email changes once you confirm it.");
+      setMessage(
+        t("lab.account.emailPending", {
+          defaultValue: "Check your new address for a confirmation link. Your email changes once you confirm it.",
+        })
+      );
       setEmailForm((prev) => ({ ...prev, currentPassword: "" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change your email address.");
+      setError(
+        err instanceof Error ? err.message : t("lab.account.emailFailed", { defaultValue: "Could not change your email address." })
+      );
     } finally {
       setBusy(false);
     }
@@ -62,7 +72,7 @@ export default function MyAccountPage() {
   const submitPassword = async (event) => {
     event.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError("Those passwords do not match.");
+      setError(t("lab.account.passwordMismatch", { defaultValue: "Those passwords do not match." }));
       return;
     }
     setBusy(true);
@@ -76,24 +86,27 @@ export default function MyAccountPage() {
           newPassword: passwordForm.newPassword,
         }),
       });
-      setMessage("Password changed.");
+      setMessage(t("lab.account.passwordChanged", { defaultValue: "Password changed." }));
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change your password.");
+      setError(
+        err instanceof Error ? err.message : t("lab.account.passwordFailed", { defaultValue: "Could not change your password." })
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) return <div className="p-6 text-sm text-neutral-500">Loading…</div>;
+  if (loading) return <div className="p-6 text-sm text-neutral-500">{t("lab.common.loading", { defaultValue: "Loading…" })}</div>;
 
   return (
     <div className="max-w-2xl space-y-8 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">My account</h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">{t("lab.account.title", { defaultValue: "My account" })}</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Your personal sign-in details. Your laboratory's own details live under Laboratory
-          settings.
+          {t("lab.account.subtitle", {
+            defaultValue: "Your personal sign-in details. Your laboratory's own details live under Laboratory settings.",
+          })}
         </p>
       </div>
 
@@ -101,30 +114,37 @@ export default function MyAccountPage() {
       {message ? <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div> : null}
 
       <section className="rounded border border-neutral-200 p-4">
-        <h2 className="text-sm font-semibold text-neutral-900">Signed in as</h2>
+        <h2 className="text-sm font-semibold text-neutral-900">{t("lab.shell.signedInAs", { defaultValue: "Signed in as" })}</h2>
         <dl className="mt-2 space-y-1 text-sm">
           <div className="flex gap-2">
-            <dt className="w-24 text-neutral-500">Name</dt>
+            <dt className="w-24 text-neutral-500">{t("lab.catalog.colName", { defaultValue: "Name" })}</dt>
             <dd>{user?.fullName || "—"}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-24 text-neutral-500">Email</dt>
+            <dt className="w-24 text-neutral-500">{t("lab.team.colEmail", { defaultValue: "Email" })}</dt>
             <dd>{user?.email}</dd>
           </div>
           {user?.pendingEmail ? (
             <div className="flex gap-2">
-              <dt className="w-24 text-neutral-500">Pending</dt>
-              <dd className="text-amber-700">{user.pendingEmail} — awaiting confirmation</dd>
+              <dt className="w-24 text-neutral-500">{t("lab.account.pending", { defaultValue: "Pending" })}</dt>
+              <dd className="text-amber-700">
+                {t("lab.account.pendingEmail", {
+                  defaultValue: "{{email}} — awaiting confirmation",
+                  email: user.pendingEmail,
+                })}
+              </dd>
             </div>
           ) : null}
         </dl>
       </section>
 
       <section className="rounded border border-neutral-200 p-4">
-        <h2 className="text-sm font-semibold text-neutral-900">Change email address</h2>
+        <h2 className="text-sm font-semibold text-neutral-900">
+          {t("lab.account.changeEmailTitle", { defaultValue: "Change email address" })}
+        </h2>
         <form onSubmit={submitEmail} className="mt-3 space-y-3">
           <label className="block text-sm">
-            <span className="text-neutral-700">New email address</span>
+            <span className="text-neutral-700">{t("lab.account.newEmail", { defaultValue: "New email address" })}</span>
             <input
               type="email"
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -134,7 +154,7 @@ export default function MyAccountPage() {
             />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-700">Current password</span>
+            <span className="text-neutral-700">{t("lab.account.currentPassword", { defaultValue: "Current password" })}</span>
             <input
               type="password"
               autoComplete="current-password"
@@ -149,16 +169,18 @@ export default function MyAccountPage() {
             disabled={busy}
             className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            Change email
+            {t("lab.account.changeEmail", { defaultValue: "Change email" })}
           </button>
         </form>
       </section>
 
       <section className="rounded border border-neutral-200 p-4">
-        <h2 className="text-sm font-semibold text-neutral-900">Change password</h2>
+        <h2 className="text-sm font-semibold text-neutral-900">
+          {t("lab.account.changePassword", { defaultValue: "Change password" })}
+        </h2>
         <form onSubmit={submitPassword} className="mt-3 space-y-3">
           <label className="block text-sm">
-            <span className="text-neutral-700">Current password</span>
+            <span className="text-neutral-700">{t("lab.account.currentPassword", { defaultValue: "Current password" })}</span>
             <input
               type="password"
               autoComplete="current-password"
@@ -169,7 +191,7 @@ export default function MyAccountPage() {
             />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-700">New password</span>
+            <span className="text-neutral-700">{t("lab.account.newPassword", { defaultValue: "New password" })}</span>
             <input
               type="password"
               autoComplete="new-password"
@@ -181,7 +203,7 @@ export default function MyAccountPage() {
             />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-700">Confirm new password</span>
+            <span className="text-neutral-700">{t("lab.account.confirmPassword", { defaultValue: "Confirm new password" })}</span>
             <input
               type="password"
               autoComplete="new-password"
@@ -196,7 +218,7 @@ export default function MyAccountPage() {
             disabled={busy}
             className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            Change password
+            {t("lab.account.changePassword", { defaultValue: "Change password" })}
           </button>
         </form>
       </section>

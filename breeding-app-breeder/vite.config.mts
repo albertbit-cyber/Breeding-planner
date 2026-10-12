@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
@@ -128,6 +128,11 @@ export default defineConfig(({ mode }) => {
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
+    // breeding-app-shared is a file: dependency served from its own folder,
+    // outside this app's root; without this the dev server refuses its files.
+    fs: {
+      allow: [searchForWorkspaceRoot(rootDir), resolve(rootDir, "../breeding-app-shared")],
+    },
   },
   preview: {
     port: 4173,

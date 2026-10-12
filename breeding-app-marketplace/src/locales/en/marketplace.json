@@ -9,7 +9,8 @@
     "sell": "List an animal",
     "signIn": "Sign in",
     "skip": "Skip to content",
-    "language": "Language"
+    "language": "Language",
+    "myAnimals": "My animals"
   },
   "footer": {
     "tagline": "Animals listed with their record — weights, feeding, lineage and lab-verified genetics."
@@ -72,7 +73,6 @@
   },
   "browse": {
     "title": "Browse animals",
-    "searchPlaceholder": "Add a gene, morph, breeder or city…",
     "searchLabel": "Search animals",
     "saveSearch": "Save this search",
     "searching": "Searching…",
@@ -83,7 +83,11 @@
     "emptyTitle": "No animals match those filters",
     "emptyBody": "Try widening the price range, removing a gene, or including sold animals as price comparison.",
     "pagination": "Pages",
-    "pageOf": "Page {{page}} of {{total}}"
+    "pageOf": "Page {{page}} of {{total}}",
+    "searchPlaceholderHobby": "Morph, het, breeder or city: “clown”, “het pied”…",
+    "emptyVisualBody": "A bare gene means a visual. Tap the gene again to look for hets instead, widen the price, or save this search and check back.",
+    "catalogueEmptyTitle": "Nothing is listed yet",
+    "catalogueEmptyBody": "No breeder has published an animal yet. Check back soon."
   },
   "filters": {
     "title": "Filters",
@@ -93,11 +97,6 @@
     "apply": "Apply filters",
     "showCount_one": "Show {{count}} animal",
     "showCount_other": "Show {{count}} animals",
-    "genes": "Genes",
-    "genesHint": "Tap once to require a gene, again to rule it out.",
-    "geneIncluded": "Required — tap to rule out",
-    "geneExcluded": "Ruled out — tap to clear",
-    "geneOff": "Tap to require",
     "removeGene": "Remove {{gene}}",
     "without": "no {{gene}}",
     "sex": "Sex",
@@ -121,7 +120,15 @@
     "pickup": "Local pickup",
     "availableOnly": "Available only",
     "includeSold": "Include sold, as price comparison",
-    "showingSold": "Including sold"
+    "showingSold": "Including sold",
+    "geneVisual": "Visual required. Tap for het.",
+    "geneHet": "Het required. Tap to rule out visuals.",
+    "geneVisualExcluded": "Visuals ruled out. Tap to clear.",
+    "geneVisualOff": "Tap to require a visual.",
+    "species": "Species",
+    "allSpecies": "All species",
+    "morphsAndHets": "Morphs and hets",
+    "morphsHint": "Tap once for a visual, twice for a het, three times to rule visuals out. Type “66% het hypo” or “pos het ghost” in the search box for the rest."
   },
   "listing": {
     "untitled": "Untitled listing",
@@ -155,13 +162,22 @@
     "feedingNotes": "Feeding",
     "report": "Report this listing",
     "reportedShort": "Reported",
-    "reported": "Thanks — our moderators will look at this listing."
+    "reported": "Thanks — our moderators will look at this listing.",
+    "reportTitle": "Report this listing",
+    "sendReport": "Send to moderators",
+    "reportWhat": "What's wrong?",
+    "reportNote": "Anything moderators should know (optional)",
+    "reportTypes": {
+      "incorrect_genetics": "The genetics are wrong or overstated",
+      "fake_listing": "The animal or photos aren't real",
+      "scam_suspicion": "Looks like a scam",
+      "animal_welfare_concern": "Animal welfare concern",
+      "other": "Something else"
+    }
   },
   "record": {
     "title": "The record — published by the seller",
-    "geneticsConfirmed": "Genetics confirmed by shed test",
     "certificate": "cert. {{number}}",
-    "verified": "Verified",
     "weights": "Weight history — {{from}} g to {{to}} g over {{count}} entries",
     "feeding_one": "Feeding — {{count}} recorded meal",
     "feeding_other": "Feeding — {{count}} recorded meals",
@@ -173,7 +189,9 @@
     "lineage_other": "Lineage — {{count}} parents recorded",
     "clutch": "clutch {{id}}",
     "kept": "The seller kept private: {{list}}.",
-    "none": "This seller hasn't published any of the animal's record. You can ask them for it before buying."
+    "none": "This seller hasn't published any of the animal's record. You can ask them for it before buying.",
+    "labCertificate": "Lab certificate (shed test)",
+    "checkCertificate": "Check this certificate"
   },
   "seller": {
     "verified": "Verified breeder",
@@ -215,7 +233,11 @@
   "inbox": {
     "needsReply_one": "{{count}} unread",
     "needsReply_other": "{{count}} unread",
-    "filter": { "all": "All", "unread": "Unread", "offers": "Offers" },
+    "filter": {
+      "all": "All",
+      "unread": "Unread",
+      "offers": "Offers"
+    },
     "noThreads": "No conversations yet.",
     "someone": "Marketplace user",
     "pickTitle": "Pick a conversation",
@@ -241,7 +263,21 @@
     "reportTitle": "Report this conversation",
     "reportReason": "What's wrong?",
     "reportPlaceholder": "Scam attempt, abusive language, off-platform payment…",
-    "sendReport": "Send report"
+    "sendReport": "Send report",
+    "unblocked": "Unblocked. You can message each other again.",
+    "nothingToReport": "They haven't written anything yet.",
+    "unblock": "Unblock",
+    "youBlocked": "You blocked {{name}}. Neither of you can send messages here until you unblock them.",
+    "closedThread": "This conversation is closed. New messages can't be sent.",
+    "reportGoesTo": "This goes to the moderators with their last message attached.",
+    "reportWhat": "What's wrong?",
+    "reportNote": "Details (optional)",
+    "reportTypes": {
+      "scam_suspicion": "Scam, or asking to pay off the platform",
+      "abusive_message": "Abusive or threatening",
+      "spam": "Spam",
+      "other": "Something else"
+    }
   },
   "deal": {
     "title": "Where this stands",
@@ -260,12 +296,25 @@
     "acceptedToast": "Offer accepted. The animal is now reserved.",
     "depositOptional": "Deposit received (optional)",
     "depositHint": "Record it here if the buyer has already paid a deposit.",
-    "acceptExplainer": "Accepting an offer marks the animal Reserved and writes the sale record. It stays visible with a Reserved badge until you mark it collected."
+    "acceptExplainer": "Accepting an offer marks the animal Reserved and writes the sale record. It stays visible with a Reserved badge until you mark it collected.",
+    "markHandedOver": "Mark as handed over",
+    "reviewPrompt": "The sale is complete. How did it go with {{name}}?",
+    "reviewed": "You reviewed this sale. It shows on the breeder's store page.",
+    "completeTitle": "Mark this animal as handed over?",
+    "completeConfirm": "Mark handed over",
+    "completedPill": "Sale complete",
+    "completedRecordToast": "Sale complete. The animal and its record are now in the buyer's account.",
+    "completeRecordBody": "The sale is recorded as complete and the listing shows as sold. The buyer receives the animal's record (genetics with their sources, weights, feeding, health, lineage and certificate codes) and is invited to review you. Your own copy stays, marked Sold. This can't be undone here."
   },
   "sell": {
     "title": "List an animal",
     "editTitle": "Edit listing",
-    "step": { "animal": "Choose the animal", "price": "Price & terms", "publish": "What to publish", "review": "Review & publish" },
+    "step": {
+      "animal": "Choose the animal",
+      "price": "Price & terms",
+      "publish": "What to publish",
+      "review": "Review & publish"
+    },
     "pickBody": "Everything you've already logged — photos, weights, feeding, genetics, lineage — comes across with the animal. You choose what stays private in step 3.",
     "searchAnimals": "Search your {{count}} animals…",
     "searchAnimalsLabel": "Search your animals",
@@ -303,7 +352,8 @@
     "saveDraft": "Save as draft",
     "publish": "Publish listing",
     "published": "Listing published.",
-    "savedDraft": "Saved as a draft."
+    "savedDraft": "Saved as a draft.",
+    "categoryPlaceholder": "Juvenile"
   },
   "publish": {
     "title": "What should buyers see?",
@@ -395,19 +445,21 @@
     "noAnimals": "Nothing saved yet",
     "noAnimalsBody": "Tap the heart on any animal to keep it here while you decide.",
     "noSearches": "No saved searches",
-    "noSearchesBody": "Set up the filters you actually want — a gene, a sex, a price ceiling — then save them, and we'll email you when something matches.",
     "startSearch": "Start a search",
     "run": "Run search",
     "remove": "Remove saved search",
     "noFilters": "No filters",
-    "alertNote": "You'll be emailed when a new animal matches.",
     "saveTitle": "Save this search",
-    "saveBody": "We'll email you when an animal matching these filters is listed.",
     "name": "Name this search",
     "save": "Save search",
     "searchDefaultName": "My search",
-    "searchSaved": "Saved. We'll email you when a match is listed.",
-    "searchRemoved": "Saved search removed."
+    "searchRemoved": "Saved search removed.",
+    "searchSavedCount": "Saved. Your Saved page shows how many new animals match each time you look.",
+    "saveBodyCount": "It goes on your Saved page, which shows how many new animals match since you last ran it.",
+    "newCount": "{{count}} new",
+    "matchSummary": "{{count}} match now · {{fresh}} listed since you last ran it.",
+    "matchUnknown": "Run it to see what matches now.",
+    "noSearchesBodyCount": "Set up the filters you actually want — a visual, a het, a sex, a price ceiling — and save them. This page then shows how many new animals match each time you look."
   },
   "reviews": {
     "aria": "Rated {{rating}} out of 5",
@@ -434,11 +486,11 @@
     "favoriteTitle": "Sign in to save this animal",
     "favoriteBody": "We'll keep it in your saved list and bring you straight back here.",
     "messageTitle": "Sign in to message the seller",
-    "messageBody": "Your message is held and sent as soon as you're in.",
+    "messageBody": "We'll bring you back to this animal with your message ready to send.",
     "offerTitle": "Sign in to make an offer",
     "offerBody": "Offers go to the seller with your account attached.",
     "searchTitle": "Sign in to save this search",
-    "searchBody": "We'll email you when an animal matching these filters is listed.",
+    "searchBody": "We'll bring you back to these filters so you can name and save the search.",
     "defaultTitle": "Sign in to continue",
     "defaultBody": "This part of the marketplace needs an account.",
     "sellerTitle": "Selling needs a breeder account",
@@ -447,5 +499,56 @@
   "notFound": {
     "title": "That page isn't here",
     "body": "The listing may have been sold and archived, or the link may be out of date."
+  },
+  "genes": {
+    "none": "The seller has not listed genetics. Ask before buying.",
+    "labDisagrees": "The lab result on the certificate reads “{{result}}”. Ask the seller about this before buying.",
+    "labInconclusive": "Tested, result inconclusive: “{{result}}”.",
+    "labOnly": "Found by the lab; not in the seller's description.",
+    "legendObserved": "Observed: a visual the seller can see.",
+    "legendPredicted": "Predicted: inferred from the parents, not tested.",
+    "legendLab": "Lab-confirmed: on a shed-test certificate.",
+    "title": "Genetics, and where each claim comes from",
+    "hetToken": "het {{gene}}",
+    "posHetToken": "pos het {{gene}}",
+    "visualToken": "visual {{gene}}",
+    "labConfirmedCert": "Lab-confirmed, certificate {{number}}",
+    "labConfirmed": "Lab-confirmed",
+    "predictedPercent": "Predicted from the pairing, {{percent}}% odds",
+    "predicted": "Predicted from the pairing, not tested",
+    "observed": "Observed by the seller, not tested",
+    "het": "het",
+    "possibleHet": "possible het",
+    "super": "visual (super)",
+    "visual": "visual"
+  },
+  "sold": {
+    "title": "Who bought {{title}}?",
+    "body": "The buyer gets the animal's record in their account: genetics with where each claim comes from, weights, feeding, sheds, health entries, lineage and certificates. Your own copy stays, marked Sold.",
+    "confirmOffPlatform": "Mark sold",
+    "confirm": "Mark sold and send the record",
+    "buyer": "Buyer",
+    "offered": "offered {{amount}}",
+    "offPlatform": "Someone without a Serpentora account",
+    "noThreads": "Nobody has messaged you about this animal here, so there is no account to send the record to.",
+    "offPlatformNote": "The listing is marked sold. No record is transferred, because there is no account to receive it.",
+    "price": "Sale price ({{currency}})",
+    "done": "Sold. {{buyer}} now has the animal and its record.",
+    "theBuyer": "The buyer",
+    "doneOffPlatform": "Marked sold.",
+    "bodyNoBuyers": "Only a buyer with a Serpentora account can receive the animal's record."
+  },
+  "acquired": {
+    "from": "Acquired from {{seller}} on {{date}}",
+    "store": "Seller's store",
+    "labDisagrees": "The seller recorded this, but the certificate reads “{{result}}”.",
+    "noGenetics": "No genetics were recorded for this animal.",
+    "certificates": "Lab certificates",
+    "code": "Verification code",
+    "counts": "{{weights}} weights · {{feeds}} feeds · {{sheds}} sheds · {{meds}} health entries",
+    "emptyTitle": "No animals bought here yet",
+    "emptyBody": "When a seller marks an animal sold to you, it arrives here with its record and certificates.",
+    "title": "Animals you bought here",
+    "breederAppNote": "With a breeder account, the same animals appear in your collection in the Serpentora app after it syncs."
   }
 }

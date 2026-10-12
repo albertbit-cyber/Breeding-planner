@@ -380,6 +380,114 @@ This is most useful for:
 - planning housing changes
 - keeping rack occupancy organized
 
+## Breeding Cards
+
+`Breeding → Breeding cards` is the female-centred view of a breeding season. It is the default
+view of the Breeding tab. Each card is one female's breeding cycle and holds everything that
+belongs to it: the candidate males, the actual pairing sessions, the observed locks, the follicle
+examinations, the milestones, the clutch and hatchling outcome, and a small history of her earlier
+cycles.
+
+### What a breeding card and a breeding season mean
+
+- A card is created by the first ACTUAL pairing of a female (the day a male was really put in
+  with her). A planned appointment never creates a card and never counts as a pairing.
+- Every later pairing of that female, with any male, lands on the same card until the card is
+  closed. There is one open card per female.
+- The card's name is the breeding season, shown as `2026–27`. The app proposes it from the year
+  the first pairing happened; you can edit the label on the card. Two cards with the same label
+  stay distinct (they are told apart by their start dates).
+- Roughly six to seven months to hatchlings is a rough expectation, not a timer. Nothing closes
+  automatically.
+
+### Starting, pausing, closing and reopening
+
+- Start: `Record a pairing` (or `Record first pairing` on a female) with an actual date.
+- Pause: `Pause` stops new pairing reminders. Recording a real pairing on a paused card resumes it.
+- Close with hatchlings: `Hatching complete` records the final outcome (final hatch date,
+  hatchlings, unhatched eggs) and completes the cycle. The first hatchling alone never closes a
+  card.
+- Close without hatchlings: `Close card` with a documented outcome (no clutch, failed clutch,
+  cancelled, other with a note).
+- Reopen: `Reopen` on a closed card. The earlier closure stays in the record.
+- The card shows the biological date (final hatch) and the administrative date (when you closed
+  the card) separately.
+
+### Planned pairings, actual sessions and observed locks
+
+Three different things, kept apart on purpose:
+
+- A **planned pairing** is a reminder with a date. It appears in the Calendar and (if enabled in
+  your notification settings) by email. It never counts as a pairing or a lock.
+- A **pairing session** is an actual introduction of a male, with a date and optionally a removal
+  date and times. A session can span days.
+- An **observed lock** is one dated record with status `Lock observed`. Two dated records on two
+  days are two locks. Opening or re-saving the same record never adds a count. `Not observed`
+  means no lock was seen (not proof that mating did not happen); `Unknown` is unknown. Neither
+  counts. If the lock was seen on a different day than the introduction, both dates are stored.
+
+The observed-lock total and the session total are shown separately, for the card and per male.
+
+### Multiple males and unresolved paternity
+
+Tick `Multiple sires` to add more candidate males to the same card. Each male keeps his own
+history (sessions, locks, latest dates). Males are candidate sires until you assign a sire to a
+hatchling with a stated basis (breeder's judgement, DNA test, visual genetics). A lock never
+chooses a father. Turning `Multiple sires` off never deletes history: when two males already have
+sessions, the card keeps the multiple-sire state and tells you why; an unused planned male can be
+removed.
+
+### Fast pairing and follicle entry, pre-pairing scans
+
+- `+ Pairing` opens the quick entry with the female prefilled and the male from the card's last
+  entry, visible and changeable. The date defaults to today and can be backdated. The lock
+  question is `Yes / Not observed / Unknown` and is never pre-answered.
+- `+ Follicle exam` records an ultrasound, a palpation (saved as an estimate) or an external
+  observation (which cannot carry a measured diameter). A result like `Not visualized` or
+  `Inconclusive` needs no number. Images and short videos can be attached as evidence for your
+  own review; the app never measures or diagnoses from them.
+- A scan recorded before the first pairing stays with the female and joins her card when the
+  card is created, keeping its original date. The chart shows it as a negative day.
+- `Scan walk: save and next female` and `Pairing walk: save and next female` in Follicle tracking
+  move through your females without carrying measurements or lock answers over.
+
+### History metrics, medians, sample sizes and missing data
+
+`Previous breeding cycles` on each card lists her earlier cards, most recent first, and shows a
+statistics table: for each metric the median ("typical") with the shortest–longest range and
+the number of cycles that metric is based on. One prior cycle is labelled as one prior cycle. No
+history gives an empty state. Clutch-size statistics use laid clutches only; cycles without a
+clutch are listed separately and never counted as zero eggs. Only exact, recorded milestone dates
+feed the statistics; estimated or suspected dates are shown but left out. Conflicting dates are
+flagged and excluded from the affected interval, never turned into a negative number.
+
+### Reminder behaviour and date editing
+
+An observed lock proposes the next pairing with that male exactly one calendar month later
+(1 March → 1 April; 31 January → 28 or 29 February). You can move, skip or cancel it. A date you
+moved yourself is never overwritten by a later lock. Recorded ovulation cancels automatic pairing
+proposals (your own planned entries are left for review). Paused and closed cards get no new
+reminders. Backfilled history never creates past-due reminders. Reminders exist only in the
+Calendar and, when enabled, by email.
+
+### Recording complete clutch outcomes
+
+`Clutch` records the laying date and the egg counts (total, fertile, slugs). `Hatching` records
+the first hatch and the running hatchling count while the card stays open. `Hatching complete`
+records the final hatch, the final hatchling count and unhatched or lost eggs, and completes the
+cycle. `Create hatchling records` uses the normal hatch wizard; retries never duplicate
+hatchlings.
+
+### Trends and forecasts: meaning and limits
+
+A single scan is a measurement. Two comparable scans (same method, at least one day apart) give
+a change in millimetres and a per-day rate. A lower reading suggests a review; the app never
+diagnoses regression. Expected windows are built from this female's own completed cycles when
+enough exist (three by default, adjustable in `Review settings`), otherwise from the same-species
+collection history, otherwise from a documented species reference where one exists. Each window
+names its source, sample count and anchor. The range is a historical range, not a confidence
+interval. There are no learned models and no automated image interpretation.
+
 ## Breeding Planner
 
 The `Breeding Planner` section manages pairings and the breeding cycle.

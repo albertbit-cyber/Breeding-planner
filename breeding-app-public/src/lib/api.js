@@ -28,3 +28,14 @@ export function loginUser({ email, password }) {
 export function getPublicTiers() {
   return req('/api/subscriptions/public/tiers');
 }
+
+// Public and cookie-free on purpose: a buyer checking a certificate has no
+// account, and a plain GET with no custom headers needs no CORS preflight.
+export async function verifyCertificate(code) {
+  const res = await fetch(`${BASE}/api/public/certificates/verify/${encodeURIComponent(code)}`, {
+    credentials: 'omit',
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...body };
+  return body;
+}

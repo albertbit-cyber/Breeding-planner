@@ -1,15 +1,16 @@
 {
   "nav": {
     "market": "Markt",
-    "primary": "Marktplaats",
+    "primary": "Marketplace",
     "browse": "Bekijken",
     "saved": "Bewaard",
     "inbox": "Berichten",
     "dashboard": "Verkopen",
     "sell": "Dier plaatsen",
-    "signIn": "Inloggen",
+    "signIn": "Aanmelden",
     "skip": "Naar de inhoud",
-    "language": "Taal"
+    "language": "Taal",
+    "myAnimals": "Mijn dieren"
   },
   "footer": {
     "tagline": "Dieren met hun dossier — gewichten, voeding, afstamming en labgetoetste genetica."
@@ -32,8 +33,8 @@
     "favorite": "De bewaarlijst kon niet worden bijgewerkt."
   },
   "sex": {
-    "female": "Vrouw",
-    "male": "Man",
+    "female": "Vrouwtje",
+    "male": "Mannetje",
     "unknown": "Onbekend"
   },
   "availability": {
@@ -72,7 +73,6 @@
   },
   "browse": {
     "title": "Dieren bekijken",
-    "searchPlaceholder": "Voeg een gen, morph, kweker of stad toe …",
     "searchLabel": "Dieren zoeken",
     "saveSearch": "Zoekopdracht bewaren",
     "searching": "Zoeken …",
@@ -83,7 +83,11 @@
     "emptyTitle": "Geen dier past bij deze filters",
     "emptyBody": "Verruim de prijsklasse, haal een gen weg, of neem verkochte dieren mee als prijsvergelijking.",
     "pagination": "Pagina's",
-    "pageOf": "Pagina {{page}} van {{total}}"
+    "pageOf": "Pagina {{page}} van {{total}}",
+    "searchPlaceholderHobby": "Morph, het, kweker of plaats: “clown”, “het pied”…",
+    "emptyVisualBody": "Een los gen betekent een visual. Tik nogmaals op het gen om in plaats daarvan naar hets te zoeken, verruim de prijs, of bewaar deze zoekopdracht en kijk later nog eens.",
+    "catalogueEmptyTitle": "Er staat nog niets online",
+    "catalogueEmptyBody": "Nog geen enkele kweker heeft een dier gepubliceerd. Kijk binnenkort nog eens."
   },
   "filters": {
     "title": "Filters",
@@ -93,11 +97,6 @@
     "apply": "Filters toepassen",
     "showCount_one": "Toon {{count}} dier",
     "showCount_other": "Toon {{count}} dieren",
-    "genes": "Genen",
-    "genesHint": "Eén tik om een gen te eisen, nog een tik om het uit te sluiten.",
-    "geneIncluded": "Vereist — tik om uit te sluiten",
-    "geneExcluded": "Uitgesloten — tik om te wissen",
-    "geneOff": "Tik om te eisen",
     "removeGene": "{{gene}} verwijderen",
     "without": "geen {{gene}}",
     "sex": "Geslacht",
@@ -121,7 +120,15 @@
     "pickup": "Afhalen",
     "availableOnly": "Alleen beschikbaar",
     "includeSold": "Verkochte tonen als prijsvergelijking",
-    "showingSold": "Inclusief verkocht"
+    "showingSold": "Inclusief verkocht",
+    "geneVisual": "Moet visual zijn. Tik voor het.",
+    "geneHet": "Moet het zijn. Tik om visuals uit te sluiten.",
+    "geneVisualExcluded": "Visuals uitgesloten. Tik om te wissen.",
+    "geneVisualOff": "Tik om een visual te vereisen.",
+    "species": "Soort",
+    "allSpecies": "Alle soorten",
+    "morphsAndHets": "Morphs en hets",
+    "morphsHint": "Tik één keer voor een visual, twee keer voor een het, drie keer om visuals uit te sluiten. Typ “66% het hypo” of “pos het ghost” in het zoekvak voor de rest."
   },
   "listing": {
     "untitled": "Advertentie zonder titel",
@@ -155,13 +162,22 @@
     "feedingNotes": "Voeding",
     "report": "Deze advertentie melden",
     "reportedShort": "Gemeld",
-    "reported": "Bedankt — onze moderatoren kijken ernaar."
+    "reported": "Bedankt — onze moderatoren kijken ernaar.",
+    "reportTitle": "Deze advertentie melden",
+    "sendReport": "Naar moderatoren sturen",
+    "reportWhat": "Wat is er mis?",
+    "reportNote": "Wat moderatoren moeten weten (optioneel)",
+    "reportTypes": {
+      "incorrect_genetics": "De genetica klopt niet of is overdreven",
+      "fake_listing": "Het dier of de foto's zijn niet echt",
+      "scam_suspicion": "Lijkt op oplichting",
+      "animal_welfare_concern": "Zorgen over dierenwelzijn",
+      "other": "Iets anders"
+    }
   },
   "record": {
     "title": "Het dossier — gepubliceerd door de verkoper",
-    "geneticsConfirmed": "Genetica bevestigd met een vervellingstest",
     "certificate": "cert. {{number}}",
-    "verified": "Bevestigd",
     "weights": "Gewichtsverloop — {{from}} g tot {{to}} g over {{count}} metingen",
     "feeding_one": "Voeding — {{count}} geregistreerde maaltijd",
     "feeding_other": "Voeding — {{count}} geregistreerde maaltijden",
@@ -171,9 +187,11 @@
     "noRefusals": "geen weigeringen geregistreerd",
     "lineage_one": "Afstamming — {{count}} ouderdier vastgelegd",
     "lineage_other": "Afstamming — {{count}} ouderdieren vastgelegd",
-    "clutch": "legsel {{id}}",
+    "clutch": "nest {{id}}",
     "kept": "Niet gepubliceerd: {{list}}.",
-    "none": "Deze verkoper heeft niets uit het dossier gepubliceerd. Vraag ernaar voordat je koopt."
+    "none": "Deze verkoper heeft niets uit het dossier gepubliceerd. Vraag ernaar voordat je koopt.",
+    "labCertificate": "Labcertificaat (vervellingstest)",
+    "checkCertificate": "Dit certificaat controleren"
   },
   "seller": {
     "verified": "Geverifieerde kweker",
@@ -221,7 +239,7 @@
       "offers": "Biedingen"
     },
     "noThreads": "Nog geen gesprekken.",
-    "someone": "Marktplaatsgebruiker",
+    "someone": "Marketplace-gebruiker",
     "pickTitle": "Kies een gesprek",
     "pickBody": "Berichten over een dier, de biedingen erop en de stand van de deal staan in één gesprek.",
     "backToList": "Terug naar de gesprekken",
@@ -245,7 +263,21 @@
     "reportTitle": "Dit gesprek melden",
     "reportReason": "Wat is er mis?",
     "reportPlaceholder": "Oplichting, beledigende taal, betaling buiten het platform …",
-    "sendReport": "Melding sturen"
+    "sendReport": "Melding sturen",
+    "unblocked": "Gedeblokkeerd. Jullie kunnen elkaar weer berichten sturen.",
+    "nothingToReport": "Ze hebben nog niets geschreven.",
+    "unblock": "Deblokkeren",
+    "youBlocked": "Je hebt {{name}} geblokkeerd. Geen van jullie kan hier berichten sturen tot je de blokkade opheft.",
+    "closedThread": "Dit gesprek is gesloten. Er kunnen geen nieuwe berichten worden verstuurd.",
+    "reportGoesTo": "Dit gaat naar de moderatoren, met hun laatste bericht als bijlage.",
+    "reportWhat": "Wat is er mis?",
+    "reportNote": "Details (optioneel)",
+    "reportTypes": {
+      "scam_suspicion": "Oplichting, of vraagt om buiten het platform te betalen",
+      "abusive_message": "Beledigend of bedreigend",
+      "spam": "Spam",
+      "other": "Iets anders"
+    }
   },
   "deal": {
     "title": "Stand van de deal",
@@ -264,7 +296,15 @@
     "acceptedToast": "Bod geaccepteerd. Het dier is nu gereserveerd.",
     "depositOptional": "Ontvangen aanbetaling (optioneel)",
     "depositHint": "Vul dit in als de koper al een aanbetaling heeft gedaan.",
-    "acceptExplainer": "Een geaccepteerd bod zet het dier op Gereserveerd en legt de verkoop vast. Het blijft zichtbaar met een label Gereserveerd tot je het als opgehaald markeert."
+    "acceptExplainer": "Een geaccepteerd bod zet het dier op Gereserveerd en legt de verkoop vast. Het blijft zichtbaar met een label Gereserveerd tot je het als opgehaald markeert.",
+    "markHandedOver": "Als overgedragen markeren",
+    "reviewPrompt": "De verkoop is afgerond. Hoe ging het met {{name}}?",
+    "reviewed": "Je hebt deze verkoop beoordeeld. Het staat op de winkelpagina van de kweker.",
+    "completeTitle": "Dit dier als overgedragen markeren?",
+    "completeConfirm": "Overgedragen markeren",
+    "completedPill": "Verkoop afgerond",
+    "completedRecordToast": "Verkoop afgerond. Het dier en zijn dossier staan nu in het account van de koper.",
+    "completeRecordBody": "De verkoop wordt als afgerond vastgelegd en de advertentie staat als verkocht. De koper ontvangt het dossier van het dier (genetica met bronnen, gewichten, voeding, gezondheid, afstamming en certificaatcodes) en wordt uitgenodigd om jou te beoordelen. Je eigen kopie blijft bestaan, gemarkeerd als Verkocht. Dit kan hier niet ongedaan worden gemaakt."
   },
   "sell": {
     "title": "Dier plaatsen",
@@ -312,7 +352,8 @@
     "saveDraft": "Opslaan als concept",
     "publish": "Advertentie plaatsen",
     "published": "Advertentie geplaatst.",
-    "savedDraft": "Opgeslagen als concept."
+    "savedDraft": "Opgeslagen als concept.",
+    "categoryPlaceholder": "Juveniel"
   },
   "publish": {
     "title": "Wat moeten kopers zien?",
@@ -330,8 +371,8 @@
     "showFeedingHistory": "Voedingsgeschiedenis",
     "showFeedingHistoryWhy": "De vraag die kopers het vaakst stellen",
     "showFeedingHistoryShort": "de voedingsgeschiedenis",
-    "showLineage": "Afstamming — vader, moeder en legsel",
-    "showLineageWhy": "Kopers kunnen het dier via je legsels terugvolgen",
+    "showLineage": "Afstamming — vader, moeder en nest",
+    "showLineageWhy": "Kopers kunnen het dier via je nesten terugvolgen",
     "showLineageShort": "de afstamming",
     "showParents": "Ouderdieren",
     "showAnimalId": "Jouw dier-ID",
@@ -404,19 +445,21 @@
     "noAnimals": "Nog niets bewaard",
     "noAnimalsBody": "Tik op het hartje bij een dier om het hier te bewaren terwijl je nadenkt.",
     "noSearches": "Geen bewaarde zoekopdrachten",
-    "noSearchesBody": "Stel de filters in die je echt wilt — een gen, een geslacht, een prijsplafond — bewaar ze, en we mailen je zodra er iets past.",
     "startSearch": "Begin een zoekopdracht",
     "run": "Zoekopdracht uitvoeren",
     "remove": "Bewaarde zoekopdracht verwijderen",
     "noFilters": "Geen filters",
-    "alertNote": "Je krijgt een mail zodra een nieuw dier past.",
     "saveTitle": "Deze zoekopdracht bewaren",
-    "saveBody": "We mailen je zodra er een dier wordt geplaatst dat bij deze filters past.",
     "name": "Geef deze zoekopdracht een naam",
     "save": "Zoekopdracht bewaren",
     "searchDefaultName": "Mijn zoekopdracht",
-    "searchSaved": "Bewaard. We mailen je zodra er iets past.",
-    "searchRemoved": "Bewaarde zoekopdracht verwijderd."
+    "searchRemoved": "Bewaarde zoekopdracht verwijderd.",
+    "searchSavedCount": "Bewaard. Je pagina Bewaard toont elke keer dat je kijkt hoeveel nieuwe dieren erbij passen.",
+    "saveBodyCount": "Hij komt op je pagina Bewaard, die laat zien hoeveel nieuwe dieren erbij passen sinds je hem voor het laatst uitvoerde.",
+    "newCount": "{{count}} nieuw",
+    "matchSummary": "{{count}} passen er nu · {{fresh}} geplaatst sinds je hem voor het laatst uitvoerde.",
+    "matchUnknown": "Voer hem uit om te zien wat er nu bij past.",
+    "noSearchesBodyCount": "Stel de filters in die je echt wilt — een visual, een het, een geslacht, een maximumprijs — en bewaar ze. Deze pagina toont dan elke keer dat je kijkt hoeveel nieuwe dieren erbij passen."
   },
   "reviews": {
     "aria": "Beoordeeld met {{rating}} van 5",
@@ -428,33 +471,84 @@
     "yourWords": "In je eigen woorden",
     "placeholder": "Hoe waren de communicatie, de juistheid van de advertentie en de conditie van het dier?",
     "none": "Nog geen beoordelingen",
-    "noneBody": "Kopers kunnen beoordelen zodra een verkoop via de marktplaats is afgerond.",
+    "noneBody": "Kopers kunnen beoordelen zodra een verkoop via de Marketplace is afgerond.",
     "nonePending": "Niets te beoordelen",
-    "nonePendingBody": "Zodra een aankoop via de marktplaats is afgerond, kun je de kweker hier beoordelen.",
+    "nonePendingBody": "Zodra een aankoop via de Marketplace is afgerond, kun je de kweker hier beoordelen.",
     "write": "Beoordeling schrijven",
     "writeTitle": "Deze kweker beoordelen",
     "publish": "Beoordeling plaatsen",
     "thanks": "Bedankt — je beoordeling staat online."
   },
   "gate": {
-    "signIn": "Inloggen",
+    "signIn": "Aanmelden",
     "backToBrowse": "Terug naar het overzicht",
     "browsingIsFree": "Bekijken, filteren en elke advertentie openen blijft gratis — zonder account.",
     "favoriteTitle": "Log in om dit dier te bewaren",
     "favoriteBody": "We bewaren het in je lijst en brengen je meteen hierheen terug.",
     "messageTitle": "Log in om de verkoper te berichten",
-    "messageBody": "Je bericht wordt bewaard en verstuurd zodra je binnen bent.",
     "offerTitle": "Log in om een bod te doen",
     "offerBody": "Biedingen gaan met je account naar de verkoper.",
     "searchTitle": "Log in om deze zoekopdracht te bewaren",
-    "searchBody": "We mailen je zodra er een dier wordt geplaatst dat bij deze filters past.",
     "defaultTitle": "Log in om verder te gaan",
-    "defaultBody": "Voor dit deel van de marktplaats heb je een account nodig.",
+    "defaultBody": "Voor dit deel van de Marketplace heb je een account nodig.",
     "sellerTitle": "Verkopen vraagt een kwekersaccount",
-    "sellerBody": "Je bent ingelogd, maar dit account kan geen dieren plaatsen. Vraag een beheerder om het aan te zetten, of gebruik je kwekersaccount."
+    "sellerBody": "Je bent ingelogd, maar dit account kan geen dieren plaatsen. Vraag een beheerder om het aan te zetten, of gebruik je kwekersaccount.",
+    "messageBody": "We brengen je terug naar dit dier, met je bericht klaar om te versturen.",
+    "searchBody": "We brengen je terug naar deze filters, zodat je de zoekopdracht een naam kunt geven en bewaren."
   },
   "notFound": {
     "title": "Die pagina bestaat niet",
     "body": "De advertentie is misschien verkocht en gearchiveerd, of de link is verouderd."
+  },
+  "genes": {
+    "none": "De verkoper heeft geen genetica vermeld. Vraag ernaar voordat je koopt.",
+    "labDisagrees": "Het labresultaat op het certificaat zegt “{{result}}”. Vraag de verkoper hiernaar voordat je koopt.",
+    "labInconclusive": "Getest, resultaat niet eenduidig: “{{result}}”.",
+    "labOnly": "Gevonden door het lab; staat niet in de beschrijving van de verkoper.",
+    "legendObserved": "Waargenomen: een visual die de verkoper kan zien.",
+    "legendPredicted": "Voorspeld: afgeleid uit de ouders, niet getest.",
+    "legendLab": "Labgetoetst: op een certificaat van een vervellingstest.",
+    "title": "Genetica, en waar elke bewering vandaan komt",
+    "hetToken": "het {{gene}}",
+    "posHetToken": "pos het {{gene}}",
+    "visualToken": "visual {{gene}}",
+    "labConfirmedCert": "Labgetoetst, certificaat {{number}}",
+    "labConfirmed": "Labgetoetst",
+    "predictedPercent": "Voorspeld uit de koppeling, {{percent}}% kans",
+    "predicted": "Voorspeld uit de koppeling, niet getest",
+    "observed": "Waargenomen door de verkoper, niet getest",
+    "het": "het",
+    "possibleHet": "possible het",
+    "super": "visual (super)",
+    "visual": "visual"
+  },
+  "sold": {
+    "title": "Wie heeft {{title}} gekocht?",
+    "body": "De koper krijgt het dossier van het dier in zijn account: genetica met de herkomst van elke bewering, gewichten, voeding, vervellingen, gezondheidsnotities, afstamming en certificaten. Je eigen kopie blijft bestaan, gemarkeerd als Verkocht.",
+    "confirmOffPlatform": "Markeer als verkocht",
+    "confirm": "Als verkocht markeren en dossier versturen",
+    "buyer": "Koper",
+    "offered": "bood {{amount}}",
+    "offPlatform": "Iemand zonder Serpentora-account",
+    "noThreads": "Niemand heeft je hier over dit dier een bericht gestuurd, dus er is geen account om het dossier naartoe te sturen.",
+    "offPlatformNote": "De advertentie is als verkocht gemarkeerd. Er wordt geen dossier overgedragen, omdat er geen account is om het te ontvangen.",
+    "price": "Verkoopprijs ({{currency}})",
+    "done": "Verkocht. {{buyer}} heeft nu het dier en zijn dossier.",
+    "theBuyer": "De koper",
+    "doneOffPlatform": "Als verkocht gemarkeerd.",
+    "bodyNoBuyers": "Alleen een koper met een Serpentora-account kan het dossier van het dier ontvangen."
+  },
+  "acquired": {
+    "from": "Gekocht van {{seller}} op {{date}}",
+    "store": "Winkel van de verkoper",
+    "labDisagrees": "De verkoper heeft dit vastgelegd, maar het certificaat zegt “{{result}}”.",
+    "noGenetics": "Er is geen genetica vastgelegd voor dit dier.",
+    "certificates": "Labcertificaten",
+    "code": "Verificatiecode",
+    "counts": "{{weights}} gewichten · {{feeds}} voedingen · {{sheds}} vervellingen · {{meds}} gezondheidsnotities",
+    "emptyTitle": "Hier nog geen dieren gekocht",
+    "emptyBody": "Als een verkoper een dier als aan jou verkocht markeert, komt het hier binnen met zijn dossier en certificaten.",
+    "title": "Dieren die je hier hebt gekocht",
+    "breederAppNote": "Met een kwekersaccount verschijnen dezelfde dieren na het synchroniseren in je collectie in de Serpentora-app."
   }
 }

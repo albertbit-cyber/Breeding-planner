@@ -1,5 +1,7 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useSharedBackend } from "../contexts/SharedBackendContext.jsx";
+import { backendMessageText } from "./backendMessageText.js";
 
 const guardTone = {
   checking: "border-sky-200 bg-sky-50 text-sky-800",
@@ -10,10 +12,11 @@ const guardTone = {
 };
 
 export default function SharedBackendGuard({
-  featureName = "This feature",
+  featureName,
   children,
   fallback = null,
 }) {
+  const { t } = useTranslation();
   const { snapshot, retry, sharedFeaturesEnabled } = useSharedBackend();
 
   if (sharedFeaturesEnabled) {
@@ -26,10 +29,18 @@ export default function SharedBackendGuard({
 
   return (
     <div className={`rounded-2xl border p-4 text-sm ${guardTone[snapshot.state] || guardTone.checking}`}>
-      <div className="font-semibold">{featureName} is blocked</div>
-      <div className="mt-1">{snapshot.message || "Shared backend access is required for this feature."}</div>
+      <div className="font-semibold">
+        {t("auth:sharedBackend.featureBlocked", {
+          defaultValue: "{{feature}} is blocked",
+          feature: featureName || t("auth:sharedBackend.thisFeature", { defaultValue: "This feature" }),
+        })}
+      </div>
+      <div className="mt-1">
+        {backendMessageText(t, snapshot.message) ||
+          t("auth:sharedBackend.accessRequired", { defaultValue: "Shared backend access is required for this feature." })}
+      </div>
       <button type="button" className="mt-3 rounded-lg border border-current/25 bg-white/70 px-3 py-1.5 text-xs" onClick={retry}>
-        Retry backend check
+        {t("auth:sharedBackend.retryCheck", { defaultValue: "Retry backend check" })}
       </button>
     </div>
   );

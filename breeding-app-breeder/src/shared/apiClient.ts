@@ -1,4 +1,4 @@
-import { DEFAULT_SHARED_API_TIMEOUT_MS, getSharedApiConfig } from "./config/api";
+import { DEFAULT_SHARED_API_TIMEOUT_MS, getSharedApiConfig } from "./apiConfig";
 import {
   type SharedBackendState,
   getSharedBackendSnapshot,
@@ -1021,18 +1021,6 @@ export const saveMyBreederProfile = async (payload: BreederProfilePayload) =>
 export const fetchMarketplaceProfiles = async () =>
   request<{ profiles: unknown[] }>("/profiles/marketplace");
 
-export const fetchMyListings = async () =>
-  request<{ listings: unknown[] }>("/listings/me");
-
-export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
-  request<{ listings: unknown[] }>("/listings/me", {
-    method: "PUT",
-    body: JSON.stringify({ listings }),
-  });
-
-export const fetchMarketplaceListings = async () =>
-  request<{ listings: unknown[] }>("/listings/marketplace");
-
 export const fetchMarketplaceCatalog = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -1122,18 +1110,6 @@ export const createMarketplaceReview = async (payload: Record<string, unknown>) 
 export const fetchAdminMarketplace = async () =>
   request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");
 
-export const fetchModerationListings = async () =>
-  request<{ listings: unknown[] }>("/listings/moderation");
-
-export const fetchModerationAudit = async () =>
-  request<{ audits: unknown[] }>("/listings/moderation/audit");
-
-export const updateListingStatus = async (id: string, status: string, note = "") =>
-  request<{ listing: unknown }>(`/listings/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status, note }),
-  });
-
 export const fetchSavedSearches = async () =>
   request<{ searches: unknown[] }>("/searches");
 
@@ -1196,6 +1172,28 @@ export const changeMySubscription = async (tierId: string) =>
     method: "PATCH",
     body: JSON.stringify({ tierId }),
   });
+
+export type BillingStatus = {
+  configured: boolean;
+  mode: "test" | "live" | "off";
+  message: string;
+  purchasableTierKeys: string[];
+  foundingMember: boolean;
+  hasBillingAccount: boolean;
+  hasActivePaidSubscription: boolean;
+};
+
+export const fetchBillingStatus = async () => request<BillingStatus>("/billing/status");
+
+/** Returns Stripe's hosted checkout URL; the plan changes only when Stripe's webhook confirms payment. */
+export const createBillingCheckout = async (tierKey: string) =>
+  request<{ url: string; mode: string; founding: boolean }>("/billing/checkout-session", {
+    method: "POST",
+    body: JSON.stringify({ tierKey }),
+  });
+
+export const createBillingPortal = async () =>
+  request<{ url: string }>("/billing/portal-session", { method: "POST" });
 
 export const fetchSubscriptionTiers = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();

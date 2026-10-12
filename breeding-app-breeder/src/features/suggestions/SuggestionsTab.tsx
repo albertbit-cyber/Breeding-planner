@@ -484,7 +484,7 @@ const GeneTagRow = ({ label, tokens }) => {
   if (!list.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-600">
-      <span className="uppercase tracking-wide text-[10px] text-neutral-500 mr-1">{label}:</span>
+      <span className="uppercase tracking-wide text-[10px] text-neutral-500 me-1">{label}:</span>
       {list.map((token) => (
         <span
           key={`${label}-${token}`}
@@ -1071,14 +1071,14 @@ export const SuggestionsTab = ({
               className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-50"
               onClick={() => onPlanSuggestion?.(suggestion)}
             >
-              {t("advisor.cards.actions.plan", { defaultValue: "Convert to Plan" })}
+              {t("advisor.cards.actions.plan", { defaultValue: "Make a plan" })}
             </button>
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
               onClick={() => openFlowchartCard(suggestion)}
             >
-              {t("advisor.cards.actions.showPlan", { defaultValue: "Show Breeding Plan" })}
+              {t("advisor.cards.actions.showPlan", { defaultValue: "Show plan" })}
             </button>
             <button
               type="button"
@@ -1096,7 +1096,7 @@ export const SuggestionsTab = ({
               <button
                 type="button"
                 onClick={togglePlanExpanded}
-                className="flex w-full items-center justify-between text-left"
+                className="flex w-full items-center justify-between text-start"
                 aria-expanded={isPlanExpanded}
               >
                 <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">

@@ -24,6 +24,9 @@ vi.mock("../lib/prisma", () => {
   const organization = {
     create: vi.fn().mockResolvedValue({ id: "org_user-1", kind: "breeder" }),
   };
+  // Registration also puts the account on the Free tier in that transaction.
+  const subscriptionTier = { findFirst: vi.fn().mockResolvedValue(null) };
+  const userSubscription = { create: vi.fn().mockResolvedValue({ id: "sub-1" }) };
   return {
     prisma: {
       user,
@@ -38,8 +41,10 @@ vi.mock("../lib/prisma", () => {
       accountToken,
       membership,
       organization,
+      subscriptionTier,
+      userSubscription,
       $transaction: vi.fn((callback: (tx: unknown) => unknown) =>
-        callback({ accountToken, user, membership, organization })
+        callback({ accountToken, user, membership, organization, subscriptionTier, userSubscription })
       ),
     },
   };
@@ -117,6 +122,46 @@ describe("POST /api/auth/register", () => {
       templateKey: "account_email_verification",
       category: "account_and_security",
     }));
+  });
+
+  it("puts a new account on the Free tier so its limits and My Account tier are known", async () => {
+    const newUser = { ...mockUser, id: "user-new", email: "keeper@example.com", emailVerified: false, emailVerifiedAt: null };
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue(newUser);
+    vi.mocked((prisma as any).subscriptionTier.findFirst).mockResolvedValue({ id: "tier-free", key: "free", name: "Free" });
+
+    const res = await request(app).post("/api/auth/register").send({
+      email: "keeper@example.com",
+      password: "password123",
+      fullName: "Keeper",
+    });
+
+    expect(res.status).toBe(201);
+    expect((prisma as any).subscriptionTier.findFirst).toHaveBeenCalledWith({
+      where: { key: "free", isActive: true, archivedAt: null },
+    });
+    expect((prisma as any).userSubscription.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: "user-new", tierId: "tier-free", status: "active", paymentStatus: "none" }),
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user-new" },
+      data: expect.objectContaining({ subscriptionPlan: "free", subscriptionStatus: "active" }),
+    });
+  });
+
+  it("still registers when the tier catalogue has no Free tier", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue({ ...mockUser, email: "early@example.com", emailVerified: false });
+    vi.mocked((prisma as any).subscriptionTier.findFirst).mockResolvedValue(null);
+
+    const res = await request(app).post("/api/auth/register").send({
+      email: "early@example.com",
+      password: "password123",
+      fullName: "Early Keeper",
+    });
+
+    expect(res.status).toBe(201);
+    expect((prisma as any).userSubscription.create).not.toHaveBeenCalled();
   });
 
   it("allows public buyer registration", async () => {

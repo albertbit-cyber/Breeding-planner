@@ -137,7 +137,7 @@ const SnakeNode = ({ data }) => {
 
       {/* Hatch year if available */}
       {snake.hatchDate && (
-        <div className="mt-1 text-[9px] text-neutral-400 text-right font-mono">
+        <div className="mt-1 text-[9px] text-neutral-400 text-end font-mono">
           {snake.hatchDate.slice(0, 4)}
         </div>
       )}

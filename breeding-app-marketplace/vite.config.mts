@@ -92,6 +92,8 @@ export default defineConfig({
       "**/.{idea,git,cache,output,temp}/**",
       "server/**",
       "src/genetics/punnett.test.ts",
+      // Playwright specs; `npm run test:e2e` runs them, vitest cannot.
+      "tests/e2e/**",
     ],
   },
   resolve: {

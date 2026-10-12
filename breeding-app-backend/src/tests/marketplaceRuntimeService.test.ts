@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/prisma", () => ({
   prisma: {
     marketplaceListing: { findUnique: vi.fn() },
+    report: { create: vi.fn(), findFirst: vi.fn() },
     marketplaceMedia: { create: vi.fn(), findMany: vi.fn() },
     marketplaceMessage: { findUnique: vi.fn() },
     marketplaceMessageReport: { create: vi.fn() },
@@ -23,6 +24,7 @@ import { prisma } from "../lib/prisma";
 import {
   blockMarketplaceUser,
   createMarketplaceMediaUpload,
+  reportMarketplaceListing,
   reportMarketplaceMessage,
   unblockMarketplaceUser,
 } from "../services/marketplaceRuntimeService";
@@ -100,11 +102,14 @@ describe("marketplaceRuntimeService", () => {
     })).rejects.toThrow("You cannot upload media to this listing.");
   });
 
-  it("reports a marketplace message when the actor belongs to the conversation", async () => {
+  it("reports a marketplace message into the admin moderation queue", async () => {
     vi.mocked((prisma as any).marketplaceMessage.findUnique).mockResolvedValue({
       id: "message-1",
       conversationId: "conversation-1",
+      senderUserId: "buyer-1",
+      messageText: "Pay me outside the platform",
       conversation: {
+        listingId: "listing-1",
         buyerUserId: "buyer-1",
         sellerUserId: "breeder-1",
       },
@@ -116,9 +121,63 @@ describe("marketplaceRuntimeService", () => {
       reason: "spam",
       status: "open",
     });
+    vi.mocked((prisma as any).report.create).mockResolvedValue({ id: "case-1" });
 
-    await expect(reportMarketplaceMessage(breederActor, "message-1", { reason: "spam" }))
-      .resolves.toMatchObject({ report: { id: "report-1", status: "open" } });
+    await expect(reportMarketplaceMessage(breederActor, "message-1", { type: "scam_suspicion", reason: "spam" }))
+      .resolves.toMatchObject({ report: { id: "report-1", status: "open", moderationReportId: "case-1" } });
+
+    // The case a moderator sees: typed, pointing at the sender and the message.
+    expect((prisma as any).report.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        reporterUserId: "breeder-1",
+        reportedUserId: "buyer-1",
+        relatedMessageId: "message-1",
+        type: "scam_suspicion",
+        status: "open",
+        description: expect.stringContaining("Pay me outside the platform"),
+      }),
+    });
+  });
+
+  it("refuses a report on your own message", async () => {
+    vi.mocked((prisma as any).marketplaceMessage.findUnique).mockResolvedValue({
+      id: "message-1",
+      senderUserId: "breeder-1",
+      conversation: { buyerUserId: "buyer-1", sellerUserId: "breeder-1" },
+    });
+    await expect(reportMarketplaceMessage(breederActor, "message-1", { reason: "spam" })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect((prisma as any).report.create).not.toHaveBeenCalled();
+  });
+
+  it("files a listing report against the seller, once per reporter", async () => {
+    const buyer = { id: "buyer-1", role: "buyer" } as any;
+    vi.mocked((prisma as any).marketplaceListing.findUnique).mockResolvedValue({
+      id: "listing-1",
+      title: "Clown het Pied",
+      sellerUserId: "breeder-1",
+      genetics: "Clown, het Pied",
+    });
+    vi.mocked((prisma as any).report.findFirst).mockResolvedValueOnce(null);
+    vi.mocked((prisma as any).report.create).mockResolvedValue({ id: "case-2", status: "open" });
+
+    await expect(reportMarketplaceListing(buyer, "listing-1", { type: "incorrect_genetics", note: "Not a clown" }))
+      .resolves.toEqual({ report: { id: "case-2", status: "open" }, duplicate: false });
+    expect((prisma as any).report.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportedUserId: "breeder-1",
+          relatedMarketplaceListingId: "listing-1",
+          type: "incorrect_genetics",
+        }),
+      })
+    );
+
+    vi.mocked((prisma as any).report.findFirst).mockResolvedValueOnce({ id: "case-2", status: "open" });
+    await expect(reportMarketplaceListing(buyer, "listing-1", { type: "incorrect_genetics" }))
+      .resolves.toMatchObject({ duplicate: true });
+    expect((prisma as any).report.create).toHaveBeenCalledTimes(1);
   });
 
   it("blocks and unblocks a marketplace user", async () => {

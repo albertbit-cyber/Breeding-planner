@@ -128,6 +128,18 @@ const EXPORT_ENTRIES: ExportEntry[] = [
     group: "animals",
     query: (userId) => (prisma as any).reproductiveCycle.findMany({ where: { ownerId: userId } }),
   },
+  {
+    key: "breedingCycles",
+    section: "records",
+    group: "animals",
+    query: (userId) => (prisma as any).breedingCycle.findMany({ where: { ownerId: userId } }),
+  },
+  {
+    key: "follicleExaminations",
+    section: "records",
+    group: "animals",
+    query: (userId) => (prisma as any).follicleExamination.findMany({ where: { ownerId: userId } }),
+  },
 
   // Lab orders.
   {
@@ -142,6 +154,10 @@ const EXPORT_ENTRIES: ExportEntry[] = [
   },
 
   // Marketplace.
+  // The retired legacy listings table. Nothing reads it for the product any more,
+  // but it still holds this person's data (including payload fields with no
+  // column in marketplace_listings), and an export must cover everything held.
+  // Goes when the table goes: no earlier than 2027-01-05 (src/routes/listingRoutes.ts).
   {
     key: "listings",
     section: "records",

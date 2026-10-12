@@ -36,7 +36,89 @@ const E2E_USERS = {
     password: "demo1234",
     role: "lab" as const,
   },
+  // A marketplace buyer: someone with no collection of their own, which is the
+  // account the buyer journey has to work for.
+  buyer: {
+    email: "buyer@proherper.dev",
+    fullName: "Seed Buyer",
+    password: "buyer1234",
+    role: "buyer" as const,
+  },
 };
+
+/**
+ * Marketplace stock for the buyer-journey spec. Fixed ids and a fixed publish
+ * date so a reset always yields the same catalogue. The genetics are chosen so
+ * a "Clown" search has a right answer: one visual Clown, one het Clown that a
+ * visual search must not return.
+ */
+const E2E_PUBLISHED_AT = new Date("2026-09-01T09:00:00.000Z");
+/**
+ * The seller's own record for the Clown listing, so a sale has something to
+ * carry: genetics, weights, feeds and a health entry, plus a private note and
+ * an enclosure log that must never reach the buyer.
+ */
+const E2E_LISTED_ANIMAL = {
+  appAnimalId: "E2E-CLOWN-1",
+  name: "Clown het Pied female",
+  payload: {
+    id: "E2E-CLOWN-1",
+    name: "Clown het Pied female",
+    sex: "F",
+    species: "ball-python",
+    morphs: ["Clown"],
+    hets: ["Pied"],
+    possibleHets: ["50% Hypo"],
+    notes: "Private seller note: not for the buyer",
+    groups: ["Holdbacks"],
+    status: "For sell",
+    logs: {
+      weights: [
+        { date: "2026-06-01", grams: 520 },
+        { date: "2026-07-01", grams: 580 },
+        { date: "2026-08-01", grams: 640 },
+      ],
+      feeds: [{ date: "2026-08-03", result: "ate" }],
+      sheds: [{ date: "2026-08-10" }],
+      meds: [{ date: "2026-07-15", note: "Checked for mites, clear" }],
+      cleanings: [{ date: "2026-08-11", note: "Rack B deep clean" }],
+    },
+  },
+};
+
+const E2E_LISTINGS = [
+  {
+    id: "e2e-listing-clown",
+    animalId: E2E_LISTED_ANIMAL.appAnimalId,
+    title: "Clown het Pied female",
+    species: "Ball python",
+    genetics: "Clown het Pied",
+    sex: "female",
+    category: "Juvenile",
+    price: 450,
+    weight: 640,
+  },
+  {
+    id: "e2e-listing-pastel",
+    title: "Pastel het Clown male",
+    species: "Ball python",
+    genetics: "Pastel het Clown",
+    sex: "male",
+    category: "Hatchling",
+    price: 220,
+    weight: 180,
+  },
+  {
+    id: "e2e-listing-corn",
+    title: "Amel corn snake",
+    species: "Corn snake",
+    genetics: "Amel 50% het Anery",
+    sex: "female",
+    category: "Sub-adult",
+    price: 90,
+    weight: 260,
+  },
+];
 
 // The species the seeded animal belongs to, and therefore the one the seeded
 // laboratory has to serve for the breeder flow to be exercisable at all.
@@ -45,6 +127,29 @@ const E2E_SERVED_SPECIES = ["ball-python"];
 const E2E_ANIMAL = {
   id: "25Ath-1",
   name: "Athena - DEMO",
+};
+
+/**
+ * The breeder specs open this animal by name. It used to come from the app's
+ * demo collection, which only shows while an account owns nothing; once the
+ * marketplace seed gave this breeder a real animal, Athena vanished. So she is
+ * seeded as a real record too, matching the demo entry in demoAnimals.js.
+ */
+const E2E_ANIMAL_PAYLOAD = {
+  id: E2E_ANIMAL.id,
+  name: E2E_ANIMAL.name,
+  species: "ball-python",
+  sex: "F",
+  morphs: ["Clown", "Pastel"],
+  hets: ["Hypo"],
+  possibleHets: [],
+  weight: 850,
+  year: 2025,
+  birthDate: "2024-06-15",
+  tags: ["proven", "female"],
+  groups: ["Breeders"],
+  status: "Active",
+  logs: { feeds: [], weights: [], sheds: [], cleanings: [], meds: [] },
 };
 
 const E2E_BASELINE_ORDER = {
@@ -332,6 +437,22 @@ const resetBreederLabOrders = async (breederId: string) => {
   });
 };
 
+const ensureBreederAnimal = async (breederId: string) => {
+  const animalData = {
+    name: E2E_ANIMAL.name,
+    sex: "F",
+    species: "ball-python",
+    status: "Active",
+    payload: E2E_ANIMAL_PAYLOAD,
+    deletedAt: null,
+  };
+  await prisma.animal.upsert({
+    where: { ownerId_appAnimalId: { ownerId: breederId, appAnimalId: E2E_ANIMAL.id } },
+    update: animalData,
+    create: { ownerId: breederId, appAnimalId: E2E_ANIMAL.id, ...animalData },
+  });
+};
+
 const createBaselineOrder = async (breederId: string, labOrganizationId: string) => {
   const orderData = {
     orderNumber: E2E_BASELINE_ORDER.orderNumber,
@@ -398,15 +519,132 @@ const createBaselineOrder = async (breederId: string, labOrganizationId: string)
   return order;
 };
 
+/**
+ * A shed-test certificate for the listed animal, from the seeded lab: het Pied
+ * confirmed, Hypo not detected. The second call contradicts the seller's
+ * "50% het Hypo", which is what lets the sale test prove a disputed claim
+ * travels as disputed rather than being quietly dropped or upgraded.
+ */
+const E2E_CERTIFICATE = {
+  certificateNumber: "E2E-CERT-0001",
+  verificationCode: "E2E0A1B2C3D4E5F6A7B8C9D0",
+  resultId: "e2e-cert-result-1",
+};
+
+const resetMarketplace = async (sellerId: string, buyerId: string, labOrganizationId: string) => {
+  const listingIds = E2E_LISTINGS.map((listing) => listing.id);
+  // Everything the spec can create: threads (messages cascade), saves, sales,
+  // saved searches and blocks between the two seeded accounts.
+  await prisma.marketplaceConversation.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.marketplaceFavorite.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.marketplaceSale.deleteMany({ where: { listingId: { in: listingIds } } });
+  await prisma.savedSearch.deleteMany({ where: { ownerId: buyerId } });
+  await prisma.marketplaceUserBlock.deleteMany({
+    where: {
+      OR: [
+        { blockerUserId: buyerId, blockedUserId: sellerId },
+        { blockerUserId: sellerId, blockedUserId: buyerId },
+      ],
+    },
+  });
+
+  // Copies a sale transferred to the buyer, and the seller animal's custody rows.
+  const acquired = await prisma.animal.findMany({
+    where: { ownerId: buyerId, payload: { path: ["acquiredFrom", "source"], equals: "serpentora_marketplace" } },
+    select: { id: true },
+  });
+  await prisma.animal.deleteMany({ where: { id: { in: acquired.map((row) => row.id) } } });
+
+  const animalData = {
+    name: E2E_LISTED_ANIMAL.name,
+    sex: "F",
+    species: "ball-python",
+    status: "For sell",
+    payload: E2E_LISTED_ANIMAL.payload,
+    deletedAt: null,
+  };
+  const listedAnimal = await prisma.animal.upsert({
+    where: { ownerId_appAnimalId: { ownerId: sellerId, appAnimalId: E2E_LISTED_ANIMAL.appAnimalId } },
+    update: animalData,
+    create: { ownerId: sellerId, appAnimalId: E2E_LISTED_ANIMAL.appAnimalId, ...animalData },
+  });
+  await prisma.ownershipHistory.deleteMany({ where: { animalId: listedAnimal.id } });
+
+  const certificateData = {
+    breederId: sellerId,
+    labOrganizationId,
+    animalAppId: E2E_LISTED_ANIMAL.appAnimalId,
+    resultId: E2E_CERTIFICATE.resultId,
+    verificationCode: E2E_CERTIFICATE.verificationCode,
+    issuedAt: new Date("2026-08-20T00:00:00.000Z"),
+    snapshotJson: {
+      results: [
+        {
+          id: E2E_CERTIFICATE.resultId,
+          animalId: E2E_LISTED_ANIMAL.appAnimalId,
+          status: "completed",
+          findingsJson: [
+            { marker: "Pied", outcome: "carrierDetected" },
+            { marker: "Hypo", outcome: "notDetected" },
+          ],
+        },
+      ],
+    },
+  };
+  await prisma.shedTestCertificate.upsert({
+    where: { certificateNumber: E2E_CERTIFICATE.certificateNumber },
+    update: certificateData,
+    create: { certificateNumber: E2E_CERTIFICATE.certificateNumber, ...certificateData },
+  });
+
+  await prisma.marketplaceStore.upsert({
+    where: { userId: sellerId },
+    update: { storeName: "Seed Breeder Reptiles", country: "Germany", city: "Berlin" },
+    create: { userId: sellerId, storeName: "Seed Breeder Reptiles", country: "Germany", city: "Berlin" },
+  });
+
+  for (const listing of E2E_LISTINGS) {
+    const data = {
+      sellerUserId: sellerId,
+      animalId: (listing as { animalId?: string }).animalId ?? null,
+      title: listing.title,
+      species: listing.species,
+      genetics: listing.genetics,
+      sex: listing.sex,
+      category: listing.category,
+      price: listing.price,
+      weight: listing.weight,
+      currency: "EUR",
+      status: "available",
+      availability: "available",
+      country: "Germany",
+      city: "Berlin",
+      shippingAvailable: true,
+      pickupAvailable: true,
+      description: "Seeded for the marketplace buyer-journey test.",
+      favoritesCount: 0,
+      viewsCount: 0,
+      archivedAt: null,
+      publishedAt: E2E_PUBLISHED_AT,
+    };
+    await prisma.marketplaceListing.upsert({
+      where: { id: listing.id },
+      update: data,
+      create: { id: listing.id, ...data },
+    });
+  }
+};
+
 const main = async () => {
   assertSeedAllowed("prisma/e2eReset.ts");
   const database = assertLocalDatabaseUrl();
 
-  const [adminUser, breederUser, labUser, labBUser] = await Promise.all([
+  const [adminUser, breederUser, labUser, labBUser, buyerUser] = await Promise.all([
     upsertUser(E2E_USERS.admin),
     upsertUser(E2E_USERS.breeder),
     upsertUser(E2E_USERS.lab),
     upsertUser(E2E_USERS.labB),
+    upsertUser(E2E_USERS.buyer),
   ]);
 
   await prisma.user.update({
@@ -430,12 +668,15 @@ const main = async () => {
   await ensureLabOfferingsAndPricing(labOrganizationId);
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
+  await ensureBreederAnimal(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
+  await resetMarketplace(breederUser.id, buyerUser.id, labOrganizationId);
 
   console.log("E2E reset complete", {
     databaseHost: database.hostname,
     databaseName: database.databaseName,
-    users: [adminUser.email, breederUser.email, labUser.email, labBUser.email],
+    users: [adminUser.email, breederUser.email, labUser.email, labBUser.email, buyerUser.email],
+    marketplaceListings: E2E_LISTINGS.map((listing) => listing.id),
     laboratories: [labOrganizationId, labBOrganizationId],
     baselineOrderNumber: baselineOrder.orderNumber,
   });

@@ -6,10 +6,13 @@ import { backendUrl, labEmail, labFrontendUrl, requireLabPassword } from "./help
 const authFile = resolve("playwright/.auth/lab.json");
 
 setup("create authenticated lab storage state", async ({ request }) => {
+  // Sign-ins name their portal; without it the backend assumes the breeder
+  // portal and refuses a laboratory account with 403.
   const response = await request.post(`${backendUrl}/api/auth/login`, {
     data: {
       email: labEmail,
       password: requireLabPassword(),
+      portal: "lab",
     },
   });
 

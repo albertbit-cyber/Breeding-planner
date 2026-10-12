@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchPublicSubscriptionTiers } from "../../shared/apiClient";
 
-const formatPrice = (tier) => {
-  if (tier.customPrice) return "Custom";
+const formatPrice = (tier, t) => {
+  if (tier.customPrice) return t("subscriptions.pricing.custom", { defaultValue: "Custom" });
   const amount = Number(tier.monthlyPrice || 0);
-  return amount ? `${tier.currency || "EUR"} ${amount}/mo` : "Free";
+  return amount
+    ? t("subscriptions.pricing.perMonth", { defaultValue: "{{currency}} {{amount}}/mo", currency: tier.currency || "EUR", amount })
+    : t("subscriptions.pricing.free", { defaultValue: "Free" });
 };
 
 function PricingTierCard({ tier }) {
+  const { t } = useTranslation();
   const mainFeatures = (tier.features || []).filter((feature) => feature.enabled).slice(0, 8);
   const limits = (tier.features || []).filter((feature) => feature.enabled && feature.limitValue !== null && feature.limitValue !== undefined).slice(0, 5);
   return (
     <article className={`pricing-card ${tier.isRecommended ? "is-recommended" : ""}`}>
-      {tier.isRecommended ? <span className="pricing-badge">Recommended</span> : null}
+      {tier.isRecommended ? <span className="pricing-badge">{t("subscriptions.pricing.recommended", { defaultValue: "Recommended" })}</span> : null}
       <h2>{tier.name}</h2>
-      <strong>{formatPrice(tier)}</strong>
-      <p>{tier.shortDescription || tier.longDescription || "Flexible Serpentora access."}</p>
+      <strong>{formatPrice(tier, t)}</strong>
+      <p>{tier.shortDescription || tier.longDescription || t("subscriptions.pricing.fallbackDescription", { defaultValue: "Flexible Serpentora access." })}</p>
       <ul>
         {mainFeatures.map((feature) => <li key={feature.featureKey}>{feature.featureName}</li>)}
       </ul>
@@ -28,9 +32,9 @@ function PricingTierCard({ tier }) {
       ) : null}
       <div className="pricing-actions">
         {tier.customPrice ? (
-          <button type="button" onClick={() => { window.location.hash = "/"; }}>Contact us</button>
+          <button type="button" onClick={() => { window.location.hash = "/"; }}>{t("subscriptions.pricing.contactUs", { defaultValue: "Contact us" })}</button>
         ) : (
-          <button type="button" onClick={() => { window.location.hash = "/breeder"; }}>Subscribe</button>
+          <button type="button" onClick={() => { window.location.hash = "/breeder"; }}>{t("subscriptions.pricing.subscribe", { defaultValue: "Subscribe" })}</button>
         )}
       </div>
     </article>
@@ -38,6 +42,7 @@ function PricingTierCard({ tier }) {
 }
 
 export default function PricingPage() {
+  const { t } = useTranslation();
   const [tiers, setTiers] = useState([]);
   const [error, setError] = useState("");
 
@@ -45,17 +50,17 @@ export default function PricingPage() {
     let mounted = true;
     fetchPublicSubscriptionTiers()
       .then((data) => mounted && setTiers(Array.isArray(data.tiers) ? data.tiers : []))
-      .catch((err) => mounted && setError(err instanceof Error ? err.message : "Unable to load pricing."));
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : t("subscriptions.pricing.loadFailed", { defaultValue: "Unable to load pricing." })));
     return () => { mounted = false; };
   }, []);
 
   return (
     <main className="pricing-page">
       <header className="pricing-header">
-        <button type="button" onClick={() => { window.location.hash = "/"; }}>Back</button>
+        <button type="button" onClick={() => { window.location.hash = "/"; }}>{t("common.back", { defaultValue: "Back" })}</button>
         <div>
-          <h1>Serpentora Pricing</h1>
-          <p>Choose the plan that matches your collection, lab, or breeding business.</p>
+          <h1>{t("subscriptions.pricing.title", { defaultValue: "Serpentora Pricing" })}</h1>
+          <p>{t("subscriptions.pricing.subtitle", { defaultValue: "Choose the plan that matches your collection, lab, or breeding business." })}</p>
         </div>
       </header>
       {error && <div className="admin-error">{error}</div>}

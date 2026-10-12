@@ -4,6 +4,7 @@ import MobileApp from "./features/mobile/MobileApp.jsx";
 import AuthGate from "./features/auth/AuthGate.jsx";
 import { AppearanceProvider } from "./contexts/AppearanceContext.jsx";
 import { SharedBackendProvider } from "./contexts/SharedBackendContext.jsx";
+import { FeatureAccessProvider } from "./features/subscriptions/FeatureAccessContext.jsx";
 import SharedBackendBanner from "./components/SharedBackendBanner.jsx";
 import { BatchOrderProvider } from "./features/lab/contexts/BatchOrderContext.jsx";
 
@@ -21,9 +22,11 @@ export default function AppEntry() {
     return (
       <AppearanceProvider>
         <SharedBackendProvider>
-          <BatchOrderProvider>
-            <MobileApp />
-          </BatchOrderProvider>
+          <FeatureAccessProvider>
+            <BatchOrderProvider>
+              <MobileApp />
+            </BatchOrderProvider>
+          </FeatureAccessProvider>
         </SharedBackendProvider>
       </AppearanceProvider>
     );
@@ -32,12 +35,15 @@ export default function AppEntry() {
   return (
     <AppearanceProvider>
       <SharedBackendProvider>
-        <BatchOrderProvider>
-          <SharedBackendBanner />
-          <AuthGate>
-            <BreedingPlannerApp />
-          </AuthGate>
-        </BatchOrderProvider>
+        <FeatureAccessProvider>
+          <BatchOrderProvider>
+            {/* Diagnostics are for developers; production shows a status dot in Settings. */}
+            {import.meta.env.DEV ? <SharedBackendBanner /> : null}
+            <AuthGate>
+              <BreedingPlannerApp />
+            </AuthGate>
+          </BatchOrderProvider>
+        </FeatureAccessProvider>
       </SharedBackendProvider>
     </AppearanceProvider>
   );

@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { summarizeTests, type CertifiedTestLine } from "./publicCertificateService";
 
 /**
  * The marketplace's differentiator: a listing can carry the animal's real
@@ -35,6 +36,8 @@ export type ListingRecord = {
     verificationCode: string;
     issuedAt: Date;
     labName: string | null;
+    /** Test and call only, from the same allowlist the public verify page uses. */
+    lines: CertifiedTestLine[];
   } | null;
 };
 
@@ -67,6 +70,15 @@ const toDate = (entry: any): string | null => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 };
 
+/** A certificate the snapshot cannot be read from still certifies, just without lines. */
+const certifiedLines = (cert: any): CertifiedTestLine[] => {
+  try {
+    return summarizeTests(cert?.snapshotJson, cert?.resultId || null, String(cert?.animalAppId || ""));
+  } catch {
+    return [];
+  }
+};
+
 const countFilled = (flags: ProvenanceFlags): number =>
   Number(flags.photos) + Number(flags.weights) + Number(flags.lineage) + Number(flags.verifiedGenetics);
 
@@ -92,6 +104,8 @@ const readCertificates = async (owners: string[], appIds: string[]): Promise<any
       certificateNumber: true,
       verificationCode: true,
       issuedAt: true,
+      resultId: true,
+      snapshotJson: true,
       labOrganization: { select: { name: true } },
     },
   });
@@ -215,6 +229,7 @@ export const buildListingRecords = async (
             verificationCode: cert.verificationCode,
             issuedAt: cert.issuedAt,
             labName: cert.labOrganization?.name || null,
+            lines: certifiedLines(cert),
           }
         : null,
     });

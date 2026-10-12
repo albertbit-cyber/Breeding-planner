@@ -57,6 +57,22 @@ export function buildMarketplaceListingPayload(snake, options = {}) {
   };
 }
 
+/**
+ * The publish body with its photo folded in, so one request sets status,
+ * currency and picture together (docs/marketplace-listings.md).
+ *
+ * No photo means no `images` key at all, not an empty list: the server keeps
+ * the pictures a card already has when the request names none, and an empty
+ * list would read as "remove them".
+ */
+export function withListingPhoto(payload, photo) {
+  if (!payload) return payload;
+  const images = Array.isArray(photo?.images) ? photo.images.filter((image) => image?.imageUrl) : [];
+  if (!images.length) return payload;
+  const mediaIds = Array.isArray(photo?.mediaIds) ? photo.mediaIds.filter(Boolean) : [];
+  return { ...payload, images, ...(mediaIds.length ? { mediaIds } : {}) };
+}
+
 const isFilled = (value) =>
   value !== undefined && value !== null && String(value).replace(/\s+/g, ' ').trim() !== '';
 

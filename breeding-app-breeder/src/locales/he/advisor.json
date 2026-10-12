@@ -50,22 +50,23 @@
     "readyCallout": "מוכן כשאתה מוכן - לחץ על <strong>הפעל יועץ</strong> כדי למצוא את זיווגי הרבייה החזקים ביותר.",
     "actions": {
       "accept": "קבל",
-      "plan": "המר לתוכנית",
-      "showPlan": "הצג תוכנית רבייה",
+      "plan": "צור תוכנית",
+      "showPlan": "הצג תוכנית",
       "ignore": "התעלם"
-    }
+    },
+    "successLabel": "הצלחה"
   },
   "genes": {
     "goalVisuals": "ויזואלים ביעד",
-    "goalHets": "הטים ביעד",
+    "goalHets": "hets ביעד",
     "projectedVisuals": "ויזואלים צפויים",
-    "projectedHets": "הטים צפויים",
+    "projectedHets": "hets צפויים",
     "holdbackVisuals": "ויזואלים לשמירה",
-    "holdbackHets": "הטים לשמירה",
+    "holdbackHets": "hets לשמירה",
     "nextVisuals": "ויזואלים בדור הבא",
-    "nextHets": "הטים בדור הבא",
+    "nextHets": "hets בדור הבא",
     "focusVisuals": "ויזואלים במיקוד",
-    "focusHets": "הטים במיקוד"
+    "focusHets": "hets במיקוד"
   },
   "plan": {
     "title": "תוכנית רב-דורית ({{strategy}})",
@@ -83,14 +84,14 @@
     "flowchartUnavailable": "לא ניתן היה ליצור תרשים רבייה עבור ההצעה הזו.",
     "status": {
       "visual": "ויזואלי",
-      "het": "הט",
-      "possibleHet": "הט אפשרי",
+      "het": "Het",
+      "possibleHet": "Possible het",
       "none": "רגיל"
     },
     "expectation": {
-      "none-visual": "100% הט",
-      "het-het": "≈66% הט",
-      "het-none": "≈50% הט"
+      "none-visual": "100% het",
+      "het-het": "≈66% het",
+      "het-none": "≈50% het"
     }
   },
   "labels": {
@@ -126,8 +127,8 @@
       "label": "מצב רצסיבי",
       "any": "כל מצב",
       "visual": "ויזואלי",
-      "het": "הט",
-      "possibleHet": "הט אפשרי"
+      "het": "Het",
+      "possibleHet": "Possible het"
     },
     "minProbability": "הסתברות מינימלית ({{percent}}%)",
     "weight": "משקל ({{value}})",
@@ -147,7 +148,13 @@
     "relevant": "{{count}} מועמדים רלוונטיים",
     "strongPairings": "נמצאו {{count}} זיווגים חזקים",
     "retry": "נסה שוב",
-    "viewResults": "הצג תוצאות"
+    "viewResults": "הצג תוצאות",
+    "stepStatus": {
+      "completed": "הושלם",
+      "failed": "נכשלו",
+      "pending": "ממתין",
+      "running": "פועל"
+    }
   },
   "api": {
     "rationaleSummary": "ציון צפוי {{score}} עם מדד ביקוש {{demand}}. {{goalSummary}}",

@@ -1,13 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { acceptOffer, blockUser, conversation as fetchConversation, conversations as fetchConversations, markRead, reportMessage, sendMessage } from "../api";
+import {
+  acceptOffer,
+  blockUser,
+  completeSale,
+  conversation as fetchConversation,
+  conversations as fetchConversations,
+  markRead,
+  reportMessage,
+  sendMessage,
+  submitReview,
+  unblockUser,
+} from "../api";
 import { initials, money, relativeTime, shortDate } from "../format";
-import { useSession } from "../session";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
 import { Pill } from "../ui/Pill";
+import { StarInput } from "../ui/StarRating";
 import { EmptyState, ErrorPanel, Spinner } from "../ui/States";
 import { useToast } from "../ui/Toast";
 
@@ -25,6 +36,15 @@ import { useToast } from "../ui/Toast";
  */
 
 const DEAL_STEPS = ["inquiry", "offer", "reserved", "completed"];
+
+/** The admin console's report types that fit a conversation. */
+const MESSAGE_REPORT_TYPES = ["scam_suspicion", "abusive_message", "spam", "other"];
+const MESSAGE_REPORT_LABELS = {
+  scam_suspicion: "Scam, or asking to pay off the platform",
+  abusive_message: "Abusive or threatening",
+  spam: "Spam",
+  other: "Something else",
+};
 
 function DealState({ thread, t, locale }) {
   const sale = thread.sale;
@@ -71,7 +91,6 @@ export default function InboxPage() {
   const { t, i18n } = useTranslation("marketplace");
   const { notify } = useToast();
   const navigate = useNavigate();
-  const session = useSession();
 
   const [threads, setThreads] = useState(null);
   const [error, setError] = useState(null);
@@ -85,6 +104,12 @@ export default function InboxPage() {
   const [deposit, setDeposit] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [reportType, setReportType] = useState("scam_suspicion");
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [busy, setBusy] = useState(false);
   const bottomRef = useRef(null);
 
   const loadThreads = useCallback(async () => {
@@ -172,11 +197,18 @@ export default function InboxPage() {
     }
   };
 
+  const refresh = async () => {
+    const refreshed = await fetchConversation(active.id);
+    setActive(refreshed);
+    loadThreads();
+  };
+
+  const lastFromThem = active ? [...(active.messages || [])].reverse().find((message) => !message.mine) : null;
+
   const submitReport = async () => {
-    const lastFromThem = [...(active.messages || [])].reverse().find((message) => !message.mine);
     if (!lastFromThem) return;
     try {
-      await reportMessage(lastFromThem.id, { reason: reportReason });
+      await reportMessage(lastFromThem.id, { type: reportType, reason: reportType, note: reportReason });
       setReportOpen(false);
       setReportReason("");
       notify(t("inbox.reported", { defaultValue: "Reported. Our moderators will take a look." }));
@@ -189,11 +221,64 @@ export default function InboxPage() {
     if (!active?.counterparty?.id) return;
     try {
       await blockUser({ blockedUserId: active.counterparty.id });
+      await refresh();
       notify(t("inbox.blocked", { defaultValue: "Blocked. They can no longer message you." }));
     } catch (blockError) {
       notify(blockError?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
     }
   };
+
+  const unblock = async () => {
+    if (!active?.counterparty?.id) return;
+    try {
+      await unblockUser(active.counterparty.id);
+      await refresh();
+      notify(t("inbox.unblocked", { defaultValue: "Unblocked. You can message each other again." }));
+    } catch (unblockError) {
+      notify(unblockError?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
+    }
+  };
+
+  const markHandedOver = async () => {
+    if (!active?.sale?.id) return;
+    setBusy(true);
+    try {
+      await completeSale(active.sale.id);
+      setCompleteOpen(false);
+      await refresh();
+      notify(
+        t("deal.completedRecordToast", {
+          defaultValue: "Sale complete. The animal and its record are now in the buyer's account.",
+        })
+      );
+    } catch (completeError) {
+      notify(completeError?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReview = async () => {
+    if (!active?.sale?.id || !rating) return;
+    setBusy(true);
+    try {
+      await submitReview({ saleId: active.sale.id, rating, reviewText });
+      setReviewOpen(false);
+      setRating(0);
+      setReviewText("");
+      await refresh();
+      notify(t("reviews.thanks", { defaultValue: "Thanks — your review is published." }));
+    } catch (reviewError) {
+      notify(reviewError?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const blocked = active?.blocked || null;
+  const sale = active?.sale || null;
+  const canComplete = active?.role === "seller" && sale?.saleStatus === "reserved";
+  const canReview = active?.role === "buyer" && sale?.isBuyer && sale?.saleStatus === "completed" && !sale?.reviewed;
 
   const canAccept =
     active?.role === "seller" &&
@@ -259,8 +344,10 @@ export default function InboxPage() {
               <p className="mk-thread-item__preview">{thread.lastMessage?.messageText}</p>
               {thread.latestOffer ? (
                 <span style={{ display: "inline-block", marginTop: 7 }}>
-                  <Pill tone={thread.sale?.saleStatus === "reserved" ? "ok" : "hold"}>
-                    {thread.sale?.saleStatus === "reserved"
+                  <Pill tone={thread.sale?.saleStatus === "reserved" || thread.sale?.saleStatus === "completed" ? "ok" : "hold"}>
+                    {thread.sale?.saleStatus === "completed"
+                      ? t("deal.completedPill", { defaultValue: "Sale complete" })
+                      : thread.sale?.saleStatus === "reserved"
                       ? t("deal.reserved", { defaultValue: "Reserved" })
                       : t("inbox.offerPill", {
                           defaultValue: "Offer {{amount}}",
@@ -321,12 +408,25 @@ export default function InboxPage() {
                 </span>
               </div>
               <div className="mk-row" style={{ gap: 8 }}>
-                <Button variant="quiet" size="sm" onClick={() => setReportOpen(true)}>
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  icon="flag"
+                  disabled={!lastFromThem}
+                  title={lastFromThem ? undefined : t("inbox.nothingToReport", { defaultValue: "They haven't written anything yet." })}
+                  onClick={() => setReportOpen(true)}
+                >
                   {t("inbox.report", { defaultValue: "Report" })}
                 </Button>
-                <Button variant="quiet" size="sm" onClick={block}>
-                  {t("inbox.block", { defaultValue: "Block" })}
-                </Button>
+                {blocked === "by_me" ? (
+                  <Button variant="quiet" size="sm" onClick={unblock}>
+                    {t("inbox.unblock", { defaultValue: "Unblock" })}
+                  </Button>
+                ) : (
+                  <Button variant="quiet" size="sm" onClick={block} disabled={blocked === "by_them"}>
+                    {t("inbox.block", { defaultValue: "Block" })}
+                  </Button>
+                )}
               </div>
             </header>
 
@@ -373,6 +473,18 @@ export default function InboxPage() {
               <span ref={bottomRef} />
             </div>
 
+            {blocked ? (
+              <div className="mk-composer" role="status">
+                <p className="mk-muted mk-sm" style={{ margin: 0 }}>
+                  {blocked === "by_me"
+                    ? t("inbox.youBlocked", {
+                        defaultValue: "You blocked {{name}}. Neither of you can send messages here until you unblock them.",
+                        name: active.counterparty?.name || t("inbox.someone", { defaultValue: "Marketplace user" }),
+                      })
+                    : t("inbox.closedThread", { defaultValue: "This conversation is closed. New messages can't be sent." })}
+                </p>
+              </div>
+            ) : (
             <div className="mk-composer">
               {offerMode ? (
                 <label className="mk-field" style={{ marginBottom: 10 }}>
@@ -422,6 +534,7 @@ export default function InboxPage() {
                 </Button>
               </div>
             </div>
+            )}
           </>
         )}
       </section>
@@ -452,6 +565,30 @@ export default function InboxPage() {
             {t("deal.title", { defaultValue: "Where this stands" })}
           </h2>
           <DealState thread={active} t={t} locale={i18n.language} />
+
+          {canComplete ? (
+            <Button variant="ink" block style={{ marginTop: 16 }} onClick={() => setCompleteOpen(true)}>
+              {t("deal.markHandedOver", { defaultValue: "Mark as handed over" })}
+            </Button>
+          ) : null}
+
+          {canReview ? (
+            <div className="mk-card" style={{ marginTop: 16, padding: "12px 14px" }}>
+              <p className="mk-sm" style={{ margin: "0 0 10px" }}>
+                {t("deal.reviewPrompt", {
+                  defaultValue: "The sale is complete. How did it go with {{name}}?",
+                  name: active.counterparty?.name || t("seller.fallback", { defaultValue: "Breeder" }),
+                })}
+              </p>
+              <Button variant="ink" size="sm" icon="star" onClick={() => setReviewOpen(true)}>
+                {t("reviews.write", { defaultValue: "Write a review" })}
+              </Button>
+            </div>
+          ) : active.role === "buyer" && sale?.reviewed ? (
+            <p className="mk-xs mk-muted" style={{ marginTop: 14 }}>
+              {t("deal.reviewed", { defaultValue: "You reviewed this sale. It shows on the breeder's store page." })}
+            </p>
+          ) : null}
 
           {active.role === "seller" ? (
             <div className="mk-card" style={{ marginTop: 18, padding: "12px 14px", background: "var(--mk-bg)", boxShadow: "none" }}>
@@ -508,23 +645,96 @@ export default function InboxPage() {
       </Dialog>
 
       <Dialog
+        open={completeOpen}
+        onClose={() => setCompleteOpen(false)}
+        size="sm"
+        title={t("deal.completeTitle", { defaultValue: "Mark this animal as handed over?" })}
+        description={t("deal.completeRecordBody", {
+          defaultValue:
+            "The sale is recorded as complete and the listing shows as sold. The buyer receives the animal's record (genetics with their sources, weights, feeding, health, lineage and certificate codes) and is invited to review you. Your own copy stays, marked Sold. This can't be undone here.",
+        })}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setCompleteOpen(false)}>
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button variant="ink" busy={busy} onClick={markHandedOver}>
+              {t("deal.completeConfirm", { defaultValue: "Mark handed over" })}
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title={t("reviews.writeTitle", { defaultValue: "Review this breeder" })}
+        description={active?.listing?.title}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setReviewOpen(false)}>
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button variant="ink" busy={busy} disabled={!rating} onClick={sendReview}>
+              {t("reviews.publish", { defaultValue: "Publish review" })}
+            </Button>
+          </>
+        }
+      >
+        <div className="mk-field">
+          <span className="mk-label">{t("reviews.yourRating", { defaultValue: "Your rating" })}</span>
+          <StarInput value={rating} onChange={setRating} />
+        </div>
+        <label className="mk-field">
+          <span className="mk-label">{t("reviews.yourWords", { defaultValue: "In your words" })}</span>
+          <textarea
+            className="mk-textarea"
+            rows={4}
+            value={reviewText}
+            onChange={(event) => setReviewText(event.target.value)}
+            placeholder={t("reviews.placeholder", {
+              defaultValue: "How was the communication, the accuracy of the listing, and the animal's condition?",
+            })}
+          />
+        </label>
+      </Dialog>
+
+      <Dialog
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         size="sm"
         title={t("inbox.reportTitle", { defaultValue: "Report this conversation" })}
+        description={t("inbox.reportGoesTo", {
+          defaultValue: "This goes to the moderators with their last message attached.",
+        })}
         footer={
           <>
             <Button variant="quiet" onClick={() => setReportOpen(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}
             </Button>
-            <Button variant="ink" disabled={!reportReason.trim()} onClick={submitReport}>
+            <Button variant="ink" onClick={submitReport}>
               {t("inbox.sendReport", { defaultValue: "Send report" })}
             </Button>
           </>
         }
       >
+        <fieldset className="mk-field">
+          <legend className="mk-label">{t("inbox.reportWhat", { defaultValue: "What's wrong?" })}</legend>
+          {MESSAGE_REPORT_TYPES.map((value) => (
+            <label key={value} className="mk-row" style={{ gap: 8 }}>
+              <input
+                type="radio"
+                name="message-report-type"
+                value={value}
+                checked={reportType === value}
+                onChange={() => setReportType(value)}
+              />
+              <span className="mk-sm">{t(`inbox.reportTypes.${value}`, { defaultValue: MESSAGE_REPORT_LABELS[value] })}</span>
+            </label>
+          ))}
+        </fieldset>
         <label className="mk-field">
-          <span className="mk-label">{t("inbox.reportReason", { defaultValue: "What's wrong?" })}</span>
+          <span className="mk-label">{t("inbox.reportNote", { defaultValue: "Details (optional)" })}</span>
           <textarea
             className="mk-textarea"
             rows={3}

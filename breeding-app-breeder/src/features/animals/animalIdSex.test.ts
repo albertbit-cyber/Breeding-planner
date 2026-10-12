@@ -98,6 +98,7 @@ describe('retagIdForSex on hand-typed IDs', () => {
   it('returns blank and whitespace IDs untouched', () => {
     expect(retagIdForSex('', 'M')).toBe('');
     expect(retagIdForSex('   ', 'M')).toBe('   ');
+    // @ts-expect-error -- deliberately off-type: an unsaved record can reach this with no ID.
     expect(retagIdForSex(null, 'M')).toBe('');
   });
 });

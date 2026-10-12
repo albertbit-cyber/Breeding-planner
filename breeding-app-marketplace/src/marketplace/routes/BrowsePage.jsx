@@ -2,9 +2,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { browse, favorite, saveSearch } from "../api";
-import { DEFAULT_FILTERS, QUICK_GENES, SORTS, activeChips, countActive, cycleGene, fromSearchParams, geneState, toSearchParams } from "../filters";
+import {
+  DEFAULT_FILTERS,
+  QUICK_GENES,
+  SORTS,
+  activeChips,
+  addGeneToken,
+  countActive,
+  cycleGene,
+  fromSearchParams,
+  geneState,
+  toSearchParams,
+} from "../filters";
 import { geneTokens, joinTokens } from "../format";
-import { useAuthAction } from "../session";
+import { isGeneLanguage, parseGeneToken, tokenLabel } from "../genetics";
+import { useAuthAction, useResumeIntent } from "../session";
 import FilterSheet from "../components/FilterSheet";
 import { SignInPrompt } from "../components/RequireAuth";
 import Button from "../ui/Button";
@@ -28,7 +40,7 @@ export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => fromSearchParams(params), [params]);
 
-  const [state, setState] = useState({ status: "loading", listings: [], total: 0, pageCount: 1 });
+  const [state, setState] = useState({ status: "loading", listings: [], total: 0, pageCount: 1, species: [] });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
@@ -57,11 +69,12 @@ export default function BrowsePage() {
           listings: result.listings || [],
           total: result.total || 0,
           pageCount: result.pageCount || 1,
+          species: result.facets?.species || [],
         });
       })
       .catch((error) => {
         if (requestId.current !== id) return;
-        setState({ status: "error", error, listings: [], total: 0, pageCount: 1 });
+        setState((current) => ({ status: "error", error, listings: [], total: 0, pageCount: 1, species: current.species }));
       });
   }, [filters]);
 
@@ -81,37 +94,57 @@ export default function BrowsePage() {
       }
     });
 
-  const onSaveSearch = () =>
-    auth.run({ kind: "savedSearch", filters }, () => {
-      setSearchName(
-        joinTokens(geneTokens(filters.includeGenes)) ||
-          filters.search ||
-          t("saved.searchDefaultName", { defaultValue: "My search" })
-      );
-      setSaveOpen(true);
-    });
+  const openSaveDialog = () => {
+    setSearchName(
+      joinTokens(geneTokens(filters.includeGenes).map((token) => tokenLabel(token, t))) ||
+        filters.search ||
+        t("saved.searchDefaultName", { defaultValue: "My search" })
+    );
+    setSaveOpen(true);
+  };
+
+  const onSaveSearch = () => auth.run({ kind: "savedSearch" }, openSaveDialog);
+
+  // Back from signing in to save this search: the filters are in the URL, so
+  // only the dialog needs reopening.
+  useResumeIntent((intent) => intent.kind === "savedSearch", openSaveDialog);
 
   const commitSavedSearch = async () => {
     try {
       await saveSearch({ name: searchName, filters });
       setSaveOpen(false);
-      notify(t("saved.searchSaved", { defaultValue: "Saved. We'll email you when a match is listed." }));
+      notify(
+        t("saved.searchSavedCount", {
+          defaultValue: "Saved. Your Saved page shows how many new animals match each time you look.",
+        })
+      );
     } catch (error) {
       notify(error?.message || t("errors.generic", { defaultValue: "Something went wrong." }), { tone: "bad" });
     }
   };
 
   const commitTerm = (value) => {
-    // A bare gene name typed into the search box is almost always meant as a
-    // gene filter, so promote it rather than leaving it as free text.
-    const match = QUICK_GENES.find((gene) => gene.toLowerCase() === value.trim().toLowerCase());
-    if (match) {
-      apply({ ...cycleGene(filters, match), search: "" });
+    // Gene language typed into the search box is a gene filter, not free text:
+    // a known morph ("clown"), or anything the hobby only ever says about
+    // genes ("het pied", "66% het hypo", "pos het ghost").
+    const parsed = parseGeneToken(value);
+    const known = parsed && QUICK_GENES.find((gene) => gene.toLowerCase() === parsed.gene.toLowerCase());
+    if (parsed && (known || isGeneLanguage(value))) {
+      apply({ ...addGeneToken(filters, value), search: "", page: "" });
       setTerm("");
       return;
     }
-    apply({ search: value.trim() });
+    apply({ search: value.trim(), page: "" });
   };
+
+  const geneTitle = (geneNow) =>
+    geneNow === "visual"
+      ? t("filters.geneVisual", { defaultValue: "Visual required. Tap for het." })
+      : geneNow === "het"
+        ? t("filters.geneHet", { defaultValue: "Het required. Tap to rule out visuals." })
+        : geneNow === "exclude"
+          ? t("filters.geneVisualExcluded", { defaultValue: "Visuals ruled out. Tap to clear." })
+          : t("filters.geneVisualOff", { defaultValue: "Tap to require a visual." });
 
   return (
     <>
@@ -123,8 +156,11 @@ export default function BrowsePage() {
             <div className="mk-tokenfield">
               <Icon name="search" size={17} />
               {geneTokens(filters.includeGenes).map((gene) => (
-                <span key={`in-${gene}`} className="mk-gene">
-                  {gene}
+                <span
+                  key={`in-${gene}`}
+                  className={`mk-gene ${parseGeneToken(gene)?.zygosity === "visual" ? "" : "mk-gene--het"}`}
+                >
+                  {tokenLabel(gene, t)}
                   <button
                     type="button"
                     className="mk-token-remove"
@@ -139,7 +175,7 @@ export default function BrowsePage() {
               ))}
               {geneTokens(filters.excludeGenes).map((gene) => (
                 <span key={`out-${gene}`} className="mk-gene mk-gene--off">
-                  {gene}
+                  {tokenLabel(gene, t)}
                   <button
                     type="button"
                     className="mk-token-remove"
@@ -163,8 +199,8 @@ export default function BrowsePage() {
                   }
                 }}
                 onBlur={() => term !== filters.search && commitTerm(term)}
-                placeholder={t("browse.searchPlaceholder", {
-                  defaultValue: "Add a gene, morph, breeder or city…",
+                placeholder={t("browse.searchPlaceholderHobby", {
+                  defaultValue: "Morph, het, breeder or city: “clown”, “het pied”…",
                 })}
                 aria-label={t("browse.searchLabel", { defaultValue: "Search animals" })}
               />
@@ -212,16 +248,48 @@ export default function BrowsePage() {
               <Icon name="dna" size={13} />
               {t("filters.fullRecord", { defaultValue: "Full record" })}
             </button>
-            {QUICK_GENES.slice(0, 4).map((gene) => (
-              <GeneTag
-                key={gene}
-                label={gene}
-                excluded={geneState(filters, gene) === "exclude"}
-                onClick={() => apply(cycleGene(filters, gene))}
-                style={geneState(filters, gene) === "off" ? { opacity: 0.6 } : undefined}
-              />
-            ))}
+            {QUICK_GENES.slice(0, 4).map((gene) => {
+              const geneNow = geneState(filters, gene);
+              return (
+                <GeneTag
+                  key={gene}
+                  label={geneNow === "het" ? `het ${gene}` : gene}
+                  het={geneNow === "het"}
+                  excluded={geneNow === "exclude"}
+                  title={geneTitle(geneNow)}
+                  onClick={() => apply({ ...cycleGene(filters, gene), page: "" })}
+                  style={geneNow === "off" ? { opacity: 0.6 } : undefined}
+                />
+              );
+            })}
           </div>
+
+          {state.species.length > 1 || filters.species ? (
+            <div className="mk-chiprow" role="group" aria-label={t("filters.species", { defaultValue: "Species" })}>
+              <button
+                type="button"
+                className={`mk-chip ${!filters.species ? "is-on" : ""}`}
+                aria-pressed={!filters.species}
+                onClick={() => apply({ species: "", page: "" })}
+              >
+                {t("filters.allSpecies", { defaultValue: "All species" })}
+              </button>
+              {state.species.map((entry) => {
+                const on = filters.species.toLowerCase() === entry.species.toLowerCase();
+                return (
+                  <button
+                    key={entry.species}
+                    type="button"
+                    className={`mk-chip ${on ? "is-on" : ""}`}
+                    aria-pressed={on}
+                    onClick={() => apply({ species: entry.species, page: "" })}
+                  >
+                    {entry.species} <span className="mk-tnum">{entry.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -275,19 +343,38 @@ export default function BrowsePage() {
         ) : state.status === "loading" ? (
           <ListingSkeletonGrid />
         ) : state.listings.length === 0 ? (
-          <EmptyState
-            title={t("browse.emptyTitle", { defaultValue: "No animals match those filters" })}
-            body={t("browse.emptyBody", {
-              defaultValue: "Try widening the price range, removing a gene, or including sold animals as price comparison.",
-            })}
-            action={
-              activeCount ? (
-                <Button variant="outline" onClick={() => setParams(new URLSearchParams())}>
-                  {t("filters.clearAll", { defaultValue: "Clear all" })}
-                </Button>
-              ) : null
-            }
-          />
+          activeCount || filters.search ? (
+            <EmptyState
+              title={t("browse.emptyTitle", { defaultValue: "No animals match those filters" })}
+              body={
+                geneTokens(filters.includeGenes).some((token) => parseGeneToken(token)?.zygosity === "visual")
+                  ? t("browse.emptyVisualBody", {
+                      defaultValue:
+                        "A bare gene means a visual. Tap the gene again to look for hets instead, widen the price, or save this search and check back.",
+                    })
+                  : t("browse.emptyBody", {
+                      defaultValue: "Try widening the price range, removing a gene, or including sold animals as price comparison.",
+                    })
+              }
+              action={
+                <span className="mk-row" style={{ gap: 8, justifyContent: "center" }}>
+                  <Button variant="outline" onClick={() => setParams(new URLSearchParams())}>
+                    {t("filters.clearAll", { defaultValue: "Clear all" })}
+                  </Button>
+                  <Button variant="ink" icon="bell" onClick={onSaveSearch}>
+                    {t("browse.saveSearch", { defaultValue: "Save this search" })}
+                  </Button>
+                </span>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={t("browse.catalogueEmptyTitle", { defaultValue: "Nothing is listed yet" })}
+              body={t("browse.catalogueEmptyBody", {
+                defaultValue: "No breeder has published an animal yet. Check back soon.",
+              })}
+            />
+          )
         ) : (
           <>
             <div className="mk-grid">
@@ -338,6 +425,7 @@ export default function BrowsePage() {
         open={sheetOpen}
         filters={filters}
         resultCount={state.status === "ready" ? state.total : undefined}
+        species={state.species}
         onClose={() => setSheetOpen(false)}
         onApply={(next) => {
           setSheetOpen(false);
@@ -350,8 +438,8 @@ export default function BrowsePage() {
         onClose={() => setSaveOpen(false)}
         size="sm"
         title={t("saved.saveTitle", { defaultValue: "Save this search" })}
-        description={t("saved.saveBody", {
-          defaultValue: "We'll email you when an animal matching these filters is listed.",
+        description={t("saved.saveBodyCount", {
+          defaultValue: "It goes on your Saved page, which shows how many new animals match since you last ran it.",
         })}
         footer={
           <>

@@ -5,7 +5,7 @@ import LanguageMenu from "./LanguageMenu";
 import SharedBackendBanner from "../../components/SharedBackendBanner";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { conversations as fetchConversations } from "../api";
-import { useSession } from "../session";
+import { useReturnAfterSignIn, useSession } from "../session";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 
@@ -27,6 +27,9 @@ export default function Shell() {
   const location = useLocation();
   const { snapshot } = useSharedBackend();
   const [unread, setUnread] = useState(0);
+
+  // Brings a visitor who signed in mid-action back to the page they left.
+  useReturnAfterSignIn();
 
   /**
    * The shared banner is an operator diagnostic: it renders a permanent green
@@ -90,9 +93,11 @@ export default function Shell() {
                 {unread > 0 ? <span className="mk-badge mk-tnum">{unread}</span> : null}
               </NavLink>
             ) : null}
-            {session.isSeller ? (
+            {session.isAuthenticated ? (
               <NavLink to="/dashboard" className={({ isActive }) => (isActive ? "is-active" : "")}>
-                {t("nav.dashboard", { defaultValue: "Selling" })}
+                {session.isSeller
+                  ? t("nav.dashboard", { defaultValue: "Selling" })
+                  : t("nav.myAnimals", { defaultValue: "My animals" })}
               </NavLink>
             ) : null}
           </nav>

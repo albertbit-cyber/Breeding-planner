@@ -5,7 +5,9 @@
 		"label": "Goal (Name and Traits)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
 		"tip": "Format tip: \"Goal Name: trait one, trait two\". If you only list traits, we’ll build a generic goal.",
-		"defaultName": "Custom goal"
+		"defaultName": "Custom goal",
+		"freeTextPlaceholder": "I want to make clown desert ghost with pastel and possible het pied",
+		"freeTextTip": "Type your goal naturally. The advisor matches morph names and aliases from the morph database automatically, so commas are not required."
 	},
 	"status": {
 		"heading": "Status"
@@ -22,17 +24,21 @@
 		"males_plural": "{{count}} breeder males",
 		"females": "{{count}} breeder female",
 		"females_plural": "{{count}} breeder females",
-		"confidenceBar": "Confidence bar ≥ {{threshold}}"
+		"confidenceBar": "Confidence bar ≥ {{threshold}}",
+		"femalesFiltered": "{{filtered}}/{{total}} breeder females matched goal",
+		"malesFiltered": "{{filtered}}/{{total}} breeder males matched goal"
 	},
 	"buttons": {
 		"run": "Run Advisor",
 		"generating": "Generating...",
-		"reset": "Reset Advisor"
+		"reset": "Reset Advisor",
+		"exportPairingsByMale": "Export by pairing (Male → Females)"
 	},
 	"errors": {
 		"noBreeders": "Add animals to the Breeders group to see advisor recommendations.",
 		"noGoals": "Add goal traits before running the advisor.",
-		"failure": "Failed to generate suggestions."
+		"failure": "Failed to generate suggestions.",
+		"noRelevantAnimals": "No breeder animals carry genes related to this goal. Add animals with the target genetics to the Breeders group."
 	},
 	"cards": {
 		"goalSuccessLabel": "Goal success chance:",
@@ -41,7 +47,14 @@
 		"priceRange": "Price guidance: {{range}}",
 		"sources": "Sources:",
 		"additionalHeading": "Additional pairings worth reviewing",
-		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings."
+		"readyCallout": "Ready when you are—click <strong>Run Advisor</strong> to discover your strongest breeder pairings.",
+		"actions": {
+			"accept": "Accept",
+			"ignore": "Ignore",
+			"plan": "Make a plan",
+			"showPlan": "Show plan"
+		},
+		"successLabel": "success"
 	},
 	"genes": {
 		"goalVisuals": "Goal Visuals",
@@ -78,7 +91,8 @@
 			"none-visual": "100% het",
 			"het-het": "≈66% het",
 			"het-none": "≈50% het"
-		}
+		},
+		"flowchartUnavailable": "No breeding flowchart could be generated for this suggestion."
 	},
 	"labels": {
 		"unknownAnimal": "Unknown",
@@ -143,6 +157,22 @@
 				"female": "female",
 				"male": "male"
 			}
+		}
+	},
+	"progress": {
+		"relevant": "{{count}} relevant candidates",
+		"retry": "Retry",
+		"running": "Analysis in progress...",
+		"scanned": "Processed {{count}} snakes",
+		"strongPairings": "{{count}} strong pairings found",
+		"titleRunning": "Breeding Advisor Running",
+		"viewResults": "View Results",
+		"waiting": "Waiting for analysis to start...",
+		"stepStatus": {
+			"completed": "Completed",
+			"failed": "Failed",
+			"pending": "Pending",
+			"running": "Running"
 		}
 	}
 }

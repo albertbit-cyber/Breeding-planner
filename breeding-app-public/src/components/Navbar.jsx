@@ -28,10 +28,10 @@ export default function Navbar() {
       background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(8px)',
     }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-        <img src="/Logo.png" alt="Breeding Planner" style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: 4, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }} />
+        <img src="/Logo.png" alt="Serpentora" style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: 4, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }} />
         <div>
           <div style={{ fontWeight: 500, fontSize: 15, color: 'var(--dark)', lineHeight: 1.2 }}>
-            Breeding Planner
+            Serpentora
           </div>
           <div style={{ fontSize: 11, color: 'var(--hint)' }}>Morph management platform</div>
         </div>
@@ -42,7 +42,7 @@ export default function Navbar() {
         {navLink('/', 'Home')}
         {navLink('/pricing', 'Pricing')}
         <Link to="/login" style={{ fontSize: 13, color: '#5a5650', textDecoration: 'none' }}>Sign in</Link>
-        <Link to="/register" className="btn btn-primary btn-sm">Get started free</Link>
+        <Link to="/waitlist" className="btn btn-primary btn-sm">Join the waitlist</Link>
       </div>
 
       {/* Mobile toggle */}
@@ -71,8 +71,8 @@ export default function Navbar() {
           <Link to="/"        onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Home</Link>
           <Link to="/pricing" onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Pricing</Link>
           <Link to="/login"   onClick={() => setOpen(false)} style={{ fontSize: 14, color: '#5a5650' }}>Sign in</Link>
-          <Link to="/register" onClick={() => setOpen(false)} className="btn btn-primary btn-sm" style={{ width: 'fit-content' }}>
-            Get started free
+          <Link to="/waitlist" onClick={() => setOpen(false)} className="btn btn-primary btn-sm" style={{ width: 'fit-content' }}>
+            Join the waitlist
           </Link>
         </div>
       )}

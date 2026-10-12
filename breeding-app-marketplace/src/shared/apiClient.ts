@@ -144,10 +144,6 @@ const clearStoredAuth = (scope?: AuthScope): void => {
 const isCookiePreferredAuth = (scope?: AuthScope): boolean =>
   getStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)]) === COOKIE_PREFERRED_AUTH_MODE;
 
-const setCookiePreferredAuth = (scope?: AuthScope): void => {
-  setStoredValue(AUTH_MODE_STORAGE_KEYS[normalizeAuthScope(scope)], COOKIE_PREFERRED_AUTH_MODE);
-};
-
 const getStoredCsrfToken = (scope?: AuthScope): string =>
   getStoredValue(CSRF_TOKEN_STORAGE_KEYS[normalizeAuthScope(scope)]);
 
@@ -638,18 +634,6 @@ export const saveMyBreederProfile = async (payload: BreederProfilePayload) =>
 export const fetchMarketplaceProfiles = async () =>
   request<{ profiles: unknown[] }>("/profiles/marketplace");
 
-export const fetchMyListings = async () =>
-  request<{ listings: unknown[] }>("/listings/me");
-
-export const saveMyListings = async (listings: MarketplaceListingPayload[]) =>
-  request<{ listings: unknown[] }>("/listings/me", {
-    method: "PUT",
-    body: JSON.stringify({ listings }),
-  });
-
-export const fetchMarketplaceListings = async () =>
-  request<{ listings: unknown[] }>("/listings/marketplace");
-
 export const fetchMarketplaceCatalog = async (params: Record<string, string | number | boolean | undefined> = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -786,6 +770,37 @@ export const blockMarketplaceUser = async (payload: Record<string, unknown>) =>
     body: JSON.stringify(payload),
   });
 
+/** Files a moderation case about a listing; a repeat by the same buyer is not a second case. */
+export const reportMarketplaceListing = async (id: string, payload: Record<string, unknown>) =>
+  request<{ report: unknown; duplicate: boolean }>(`/marketplace/listings/${encodeURIComponent(id)}/report`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+/** The seller marks a listing sold to a marketplace buyer; the animal's record goes to the buyer. */
+export const markMarketplaceListingSold = async (
+  id: string,
+  payload: { buyerUserId: string; price?: number | null; handoverMethod?: string }
+) =>
+  request<{ sale: unknown; animal: unknown; alreadyTransferred: boolean }>(
+    `/marketplace/listings/${encodeURIComponent(id)}/sold`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+
+/** Animals this account received through a sale, with the record that came with them. */
+export const fetchAcquiredAnimals = async () => request<{ animals: unknown[] }>("/marketplace/acquired");
+
+/** The seller marks a reserved animal as handed over. */
+export const completeMarketplaceSale = async (id: string, payload: Record<string, unknown> = {}) =>
+  request<{ sale: unknown }>(`/marketplace/sales/${encodeURIComponent(id)}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+/** Resets a saved search's "new since last run" count. */
+export const markSavedSearchRun = async (id: string) =>
+  request<{ search: unknown }>(`/searches/${encodeURIComponent(id)}/run`, { method: "POST" });
+
 export const fetchMarketplaceBlocks = async () =>
   request<{ blocks: unknown[] }>("/marketplace/blocks");
 
@@ -805,18 +820,6 @@ export const fetchSellableAnimals = async () =>
 
 export const fetchAdminMarketplace = async () =>
   request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");
-
-export const fetchModerationListings = async () =>
-  request<{ listings: unknown[] }>("/listings/moderation");
-
-export const fetchModerationAudit = async () =>
-  request<{ audits: unknown[] }>("/listings/moderation/audit");
-
-export const updateListingStatus = async (id: string, status: string, note = "") =>
-  request<{ listing: unknown }>(`/listings/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status, note }),
-  });
 
 export const fetchSavedSearches = async () =>
   request<{ searches: unknown[] }>("/searches");

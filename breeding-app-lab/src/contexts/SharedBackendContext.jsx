@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { getHealth, getCurrentUser, hasStoredAuthSession, normalizeSharedApiError, resetSharedBackendState } from "../shared/apiClient";
-import { getSharedApiConfig } from "../shared/config/api";
+import { getSharedApiConfig } from "breeding-app-shared/config/api";
 import { getSharedBackendSnapshot, subscribeSharedBackendStatus } from "../shared/backendStatus";
 
 const SharedBackendContext = createContext({

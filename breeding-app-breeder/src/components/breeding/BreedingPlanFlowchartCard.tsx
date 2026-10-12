@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from "reactflow";
+import { useTranslation } from "react-i18next";
 import "reactflow/dist/style.css";
 
 const NODE_WIDTH = 260;
@@ -68,6 +69,7 @@ const DetailSection = ({ label, tokens, tone = "neutral", emptyLabel }) => {
 };
 
 const PlannerNode = ({ data, selected }) => {
+  const { t } = useTranslation();
   const title = typeof data.resolveTitle === "function" ? data.resolveTitle(data) : data.title;
   const tooltip = (data.probabilities || [])
     .map((entry) => `${entry.label}: ${formatPercent(entry.probability, 1)}`)
@@ -77,7 +79,7 @@ const PlannerNode = ({ data, selected }) => {
     <div className={nodeClassNames(data.kind, data.isGoal, selected)} title={tooltip || title} style={{ width: NODE_WIDTH }}>
       <div className="flex items-center justify-between gap-2">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-          Generation {data.generation}
+          {t("breedingPlan.generationN", { defaultValue: "Generation {{generation}}", generation: data.generation })}
         </div>
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{data.kind}</div>
       </div>
@@ -94,7 +96,7 @@ const PlannerNode = ({ data, selected }) => {
       ) : null}
       {data.goalProbability != null ? (
         <div className={`mt-2 text-xs font-semibold ${data.isGoal ? "text-emerald-700" : "text-sky-700"}`}>
-          Goal chance {formatPercent(data.goalProbability, 1)}
+          {t("breedingPlan.goalChance", { defaultValue: "Goal chance {{value}}", value: formatPercent(data.goalProbability, 1) })}
         </div>
       ) : null}
     </div>
@@ -162,6 +164,7 @@ const buildFlowEdges = (plan) =>
   }));
 
 const SelectionDetails = ({ node, getDisplayNameForAnimal }) => {
+  const { t } = useTranslation();
   if (!node) return null;
   const title = node.kind === "collection" && node.animalId
     ? getDisplayNameForAnimal(node.animalId)
@@ -176,12 +179,12 @@ const SelectionDetails = ({ node, getDisplayNameForAnimal }) => {
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{node.kind}</div>
           <div className="mt-1 text-sm font-semibold text-neutral-900">{title}</div>
         </div>
-        <div className="text-xs font-semibold text-neutral-500">Generation {node.generation}</div>
+        <div className="text-xs font-semibold text-neutral-500">{t("breedingPlan.generationN", { defaultValue: "Generation {{generation}}", generation: node.generation })}</div>
       </div>
       {node.subtitle ? <div className="mt-2 text-sm text-neutral-600">{node.subtitle}</div> : null}
       {node.expectedGenetics?.length ? (
         <div className="mt-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Expected Genetics</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("breedingPlan.expectedGenetics", { defaultValue: "Expected Genetics" })}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {node.expectedGenetics.map((entry) => (
               <span key={`${node.id}-detail-${entry}`} className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-700">
@@ -192,20 +195,20 @@ const SelectionDetails = ({ node, getDisplayNameForAnimal }) => {
         </div>
       ) : null}
       <DetailSection
-        label="Matched Genes"
+        label={t("breedingPlan.matchedGenes", { defaultValue: "Matched Genes" })}
         tokens={node.matchedGenes}
         tone="matched"
-        emptyLabel="No target genes matched on this node."
+        emptyLabel={t("breedingPlan.noMatchedGenesOnNode", { defaultValue: "No target genes matched on this node." })}
       />
       <DetailSection
-        label="Selected Holdback"
+        label={t("breedingPlan.selectedHoldback", { defaultValue: "Selected Holdback" })}
         tokens={node.holdbackTraits}
         tone="holdback"
-        emptyLabel="No holdback is attached to this node."
+        emptyLabel={t("breedingPlan.noHoldbackOnNode", { defaultValue: "No holdback is attached to this node." })}
       />
       {node.probabilities?.length ? (
         <div className="mt-3 space-y-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Probabilities</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("breedingPlan.probabilities", { defaultValue: "Probabilities" })}</div>
           {node.probabilities.map((entry) => (
             <div key={`${node.id}-${entry.label}`} className="flex items-center justify-between gap-3 rounded-md bg-neutral-50 px-2 py-1 text-xs text-neutral-700">
               <span className={entry.isGoal ? "font-semibold text-emerald-700" : ""}>{entry.label}</span>
@@ -219,6 +222,7 @@ const SelectionDetails = ({ node, getDisplayNameForAnimal }) => {
 };
 
 const BranchInspectionPanel = ({ plan, node, getDisplayNameForAnimal }) => {
+  const { t } = useTranslation();
   const matchedGenes = uniqueTokens(node?.matchedGenes?.length ? node.matchedGenes : plan?.matchedGenes || []);
   const holdbacks = plan?.selectedHoldbacks || [];
 
@@ -226,21 +230,21 @@ const BranchInspectionPanel = ({ plan, node, getDisplayNameForAnimal }) => {
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Branch Inspection</div>
-          <div className="mt-1 text-sm font-semibold text-neutral-900">Matched Genes / Selected Holdbacks</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("breedingPlan.branchInspection", { defaultValue: "Branch Inspection" })}</div>
+          <div className="mt-1 text-sm font-semibold text-neutral-900">{t("breedingPlan.matchedGenesSelectedHoldbacks", { defaultValue: "Matched Genes / Selected Holdbacks" })}</div>
         </div>
-        <div className="text-xs text-neutral-500">{holdbacks.length} tracked holdback{holdbacks.length === 1 ? "" : "s"}</div>
+        <div className="text-xs text-neutral-500">{t("breedingPlan.trackedHoldbacks", { count: holdbacks.length, defaultValue_one: "{{count}} tracked holdback", defaultValue_other: "{{count}} tracked holdbacks" })}</div>
       </div>
 
       <DetailSection
-        label="Matched Genes"
+        label={t("breedingPlan.matchedGenes", { defaultValue: "Matched Genes" })}
         tokens={matchedGenes}
         tone="matched"
-        emptyLabel="Select a branch to inspect matched target genes."
+        emptyLabel={t("breedingPlan.selectBranchToInspect", { defaultValue: "Select a branch to inspect matched target genes." })}
       />
 
       <div className="mt-4">
-        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Selected Holdbacks</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("breedingPlan.selectedHoldbacks", { defaultValue: "Selected Holdbacks" })}</div>
         {holdbacks.length ? (
           <div className="mt-2 space-y-2">
             {holdbacks.map((holdback) => {
@@ -251,7 +255,7 @@ const BranchInspectionPanel = ({ plan, node, getDisplayNameForAnimal }) => {
               );
               const holdbackLabel = holdback.maleId && holdback.femaleId
                 ? `${getDisplayNameForAnimal(holdback.maleId)} / ${getDisplayNameForAnimal(holdback.femaleId)}`
-                : "Synthetic holdback pair";
+                : t("breedingPlan.syntheticHoldbackPair", { defaultValue: "Synthetic holdback pair" });
 
               return (
                 <div
@@ -260,30 +264,30 @@ const BranchInspectionPanel = ({ plan, node, getDisplayNameForAnimal }) => {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-neutral-900">Generation {holdback.generation}</div>
+                      <div className="text-xs font-semibold text-neutral-900">{t("breedingPlan.generationN", { defaultValue: "Generation {{generation}}", generation: holdback.generation })}</div>
                       <div className="text-xs text-neutral-600">{holdback.pairingTitle}</div>
                     </div>
                     <div className="text-xs font-semibold text-sky-800">{formatPercent(holdback.probability, 1)}</div>
                   </div>
                   <div className="mt-2 text-xs text-neutral-600">{holdbackLabel}</div>
                   <DetailSection
-                    label="Matched Genes"
+                    label={t("breedingPlan.matchedGenes", { defaultValue: "Matched Genes" })}
                     tokens={holdback.matchedGenes}
                     tone="matched"
-                    emptyLabel="No target genes matched."
+                    emptyLabel={t("breedingPlan.noMatchedGenes", { defaultValue: "No target genes matched." })}
                   />
                   <DetailSection
-                    label="Holdback Traits"
+                    label={t("breedingPlan.holdbackTraits", { defaultValue: "Holdback Traits" })}
                     tokens={holdback.traits}
                     tone="holdback"
-                    emptyLabel="No holdback traits recorded."
+                    emptyLabel={t("breedingPlan.noHoldbackTraits", { defaultValue: "No holdback traits recorded." })}
                   />
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="mt-2 text-xs text-neutral-500">No holdbacks were selected for this plan.</div>
+          <div className="mt-2 text-xs text-neutral-500">{t("breedingPlan.noHoldbacksSelected", { defaultValue: "No holdbacks were selected for this plan." })}</div>
         )}
       </div>
     </div>
@@ -291,6 +295,7 @@ const BranchInspectionPanel = ({ plan, node, getDisplayNameForAnimal }) => {
 };
 
 const FlowchartBody = ({ plan, getDisplayNameForAnimal }) => {
+  const { t } = useTranslation();
   const { layoutNodes, generations } = useMemo(
     () => buildFlowNodes(plan, getDisplayNameForAnimal),
     [plan, getDisplayNameForAnimal]
@@ -313,7 +318,7 @@ const FlowchartBody = ({ plan, getDisplayNameForAnimal }) => {
       <div className="flex flex-wrap gap-2">
         {generations.map((generation) => (
           <span key={`generation-pill-${generation}`} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
-            Generation {generation}
+            {t("breedingPlan.generationN", { defaultValue: "Generation {{generation}}", generation })}
           </span>
         ))}
       </div>
@@ -360,6 +365,7 @@ const BreedingPlanFlowchartCard = ({
   onRefresh,
   onClose,
 }) => {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -367,21 +373,21 @@ const BreedingPlanFlowchartCard = ({
       <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4">
           <div className="min-w-[280px] flex-1">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">Breeding Plan</div>
-            <h3 className="mt-1 text-lg font-semibold text-neutral-900">{suggestionLabel || "Multi-Generation Breeding Flowchart Planner"}</h3>
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{t("breedingPlan.eyebrow", { defaultValue: "Breeding Plan" })}</div>
+            <h3 className="mt-1 text-lg font-semibold text-neutral-900">{suggestionLabel || t("breedingPlan.defaultTitle", { defaultValue: "Multi-Generation Breeding Flowchart Planner" })}</h3>
             {plan ? (
               <div className="mt-1 flex flex-wrap gap-3 text-xs text-neutral-500">
-                <span>Threshold: {formatPercent(plan.threshold ?? 0.7, 0)}</span>
-                <span>Generation limit: {plan.generationLimit ?? 0}</span>
-                <span>Best goal chance: {formatPercent(plan.cumulativeProb ?? 0, 1)}</span>
-                <span>{plan.goalReached ? `Reached in generation ${plan.goalReachedGeneration}` : "Threshold not reached within plan limit"}</span>
+                <span>{t("breedingPlan.thresholdValue", { defaultValue: "Threshold: {{value}}", value: formatPercent(plan.threshold ?? 0.7, 0) })}</span>
+                <span>{t("breedingPlan.generationLimitValue", { defaultValue: "Generation limit: {{value}}", value: plan.generationLimit ?? 0 })}</span>
+                <span>{t("breedingPlan.bestGoalChance", { defaultValue: "Best goal chance: {{value}}", value: formatPercent(plan.cumulativeProb ?? 0, 1) })}</span>
+                <span>{plan.goalReached ? t("breedingPlan.reachedInGeneration", { defaultValue: "Reached in generation {{generation}}", generation: plan.goalReachedGeneration }) : t("breedingPlan.thresholdNotReached", { defaultValue: "Threshold not reached within plan limit" })}</span>
               </div>
             ) : null}
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-[118px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Goal Threshold
+              {t("breedingPlan.goalThreshold", { defaultValue: "Goal Threshold" })}
               <input
                 type="number"
                 min={1}
@@ -393,7 +399,7 @@ const BreedingPlanFlowchartCard = ({
               />
             </label>
             <label className="flex min-w-[118px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Generation Limit
+              {t("breedingPlan.generationLimit", { defaultValue: "Generation Limit" })}
               <input
                 type="number"
                 min={1}
@@ -410,21 +416,21 @@ const BreedingPlanFlowchartCard = ({
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Update Plan
+              {t("breedingPlan.updatePlan", { defaultValue: "Update Plan" })}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
             >
-              Close
+              {t("common.close", { defaultValue: "Close" })}
             </button>
           </div>
         </div>
 
         <div className="overflow-y-auto px-5 py-5">
           {loading ? (
-            <div className="flex h-[420px] items-center justify-center text-sm text-neutral-500">Building breeding flowchart…</div>
+            <div className="flex h-[420px] items-center justify-center text-sm text-neutral-500">{t("breedingPlan.building", { defaultValue: "Building breeding flowchart…" })}</div>
           ) : error ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
           ) : plan?.flowchart?.nodes?.length ? (
@@ -433,7 +439,7 @@ const BreedingPlanFlowchartCard = ({
             </ReactFlowProvider>
           ) : (
             <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
-              No breeding flowchart could be generated for this plan.
+              {t("breedingPlan.noFlowchart", { defaultValue: "No breeding flowchart could be generated for this plan." })}
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import "./MobileApp.css";
 import { useAppearance } from "../../contexts/AppearanceContext.jsx";
 import jsQR from "jsqr";
@@ -11,7 +12,6 @@ import {
   clearAuthToken,
   fetchBreederSnapshot,
   fetchMobileAnimal,
-  fetchMobileCommunication,
   fetchMobilePermissions,
   fetchMobileRackMode,
   fetchMobileTasks,
@@ -24,7 +24,6 @@ import {
   logMobileWater,
   logMobileWeight,
   saveBreederSnapshot,
-  scanMobileQr,
   syncMobileQueue,
 } from "../../shared/apiClient";
 
@@ -82,19 +81,30 @@ const scopedStorageKey = (baseKey, user = {}) => {
 // ג”€ג”€ג”€ Tiny utilities ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const cap = (s) => String(s || "").replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const fmtSyncTime = (iso) => {
-  if (!iso) return "Never";
+const fmtSyncTime = (iso, t) => {
+  if (!iso) return t("mobile.sync.never", { defaultValue: "Never" });
   try {
     const d = new Date(iso);
     const diff = Date.now() - d.getTime();
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 60000) return t("mobile.sync.justNow", { defaultValue: "Just now" });
+    if (diff < 3600000) return t("mobile.sync.minutesAgo", { n: Math.floor(diff / 60000), defaultValue: "{{n}}m ago" });
     const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    if (diff < 86400000) return `Today at ${time}`;
-    return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} at ${time}`;
-  } catch { return "Unknown"; }
+    if (diff < 86400000) return t("mobile.sync.todayAt", { time, defaultValue: "Today at {{time}}" });
+    const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return t("mobile.sync.dateAt", { date, time, defaultValue: "{{date}} at {{time}}" });
+  } catch { return t("mobile.sync.unknown", { defaultValue: "Unknown" }); }
 };
-const first = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
+// Visible label for a quick-action type key (the key itself stays English for logic).
+const quickActionLabel = (type, t) => {
+  if (type === "feed") return t("mobile.actions.feed", { defaultValue: "Feed" });
+  if (type === "weight") return t("mobile.actions.weight", { defaultValue: "Weight" });
+  if (type === "shed") return t("mobile.actions.shed", { defaultValue: "Shed" });
+  if (type === "clean") return t("mobile.actions.clean", { defaultValue: "Clean" });
+  if (type === "water") return t("mobile.actions.water", { defaultValue: "Water" });
+  if (type === "note") return t("mobile.actions.note", { defaultValue: "Note" });
+  return cap(type);
+};
+
 const logoSrc = `${process.env.PUBLIC_URL || ""}/app-icons/icon_512x512.png`;
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -349,6 +359,8 @@ const mergeLogs = (localLogs, backendLogs) => {
 const mergeAnimalRecord = (localAnimal, backendAnimal) => {
   if (!localAnimal) return backendAnimal;
   if (!backendAnimal) return localAnimal;
+  // A saved record replaces a demo with the same id whole; merged, it kept isDemo and was hidden.
+  if (isDemoAnimal(localAnimal) && !isDemoAnimal(backendAnimal)) return backendAnimal;
   const localTime = recordTimestamp(localAnimal);
   const backendTime = recordTimestamp(backendAnimal);
   const base = localTime >= backendTime ? localAnimal : backendAnimal;
@@ -478,6 +490,8 @@ const normalizeMobileSnapshot = (snapshot = {}) => {
   return {
     animals: animals.filter((animal) => !isDemoAnimal(animal)),
     pairings: filterDemoPairings(snapshot?.pairings, demoIds),
+    // Breeding cards travel with the snapshot read-only here; the desktop app owns their edits.
+    breedingCycles: Array.isArray(snapshot?.breedingCycles) ? snapshot.breedingCycles.filter((c) => c && !c.deletedAt && !demoIds.has(c.femaleId)) : [],
     plannerState: extractMobilePlannerState(snapshot),
   };
 };
@@ -490,6 +504,7 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normal
     mergeAnimalRecord
   ),
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing", mergePairingRecord),
+  breedingCycles: backendSnapshot.breedingCycles || localSnapshot.breedingCycles || [],
   plannerState: backendSnapshot.plannerState || localSnapshot.plannerState,
 });
 
@@ -503,13 +518,13 @@ const animalMapByIdentity = (animals = []) => {
   return map;
 };
 
-const rackSlotLabel = (slot = {}, index = 0) => {
+const rackSlotLabel = (slot = {}, index = 0, t) => {
   const explicit = firstText(slot.label, slot.name, slot.tub, slot.tubLabel, slot.position);
   if (explicit) return explicit;
   const level = Number(slot.levelIndex);
   const column = Number(slot.columnIndex);
   if (Number.isFinite(level) && Number.isFinite(column)) return `L${level + 1}-${column + 1}`;
-  return `Tub ${index + 1}`;
+  return t("mobile.rack.tubNumber", { n: index + 1, defaultValue: "Tub {{n}}" });
 };
 
 const defaultRackSlots = (rack = {}) => {
@@ -524,11 +539,11 @@ const defaultRackSlots = (rack = {}) => {
   return slots;
 };
 
-const makeTubRow = (slot, index, animalsById) => {
+const makeTubRow = (slot, index, animalsById, t) => {
   const animalId = firstText(slot?.snakeId, slot?.animalId, slot?.appAnimalId);
   const occupant = animalId ? animalsById.get(animalId) : null;
   return {
-    tub: rackSlotLabel(slot, index),
+    tub: rackSlotLabel(slot, index, t),
     animalId,
     name: occupant?.name || animalId || "",
     feedingDue: occupant ? isFeedDue(occupant) : false,
@@ -536,18 +551,18 @@ const makeTubRow = (slot, index, animalsById) => {
   };
 };
 
-const buildRackDataFromAnimalLocations = (animals = []) => {
+const buildRackDataFromAnimalLocations = (animals = [], t) => {
   const roomMap = new Map();
   asArray(animals).forEach((animal) => {
     const [roomName, rackName, tubName] = animalLocationParts(animal);
     if (!roomName && !rackName && !tubName) return;
-    const resolvedRoom = roomName || "Unassigned room";
-    const resolvedRack = rackName || "Loose housing";
+    const resolvedRoom = roomName || t("mobile.rack.unassignedRoom", { defaultValue: "Unassigned room" });
+    const resolvedRack = rackName || t("mobile.rack.looseHousing", { defaultValue: "Loose housing" });
     if (!roomMap.has(resolvedRoom)) roomMap.set(resolvedRoom, new Map());
     const rackMap = roomMap.get(resolvedRoom);
     if (!rackMap.has(resolvedRack)) rackMap.set(resolvedRack, []);
     rackMap.get(resolvedRack).push({
-      tub: tubName || "Open",
+      tub: tubName || t("mobile.rack.openTub", { defaultValue: "Open" }),
       animalId: animalIdentity(animal),
       name: animal.name || animalIdentity(animal),
       feedingDue: isFeedDue(animal),
@@ -562,24 +577,25 @@ const buildRackDataFromAnimalLocations = (animals = []) => {
   };
 };
 
-const buildRackDataFromPlannerState = (plannerState, animals = []) => {
+const buildRackDataFromPlannerState = (plannerState, animals = [], t) => {
   const state = normalizeMobilePlannerState(plannerState);
-  if (!hasPlannerSpaces(state)) return buildRackDataFromAnimalLocations(animals);
+  if (!hasPlannerSpaces(state)) return buildRackDataFromAnimalLocations(animals, t);
+  const terrariumFallback = t("mobile.rack.terrarium", { defaultValue: "Terrarium" });
 
   const animalsById = animalMapByIdentity(animals);
   if (!asArray(state.rooms).length && asArray(state.spaces).length) {
     const legacyRooms = asArray(state.spaces).map((room) => {
       const racks = asArray(room.racks).map((rack) => ({
-        rackName: firstText(rack.name, rack.type, rack.tubSize) || "Rack",
+        rackName: firstText(rack.name, rack.type, rack.tubSize) || t("mobile.rack.rack", { defaultValue: "Rack" }),
         tubs: defaultRackSlots({
           columns: rack.cols,
           rows: rack.rows,
-        }).map((slot, index) => makeTubRow(slot, index, animalsById)),
+        }).map((slot, index) => makeTubRow(slot, index, animalsById, t)),
       }));
       const terrariums = asArray(room.terrariums).map((terrarium) => ({
-        rackName: `${firstText(terrarium.name, terrarium.type) || "Terrarium"} (Terrarium)`,
+        rackName: t("mobile.rack.terrariumName", { name: firstText(terrarium.name, terrarium.type) || terrariumFallback, defaultValue: "{{name}} (Terrarium)" }),
         tubs: Array.from({ length: Math.max(1, Number(terrarium.capacity) || Number(terrarium.occupants) || 1) }).map((_, index) => ({
-          tub: `Animal ${index + 1}`,
+          tub: t("mobile.rack.animalNumber", { n: index + 1, defaultValue: "Animal {{n}}" }),
           animalId: "",
           name: "",
           feedingDue: false,
@@ -587,11 +603,11 @@ const buildRackDataFromPlannerState = (plannerState, animals = []) => {
         })),
       }));
       return {
-        roomName: firstText(room.name, room.label) || "Room",
+        roomName: firstText(room.name, room.label) || t("mobile.rack.room", { defaultValue: "Room" }),
         racks: [...racks, ...terrariums],
       };
     }).filter((room) => room.racks.length);
-    const fallback = buildRackDataFromAnimalLocations(animals);
+    const fallback = buildRackDataFromAnimalLocations(animals, t);
     return { rooms: [...legacyRooms, ...asArray(fallback.rooms)] };
   }
 
@@ -601,14 +617,14 @@ const buildRackDataFromPlannerState = (plannerState, animals = []) => {
 
   const roomRows = rooms.map((room) => {
     const roomId = firstText(room.id, room.roomId);
-    const roomName = firstText(room.name, room.label) || "Room";
+    const roomName = firstText(room.name, room.label) || t("mobile.rack.room", { defaultValue: "Room" });
     const rackRows = racks
       .filter((rack) => firstText(rack.roomId) === roomId)
       .map((rack) => {
         const sourceSlots = asArray(rack.slots).length ? asArray(rack.slots) : defaultRackSlots(rack);
         return {
-          rackName: firstText(rack.name, rack.label, rack.type) || "Rack",
-          tubs: sourceSlots.map((slot, index) => makeTubRow(slot, index, animalsById)),
+          rackName: firstText(rack.name, rack.label, rack.type) || t("mobile.rack.rack", { defaultValue: "Rack" }),
+          tubs: sourceSlots.map((slot, index) => makeTubRow(slot, index, animalsById, t)),
         };
       });
 
@@ -621,7 +637,7 @@ const buildRackDataFromPlannerState = (plannerState, animals = []) => {
           const animalId = occupantIds[index] || "";
           const occupant = animalId ? animalsById.get(animalId) : null;
           return {
-            tub: `Animal ${index + 1}`,
+            tub: t("mobile.rack.animalNumber", { n: index + 1, defaultValue: "Animal {{n}}" }),
             animalId,
             name: occupant?.name || animalId || "",
             feedingDue: occupant ? isFeedDue(occupant) : false,
@@ -629,7 +645,7 @@ const buildRackDataFromPlannerState = (plannerState, animals = []) => {
           };
         });
         return {
-          rackName: `${firstText(terrarium.name, terrarium.label) || "Terrarium"} (Terrarium)`,
+          rackName: t("mobile.rack.terrariumName", { name: firstText(terrarium.name, terrarium.label) || terrariumFallback, defaultValue: "{{name}} (Terrarium)" }),
           tubs,
         };
       });
@@ -637,7 +653,7 @@ const buildRackDataFromPlannerState = (plannerState, animals = []) => {
     return { roomName, racks: [...rackRows, ...terrariumRows] };
   }).filter((room) => room.racks.length);
 
-  const fallback = buildRackDataFromAnimalLocations(animals);
+  const fallback = buildRackDataFromAnimalLocations(animals, t);
   return { rooms: [...roomRows, ...asArray(fallback.rooms)] };
 };
 
@@ -665,29 +681,32 @@ function Toast({ msg, onDismiss }) {
 }
 
 function Spinner() {
-  return <div className="mbl-spinner" aria-label="Loading" />;
+  const { t } = useTranslation();
+  return <div className="mbl-spinner" aria-label={t("mobile.common.loading", { defaultValue: "Loading" })} />;
 }
 
 function OfflineBanner({ online, queued, onSync }) {
+  const { t } = useTranslation();
   if (online && !queued) return null;
   return (
     <div className={`mbl-offline-bar ${online ? "" : "is-offline"}`}>
-      <span>{online ? `${queued} update${queued === 1 ? "" : "s"} pending sync` : "Offline"}</span>
+      <span>{online ? t("mobile.sync.updatesPending", { count: queued, defaultValue: "{{count}} updates pending sync", defaultValue_one: "{{count}} update pending sync" }) : t("mobile.sync.offline", { defaultValue: "Offline" })}</span>
       {online && queued > 0 && (
-        <button type="button" onClick={onSync}>Sync now</button>
+        <button type="button" onClick={onSync}>{t("mobile.sync.syncNow", { defaultValue: "Sync now" })}</button>
       )}
     </div>
   );
 }
 
 function ActionSheet({ title, onClose, children }) {
+  const { t } = useTranslation();
   return (
     <div className="mbl-sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mbl-sheet">
         <div className="mbl-sheet-handle" />
         <div className="mbl-sheet-head">
           <h2>{title}</h2>
-          <button type="button" className="mbl-icon-btn" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="mbl-icon-btn" onClick={onClose} aria-label={t("mobile.common.close", { defaultValue: "Close" })}>✕</button>
         </div>
         <div className="mbl-sheet-body">{children}</div>
       </div>
@@ -697,6 +716,7 @@ function ActionSheet({ title, onClose, children }) {
 
 // ג”€ג”€ג”€ LOGIN SCREEN ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function LoginScreen({ onLogin }) {
+  const { t } = useTranslation();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy]         = useState(false);
@@ -705,13 +725,13 @@ function LoginScreen({ onLogin }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!email.trim() || !password.trim()) { setError("Enter email and password."); return; }
+    if (!email.trim() || !password.trim()) { setError(t("mobile.login.missingCredentials", { defaultValue: "Enter email and password." })); return; }
     setBusy(true);
     try {
       const result = await loginApi({ email: email.trim().toLowerCase(), password });
       onLogin(result?.user || {});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Check your credentials.");
+      setError(err instanceof Error ? err.message : t("mobile.login.failed", { defaultValue: "Login failed. Check your credentials." }));
     } finally {
       setBusy(false);
     }
@@ -722,23 +742,23 @@ function LoginScreen({ onLogin }) {
       <div className="mbl-login-card">
         <img src={logoSrc} alt="Serpentora" className="mbl-login-logo" />
         <h1 className="mbl-login-title">Serpentora</h1>
-        <p className="mbl-login-tagline">Complete Reptile Management App</p>
-        <p className="mbl-login-sub">Sign in to sync with your desktop account</p>
+        <p className="mbl-login-tagline">{t("mobile.login.tagline", { defaultValue: "Complete Reptile Management App" })}</p>
+        <p className="mbl-login-sub">{t("mobile.login.subtitle", { defaultValue: "Sign in to sync with your desktop account" })}</p>
         <form className="mbl-login-form" onSubmit={submit}>
           <label className="mbl-field">
-            <span>Email</span>
+            <span>{t("mobile.login.email", { defaultValue: "Email" })}</span>
             <input
               type="email"
               autoComplete="email"
               inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("mobile.login.emailPlaceholder", { defaultValue: "you@example.com" })}
               disabled={busy}
             />
           </label>
           <label className="mbl-field">
-            <span>Password</span>
+            <span>{t("mobile.login.password", { defaultValue: "Password" })}</span>
             <input
               type="password"
               autoComplete="current-password"
@@ -750,7 +770,7 @@ function LoginScreen({ onLogin }) {
           </label>
           {error && <p className="mbl-login-error">{error}</p>}
           <button type="submit" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" disabled={busy}>
-            {busy ? <Spinner /> : "Sign in"}
+            {busy ? <Spinner /> : t("mobile.login.signIn", { defaultValue: "Sign in" })}
           </button>
         </form>
       </div>
@@ -760,14 +780,15 @@ function LoginScreen({ onLogin }) {
 
 // ג”€ג”€ג”€ MODE SELECT SCREEN ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function ModeSelectScreen({ user, onMode, onSignOut }) {
-  const displayName = user?.fullName || user?.displayName || user?.email || "Keeper";
+  const { t } = useTranslation();
+  const displayName = user?.fullName || user?.displayName || user?.email || t("mobile.mode.defaultName", { defaultValue: "Keeper" });
   return (
     <div className="mbl-mode-shell">
       <div className="mbl-mode-header">
         <img src={logoSrc} alt="" className="mbl-mode-logo" />
-        <p className="mbl-mode-greeting">Hi, {displayName}</p>
+        <p className="mbl-mode-greeting">{t("mobile.mode.greeting", { name: displayName, defaultValue: "Hi, {{name}}" })}</p>
         <button type="button" className="mbl-text-btn mbl-mode-signout" onClick={onSignOut}>
-          Sign out
+          {t("mobile.common.signOut", { defaultValue: "Sign out" })}
         </button>
       </div>
 
@@ -778,8 +799,8 @@ function ModeSelectScreen({ user, onMode, onSignOut }) {
           onClick={() => onMode("terminal")}
         >
           <span className="mbl-mode-icon">⬛</span>
-          <strong>Terminal</strong>
-          <span>Scan a QR code to instantly open and update any snake card. Fast rack workflow.</span>
+          <strong>{t("mobile.mode.terminalTitle", { defaultValue: "Terminal" })}</strong>
+          <span>{t("mobile.mode.terminalDescription", { defaultValue: "Scan a QR code to instantly open and update any snake card. Fast rack workflow." })}</span>
         </button>
 
         <button
@@ -788,8 +809,8 @@ function ModeSelectScreen({ user, onMode, onSignOut }) {
           onClick={() => onMode("full")}
         >
           <span className="mbl-mode-icon">≡</span>
-          <strong>Full Access</strong>
-          <span>Animals, pairings, tasks, rack mode and more — full desktop features on mobile.</span>
+          <strong>{t("mobile.mode.fullTitle", { defaultValue: "Full Access" })}</strong>
+          <span>{t("mobile.mode.fullDescription", { defaultValue: "Animals, pairings, tasks, rack mode and more — full desktop features on mobile." })}</span>
         </button>
       </div>
     </div>
@@ -801,9 +822,10 @@ function QRScanner({ onScan, onError }) {
   const videoRef  = useRef(null);
   const activeRef = useRef(false);
   const canvasRef = useRef(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
-    if (!navigator.mediaDevices?.getUserMedia) { onError("Camera not available."); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { onError(t("mobile.scan.cameraUnavailable", { defaultValue: "Camera not available." })); return; }
     let stream;
     let timer;
     activeRef.current = true;
@@ -850,15 +872,15 @@ function QRScanner({ onScan, onError }) {
           timer = requestAnimationFrame(tick);
         }
       })
-      .catch(() => onError("Camera access denied. Use manual entry below."));
+      .catch(() => onError(t("mobile.scan.cameraDenied", { defaultValue: "Camera access denied. Use manual entry below." })));
 
     return () => {
       activeRef.current = false;
       clearTimeout(timer);
       cancelAnimationFrame(timer);
-      stream?.getTracks().forEach((t) => t.stop());
+      stream?.getTracks().forEach((track) => track.stop());
     };
-  }, [onScan, onError]);
+  }, [onScan, onError, t]);
 
   return (
     <div className="mbl-camera-box">
@@ -886,23 +908,37 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
     acquisitionDate: animal?.acquisitionDate || "",
   }));
 
+  const { t } = useTranslation();
   const set = (field) => (e) => setDraft((prev) => ({ ...prev, [field]: e.target.value }));
 
   const fields = [
-    { key: "name",            label: "Name",             type: "text" },
-    { key: "sex",             label: "Sex",              type: "select", opts: ["", "Male", "Female", "Unknown"] },
-    { key: "genetics",        label: "Genetics / Morph", type: "text" },
-    { key: "status",          label: "Status",           type: "select", opts: ["", "Active", "For Sale", "Sold", "Deceased", "Quarantine"] },
-    { key: "species",         label: "Species",          type: "text" },
-    { key: "dob",             label: "Date of birth",    type: "date" },
-    { key: "weight",          label: "Weight (g)",       type: "number" },
-    { key: "acquisitionDate", label: "Acquired",         type: "date" },
-    { key: "price",           label: "Price",            type: "text" },
-    { key: "room",            label: "Room",             type: "text" },
-    { key: "rack",            label: "Rack",             type: "text" },
-    { key: "tub",             label: "Tub / Enclosure",  type: "text" },
-    { key: "notes",           label: "Notes",            type: "textarea" },
+    { key: "name",            label: t("mobile.edit.name", { defaultValue: "Name" }),                 type: "text" },
+    { key: "sex",             label: t("mobile.edit.sex", { defaultValue: "Sex" }),                   type: "select", opts: ["", "Male", "Female", "Unknown"] },
+    { key: "genetics",        label: t("mobile.edit.genetics", { defaultValue: "Genetics / Morph" }), type: "text" },
+    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Sold", "Deceased", "Quarantine"] },
+    { key: "species",         label: t("mobile.edit.species", { defaultValue: "Species" }),           type: "text" },
+    { key: "dob",             label: t("mobile.edit.dob", { defaultValue: "Date of birth" }),         type: "date" },
+    { key: "weight",          label: t("mobile.edit.weight", { defaultValue: "Weight (g)" }),         type: "number" },
+    { key: "acquisitionDate", label: t("mobile.edit.acquired", { defaultValue: "Acquired" }),         type: "date" },
+    { key: "price",           label: t("mobile.edit.price", { defaultValue: "Price" }),               type: "text" },
+    { key: "room",            label: t("mobile.edit.room", { defaultValue: "Room" }),                 type: "text" },
+    { key: "rack",            label: t("mobile.edit.rack", { defaultValue: "Rack" }),                 type: "text" },
+    { key: "tub",             label: t("mobile.edit.tub", { defaultValue: "Tub / Enclosure" }),       type: "text" },
+    { key: "notes",           label: t("mobile.edit.notes", { defaultValue: "Notes" }),               type: "textarea" },
   ];
+
+  // Option values stay in English (they are stored data); only the visible text is translated.
+  const optionLabels = {
+    "": t("mobile.edit.notSet", { defaultValue: "— not set —" }),
+    Male: t("mobile.edit.sexMale", { defaultValue: "Male" }),
+    Female: t("mobile.edit.sexFemale", { defaultValue: "Female" }),
+    Unknown: t("mobile.edit.sexUnknown", { defaultValue: "Unknown" }),
+    Active: t("mobile.edit.statusActive", { defaultValue: "Active" }),
+    "For sale": t("mobile.edit.statusForSale", { defaultValue: "For sale" }),
+    Sold: t("mobile.edit.statusSold", { defaultValue: "Sold" }),
+    Deceased: t("mobile.edit.statusDeceased", { defaultValue: "Deceased" }),
+    Quarantine: t("mobile.edit.statusQuarantine", { defaultValue: "Quarantine" }),
+  };
 
   return (
     <form className="mbl-edit-form" onSubmit={(e) => { e.preventDefault(); onSave(draft); }}>
@@ -911,7 +947,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
           <span>{label}</span>
           {type === "select" ? (
             <select value={draft[key]} onChange={set(key)}>
-              {opts.map((o) => <option key={o} value={o}>{o || "— not set —"}</option>)}
+              {opts.map((o) => <option key={o} value={o}>{optionLabels[o] ?? o}</option>)}
             </select>
           ) : type === "textarea" ? (
             <textarea rows={3} value={draft[key]} onChange={set(key)} />
@@ -922,9 +958,9 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
         </label>
       ))}
       <div className="mbl-edit-actions">
-        <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>{t("mobile.common.cancel", { defaultValue: "Cancel" })}</button>
         <button type="submit" className="mbl-btn mbl-btn--sk-primary" disabled={busy}>
-          {busy ? <Spinner /> : "Save changes"}
+          {busy ? <Spinner /> : t("mobile.edit.saveChanges", { defaultValue: "Save changes" })}
         </button>
       </div>
     </form>
@@ -935,20 +971,25 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
 function FeedModal({ animal, onSave, onClose }) {
   const [food, setFood]     = useState("Rat pup");
   const [result, setResult] = useState("ate");
+  const { t } = useTranslation();
+  const resultLabels = {
+    ate: t("mobile.feed.ate", { defaultValue: "Ate" }),
+    refused: t("mobile.feed.refused", { defaultValue: "Refused" }),
+  };
   return (
-    <ActionSheet title="Feed" onClose={onClose}>
-      <label className="mbl-field"><span>Food</span>
+    <ActionSheet title={t("mobile.feed.title", { defaultValue: "Feed" })} onClose={onClose}>
+      <label className="mbl-field"><span>{t("mobile.feed.food", { defaultValue: "Food" })}</span>
         <input value={food} onChange={(e) => setFood(e.target.value)} />
       </label>
       <div className="mbl-seg">
         {["ate", "refused"].map((v) => (
           <button key={v} type="button" className={result === v ? "is-active" : ""}
-            onClick={() => setResult(v)}>{cap(v)}</button>
+            onClick={() => setResult(v)}>{resultLabels[v] || cap(v)}</button>
         ))}
       </div>
       <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, food, result })}>
-        Save feed
+        {t("mobile.feed.save", { defaultValue: "Save feed" })}
       </button>
     </ActionSheet>
   );
@@ -956,15 +997,16 @@ function FeedModal({ animal, onSave, onClose }) {
 
 function WeightModal({ animal, onSave, onClose }) {
   const [grams, setGrams] = useState(animal?.weight || "");
+  const { t } = useTranslation();
   return (
-    <ActionSheet title="Weight" onClose={onClose}>
-      <label className="mbl-field"><span>Grams</span>
+    <ActionSheet title={t("mobile.weight.title", { defaultValue: "Weight" })} onClose={onClose}>
+      <label className="mbl-field"><span>{t("mobile.weight.grams", { defaultValue: "Grams" })}</span>
         <input type="number" inputMode="numeric" value={grams}
           onChange={(e) => setGrams(e.target.value)} />
       </label>
       <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, grams })}>
-        Save weight
+        {t("mobile.weight.save", { defaultValue: "Save weight" })}
       </button>
     </ActionSheet>
   );
@@ -972,17 +1014,18 @@ function WeightModal({ animal, onSave, onClose }) {
 
 function ShedModal({ animal, onSave, onClose }) {
   const [result, setResult] = useState("complete");
+  const { t } = useTranslation();
   return (
-    <ActionSheet title="Shed" onClose={onClose}>
+    <ActionSheet title={t("mobile.shed.title", { defaultValue: "Shed" })} onClose={onClose}>
       <div className="mbl-seg">
         {["complete", "bad"].map((v) => (
           <button key={v} type="button" className={result === v ? "is-active" : ""}
-            onClick={() => setResult(v)}>{v === "bad" ? "Bad shed" : "Complete"}</button>
+            onClick={() => setResult(v)}>{v === "bad" ? t("mobile.shed.bad", { defaultValue: "Bad shed" }) : t("mobile.shed.complete", { defaultValue: "Complete" })}</button>
         ))}
       </div>
       <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide"
         onClick={() => onSave({ animalId: animal.appAnimalId, result })}>
-        Save shed
+        {t("mobile.shed.save", { defaultValue: "Save shed" })}
       </button>
     </ActionSheet>
   );
@@ -990,6 +1033,7 @@ function ShedModal({ animal, onSave, onClose }) {
 
 function NoteModal({ animal, onSave, onClose }) {
   const [note, setNote] = useState("");
+  const { t } = useTranslation();
   const startVoice = () => {
     const R = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!R) return;
@@ -998,14 +1042,14 @@ function NoteModal({ animal, onSave, onClose }) {
     r.start();
   };
   return (
-    <ActionSheet title="Note" onClose={onClose}>
+    <ActionSheet title={t("mobile.note.title", { defaultValue: "Note" })} onClose={onClose}>
       <textarea className="mbl-note-area" rows={5} value={note}
-        onChange={(e) => setNote(e.target.value)} placeholder="Type or use voice…" />
+        onChange={(e) => setNote(e.target.value)} placeholder={t("mobile.note.placeholder", { defaultValue: "Type or use voice…" })} />
       <div className="mbl-edit-actions">
-        <button type="button" className="mbl-btn" onClick={startVoice}>🎤 Voice</button>
+        <button type="button" className="mbl-btn" onClick={startVoice}>{t("mobile.note.voice", { defaultValue: "🎤 Voice" })}</button>
         <button type="button" className="mbl-btn mbl-btn--sk-primary"
           onClick={() => onSave({ animalId: animal.appAnimalId, note })}>
-          Save note
+          {t("mobile.note.save", { defaultValue: "Save note" })}
         </button>
       </div>
     </ActionSheet>
@@ -1016,10 +1060,11 @@ function NoteModal({ animal, onSave, onClose }) {
 function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, busy }) {
   const photos = Array.isArray(animal?.photos) ? [...animal.photos].reverse() : [];
   const currentIcon = animal?.imageUrl;
+  const { t } = useTranslation();
   return (
-    <ActionSheet title="Photos" onClose={onClose}>
+    <ActionSheet title={t("mobile.photos.title", { defaultValue: "Photos" })} onClose={onClose}>
       <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" onClick={onTakePhoto} disabled={busy}>
-        {busy ? <Spinner /> : "📷 Take Photo"}
+        {busy ? <Spinner /> : t("mobile.photos.takePhoto", { defaultValue: "📷 Take Photo" })}
       </button>
       {photos.length > 0 ? (
         <div className="mbl-photo-grid">
@@ -1033,18 +1078,18 @@ function PhotoModal({ animal, onTakePhoto, onSetIcon, onDeletePhoto, onClose, bu
                   onClick={() => onSetIcon(photo.url)}
                   disabled={busy || currentIcon === photo.url}
                 >
-                  {currentIcon === photo.url ? "✓ Icon" : "Set as icon"}
+                  {currentIcon === photo.url ? t("mobile.photos.currentIcon", { defaultValue: "✓ Icon" }) : t("mobile.photos.setAsIcon", { defaultValue: "Set as icon" })}
                 </button>
                 <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
                   onClick={() => onDeletePhoto(photo.id)} disabled={busy}>
-                  Delete
+                  {t("mobile.photos.delete", { defaultValue: "Delete" })}
                 </button>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mbl-empty">No photos yet. Tap above to take one.</p>
+        <p className="mbl-empty">{t("mobile.photos.empty", { defaultValue: "No photos yet. Tap above to take one." })}</p>
       )}
     </ActionSheet>
   );
@@ -1067,7 +1112,7 @@ function AnimalCardRow({ animal, onOpen }) {
       </div>
       <div className="mbl-animal-card-body">
         <div className="mbl-animal-card-row1">
-          <strong className="mbl-animal-card-name">{animal.name || animal.id}</strong>
+          <strong className="mbl-animal-card-name"><bdi>{animal.name || animal.id}</bdi></strong>
           {animal.status && <span className={`mbl-status-badge mbl-status--${statusKey}`}>{animal.status}</span>}
         </div>
         {genetics && <div className="mbl-animal-card-genetics">{genetics}</div>}
@@ -1081,12 +1126,13 @@ function AnimalCardRow({ animal, onOpen }) {
   );
 }
 
-// ג”€ג”€ג”€ FULL SCREEN PANEL (Breeding Advisor / Shed Test Terminal) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+// ג”€ג”€ג”€ FULL SCREEN PANEL (Breeding Advisor / Lab tests) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 function FullScreenPanel({ title, onClose, children }) {
+  const { t } = useTranslation();
   return (
     <section className="mbl-profile">
       <div className="mbl-profile-topbar">
-        <button type="button" className="mbl-back-btn" onClick={onClose}>← Back</button>
+        <button type="button" className="mbl-back-btn" onClick={onClose}>{t("mobile.common.back", { defaultValue: "← Back" })}</button>
         <span className="mbl-profile-topbar-name">{title}</span>
         <div style={{ width: 56 }} />
       </div>
@@ -1153,10 +1199,11 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
   const [fertileEggs, setFertileEggs] = useState("");
   const [slugs, setSlugs]             = useState("");
   const [hatchedCount, setHatchedCount] = useState("");
+  const { t } = useTranslation();
 
   const STAGE_LABELS = {
-    ovulation: "Ovulation", preLayShed: "Pre-lay Shed",
-    clutch: "Lay / Clutch", hatch: "Hatch",
+    ovulation: t("mobile.cycle.ovulation", { defaultValue: "Ovulation" }), preLayShed: t("mobile.cycle.preLayShed", { defaultValue: "Pre-lay Shed" }),
+    clutch: t("mobile.cycle.clutch", { defaultValue: "Lay / Clutch" }), hatch: t("mobile.cycle.hatch", { defaultValue: "Hatch" }),
   };
 
   const save = () => {
@@ -1174,23 +1221,23 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
   return (
     <div className="mbl-cs-form">
       <label className="mbl-field">
-        <span>Date observed</span>
+        <span>{t("mobile.cycle.dateObserved", { defaultValue: "Date observed" })}</span>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       {stageKey === "clutch" && (
         <>
           <label className="mbl-field">
-            <span>Total eggs</span>
+            <span>{t("mobile.cycle.totalEggs", { defaultValue: "Total eggs" })}</span>
             <input type="number" inputMode="numeric" value={eggsTotal}
               onChange={(e) => setEggsTotal(e.target.value)} placeholder="—" />
           </label>
           <label className="mbl-field">
-            <span>Fertile eggs</span>
+            <span>{t("mobile.cycle.fertileEggs", { defaultValue: "Fertile eggs" })}</span>
             <input type="number" inputMode="numeric" value={fertileEggs}
               onChange={(e) => setFertileEggs(e.target.value)} placeholder="—" />
           </label>
           <label className="mbl-field">
-            <span>Slugs</span>
+            <span>{t("mobile.cycle.slugs", { defaultValue: "Slugs" })}</span>
             <input type="number" inputMode="numeric" value={slugs}
               onChange={(e) => setSlugs(e.target.value)} placeholder="—" />
           </label>
@@ -1198,22 +1245,22 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
       )}
       {stageKey === "hatch" && (
         <label className="mbl-field">
-          <span>Hatchlings</span>
+          <span>{t("mobile.cycle.hatchlings", { defaultValue: "Hatchlings" })}</span>
           <input type="number" inputMode="numeric" value={hatchedCount}
             onChange={(e) => setHatchedCount(e.target.value)} placeholder="—" />
         </label>
       )}
       <label className="mbl-field">
-        <span>Notes</span>
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+        <span>{t("mobile.cycle.notes", { defaultValue: "Notes" })}</span>
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("mobile.cycle.optional", { defaultValue: "Optional" })} />
       </label>
       <div className="mbl-edit-actions">
         <button type="button" className="mbl-btn" onClick={onCancel} disabled={busy}>
-          Cancel
+          {t("mobile.common.cancel", { defaultValue: "Cancel" })}
         </button>
         <button type="button" className="mbl-btn mbl-btn--sk-primary"
           onClick={save} disabled={busy || !date}>
-          {busy ? <Spinner /> : `Log ${STAGE_LABELS[stageKey]}`}
+          {busy ? <Spinner /> : t("mobile.cycle.logStage", { stage: STAGE_LABELS[stageKey], defaultValue: "Log {{stage}}" })}
         </button>
       </div>
     </div>
@@ -1224,6 +1271,7 @@ function CycleStageForm({ stageKey, onSave, onCancel, busy }) {
 function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
   const [openStage, setOpenStage] = useState(null);
   const [saving, setSaving]       = useState(false);
+  const { t } = useTranslation();
 
   const ovLogs = useMemo(() => sortLogs(pairing.mobileOvulationLogs),  [pairing.mobileOvulationLogs]);
   const plLogs = useMemo(() => sortLogs(pairing.mobilePreLayShedLogs), [pairing.mobilePreLayShedLogs]);
@@ -1257,15 +1305,15 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
   };
 
   // Countdown strings from most-recent logged date per stage
-  const ovCd = latestOv?.date ? `Expected pre-lay shed: ${fmtDate(addDays(latestOv.date, 14))} – ${fmtDate(addDays(latestOv.date, 28))}` : null;
-  const plCd = latestPl?.date ? `Expected lay: ${fmtDate(addDays(latestPl.date, 14))} – ${fmtDate(addDays(latestPl.date, 28))}` : null;
-  const clCd = latestCl?.date ? `Expected hatch: ${fmtDate(addDays(latestCl.date, 55))} – ${fmtDate(addDays(latestCl.date, 65))}` : null;
+  const ovCd = latestOv?.date ? t("mobile.cycle.expectedPreLayShed", { from: fmtDate(addDays(latestOv.date, 14)), to: fmtDate(addDays(latestOv.date, 28)), defaultValue: "Expected pre-lay shed: {{from}} – {{to}}" }) : null;
+  const plCd = latestPl?.date ? t("mobile.cycle.expectedLay", { from: fmtDate(addDays(latestPl.date, 14)), to: fmtDate(addDays(latestPl.date, 28)), defaultValue: "Expected lay: {{from}} – {{to}}" }) : null;
+  const clCd = latestCl?.date ? t("mobile.cycle.expectedHatch", { from: fmtDate(addDays(latestCl.date, 55)), to: fmtDate(addDays(latestCl.date, 65)), defaultValue: "Expected hatch: {{from}} – {{to}}" }) : null;
 
   const stages = [
-    { key: "ovulation",  label: "Ovulation",    logs: ovLogs, latest: latestOv, countdown: ovCd },
-    { key: "preLayShed", label: "Pre-lay Shed",  logs: plLogs, latest: latestPl, countdown: plCd },
-    { key: "clutch",     label: "Lay / Clutch",  logs: clLogs, latest: latestCl, countdown: clCd },
-    { key: "hatch",      label: "Hatch",          logs: haLogs, latest: latestHa, countdown: null },
+    { key: "ovulation",  label: t("mobile.cycle.ovulation", { defaultValue: "Ovulation" }),    logs: ovLogs, latest: latestOv, countdown: ovCd },
+    { key: "preLayShed", label: t("mobile.cycle.preLayShed", { defaultValue: "Pre-lay Shed" }), logs: plLogs, latest: latestPl, countdown: plCd },
+    { key: "clutch",     label: t("mobile.cycle.clutch", { defaultValue: "Lay / Clutch" }),     logs: clLogs, latest: latestCl, countdown: clCd },
+    { key: "hatch",      label: t("mobile.cycle.hatch", { defaultValue: "Hatch" }),             logs: haLogs, latest: latestHa, countdown: null },
   ];
 
   const statusCls = `mbl-bp-status--${(pairing.status || "unknown").toLowerCase().replace(/\s+/g, "-")}`;
@@ -1274,12 +1322,12 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
     <div className="mbl-bp-card">
       <div className="mbl-bp-header">
         <div>
-          <strong>{pairing.label || `Pairing ${(pairing.id || "").slice(-6)}`}</strong>
+          <strong>{pairing.label || t("mobile.pairing.fallbackLabel", { id: (pairing.id || "").slice(-6), defaultValue: "Pairing {{id}}" })}</strong>
           <small className="mbl-bp-meta">
-            {isFemale ? "Female" : "Male"} · Partner: {partnerName}
+            {isFemale ? t("mobile.pairing.female", { defaultValue: "Female" }) : t("mobile.pairing.male", { defaultValue: "Male" })} · {t("mobile.pairing.partner", { name: partnerName, defaultValue: "Partner: {{name}}" })}
           </small>
         </div>
-        <span className={`mbl-bp-status ${statusCls}`}>{pairing.status || "Unknown"}</span>
+        <span className={`mbl-bp-status ${statusCls}`}>{pairing.status || t("mobile.pairing.unknownStatus", { defaultValue: "Unknown" })}</span>
       </div>
 
       <div className="mbl-bp-stages">
@@ -1290,7 +1338,7 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
                 <strong>{label}</strong>
                 {latest
                   ? <span className="mbl-cs-latest">{fmtDate(latest.date)}</span>
-                  : <span className="mbl-cs-none">Not logged</span>}
+                  : <span className="mbl-cs-none">{t("mobile.cycle.notLogged", { defaultValue: "Not logged" })}</span>}
               </div>
               <div className="mbl-cs-right">
                 {logs.length > 0 && <span className="mbl-cs-badge">{logs.length}</span>}
@@ -1310,24 +1358,24 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
                 />
                 {logs.length > 0 && (
                   <div className="mbl-cs-history">
-                    <div className="mbl-cs-history-label">History</div>
+                    <div className="mbl-cs-history-label">{t("mobile.cycle.history", { defaultValue: "History" })}</div>
                     {logs.map((entry, i) => (
                       <div key={entry.id || `${key}-${i}`}
                         className={`mbl-cs-entry ${i === 0 ? "is-latest" : ""}`}>
                         <div className="mbl-cs-entry-row">
                           <span className="mbl-cs-entry-date">{fmtDate(entry.date)}</span>
-                          {i === 0 && <span className="mbl-cs-tag">Latest</span>}
+                          {i === 0 && <span className="mbl-cs-tag">{t("mobile.cycle.latest", { defaultValue: "Latest" })}</span>}
                         </div>
                         {(entry.eggsTotal || entry.fertileEggs || entry.slugs) && (
                           <div className="mbl-cs-entry-detail">
-                            {entry.eggsTotal   && <span>{entry.eggsTotal} eggs</span>}
-                            {entry.fertileEggs && <span>{entry.fertileEggs} fertile</span>}
-                            {entry.slugs       && <span>{entry.slugs} slugs</span>}
+                            {entry.eggsTotal   && <span>{t("mobile.cycle.eggsCount", { n: entry.eggsTotal, defaultValue: "{{n}} eggs" })}</span>}
+                            {entry.fertileEggs && <span>{t("mobile.cycle.fertileCount", { n: entry.fertileEggs, defaultValue: "{{n}} fertile" })}</span>}
+                            {entry.slugs       && <span>{t("mobile.cycle.slugsCount", { n: entry.slugs, defaultValue: "{{n}} slugs" })}</span>}
                           </div>
                         )}
                         {entry.hatchedCount > 0 && (
                           <div className="mbl-cs-entry-detail">
-                            <span>{entry.hatchedCount} hatchlings</span>
+                            <span>{t("mobile.cycle.hatchlingsCount", { n: entry.hatchedCount, defaultValue: "{{n}} hatchlings" })}</span>
                           </div>
                         )}
                         {entry.notes && (
@@ -1347,7 +1395,32 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
 }
 
 // ג”€ג”€ג”€ BREEDING PANEL ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
+function BreedingCardSummary({ cycle, animalMap }) {
+  const { t } = useTranslation();
+  const sessions = (cycle.sessions || []).filter((s) => s.introductionDate).length;
+  const locks = (cycle.sessions || []).reduce((n, s) => n + (s.locks || []).filter((l) => l.status === "observed" && l.observationDate).length, 0);
+  const pending = (cycle.plannedPairings || []).filter((p) => p.status === "pending" && p.date).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const males = (cycle.males || []).map((m) => animalMap.get(m.maleId)?.name || m.maleId).join(", ");
+  return (
+    <div className="mbl-bp-card">
+      <div className="mbl-bp-header">
+        <div>
+          <strong>{t("mobile.breedingCard.title", { season: cycle.seasonLabel || "", defaultValue: "Breeding card {{season}}" })}</strong>
+          <small className="mbl-bp-meta">{t("mobile.breedingCard.males", { males: males || "—", defaultValue: "Males: {{males}}" })}</small>
+        </div>
+        <span className={`mbl-bp-status mbl-bp-status--${cycle.status || "active"}`}>{cycle.status}</span>
+      </div>
+      <div className="mbl-cs-entry-detail">
+        <span>{t("mobile.breedingCard.sessions", { n: sessions, defaultValue: "{{n}} sessions" })}</span>
+        <span>{t("mobile.breedingCard.locks", { n: locks, defaultValue: "{{n}} observed locks" })}</span>
+        {pending ? <span>{t("mobile.breedingCard.nextPlanned", { date: fmtDate(pending.date), defaultValue: "Next planned pairing {{date}}" })}</span> : null}
+      </div>
+      <div className="mbl-cs-entry-notes">{t("mobile.breedingCard.editHint", { defaultValue: "Record sessions, locks and scans in the full app; this view is read-only." })}</div>
+    </div>
+  );
+}
+
+function BreedingPanel({ animal, pairings, allAnimals, onSavePairing, breedingCycles = [] }) {
   const animalId = animal?.id || animal?.appAnimalId;
   const related  = useMemo(
     () => (pairings || []).filter((p) => p.femaleId === animalId || p.maleId === animalId),
@@ -1357,17 +1430,24 @@ function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
     () => new Map((allAnimals || []).map((a) => [a.id, a])),
     [allAnimals]
   );
+  const { t } = useTranslation();
 
-  if (!related.length) {
-    return <p className="mbl-empty">No pairings found for this animal.</p>;
+  const cards = useMemo(
+    () => (breedingCycles || []).filter((c) => c && (c.femaleId === animalId || (c.males || []).some((m) => m.maleId === animalId))),
+    [breedingCycles, animalId]
+  );
+
+  if (!related.length && !cards.length) {
+    return <p className="mbl-empty">{t("mobile.breeding.noPairingsForAnimal", { defaultValue: "No pairings found for this animal." })}</p>;
   }
 
   return (
     <div className="mbl-breeding-list">
+      {cards.map((cycle) => <BreedingCardSummary key={cycle.id} cycle={cycle} animalMap={animalMap} />)}
       {related.map((pairing) => {
         const isFemale    = pairing.femaleId === animalId;
         const partnerId   = isFemale ? pairing.maleId : pairing.femaleId;
-        const partnerName = animalMap.get(partnerId)?.name || partnerId || "Unknown";
+        const partnerName = animalMap.get(partnerId)?.name || partnerId || t("mobile.breeding.unknownPartner", { defaultValue: "Unknown" });
         return (
           <PairingSection
             key={pairing.id}
@@ -1396,10 +1476,10 @@ const LOG_META = {
   health: { label: "Health", icon: "H" },
 };
 
-const displayValue = (value) => {
+const displayValue = (value, t) => {
   if (Array.isArray(value)) return joinText(value);
-  if (value === true) return "Yes";
-  if (value === false) return "No";
+  if (value === true) return t("mobile.common.yes", { defaultValue: "Yes" });
+  if (value === false) return t("mobile.common.no", { defaultValue: "No" });
   if (value === null || value === undefined) return "";
   if (typeof value === "number") return String(value);
   if (typeof value === "string") return value.trim();
@@ -1407,8 +1487,9 @@ const displayValue = (value) => {
 };
 
 function InfoRows({ rows = [] }) {
+  const { t } = useTranslation();
   const visible = rows
-    .map((row) => ({ ...row, value: displayValue(row.value) }))
+    .map((row) => ({ ...row, value: displayValue(row.value, t) }))
     .filter((row) => row.value);
   if (!visible.length) return null;
   return (
@@ -1432,9 +1513,9 @@ function DetailSection({ title, rows }) {
   );
 }
 
-const formatWeight = (value) => {
+const formatWeight = (value, t) => {
   const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? `${number} g` : displayValue(value);
+  return Number.isFinite(number) && number > 0 ? `${number} g` : displayValue(value, t);
 };
 
 const formatDateValue = (value) => (firstText(value) ? fmtDate(value) : "");
@@ -1449,82 +1530,82 @@ const feederSummary = (profile) => {
   ).join(" ");
 };
 
-const animalDetailSections = (animal = {}) => {
+const animalDetailSections = (animal = {}, t) => {
   const breeder = isObject(animal.breeder) ? animal.breeder : {};
   const sale = isObject(animal.sale) ? animal.sale : {};
   const lab = isObject(animal.lab) ? animal.lab : {};
   return [
     {
-      title: "Identity",
+      title: t("mobile.details.identitySection", { defaultValue: "Identity" }),
       rows: [
-        { label: "Animal ID", value: animalIdentity(animal) },
-        { label: "Name", value: animal.name },
-        { label: "Sex", value: animal.sex },
-        { label: "Status", value: animal.status },
-        { label: "Species", value: animal.species },
-        { label: "Year", value: animal.year || animal.hatchYear || animal.birthYear },
-        { label: "Date of birth", value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
-        { label: "Weight", value: formatWeight(animal.weight || animal.weightGrams) },
+        { label: t("mobile.details.animalId", { defaultValue: "Animal ID" }), value: animalIdentity(animal) },
+        { label: t("mobile.details.name", { defaultValue: "Name" }), value: animal.name },
+        { label: t("mobile.details.sex", { defaultValue: "Sex" }), value: animal.sex },
+        { label: t("mobile.details.status", { defaultValue: "Status" }), value: animal.status },
+        { label: t("mobile.details.species", { defaultValue: "Species" }), value: animal.species },
+        { label: t("mobile.details.year", { defaultValue: "Year" }), value: animal.year || animal.hatchYear || animal.birthYear },
+        { label: t("mobile.details.dateOfBirth", { defaultValue: "Date of birth" }), value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
+        { label: t("mobile.details.weight", { defaultValue: "Weight" }), value: formatWeight(animal.weight || animal.weightGrams, t) },
       ],
     },
     {
-      title: "Genetics",
+      title: t("mobile.details.geneticsSection", { defaultValue: "Genetics" }),
       rows: [
-        { label: "Genetics", value: formatGeneticsText(animal) },
-        { label: "Morphs", value: animal.morphs },
-        { label: "Hets", value: animal.hets },
-        { label: "Possible hets", value: animal.possibleHets },
-        { label: "Line", value: firstText(animal.line, animal.bloodline, animal.project) },
+        { label: t("mobile.details.genetics", { defaultValue: "Genetics" }), value: formatGeneticsText(animal) },
+        { label: t("mobile.details.morphs", { defaultValue: "Morphs" }), value: animal.morphs },
+        { label: t("mobile.details.hets", { defaultValue: "Hets" }), value: animal.hets },
+        { label: t("mobile.details.possibleHets", { defaultValue: "Possible hets" }), value: animal.possibleHets },
+        { label: t("mobile.details.line", { defaultValue: "Line" }), value: firstText(animal.line, animal.bloodline, animal.project) },
       ],
     },
     {
-      title: "Location",
+      title: t("mobile.details.locationSection", { defaultValue: "Location" }),
       rows: [
-        { label: "Location", value: locationText(animal) },
-        { label: "Room", value: firstText(animal.roomName, animal.room, animal.location?.roomName, animal.location?.room) },
-        { label: "Rack", value: firstText(animal.rackName, animal.rack, animal.heatRackName, animal.heatRack, animal.location?.rackName, animal.location?.rack) },
-        { label: "Tub", value: firstText(animal.tubName, animal.tub, animal.tubLabel, animal.slotLabel, animal.location?.tubName, animal.location?.tub) },
+        { label: t("mobile.details.location", { defaultValue: "Location" }), value: locationText(animal) },
+        { label: t("mobile.details.room", { defaultValue: "Room" }), value: firstText(animal.roomName, animal.room, animal.location?.roomName, animal.location?.room) },
+        { label: t("mobile.details.rack", { defaultValue: "Rack" }), value: firstText(animal.rackName, animal.rack, animal.heatRackName, animal.heatRack, animal.location?.rackName, animal.location?.rack) },
+        { label: t("mobile.details.tub", { defaultValue: "Tub" }), value: firstText(animal.tubName, animal.tub, animal.tubLabel, animal.slotLabel, animal.location?.tubName, animal.location?.tub) },
       ],
     },
     {
-      title: "Groups",
+      title: t("mobile.details.groupsSection", { defaultValue: "Groups" }),
       rows: [
-        { label: "Groups", value: animal.groups },
-        { label: "Tags", value: animal.tags },
+        { label: t("mobile.details.groups", { defaultValue: "Groups" }), value: animal.groups },
+        { label: t("mobile.details.tags", { defaultValue: "Tags" }), value: animal.tags },
       ],
     },
     {
-      title: "Lineage",
+      title: t("mobile.details.lineageSection", { defaultValue: "Lineage" }),
       rows: [
-        { label: "Sire", value: firstText(animal.sireName, animal.sireId, animal.fatherName, animal.fatherId) },
-        { label: "Dam", value: firstText(animal.damName, animal.damId, animal.motherName, animal.motherId) },
-        { label: "Breeder", value: firstText(animal.breederName, breeder.name) },
-        { label: "Source", value: firstText(animal.source, animal.origin) },
+        { label: t("mobile.details.sire", { defaultValue: "Sire" }), value: firstText(animal.sireName, animal.sireId, animal.fatherName, animal.fatherId) },
+        { label: t("mobile.details.dam", { defaultValue: "Dam" }), value: firstText(animal.damName, animal.damId, animal.motherName, animal.motherId) },
+        { label: t("mobile.details.breeder", { defaultValue: "Breeder" }), value: firstText(animal.breederName, breeder.name) },
+        { label: t("mobile.details.source", { defaultValue: "Source" }), value: firstText(animal.source, animal.origin) },
       ],
     },
     {
-      title: "Acquisition & sale",
+      title: t("mobile.details.acquisitionAndSaleSection", { defaultValue: "Acquisition & sale" }),
       rows: [
-        { label: "Acquired", value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
-        { label: "Price", value: firstText(animal.price, animal.purchasePrice) },
-        { label: "Currency", value: firstText(animal.currency, sale.currency) },
-        { label: "For sale", value: animal.forSale },
-        { label: "Sale status", value: firstText(sale.status, animal.saleStatus, animal.marketplaceStatus) },
+        { label: t("mobile.details.acquired", { defaultValue: "Acquired" }), value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
+        { label: t("mobile.details.price", { defaultValue: "Price" }), value: firstText(animal.price, animal.purchasePrice) },
+        { label: t("mobile.details.currency", { defaultValue: "Currency" }), value: firstText(animal.currency, sale.currency) },
+        { label: t("mobile.details.forSale", { defaultValue: "For sale" }), value: animal.forSale },
+        { label: t("mobile.details.saleStatus", { defaultValue: "Sale status" }), value: firstText(sale.status, animal.saleStatus, animal.marketplaceStatus) },
       ],
     },
     {
-      title: "Lab & marketplace",
+      title: t("mobile.details.labAndMarketplaceSection", { defaultValue: "Lab & marketplace" }),
       rows: [
-        { label: "Lab order", value: firstText(lab.orderStatus, animal.labOrderStatus, animal.testOrderStatus) },
-        { label: "Lab result", value: firstText(lab.resultStatus, animal.labResultStatus, animal.testResultStatus) },
-        { label: "Listing", value: firstText(animal.listingStatus, animal.marketplaceListingStatus) },
-        { label: "Public contact", value: firstText(animal.publicContactEmail, animal.contactEmail) },
+        { label: t("mobile.details.labOrder", { defaultValue: "Lab order" }), value: firstText(lab.orderStatus, animal.labOrderStatus, animal.testOrderStatus) },
+        { label: t("mobile.details.labResult", { defaultValue: "Lab result" }), value: firstText(lab.resultStatus, animal.labResultStatus, animal.testResultStatus) },
+        { label: t("mobile.details.listing", { defaultValue: "Listing" }), value: firstText(animal.listingStatus, animal.marketplaceListingStatus) },
+        { label: t("mobile.details.publicContact", { defaultValue: "Public contact" }), value: firstText(animal.publicContactEmail, animal.contactEmail) },
       ],
     },
     {
-      title: "Notes",
+      title: t("mobile.details.notesSection", { defaultValue: "Notes" }),
       rows: [
-        { label: "Notes", value: animal.notes, full: true },
+        { label: t("mobile.details.notes", { defaultValue: "Notes" }), value: animal.notes, full: true },
       ],
     },
   ];
@@ -1543,26 +1624,37 @@ const flattenLogs = (logs = {}) => Object.entries(isObject(logs) ? logs : {}).fl
     }))
 ));
 
-const logEntrySummary = (entry = {}) => {
+const logEntrySummary = (entry = {}, t) => {
   if (entry.logKey === "feeds") {
-    return compactText(entry.result || entry.status || "fed", entry.feed || entry.food, entry.size || entry.sizeDetail, entry.grams ? `${entry.grams} g` : "").join(" | ");
+    return compactText(entry.result || entry.status || t("mobile.logs.fed", { defaultValue: "fed" }), entry.feed || entry.food, entry.size || entry.sizeDetail, entry.grams ? `${entry.grams} g` : "").join(" | ");
   }
-  if (entry.logKey === "weights") return formatWeight(entry.grams || entry.weight || entry.weightGrams);
+  if (entry.logKey === "weights") return formatWeight(entry.grams || entry.weight || entry.weightGrams, t);
   if (entry.logKey === "meds") return compactText(entry.medication, entry.dose, entry.note || entry.notes).join(" | ");
-  return firstText(entry.note, entry.notes, entry.result, entry.status, entry.outcome, entry.description) || "Saved";
+  return firstText(entry.note, entry.notes, entry.result, entry.status, entry.outcome, entry.description) || t("mobile.logs.saved", { defaultValue: "Saved" });
 };
 
 function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickAction, onTakePhoto, onSetIcon, onDeletePhoto, onSavePairing, onBack }) {
   const [subtab, setSubtab]         = useState("overview");
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [orderTestOpen, setOrderTestOpen] = useState(false);
+  const { t } = useTranslation();
   const logs = animal?.logs || {};
   const latestFeed   = latestLogEntry(logs.feeds);
   const latestWeight = latestLogEntry(logs.weights);
   const latestShed   = latestLogEntry(logs.sheds);
   const feederProfile = normalizeFeederProfile(animal);
   const feedCycle = getNextFeedCycle(animal);
-  const detailSections = animalDetailSections(animal);
+  const detailSections = animalDetailSections(animal, t);
+  const logTypeLabels = {
+    feeds: t("mobile.logs.typeFeed", { defaultValue: "Feed" }),
+    weights: t("mobile.logs.typeWeight", { defaultValue: "Weight" }),
+    sheds: t("mobile.logs.typeShed", { defaultValue: "Shed" }),
+    cleanings: t("mobile.logs.typeClean", { defaultValue: "Clean" }),
+    meds: t("mobile.logs.typeMedication", { defaultValue: "Medication" }),
+    water: t("mobile.logs.typeWater", { defaultValue: "Water" }),
+    notes: t("mobile.logs.typeNote", { defaultValue: "Note" }),
+    health: t("mobile.logs.typeHealth", { defaultValue: "Health" }),
+  };
   const logRows = flattenLogs(logs).sort((a, b) => (b.sortTime || 0) - (a.sortTime || 0)).slice(0, 80);
   const genetics = formatGeneticsText(animal);
 
@@ -1572,14 +1664,14 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
   };
 
   const quickActions = [
-    { label: "Feed",       icon: "🍗", action: "feed"       },
-    { label: "Weight",     icon: "⚖", action: "weight"     },
-    { label: "Shed",       icon: "🐍", action: "shed"       },
-    { label: "Clean",      icon: "🧹", action: "clean"      },
-    { label: "Water",      icon: "💧", action: "water"      },
-    { label: "Note",       icon: "📝", action: "note"       },
-    { label: "Photo",      icon: "📷", action: "photo"      },
-    { label: "Order Test", icon: "🧬", action: "order-test" },
+    { label: t("mobile.actions.feed", { defaultValue: "Feed" }),            icon: "🍗", action: "feed"       },
+    { label: t("mobile.actions.weight", { defaultValue: "Weight" }),        icon: "⚖", action: "weight"     },
+    { label: t("mobile.actions.shed", { defaultValue: "Shed" }),            icon: "🐍", action: "shed"       },
+    { label: t("mobile.actions.clean", { defaultValue: "Clean" }),          icon: "🧹", action: "clean"      },
+    { label: t("mobile.actions.water", { defaultValue: "Water" }),          icon: "💧", action: "water"      },
+    { label: t("mobile.actions.note", { defaultValue: "Note" }),            icon: "📝", action: "note"       },
+    { label: t("mobile.actions.photo", { defaultValue: "Photo" }),          icon: "📷", action: "photo"      },
+    { label: t("mobile.actions.orderTest", { defaultValue: "Order Test" }), icon: "🧬", action: "order-test" },
   ];
 
   const statusColor = STATUS_COLORS[(animal?.status || "").toLowerCase()] || "gray";
@@ -1587,7 +1679,7 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
   return (
     <section className="mbl-profile">
       <div className="mbl-profile-topbar">
-        <button type="button" className="mbl-back-btn" onClick={onBack}>← Back</button>
+        <button type="button" className="mbl-back-btn" onClick={onBack}>{t("mobile.common.back", { defaultValue: "← Back" })}</button>
         <span className="mbl-profile-topbar-name">{animal.name || animal.appAnimalId}</span>
         <div style={{ width: 56 }} />
       </div>
@@ -1625,14 +1717,14 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
 
       <div className="mbl-subtabs mbl-subtabs--scroll">
         {[
-          ["overview", "Overview"],
-          ["feed", "Feed Cycle"],
-          ["details", "Details"],
-          ["logs", "Logs"],
-          ["photos", "Photos"],
-          ["breeding", "Breeding"],
-        ].map(([t, label]) => (
-          <button key={t} type="button" className={subtab === t ? "is-active" : ""} onClick={() => setSubtab(t)}>
+          ["overview", t("mobile.profile.tabOverview", { defaultValue: "Overview" })],
+          ["feed", t("mobile.profile.tabFeedCycle", { defaultValue: "Feed Cycle" })],
+          ["details", t("mobile.profile.tabDetails", { defaultValue: "Details" })],
+          ["logs", t("mobile.profile.tabLogs", { defaultValue: "Logs" })],
+          ["photos", t("mobile.profile.tabPhotos", { defaultValue: "Photos" })],
+          ["breeding", t("mobile.profile.tabBreeding", { defaultValue: "Breeding" })],
+        ].map(([tabKey, label]) => (
+          <button key={tabKey} type="button" className={subtab === tabKey ? "is-active" : ""} onClick={() => setSubtab(tabKey)}>
             {label}
           </button>
         ))}
@@ -1642,32 +1734,32 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
         <div className="mbl-overview-section">
           <div className="mbl-data-grid">
             <div className="mbl-data-card">
-              <span>Last feed</span>
-              <strong>{latestFeed ? compactText(latestFeed.result || latestFeed.status || "fed", latestFeed.feed || latestFeed.food, latestFeed.size || latestFeed.sizeDetail).join(" | ") : "No feed log"}</strong>
+              <span>{t("mobile.profile.lastFeed", { defaultValue: "Last feed" })}</span>
+              <strong>{latestFeed ? compactText(latestFeed.result || latestFeed.status || t("mobile.logs.fed", { defaultValue: "fed" }), latestFeed.feed || latestFeed.food, latestFeed.size || latestFeed.sizeDetail).join(" | ") : t("mobile.profile.noFeedLog", { defaultValue: "No feed log" })}</strong>
             </div>
             <div className="mbl-data-card">
-              <span>Weight</span>
-              <strong>{formatWeight(latestWeight?.grams ?? latestWeight?.weight ?? animal.weight ?? animal.weightGrams) || "No weight"}</strong>
+              <span>{t("mobile.profile.weight", { defaultValue: "Weight" })}</span>
+              <strong>{formatWeight(latestWeight?.grams ?? latestWeight?.weight ?? animal.weight ?? animal.weightGrams, t) || t("mobile.profile.noWeight", { defaultValue: "No weight" })}</strong>
             </div>
             <div className="mbl-data-card">
-              <span>Last shed</span>
-              <strong>{latestShed ? (latestShed.result || formatDateValue(entryDateValue(latestShed))) : "No shed log"}</strong>
+              <span>{t("mobile.profile.lastShed", { defaultValue: "Last shed" })}</span>
+              <strong>{latestShed ? (latestShed.result || formatDateValue(entryDateValue(latestShed))) : t("mobile.profile.noShedLog", { defaultValue: "No shed log" })}</strong>
             </div>
             <div className="mbl-data-card">
-              <span>Next feed</span>
-              <strong>{feedCycle ? fmtDate(feedCycle.nextFeedDate) : "Set interval after feed"}</strong>
+              <span>{t("mobile.profile.nextFeed", { defaultValue: "Next feed" })}</span>
+              <strong>{feedCycle ? fmtDate(feedCycle.nextFeedDate) : t("mobile.profile.setIntervalAfterFeed", { defaultValue: "Set interval after feed" })}</strong>
             </div>
           </div>
           <InfoRows rows={[
-            { label: "Feeder", value: feederSummary(feederProfile) },
-            { label: "Feed interval", value: feederProfile.intervalDays ? `Every ${feederProfile.intervalDays} days` : "" },
-            { label: "Species", value: animal.species },
-            { label: "Date of birth", value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
-            { label: "Acquired", value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
-            { label: "Price", value: animal.price },
-            { label: "Breeding", value: animal.breeding?.pairingStatus || "" },
-            { label: "Lab order", value: animal.lab?.orderStatus },
-            { label: "Notes", value: animal.notes, full: true },
+            { label: t("mobile.profile.feeder", { defaultValue: "Feeder" }), value: feederSummary(feederProfile) },
+            { label: t("mobile.profile.feedInterval", { defaultValue: "Feed interval" }), value: feederProfile.intervalDays ? t("mobile.profile.everyNDays", { n: feederProfile.intervalDays, defaultValue: "Every {{n}} days" }) : "" },
+            { label: t("mobile.profile.species", { defaultValue: "Species" }), value: animal.species },
+            { label: t("mobile.profile.dateOfBirth", { defaultValue: "Date of birth" }), value: formatDateValue(animal.dob || animal.birthDate || animal.hatchDate) },
+            { label: t("mobile.profile.acquired", { defaultValue: "Acquired" }), value: formatDateValue(animal.acquisitionDate || animal.acquiredAt || animal.purchaseDate) },
+            { label: t("mobile.profile.price", { defaultValue: "Price" }), value: animal.price },
+            { label: t("mobile.profile.breeding", { defaultValue: "Breeding" }), value: animal.breeding?.pairingStatus || "" },
+            { label: t("mobile.profile.labOrder", { defaultValue: "Lab order" }), value: animal.lab?.orderStatus },
+            { label: t("mobile.profile.notes", { defaultValue: "Notes" }), value: animal.notes, full: true },
           ]} />
         </div>
       )}
@@ -1676,24 +1768,24 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
         <div className="mbl-feed-section">
           <div className="mbl-feed-card">
             <div>
-              <span>Feed Cycle</span>
-              <strong>{feederSummary(feederProfile) || "No feeder selected"}</strong>
+              <span>{t("mobile.feedCycle.title", { defaultValue: "Feed Cycle" })}</span>
+              <strong>{feederSummary(feederProfile) || t("mobile.feedCycle.noFeeder", { defaultValue: "No feeder selected" })}</strong>
             </div>
-            {isFeedDue(animal) && <em>Due</em>}
+            {isFeedDue(animal) && <em>{t("mobile.feedCycle.due", { defaultValue: "Due" })}</em>}
           </div>
           <InfoRows rows={[
-            { label: "Food type", value: feederProfile.feedType },
-            { label: "Size", value: feederProfile.sizeClass },
-            { label: "Weight class", value: feederProfile.weightGrams ? `${feederProfile.weightGrams} g` : "" },
-            { label: "Quantity", value: feederProfile.quantity },
-            { label: "Interval", value: feederProfile.intervalDays ? `Every ${feederProfile.intervalDays} days` : "" },
-            { label: "Last accepted feed", value: feedCycle?.lastFeedDate ? fmtDate(feedCycle.lastFeedDate) : "" },
-            { label: "Next feeding", value: feedCycle?.nextFeedDate ? fmtDate(feedCycle.nextFeedDate) : "" },
-            { label: "Notes", value: feederProfile.notes, full: true },
+            { label: t("mobile.feedCycle.foodType", { defaultValue: "Food type" }), value: feederProfile.feedType },
+            { label: t("mobile.feedCycle.size", { defaultValue: "Size" }), value: feederProfile.sizeClass },
+            { label: t("mobile.feedCycle.weightClass", { defaultValue: "Weight class" }), value: feederProfile.weightGrams ? `${feederProfile.weightGrams} g` : "" },
+            { label: t("mobile.feedCycle.quantity", { defaultValue: "Quantity" }), value: feederProfile.quantity },
+            { label: t("mobile.feedCycle.interval", { defaultValue: "Interval" }), value: feederProfile.intervalDays ? t("mobile.profile.everyNDays", { n: feederProfile.intervalDays, defaultValue: "Every {{n}} days" }) : "" },
+            { label: t("mobile.feedCycle.lastAcceptedFeed", { defaultValue: "Last accepted feed" }), value: feedCycle?.lastFeedDate ? fmtDate(feedCycle.lastFeedDate) : "" },
+            { label: t("mobile.feedCycle.nextFeeding", { defaultValue: "Next feeding" }), value: feedCycle?.nextFeedDate ? fmtDate(feedCycle.nextFeedDate) : "" },
+            { label: t("mobile.feedCycle.notes", { defaultValue: "Notes" }), value: feederProfile.notes, full: true },
           ]} />
           {!feedCycle && (
             <p className="mbl-settings-hint">
-              Feeding reminders start after this snake has both a feeding interval and an accepted feed log.
+              {t("mobile.feedCycle.remindersHint", { defaultValue: "Feeding reminders start after this snake has both a feeding interval and an accepted feed log." })}
             </p>
           )}
         </div>
@@ -1712,20 +1804,20 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
               <div key={entry.rowKey} className="mbl-log-row">
                 <span className="mbl-log-type-icon">{entry.typeIcon}</span>
                 <div className="mbl-log-body">
-                  <strong>{entry.type}</strong>
-                  <span>{logEntrySummary(entry)}</span>
+                  <strong>{logTypeLabels[entry.logKey] || entry.type}</strong>
+                  <span>{logEntrySummary(entry, t)}</span>
                 </div>
                 <small>{formatDateValue(entryDateValue(entry))}</small>
               </div>
             ))}
-          {!logRows.length && <p className="mbl-empty">No logs yet.</p>}
+          {!logRows.length && <p className="mbl-empty">{t("mobile.logs.empty", { defaultValue: "No logs yet." })}</p>}
         </div>
       )}
 
       {subtab === "photos" && (
         <div className="mbl-photo-panel">
           <button type="button" className="mbl-btn mbl-btn--sk-primary mbl-btn--wide" onClick={handleTakePhoto} disabled={photoBusy}>
-            {photoBusy ? <Spinner /> : "📷 Take Photo"}
+            {photoBusy ? <Spinner /> : t("mobile.photos.takePhoto", { defaultValue: "📷 Take Photo" })}
           </button>
           {(animal.photos || []).length > 0 ? (
             <div className="mbl-photo-grid">
@@ -1737,18 +1829,18 @@ function AnimalProfile({ animal, permissions, pairings, allAnimals, onQuickActio
                       className={`mbl-btn mbl-btn--sm ${animal.imageUrl === photo.url ? "mbl-btn--icon-active" : ""}`}
                       onClick={() => onSetIcon(photo.url)}
                       disabled={photoBusy || animal.imageUrl === photo.url}>
-                      {animal.imageUrl === photo.url ? "✓ Icon" : "Set icon"}
+                      {animal.imageUrl === photo.url ? t("mobile.photos.currentIcon", { defaultValue: "✓ Icon" }) : t("mobile.photos.setIcon", { defaultValue: "Set icon" })}
                     </button>
                     <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--danger"
                       onClick={() => onDeletePhoto(photo.id)} disabled={photoBusy}>
-                      Delete
+                      {t("mobile.photos.delete", { defaultValue: "Delete" })}
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="mbl-empty">No photos yet. Tap above to take one.</p>
+            <p className="mbl-empty">{t("mobile.photos.empty", { defaultValue: "No photos yet. Tap above to take one." })}</p>
           )}
         </div>
       )}
@@ -1781,6 +1873,8 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const [recent, setRecent]       = useState(() => readJson(RECENT_KEY, []));
   const [localAnimals, setLocalAnimals] = useState(() => normalizeMobileSnapshot({ animals: readJson(ANIMALS_CACHE, []) }).animals);
   const [pairings, setPairings]   = useState([]);
+  const [breedingCycles, setBreedingCycles] = useState([]);
+  const { t } = useTranslation();
 
   useEffect(() => { writeJson(RECENT_KEY, recent); }, [recent]);
 
@@ -1791,6 +1885,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         const normalizedSnapshot = normalizeMobileSnapshot(snap);
         setLocalAnimals(normalizedSnapshot.animals);
         setPairings(normalizedSnapshot.pairings);
+        setBreedingCycles(normalizedSnapshot.breedingCycles || []);
         writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
       })
       .catch(() => {});
@@ -1824,14 +1919,14 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         setRecent((prev) => [res.animal, ...prev.filter((a) => a.appAnimalId !== res.animal.appAnimalId)].slice(0, 10));
         setScreen("card");
       } else {
-        pushToast("No animal found for this QR code.");
+        pushToast(t("mobile.toast.noAnimalForQr", { defaultValue: "No animal found for this QR code." }));
       }
     } catch {
-      pushToast("Animal not found. Make sure the snapshot is synced.");
+      pushToast(t("mobile.toast.animalNotFoundSync", { defaultValue: "Animal not found. Make sure the snapshot is synced." }));
     } finally {
       setBusy(false);
     }
-  }, [localAnimals, pushToast]);
+  }, [localAnimals, pushToast, t]);
 
   const handleManual = (e) => { e.preventDefault(); resolveAnimal(manual); setManual(""); };
 
@@ -1887,28 +1982,28 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       };
       const updated = { ...animal, photos: [...(animal.photos || []), newPhoto] };
       await updateAnimalInSnapshot(updated);
-      pushToast("Photo saved.");
+      pushToast(t("mobile.toast.photoSaved", { defaultValue: "Photo saved." }));
     } catch (err) {
       if (!String(err?.message || "").toLowerCase().includes("cancel")) {
-        pushToast("Could not take photo.");
+        pushToast(t("mobile.toast.photoFailed", { defaultValue: "Could not take photo." }));
       }
     } finally {
       setPhotoBusy(false);
     }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const handleSetIcon = useCallback(async (photoUrl) => {
     if (!animal) return;
     setPhotoBusy(true);
     try {
       await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
-      pushToast("Icon updated.");
+      pushToast(t("mobile.toast.iconUpdated", { defaultValue: "Icon updated." }));
     } catch {
-      pushToast("Could not update icon.");
+      pushToast(t("mobile.toast.iconFailed", { defaultValue: "Could not update icon." }));
     } finally {
       setPhotoBusy(false);
     }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const handleDeletePhoto = useCallback(async (photoId) => {
     if (!animal) return;
@@ -1919,13 +2014,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         ? animal.imageUrl
         : (remaining.length ? remaining[remaining.length - 1].url : undefined);
       await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
-      pushToast("Photo deleted.");
+      pushToast(t("mobile.toast.photoDeleted", { defaultValue: "Photo deleted." }));
     } catch {
-      pushToast("Could not delete photo.");
+      pushToast(t("mobile.toast.photoDeleteFailed", { defaultValue: "Could not delete photo." }));
     } finally {
       setPhotoBusy(false);
     }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const saveEdit = useCallback(async (draft) => {
     setEditBusy(true);
@@ -1938,13 +2033,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       const mergedKey = recordIdentity(merged, "animal", 0);
       const savedAnimal = reconciledAnimals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
       setAnimal(savedAnimal);
-      pushToast("Changes saved.");
+      pushToast(t("mobile.toast.changesSaved", { defaultValue: "Changes saved." }));
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Save failed.");
+      pushToast(err instanceof Error ? err.message : t("mobile.toast.saveFailed", { defaultValue: "Save failed." }));
     } finally {
       setEditBusy(false);
     }
-  }, [animal, pushToast]);
+  }, [animal, pushToast, t]);
 
   const logActions = {
     feed:   logMobileFeed,
@@ -1961,12 +2056,12 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     try {
       const res = await api(payload);
       if (res?.animal) setAnimal(res.animal);
-      pushToast(`${cap(type)} saved.`);
+      pushToast(t("mobile.toast.actionSaved", { action: quickActionLabel(type, t), defaultValue: "{{action}} saved." }));
       setModal(null);
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Save failed.");
+      pushToast(err instanceof Error ? err.message : t("mobile.toast.saveFailed", { defaultValue: "Save failed." }));
     }
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   const startModal = (type) => {
     if (type === "clean" || type === "water") {
@@ -1979,9 +2074,9 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   return (
     <div className="mbl-shell">
       <div className="mbl-terminal-topbar">
-        <button type="button" className="mbl-text-btn" onClick={onSwitchMode}>⇄ Switch mode</button>
-        <span className="mbl-terminal-badge">TERMINAL</span>
-        <button type="button" className="mbl-text-btn" onClick={onSignOut}>Sign out</button>
+        <button type="button" className="mbl-text-btn" onClick={onSwitchMode}>{t("mobile.terminal.switchMode", { defaultValue: "⇄ Switch mode" })}</button>
+        <span className="mbl-terminal-badge">{t("mobile.terminal.badge", { defaultValue: "TERMINAL" })}</span>
+        <button type="button" className="mbl-text-btn" onClick={onSignOut}>{t("mobile.common.signOut", { defaultValue: "Sign out" })}</button>
       </div>
 
       <Toast msg={toast} onDismiss={dismissToast} />
@@ -1989,24 +2084,24 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       {screen === "scan" && (
         <div className="mbl-terminal-scan">
           <div className="mbl-terminal-hero">
-            <h1>Scan QR</h1>
-            <p>Point at an animal QR to open its card</p>
+            <h1>{t("mobile.terminal.scanTitle", { defaultValue: "Scan QR" })}</h1>
+            <p>{t("mobile.terminal.scanHint", { defaultValue: "Point at an animal QR to open its card" })}</p>
           </div>
 
-          {busy ? <div className="mbl-loading"><Spinner /><span>Looking up animal…</span></div>
+          {busy ? <div className="mbl-loading"><Spinner /><span>{t("mobile.terminal.lookingUp", { defaultValue: "Looking up animal…" })}</span></div>
             : <QRScanner onScan={resolveAnimal} onError={pushToast} />}
 
           <form className="mbl-manual-row" onSubmit={handleManual}>
             <input value={manual} onChange={(e) => setManual(e.target.value)}
-              placeholder="Or paste QR value / animal ID" disabled={busy} />
+              placeholder={t("mobile.terminal.manualPlaceholder", { defaultValue: "Or paste QR value / animal ID" })} disabled={busy} />
             <button type="submit" className="mbl-btn mbl-btn--sk-primary" disabled={busy || !manual.trim()}>
-              Open
+              {t("mobile.common.open", { defaultValue: "Open" })}
             </button>
           </form>
 
           {recent.length > 0 && (
             <div className="mbl-recent-section">
-              <h2>Recent</h2>
+              <h2>{t("mobile.common.recent", { defaultValue: "Recent" })}</h2>
               {recent.slice(0, 6).map((a) => (
                 <button key={a.appAnimalId} type="button" className="mbl-animal-row"
                   onClick={() => resolveAnimal(a.appAnimalId)}>
@@ -2026,7 +2121,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         <div className="mbl-terminal-card">
           <div className="mbl-card-topbar">
             <button type="button" className="mbl-back-btn" onClick={() => { setScreen("scan"); setAnimal(null); setCardTab("edit"); }}>
-              ← Back to scan
+              {t("mobile.terminal.backToScan", { defaultValue: "← Back to scan" })}
             </button>
             <span>{animal.name || animal.appAnimalId}</span>
           </div>
@@ -2037,13 +2132,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
               : <div className="mbl-avatar-placeholder mbl-avatar-lg">{String(animal.name || "?").slice(0, 1)}</div>}
             <div>
               <h2>{animal.name}</h2>
-              <p>{animal.sex || "—"} · {formatGeneticsText(animal) || "No genetics"}</p>
-              <small>{locationText(animal) || "No location"}</small>
+              <p>{animal.sex || "—"} · {formatGeneticsText(animal) || t("mobile.terminal.noGenetics", { defaultValue: "No genetics" })}</p>
+              <small>{locationText(animal) || t("mobile.terminal.noLocation", { defaultValue: "No location" })}</small>
             </div>
           </div>
 
           <div className="mbl-quick-actions mbl-quick-actions--card">
-            {[["Feed","feed"],["Weight","weight"],["Shed","shed"],["Clean","clean"],["Water","water"],["Note","note"],["📷","photo"]].map(
+            {[[t("mobile.actions.feed", { defaultValue: "Feed" }),"feed"],[t("mobile.actions.weight", { defaultValue: "Weight" }),"weight"],[t("mobile.actions.shed", { defaultValue: "Shed" }),"shed"],[t("mobile.actions.clean", { defaultValue: "Clean" }),"clean"],[t("mobile.actions.water", { defaultValue: "Water" }),"water"],[t("mobile.actions.note", { defaultValue: "Note" }),"note"],["📷","photo"]].map(
               ([label, type]) => (
                 <button key={type} type="button" className="mbl-quick-btn"
                   onClick={() => type === "photo" ? setPhotoModal(true) : startModal(type)}>
@@ -2054,7 +2149,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
           </div>
 
           <div className="mbl-subtabs">
-            {[["edit","Edit card"],["breeding","Breeding"]].map(([k, lbl]) => (
+            {[["edit",t("mobile.terminal.tabEditCard", { defaultValue: "Edit card" })],["breeding",t("mobile.terminal.tabBreeding", { defaultValue: "Breeding" })]].map(([k, lbl]) => (
               <button key={k} type="button" className={cardTab === k ? "is-active" : ""} onClick={() => setCardTab(k)}>
                 {lbl}
               </button>
@@ -2065,7 +2160,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
             <AnimalEditForm animal={animal} onSave={saveEdit} onCancel={() => { setScreen("scan"); setAnimal(null); }} busy={editBusy} />
           )}
           {cardTab === "breeding" && (
-            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} />
+            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} breedingCycles={breedingCycles} />
           )}
         </div>
       )}
@@ -2094,6 +2189,7 @@ const TASK_ICONS = { Feed: "🍗", Water: "💧", Clean: "🧹", Shed: "🐍", W
 function TaskCard({ task, animalMap, onComplete, onOpen }) {
   const animal = animalMap?.get(task.animalId);
   const isDue = String(task.dueStatus || "").toLowerCase().includes("due");
+  const { t } = useTranslation();
   return (
     <div className={`mbl-task-card ${isDue ? "mbl-task-card--due" : ""}`}>
       <div className="mbl-task-card-icon">{TASK_ICONS[task.type] || "✓"}</div>
@@ -2103,19 +2199,22 @@ function TaskCard({ task, animalMap, onComplete, onOpen }) {
         <small>{[task.location, task.dueStatus].filter(Boolean).join(" · ") || "—"}</small>
       </div>
       <div className="mbl-task-btns">
-        <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--sk-primary" onClick={() => onComplete(task, "done")}>Done</button>
+        <button type="button" className="mbl-btn mbl-btn--sm mbl-btn--sk-primary" onClick={() => onComplete(task, "done")}>{t("mobile.tasks.done", { defaultValue: "Done" })}</button>
         {task.type === "Feed" && (
-          <button type="button" className="mbl-btn mbl-btn--sm" onClick={() => onComplete(task, "refused")}>Refused</button>
+          <button type="button" className="mbl-btn mbl-btn--sm" onClick={() => onComplete(task, "refused")}>{t("mobile.tasks.refused", { defaultValue: "Refused" })}</button>
         )}
-        <button type="button" className="mbl-btn mbl-btn--sm" onClick={() => onOpen(task.animalId)}>Open</button>
+        <button type="button" className="mbl-btn mbl-btn--sm" onClick={() => onOpen(task.animalId)}>{t("mobile.common.open", { defaultValue: "Open" })}</button>
       </div>
     </div>
   );
 }
 
 // ג”€ג”€ג”€ FULL MODE ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+const PUSH_NOT_SAVED_MESSAGE = "Sync failed — your data was NOT saved to the cloud. Will retry when online.";
+
 function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const { appearanceState, updateAppearance } = useAppearance();
+  const { t } = useTranslation();
   const snapshotCacheKey = useMemo(() => scopedStorageKey(SNAPSHOT_CACHE, user), [user]);
   const cachedSnapshot = useMemo(
     () => normalizeMobileSnapshot(readJson(snapshotCacheKey, {})),
@@ -2131,7 +2230,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const [animal, setAnimal]            = useState(null);
   const [modal, setModal]              = useState(null);
   const [scanOpen, setScanOpen]        = useState(false);
-  const [photoBusy, setPhotoBusy]      = useState(false);
+  const [, setPhotoBusy]              = useState(false);
   const [online, setOnline]            = useState(() => navigator.onLine !== false);
   const [queue, setQueue]              = useState(() => readJson(QUEUE_KEY, []));
   const [lastSyncAt, setLastSyncAt]    = useState(() => { try { return localStorage.getItem(LAST_SYNC_KEY) || ""; } catch { return ""; } });
@@ -2178,29 +2277,29 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       setAnimals(normalizedSnapshot.animals);
       setPairings(normalizedSnapshot.pairings);
       setPlannerState(normalizedSnapshot.plannerState);
-      setRackData(buildRackDataFromPlannerState(normalizedSnapshot.plannerState, normalizedSnapshot.animals));
+      setRackData(buildRackDataFromPlannerState(normalizedSnapshot.plannerState, normalizedSnapshot.animals, t));
       writeJson(snapshotCacheKey, normalizedSnapshot);
       writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
       setSnapshotError("");
       recordSync();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load data.";
+      const message = err instanceof Error ? err.message : t("mobile.toast.loadFailed", { defaultValue: "Failed to load data." });
       setSnapshotError(message);
       pushToast(message);
     } finally {
       setLoading(false);
     }
-  }, [deviceId, pushToast, recordSync, snapshotCacheKey]);
+  }, [deviceId, pushToast, recordSync, snapshotCacheKey, t]);
 
   const pushToCloud = useCallback(async () => {
-    if (!online) { pushToast("Cannot push while offline."); return; }
+    if (!online) { pushToast(t("mobile.toast.cannotPushOffline", { defaultValue: "Cannot push while offline." })); return; }
     let latest;
     try {
       latest = await fetchBreederSnapshot();
     } catch (err) {
-      const message = "Sync failed — your data was NOT saved to the cloud. Will retry when online.";
-      setSnapshotError(message);
-      pushToast(message);
+      // The English sentinel stays in state because the Retry button checks it; it is translated at render.
+      setSnapshotError(PUSH_NOT_SAVED_MESSAGE);
+      pushToast(t("mobile.sync.pushNotSaved", { defaultValue: "Sync failed — your data was NOT saved to the cloud. Will retry when online." }));
       return;
     }
     try {
@@ -2214,18 +2313,18 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       setAnimals(reconciledAnimals);
       setPairings(reconciledPairings);
       setPlannerState(savedSnapshot.plannerState);
-      setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals));
+      setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals, t));
       writeJson(snapshotCacheKey, reconciledSnapshot);
       writeJson(ANIMALS_CACHE, reconciledAnimals);
       setSnapshotError("");
       recordSync();
-      pushToast("Data merged to cloud.");
+      pushToast(t("mobile.toast.mergedToCloud", { defaultValue: "Data merged to cloud." }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Push failed.";
+      const message = err instanceof Error ? err.message : t("mobile.toast.pushFailed", { defaultValue: "Push failed." });
       setSnapshotError(message);
       pushToast(message);
     }
-  }, [online, animals, pairings, plannerState, recordSync, pushToast, snapshotCacheKey]);
+  }, [online, animals, pairings, plannerState, recordSync, pushToast, snapshotCacheKey, t]);
 
   useEffect(() => {
     refresh();
@@ -2242,13 +2341,13 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   useEffect(() => {
     if (tab !== "rack") return;
     if (hasPlannerSpaces(plannerState)) {
-      setRackData(buildRackDataFromPlannerState(plannerState, animals));
+      setRackData(buildRackDataFromPlannerState(plannerState, animals, t));
       return;
     }
     fetchMobileRackMode().then(setRackData).catch(() => {
-      setRackData(buildRackDataFromAnimalLocations(animals));
+      setRackData(buildRackDataFromAnimalLocations(animals, t));
     });
-  }, [tab, plannerState, animals]);
+  }, [tab, plannerState, animals, t]);
 
   useEffect(() => {
     if (!online) return undefined;
@@ -2281,12 +2380,12 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         setRecent((prev) => [res.animal, ...prev.filter((a) => a.appAnimalId !== res.animal.appAnimalId)].slice(0, 10));
         setTab("animals");
       } else {
-        pushToast("No animal found for this QR code.");
+        pushToast(t("mobile.toast.noAnimalForQr", { defaultValue: "No animal found for this QR code." }));
       }
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Scan failed.");
+      pushToast(err instanceof Error ? err.message : t("mobile.toast.scanFailed", { defaultValue: "Scan failed." }));
     }
-  }, [animals, pushToast]);
+  }, [animals, pushToast, t]);
 
   const logActions = { feed: logMobileFeed, weight: logMobileWeight, shed: logMobileShed, note: logMobileNote, clean: logMobileClean, water: logMobileWater };
 
@@ -2296,19 +2395,19 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     if (!online) {
       setQueue((prev) => [...prev, { id: `q-${Date.now()}`, actionType: type, payload, deviceId }]);
       setModal(null);
-      pushToast("Saved offline — will sync when online.");
+      pushToast(t("mobile.toast.savedOffline", { defaultValue: "Saved offline — will sync when online." }));
       return;
     }
     try {
       const res = await api(payload);
       if (res?.animal) setAnimal(res.animal);
       setModal(null);
-      pushToast(`${cap(type)} saved.`);
+      pushToast(t("mobile.toast.actionSaved", { action: quickActionLabel(type, t), defaultValue: "{{action}} saved." }));
       await refresh();
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Save failed.");
+      pushToast(err instanceof Error ? err.message : t("mobile.toast.saveFailed", { defaultValue: "Save failed." }));
     }
-  }, [online, deviceId, refresh, pushToast]);
+  }, [online, deviceId, refresh, pushToast, t]);
 
   const startModal = (type) => {
     if ((type === "clean" || type === "water") && animal?.appAnimalId) {
@@ -2322,10 +2421,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     try {
       await syncMobileQueue({ deviceId, actions: queue });
       setQueue([]);
-      pushToast("Offline updates synced.");
+      pushToast(t("mobile.toast.offlineSynced", { defaultValue: "Offline updates synced." }));
       await refresh();
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Sync failed.");
+      pushToast(err instanceof Error ? err.message : t("mobile.toast.syncFailed", { defaultValue: "Sync failed." }));
     }
   };
 
@@ -2361,10 +2460,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     setAnimal(savedAnimal);
     setAnimals((prev) => upsertSnapshotRecord(prev, savedAnimal, "animal"));
     setPlannerState(savedSnapshot.plannerState);
-    setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals));
+    setRackData(buildRackDataFromPlannerState(savedSnapshot.plannerState, reconciledAnimals, t));
     writeJson(snapshotCacheKey, reconciledSnapshot);
     writeJson(ANIMALS_CACHE, reconciledAnimals);
-  }, [snapshotCacheKey]);
+  }, [snapshotCacheKey, t]);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const handleSavePairing = useCallback(async (updatedPairing) => {
@@ -2403,25 +2502,25 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         size: estimateDataUrlBytes(dataUrl),
       };
       await updateAnimalInSnapshot({ ...animal, photos: [...(animal.photos || []), newPhoto] });
-      pushToast("Photo saved.");
+      pushToast(t("mobile.toast.photoSaved", { defaultValue: "Photo saved." }));
     } catch (err) {
       if (!String(err?.message || "").toLowerCase().includes("cancel")) {
-        pushToast("Could not take photo.");
+        pushToast(t("mobile.toast.photoFailed", { defaultValue: "Could not take photo." }));
       }
     } finally {
       setPhotoBusy(false);
     }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const handleSetIcon = useCallback(async (photoUrl) => {
     if (!animal) return;
     setPhotoBusy(true);
     try {
       await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
-      pushToast("Icon updated.");
-    } catch { pushToast("Could not update icon."); }
+      pushToast(t("mobile.toast.iconUpdated", { defaultValue: "Icon updated." }));
+    } catch { pushToast(t("mobile.toast.iconFailed", { defaultValue: "Could not update icon." })); }
     finally { setPhotoBusy(false); }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const handleDeletePhoto = useCallback(async (photoId) => {
     if (!animal) return;
@@ -2432,10 +2531,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         ? animal.imageUrl
         : (remaining.length ? remaining[remaining.length - 1].url : undefined);
       await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
-      pushToast("Photo deleted.");
-    } catch { pushToast("Could not delete photo."); }
+      pushToast(t("mobile.toast.photoDeleted", { defaultValue: "Photo deleted." }));
+    } catch { pushToast(t("mobile.toast.photoDeleteFailed", { defaultValue: "Could not delete photo." })); }
     finally { setPhotoBusy(false); }
-  }, [animal, updateAnimalInSnapshot, pushToast]);
+  }, [animal, updateAnimalInSnapshot, pushToast, t]);
 
   const animalMap = useMemo(
     () => animalMapByIdentity(animals),
@@ -2503,12 +2602,14 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   }), [animals, pairings]);
 
   const navTabs = [
-    { key: "animals",  label: "Animals",  icon: "🐍" },
-    { key: "breeding", label: "Breeding", icon: "♥"  },
-    { key: "tasks",    label: "Tasks",    icon: "✓"  },
-    { key: "rack",     label: "Rack",     icon: "⬛" },
-    { key: "more",     label: "More",     icon: "≡"  },
+    { key: "animals",  label: t("mobile.nav.animals", { defaultValue: "Animals" }),   icon: "🐍" },
+    { key: "breeding", label: t("mobile.nav.breeding", { defaultValue: "Breeding" }), icon: "♥"  },
+    { key: "tasks",    label: t("mobile.nav.tasks", { defaultValue: "Tasks" }),       icon: "✓"  },
+    { key: "rack",     label: t("mobile.nav.rack", { defaultValue: "Rack" }),         icon: "⬛" },
+    { key: "more",     label: t("mobile.nav.more", { defaultValue: "More" }),         icon: "≡"  },
   ];
+
+  const thisAccountLabel = t("mobile.animals.thisAccount", { defaultValue: "this account" });
 
   const switchTab = (key) => { setAnimal(null); setExpandedPairing(null); setMorePanel(null); setTab(key); };
 
@@ -2521,20 +2622,20 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         <div className="mbl-topbar-actions">
           {lastSyncAt && online && (
             <span className="mbl-topbar-sync-time" title={lastSyncAt}>
-              {fmtSyncTime(lastSyncAt)}
+              {fmtSyncTime(lastSyncAt, t)}
             </span>
           )}
-          {!online && <span className="mbl-topbar-offline">Offline</span>}
-          <button type="button" className="mbl-topbar-qr-btn" onClick={() => setScanOpen(true)} aria-label="Scan QR">▣</button>
+          {!online && <span className="mbl-topbar-offline">{t("mobile.sync.offline", { defaultValue: "Offline" })}</span>}
+          <button type="button" className="mbl-topbar-qr-btn" onClick={() => setScanOpen(true)} aria-label={t("mobile.scan.scanQr", { defaultValue: "Scan QR" })}>▣</button>
         </div>
       </div>
 
       {snapshotError && (
         <div className="mbl-sync-error mbl-sync-error--global" role="alert">
-          <strong>Sync error</strong>
-          <span>{snapshotError}</span>
+          <strong>{t("mobile.sync.errorTitle", { defaultValue: "Sync error" })}</strong>
+          <span>{snapshotError === PUSH_NOT_SAVED_MESSAGE ? t("mobile.sync.pushNotSaved", { defaultValue: "Sync failed — your data was NOT saved to the cloud. Will retry when online." }) : snapshotError}</span>
           <button type="button" className="mbl-text-btn mbl-text-btn--sm" onClick={snapshotError.includes("NOT saved") ? pushToCloud : refresh}>
-            Retry
+            {t("mobile.sync.retry", { defaultValue: "Retry" })}
           </button>
         </div>
       )}
@@ -2543,15 +2644,15 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
       {/* ג”€ג”€ QR scan overlay ג”€ג”€ */}
       {scanOpen && (
-        <ActionSheet title="Scan QR code" onClose={() => setScanOpen(false)}>
+        <ActionSheet title={t("mobile.scan.sheetTitle", { defaultValue: "Scan QR code" })} onClose={() => setScanOpen(false)}>
           <QRScanner onScan={openAnimal} onError={(e) => { pushToast(e); setScanOpen(false); }} />
           <form className="mbl-manual-row" onSubmit={(e) => { e.preventDefault(); const v = e.target.elements.qr.value.trim(); if (v) { openAnimal(v); e.target.reset(); } }}>
-            <input name="qr" placeholder="Or paste QR / animal ID" />
-            <button type="submit" className="mbl-btn mbl-btn--sk-primary">Open</button>
+            <input name="qr" placeholder={t("mobile.scan.manualPlaceholder", { defaultValue: "Or paste QR / animal ID" })} />
+            <button type="submit" className="mbl-btn mbl-btn--sk-primary">{t("mobile.common.open", { defaultValue: "Open" })}</button>
           </form>
           {recent.length > 0 && (
             <>
-              <div className="mbl-section-label">Recent</div>
+              <div className="mbl-section-label">{t("mobile.common.recent", { defaultValue: "Recent" })}</div>
               {recent.slice(0, 4).map((a) => (
                 <button key={a.appAnimalId} type="button" className="mbl-animal-row" onClick={() => openAnimal(a.appAnimalId)}>
                   <div className="mbl-avatar-sm">{String(a.name || "?").slice(0, 1)}</div>
@@ -2564,12 +2665,12 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       )}
 
       <div className="mbl-full-body">
-        {loading && <div className="mbl-loading"><Spinner /><span>Loading…</span></div>}
+        {loading && <div className="mbl-loading"><Spinner /><span>{t("mobile.common.loadingEllipsis", { defaultValue: "Loading…" })}</span></div>}
 
         {/* ג”€ג”€ ANIMALS TAB ג”€ג”€ */}
         {/* Full-screen feature panels */}
         {!loading && morePanel === "advisor" && (
-          <FullScreenPanel title="Breeding Advisor" onClose={() => setMorePanel(null)}>
+          <FullScreenPanel title={t("mobile.more.breedingAdvisorTitle", { defaultValue: "Breeding Advisor" })} onClose={() => setMorePanel(null)}>
             <SuggestionsTab
               males={advisorMales}
               females={advisorFemales}
@@ -2580,10 +2681,10 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         )}
 
         {!loading && morePanel === "shed-test" && (
-          <FullScreenPanel title="Shed Test Terminal" onClose={() => setMorePanel(null)}>
+          <FullScreenPanel title={t("mobile.more.shedTestTitle", { defaultValue: "Lab tests" })} onClose={() => setMorePanel(null)}>
             <ShedTestTerminalPanel
               snakes={animals}
-              onBatchSubmitted={() => pushToast("Batch submitted.")}
+              onBatchSubmitted={() => pushToast(t("mobile.toast.batchSubmitted", { defaultValue: "Batch submitted." }))}
             />
           </FullScreenPanel>
         )}
@@ -2609,11 +2710,11 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by name, morph, location…"
+                    placeholder={t("mobile.animals.searchPlaceholder", { defaultValue: "Search by name, morph, location…" })}
                     className="mbl-search-input"
                   />
                   <div className="mbl-filter-chips">
-                    {[["", "All"], ["Male", "Male"], ["Female", "Female"], ["groups", "Groups"]].map(([val, label]) => (
+                    {[["", t("mobile.animals.filterAll", { defaultValue: "All" })], ["Male", t("mobile.animals.filterMale", { defaultValue: "Male" })], ["Female", t("mobile.animals.filterFemale", { defaultValue: "Female" })], ["groups", t("mobile.animals.filterGroups", { defaultValue: "Groups" })]].map(([val, label]) => (
                       <button key={val || "all"} type="button"
                         className={`mbl-chip ${sexFilter === val ? "is-active" : ""}`}
                         onClick={() => setSexFilter(val)}>
@@ -2627,8 +2728,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                   groupedAnimals.length === 0
                     ? (
                       <p className="mbl-empty">
-                        No animals are saved in the cloud for {user?.email || "this account"}.
-                        Sync the desktop app with the same account, then tap Refresh from cloud.
+                        {t("mobile.animals.emptyCloud", { account: user?.email || thisAccountLabel, defaultValue: "No animals are saved in the cloud for {{account}}. Sync the desktop app with the same account, then tap Refresh from cloud." })}
                       </p>
                     )
                     : groupedAnimals.map(([groupName, groupList]) => {
@@ -2641,7 +2741,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                         if (!visible.length) return null;
                         return (
                           <React.Fragment key={groupName}>
-                            <div className="mbl-section-label">{groupName} ({visible.length})</div>
+                            <div className="mbl-section-label">{groupName === "Ungrouped" ? t("mobile.animals.ungrouped", { defaultValue: "Ungrouped" }) : groupName} ({visible.length})</div>
                             {visible.map((a) => <AnimalCardRow key={a.id || a.appAnimalId} animal={a} onOpen={openAnimal} />)}
                           </React.Fragment>
                         );
@@ -2649,9 +2749,9 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                 ) : (
                   /* Flat list view */
                   <>
-                    <div className="mbl-section-label">{filteredAnimals.length} animal{filteredAnimals.length !== 1 ? "s" : ""}</div>
+                    <div className="mbl-section-label">{t("mobile.animals.count", { count: filteredAnimals.length, defaultValue: "{{count}} animals", defaultValue_one: "{{count}} animal" })}</div>
                     {filteredAnimals.map((a) => <AnimalCardRow key={a.id || a.appAnimalId} animal={a} onOpen={openAnimal} />)}
-                    {!filteredAnimals.length && <p className="mbl-empty">No animals found.</p>}
+                    {!filteredAnimals.length && <p className="mbl-empty">{t("mobile.animals.noneFound", { defaultValue: "No animals found." })}</p>}
                   </>
                 )}
               </>
@@ -2662,20 +2762,20 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         {/* ג”€ג”€ BREEDING TAB ג”€ג”€ */}
         {!loading && !morePanel && tab === "breeding" && (
           <div className="mbl-screen">
-            <div className="mbl-section-label">{pairings.length} pairing{pairings.length !== 1 ? "s" : ""}</div>
-            {pairings.length === 0 && <p className="mbl-empty">No pairings yet. Create pairings in the desktop app.</p>}
+            <div className="mbl-section-label">{t("mobile.breeding.pairingCount", { count: pairings.length, defaultValue: "{{count}} pairings", defaultValue_one: "{{count}} pairing" })}</div>
+            {pairings.length === 0 && <p className="mbl-empty">{t("mobile.breeding.noPairings", { defaultValue: "No pairings yet. Create pairings in the desktop app." })}</p>}
             {pairings.map((pairing) => {
               const female      = animalMap.get(pairing.femaleId);
               const male        = animalMap.get(pairing.maleId);
-              const femaleName  = female?.name || pairing.femaleId || "Female";
-              const maleName    = male?.name   || pairing.maleId   || "Male";
+              const femaleName  = female?.name || pairing.femaleId || t("mobile.breeding.female", { defaultValue: "Female" });
+              const maleName    = male?.name   || pairing.maleId   || t("mobile.breeding.male", { defaultValue: "Male" });
               const isExpanded  = expandedPairing === pairing.id;
               const statusCls   = `mbl-bp-status mbl-bp-status--${(pairing.status || "unknown").toLowerCase().replace(/\s+/g, "-")}`;
               const stages = [
-                { key: "ovulation",  label: "Ov",   done: !!(pairing.ovulation?.date  || pairing.mobileOvulationLogs?.length)  },
-                { key: "preLayShed", label: "Shed",  done: !!(pairing.preLayShed?.date || pairing.mobilePreLayShedLogs?.length) },
-                { key: "clutch",     label: "Lay",   done: !!(pairing.clutch?.date     || pairing.mobileClutchLogs?.length)     },
-                { key: "hatch",      label: "Hatch", done: !!(pairing.hatch?.date      || pairing.mobileHatchLogs?.length)      },
+                { key: "ovulation",  label: t("mobile.breeding.stageOv", { defaultValue: "Ov" }),       done: !!(pairing.ovulation?.date  || pairing.mobileOvulationLogs?.length)  },
+                { key: "preLayShed", label: t("mobile.breeding.stageShed", { defaultValue: "Shed" }),   done: !!(pairing.preLayShed?.date || pairing.mobilePreLayShedLogs?.length) },
+                { key: "clutch",     label: t("mobile.breeding.stageLay", { defaultValue: "Lay" }),     done: !!(pairing.clutch?.date     || pairing.mobileClutchLogs?.length)     },
+                { key: "hatch",      label: t("mobile.breeding.stageHatch", { defaultValue: "Hatch" }), done: !!(pairing.hatch?.date      || pairing.mobileHatchLogs?.length)      },
               ];
               return (
                 <div key={pairing.id} className="mbl-pairing-card">
@@ -2683,17 +2783,17 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                     onClick={() => setExpandedPairing(isExpanded ? null : pairing.id)}>
                     <div className="mbl-pairing-animals">
                       <div className="mbl-pairing-animal-chip">
-                        <span className="mbl-pairing-dot mbl-pairing-dot--f">F</span>
+                        <span className="mbl-pairing-dot mbl-pairing-dot--f">{t("mobile.breeding.femaleShort", { defaultValue: "F" })}</span>
                         <span>{femaleName}</span>
                       </div>
                       <span className="mbl-pairing-x">ֳ—</span>
                       <div className="mbl-pairing-animal-chip">
-                        <span className="mbl-pairing-dot mbl-pairing-dot--m">M</span>
+                        <span className="mbl-pairing-dot mbl-pairing-dot--m">{t("mobile.breeding.maleShort", { defaultValue: "M" })}</span>
                         <span>{maleName}</span>
                       </div>
                     </div>
                     <div className="mbl-pairing-header-right">
-                      <span className={statusCls}>{pairing.status || "Unknown"}</span>
+                      <span className={statusCls}>{pairing.status || t("mobile.pairing.unknownStatus", { defaultValue: "Unknown" })}</span>
                       <span className="mbl-pairing-chevron">{isExpanded ? "▲" : "▼"}</span>
                     </div>
                   </button>
@@ -2727,23 +2827,23 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         {/* ג”€ג”€ TASKS TAB ג”€ג”€ */}
         {!loading && !morePanel && tab === "tasks" && (
           <div className="mbl-screen">
-            {tasks.length === 0 && <p className="mbl-empty">No tasks for today. 🎉</p>}
+            {tasks.length === 0 && <p className="mbl-empty">{t("mobile.tasks.empty", { defaultValue: "No tasks for today. 🎉" })}</p>}
             {taskGroups.overdue.length > 0 && (
               <>
-                <div className="mbl-section-label mbl-section-label--danger">⚠ Overdue ({taskGroups.overdue.length})</div>
-                {taskGroups.overdue.map((t) => <TaskCard key={t.id} task={t} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
+                <div className="mbl-section-label mbl-section-label--danger">{t("mobile.tasks.overdue", { n: taskGroups.overdue.length, defaultValue: "⚠ Overdue ({{n}})" })}</div>
+                {taskGroups.overdue.map((task) => <TaskCard key={task.id} task={task} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
               </>
             )}
             {taskGroups.today.length > 0 && (
               <>
-                <div className="mbl-section-label">Today ({taskGroups.today.length})</div>
-                {taskGroups.today.map((t) => <TaskCard key={t.id} task={t} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
+                <div className="mbl-section-label">{t("mobile.tasks.today", { n: taskGroups.today.length, defaultValue: "Today ({{n}})" })}</div>
+                {taskGroups.today.map((task) => <TaskCard key={task.id} task={task} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
               </>
             )}
             {taskGroups.other.length > 0 && (
               <>
-                <div className="mbl-section-label">Upcoming ({taskGroups.other.length})</div>
-                {taskGroups.other.map((t) => <TaskCard key={t.id} task={t} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
+                <div className="mbl-section-label">{t("mobile.tasks.upcoming", { n: taskGroups.other.length, defaultValue: "Upcoming ({{n}})" })}</div>
+                {taskGroups.other.map((task) => <TaskCard key={task.id} task={task} animalMap={animalMap} onComplete={completeTask} onOpen={openAnimal} />)}
               </>
             )}
           </div>
@@ -2752,7 +2852,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         {/* ג”€ג”€ RACK TAB ג”€ג”€ */}
         {!loading && !morePanel && tab === "rack" && (
           <div className="mbl-screen">
-            <div className="mbl-section-label">Spaces / Rack view</div>
+            <div className="mbl-section-label">{t("mobile.rack.title", { defaultValue: "Spaces / Rack view" })}</div>
             {(rackData.rooms || []).map((room) => (
               <div key={room.roomName} className="mbl-rack-room">
                 <h2>{room.roomName}</h2>
@@ -2765,7 +2865,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                           className={`mbl-tub ${tub.alert ? "is-alert" : ""} ${tub.feedingDue ? "is-feed" : ""} ${!tub.animalId ? "is-empty" : ""}`}
                           onClick={() => tub.animalId && openAnimal(tub.animalId)}>
                           <strong>{tub.tub}</strong>
-                          <small>{tub.name || (tub.animalId ? "···" : "Empty")}</small>
+                          <small>{tub.name || (tub.animalId ? "···" : t("mobile.rack.empty", { defaultValue: "Empty" }))}</small>
                         </button>
                       ))}
                     </div>
@@ -2773,7 +2873,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                 ))}
               </div>
             ))}
-            {!rackData.rooms?.length && <p className="mbl-empty">No rack data. Configure spaces in the desktop app.</p>}
+            {!rackData.rooms?.length && <p className="mbl-empty">{t("mobile.rack.noData", { defaultValue: "No rack data. Configure spaces in the desktop app." })}</p>}
           </div>
         )}
 
@@ -2787,55 +2887,55 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
                 {String(user?.fullName || user?.displayName || user?.email || "?").slice(0, 1).toUpperCase()}
               </div>
               <div className="mbl-profile-card-info">
-                <strong>{user?.fullName || user?.displayName || "Breeder"}</strong>
+                <strong>{user?.fullName || user?.displayName || t("mobile.more.defaultName", { defaultValue: "Breeder" })}</strong>
                 {user?.email && <span>{user.email}</span>}
               </div>
             </div>
 
             {/* Quick access */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Quick access</div>
+              <div className="mbl-section-label">{t("mobile.more.quickAccess", { defaultValue: "Quick access" })}</div>
               <div className="mbl-more-quick-grid">
                 <button type="button" className="mbl-more-quick-card" onClick={() => setScanOpen(true)}>
-                  <span>▣</span><strong>Scan QR</strong>
+                  <span>▣</span><strong>{t("mobile.scan.scanQr", { defaultValue: "Scan QR" })}</strong>
                 </button>
                 <button type="button" className="mbl-more-quick-card" onClick={() => switchTab("rack")}>
-                  <span>⬛</span><strong>Rack view</strong>
+                  <span>⬛</span><strong>{t("mobile.more.rackView", { defaultValue: "Rack view" })}</strong>
                 </button>
                 <button type="button" className="mbl-more-quick-card" onClick={() => switchTab("breeding")}>
-                  <span>♥</span><strong>Breeding</strong>
+                  <span>♥</span><strong>{t("mobile.nav.breeding", { defaultValue: "Breeding" })}</strong>
                 </button>
                 <button type="button" className="mbl-more-quick-card" onClick={() => switchTab("tasks")}>
-                  <span>✓</span><strong>Tasks</strong>
+                  <span>✓</span><strong>{t("mobile.nav.tasks", { defaultValue: "Tasks" })}</strong>
                 </button>
               </div>
             </div>
 
             {/* Collection data */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Collection data</div>
+              <div className="mbl-section-label">{t("mobile.more.collectionData", { defaultValue: "Collection data" })}</div>
               <div className="mbl-summary-grid">
-                <div><span>Animals</span><strong>{dataSummary.animals}</strong></div>
-                <div><span>Pairings</span><strong>{dataSummary.pairings}</strong></div>
-                <div><span>Rooms</span><strong>{spacesSummary.rooms}</strong></div>
-                <div><span>Racks</span><strong>{spacesSummary.racks}</strong></div>
-                <div><span>Terrariums</span><strong>{spacesSummary.terrariums}</strong></div>
-                <div><span>Feed cycles</span><strong>{dataSummary.feedCycles}</strong></div>
-                <div><span>Photos</span><strong>{dataSummary.photos}</strong></div>
-                <div><span>Logs</span><strong>{dataSummary.logs}</strong></div>
+                <div><span>{t("mobile.more.summaryAnimals", { defaultValue: "Animals" })}</span><strong>{dataSummary.animals}</strong></div>
+                <div><span>{t("mobile.more.summaryPairings", { defaultValue: "Pairings" })}</span><strong>{dataSummary.pairings}</strong></div>
+                <div><span>{t("mobile.more.summaryRooms", { defaultValue: "Rooms" })}</span><strong>{spacesSummary.rooms}</strong></div>
+                <div><span>{t("mobile.more.summaryRacks", { defaultValue: "Racks" })}</span><strong>{spacesSummary.racks}</strong></div>
+                <div><span>{t("mobile.more.summaryTerrariums", { defaultValue: "Terrariums" })}</span><strong>{spacesSummary.terrariums}</strong></div>
+                <div><span>{t("mobile.more.summaryFeedCycles", { defaultValue: "Feed cycles" })}</span><strong>{dataSummary.feedCycles}</strong></div>
+                <div><span>{t("mobile.more.summaryPhotos", { defaultValue: "Photos" })}</span><strong>{dataSummary.photos}</strong></div>
+                <div><span>{t("mobile.more.summaryLogs", { defaultValue: "Logs" })}</span><strong>{dataSummary.logs}</strong></div>
               </div>
             </div>
 
             {/* Tools */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Tools</div>
+              <div className="mbl-section-label">{t("mobile.more.tools", { defaultValue: "Tools" })}</div>
               <div className="mbl-settings-list">
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={() => setMorePanel("advisor")}>
-                  <span>🧬 Breeding Advisor</span>
+                  <span>{t("mobile.more.breedingAdvisorRow", { defaultValue: "🧬 Breeding Advisor" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={() => setMorePanel("shed-test")}>
-                  <span>🔬 Shed Test Terminal</span>
+                  <span>{t("mobile.more.shedTestRow", { defaultValue: "🔬 Lab tests" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
               </div>
@@ -2843,16 +2943,16 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
             {/* Appearance */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Appearance</div>
+              <div className="mbl-section-label">{t("mobile.more.appearance", { defaultValue: "Appearance" })}</div>
               <div className="mbl-settings-list">
                 <div className="mbl-settings-row mbl-settings-row--stacked">
-                  <span>Theme</span>
+                  <span>{t("mobile.more.theme", { defaultValue: "Theme" })}</span>
                   <div className="mbl-seg">
                     {["system", "light", "dark"].map((mode) => (
                       <button key={mode} type="button"
                         className={appearanceState.themeMode === mode ? "is-active" : ""}
                         onClick={() => updateAppearance({ themeMode: mode })}>
-                        {mode === "system" ? "Auto" : cap(mode)}
+                        {mode === "system" ? t("mobile.more.themeAuto", { defaultValue: "Auto" }) : mode === "light" ? t("mobile.more.themeLight", { defaultValue: "Light" }) : t("mobile.more.themeDark", { defaultValue: "Dark" })}
                       </button>
                     ))}
                   </div>
@@ -2862,38 +2962,38 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
             {/* Cloud & Sync */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Cloud & sync</div>
+              <div className="mbl-section-label">{t("mobile.more.cloudSync", { defaultValue: "Cloud & sync" })}</div>
               <div className="mbl-settings-list">
                 <div className="mbl-settings-row">
-                  <span>Status</span>
+                  <span>{t("mobile.more.status", { defaultValue: "Status" })}</span>
                   <span className={`mbl-settings-badge ${online ? "mbl-settings-badge--green" : "mbl-settings-badge--red"}`}>
-                    {online ? "Online" : "Offline"}
+                    {online ? t("mobile.sync.online", { defaultValue: "Online" }) : t("mobile.sync.offline", { defaultValue: "Offline" })}
                   </span>
                 </div>
                 <div className="mbl-settings-row">
-                  <span>Last synced</span>
-                  <span className="mbl-settings-muted">{fmtSyncTime(lastSyncAt)}</span>
+                  <span>{t("mobile.more.lastSynced", { defaultValue: "Last synced" })}</span>
+                  <span className="mbl-settings-muted">{fmtSyncTime(lastSyncAt, t)}</span>
                 </div>
                 <div className="mbl-settings-row">
-                  <span>Auto sync</span>
-                  <span className="mbl-settings-muted">On while signed in</span>
+                  <span>{t("mobile.more.autoSync", { defaultValue: "Auto sync" })}</span>
+                  <span className="mbl-settings-muted">{t("mobile.more.autoSyncValue", { defaultValue: "On while signed in" })}</span>
                 </div>
                 <div className="mbl-settings-row">
-                  <span>Synced spaces</span>
-                  <span className="mbl-settings-muted">{spacesSummary.rooms} rooms / {spacesSummary.racks} racks</span>
+                  <span>{t("mobile.more.syncedSpaces", { defaultValue: "Synced spaces" })}</span>
+                  <span className="mbl-settings-muted">{t("mobile.more.syncedSpacesValue", { rooms: spacesSummary.rooms, racks: spacesSummary.racks, defaultValue: "{{rooms}} rooms / {{racks}} racks" })}</span>
                 </div>
                 {queue.length > 0 && (
                   <div className="mbl-settings-row">
-                    <span>{queue.length} pending action{queue.length !== 1 ? "s" : ""}</span>
-                    <button type="button" className="mbl-text-btn mbl-text-btn--sm" onClick={runSync}>Sync now</button>
+                    <span>{t("mobile.more.pendingActions", { count: queue.length, defaultValue: "{{count}} pending actions", defaultValue_one: "{{count}} pending action" })}</span>
+                    <button type="button" className="mbl-text-btn mbl-text-btn--sm" onClick={runSync}>{t("mobile.sync.syncNow", { defaultValue: "Sync now" })}</button>
                   </div>
                 )}
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={syncCloudDatabase} disabled={!online}>
-                  <span style={{ opacity: online ? 1 : 0.45 }}>Sync cloud database</span>
+                  <span style={{ opacity: online ? 1 : 0.45 }}>{t("mobile.more.syncCloudDatabase", { defaultValue: "Sync cloud database" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={refresh}>
-                  <span>Refresh from cloud</span>
+                  <span>{t("mobile.more.refreshFromCloud", { defaultValue: "Refresh from cloud" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
               </div>
@@ -2901,28 +3001,28 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
 
             {/* Devices */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Devices</div>
+              <div className="mbl-section-label">{t("mobile.more.devices", { defaultValue: "Devices" })}</div>
               <div className="mbl-settings-list">
                 <div className="mbl-settings-row mbl-settings-row--col">
-                  <span>This device ID</span>
+                  <span>{t("mobile.more.thisDeviceId", { defaultValue: "This device ID" })}</span>
                   <span className="mbl-device-id">{deviceId}</span>
                 </div>
               </div>
               <p className="mbl-settings-hint">
-                Sign in with the same account on any device to access your data. All devices sync through the cloud automatically.
+                {t("mobile.more.devicesHint", { defaultValue: "Sign in with the same account on any device to access your data. All devices sync through the cloud automatically." })}
               </p>
             </div>
 
             {/* Account */}
             <div className="mbl-more-section">
-              <div className="mbl-section-label">Account</div>
+              <div className="mbl-section-label">{t("mobile.more.account", { defaultValue: "Account" })}</div>
               <div className="mbl-settings-list">
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn" onClick={onSwitchMode}>
-                  <span>Switch to Terminal mode</span>
+                  <span>{t("mobile.more.switchToTerminal", { defaultValue: "Switch to Terminal mode" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
                 <button type="button" className="mbl-settings-row mbl-settings-row--btn mbl-settings-row--danger" onClick={onSignOut}>
-                  <span>Sign out</span>
+                  <span>{t("mobile.common.signOut", { defaultValue: "Sign out" })}</span>
                   <span className="mbl-settings-chevron">›</span>
                 </button>
               </div>

@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AppRole } from "../types/auth";
+import { countMarketplaceMatches } from "./marketplaceService";
 
 type SearchInput = {
   name?: unknown;
@@ -67,12 +68,49 @@ const toPublicSavedSearch = (row: any) => ({
   updatedAt: row.updatedAt,
 });
 
+/**
+ * There is no alert mail behind a saved search -- nothing sends one -- so the
+ * honest version of "tell me when one is listed" is a count, shown the next
+ * time the buyer looks: how many animals match now, and how many of those were
+ * listed since the search was last run. `updatedAt` is that "last run" mark;
+ * running a search touches it.
+ */
+const MAX_COUNTED = 20;
+
+const withMatchCounts = async (rows: any[]) =>
+  Promise.all(
+    rows.map(async (row, index) => {
+      const search = toPublicSavedSearch(row);
+      if (index >= MAX_COUNTED) return { ...search, matchCount: null, newSinceLastRun: null };
+      try {
+        const [matchCount, newSinceLastRun] = await Promise.all([
+          countMarketplaceMatches(search.filters),
+          countMarketplaceMatches(search.filters, row.updatedAt ? new Date(row.updatedAt) : null),
+        ]);
+        return { ...search, matchCount, newSinceLastRun };
+      } catch {
+        // A count is a convenience; the saved search itself must still list.
+        return { ...search, matchCount: null, newSinceLastRun: null };
+      }
+    })
+  );
+
 export const listMySavedSearches = async (actor: { id: string; role: AppRole }) => {
   const rows = await db.savedSearch.findMany({
     where: { ownerId: actor.id },
     orderBy: [{ updatedAt: "desc" }],
   });
-  return rows.map(toPublicSavedSearch);
+  return withMatchCounts(rows);
+};
+
+/** Marks a saved search as run now, which resets its "new" count. */
+export const markMarketplaceSearchRun = async (actor: { id: string; role: AppRole }, searchId: string) => {
+  const id = textValue(searchId, 160);
+  const existing = await db.savedSearch.findUnique({ where: { id } });
+  if (!existing) throw new HttpError(404, "Saved search not found.");
+  if (existing.ownerId !== actor.id) throw new HttpError(403, "You can only run your own saved searches.");
+  const row = await db.savedSearch.update({ where: { id }, data: { updatedAt: new Date() } });
+  return toPublicSavedSearch(row);
 };
 
 export const saveMarketplaceSearch = async (

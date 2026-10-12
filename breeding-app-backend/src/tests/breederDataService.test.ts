@@ -4,13 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // itself only carries writes, inserting through createMany.
 const tx = {
   animal: { createMany: vi.fn(), update: vi.fn() },
+  // Present only so the test can prove a sync never touches either listing store.
   listing: {
     updateMany: vi.fn(),
     upsert: vi.fn(),
   },
+  marketplaceListing: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   pairing: { createMany: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   clutch: { createMany: vi.fn(), update: vi.fn() },
   breederPlannerState: { create: vi.fn(), update: vi.fn() },
+  breedingCycle: { createMany: vi.fn(), update: vi.fn() },
+  follicleExamination: { createMany: vi.fn(), update: vi.fn() },
 };
 
 // A row as the bulk pre-load sees it: the app-side id is what keys the lookup, so a row without
@@ -25,14 +29,22 @@ const existingRow = (appIdField: string, appId: string, payload: unknown, update
 vi.mock("../lib/prisma", () => ({
   prisma: {
     $transaction: vi.fn(async (callback) => callback(tx)),
-    animal: { findMany: vi.fn() },
+    animal: { findMany: vi.fn(), count: vi.fn() },
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
     breederPlannerState: { findUnique: vi.fn() },
+    breedingCycle: { findMany: vi.fn() },
+    follicleExamination: { findMany: vi.fn() },
   },
 }));
 
+// The tier lookup is its own service; these tests set the answer it gives.
+vi.mock("../services/subscriptionService", () => ({
+  canAccessFeature: vi.fn(),
+}));
+
 import { prisma } from "../lib/prisma";
+import { canAccessFeature } from "../services/subscriptionService";
 import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederDataService";
 
 beforeEach(() => {
@@ -53,6 +65,95 @@ beforeEach(() => {
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
+  vi.mocked((prisma as any).breedingCycle.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).follicleExamination.findMany).mockResolvedValue([]);
+  tx.breedingCycle.createMany.mockResolvedValue({ count: 0 });
+  tx.follicleExamination.createMany.mockResolvedValue({ count: 0 });
+  vi.mocked(canAccessFeature).mockResolvedValue({ allowed: true, featureKey: "animals.create", source: "unconfigured", tier: "Unconfigured" } as any);
+});
+
+describe("the tier's animal cap", () => {
+  const freeAt = (currentUsage: number) => ({
+    allowed: currentUsage < 20,
+    featureKey: "animals.create",
+    tier: "Free",
+    currentTier: "Free",
+    currentUsage,
+    limit: 20,
+    ...(currentUsage >= 20 ? { reason: "Usage limit reached" } : {}),
+  });
+  const newAnimals = (count: number, from = 1) =>
+    Array.from({ length: count }, (_, index) => ({ id: `new-${from + index}`, name: `New ${from + index}` }));
+
+  it("lets an account at its cap keep saving edits", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", name: "Old" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", name: "Renamed", updatedAt: "2026-02-01T00:00:00.000Z" }],
+    });
+
+    expect(tx.animal.update).toHaveBeenCalled();
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+  });
+
+  it("accepts new animals up to the cap, counting only live animals", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(19) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(19);
+
+    await upsertBreederSnapshot("breeder-1", { animals: newAnimals(1) });
+
+    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: { ownerId: "breeder-1", deletedAt: null } });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("refuses a save that would take the cloud past the cap, and writes nothing", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(15) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(15);
+
+    await expect(upsertBreederSnapshot("breeder-1", { animals: newAnimals(10) })).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Free keeps 20 animals in the cloud. This save would bring it to 25, so it was not saved. Every animal is still on this device.",
+    });
+    expect((prisma as any).$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a first sync of 60 animals on Free instead of letting the request size decide", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(0) as any);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(0);
+
+    await expect(upsertBreederSnapshot("breeder-1", { animals: newAnimals(60) })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("makes room for a new animal when the same save deletes one", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1" }),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValueOnce(20).mockResolvedValueOnce(1);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", deletedAt: "2026-03-01T00:00:00.000Z" }, ...newAnimals(1)],
+    });
+
+    expect((prisma as any).animal.count).toHaveBeenLastCalledWith({
+      where: { ownerId: "breeder-1", deletedAt: null, appAnimalId: { in: ["snake-1"] } },
+    });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("does not count a deletion of an animal the cloud never had", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "never-synced", deletedAt: "2026-03-01T00:00:00.000Z" }],
+    });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
 });
 
 describe("breederDataService", () => {
@@ -136,16 +237,15 @@ describe("breederDataService", () => {
     })).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("syncs animals tagged for sale into uniform marketplace listings", async () => {
+  it("never writes a listing, even for an animal tagged for sale and published", async () => {
+    // The snapshot used to mirror sale-tagged animals into the legacy listings
+    // table. The one listing pipeline is the explicit publish; a sync must not
+    // put anything on sale, or take anything off it, in either store.
     const animal = {
       id: "snake-1",
-      name: "Banana Clown Female",
-      sex: "female",
       status: "For Sale",
       morphs: ["Banana", "Clown"],
-      hets: ["Pied"],
       price: "450",
-      imageUrl: "https://example.com/snake.jpg",
       marketplacePublished: true,
       marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
     };
@@ -156,49 +256,11 @@ describe("breederDataService", () => {
       pairings: [],
     });
 
-    expect(tx.listing.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        ownerId: "breeder-1",
-        appListingId: { startsWith: "auto-animal-" },
-      }),
-      data: { status: "hidden" },
-    }));
-    expect(tx.listing.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { ownerId_appListingId: { ownerId: "breeder-1", appListingId: "auto-animal-snake-1" } },
-      create: expect.objectContaining({
-        ownerId: "breeder-1",
-        appListingId: "auto-animal-snake-1",
-        animalAppId: "snake-1",
-        title: "Banana, Clown, het Pied",
-        status: "available",
-        priceCents: 45000,
-        payload: expect.objectContaining({
-          source: "breeder-animal-tag",
-          genetics: "Banana, Clown, het Pied",
-          imageUrl: "https://example.com/snake.jpg",
-          marketplacePublished: true,
-          marketplacePublishedAt: "2026-05-01T20:00:00.000Z",
-          price: "450",
-        }),
-      }),
-    }));
-  });
-
-  it("does not publish sale-tagged animals until explicitly published", async () => {
-    const animal = {
-      id: "snake-1",
-      status: "For Sale",
-      morphs: ["Clown"],
-    };
-    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([{ payload: animal }]);
-
-    await upsertBreederSnapshot("breeder-1", {
-      animals: [animal],
-      pairings: [],
-    });
-
-    expect(tx.listing.updateMany).toHaveBeenCalled();
+    expect(tx.listing.updateMany).not.toHaveBeenCalled();
     expect(tx.listing.upsert).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.create).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.update).not.toHaveBeenCalled();
+    expect(tx.marketplaceListing.updateMany).not.toHaveBeenCalled();
   });
 
   it("does not overwrite newer database rows with older incoming animal payloads", async () => {
@@ -609,6 +671,8 @@ describe("breederDataService", () => {
       animals: [],
       pairings: [],
       clutches: [],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
       serverTime: expect.any(String),
     });
@@ -623,6 +687,8 @@ describe("breederDataService", () => {
       animals: [{ id: "snake-1" }],
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: null,
       serverTime: expect.any(String),
     });

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /**
  * Who is looking, and what they were trying to do before we asked them to
@@ -119,9 +120,14 @@ export const takeIntent = () => {
 /**
  * Wraps an action that needs an account. Returns `[run, pending]` where
  * `pending` is the intent to show in the sign-in sheet, or null.
+ *
+ * The intent remembers the page it came from, so signing in can bring the
+ * visitor back to it (see `useReturnAfterSignIn`) and the page can finish what
+ * was started (see `useResumeIntent`).
  */
 export const useAuthAction = () => {
   const session = useSession();
+  const location = useLocation();
   const [pending, setPending] = useState(null);
 
   const run = useCallback(
@@ -130,14 +136,56 @@ export const useAuthAction = () => {
         action();
         return true;
       }
-      rememberIntent(intent);
-      setPending(intent);
+      const full = { ...intent, returnTo: `${location.pathname}${location.search}` };
+      rememberIntent(full);
+      setPending(full);
       return false;
     },
-    [session.isAuthenticated]
+    [session.isAuthenticated, location.pathname, location.search]
   );
 
-  const dismiss = useCallback(() => setPending(null), []);
+  // "Not now" means not now: a later sign-in should not jump back here.
+  const dismiss = useCallback(() => {
+    takeIntent();
+    setPending(null);
+  }, []);
 
   return useMemo(() => ({ run, pending, dismiss, session }), [run, pending, dismiss, session]);
+};
+
+/**
+ * Signing in happens on whatever account page the sheet sent the visitor to.
+ * Once a session exists and a held intent names another page, go back there.
+ * Mounted once, in the shell.
+ */
+export const useReturnAfterSignIn = () => {
+  const session = useSession();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!session.isAuthenticated) return;
+    const intent = peekIntent();
+    if (!intent?.returnTo) return;
+    const here = `${location.pathname}${location.search}`;
+    if (intent.returnTo !== here) navigate(intent.returnTo, { replace: true });
+  }, [session.isAuthenticated, location.pathname, location.search, navigate]);
+};
+
+/**
+ * Hands a page the intent it was waiting for, exactly once, when the visitor
+ * is signed in, the page is `ready` (its data has loaded) and the intent
+ * belongs here. `matches` decides that.
+ */
+export const useResumeIntent = (matches, onResume, ready = true) => {
+  const session = useSession();
+  useEffect(() => {
+    if (!session.isAuthenticated || !ready) return;
+    const intent = peekIntent();
+    if (!intent || !matches(intent)) return;
+    takeIntent();
+    onResume(intent);
+    // `matches` and `onResume` are per-render closures; the trigger is signing in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.isAuthenticated, ready]);
 };

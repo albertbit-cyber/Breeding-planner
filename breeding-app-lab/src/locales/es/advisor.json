@@ -1,9 +1,9 @@
 {
 	"title": "Asesor de Cría",
-	"description": "Solo analizamos los animales etiquetados en el grupo <strong>Breeders</strong> y mostramos emparejamientos con una probabilidad muy alta de producir tu morfología objetivo seleccionada.",
+	"description": "Solo analizamos los animales del grupo <strong>Breeders</strong> y mostramos apareamientos con una probabilidad muy alta de producir el morph objetivo que elegiste.",
 	"goal": {
 		"label": "Objetivo (Nombre y Rasgos)",
-		"placeholder": "Visual Clown: Clown, het Desert Ghost",
+		"placeholder": "Clown visual: Clown, het Desert Ghost",
 		"tip": "Consejo de formato: \"Nombre del objetivo: rasgo uno, rasgo dos\". Si solo listas rasgos, crearemos un objetivo genérico.",
 		"defaultName": "Objetivo personalizado"
 	},
@@ -12,10 +12,10 @@
 	},
 	"summary": {
 		"loading": "Calculando cuadros de Punnett…",
-		"ready": "Ejecuta el asesor para descubrir emparejamientos prometedores.",
+		"ready": "Ejecuta el asesor para descubrir apareamientos prometedores.",
 		"supportingOnly": "Aún no hay pares que cumplan el umbral de alta confianza, pero aquí hay {{count}} opciones para revisar.",
-		"noConfidence": "Ningún emparejamiento superó el umbral de confianza. Intenta ajustar tu colección o los objetivos.",
-		"confidentCount": "{{count}} emparejamiento(s) cumplen el objetivo de confianza ≥ {{threshold}}."
+		"noConfidence": "Ningún apareamiento superó el umbral de confianza. Intenta ajustar tu colección o los objetivos.",
+		"confidentCount": "{{count}} apareamiento(s) cumplen el objetivo de confianza ≥ {{threshold}}."
 	},
 	"stats": {
 		"males": "{{count}} macho reproductor",
@@ -30,7 +30,7 @@
 		"reset": "Reiniciar Asesor"
 	},
 	"errors": {
-		"noBreeders": "Añade animales al grupo Breeders para ver las recomendaciones del asesor.",
+		"noBreeders": "Agrega animales al grupo Breeders para ver las recomendaciones del asesor.",
 		"noGoals": "Añade rasgos de objetivo antes de ejecutar el asesor.",
 		"failure": "No se pudieron generar sugerencias."
 	},
@@ -40,8 +40,8 @@
 		"demandSignals": "Señales de demanda:",
 		"priceRange": "Orientación de precios: {{range}}",
 		"sources": "Fuentes:",
-		"additionalHeading": "Emparejamientos adicionales que vale la pena revisar",
-		"readyCallout": "Listo cuando quieras—haz clic en <strong>Ejecutar Asesor</strong> para descubrir tus mejores emparejamientos de reproductores."
+		"additionalHeading": "Apareamientos adicionales que vale la pena revisar",
+		"readyCallout": "Listo cuando quieras: haz clic en <strong>Ejecutar Asesor</strong> para descubrir los mejores apareamientos de tus reproductores."
 	},
 	"genes": {
 		"goalVisuals": "Visuales del Objetivo",
@@ -63,7 +63,7 @@
 		},
 		"combinedProbability": "Combinado ≈ {{value}}",
 		"generationLabel": "Generación {{generation}}",
-		"prereqProbability": "Prereq ≈ {{value}}",
+		"prereqProbability": "Prerrequisito ≈ {{value}}",
 		"goalProbability": "Objetivo ≈ {{value}}",
 		"holdbackProbability": "Holdback ≈ {{value}}",
 		"holdbackGenes": "Genes Holdback: {{genes}}",
@@ -82,13 +82,13 @@
 	},
 	"labels": {
 		"unknownAnimal": "Desconocido",
-		"holdbackMale": "Holdback Macho",
-		"holdbackFemale": "Holdback Hembra",
+		"holdbackMale": "Macho holdback",
+		"holdbackFemale": "Hembra holdback",
 		"holdback": "Holdback"
 	},
 	"outcomes": {
 		"none": "No hay proyección disponible.",
-		"unknownMorph": "Morfología desconocida",
+		"unknownMorph": "Morph desconocido",
 		"probability": "{{genotype}} ({{chance}} de probabilidad de aparición)"
 	},
 	"goals": {
@@ -119,9 +119,9 @@
 		"minProbability": "Probabilidad mínima ({{percent}}%)",
 		"weight": "Peso ({{value}})",
 		"idLabel": "ID: {{id}}",
-		"loadPreset": "Cargar Preset",
+		"loadPreset": "Cargar preajuste",
 		"presets": {
-			"title": "Presets",
+			"title": "Preajustes",
 			"close": "Cerrar"
 		},
 		"defaultName": "Nuevo objetivo"
@@ -138,7 +138,7 @@
 			"holdbackSummary": "No se espera ningún visual directo; producir holdbacks portadores de {{traits}}.",
 			"adjustedSummary": "Probabilidad directa del objetivo {{chance}}%. Priorizar la producción de holdbacks portadores de {{holdback}}.",
 			"secondTitle": "Generación {{generation}}: Holdback × {{partner}}",
-			"secondSummary": "Retener el holdback {{sex}} ({{holdback}}). Empareja con {{partner}} para una probabilidad del {{chance}}% de alcanzar el objetivo.",
+			"secondSummary": "Conserva el holdback {{sex}} ({{holdback}}). Apárealo con {{partner}} para tener un {{chance}}% de probabilidad de alcanzar el objetivo.",
 			"holdbackSex": {
 				"female": "hembra",
 				"male": "macho"

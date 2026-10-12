@@ -1,6 +1,6 @@
 {
 	"title": "Kweekadviseur",
-	"description": "We kijken alleen naar dieren in de <strong>Fokdieren</strong>-groep en tonen koppelingen met een zeer hoge kans op het gewenste morph-doel.",
+	"description": "We kijken alleen naar dieren in de <strong>Breeders</strong>-groep en tonen koppelingen met een zeer hoge kans op het gewenste morph-doel.",
 	"goal": {
 		"label": "Doel (naam en eigenschappen)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
@@ -30,7 +30,7 @@
 		"reset": "Adviseur resetten"
 	},
 	"errors": {
-		"noBreeders": "Voeg dieren toe aan de Fokdieren-groep om aanbevelingen te zien.",
+		"noBreeders": "Voeg dieren toe aan de Breeders-groep om aanbevelingen te zien.",
 		"noGoals": "Voeg doeleigenschappen toe voordat je de adviseur uitvoert.",
 		"failure": "Suggesties konden niet worden gegenereerd."
 	},
@@ -71,7 +71,7 @@
 		"status": {
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Mogelijke het",
+			"possibleHet": "Possible het",
 			"none": "Normaal"
 		},
 		"expectation": {
@@ -114,7 +114,7 @@
 			"any": "Elk",
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Mogelijke het"
+			"possibleHet": "Possible het"
 		},
 		"minProbability": "Minimale kans ({{percent}}%)",
 		"weight": "Gewicht ({{value}})",

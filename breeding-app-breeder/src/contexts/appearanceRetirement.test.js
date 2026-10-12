@@ -3,7 +3,7 @@
  * still resolve to something legal for users who had it saved.
  */
 import { describe, it, expect } from 'vitest';
-import { sanitizeAppearance, APPEARANCE_PRESETS, MATERIALS } from './AppearanceContext.jsx';
+import { sanitizeAppearance } from './AppearanceContext.jsx';
 
 import { APPEARANCE_VERSION as V } from './AppearanceContext.jsx';
 describe('retirement migration', () => {

@@ -1,4 +1,4 @@
-package com.breedingplanner.mobile;
+package com.serpentora.mobile;
 
 import static org.junit.Assert.*;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.breedingplanner.mobile", appContext.getPackageName());
+        assertEquals("com.serpentora.mobile", appContext.getPackageName());
     }
 }

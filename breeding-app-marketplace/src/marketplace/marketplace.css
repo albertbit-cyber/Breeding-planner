@@ -249,7 +249,7 @@
 /* ── Right-to-left ──────────────────────────────────────────────────────── */
 
 [dir="rtl"] .mk-rot180 { transform: none; }
-[dir="rtl"] .mk-listing__link { text-align: right; }
+[dir="rtl"] .mk-listing__link { text-align: end; }
 [dir="rtl"] .mk-msg--mine .mk-msg__bubble {
   border-radius: var(--mk-r-lg) var(--mk-r-lg) var(--mk-r-lg) 4px;
 }
@@ -258,18 +258,18 @@
 }
 [dir="rtl"] .mk-switch::after { left: auto; right: 2px; }
 [dir="rtl"] .mk-switch[aria-checked="true"]::after { transform: translateX(-16px); }
-[dir="rtl"] .mk-thread-item { border-left: 0; border-right: 3px solid transparent; }
+[dir="rtl"] .mk-thread-item { border-inline-start: 0; border-inline-end: 3px solid transparent; }
 [dir="rtl"] .mk-thread-item.is-unread,
-[dir="rtl"] .mk-thread-item.is-active { border-right-color: var(--mk-sky); }
-[dir="rtl"] .mk-inbox__list { border-right: 0; border-left: 1px solid var(--mk-rule); }
-[dir="rtl"] .mk-inbox__rail { border-left: 0; border-right: 1px solid var(--mk-rule); }
+[dir="rtl"] .mk-thread-item.is-active { border-inline-end-color: var(--mk-sky); }
+[dir="rtl"] .mk-inbox__list { border-inline-end: 0; border-inline-start: 1px solid var(--mk-rule); }
+[dir="rtl"] .mk-inbox__rail { border-inline-start: 0; border-inline-end: 1px solid var(--mk-rule); }
 [dir="rtl"] .mk-heart { right: auto; left: 8px; }
 [dir="rtl"] .mk-listing__badges { left: auto; right: 10px; }
 [dir="rtl"] .mk-listing__count { right: auto; left: 8px; }
 [dir="rtl"] .mk-photos__cover { left: auto; right: 6px; }
 [dir="rtl"] .mk-photos__tools { right: auto; left: 4px; }
 [dir="rtl"] .mk-toasts { right: auto; left: 20px; }
-[dir="rtl"] .mk-step__line { margin-left: 0; margin-right: 8px; }
+[dir="rtl"] .mk-step__line { margin-inline-start: 0; margin-inline-end: 8px; }
 
 .mk-badge {
   background: var(--mk-sky);
@@ -360,7 +360,7 @@
 .mk-btn--outline { border-color: var(--mk-rule); background: var(--mk-surface); }
 .mk-btn--outline:hover { border-color: var(--sk-border-strong, var(--mk-rule)); }
 
-.mk-btn--quiet { color: var(--mk-muted); padding-left: 10px; padding-right: 10px; }
+.mk-btn--quiet { color: var(--mk-muted); padding-inline-start: 10px; padding-inline-end: 10px; }
 .mk-btn--quiet:hover { color: var(--mk-text); background: var(--mk-surface-2); box-shadow: none; transform: none; }
 
 .mk-btn--danger { color: var(--mk-bad-text); }
@@ -424,6 +424,37 @@ button.mk-gene { cursor: pointer; }
   font-style: normal;
 }
 .mk-gene--more { background: var(--mk-surface-2); color: var(--mk-muted); }
+/* Provenance on the tag itself. Lab-confirmed: a tick and a solid edge in the
+   tag's own hue. Disputed by the lab: a cross and a dashed edge. Untested
+   claims stay plain, so the eye finds the tested ones. */
+.mk-gene--lab { border-color: currentColor; }
+.mk-gene--disputed { border: 1px dashed currentColor; }
+.mk-gene--lab, .mk-gene--disputed { display: inline-flex; align-items: center; gap: 3px; }
+.mk-gene__mark { display: inline-block; flex: none; }
+
+/* ── Genetics with provenance, on the listing page ───────────────────────── */
+
+.mk-claims { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mk-claim {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid var(--mk-rule);
+  border-radius: var(--mk-r-sm);
+  background: var(--mk-surface);
+}
+.mk-claim__what { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mk-claim__how { font-size: 12.5px; color: var(--mk-muted); }
+.mk-claim__how b { color: var(--mk-text, inherit); font-weight: 600; }
+.mk-claim__lab { grid-column: 1 / -1; font-size: 12px; color: var(--mk-muted); }
+.mk-claim__lab--disputed { color: var(--mk-gene-text); }
+.mk-claim-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font-size: 12px; color: var(--mk-muted); }
+@media (max-width: 520px) {
+  .mk-claim { grid-template-columns: 1fr; }
+}
+
 
 /* ── Provenance meter ───────────────────────────────────────────────────── */
 
@@ -1107,9 +1138,9 @@ button.mk-gene { cursor: pointer; }
   min-height: calc(100vh - 60px);
   border-top: 1px solid var(--mk-rule);
 }
-.mk-inbox__list { border-right: 1px solid var(--mk-rule); background: var(--mk-surface); overflow-y: auto; }
+.mk-inbox__list { border-inline-end: 1px solid var(--mk-rule); background: var(--mk-surface); overflow-y: auto; }
 .mk-inbox__thread { display: flex; flex-direction: column; background: var(--mk-bg); min-width: 0; }
-.mk-inbox__rail { border-left: 1px solid var(--mk-rule); background: var(--mk-surface); padding: 18px; overflow-y: auto; }
+.mk-inbox__rail { border-inline-start: 1px solid var(--mk-rule); background: var(--mk-surface); padding: 18px; overflow-y: auto; }
 
 .mk-thread-item {
   display: block;
@@ -1120,13 +1151,13 @@ button.mk-gene { cursor: pointer; }
   padding: 13px 16px;
   border: 0;
   border-bottom: 1px solid var(--mk-rule-soft);
-  border-left: 3px solid transparent;
+  border-inline-start: 3px solid transparent;
   background: transparent;
   cursor: pointer;
 }
 .mk-thread-item:hover { background: var(--mk-surface-2); }
-.mk-thread-item.is-unread { border-left-color: var(--mk-sky); }
-.mk-thread-item.is-active { background: var(--mk-sky-wash); border-left-color: var(--mk-sky); }
+.mk-thread-item.is-unread { border-inline-start-color: var(--mk-sky); }
+.mk-thread-item.is-active { background: var(--mk-sky-wash); border-inline-start-color: var(--mk-sky); }
 .mk-thread-item__top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
 .mk-thread-item__preview {
   margin: 0;
@@ -1206,7 +1237,7 @@ button.mk-gene { cursor: pointer; }
 .mk-step.is-done .mk-step__dot { background: var(--mk-ok-text); border-color: var(--mk-ok-text); color: var(--mk-surface); }
 .mk-step.is-now .mk-step__dot { background: var(--mk-gold-mark); border-color: var(--mk-gold-mark); color: var(--mk-surface); }
 .mk-step.is-todo { opacity: 0.55; }
-.mk-step__line { width: 2px; height: 16px; background: var(--mk-rule); margin-left: 8px; }
+.mk-step__line { width: 2px; height: 16px; background: var(--mk-rule); margin-inline-start: 8px; }
 .mk-step__line.is-done { background: var(--mk-ok-text); }
 .mk-step__body { font-size: 13px; }
 .mk-step__body b { display: block; }
@@ -1224,8 +1255,8 @@ button.mk-gene { cursor: pointer; }
   font-size: 13px;
   background: none;
   border-top: 0;
-  border-left: 0;
-  border-right: 0;
+  border-inline-start: 0;
+  border-inline-end: 0;
   font-family: inherit;
   cursor: pointer;
 }
@@ -1323,7 +1354,7 @@ button.mk-gene { cursor: pointer; }
   .mk-price { font-size: 15px; }
   .mk-seller__name { display: none; }
   .mk-inbox { grid-template-columns: minmax(0, 1fr); }
-  .mk-inbox__list { border-right: 0; }
+  .mk-inbox__list { border-inline-end: 0; }
   .mk-inbox--thread-open .mk-inbox__list { display: none; }
   .mk-msg { max-width: 84%; }
   .mk-spec { grid-template-columns: 96px minmax(0, 1fr); }
@@ -1356,3 +1387,21 @@ button.mk-gene { cursor: pointer; }
   .mk-nav__actions .mk-btn--ink .mk-btn__label { display: none; }
   .mk-nav__actions .mk-btn--ink { padding: 8px 11px; }
 }
+
+/* ── Acquired animals: the record that came with a purchase ──────────────── */
+
+.mk-acquired { padding: 16px; display: grid; gap: 14px; }
+.mk-acquired__head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: flex-start; }
+.mk-acquired__certs { border-top: 1px solid var(--mk-rule); padding-top: 12px; }
+.mk-acquired__cert {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+.mk-acquired__cert + .mk-acquired__cert { border-top: 1px dashed var(--mk-rule); }
+.mk-acquired__cert .mk-mono { overflow-wrap: anywhere; }
+.mk-acquired__facts { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mk-acquired__facts .mk-icon { flex: none; }

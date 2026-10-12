@@ -23,10 +23,13 @@ import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
 import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { reproductiveRoutes } from "./routes/reproductiveRoutes";
+import { breedingRoutes } from "./routes/breedingRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { inviteRoutes } from "./routes/inviteRoutes";
 import { partnerRoutes } from "./routes/partnerRoutes";
+import { publicRoutes } from "./routes/publicRoutes";
 import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
+import { billingRoutes, billingWebhookRoutes } from "./routes/billingRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -40,6 +43,7 @@ app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 // Mounted before express.json() below: webhook signature verification needs the
 // exact raw request bytes, which a JSON body parser would already have consumed.
 app.use("/api/webhooks", emailWebhookRoutes);
+app.use("/api/billing/webhook", billingWebhookRoutes);
 
 const origins = env.corsOrigin
   .split(",")
@@ -144,6 +148,7 @@ app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/searches", savedSearchRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/billing", billingRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/mobile", mobileRoutes);
 // Ahead of adminRoutes on purpose: these are the endpoints a read-only
@@ -157,11 +162,14 @@ app.use("/api/lab/orders", orderRoutes);
 app.use("/api/lab/pending-sheds", pendingShedRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
 app.use("/api/reproductive", reproductiveRoutes);
+app.use("/api/breeding", breedingRoutes);
 app.use("/api/emails", emailRoutes);
 // Unauthenticated: an invitee has a token instead of an account.
 app.use("/api/invites", inviteRoutes);
 // Unauthenticated: a laboratory asking to be considered has no account yet.
 app.use("/api/partners", partnerRoutes);
+// Unauthenticated: a buyer checking a certificate holds a code, not an account.
+app.use("/api/public", publicRoutes);
 
 app.use(errorHandler);
 

@@ -34,7 +34,7 @@ function HealthIcons({ flags = [] }) {
   if (!flags || !flags.length) return null;
   const unique = [...new Set(flags)];
   return (
-    <span className="flex items-center gap-0.5 ml-1">
+    <span className="flex items-center gap-0.5 ms-1">
       {unique.map(flag => {
         const h = HEALTH_ICONS[flag];
         if (!h) return null;
@@ -363,7 +363,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
               aria-selected={idx === activeIdx}
               onMouseEnter={() => setActiveIdx(idx)}
               onClick={() => selectOption(option)}
-              className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors ${
+              className={`w-full text-start px-3 py-2 flex items-center gap-2 transition-colors ${
                 idx === activeIdx ? 'bg-blue-50' : 'hover:bg-neutral-50'
               }`}
             >
@@ -378,7 +378,7 @@ export default function GeneAutocomplete({ morphs = [], hets = [], onChange, dis
               )}
               {option.showMeta && <HealthIcons flags={option.gene.healthFlags} />}
               {option.showMeta && option.gene.complex && (
-                <span className="text-[10px] text-neutral-400 ml-auto shrink-0 truncate max-w-28" title={option.gene.complex}>
+                <span className="text-[10px] text-neutral-400 ms-auto shrink-0 truncate max-w-28" title={option.gene.complex}>
                   {option.gene.complex}
                 </span>
               )}

@@ -22,7 +22,26 @@ export type SharedApiConfigValidation = {
   isLocalhost: boolean;
 };
 
+export type SharedApiConfigOptions = {
+  /** Browser ports that mark a Vite dev or preview session. */
+  devPorts?: readonly string[];
+  /** Message shown when VITE_API_URL does not parse as a URL. */
+  invalidUrlMessage?: (rawUrl: string) => string;
+};
+
+export type SharedApiConfig = {
+  isProductionBuild: () => boolean;
+  validateSharedApiUrl: (
+    input?: string,
+    options?: { production?: boolean }
+  ) => SharedApiConfigValidation;
+  getSharedApiConfig: () => SharedApiConfigValidation;
+};
+
 const DEV_FALLBACK_API_URL = "http://127.0.0.1:4000/api";
+const DEFAULT_DEV_PORTS: readonly string[] = ["5173", "4173"];
+const defaultInvalidUrlMessage = (raw: string): string =>
+  `VITE_API_URL is invalid: "${raw}". Expected a full URL such as https://api.example.com.`;
 
 const readBrowserLocation = (): Location | null => {
   try {
@@ -41,13 +60,13 @@ const resolveDevFallbackApiUrl = (): string => {
   return `http://${hostname}:4000/api`;
 };
 
-const isLikelyDevBrowserSession = (): boolean => {
+const isLikelyDevBrowserSession = (devPorts: readonly string[]): boolean => {
   const location = readBrowserLocation();
   const port = String(location?.port || "").trim();
-  return port === "5173" || port === "4173";
+  return devPorts.includes(port);
 };
 
-const isDevBuild = (): boolean => {
+const isDevBuild = (devPorts: readonly string[]): boolean => {
   try {
     if (Boolean((import.meta as any)?.env?.DEV)) {
       return true;
@@ -57,26 +76,26 @@ const isDevBuild = (): boolean => {
   }
 
   try {
-    return isLikelyDevBrowserSession();
+    return isLikelyDevBrowserSession(devPorts);
   } catch {
     return false;
   }
 };
 
-const readRuntimeApiUrl = (): string => {
+const readRuntimeApiUrl = (devPorts: readonly string[]): string => {
   try {
     const configured = (import.meta as any)?.env?.VITE_API_URL;
     const trimmed = typeof configured === "string" ? configured.trim() : "";
     if (trimmed) return trimmed;
-    return isDevBuild() ? resolveDevFallbackApiUrl() : "";
+    return isDevBuild(devPorts) ? resolveDevFallbackApiUrl() : "";
   } catch {
-    return isDevBuild() ? resolveDevFallbackApiUrl() : "";
+    return isDevBuild(devPorts) ? resolveDevFallbackApiUrl() : "";
   }
 };
 
-export const isProductionBuild = (): boolean => {
+const isProductionBuildFor = (devPorts: readonly string[]): boolean => {
   try {
-    if (isLikelyDevBrowserSession()) {
+    if (isLikelyDevBrowserSession(devPorts)) {
       return false;
     }
     return Boolean((import.meta as any)?.env?.PROD);
@@ -99,12 +118,13 @@ const isLoopbackHostname = (hostname: string): boolean => {
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 };
 
-export const validateSharedApiUrl = (
+const validateSharedApiUrlFor = (
+  config: Required<SharedApiConfigOptions>,
   input?: string,
   options: { production?: boolean } = {}
 ): SharedApiConfigValidation => {
-  const raw = typeof input === "string" ? input.trim() : readRuntimeApiUrl();
-  const production = options.production ?? isProductionBuild();
+  const raw = typeof input === "string" ? input.trim() : readRuntimeApiUrl(config.devPorts);
+  const production = options.production ?? isProductionBuildFor(config.devPorts);
 
   if (typeof input === "undefined" && !raw) {
     return {
@@ -139,7 +159,7 @@ export const validateSharedApiUrl = (
       rawUrl: raw,
       baseUrl: "",
       issueCode: "invalid-url",
-      message: `VITE_API_URL is invalid: "${raw}". Expected a full URL such as https://api.example.com.`,
+      message: config.invalidUrlMessage(raw),
       warnings: [],
       isLocalhost: false,
     };
@@ -179,4 +199,20 @@ export const validateSharedApiUrl = (
   };
 };
 
-export const getSharedApiConfig = (): SharedApiConfigValidation => validateSharedApiUrl();
+// Each app may differ in which ports count as a dev session and in how an
+// unparseable URL is worded; everything else is one rule for every app.
+export const createSharedApiConfig = (options: SharedApiConfigOptions = {}): SharedApiConfig => {
+  const config: Required<SharedApiConfigOptions> = {
+    devPorts: options.devPorts ?? DEFAULT_DEV_PORTS,
+    invalidUrlMessage: options.invalidUrlMessage ?? defaultInvalidUrlMessage,
+  };
+  const validateSharedApiUrl: SharedApiConfig["validateSharedApiUrl"] = (input, validateOptions) =>
+    validateSharedApiUrlFor(config, input, validateOptions);
+  return {
+    isProductionBuild: () => isProductionBuildFor(config.devPorts),
+    validateSharedApiUrl,
+    getSharedApiConfig: () => validateSharedApiUrl(),
+  };
+};
+
+export const { isProductionBuild, validateSharedApiUrl, getSharedApiConfig } = createSharedApiConfig();

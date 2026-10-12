@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFamilyTreeData } from './hooks/useFamilyTreeData';
 import FamilyTreeCanvas from './components/FamilyTreeCanvas';
 import SelectedSnakePanel from './components/SelectedSnakePanel';
 import PedigreePassportPanel from './components/PedigreePassportPanel';
-import ViewTabs, { VIEW_TABS } from './components/ViewTabs';
+import ViewTabs, { VIEW_TABS, viewTabText } from './components/ViewTabs';
 import StatsBar from './components/StatsBar';
 import './familyTree.css';
-import { splitPairLabel } from '../animals/parentage';
 
 /**
  * The Family Tree.
@@ -26,6 +26,7 @@ const EmptyCanvas = ({ icon, title, body }) => (
 );
 
 const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => {
+  const { t } = useTranslation();
   const [selectedSnakeId, setSelectedSnakeId] = useState(() => focusSnakeId || snakes[0]?.id || null);
   const [activeView, setActiveView] = useState('tree');
 
@@ -69,6 +70,7 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
     () => VIEW_TABS.find(tab => tab.id === activeView) || VIEW_TABS[0],
     [activeView],
   );
+  const activeTabText = viewTabText(t, activeTab);
 
   const noAnimals = !snakes.length;
   const emptyGraph = !graph.nodes.length;
@@ -78,15 +80,15 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
       return (
         <EmptyCanvas
           icon="🐍"
-          title="No animals yet"
-          body="Add animals in the Animals tab, and their pedigree will build itself from the parents and clutches you record."
+          title={t('familyTree.noAnimals', { defaultValue: 'No animals yet' })}
+          body={t('familyTree.noAnimalsHelp', { defaultValue: 'Add animals in the Animals tab, and their pedigree will build itself from the parents and clutches you record.' })}
         />
       );
     }
     if (loading && emptyGraph) {
       return (
         <div className="flex items-center justify-center h-full">
-          <div className="text-sm text-neutral-400 animate-pulse">Building pedigree…</div>
+          <div className="text-sm text-neutral-400 animate-pulse">{t('familyTree.building', { defaultValue: 'Building pedigree…' })}</div>
         </div>
       );
     }
@@ -94,11 +96,11 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
       return (
         <EmptyCanvas
           icon={activeTab.icon}
-          title={`Nothing to draw in ${activeTab.label} view`}
+          title={t('familyTree.nothingToDraw', { defaultValue: 'Nothing to draw in {{view}} view', view: activeTabText.label })}
           body={
             activeView === 'clutch'
-              ? 'This animal has no clutch recorded either side of it. Set its parents in the animal editor, or log a clutch on its pairing.'
-              : 'Select an animal with recorded parents or offspring, or set parentage in the animal editor.'
+              ? t('familyTree.noClutchRecorded', { defaultValue: 'This animal has no clutch recorded either side of it. Set its parents in the animal editor, or log a clutch on its pairing.' })
+              : t('familyTree.selectAnimalWithRelatives', { defaultValue: 'Select an animal with recorded parents or offspring, or set parentage in the animal editor.' })
           }
         />
       );
@@ -125,9 +127,9 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
             🌳
           </div>
           <div className="min-w-0">
-            <div className="text-base font-bold text-neutral-900 leading-tight">Family Tree</div>
+            <div className="text-base font-bold text-neutral-900 leading-tight">{t('nav.familyTree', { defaultValue: 'Family Tree' })}</div>
             <div className="text-[11px] text-neutral-500 font-medium truncate">
-              {activeTab.hint}
+              {activeTabText.hint}
               {selectedSnake && ` · ${selectedSnake.name}`}
             </div>
           </div>
@@ -135,13 +137,13 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
 
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="rounded-full bg-violet-100 border border-violet-200 text-violet-700 text-[11px] font-semibold px-3 py-1">
-            {snakes.length} animal{snakes.length !== 1 ? 's' : ''}
+            {t('familyTree.animalCount', { count: snakes.length, defaultValue_one: '{{count}} animal', defaultValue_other: '{{count}} animals' })}
           </span>
         </div>
       </div>
 
       <div className="ft-body">
-        <div className="ft-left-col border-r border-violet-100">
+        <div className="ft-left-col border-e border-violet-100">
           <SelectedSnakePanel
             snake={selectedSnake}
             parents={parents}
@@ -157,14 +159,14 @@ const FamilyTreePage = ({ snakes = [], pairings = [], focusSnakeId = null }) => 
               reached costs the extra relatives it would have added, not the tree itself. */}
           {serverError && !noAnimals && (
             <div className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
-              Showing this collection only — the shared pedigree service is unreachable.
+              {t('familyTree.serverUnreachable', { defaultValue: 'Showing this collection only — the shared pedigree service is unreachable.' })}
             </div>
           )}
 
           <div className="ft-canvas-area">{canvasBody()}</div>
         </div>
 
-        <div className="ft-right-col border-l border-violet-100">
+        <div className="ft-right-col border-s border-violet-100">
           <PedigreePassportPanel
             snake={selectedSnake}
             parents={parents}

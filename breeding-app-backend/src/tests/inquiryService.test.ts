@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/prisma", () => ({
   prisma: {
-    listing: { findFirst: vi.fn() },
+    marketplaceListing: { findFirst: vi.fn() },
     listingInquiry: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -18,15 +18,15 @@ import { createListingInquiry, listMyInquiries, updateInquiryFollowUp } from "..
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked((prisma as any).listing.findFirst).mockResolvedValue({
-    id: "listing-row-1",
-    ownerId: "breeder-1",
-    appListingId: "listing-1",
+  vi.mocked((prisma as any).marketplaceListing.findFirst).mockResolvedValue({
+    id: "listing-1",
+    sellerUserId: "breeder-1",
     title: "Banana Clown",
   });
   vi.mocked((prisma as any).listingInquiry.create).mockResolvedValue({
     id: "inquiry-1",
-    listingId: "listing-row-1",
+    listingId: null,
+    marketplaceListingId: "listing-1",
     breederId: "breeder-1",
     buyerId: "buyer-1",
     buyerName: "Buyer User",
@@ -34,7 +34,8 @@ beforeEach(() => {
     message: "Is this animal still available?",
     status: "new",
     createdAt: new Date("2026-05-01T10:00:00.000Z"),
-    listing: { appListingId: "listing-1", title: "Banana Clown" },
+    marketplaceListing: { id: "listing-1", title: "Banana Clown" },
+    listing: null,
   });
   vi.mocked((prisma as any).listingInquiry.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).listingInquiry.findUnique).mockResolvedValue({
@@ -95,7 +96,7 @@ describe("inquiryService", () => {
 
     expect((prisma as any).listingInquiry.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        listingId: "listing-row-1",
+        marketplaceListingId: "listing-1",
         breederId: "breeder-1",
         buyerId: "buyer-1",
         buyerEmail: "buyer@example.com",
@@ -108,6 +109,49 @@ describe("inquiryService", () => {
         type: "listing_inquiry",
       }),
     }));
+  });
+
+  it("looks the listing up in the one listing store, under the catalogue rule", async () => {
+    await createListingInquiry(
+      { id: "buyer-1", role: "buyer" },
+      { listingId: "legacy-row-7", buyerName: "Buyer User", buyerEmail: "buyer@example.com", message: "Is this animal still available?" }
+    );
+
+    expect((prisma as any).marketplaceListing.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        // A link from before the copy carries the legacy id; it still resolves.
+        OR: [{ id: "legacy-row-7" }, { legacyListingId: "legacy-row-7" }],
+        archivedAt: null,
+        status: { in: ["available", "reserved"] },
+        seller: { isActive: true },
+      }),
+    });
+  });
+
+  it("refuses a listing that is not in the catalogue", async () => {
+    vi.mocked((prisma as any).marketplaceListing.findFirst).mockResolvedValue(null);
+    await expect(createListingInquiry(
+      { id: "buyer-1", role: "buyer" },
+      { listingId: "hidden-1", buyerName: "Buyer User", buyerEmail: "buyer@example.com", message: "Is this animal still available?" }
+    )).rejects.toMatchObject({ statusCode: 404 });
+    expect((prisma as any).listingInquiry.create).not.toHaveBeenCalled();
+  });
+
+  it("still reads an inquiry made against the retired listings table", async () => {
+    vi.mocked((prisma as any).listingInquiry.findMany).mockResolvedValue([
+      {
+        id: "inquiry-old",
+        listingId: "legacy-row-1",
+        marketplaceListingId: null,
+        breederId: "breeder-1",
+        status: "closed",
+        listing: { appListingId: "listing-old", title: "Old Pied" },
+        marketplaceListing: null,
+      },
+    ]);
+    await expect(listMyInquiries({ id: "breeder-1", role: "breeder" })).resolves.toEqual([
+      expect.objectContaining({ listingId: "listing-old", listingTitle: "Old Pied" }),
+    ]);
   });
 
   it("blocks inquiries on the actor's own listing", async () => {

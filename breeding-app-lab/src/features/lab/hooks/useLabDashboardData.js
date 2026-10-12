@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import { useAutoRefetch } from "./useAutoRefetch";
 
@@ -20,52 +21,64 @@ const toTimestamp = (order) => {
 
 const sortByRecentDesc = (items) => [...items].sort((a, b) => toTimestamp(b) - toTimestamp(a));
 
-const buildSections = (orders) => {
+const buildSections = (orders, t) => {
   const rows = Array.isArray(orders) ? orders : [];
   const isPaidForProcessing = (row) => row?.paymentStatus === "paid" || row?.paymentStatus === "manually_approved";
 
   return [
     {
       id: "incoming",
-      title: "New Incoming Test Orders",
-      description: "Fresh breeder submissions that still need payment or initial lab triage.",
+      title: t("lab.dashboard.incomingTitle", { defaultValue: "New Incoming Test Orders" }),
+      description: t("lab.dashboard.incomingDescription", {
+        defaultValue: "Fresh breeder submissions that still need payment or initial lab triage.",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => NEW_INCOMING_STATUSES.has(row.status))),
-      emptyMessage: "No newly submitted orders right now.",
+      emptyMessage: t("lab.dashboard.incomingEmpty", { defaultValue: "No newly submitted orders right now." }),
     },
     {
       id: "payment-pending",
-      title: "Payment Pending Orders",
-      description: "Orders blocked on payment completion before sample shipment/intake.",
+      title: t("lab.dashboard.paymentPendingTitle", { defaultValue: "Payment Pending Orders" }),
+      description: t("lab.dashboard.paymentPendingDescription", {
+        defaultValue: "Orders blocked on payment completion before sample shipment/intake.",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => row.paymentStatus === "pending")),
-      emptyMessage: "No orders are waiting for payment.",
+      emptyMessage: t("lab.dashboard.paymentPendingEmpty", { defaultValue: "No orders are waiting for payment." }),
     },
     {
       id: "paid-awaiting-sample",
-      title: "Paid Orders Awaiting Samples",
-      description: "Paid orders where the physical sample has not been received yet.",
+      title: t("lab.dashboard.awaitingSampleTitle", { defaultValue: "Paid Orders Awaiting Samples" }),
+      description: t("lab.dashboard.awaitingSampleDescription", {
+        defaultValue: "Paid orders where the physical sample has not been received yet.",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => isPaidForProcessing(row) && PAID_AWAITING_SAMPLE_STATUSES.has(row.status))),
-      emptyMessage: "No paid orders are awaiting samples.",
+      emptyMessage: t("lab.dashboard.awaitingSampleEmpty", { defaultValue: "No paid orders are awaiting samples." }),
     },
     {
       id: "recent-receipts",
-      title: "Recently Received Samples",
-      description: "Orders marked as received/intake-approved (sample-level endpoint pending).",
+      title: t("lab.dashboard.receivedTitle", { defaultValue: "Recently Received Samples" }),
+      description: t("lab.dashboard.receivedDescription", {
+        defaultValue: "Orders marked as received/intake-approved (sample-level endpoint pending).",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => RECENTLY_RECEIVED_STATUSES.has(row.status))).slice(0, 12),
-      emptyMessage: "No recent sample receipts.",
+      emptyMessage: t("lab.dashboard.receivedEmpty", { defaultValue: "No recent sample receipts." }),
     },
     {
       id: "in-progress",
-      title: "Tests In Progress",
-      description: "Orders actively moving through testing, result entry, or review.",
+      title: t("lab.dashboard.inProgressTitle", { defaultValue: "Tests In Progress" }),
+      description: t("lab.dashboard.inProgressDescription", {
+        defaultValue: "Orders actively moving through testing, result entry, or review.",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => IN_PROGRESS_STATUSES.has(row.status))),
-      emptyMessage: "No tests are currently in progress.",
+      emptyMessage: t("lab.dashboard.inProgressEmpty", { defaultValue: "No tests are currently in progress." }),
     },
     {
       id: "completed",
-      title: "Completed Tests",
-      description: "Finished or certificate-issued orders ready for archival/follow-up.",
+      title: t("lab.dashboard.completedTitle", { defaultValue: "Completed Tests" }),
+      description: t("lab.dashboard.completedDescription", {
+        defaultValue: "Finished or certificate-issued orders ready for archival/follow-up.",
+      }),
       orders: sortByRecentDesc(rows.filter((row) => COMPLETED_STATUSES.has(row.status))).slice(0, 20),
-      emptyMessage: "No completed tests yet.",
+      emptyMessage: t("lab.dashboard.completedEmpty", { defaultValue: "No completed tests yet." }),
     },
   ];
 };
@@ -73,6 +86,7 @@ const buildSections = (orders) => {
 const DASHBOARD_EVENTS = [LAB_ORDER_CREATED_EVENT, LAB_ORDER_UPDATED_EVENT];
 
 export function useLabDashboardData() {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,7 +102,11 @@ export function useLabDashboardData() {
       setOrders(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setOrders([]);
-      setError(err instanceof Error ? err.message : "Failed to load lab dashboard data.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("lab.dashboard.loadFailed", { defaultValue: "Failed to load lab dashboard data." })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +117,7 @@ export function useLabDashboardData() {
     events: DASHBOARD_EVENTS,
   });
 
-  const sections = useMemo(() => buildSections(orders), [orders]);
+  const sections = useMemo(() => buildSections(orders, t), [orders, t]);
 
   return {
     orders,

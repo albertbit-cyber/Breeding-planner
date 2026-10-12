@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AppRole } from "../types/auth";
 import { createNotification } from "./notificationService";
+import { listedWhere } from "./marketplaceVisibility";
 
 type InquiryInput = {
   listingId?: unknown;
@@ -24,11 +25,17 @@ const textValue = (value: unknown, maxLength = 1000): string => {
   return text.slice(0, maxLength);
 };
 
+/**
+ * Inquiries made before 2026-10-05 point at the retired `listings` table; every
+ * later one points at `marketplace_listings`. Both read the same to a caller.
+ */
+const INQUIRY_INCLUDE = { marketplaceListing: true, listing: true } as const;
+
 const toPublicInquiry = (row: any) => ({
   id: row.id,
-  listingId: row.listing?.appListingId || row.listingId,
-  listingRowId: row.listingId,
-  listingTitle: row.listing?.title,
+  listingId: row.marketplaceListingId || row.listing?.appListingId || row.listingId,
+  listingRowId: row.marketplaceListingId || row.listingId,
+  listingTitle: row.marketplaceListing?.title ?? row.listing?.title,
   breederId: row.breederId,
   buyerId: row.buyerId,
   buyerName: row.buyerName,
@@ -54,36 +61,35 @@ export const createListingInquiry = async (
   if (!buyerEmail || !buyerEmail.includes("@")) throw new HttpError(400, "A valid buyerEmail is required.");
   if (message.length < 10) throw new HttpError(400, "message must be at least 10 characters.");
 
-  const listing = await db.listing.findFirst({
+  // By id, or by the legacy id a link from before the copy still carries.
+  // Askable means listed: the catalogue's rule, and an active seller.
+  const listing = await db.marketplaceListing.findFirst({
     where: {
-      OR: [{ id: listingId }, { appListingId: listingId }],
-      status: "available",
-      owner: {
-        isActive: true,
-        profile: { isPublic: true },
-      },
+      OR: [{ id: listingId }, { legacyListingId: listingId }],
+      ...listedWhere(),
+      seller: { isActive: true },
     },
   });
   if (!listing) throw new HttpError(404, "Available listing not found.");
-  if (listing.ownerId === actor.id) {
+  if (listing.sellerUserId === actor.id) {
     throw new HttpError(400, "You cannot inquire about your own listing.");
   }
 
   const inquiry = await db.listingInquiry.create({
     data: {
-      listingId: listing.id,
-      breederId: listing.ownerId,
+      marketplaceListingId: listing.id,
+      breederId: listing.sellerUserId,
       buyerId: actor.id,
       buyerName,
       buyerEmail,
       message,
       status: "new",
     },
-    include: { listing: true },
+    include: INQUIRY_INCLUDE,
   });
 
   await createNotification({
-    recipientId: listing.ownerId,
+    recipientId: listing.sellerUserId,
     actorId: actor.id,
     type: "listing_inquiry",
     title: "New listing inquiry",
@@ -91,7 +97,6 @@ export const createListingInquiry = async (
     metadata: {
       inquiryId: inquiry.id,
       listingId: listing.id,
-      appListingId: listing.appListingId,
     },
   });
 
@@ -107,7 +112,7 @@ export const listMyInquiries = async (actor: { id: string; role: AppRole }) => {
 
   const rows = await db.listingInquiry.findMany({
     where,
-    include: { listing: true },
+    include: INQUIRY_INCLUDE,
     orderBy: [{ createdAt: "desc" }],
   });
 
@@ -124,7 +129,7 @@ export const updateInquiryFollowUp = async (
 
   const inquiry = await db.listingInquiry.findUnique({
     where: { id },
-    include: { listing: true },
+    include: INQUIRY_INCLUDE,
   });
   if (!inquiry) throw new HttpError(404, "Inquiry not found.");
   if (actor.role !== "admin" && inquiry.breederId !== actor.id) {
@@ -145,7 +150,7 @@ export const updateInquiryFollowUp = async (
       breederResponseNote: hasResponse ? breederResponseNote : null,
       respondedAt: hasResponse ? new Date() : null,
     },
-    include: { listing: true },
+    include: INQUIRY_INCLUDE,
   });
 
   if (updated.buyerId) {
@@ -154,10 +159,10 @@ export const updateInquiryFollowUp = async (
       actorId: actor.id,
       type: "inquiry_follow_up",
       title: "Inquiry updated",
-      message: `Your inquiry about ${updated.listing?.title || "a listing"} was updated.`,
+      message: `Your inquiry about ${updated.marketplaceListing?.title || updated.listing?.title || "a listing"} was updated.`,
       metadata: {
         inquiryId: updated.id,
-        listingId: updated.listingId,
+        listingId: updated.marketplaceListingId || updated.listingId,
         status: updated.status,
       },
     });

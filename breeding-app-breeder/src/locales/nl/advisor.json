@@ -1,11 +1,13 @@
 {
 	"title": "Kweekadviseur",
-	"description": "We kijken alleen naar dieren in de <strong>Fokdieren</strong>-groep en tonen koppelingen met een zeer hoge kans op het gewenste morph-doel.",
+	"description": "We kijken alleen naar dieren in de <strong>Breeders</strong>-groep en tonen koppelingen met een zeer hoge kans op het gewenste morph-doel.",
 	"goal": {
 		"label": "Doel (naam en eigenschappen)",
 		"placeholder": "Visual Clown: Clown, het Desert Ghost",
 		"tip": "Formaattip: \"Doelnaam: eigenschap één, eigenschap twee\". Als je alleen eigenschappen opsomt, maken we een algemeen doel.",
-		"defaultName": "Aangepast doel"
+		"defaultName": "Aangepast doel",
+		"freeTextPlaceholder": "Ik wil een clown desert ghost maken met pastel en possible het pied",
+		"freeTextTip": "Typ je doel gewoon in je eigen woorden. De adviseur herkent morphnamen en aliassen uit de morphdatabase automatisch, dus komma's zijn niet nodig."
 	},
 	"status": {
 		"heading": "Status"
@@ -22,17 +24,21 @@
 		"males_plural": "{{count}} fokmannetjes",
 		"females": "{{count}} fokvrouwtje",
 		"females_plural": "{{count}} fokvrouwtjes",
-		"confidenceBar": "Betrouwbaarheidsdrempel ≥ {{threshold}}"
+		"confidenceBar": "Betrouwbaarheidsdrempel ≥ {{threshold}}",
+		"femalesFiltered": "{{filtered}}/{{total}} fokvrouwtjes passen bij het doel",
+		"malesFiltered": "{{filtered}}/{{total}} fokmannetjes passen bij het doel"
 	},
 	"buttons": {
 		"run": "Adviseur uitvoeren",
 		"generating": "Bezig met genereren...",
-		"reset": "Adviseur resetten"
+		"reset": "Adviseur resetten",
+		"exportPairingsByMale": "Exporteren per koppeling (Mannetje → Vrouwtjes)"
 	},
 	"errors": {
-		"noBreeders": "Voeg dieren toe aan de Fokdieren-groep om aanbevelingen te zien.",
+		"noBreeders": "Voeg dieren toe aan de Breeders-groep om aanbevelingen te zien.",
 		"noGoals": "Voeg doeleigenschappen toe voordat je de adviseur uitvoert.",
-		"failure": "Suggesties konden niet worden gegenereerd."
+		"failure": "Suggesties konden niet worden gegenereerd.",
+		"noRelevantAnimals": "Geen enkel fokdier draagt genen die bij dit doel horen. Voeg dieren met de gewenste genetica toe aan de groep Breeders."
 	},
 	"cards": {
 		"goalSuccessLabel": "Kans op doelbereik:",
@@ -41,7 +47,14 @@
 		"priceRange": "Prijsindicatie: {{range}}",
 		"sources": "Bronnen:",
 		"additionalHeading": "Aanvullende koppelingen ter beoordeling",
-		"readyCallout": "Klaar wanneer jij het bent — klik op <strong>Adviseur uitvoeren</strong> om je sterkste fokdier-koppelingen te ontdekken."
+		"readyCallout": "Klaar wanneer jij het bent — klik op <strong>Adviseur uitvoeren</strong> om je sterkste fokdier-koppelingen te ontdekken.",
+		"actions": {
+			"accept": "Accepteren",
+			"ignore": "Negeren",
+			"plan": "Plan maken",
+			"showPlan": "Plan tonen"
+		},
+		"successLabel": "succes"
 	},
 	"genes": {
 		"goalVisuals": "Doel-visuals",
@@ -71,14 +84,15 @@
 		"status": {
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Mogelijke het",
+			"possibleHet": "Possible het",
 			"none": "Normaal"
 		},
 		"expectation": {
 			"none-visual": "100% het",
 			"het-het": "≈66% het",
 			"het-none": "≈50% het"
-		}
+		},
+		"flowchartUnavailable": "Voor deze suggestie kon geen kweekstroomschema worden gemaakt."
 	},
 	"labels": {
 		"unknownAnimal": "Onbekend",
@@ -114,7 +128,7 @@
 			"any": "Elk",
 			"visual": "Visual",
 			"het": "Het",
-			"possibleHet": "Mogelijke het"
+			"possibleHet": "Possible het"
 		},
 		"minProbability": "Minimale kans ({{percent}}%)",
 		"weight": "Gewicht ({{value}})",
@@ -143,6 +157,22 @@
 				"female": "vrouwtjes",
 				"male": "mannetjes"
 			}
+		}
+	},
+	"progress": {
+		"relevant": "{{count}} relevante kandidaten",
+		"retry": "Opnieuw proberen",
+		"running": "Analyse bezig...",
+		"scanned": "{{count}} slangen verwerkt",
+		"strongPairings": "{{count}} sterke koppelingen gevonden",
+		"titleRunning": "Kweekadviseur is bezig",
+		"viewResults": "Resultaten bekijken",
+		"waiting": "Wachten tot de analyse start...",
+		"stepStatus": {
+			"completed": "Afgerond",
+			"failed": "Mislukt",
+			"pending": "In afwachting",
+			"running": "Bezig"
 		}
 	}
 }

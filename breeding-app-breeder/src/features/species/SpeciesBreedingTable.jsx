@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Breeding attention across the whole collection, one line per species.
  *
- * The counts are the same four the Breeding Tracker's own dashboard shows, so a keeper reads
+ * The counts are the same four the Breeding tab's own dashboard shows, so a keeper reads
  * the same numbers wherever they look. What this adds is every species at once: from inside a
  * species workspace you can only ever see one of them, and an overdue clutch in the species
  * you are not currently looking at is exactly the thing worth surfacing.
@@ -18,7 +18,7 @@ import React from 'react';
  */
 
 /**
- * `urgency` is what the Breeding Tracker dashboard opens filtered to. Tracking is the row
+ * `urgency` is what the Breeding dashboard opens filtered to. Tracking is the row
  * total rather than a band of its own, so it opens unfiltered like the species name does.
  */
 const COLUMNS = [
@@ -95,7 +95,7 @@ export default function SpeciesBreedingTable({
               tabIndex={0}
               onClick={openAll}
               onKeyDown={pressKeys(openAll)}
-              className="flex-1 min-w-0 text-left text-sm font-medium truncate rounded-lg px-1 py-1 cursor-pointer hover:text-[#3c1b73] focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="flex-1 min-w-0 text-start text-sm font-medium truncate rounded-lg px-1 py-1 cursor-pointer hover:text-[#3c1b73] focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
               {row.name}
             </div>
@@ -136,7 +136,7 @@ export default function SpeciesBreedingTable({
       {nothingTracked && (
         <div className="px-4 py-3 border-t text-xs text-neutral-500">
           {t('species.dashboard.breedingEmpty', {
-            defaultValue: 'No active pairings anywhere yet. Start one from a species’ Breeding Tracker.',
+            defaultValue: 'No active pairings anywhere yet. Start one from a species’ Breeding tab.',
           })}
         </div>
       )}

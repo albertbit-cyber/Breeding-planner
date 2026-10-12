@@ -294,7 +294,9 @@ const monthlyPeriod = () => {
 };
 
 const usageForFeature = async (userId: string, featureKey: string): Promise<number> => {
-  if (featureKey === "animals.create") return db.animal.count({ where: { ownerId: userId } });
+  // Live animals only: a deleted animal is a tombstone row kept for sync, not an animal the
+  // keeper holds, and counting it would keep an account at its cap after it made room.
+  if (featureKey === "animals.create") return db.animal.count({ where: { ownerId: userId, deletedAt: null } });
   if (featureKey === "spaces.racks") return 0;
   if (featureKey === "spaces.rooms") return 0;
   const { start, end } = monthlyPeriod();
@@ -435,6 +437,45 @@ export const getUserSubscriptionPanel = async (userId: string) => {
   };
 };
 
+export const DEFAULT_TIER_KEY = "free";
+
+/**
+ * Puts a new account on the Free tier, inside the caller's transaction.
+ *
+ * Without a subscription row an account resolves to "No active tier": My Account
+ * reads "Unknown", and every gated feature reports a tier requirement instead of
+ * the account's real limits. Skipped when the tier catalogue is not seeded, which
+ * canAccessFeature already treats as "no subscription system".
+ */
+export const assignDefaultTier = async (client: any, userId: string) => {
+  if (!client?.subscriptionTier?.findFirst || !client?.userSubscription?.create) return null;
+  const tier = await client.subscriptionTier.findFirst({
+    where: { key: DEFAULT_TIER_KEY, isActive: true, archivedAt: null },
+  });
+  if (!tier) return null;
+  const now = new Date();
+  await client.userSubscription.create({
+    data: {
+      userId,
+      tierId: tier.id,
+      status: "active",
+      paymentStatus: "none",
+      paymentProvider: "default",
+      internalNote: "Free tier assigned at registration.",
+    },
+  });
+  await client.user.update({
+    where: { id: userId },
+    data: {
+      subscriptionPlan: tier.key,
+      subscriptionStatus: "active",
+      subscriptionPaymentStatus: "none",
+      subscriptionStartedAt: now,
+    },
+  });
+  return tier;
+};
+
 export const changeOwnSubscription = async (user: AuthenticatedUser, payload: Record<string, unknown>) => {
   if (!user?.id) throw new HttpError(401, "Unauthorized");
   const tierId = String(payload.tierId || "").trim();
@@ -444,6 +485,17 @@ export const changeOwnSubscription = async (user: AuthenticatedUser, payload: Re
     where: { id: tierId, isActive: true, isPublic: true, archivedAt: null },
   });
   if (!tier) throw new HttpError(404, "Public subscription tier not found.");
+  // A paid tier is bought through checkout and granted by Stripe's webhook
+  // (billingService.ts). Switching to one here would hand it out for nothing.
+  if (tier.customPrice || Number(tier.monthlyPrice || 0) > 0) {
+    throw new HttpError(402, "Paid plans can only be bought through checkout.");
+  }
+  const paid = await db.userSubscription.findFirst({
+    where: { userId: user.id, paymentProvider: "stripe", status: { in: ["active", "trialing", "paused", "past_due"] } },
+  });
+  if (paid) {
+    throw new HttpError(409, "Your paid plan is billed by Stripe. Cancel it under Manage billing and the account moves to Free.");
+  }
 
   const now = new Date();
   await db.$transaction(async (tx: any) => {

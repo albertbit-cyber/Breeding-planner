@@ -1,36 +1,36 @@
 ﻿{
 	"quickAdd": {
-		"date": "Date",
-		"feedType": "Feed type",
-		"size": "Size",
-		"selectPlaceholder": "Select",
-		"customSizePlaceholder": "Custom size",
-		"weight": "Weight (g)",
-		"form": "Form",
-		"methodDetailsPlaceholder": "Method details",
-		"gramsLabel": "Grams",
-		"recentProgress": "Recent progress",
-		"medicationDrug": "Drug",
-		"medicationDose": "Dose",
-		"notes": "Notes",
+		"date": "Datum",
+		"feedType": "Typ krmiva",
+		"size": "Velikost",
+		"selectPlaceholder": "Vyberte",
+		"customSizePlaceholder": "Vlastní velikost",
+		"weight": "Hmotnost (g)",
+		"form": "Forma",
+		"methodDetailsPlaceholder": "Podrobnosti o způsobu",
+		"gramsLabel": "Gramy",
+		"recentProgress": "Nedávný vývoj",
+		"medicationDrug": "Lék",
+		"medicationDose": "Dávka",
+		"notes": "Poznámky",
 		"feedOptions": {
-			"mouse": "Mouse",
-			"rat": "Rat",
-			"chick": "Chick",
-			"other": "Other"
+			"mouse": "Myš",
+			"rat": "Potkan",
+			"chick": "Kuře",
+			"other": "Jiné"
 		},
 		"sizeOptions": {
-			"pinky": "pinky",
-			"fuzzy": "fuzzy",
-			"medium": "medium",
-			"adult": "adult",
-			"other": "Other"
+			"pinky": "holé",
+			"fuzzy": "osrstěné",
+			"medium": "střední",
+			"adult": "dospělé",
+			"other": "Jiné"
 		},
 		"formOptions": {
-			"live": "Live",
-			"fresh": "Freshly killed",
-			"frozen": "Frozen/thawed",
-			"other": "Other"
+			"live": "Živé",
+			"fresh": "Čerstvě usmrcené",
+			"frozen": "Mražené/rozmražené",
+			"other": "Jiné"
 		}
 	}
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   changeLabTeamMemberRole,
   fetchMyLabTeam,
@@ -20,16 +21,25 @@ import {
  * from their membership; none of them take an organization id.
  */
 
-const ROLE_LABELS = {
-  owner: "Owner",
-  admin: "Administrator",
-  billing_manager: "Billing manager",
-  member: "Member",
+const roleLabel = (t, role) => {
+  switch (role) {
+    case "owner":
+      return t("lab.team.roleOwner", { defaultValue: "Owner" });
+    case "admin":
+      return t("lab.team.roleAdmin", { defaultValue: "Administrator" });
+    case "billing_manager":
+      return t("lab.team.roleBillingManager", { defaultValue: "Billing manager" });
+    case "member":
+      return t("lab.team.roleMember", { defaultValue: "Member" });
+    default:
+      return undefined;
+  }
 };
 
 const ASSIGNABLE_ROLES = ["admin", "billing_manager", "member"];
 
 export default function LabTeamPage() {
+  const { t } = useTranslation();
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +56,9 @@ export default function LabTeamPage() {
         setMembers(Array.isArray(teamData?.members) ? teamData.members : []);
         setInvites(Array.isArray(inviteData?.invites) ? inviteData.invites : []);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load your team."))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("lab.team.loadFailed", { defaultValue: "Unable to load your team." }))
+      )
       .finally(() => setLoading(false));
   };
 
@@ -61,7 +73,7 @@ export default function LabTeamPage() {
       setMessage(successMessage);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That did not work.");
+      setError(err instanceof Error ? err.message : t("lab.team.actionFailed", { defaultValue: "That did not work." }));
     } finally {
       setBusy(false);
     }
@@ -71,20 +83,22 @@ export default function LabTeamPage() {
     event.preventDefault();
     run(
       () => inviteLabTeammate({ email: inviteForm.email.trim(), role: inviteForm.role }),
-      `Invitation sent to ${inviteForm.email.trim()}.`
+      t("lab.team.inviteSent", { defaultValue: "Invitation sent to {{email}}.", email: inviteForm.email.trim() })
     ).then(() => setInviteForm({ email: "", role: "member" }));
   };
 
-  if (loading) return <div className="p-6 text-sm text-neutral-500">Loading…</div>;
+  if (loading) return <div className="p-6 text-sm text-neutral-500">{t("lab.common.loading", { defaultValue: "Loading…" })}</div>;
 
   const pendingInvites = invites.filter((invite) => invite.status === "pending" && !invite.isExpired);
 
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Your team</h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">{t("lab.team.title", { defaultValue: "Your team" })}</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Colleagues you invite here work on your laboratory's orders alongside you.
+          {t("lab.team.subtitle", {
+            defaultValue: "Colleagues you invite here work on your laboratory's orders alongside you.",
+          })}
         </p>
       </div>
 
@@ -92,16 +106,16 @@ export default function LabTeamPage() {
       {message ? <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div> : null}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-neutral-900">Members</h2>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-900">{t("lab.team.members", { defaultValue: "Members" })}</h2>
         <div className="overflow-x-auto rounded border border-neutral-200">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
+            <thead className="bg-neutral-50 text-start text-xs uppercase text-neutral-500">
               <tr>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Email</th>
-                <th className="px-3 py-2">Role</th>
-                <th className="px-3 py-2">Joined</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2">{t("lab.catalog.colName", { defaultValue: "Name" })}</th>
+                <th className="px-3 py-2">{t("lab.team.colEmail", { defaultValue: "Email" })}</th>
+                <th className="px-3 py-2">{t("lab.team.colRole", { defaultValue: "Role" })}</th>
+                <th className="px-3 py-2">{t("lab.team.colJoined", { defaultValue: "Joined" })}</th>
+                <th className="px-3 py-2">{t("lab.catalog.colActions", { defaultValue: "Actions" })}</th>
               </tr>
             </thead>
             <tbody>
@@ -111,7 +125,9 @@ export default function LabTeamPage() {
                   <td className="px-3 py-2 text-neutral-600">{member.email}</td>
                   <td className="px-3 py-2">
                     {member.role === "owner" ? (
-                      <span className="rounded bg-neutral-900 px-2 py-0.5 text-xs text-white">Owner</span>
+                      <span className="rounded bg-neutral-900 px-2 py-0.5 text-xs text-white">
+                        {t("lab.team.roleOwner", { defaultValue: "Owner" })}
+                      </span>
                     ) : (
                       <select
                         className="rounded border border-neutral-300 px-2 py-1 text-xs"
@@ -120,13 +136,17 @@ export default function LabTeamPage() {
                         onChange={(e) =>
                           run(
                             () => changeLabTeamMemberRole(member.id, e.target.value),
-                            `${member.fullName || member.email} is now ${ROLE_LABELS[e.target.value]}.`
+                            t("lab.team.roleChanged", {
+                              defaultValue: "{{name}} is now {{role}}.",
+                              name: member.fullName || member.email,
+                              role: roleLabel(t, e.target.value),
+                            })
                           )
                         }
                       >
                         {ASSIGNABLE_ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                            {roleLabel(t, role)}
                           </option>
                         ))}
                       </select>
@@ -147,25 +167,43 @@ export default function LabTeamPage() {
                           onClick={() => {
                             if (
                               !window.confirm(
-                                `Hand ownership of this laboratory to ${member.fullName || member.email}? You will become an administrator.`
+                                t("lab.team.transferConfirm", {
+                                  defaultValue:
+                                    "Hand ownership of this laboratory to {{name}}? You will become an administrator.",
+                                  name: member.fullName || member.email,
+                                })
                               )
                             )
                               return;
-                            run(() => transferLabOwnership(member.id), "Ownership transferred.");
+                            run(
+                              () => transferLabOwnership(member.id),
+                              t("lab.team.ownershipTransferred", { defaultValue: "Ownership transferred." })
+                            );
                           }}
                         >
-                          Make owner
+                          {t("lab.team.makeOwner", { defaultValue: "Make owner" })}
                         </button>
                         <button
                           type="button"
                           className="text-xs text-rose-600 underline"
                           disabled={busy}
                           onClick={() => {
-                            if (!window.confirm(`Remove ${member.fullName || member.email} from this laboratory?`)) return;
-                            run(() => removeLabTeamMember(member.id), "Team member removed.");
+                            if (
+                              !window.confirm(
+                                t("lab.team.removeConfirm", {
+                                  defaultValue: "Remove {{name}} from this laboratory?",
+                                  name: member.fullName || member.email,
+                                })
+                              )
+                            )
+                              return;
+                            run(
+                              () => removeLabTeamMember(member.id),
+                              t("lab.team.memberRemoved", { defaultValue: "Team member removed." })
+                            );
                           }}
                         >
-                          Remove
+                          {t("lab.team.remove", { defaultValue: "Remove" })}
                         </button>
                       </div>
                     )}
@@ -176,16 +214,20 @@ export default function LabTeamPage() {
           </table>
         </div>
         <p className="mt-2 text-xs text-neutral-500">
-          Removing someone ends their access to this laboratory. Their account and the results they
-          signed off remain intact.
+          {t("lab.team.removeHelp", {
+            defaultValue:
+              "Removing someone ends their access to this laboratory. Their account and the results they signed off remain intact.",
+          })}
         </p>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-neutral-900">Invite a colleague</h2>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-900">
+          {t("lab.team.inviteTitle", { defaultValue: "Invite a colleague" })}
+        </h2>
         <form onSubmit={sendInvite} className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
-            <span className="text-neutral-700">Email</span>
+            <span className="text-neutral-700">{t("lab.team.colEmail", { defaultValue: "Email" })}</span>
             <input
               type="email"
               className="mt-1 block w-64 rounded border border-neutral-300 px-3 py-2"
@@ -195,7 +237,7 @@ export default function LabTeamPage() {
             />
           </label>
           <label className="text-sm">
-            <span className="text-neutral-700">Role</span>
+            <span className="text-neutral-700">{t("lab.team.colRole", { defaultValue: "Role" })}</span>
             <select
               className="mt-1 block rounded border border-neutral-300 px-3 py-2"
               value={inviteForm.role}
@@ -203,7 +245,7 @@ export default function LabTeamPage() {
             >
               {ASSIGNABLE_ROLES.map((role) => (
                 <option key={role} value={role}>
-                  {ROLE_LABELS[role]}
+                  {roleLabel(t, role)}
                 </option>
               ))}
             </select>
@@ -213,14 +255,16 @@ export default function LabTeamPage() {
             disabled={busy}
             className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            Send invitation
+            {t("lab.team.sendInvite", { defaultValue: "Send invitation" })}
           </button>
         </form>
       </section>
 
       {pendingInvites.length ? (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-neutral-900">Pending invitations</h2>
+          <h2 className="mb-2 text-sm font-semibold text-neutral-900">
+            {t("lab.team.pendingInvites", { defaultValue: "Pending invitations" })}
+          </h2>
           <ul className="space-y-2">
             {pendingInvites.map((invite) => (
               <li
@@ -230,17 +274,25 @@ export default function LabTeamPage() {
                 <span>
                   {invite.email}{" "}
                   <span className="text-neutral-500">
-                    — {ROLE_LABELS[invite.role] || invite.role}, expires{" "}
-                    {new Date(invite.expiresAt).toLocaleDateString()}
+                    {t("lab.team.inviteMeta", {
+                      defaultValue: "— {{role}}, expires {{date}}",
+                      role: roleLabel(t, invite.role) || invite.role,
+                      date: new Date(invite.expiresAt).toLocaleDateString(),
+                    })}
                   </span>
                 </span>
                 <button
                   type="button"
                   className="text-xs text-rose-600 underline"
                   disabled={busy}
-                  onClick={() => run(() => revokeLabTeamInvite(invite.id), "Invitation withdrawn.")}
+                  onClick={() =>
+                    run(
+                      () => revokeLabTeamInvite(invite.id),
+                      t("lab.team.inviteWithdrawn", { defaultValue: "Invitation withdrawn." })
+                    )
+                  }
                 >
-                  Withdraw
+                  {t("lab.team.withdraw", { defaultValue: "Withdraw" })}
                 </button>
               </li>
             ))}

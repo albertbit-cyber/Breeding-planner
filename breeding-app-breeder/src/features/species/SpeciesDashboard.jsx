@@ -27,6 +27,7 @@ export default function SpeciesDashboard({
   isDemoCollection = false,
   onOpenSpecies,
   onAddAnimal,
+  onImportCollection,
   searchQuery = '',
   onSearchQueryChange,
   searchResults = [],
@@ -43,6 +44,31 @@ export default function SpeciesDashboard({
   const preset = appearanceState?.preset || 'default';
 
   const isSearching = Boolean(String(searchQuery).trim());
+  // Before the keeper has any animals of their own, the ways in come first: on a phone the
+  // demo species would otherwise push them four cards down.
+  const isFirstRun = isDemoCollection || !summaries.length;
+  const entryCards = (
+    <>
+      {/* The two ways in, side by side and the same size, at every width. Most keepers
+          arrive with a spreadsheet or a MorphMarket export, so importing is not an
+          advanced option tucked inside a species: it sits beside adding one by hand. */}
+      <div className="grid grid-cols-2 gap-3 max-w-3xl">
+        <EntryCard
+          symbol="+"
+          title={t('actions.addAnimalAndSpecies', { defaultValue: 'New animal & species' })}
+          hint={t('species.dashboard.addHint', { defaultValue: 'a new species appears here once you own one' })}
+          onClick={() => onAddAnimal?.()}
+        />
+        <EntryCard
+          symbol={'↓'}
+          title={t('species.dashboard.importCollection', { defaultValue: 'Import your collection' })}
+          hint={t('species.dashboard.importHint', { defaultValue: 'MorphMarket export, CSV or spreadsheet' })}
+          onClick={() => onImportCollection?.()}
+        />
+      </div>
+    </>
+  );
+
   const hiddenResultCount = Math.max(0, searchResultTotal - searchResults.length);
   return (
     <div className="space-y-4">
@@ -53,11 +79,13 @@ export default function SpeciesDashboard({
           </span>
           <span className="text-sm text-amber-900">
             {t('species.dashboard.demoBanner', {
-              defaultValue: 'These are example animals so the app has something to show. Add your first animal and they disappear.',
+              defaultValue: 'These are example animals so the app has something to show. Add or import your own animals and they disappear.',
             })}
           </span>
         </div>
       )}
+
+      {isFirstRun && !isSearching && entryCards}
 
       <div className="header-search-shell w-full">
         <input
@@ -66,7 +94,7 @@ export default function SpeciesDashboard({
           placeholder={t('species.dashboard.searchPlaceholder', {
             defaultValue: 'Search every animal, any species',
           })}
-          className="header-search-input w-full pr-11"
+          className="header-search-input w-full pe-11"
         />
         {searchQuery ? (
           <button
@@ -112,19 +140,7 @@ export default function SpeciesDashboard({
               />
             ))}
 
-            <button
-              type="button"
-              onClick={() => onAddAnimal?.()}
-              className="text-center border border-dashed rounded-2xl p-4 min-h-[132px] flex flex-col items-center justify-center gap-1 text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
-            >
-              <span className="text-xl font-semibold text-[#3c1b73]" aria-hidden="true">+</span>
-              <span className="text-sm font-medium">
-                {t('actions.addAnimalAndSpecies', { defaultValue: 'New animal & species' })}
-              </span>
-              <span className="text-[11px] leading-snug">
-                {t('species.dashboard.addHint', { defaultValue: 'a new species appears here once you own one' })}
-              </span>
-            </button>
+            {!isFirstRun && entryCards}
           </div>
         </div>
 
@@ -170,7 +186,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
       type="button"
       onClick={onOpen}
       style={style}
-      className="text-left bg-white border rounded-2xl overflow-hidden flex flex-col hover:border-neutral-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
+      className="text-start bg-white border rounded-2xl overflow-hidden flex flex-col hover:border-neutral-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
     >
       {/* Livestock */}
       <div
@@ -190,7 +206,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
               <div className="text-xs italic truncate text-neutral-600">{summary.scientificName}</div>
             )}
           </div>
-          <div className="ml-auto text-2xl font-semibold tabular-nums leading-none">{summary.total}</div>
+          <div className="ms-auto text-2xl font-semibold tabular-nums leading-none">{summary.total}</div>
         </div>
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs tabular-nums text-neutral-700">
@@ -226,7 +242,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
             {t('species.dashboard.breedingHeading', { defaultValue: 'Breeding' })}
           </span>
-          <span className="ml-auto text-xs tabular-nums text-neutral-600">
+          <span className="ms-auto text-xs tabular-nums text-neutral-600">
             {summary.activePairings > 0
               ? t('species.dashboard.pairingCount', {
                   defaultValue: '{{count}} pairing(s)',
@@ -241,7 +257,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
           <div className="flex flex-wrap gap-1">
             {stages.map(([key, count]) => (
               <span key={key} className="text-[11px] tabular-nums bg-neutral-50 border rounded px-1.5 py-0.5 text-neutral-600">
-                {STAGE_LABELS[key] || key} {count}
+                {stageLabels(t)[key] || key} {count}
               </span>
             ))}
           </div>
@@ -267,14 +283,14 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
 }
 
 /** Stage keys come from the breeding tracker; these are their card-sized labels. */
-const STAGE_LABELS = {
-  locks: 'Locks',
-  ovulation: 'Ovulation',
-  preLay: 'Pre-lay',
-  clutch: 'Incubating',
-  hatched: 'Hatched',
-  active: 'Active',
-};
+const stageLabels = (t) => ({
+  locks: t('species.dashboard.stage.locks', { defaultValue: 'Locks' }),
+  ovulation: t('species.dashboard.stage.ovulation', { defaultValue: 'Ovulation' }),
+  preLay: t('species.dashboard.stage.preLay', { defaultValue: 'Pre-lay' }),
+  clutch: t('species.dashboard.stage.clutch', { defaultValue: 'Incubating' }),
+  hatched: t('species.dashboard.stage.hatched', { defaultValue: 'Hatched' }),
+  active: t('species.dashboard.stage.active', { defaultValue: 'Active' }),
+});
 
 /** Semantic only. Kept clear of every species hue so urgency still reads as urgency. */
 const URGENCY_CLASS = {
@@ -284,6 +300,20 @@ const URGENCY_CLASS = {
   upcoming: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   none: 'bg-neutral-100 text-neutral-600 border border-neutral-200',
 };
+
+function EntryCard({ symbol, title, hint, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-center border border-dashed rounded-2xl p-3 sm:p-4 min-h-[132px] flex flex-col items-center justify-center gap-1 text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
+    >
+      <span className="text-xl font-semibold text-[#3c1b73]" aria-hidden="true">{symbol}</span>
+      <span className="text-sm font-medium">{title}</span>
+      <span className="text-[11px] leading-snug">{hint}</span>
+    </button>
+  );
+}
 
 function SectionHeading({ children }) {
   return (
@@ -313,7 +343,7 @@ function SearchResults({ results, hiddenResultCount, onOpenAnimal, t }) {
           key={result.key}
           type="button"
           onClick={() => onOpenAnimal?.(result.snake)}
-          className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50 transition"
+          className="w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50 transition"
         >
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 min-w-0">
@@ -339,13 +369,5 @@ function SearchResults({ results, hiddenResultCount, onOpenAnimal, t }) {
         </div>
       )}
     </div>
-  );
-}
-
-function Chip({ children }) {
-  return (
-    <span className="text-[11px] tabular-nums bg-neutral-50 border rounded px-1.5 py-0.5 text-neutral-600">
-      {children}
-    </span>
   );
 }

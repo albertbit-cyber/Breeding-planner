@@ -34,9 +34,11 @@ export const authHeaders = (token) => ({
   Authorization: `Bearer ${token}`,
 });
 
-export const loginViaApi = async (request, email, password) => {
+// Sign-ins name their portal. The backend assumes "breeder" when it is left
+// out and refuses a laboratory account there with 403.
+export const loginViaApi = async (request, email, password, portal = "breeder") => {
   const response = await request.post(`${backendUrl}/api/auth/login`, {
-    data: { email, password },
+    data: { email, password, portal },
   });
   expect(response.status()).toBe(200);
   const body = await response.json();
@@ -51,7 +53,7 @@ export const loginBreederViaApi = (request) =>
   loginViaApi(request, breederEmail, requireBreederPassword());
 
 export const loginLabViaApi = (request) =>
-  loginViaApi(request, labEmail, requireLabPassword());
+  loginViaApi(request, labEmail, requireLabPassword(), "lab");
 
 export const loadBreederAuthFromStorageState = () => {
   const authPath = resolve("playwright/.auth/breeder.json");

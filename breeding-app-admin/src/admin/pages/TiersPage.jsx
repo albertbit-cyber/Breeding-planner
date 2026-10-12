@@ -112,7 +112,6 @@ function TierQuickEditModal({ tier, features, onClose, onSaved }) {
 
 export default function TiersPage() {
   const navigate = useNavigate();
-  const toast = useToast();
   const [tiers, setTiers] = useState([]);
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);

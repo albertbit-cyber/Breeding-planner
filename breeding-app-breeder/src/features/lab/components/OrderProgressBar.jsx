@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 const STEPS = [
   { key: "submitted", label: "Submitted" },
@@ -24,12 +25,20 @@ const STATUS_TO_STEP = {
   certificate_issued: 3,
 };
 
+const stepLabel = (t, key) => ({
+  submitted: t("lab.progress.submitted", { defaultValue: "Submitted" }),
+  received: t("lab.progress.received", { defaultValue: "Received" }),
+  in_progress: t("lab.progress.testing", { defaultValue: "Testing" }),
+  completed: t("lab.progress.done", { defaultValue: "Done" }),
+}[key]);
+
 export default function OrderProgressBar({ status }) {
+  const { t } = useTranslation();
   if (status === "cancelled") {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
         <span>✕</span>
-        <span>Order Cancelled</span>
+        <span>{t("lab.progress.cancelled", { defaultValue: "Order Cancelled" })}</span>
       </div>
     );
   }
@@ -58,7 +67,7 @@ export default function OrderProgressBar({ status }) {
               <div className={dotClass}>
                 {isCompleted && <span className="text-[9px] leading-none">✓</span>}
               </div>
-              <span className={`whitespace-nowrap ${labelClass}`}>{step.label}</span>
+              <span className={`whitespace-nowrap ${labelClass}`}>{stepLabel(t, step.key) ?? step.label}</span>
             </div>
             {index < STEPS.length - 1 && (
               <div className={`mb-4 h-0.5 w-8 shrink-0 ${isCompleted ? "bg-neutral-800" : "bg-neutral-200"}`} />

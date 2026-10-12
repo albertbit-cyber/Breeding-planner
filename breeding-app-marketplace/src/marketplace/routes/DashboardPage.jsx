@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { dashboard as fetchDashboard, saveStore, setListingStatus } from "../api";
+import AcquiredAnimals from "../components/AcquiredAnimals";
+import MarkSoldDialog from "../components/MarkSoldDialog";
 import { money, primaryImage, relativeTime } from "../format";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
-import { AvailabilityPill, Pill } from "../ui/Pill";
+import { AvailabilityPill } from "../ui/Pill";
 import ProvenanceMeter from "../ui/ProvenanceMeter";
 import { EmptyState, ErrorPanel, Spinner } from "../ui/States";
 import { useToast } from "../ui/Toast";
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   const [tab, setTab] = useState("available");
   const [storeOpen, setStoreOpen] = useState(false);
   const [storeDraft, setStoreDraft] = useState({ storeName: "", about: "", city: "", country: "" });
+  const [soldFor, setSoldFor] = useState(null);
 
   const load = useCallback(() => {
     fetchDashboard()
@@ -262,8 +265,8 @@ export default function DashboardPage() {
                         {t("dashboard.publish", { defaultValue: "Publish" })}
                       </Button>
                     ) : null}
-                    {listing.availability === "reserved" ? (
-                      <Button variant="outline" size="sm" onClick={() => changeStatus(listing, "sold")}>
+                    {listing.status !== "draft" && listing.availability !== "sold" ? (
+                      <Button variant="outline" size="sm" onClick={() => setSoldFor(listing)}>
                         {t("dashboard.markSold", { defaultValue: "Mark sold" })}
                       </Button>
                     ) : null}
@@ -322,6 +325,30 @@ export default function DashboardPage() {
             </b>
           </div>
         ))}
+      </div>
+
+      {soldFor ? (
+        <MarkSoldDialog
+          listing={soldFor}
+          threads={data.conversations || []}
+          onClose={() => setSoldFor(null)}
+          onDone={({ transferred, buyerName }) => {
+            setSoldFor(null);
+            notify(
+              transferred
+                ? t("sold.done", {
+                    defaultValue: "Sold. {{buyer}} now has the animal and its record.",
+                    buyer: buyerName || t("sold.theBuyer", { defaultValue: "The buyer" }),
+                  })
+                : t("sold.doneOffPlatform", { defaultValue: "Marked sold." })
+            );
+            load();
+          }}
+        />
+      ) : null}
+
+      <div style={{ marginTop: 28 }}>
+        <AcquiredAnimals hideWhenEmpty />
       </div>
 
       <Dialog

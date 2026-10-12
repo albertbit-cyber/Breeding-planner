@@ -1,42 +1,44 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 const goTo = (hashPath) => {
   window.location.hash = hashPath;
 };
 
 export default function LaunchPage() {
+  const { t } = useTranslation();
   return (
     <main className="launch-shell">
       <section className="launch-hero">
         <div>
           <p className="launch-kicker">Serpentora</p>
-          <h1>Select workspace</h1>
+          <h1>{t("launch.title", { defaultValue: "Select workspace" })}</h1>
           <p>
-            Open the breeder tools, mobile rack terminal, marketplace, pricing, or admin portal.
+            {t("launch.subtitle", { defaultValue: "Open the breeder tools, mobile rack terminal, marketplace, pricing, or admin portal." })}
           </p>
         </div>
       </section>
 
-      <section className="launch-actions" aria-label="Application workspaces">
+      <section className="launch-actions" aria-label={t("launch.workspacesAria", { defaultValue: "Application workspaces" })}>
         <button type="button" onClick={() => goTo("/breeder")}>
-          <span>Breeder App</span>
-          <strong>Manage animals, pairings, clutches, labels, and breeder lab orders.</strong>
+          <span>{t("launch.breeder.title", { defaultValue: "Breeder App" })}</span>
+          <strong>{t("launch.breeder.body", { defaultValue: "Manage animals, pairings, clutches, labels, and breeder lab orders." })}</strong>
         </button>
         <button type="button" onClick={() => goTo("/marketplace")}>
-          <span>Marketplace</span>
-          <strong>Browse public breeder profiles, listings, inquiries, and saved searches.</strong>
+          <span>{t("launch.marketplace.title", { defaultValue: "Marketplace" })}</span>
+          <strong>{t("launch.marketplace.body", { defaultValue: "Browse public breeder profiles, listings, inquiries, and saved searches." })}</strong>
         </button>
         <button type="button" onClick={() => goTo("/mobile")}>
-          <span>Mobile App</span>
-          <strong>Scan QR codes, open animal profiles, and update rack records fast.</strong>
+          <span>{t("launch.mobile.title", { defaultValue: "Mobile App" })}</span>
+          <strong>{t("launch.mobile.body", { defaultValue: "Scan QR codes, open animal profiles, and update rack records fast." })}</strong>
         </button>
         <button type="button" onClick={() => goTo("/pricing")}>
-          <span>Pricing</span>
-          <strong>Compare public subscription tiers and upgrade options.</strong>
+          <span>{t("launch.pricing.title", { defaultValue: "Pricing" })}</span>
+          <strong>{t("launch.pricing.body", { defaultValue: "Compare public subscription tiers and upgrade options." })}</strong>
         </button>
         <button type="button" onClick={() => goTo("/admin")}>
-          <span>Admin Portal</span>
-          <strong>Moderate listings, review notifications, and inspect audit history.</strong>
+          <span>{t("launch.admin.title", { defaultValue: "Admin Portal" })}</span>
+          <strong>{t("launch.admin.body", { defaultValue: "Moderate listings, review notifications, and inspect audit history." })}</strong>
         </button>
       </section>
     </main>

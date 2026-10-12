@@ -1,6 +1,16 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
-import { listPublicListingsByOwner } from "./listingService";
+import { toProfileListingDto } from "./marketplaceDtos";
+import { listedWhere } from "./marketplaceVisibility";
+
+/** A breeder's listings in the catalogue: the same rule browse applies. */
+const listPublicListingsByOwner = async (sellerUserId: string) => {
+  const rows = await db.marketplaceListing.findMany({
+    where: { sellerUserId, ...listedWhere() },
+    orderBy: [{ updatedAt: "desc" }],
+  });
+  return rows.map(toProfileListingDto).filter(Boolean);
+};
 
 type ProfilePayload = {
   breederName?: unknown;

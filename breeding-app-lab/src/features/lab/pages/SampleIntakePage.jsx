@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
 import LabQrScanner from "../components/LabQrScanner.jsx";
-import {
-  SAMPLE_STATUS_LABELS,
-  SAMPLE_STATUS_TONES,
-  ORDER_PAYMENT_STATUS_LABELS,
-  ORDER_PAYMENT_STATUS_TONES,
-} from "../../../types/labStatus";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { SAMPLE_STATUS_TONES, ORDER_PAYMENT_STATUS_TONES } from "../../../types/labStatus";
+import { ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { orderStatusLabel, paymentStatusLabel, sampleStatusLabel } from "../constants/statusLabelsI18n";
 import { canResolveLabQrInput, toLabQrResolvePayload } from "../utils/qrLookupInput";
 
 const toneClass = {
@@ -26,7 +23,8 @@ const formatDate = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const label = ORDER_STATUS_LABELS[status] || status;
+  const { t } = useTranslation();
+  const label = orderStatusLabel(t, status);
   const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -36,8 +34,9 @@ const StatusBadge = ({ status }) => {
 };
 
 const PaymentBadge = ({ paymentStatus }) => {
+  const { t } = useTranslation();
   const normalized = paymentStatus || "pending";
-  const label = ORDER_PAYMENT_STATUS_LABELS[normalized] || normalized;
+  const label = paymentStatusLabel(t, normalized);
   const tone = ORDER_PAYMENT_STATUS_TONES[normalized] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -47,8 +46,9 @@ const PaymentBadge = ({ paymentStatus }) => {
 };
 
 const SampleBadge = ({ status }) => {
+  const { t } = useTranslation();
   const normalized = status || "expected";
-  const label = SAMPLE_STATUS_LABELS[normalized] || normalized;
+  const label = sampleStatusLabel(t, normalized);
   const tone = SAMPLE_STATUS_TONES[normalized] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -58,6 +58,7 @@ const SampleBadge = ({ status }) => {
 };
 
 export default function SampleIntakePage({ presetToken }) {
+  const { t } = useTranslation();
   const [qrToken, setQrToken] = useState("");
   const [resolved, setResolved] = useState(null);
   const [lookupError, setLookupError] = useState("");
@@ -91,7 +92,11 @@ export default function SampleIntakePage({ presetToken }) {
       const parsed = toLabQrResolvePayload(normalized);
       lookupModeLabel = parsed.qrToken ? "token" : parsed.sampleId ? "sampleId" : "payload";
     } catch (err) {
-      setLookupError(err instanceof Error ? err.message : "Enter a valid QR token, sample ID, or payload.");
+      setLookupError(
+        err instanceof Error
+          ? err.message
+          : t("lab.intake.invalidInput", { defaultValue: "Enter a valid QR token, sample ID, or payload." })
+      );
       return;
     }
 
@@ -105,7 +110,12 @@ export default function SampleIntakePage({ presetToken }) {
       setIntakeNotes("");
     } catch (error) {
       setLookupError(
-        error instanceof Error ? error.message : `Unable to resolve QR ${lookupModeLabel || "input"}.`
+        error instanceof Error
+          ? error.message
+          : t("lab.intake.resolveFailed", {
+              defaultValue: "Unable to resolve QR {{mode}}.",
+              mode: lookupModeLabel || "input",
+            })
       );
     } finally {
       setLookupLoading(false);
@@ -140,11 +150,13 @@ export default function SampleIntakePage({ presetToken }) {
     resetIntakeFeedback();
 
     if (!resolved?.testOrder?.id) {
-      setSubmitError("Resolve a sample token before submitting intake.");
+      setSubmitError(
+        t("lab.intake.resolveFirst", { defaultValue: "Resolve a sample token before submitting intake." })
+      );
       return;
     }
     if (!received) {
-      setSubmitError("Mark sample as received to continue.");
+      setSubmitError(t("lab.intake.markReceived", { defaultValue: "Mark sample as received to continue." }));
       return;
     }
 
@@ -175,14 +187,27 @@ export default function SampleIntakePage({ presetToken }) {
       }
 
       if (updatedOrder.status === "in_progress") {
-        setSubmitSuccess("Sample received and moved into testing.");
+        setSubmitSuccess(
+          t("lab.intake.successTesting", { defaultValue: "Sample received and moved into testing." })
+        );
       } else if (updatedOrder.status === "received") {
-        setSubmitSuccess("Sample received. Intake remains pending because the sample was marked insufficient.");
+        setSubmitSuccess(
+          t("lab.intake.successInsufficient", {
+            defaultValue: "Sample received. Intake remains pending because the sample was marked insufficient.",
+          })
+        );
       } else {
-        setSubmitSuccess(`Sample intake updated. Order status is now ${updatedOrder.status}.`);
+        setSubmitSuccess(
+          t("lab.intake.successUpdated", {
+            defaultValue: "Sample intake updated. Order status is now {{status}}.",
+            status: updatedOrder.status,
+          })
+        );
       }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Intake submission failed.");
+      setSubmitError(
+        error instanceof Error ? error.message : t("lab.intake.submitFailed", { defaultValue: "Intake submission failed." })
+      );
     } finally {
       setSubmitLoading(false);
     }
@@ -196,27 +221,36 @@ export default function SampleIntakePage({ presetToken }) {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold text-neutral-900">Sample Intake</h1>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        {t("lab.shell.nav.sampleIntake", { defaultValue: "Sample Intake" })}
+      </h1>
       <p className="text-sm text-neutral-600">
-        Resolve a QR token, verify linked order context, and submit intake outcome. Scanner hookup can plug into this token field later.
+        {t("lab.intake.subtitle", {
+          defaultValue:
+            "Resolve a QR token, verify linked order context, and submit intake outcome. Scanner hookup can plug into this token field later.",
+        })}
       </p>
 
       <form className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm" onSubmit={handleResolve}>
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-wide text-neutral-500">QR Token Lookup</div>
+          <div className="text-xs uppercase tracking-wide text-neutral-500">
+            {t("lab.intake.lookupTitle", { defaultValue: "QR Token Lookup" })}
+          </div>
         </div>
         <div className="mt-2">
           <LabQrScanner onScan={handleScanResult} />
         </div>
         <div className="mt-3 flex items-center gap-2">
           <div className="h-px flex-1 bg-neutral-200" />
-          <span className="text-xs text-neutral-500">or enter manually</span>
+          <span className="text-xs text-neutral-500">{t("lab.intake.orManual", { defaultValue: "or enter manually" })}</span>
           <div className="h-px flex-1 bg-neutral-200" />
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm font-mono"
-            placeholder="Paste 64-char QR token, sample ID, or full QR payload JSON"
+            placeholder={t("lab.intake.tokenPlaceholder", {
+              defaultValue: "Paste 64-char QR token, sample ID, or full QR payload JSON",
+            })}
             value={qrToken}
             onChange={(event) => setQrToken(event.target.value)}
           />
@@ -225,11 +259,15 @@ export default function SampleIntakePage({ presetToken }) {
             disabled={!canLookup || lookupLoading}
             className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {lookupLoading ? "Resolving..." : "Resolve Token"}
+            {lookupLoading
+              ? t("lab.intake.resolving", { defaultValue: "Resolving..." })
+              : t("lab.intake.resolve", { defaultValue: "Resolve Token" })}
           </button>
         </div>
         <div className="mt-2 text-xs text-neutral-500">
-          Accepts normalized 64-char QR token, raw QR payload string, or manual sample ID.
+          {t("lab.intake.tokenHelp", {
+            defaultValue: "Accepts normalized 64-char QR token, raw QR payload string, or manual sample ID.",
+          })}
         </div>
         {lookupError ? (
           <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -242,7 +280,9 @@ export default function SampleIntakePage({ presetToken }) {
         <div className="grid gap-4 xl:grid-cols-2">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-neutral-900">Linked Order Context</div>
+              <div className="text-sm font-semibold text-neutral-900">
+                {t("lab.intake.linkedOrder", { defaultValue: "Linked Order Context" })}
+              </div>
               <div className="flex items-center gap-1.5">
                 <StatusBadge status={resolved.testOrder?.status} />
                 <PaymentBadge paymentStatus={resolved.testOrder?.paymentStatus || "pending"} />
@@ -252,38 +292,54 @@ export default function SampleIntakePage({ presetToken }) {
 
             <dl className="mt-3 grid grid-cols-1 gap-2 text-sm text-neutral-700">
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Order</dt>
-                <dd>{resolved.testOrder?.orderNumber || resolved.testOrder?.id}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.common.colOrder", { defaultValue: "Order" })}
+                </dt>
+                <dd><bdi>{resolved.testOrder?.orderNumber || resolved.testOrder?.id}</bdi></dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Order Date</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.intake.orderDate", { defaultValue: "Order Date" })}
+                </dt>
                 <dd>{formatDate(resolved.testOrder?.submittedAt || resolved.testOrder?.createdAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Sample ID</dt>
-                <dd className="font-mono text-xs">{resolved.sample?.id || "-"}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.intake.sampleId", { defaultValue: "Sample ID" })}
+                </dt>
+                <dd className="font-mono text-xs"><bdi>{resolved.sample?.id || "-"}</bdi></dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Sample Status</dt>
-                <dd>{SAMPLE_STATUS_LABELS[resolved.sample?.status || "expected"] || resolved.sample?.status || "-"}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.intake.sampleStatus", { defaultValue: "Sample Status" })}
+                </dt>
+                <dd>{sampleStatusLabel(t, resolved.sample?.status || "expected") || "-"}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Received At</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.intake.receivedAt", { defaultValue: "Received At" })}
+                </dt>
                 <dd>{formatDate(resolved.sample?.receivedAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Snake</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.common.colSnake", { defaultValue: "Snake" })}
+                </dt>
                 <dd>
-                  {resolved.animal?.name || "Unknown"}
-                  <span className="ml-2 text-xs text-neutral-500">({resolved.animal?.id || resolved.testOrder?.animalId || "-"})</span>
+                  {resolved.animal?.name || t("lab.intake.unknownAnimal", { defaultValue: "Unknown" })}
+                  <span className="ms-2 text-xs text-neutral-500">(<bdi>{resolved.animal?.id || resolved.testOrder?.animalId || "-"}</bdi>)</span>
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Breeder</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.intake.breeder", { defaultValue: "Breeder" })}
+                </dt>
                 <dd>{resolved.breeder?.displayName || resolved.breeder?.userId || "-"}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Requested Tests</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("lab.common.requestedTests", { defaultValue: "Requested Tests" })}
+                </dt>
                 <dd>{(resolved.requestedTests || resolved.testOrder?.requestedTests || []).join(", ") || "-"}</dd>
               </div>
             </dl>
@@ -293,12 +349,14 @@ export default function SampleIntakePage({ presetToken }) {
               className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs"
               onClick={openOrderDetails}
             >
-              Open Full Order Details
+              {t("lab.intake.openFullOrder", { defaultValue: "Open Full Order Details" })}
             </button>
           </section>
 
           <form className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm" onSubmit={handleSubmitIntake}>
-            <div className="text-sm font-semibold text-neutral-900">Intake Decision</div>
+            <div className="text-sm font-semibold text-neutral-900">
+              {t("lab.intake.decisionTitle", { defaultValue: "Intake Decision" })}
+            </div>
 
             <label className="mt-3 flex items-center gap-2 text-sm text-neutral-800">
               <input
@@ -306,35 +364,44 @@ export default function SampleIntakePage({ presetToken }) {
                 checked={received}
                 onChange={(event) => setReceived(event.target.checked)}
               />
-              Sample received
+              {t("lab.intake.sampleReceived", { defaultValue: "Sample received" })}
             </label>
 
             <label className="mt-3 block text-sm">
-              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Sample Condition</span>
+              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+                {t("lab.intake.sampleCondition", { defaultValue: "Sample Condition" })}
+              </span>
               <select
                 className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
                 value={sampleCondition}
                 onChange={(event) => setSampleCondition(event.target.value)}
               >
-                <option value="acceptable">Acceptable</option>
-                <option value="borderline">Borderline</option>
-                <option value="degraded">Degraded</option>
-                <option value="insufficient">Insufficient</option>
+                <option value="acceptable">{t("lab.intake.conditionAcceptable", { defaultValue: "Acceptable" })}</option>
+                <option value="borderline">{t("lab.intake.conditionBorderline", { defaultValue: "Borderline" })}</option>
+                <option value="degraded">{t("lab.intake.conditionDegraded", { defaultValue: "Degraded" })}</option>
+                <option value="insufficient">{t("lab.intake.conditionInsufficient", { defaultValue: "Insufficient" })}</option>
               </select>
             </label>
 
             <label className="mt-3 block text-sm">
-              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">Intake Notes</span>
+              <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-500">
+                {t("lab.intake.notes", { defaultValue: "Intake Notes" })}
+              </span>
               <textarea
                 className="min-h-[96px] w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                placeholder="Tube label verified, sample volume, contamination notes, etc."
+                placeholder={t("lab.intake.notesPlaceholder", {
+                  defaultValue: "Tube label verified, sample volume, contamination notes, etc.",
+                })}
                 value={intakeNotes}
                 onChange={(event) => setIntakeNotes(event.target.value)}
               />
             </label>
 
             <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-              Acceptable, borderline, and degraded samples move the hosted order into active processing. Insufficient samples stay at received so the lab can follow up before testing.
+              {t("lab.intake.conditionHelp", {
+                defaultValue:
+                  "Acceptable, borderline, and degraded samples move the hosted order into active processing. Insufficient samples stay at received so the lab can follow up before testing.",
+              })}
             </div>
 
             {submitError ? (
@@ -353,7 +420,9 @@ export default function SampleIntakePage({ presetToken }) {
               disabled={submitLoading || !received}
               className="mt-3 rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitLoading ? "Submitting Intake..." : "Submit Intake Decision"}
+              {submitLoading
+                ? t("lab.intake.submitting", { defaultValue: "Submitting Intake..." })
+                : t("lab.intake.submit", { defaultValue: "Submit Intake Decision" })}
             </button>
           </form>
         </div>

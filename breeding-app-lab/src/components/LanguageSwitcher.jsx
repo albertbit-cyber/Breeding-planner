@@ -12,7 +12,7 @@ const languages = [
   { code: "pl", label: "PL", name: "Polski", flag: "🇵🇱" },
   { code: "pt", label: "PT", name: "Português", flag: "🇵🇹" },
   { code: "cs", label: "CS", name: "Čeština", flag: "🇨🇿" },
-  { code: "he", label: "HE", name: "Hebrew", flag: "🇮🇱" },
+  { code: "he", label: "HE", name: "עברית", flag: "🇮🇱" },
 ];
 
 export default function LanguageSwitcher() {
@@ -21,7 +21,7 @@ export default function LanguageSwitcher() {
 
   return (
     <div
-      className="flex flex-col items-start gap-1 w-full max-w-xs self-start text-left"
+      className="flex flex-col items-start gap-1 w-full max-w-xs self-start text-start"
       style={{ alignSelf: "flex-start", marginLeft: 0 }}
     >
       {languages.map((lng) => {

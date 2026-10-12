@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchFemaleReproductiveProfile } from '../../shared/apiClient';
 
 // ── Utility ───────────────────────────────────────────────────────────────────
@@ -26,7 +27,13 @@ const CONFIDENCE_STYLES = {
 };
 
 function ConfidenceBadge({ level }) {
-  const label = { none: 'No data', low: 'Low confidence', medium: 'Medium confidence', high: 'High confidence' }[level] ?? level;
+  const { t } = useTranslation();
+  const label = {
+    none: t('reproIntel.confidence.none', { defaultValue: 'No data' }),
+    low: t('reproIntel.confidence.low', { defaultValue: 'Low confidence' }),
+    medium: t('reproIntel.confidence.medium', { defaultValue: 'Medium confidence' }),
+    high: t('reproIntel.confidence.high', { defaultValue: 'High confidence' }),
+  }[level] ?? level;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${CONFIDENCE_STYLES[level] ?? CONFIDENCE_STYLES.none}`}>
       {label}
@@ -45,11 +52,21 @@ const PATTERN_LABELS = {
   variable:          { label: 'Variable timing',    color: 'bg-orange-50  text-orange-700  border-orange-200'  },
 };
 
+const patternLabel = (t, tag) => ({
+  early_ovulator: t('reproIntel.pattern.earlyOvulator', { defaultValue: 'Early ovulator' }),
+  late_ovulator: t('reproIntel.pattern.lateOvulator', { defaultValue: 'Late ovulator' }),
+  frequent_locker: t('reproIntel.pattern.frequentLocker', { defaultValue: 'Frequent locker' }),
+  infrequent_locker: t('reproIntel.pattern.infrequentLocker', { defaultValue: 'Infrequent locker' }),
+  consistent: t('reproIntel.pattern.consistent', { defaultValue: 'Consistent timing' }),
+  variable: t('reproIntel.pattern.variable', { defaultValue: 'Variable timing' }),
+}[tag]);
+
 function PatternTag({ tag }) {
+  const { t } = useTranslation();
   const cfg = PATTERN_LABELS[tag] ?? { label: tag, color: 'bg-neutral-100 text-neutral-600 border-neutral-200' };
   return (
     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cfg.color}`}>
-      {cfg.label}
+      {patternLabel(t, tag) ?? cfg.label}
     </span>
   );
 }
@@ -57,6 +74,7 @@ function PatternTag({ tag }) {
 // ── Prediction window card ────────────────────────────────────────────────────
 
 function PredictionCard({ title, window: win, source }) {
+  const { t } = useTranslation();
   if (!win) return null;
   const earliestDays = daysFromToday(win.earliest);
   const avgDays = daysFromToday(win.average);
@@ -91,21 +109,21 @@ function PredictionCard({ title, window: win, source }) {
       )}
       <div className="space-y-0.5">
         <div className="flex justify-between text-[11px]">
-          <span className="text-neutral-400">Earliest</span>
+          <span className="text-neutral-400">{t('reproIntel.window.earliest', { defaultValue: 'Earliest' })}</span>
           <span className="font-semibold text-neutral-700">{formatDate(win.earliest)}</span>
         </div>
         <div className="flex justify-between text-[11px]">
-          <span className="text-neutral-500">Average</span>
-          <span className="font-bold text-violet-700">{formatDate(win.average)}{avgDays !== null ? <span className="ml-1 text-[10px] text-neutral-400">({avgDays > 0 ? `+${avgDays}d` : avgDays === 0 ? 'today' : `${avgDays}d`})</span> : null}</span>
+          <span className="text-neutral-500">{t('reproIntel.window.average', { defaultValue: 'Average' })}</span>
+          <span className="font-bold text-violet-700">{formatDate(win.average)}{avgDays !== null ? <span className="ms-1 text-[10px] text-neutral-400">({avgDays > 0 ? `+${avgDays}d` : avgDays === 0 ? t('reproIntel.window.today', { defaultValue: 'today' }) : `${avgDays}d`})</span> : null}</span>
         </div>
         <div className="flex justify-between text-[11px]">
-          <span className="text-neutral-400">Latest</span>
+          <span className="text-neutral-400">{t('reproIntel.window.latest', { defaultValue: 'Latest' })}</span>
           <span className="font-semibold text-neutral-700">{formatDate(win.latest)}</span>
         </div>
       </div>
       {source && source !== 'personal' && (
         <div className="mt-1.5 text-[9px] text-neutral-400 italic">
-          {source === 'collection' ? 'Based on collection averages' : 'Based on species defaults'}
+          {source === 'collection' ? t('reproIntel.window.basedOnCollection', { defaultValue: 'Based on collection averages' }) : t('reproIntel.window.basedOnSpecies', { defaultValue: 'Based on species defaults' })}
         </div>
       )}
     </div>
@@ -115,15 +133,16 @@ function PredictionCard({ title, window: win, source }) {
 // ── Cycle timeline row ────────────────────────────────────────────────────────
 
 function CycleRow({ cycle }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const hasData = cycle.ovulationDate || cycle.preLayShedDate || cycle.eggLayingDate || cycle.locks.length > 0;
 
   const stages = [
-    { label: 'Pairing', date: cycle.pairingStartDate, color: 'bg-neutral-300' },
-    { label: 'First lock', date: cycle.intervals.firstLockDate, color: 'bg-sky-400' },
-    { label: 'Ovulation', date: cycle.ovulationDate, color: 'bg-violet-400' },
-    { label: 'Pre-lay shed', date: cycle.preLayShedDate, color: 'bg-amber-400' },
-    { label: 'Eggs laid', date: cycle.eggLayingDate, color: 'bg-emerald-400' },
+    { label: t('reproIntel.stage.pairing', { defaultValue: 'Pairing' }), date: cycle.pairingStartDate, color: 'bg-neutral-300' },
+    { label: t('reproIntel.stage.firstLock', { defaultValue: 'First lock' }), date: cycle.intervals.firstLockDate, color: 'bg-sky-400' },
+    { label: t('reproIntel.stage.ovulation', { defaultValue: 'Ovulation' }), date: cycle.ovulationDate, color: 'bg-violet-400' },
+    { label: t('reproIntel.stage.preLayShed', { defaultValue: 'Pre-lay shed' }), date: cycle.preLayShedDate, color: 'bg-amber-400' },
+    { label: t('reproIntel.stage.eggsLaid', { defaultValue: 'Eggs laid' }), date: cycle.eggLayingDate, color: 'bg-emerald-400' },
   ].filter(s => s.date);
 
   return (
@@ -131,14 +150,14 @@ function CycleRow({ cycle }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-violet-50/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 text-start hover:bg-violet-50/40 transition-colors"
       >
         <div className="flex items-center gap-2">
           <div className="text-[11px] font-bold text-violet-700">{cycle.season}</div>
-          <div className="text-[10px] text-neutral-400">Cycle {cycle.cycleIndex}</div>
+          <div className="text-[10px] text-neutral-400">{t('reproIntel.cycleN', { defaultValue: 'Cycle {{index}}', index: cycle.cycleIndex })}</div>
           {cycle.eggLayingDate && (
             <div className="text-[10px] font-semibold text-emerald-600">
-              {cycle.eggCount ? `${cycle.fertileCount ?? '?'}/${cycle.eggCount} eggs` : 'Eggs laid'}
+              {cycle.eggCount ? t('reproIntel.fertileOfEggs', { defaultValue: '{{fertile}}/{{total}} eggs', fertile: cycle.fertileCount ?? '?', total: cycle.eggCount }) : t('reproIntel.stage.eggsLaid', { defaultValue: 'Eggs laid' })}
             </div>
           )}
         </div>
@@ -178,13 +197,13 @@ function CycleRow({ cycle }) {
           {hasData && (
             <div className="space-y-1 mt-1">
               {[
-                { label: 'Locks', value: cycle.intervals.lockCount > 0 ? `${cycle.intervals.lockCount} locks` : null },
-                { label: 'Avg days between locks', value: cycle.intervals.avgDaysBetweenLocks != null ? `${cycle.intervals.avgDaysBetweenLocks}d` : null },
-                { label: 'First lock → Ovulation', value: cycle.intervals.firstLockToOvulation != null ? `${cycle.intervals.firstLockToOvulation}d` : null },
-                { label: 'Ovulation → Pre-lay shed', value: cycle.intervals.ovulationToPreLayShed != null ? `${cycle.intervals.ovulationToPreLayShed}d` : null },
-                { label: 'Pre-lay shed → Eggs laid', value: cycle.intervals.preLayShedToEggLaying != null ? `${cycle.intervals.preLayShedToEggLaying}d` : null },
-                { label: 'Total cycle length', value: cycle.intervals.pairingStartToEggLaying != null ? `${cycle.intervals.pairingStartToEggLaying}d` : null },
-                { label: 'Fertility', value: cycle.intervals.fertilityRate != null ? `${Math.round(cycle.intervals.fertilityRate * 100)}%` : null },
+                { label: t('reproIntel.interval.locks', { defaultValue: 'Locks' }), value: cycle.intervals.lockCount > 0 ? t('reproIntel.interval.lockCount', { defaultValue: '{{locks}} locks', locks: cycle.intervals.lockCount }) : null },
+                { label: t('reproIntel.avgDaysBetweenLocks', { defaultValue: 'Avg days between locks' }), value: cycle.intervals.avgDaysBetweenLocks != null ? `${cycle.intervals.avgDaysBetweenLocks}d` : null },
+                { label: t('reproIntel.interval.firstLockToOvulation', { defaultValue: 'First lock → Ovulation' }), value: cycle.intervals.firstLockToOvulation != null ? `${cycle.intervals.firstLockToOvulation}d` : null },
+                { label: t('reproIntel.interval.ovulationToPreLayShed', { defaultValue: 'Ovulation → Pre-lay shed' }), value: cycle.intervals.ovulationToPreLayShed != null ? `${cycle.intervals.ovulationToPreLayShed}d` : null },
+                { label: t('reproIntel.interval.preLayShedToEggsLaid', { defaultValue: 'Pre-lay shed → Eggs laid' }), value: cycle.intervals.preLayShedToEggLaying != null ? `${cycle.intervals.preLayShedToEggLaying}d` : null },
+                { label: t('reproIntel.interval.totalCycleLength', { defaultValue: 'Total cycle length' }), value: cycle.intervals.pairingStartToEggLaying != null ? `${cycle.intervals.pairingStartToEggLaying}d` : null },
+                { label: t('reproIntel.interval.fertility', { defaultValue: 'Fertility' }), value: cycle.intervals.fertilityRate != null ? `${Math.round(cycle.intervals.fertilityRate * 100)}%` : null },
               ].filter(r => r.value).map(r => (
                 <div key={r.label} className="flex justify-between text-[11px]">
                   <span className="text-neutral-400">{r.label}</span>
@@ -197,7 +216,7 @@ function CycleRow({ cycle }) {
           {/* Lock list */}
           {cycle.locks.length > 0 && (
             <div>
-              <div className="text-[9px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Lock dates</div>
+              <div className="text-[9px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">{t('reproIntel.lockDates', { defaultValue: 'Lock dates' })}</div>
               <div className="flex flex-wrap gap-1">
                 {cycle.locks.map(l => (
                   <span key={l.id} className="rounded-full bg-sky-50 border border-sky-100 px-2 py-0.5 text-[10px] font-mono text-sky-700">
@@ -209,7 +228,7 @@ function CycleRow({ cycle }) {
           )}
 
           {!hasData && (
-            <div className="text-xs text-neutral-400 text-center py-2">No events recorded for this cycle.</div>
+            <div className="text-xs text-neutral-400 text-center py-2">{t('reproIntel.noEventsForCycle', { defaultValue: 'No events recorded for this cycle.' })}</div>
           )}
         </div>
       )}
@@ -231,16 +250,17 @@ function StatTile({ label, value, accent }) {
 // ── Analytics overview ────────────────────────────────────────────────────────
 
 function AnalyticsOverview({ analytics }) {
+  const { t } = useTranslation();
   const rows = [
-    { label: 'Total cycles',           value: analytics.totalCycles },
-    { label: 'Lifetime locks',         value: analytics.totalLifetimeLocks },
-    { label: 'Avg locks / cycle',      value: analytics.avgLocksPerCycle != null ? analytics.avgLocksPerCycle.toFixed(1) : null },
-    { label: 'Avg days between locks', value: analytics.avgDaysBetweenLocks != null ? `${analytics.avgDaysBetweenLocks}d` : null },
-    { label: '1st lock → Ovulation',   value: analytics.avgFirstLockToOvulation != null ? `${analytics.avgFirstLockToOvulation}d avg` : null },
-    { label: 'Ovulation → Pre-lay',    value: analytics.avgOvulationToPreLayShed != null ? `${analytics.avgOvulationToPreLayShed}d avg` : null },
-    { label: 'Pre-lay → Eggs laid',    value: analytics.avgPreLayShedToEggLaying != null ? `${analytics.avgPreLayShedToEggLaying}d avg` : null },
-    { label: 'Avg fertility',          value: analytics.avgFertilityRate != null ? `${Math.round(analytics.avgFertilityRate * 100)}%` : null },
-  ].filter(r => r.value != null && r.value !== 0 || r.label === 'Total cycles');
+    { id: 'totalCycles', label: t('reproIntel.totalCycles', { defaultValue: 'Total cycles' }), value: analytics.totalCycles },
+    { label: t('reproIntel.analytics.lifetimeLocks', { defaultValue: 'Lifetime locks' }), value: analytics.totalLifetimeLocks },
+    { label: t('reproIntel.analytics.avgLocksPerCycle', { defaultValue: 'Avg locks / cycle' }), value: analytics.avgLocksPerCycle != null ? analytics.avgLocksPerCycle.toFixed(1) : null },
+    { label: t('reproIntel.avgDaysBetweenLocks', { defaultValue: 'Avg days between locks' }), value: analytics.avgDaysBetweenLocks != null ? `${analytics.avgDaysBetweenLocks}d` : null },
+    { label: t('reproIntel.analytics.firstLockToOvulation', { defaultValue: '1st lock → Ovulation' }), value: analytics.avgFirstLockToOvulation != null ? t('reproIntel.analytics.daysAvg', { defaultValue: '{{days}}d avg', days: analytics.avgFirstLockToOvulation }) : null },
+    { label: t('reproIntel.analytics.ovulationToPreLay', { defaultValue: 'Ovulation → Pre-lay' }), value: analytics.avgOvulationToPreLayShed != null ? t('reproIntel.analytics.daysAvg', { defaultValue: '{{days}}d avg', days: analytics.avgOvulationToPreLayShed }) : null },
+    { label: t('reproIntel.analytics.preLayToEggsLaid', { defaultValue: 'Pre-lay → Eggs laid' }), value: analytics.avgPreLayShedToEggLaying != null ? t('reproIntel.analytics.daysAvg', { defaultValue: '{{days}}d avg', days: analytics.avgPreLayShedToEggLaying }) : null },
+    { label: t('reproIntel.avgFertility', { defaultValue: 'Avg fertility' }), value: analytics.avgFertilityRate != null ? `${Math.round(analytics.avgFertilityRate * 100)}%` : null },
+  ].filter(r => r.value != null && r.value !== 0 || r.id === 'totalCycles');
 
   return (
     <div className="space-y-1">
@@ -260,7 +280,14 @@ const TABS = ['Overview', 'Cycles', 'Predictions'];
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+const tabLabel = (t, tabName) => ({
+  Overview: t('reproIntel.tabs.overview', { defaultValue: 'Overview' }),
+  Cycles: t('reproIntel.tabs.cycles', { defaultValue: 'Cycles' }),
+  Predictions: t('reproIntel.tabs.predictions', { defaultValue: 'Predictions' }),
+}[tabName] ?? tabName);
+
 export function ReproductiveIntelligencePanel({ snake }) {
+  const { t } = useTranslation();
   const [profile, setProfile]     = useState(null);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState(null);
@@ -276,7 +303,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
       const data = await fetchFemaleReproductiveProfile(femaleAppId);
       setProfile(data);
     } catch (e) {
-      setError(e?.message || 'Failed to load reproductive profile');
+      setError(e?.message || t('reproIntel.loadFailed', { defaultValue: 'Failed to load reproductive profile' }));
     } finally {
       setLoading(false);
     }
@@ -296,11 +323,11 @@ export function ReproductiveIntelligencePanel({ snake }) {
     if (!analytics || analytics.totalCycles === 0) return null;
     const parts = [];
     if (analytics.avgPreLayShedToEggLaying != null)
-      parts.push(`lays eggs ~${analytics.avgPreLayShedToEggLaying}d after pre-lay shed`);
+      parts.push(t('reproIntel.insight.laysAfterShed', { defaultValue: 'lays eggs ~{{days}}d after pre-lay shed', days: analytics.avgPreLayShedToEggLaying }));
     if (analytics.avgLocksPerCycle != null && analytics.avgLocksPerCycle > 0)
-      parts.push(`averages ${analytics.avgLocksPerCycle.toFixed(1)} locks per season`);
+      parts.push(t('reproIntel.insight.averagesLocks', { defaultValue: 'averages {{locks}} locks per season', locks: analytics.avgLocksPerCycle.toFixed(1) }));
     if (patternTags.includes('consistent'))
-      parts.push('shows highly consistent reproductive timing');
+      parts.push(t('reproIntel.insight.consistent', { defaultValue: 'shows highly consistent reproductive timing' }));
     return parts.length ? parts.join(', ') + '.' : null;
   })();
 
@@ -320,13 +347,13 @@ export function ReproductiveIntelligencePanel({ snake }) {
       <div className="px-4 py-3 border-b border-violet-100 flex items-center justify-between bg-violet-50/40">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">
-            Reproductive Intelligence
+            {t('reproIntel.title', { defaultValue: 'Reproductive Intelligence' })}
           </div>
           {analytics && (
             <div className="mt-0.5 flex items-center gap-2">
               <ConfidenceBadge level={confidence} />
               {analytics.totalCycles > 0 && (
-                <span className="text-[10px] text-neutral-400">{analytics.totalCycles} cycle{analytics.totalCycles !== 1 ? 's' : ''} recorded</span>
+                <span className="text-[10px] text-neutral-400">{t('reproIntel.cyclesRecorded', { count: analytics.totalCycles, defaultValue_one: '{{count}} cycle recorded', defaultValue_other: '{{count}} cycles recorded' })}</span>
               )}
             </div>
           )}
@@ -336,25 +363,25 @@ export function ReproductiveIntelligencePanel({ snake }) {
           onClick={load}
           className="text-[10px] text-violet-400 hover:text-violet-600 transition-colors px-2 py-1 rounded-lg hover:bg-violet-100"
         >
-          Refresh
+          {t('common.refresh', { defaultValue: 'Refresh' })}
         </button>
       </div>
 
       {/* Tab bar */}
       <div className="flex border-b border-violet-100 overflow-x-auto">
-        {TABS.map(t => (
+        {TABS.map(tabName => (
           <button
-            key={t}
+            key={tabName}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(tabName)}
             className={[
               'px-3 py-2 text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors',
-              tab === t
+              tab === tabName
                 ? 'border-b-2 border-violet-500 text-violet-700'
                 : 'text-neutral-400 hover:text-neutral-600',
             ].join(' ')}
           >
-            {t}
+            {tabLabel(t, tabName)}
           </button>
         ))}
       </div>
@@ -362,13 +389,13 @@ export function ReproductiveIntelligencePanel({ snake }) {
       {/* Body */}
       <div className="p-4">
         {loading && (
-          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">Loading…</div>
+          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">{t('mobile.common.loadingEllipsis', { defaultValue: 'Loading…' })}</div>
         )}
         {!loading && error && (
           <div className="text-xs text-rose-500 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{error}</div>
         )}
         {!loading && !error && !profile && (
-          <div className="text-xs text-neutral-400 text-center py-6">No reproductive data yet.</div>
+          <div className="text-xs text-neutral-400 text-center py-6">{t('reproIntel.noData', { defaultValue: 'No reproductive data yet.' })}</div>
         )}
         {!loading && !error && profile && (
           <>
@@ -378,7 +405,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
                 {/* Pattern tags */}
                 {patternTags.length > 0 && (
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">Profile</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">{t('reproIntel.profile', { defaultValue: 'Profile' })}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {patternTags.map(tag => <PatternTag key={tag} tag={tag} />)}
                     </div>
@@ -395,35 +422,35 @@ export function ReproductiveIntelligencePanel({ snake }) {
                 {/* Active cycle status */}
                 {activeCycle ? (
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">Current Cycle</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">{t('reproIntel.currentCycle', { defaultValue: 'Current Cycle' })}</div>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[11px] space-y-1">
-                      <div className="font-semibold text-emerald-700">{activeCycle.season} — Cycle {activeCycle.cycleIndex}</div>
-                      {activeCycle.ovulationDate && <div className="text-neutral-600">Ovulation recorded: <span className="font-semibold">{formatDate(activeCycle.ovulationDate)}</span></div>}
-                      {activeCycle.preLayShedDate && <div className="text-neutral-600">Pre-lay shed: <span className="font-semibold">{formatDate(activeCycle.preLayShedDate)}</span></div>}
+                      <div className="font-semibold text-emerald-700">{t('reproIntel.seasonCycle', { defaultValue: '{{season}} — Cycle {{index}}', season: activeCycle.season, index: activeCycle.cycleIndex })}</div>
+                      {activeCycle.ovulationDate && <div className="text-neutral-600">{t('reproIntel.ovulationRecorded', { defaultValue: 'Ovulation recorded:' })} <span className="font-semibold">{formatDate(activeCycle.ovulationDate)}</span></div>}
+                      {activeCycle.preLayShedDate && <div className="text-neutral-600">{t('reproIntel.preLayShedLabel', { defaultValue: 'Pre-lay shed:' })} <span className="font-semibold">{formatDate(activeCycle.preLayShedDate)}</span></div>}
                       {!activeCycle.ovulationDate && activeCycle.intervals.lockCount > 0 && (
-                        <div className="text-neutral-600">{activeCycle.intervals.lockCount} lock{activeCycle.intervals.lockCount !== 1 ? 's' : ''} recorded</div>
+                        <div className="text-neutral-600">{t('reproIntel.locksRecorded', { count: activeCycle.intervals.lockCount, defaultValue_one: '{{count}} lock recorded', defaultValue_other: '{{count}} locks recorded' })}</div>
                       )}
                     </div>
                   </div>
                 ) : analytics.totalCycles > 0 ? (
                   <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500 text-center">
-                    No active cycle — not currently in pairing
+                    {t('reproIntel.noActiveCycle', { defaultValue: 'No active cycle — not currently in pairing' })}
                   </div>
                 ) : null}
 
                 {/* Analytics summary */}
                 {analytics.totalCycles > 0 && (
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">Lifetime Averages</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500 mb-1.5">{t('reproIntel.lifetimeAverages', { defaultValue: 'Lifetime Averages' })}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                      <StatTile label="Total cycles" value={analytics.totalCycles} />
+                      <StatTile label={t('reproIntel.totalCycles', { defaultValue: 'Total cycles' })} value={analytics.totalCycles} />
                       <StatTile
-                        label="Avg days between locks"
+                        label={t('reproIntel.avgDaysBetweenLocks', { defaultValue: 'Avg days between locks' })}
                         value={analytics.avgDaysBetweenLocks != null ? `${analytics.avgDaysBetweenLocks}d` : null}
                       />
-                      <StatTile label="Last lock date" value={lastLockDate ? formatDate(lastLockDate) : null} />
+                      <StatTile label={t('reproIntel.lastLockDate', { defaultValue: 'Last lock date' })} value={lastLockDate ? formatDate(lastLockDate) : null} />
                       <StatTile
-                        label="Avg fertility"
+                        label={t('reproIntel.avgFertility', { defaultValue: 'Avg fertility' })}
                         value={analytics.avgFertilityRate != null ? `${Math.round(analytics.avgFertilityRate * 100)}%` : null}
                         accent
                       />
@@ -435,9 +462,9 @@ export function ReproductiveIntelligencePanel({ snake }) {
                 {analytics.totalCycles === 0 && (
                   <div className="text-center py-4 space-y-1">
                     <div className="text-2xl opacity-20">🐍</div>
-                    <div className="text-xs text-neutral-400 font-semibold">No cycles recorded yet</div>
+                    <div className="text-xs text-neutral-400 font-semibold">{t('reproIntel.noCyclesYet', { defaultValue: 'No cycles recorded yet' })}</div>
                     <div className="text-[11px] text-neutral-400">
-                      Predictions will improve after the first complete breeding season.
+                      {t('reproIntel.predictionsWillImprove', { defaultValue: 'Predictions will improve after the first complete breeding season.' })}
                     </div>
                   </div>
                 )}
@@ -448,7 +475,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
             {tab === 'Cycles' && (
               <div className="space-y-2">
                 {cycles.length === 0 && (
-                  <div className="text-xs text-neutral-400 text-center py-6">No cycles recorded yet.</div>
+                  <div className="text-xs text-neutral-400 text-center py-6">{t('reproIntel.noCyclesYetPeriod', { defaultValue: 'No cycles recorded yet.' })}</div>
                 )}
                 {cycles.map(cycle => (
                   <CycleRow key={cycle.id} cycle={cycle} />
@@ -463,40 +490,40 @@ export function ReproductiveIntelligencePanel({ snake }) {
                   <ConfidenceBadge level={confidence} />
                   {predictions?.source && predictions.source !== 'personal' && (
                     <span className="text-[10px] text-neutral-400">
-                      {predictions.source === 'collection' ? '(using collection data)' : '(using species defaults)'}
+                      {predictions.source === 'collection' ? t('reproIntel.usingCollectionData', { defaultValue: '(using collection data)' }) : t('reproIntel.usingSpeciesDefaults', { defaultValue: '(using species defaults)' })}
                     </span>
                   )}
                   {predictions?.basedOnCycles > 0 && (
-                    <span className="text-[10px] text-neutral-400">Based on {predictions.basedOnCycles} cycle{predictions.basedOnCycles !== 1 ? 's' : ''}</span>
+                    <span className="text-[10px] text-neutral-400">{t('reproIntel.basedOnCycles', { count: predictions.basedOnCycles, defaultValue_one: 'Based on {{count}} cycle', defaultValue_other: 'Based on {{count}} cycles' })}</span>
                   )}
                 </div>
 
                 {predictions?.fromOvulation && (
                   <div className="space-y-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">From ovulation</div>
-                    <PredictionCard title="Expected Pre-Lay Shed" window={predictions.fromOvulation.preLayShed} source={predictions.source} />
-                    <PredictionCard title="Expected Egg Laying" window={predictions.fromOvulation.eggLaying} source={predictions.source} />
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">{t('reproIntel.fromOvulation', { defaultValue: 'From ovulation' })}</div>
+                    <PredictionCard title={t('reproIntel.expectedPreLayShed', { defaultValue: 'Expected Pre-Lay Shed' })} window={predictions.fromOvulation.preLayShed} source={predictions.source} />
+                    <PredictionCard title={t('reproIntel.expectedEggLaying', { defaultValue: 'Expected Egg Laying' })} window={predictions.fromOvulation.eggLaying} source={predictions.source} />
                   </div>
                 )}
 
                 {predictions?.fromPreLayShed && (
                   <div className="space-y-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">From pre-lay shed</div>
-                    <PredictionCard title="Expected Egg Laying" window={predictions.fromPreLayShed.eggLaying} source={predictions.source} />
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">{t('reproIntel.fromPreLayShed', { defaultValue: 'From pre-lay shed' })}</div>
+                    <PredictionCard title={t('reproIntel.expectedEggLaying', { defaultValue: 'Expected Egg Laying' })} window={predictions.fromPreLayShed.eggLaying} source={predictions.source} />
                   </div>
                 )}
 
                 {!predictions?.fromOvulation && !predictions?.fromPreLayShed && (
                   <div className="rounded-xl bg-neutral-50 border border-dashed border-neutral-200 p-4 text-center text-xs text-neutral-400">
                     {activeCycle
-                      ? 'Record ovulation or pre-lay shed to generate date predictions.'
-                      : 'Start a pairing to generate predictions.'}
+                      ? t('reproIntel.recordToPredict', { defaultValue: 'Record ovulation or pre-lay shed to generate date predictions.' })
+                      : t('reproIntel.startPairingToPredict', { defaultValue: 'Start a pairing to generate predictions.' })}
                   </div>
                 )}
 
                 {predictions?.nextLockEstimate?.avgLocksBeforeOvulation != null && (
                   <div className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700">
-                    This female typically needs <span className="font-bold">{predictions.nextLockEstimate.avgLocksBeforeOvulation.toFixed(1)}</span> locks before ovulation.
+                    {t('reproIntel.typicallyNeedsPrefix', { defaultValue: 'This female typically needs' })} <span className="font-bold">{predictions.nextLockEstimate.avgLocksBeforeOvulation.toFixed(1)}</span> {t('reproIntel.typicallyNeedsSuffix', { defaultValue: 'locks before ovulation.' })}
                   </div>
                 )}
               </div>

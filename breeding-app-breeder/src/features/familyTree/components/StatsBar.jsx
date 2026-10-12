@@ -1,7 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Stat = ({ icon, label, value }) => (
-  <div className="flex items-center gap-2 px-4 py-2 border-r border-violet-100 last:border-0 flex-shrink-0">
+  <div className="flex items-center gap-2 px-4 py-2 border-e border-violet-100 last:border-0 flex-shrink-0">
     <span className="text-base">{icon}</span>
     <div className="flex flex-col leading-tight">
       <span className="text-xs font-bold text-neutral-700">{value ?? '—'}</span>
@@ -15,19 +16,25 @@ const Stat = ({ icon, label, value }) => (
  * means the counts are drawn from the animals in the browser, which is the normal case and not
  * a degraded one, so it is not dressed up as an outage.
  */
-const StatusDot = ({ online }) => (
-  <div className="flex items-center gap-1.5 px-4 ml-auto flex-shrink-0">
+const StatusDot = ({ online }) => {
+  const { t } = useTranslation();
+  return (
+  <div className="flex items-center gap-1.5 px-4 ms-auto flex-shrink-0">
     <div
       className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-violet-300'}`}
       style={online ? { boxShadow: '0 0 0 3px rgba(52, 211, 153, 0.2)' } : {}}
     />
     <span className="text-[10px] font-semibold text-neutral-500">
-      {online ? 'Shared pedigree' : 'This collection'}
+      {online
+        ? t('familyTree.stats.sharedPedigree', { defaultValue: 'Shared pedigree' })
+        : t('familyTree.stats.thisCollection', { defaultValue: 'This collection' })}
     </span>
   </div>
-);
+  );
+};
 
 const StatsBar = ({ stats }) => {
+  const { t } = useTranslation();
   const {
     totalSnakes = 0,
     totalClutches = 0,
@@ -41,11 +48,11 @@ const StatsBar = ({ stats }) => {
 
   return (
     <div className="ft-stats-bar flex items-center overflow-x-auto">
-      <Stat icon="🐍" label="Snakes"      value={totalSnakes} />
-      <Stat icon="🥚" label="Clutches"    value={totalClutches} />
-      <Stat icon="👤" label="Breeders"    value={totalBreeders} />
-      <Stat icon="🧬" label="Bloodlines"  value={totalBloodlines} />
-      <Stat icon="📊" label="Generations" value={generationsTracked} />
+      <Stat icon="🐍" label={t('familyTree.stats.snakes', { defaultValue: 'Snakes' })} value={totalSnakes} />
+      <Stat icon="🥚" label={t('familyTree.stats.clutches', { defaultValue: 'Clutches' })} value={totalClutches} />
+      <Stat icon="👤" label={t('familyTree.stats.breeders', { defaultValue: 'Breeders' })} value={totalBreeders} />
+      <Stat icon="🧬" label={t('familyTree.stats.bloodlines', { defaultValue: 'Bloodlines' })} value={totalBloodlines} />
+      <Stat icon="📊" label={t('familyTree.stats.generations', { defaultValue: 'Generations' })} value={generationsTracked} />
       <StatusDot online={isOnline} />
     </div>
   );

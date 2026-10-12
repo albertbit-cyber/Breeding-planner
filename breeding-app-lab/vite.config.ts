@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,11 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5174,
     strictPort: true,
+    // breeding-app-shared is a file: dependency served from its own folder,
+    // outside this app's root; without this the dev server refuses its files.
+    fs: {
+      allow: [searchForWorkspaceRoot(rootDir), resolve(rootDir, "../breeding-app-shared")],
+    },
   },
   preview: {
     port: 4174,

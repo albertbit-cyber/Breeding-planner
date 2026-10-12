@@ -22,7 +22,7 @@ export default function Footer() {
           }}>
             <Logo size={26} />
           </div>
-          <span style={{ fontSize: 13, color: '#5a5650', marginLeft: 4 }}> 2026 Breeding Planner</span>
+          <span style={{ fontSize: 13, color: '#5a5650', marginLeft: 4 }}> 2026 Serpentora</span>
         </div>
 
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
@@ -30,6 +30,7 @@ export default function Footer() {
             <a key={l} href={h} style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>{l}</a>
           ))}
           <Link to="/pricing" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Pricing</Link>
+          <Link to="/verify" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Verify a certificate</Link>
           <Link to="/privacy" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Privacy</Link>
           <Link to="/terms" style={{ fontSize: 12, color: '#5a5650', textDecoration: 'none' }}>Terms</Link>
           {/* Left untranslated on purpose: German law requires the legal notice

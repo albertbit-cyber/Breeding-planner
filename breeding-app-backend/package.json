@@ -17,9 +17,13 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
     "dev:verify-user": "tsx scripts/devVerifyUser.ts",
+    "billing:founding": "tsx scripts/flagFoundingMembers.ts",
     "audit:staff": "tsx scripts/auditStaffAccounts.ts",
     "e2e:reset": "tsx prisma/e2eReset.ts",
-    "e2e:reset:local": "cross-env E2E_RESET_CONFIRM=local ALLOW_SEED=1 tsx prisma/e2eReset.ts"
+    "e2e:reset:local": "cross-env E2E_RESET_CONFIRM=local ALLOW_SEED=1 tsx prisma/e2eReset.ts",
+    "listings:copy-legacy:local": "cross-env LEGACY_LISTINGS_COPY_CONFIRM=local tsx scripts/copyLegacyListings.ts",
+    "lint": "eslint src",
+    "breeding:migrate-legacy": "tsx scripts/migrateLegacyPairingsToBreedingCycles.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -47,16 +51,21 @@
     "morgan": "^1.10.1",
     "nodemailer": "^9.0.6",
     "resend": "^4.8.0",
+    "stripe": "^19.3.0",
     "typescript": "^5.8.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
+    "@eslint/js": "^9.39.5",
     "@types/supertest": "^7.2.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "prisma": "6.5.0",
     "supertest": "^7.2.2",
     "tsx": "^4.19.3",
+    "typescript-eslint": "^8.71.0",
     "vite": "^8.0.2",
     "vitest": "^4.1.2"
   },

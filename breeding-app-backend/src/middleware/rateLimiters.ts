@@ -73,3 +73,15 @@ export const marketplaceUploadLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many marketplace uploads, please try again later." },
 });
+
+// Public certificate lookups. A buyer checks one or two certificates; a scanner
+// checks thousands. Codes are 96 bits, so this is about load and noise rather
+// than about making a guess feasible.
+export const certificateVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many certificate checks, please try again later." },
+});

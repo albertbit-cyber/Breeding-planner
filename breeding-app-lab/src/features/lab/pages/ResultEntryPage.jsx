@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createLabApiClient } from "../api/client";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { ORDER_STATUS_TONES } from "../constants/orderStatuses";
+import { orderStatusLabel, resultStatusLabel } from "../constants/statusLabelsI18n";
 import { LAB_RESULT_STATUS_OPTIONS } from "../../../types/labResultEntry";
 import { buildLabTestNumber } from "../../../services/lab/testNumber";
 
@@ -18,7 +20,8 @@ const DEFAULT_METHOD = "PCR";
 const createDefaultTestNumber = (orderId = "") => buildLabTestNumber(orderId || "lab-result");
 
 const StatusBadge = ({ status }) => {
-  const label = ORDER_STATUS_LABELS[status] || status;
+  const { t } = useTranslation();
+  const label = orderStatusLabel(t, status);
   const tone = ORDER_STATUS_TONES[status] || "neutral";
   return (
     <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${toneClass[tone] || toneClass.neutral}`}>
@@ -47,6 +50,7 @@ const initAnimalRows = (animalGroup) => {
 };
 
 export default function ResultEntryPage({ presetOrderId }) {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState("");
@@ -83,7 +87,9 @@ export default function ResultEntryPage({ presetOrderId }) {
       .catch((err) => {
         if (!mounted) return;
         setOrders([]);
-        setOrdersError(err instanceof Error ? err.message : "Failed to load orders.");
+        setOrdersError(
+          err instanceof Error ? err.message : t("lab.results.loadOrdersFailed", { defaultValue: "Failed to load orders." })
+        );
       })
       .finally(() => { if (mounted) setLoadingOrders(false); });
 
@@ -131,7 +137,7 @@ export default function ResultEntryPage({ presetOrderId }) {
             }))
           : [{
               animalId: "primary",
-              animalName: "Animal",
+              animalName: t("lab.results.animalFallback", { defaultValue: "Animal" }),
               existingResultMeta: template?.existingResult,
               rows: initAnimalRows({ items: template?.items, existingResult: template?.existingResult }),
             }];
@@ -151,7 +157,11 @@ export default function ResultEntryPage({ presetOrderId }) {
       .catch((err) => {
         if (!mounted) return;
         setAnimalGroups([]);
-        setTemplateError(err instanceof Error ? err.message : "Failed to load ordered tests.");
+        setTemplateError(
+          err instanceof Error
+            ? err.message
+            : t("lab.results.loadTestsFailed", { defaultValue: "Failed to load ordered tests." })
+        );
         setTestCode(createDefaultTestNumber(normalized));
         setMethod(DEFAULT_METHOD);
         setSummary("");
@@ -193,15 +203,29 @@ export default function ResultEntryPage({ presetOrderId }) {
     setSubmitSuccess("");
 
     const normalized = String(orderId || "").trim();
-    if (!normalized) { setSubmitError("Select a test order first."); return; }
-    if (!totalRows) { setSubmitError("No ordered tests were found for this order."); return; }
+    if (!normalized) {
+      setSubmitError(t("lab.results.selectOrderFirst", { defaultValue: "Select a test order first." }));
+      return;
+    }
+    if (!totalRows) {
+      setSubmitError(t("lab.results.noOrderedTestsFound", { defaultValue: "No ordered tests were found for this order." }));
+      return;
+    }
 
     if (mode === "draft" && filledRows === 0) {
-      setSubmitError("Set at least one ordered gene status before saving a draft.");
+      setSubmitError(
+        t("lab.results.draftNeedsOneOrdered", {
+          defaultValue: "Set at least one ordered gene status before saving a draft.",
+        })
+      );
       return;
     }
     if (mode === "submit" && filledRows !== totalRows) {
-      setSubmitError("Set a result status for every ordered gene across all animals before submitting.");
+      setSubmitError(
+        t("lab.results.submitNeedsAllOrdered", {
+          defaultValue: "Set a result status for every ordered gene across all animals before submitting.",
+        })
+      );
       return;
     }
 
@@ -240,8 +264,15 @@ export default function ResultEntryPage({ presetOrderId }) {
       const nextStatus = response?.order?.status || "(unknown)";
       setSubmitSuccess(
         mode === "draft"
-          ? `Draft saved — result ID: ${resultId}. Order status: ${nextStatus}.`
-          : `Result submitted. Order is now ${nextStatus}.`
+          ? t("lab.results.pageDraftSaved", {
+              defaultValue: "Draft saved — result ID: {{resultId}}. Order status: {{status}}.",
+              resultId,
+              status: nextStatus,
+            })
+          : t("lab.results.pageSubmitted", {
+              defaultValue: "Result submitted. Order is now {{status}}.",
+              status: nextStatus,
+            })
       );
 
       if (response?.order?.id) {
@@ -261,7 +292,9 @@ export default function ResultEntryPage({ presetOrderId }) {
 
       if (mode === "submit") setOrderId("");
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Result save failed.");
+      setSubmitError(
+        err instanceof Error ? err.message : t("lab.results.resultSaveFailed", { defaultValue: "Result save failed." })
+      );
     } finally {
       setSubmitLoading("");
     }
@@ -274,18 +307,26 @@ export default function ResultEntryPage({ presetOrderId }) {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold text-neutral-900">Result Entry</h1>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        {t("lab.shell.nav.resultEntry", { defaultValue: "Result Entry" })}
+      </h1>
       <p className="text-sm text-neutral-600">
-        Select an order. For batch orders, each snake is shown as its own section. Fill in every
-        gene result per snake, then submit all at once.
+        {t("lab.results.pageSubtitle", {
+          defaultValue:
+            "Select an order. For batch orders, each snake is shown as its own section. Fill in every gene result per snake, then submit all at once.",
+        })}
       </p>
 
       {/* ── Order selection ── */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Order Selection</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          {t("lab.results.orderSelection", { defaultValue: "Order Selection" })}
+        </div>
 
         {loadingOrders ? (
-          <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">Loading eligible orders...</div>
+          <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
+            {t("lab.results.loadingOrders", { defaultValue: "Loading eligible orders..." })}
+          </div>
         ) : null}
         {!loadingOrders && ordersError ? (
           <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{ordersError}</div>
@@ -297,17 +338,21 @@ export default function ResultEntryPage({ presetOrderId }) {
               value={orderId}
               onChange={(e) => setOrderId(e.target.value)}
             >
-              <option value="">Select order for result entry…</option>
+              <option value="">{t("lab.results.selectOrder", { defaultValue: "Select order for result entry…" })}</option>
               {orders.map((order) => (
                 <option key={order.id} value={order.id}>
                   {order.orderNumber || order.id}
                   {Array.isArray(order.animalIds) && order.animalIds.length > 1
-                    ? ` · ${order.animalIds.length} snakes`
+                    ? ` · ${t("lab.results.snakeCount", {
+                        count: order.animalIds.length,
+                        defaultValue_one: "{{count}} snake",
+                        defaultValue_other: "{{count}} snakes",
+                      })}`
                     : order.animalId
                     ? ` · ${order.animalId}`
                     : ""}
                   {" · "}
-                  {ORDER_STATUS_LABELS[order.status] || order.status}
+                  {orderStatusLabel(t, order.status)}
                 </option>
               ))}
             </select>
@@ -317,18 +362,22 @@ export default function ResultEntryPage({ presetOrderId }) {
               onClick={openOrderDetails}
               disabled={!orderId}
             >
-              Open Order
+              {t("lab.results.openOrder", { defaultValue: "Open Order" })}
             </button>
           </div>
         ) : null}
 
         {selectedOrder ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium text-neutral-800">{selectedOrder.orderNumber || selectedOrder.id}</span>
+            <span className="font-medium text-neutral-800"><bdi>{selectedOrder.orderNumber || selectedOrder.id}</bdi></span>
             <StatusBadge status={selectedOrder.status} />
             {Array.isArray(selectedOrder.animalIds) && selectedOrder.animalIds.length > 1 ? (
               <span className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
-                Batch · {selectedOrder.animalIds.length} snakes
+                {t("lab.results.batchSnakes", {
+                  count: selectedOrder.animalIds.length,
+                  defaultValue_one: "Batch · {{count}} snake",
+                  defaultValue_other: "Batch · {{count}} snakes",
+                })}
               </span>
             ) : null}
           </div>
@@ -339,7 +388,9 @@ export default function ResultEntryPage({ presetOrderId }) {
       <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">Test Number</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("lab.results.testNumber", { defaultValue: "Test Number" })}
+            </span>
             <input
               className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={testCode}
@@ -348,7 +399,9 @@ export default function ResultEntryPage({ presetOrderId }) {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">Method</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("lab.results.method", { defaultValue: "Method" })}
+            </span>
             <input
               className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={method}
@@ -367,7 +420,13 @@ export default function ResultEntryPage({ presetOrderId }) {
                 style={{ width: `${Math.round((filledRows / totalRows) * 100)}%` }}
               />
             </div>
-            <span>{filledRows}/{totalRows} genes filled</span>
+            <span>
+              {t("lab.results.genesFilled", {
+                defaultValue: "{{filled}}/{{total}} genes filled",
+                filled: filledRows,
+                total: totalRows,
+              })}
+            </span>
           </div>
         ) : null}
 
@@ -375,7 +434,7 @@ export default function ResultEntryPage({ presetOrderId }) {
         <div className="mt-4 space-y-4">
           {loadingTemplate ? (
             <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
-              Loading ordered genes…
+              {t("lab.results.loadingGenes", { defaultValue: "Loading ordered genes…" })}
             </div>
           ) : null}
           {!loadingTemplate && templateError ? (
@@ -383,7 +442,7 @@ export default function ResultEntryPage({ presetOrderId }) {
           ) : null}
           {!loadingTemplate && !templateError && orderId && !animalGroups.length ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-              This order has no requested tests to prefill.
+              {t("lab.results.noTestsToPrefill", { defaultValue: "This order has no requested tests to prefill." })}
             </div>
           ) : null}
 
@@ -398,12 +457,16 @@ export default function ResultEntryPage({ presetOrderId }) {
                   <div className="text-sm font-semibold text-neutral-800">
                     {group.animalName && group.animalName !== group.animalId
                       ? group.animalName
-                      : "Snake"}
+                      : t("lab.results.snakeFallback", { defaultValue: "Snake" })}
                   </div>
                   <div className="font-mono text-[10px] text-neutral-400">{group.animalId !== "primary" ? group.animalId : ""}</div>
                 </div>
-                <span className="ml-auto text-[11px] text-neutral-500">
-                  {group.rows.filter((r) => r.resultStatus).length}/{group.rows.length} filled
+                <span className="ms-auto text-[11px] text-neutral-500">
+                  {t("lab.results.rowsFilled", {
+                    defaultValue: "{{filled}}/{{total}} filled",
+                    filled: group.rows.filter((r) => r.resultStatus).length,
+                    total: group.rows.length,
+                  })}
                 </span>
               </div>
 
@@ -415,7 +478,9 @@ export default function ResultEntryPage({ presetOrderId }) {
                       <div>
                         <div className="text-sm font-medium text-neutral-900">{row.geneName}</div>
                         {row.sourceOrderedName && row.sourceOrderedName !== row.geneName ? (
-                          <div className="text-xs text-neutral-500">Ordered as: {row.sourceOrderedName}</div>
+                          <div className="text-xs text-neutral-500">
+                            {t("lab.results.orderedAs", { defaultValue: "Ordered as:" })} {row.sourceOrderedName}
+                          </div>
                         ) : null}
                       </div>
                       <select
@@ -423,15 +488,17 @@ export default function ResultEntryPage({ presetOrderId }) {
                         value={row.resultStatus}
                         onChange={(e) => updateRow(group.animalId, row.orderedTestKey, { resultStatus: e.target.value })}
                       >
-                        <option value="">Select result…</option>
+                        <option value="">{t("lab.results.selectResult", { defaultValue: "Select result…" })}</option>
                         {LAB_RESULT_STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          <option key={opt.value} value={opt.value}>
+                            {resultStatusLabel(t, opt.value, opt.label)}
+                          </option>
                         ))}
                       </select>
                     </div>
                     <input
                       className="mt-2 w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-                      placeholder="Per-gene notes (optional)"
+                      placeholder={t("lab.results.geneNotesPlaceholder", { defaultValue: "Per-gene notes (optional)" })}
                       value={row.notes}
                       onChange={(e) => updateRow(group.animalId, row.orderedTestKey, { notes: e.target.value })}
                     />
@@ -445,27 +512,38 @@ export default function ResultEntryPage({ presetOrderId }) {
         {/* Summary + internal notes */}
         <div className="mt-4 grid gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">Result Summary</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("lab.results.summary", { defaultValue: "Result Summary" })}
+            </span>
             <textarea
               className="min-h-[80px] w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              placeholder="Short technical summary for this result set"
+              placeholder={t("lab.results.summaryPlaceholder", {
+                defaultValue: "Short technical summary for this result set",
+              })}
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">Internal Lab Notes</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {t("lab.results.internalNotes", { defaultValue: "Internal Lab Notes" })}
+            </span>
             <textarea
               className="min-h-[80px] w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Internal-only comments for QA/review handoff"
+              placeholder={t("lab.results.internalNotesPlaceholder", {
+                defaultValue: "Internal-only comments for QA/review handoff",
+              })}
             />
           </label>
         </div>
 
         <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-          Save Draft keeps results in progress. Submit Result finalises all snakes and moves the order to Completed — immediately visible to the breeder.
+          {t("lab.results.pageHelp", {
+            defaultValue:
+              "Save Draft keeps results in progress. Submit Result finalises all snakes and moves the order to Completed — immediately visible to the breeder.",
+          })}
         </div>
 
         {submitError ? (
@@ -482,7 +560,9 @@ export default function ResultEntryPage({ presetOrderId }) {
             disabled={Boolean(submitLoading) || loadingTemplate || Boolean(templateError)}
             onClick={() => runSave("draft")}
           >
-            {submitLoading === "draft" ? "Saving…" : "Save Draft"}
+            {submitLoading === "draft"
+              ? t("lab.results.saving", { defaultValue: "Saving…" })
+              : t("lab.results.saveDraft", { defaultValue: "Save Draft" })}
           </button>
           <button
             type="button"
@@ -490,7 +570,9 @@ export default function ResultEntryPage({ presetOrderId }) {
             disabled={Boolean(submitLoading) || loadingTemplate || Boolean(templateError)}
             onClick={() => runSave("submit")}
           >
-            {submitLoading === "submit" ? "Submitting…" : "Submit Result"}
+            {submitLoading === "submit"
+              ? t("lab.results.submitting", { defaultValue: "Submitting…" })
+              : t("lab.results.submitResult", { defaultValue: "Submit Result" })}
           </button>
         </div>
       </section>

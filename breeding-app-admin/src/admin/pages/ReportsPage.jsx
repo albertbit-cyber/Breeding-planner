@@ -4,7 +4,6 @@ import AdminLayout from "../components/AdminLayout.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import CopyButton from "../components/CopyButton.jsx";
 import PaginationControls from "../components/PaginationControls.jsx";
-import ConfirmModal from "../components/ConfirmModal.jsx";
 import Spinner from "../components/Spinner.jsx";
 import { useToast } from "../hooks/useToast.jsx";
 import {
@@ -75,7 +74,6 @@ function ReportActionModal({ report, onClose, onDone }) {
 export default function ReportsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const toast = useToast();
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",

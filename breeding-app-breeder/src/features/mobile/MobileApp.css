@@ -193,7 +193,7 @@
   border-radius: 12px;
   background: var(--sk-surface);
   color: var(--sk-text);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   width: 100%;
 }
@@ -471,7 +471,7 @@
   border: 1px solid color-mix(in srgb, var(--sk-text) 12%, transparent);
   background: var(--sk-surface);
   color: var(--sk-text);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
 }
@@ -479,8 +479,8 @@
 .mbl-mode-icon { font-size: 1.5rem; }
 .mbl-mode-card strong { font-size: 1.2rem; font-weight: 900; }
 .mbl-mode-card span { font-size: 0.88rem; color: color-mix(in srgb, var(--sk-text) 65%, transparent); }
-.mbl-mode-card--terminal { border-left: 4px solid var(--sk-primary); }
-.mbl-mode-card--full { border-left: 4px solid var(--sk-accent, var(--sk-primary)); }
+.mbl-mode-card--terminal { border-inline-start: 4px solid var(--sk-primary); }
+.mbl-mode-card--full { border-inline-start: 4px solid var(--sk-accent, var(--sk-primary)); }
 
 /* ─── TERMINAL MODE ──────────────────────────────────────────────────────── */
 .mbl-terminal-topbar {
@@ -490,7 +490,7 @@
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid color-mix(in srgb, var(--sk-text) 10%, transparent);
 }
-.mbl-terminal-topbar .mbl-text-btn:last-child { text-align: right; }
+.mbl-terminal-topbar .mbl-text-btn:last-child { text-align: end; }
 .mbl-terminal-badge {
   font-size: 0.72rem;
   font-weight: 900;
@@ -781,7 +781,7 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   width: 100%;
 }
 .mbl-more-row--danger { color: var(--sk-danger-text, #e05050); border-color: color-mix(in srgb, var(--sk-danger-text) 25%, transparent); }
@@ -882,7 +882,7 @@
   border: none;
   cursor: pointer;
   color: var(--sk-text);
-  text-align: left;
+  text-align: start;
   gap: 0.5rem;
 }
 .mbl-cs-title {
@@ -1082,7 +1082,7 @@
   border-radius: 14px;
   background: var(--sk-surface);
   color: var(--sk-text);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   width: 100%;
   transition: box-shadow 0.12s;
@@ -1267,7 +1267,7 @@
   border-radius: 12px;
   background: var(--sk-surface);
 }
-.mbl-task-card--due { border-left: 3px solid var(--sk-primary); }
+.mbl-task-card--due { border-inline-start: 3px solid var(--sk-primary); }
 .mbl-task-card-icon { font-size: 1.2rem; text-align: center; }
 .mbl-section-label--danger { color: var(--sk-danger-text, #e05050); }
 
@@ -1295,7 +1295,7 @@
   color: var(--sk-text);
   cursor: pointer;
   width: 100%;
-  text-align: left;
+  text-align: start;
 }
 .mbl-pairing-animals {
   display: flex;
@@ -1426,14 +1426,14 @@
 .mbl-settings-row:last-child { border-bottom: none; }
 .mbl-settings-row--btn {
   background: none;
-  border-left: none;
-  border-right: none;
+  border-inline-start: none;
+  border-inline-end: none;
   border-top: none;
   color: var(--sk-text);
   font: inherit;
   cursor: pointer;
   width: 100%;
-  text-align: left;
+  text-align: start;
 }
 .mbl-settings-row--btn:last-child { border-bottom: none !important; }
 .mbl-settings-row--danger { color: var(--sk-danger-text, #e05050); }
@@ -1637,8 +1637,8 @@
 .mbl-sync-error--global {
   margin-bottom: 0;
   border-radius: 0;
-  border-left: none;
-  border-right: none;
+  border-inline-start: none;
+  border-inline-end: none;
 }
 
 .mbl-sync-error .mbl-text-btn {
