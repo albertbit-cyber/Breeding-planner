@@ -188,7 +188,7 @@ export default function InlineResultEntry({ orderId, onSaved }) {
 
       onSaved?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : t("mobile.toast.saveFailed", { defaultValue: "Save failed." }));
+      setSubmitError(err instanceof Error ? err.message : t("common.saveFailed", { defaultValue: "Save failed." }));
     } finally {
       setSubmitLoading("");
     }

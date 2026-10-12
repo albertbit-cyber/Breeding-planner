@@ -223,7 +223,25 @@ import {
   isoToFileTimestamp,
   saveBackupFile,
 } from "./features/backup/backupFile.js";
-import { onBackButton } from "./platform/index.js";
+import { haptic, isNativeShell, onBackButton } from "./platform/index.js";
+import FieldScreen from "./features/field/FieldScreen.jsx";
+import QuickLogSheet from "./features/field/QuickLogSheet.jsx";
+import { appendLog as appendLogToSnake, pushRecent as pushRecentAnimal, removeLog as removeLogFromSnake } from "./features/field/fieldLogic.js";
+import {
+  Brain as BrainIcon,
+  CalendarBlank as CalendarIcon,
+  Cards as AnimalsIcon,
+  DotsThreeOutline as MoreIcon,
+  Flask as LabIcon,
+  ForkKnife as FeedPrepIcon,
+  GearSix as SettingsIcon,
+  HeartStraight as BreedingIcon,
+  House as HomeIcon,
+  QrCode as FieldIcon,
+  ShieldCheck as QuarantineIcon,
+  TreeStructure as FamilyTreeIcon,
+  Warehouse as SpacesIcon,
+} from "@phosphor-icons/react";
 import {
   LOGO_PRESET,
   PHOTO_PRESET,
@@ -3065,6 +3083,9 @@ function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombs
 }
 
 const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
+
+// Tabs that live behind the phone's More sheet rather than on the bar itself.
+const MOBILE_MORE_TABS = ['calendar', 'spaces', 'quarantine', 'advisor', 'familyTree', 'shedTerminal', 'setup'];
 
 function getSyncRecordKey(record, fallbackPrefix, index) {
   const candidates = [
@@ -6993,7 +7014,15 @@ export default function BreedingPlannerApp() {
   }, [syncTombstones]);
   // The dashboard is the landing page; a species workspace is entered from it. A null scope
   // means "no species chosen", which is only valid on the dashboard and the global tabs.
-  const [tab, setTab] = useState('dashboard');
+  // The phone starts on Field (scan, due feeds, recent animals); the desktop on the dashboard.
+  const [tab, setTab] = useState(isNativeShell ? 'field' : 'dashboard');
+  // Animals opened on this device, newest first. Device-local on purpose: it is a shortcut
+  // list for the keeper holding this phone, not collection data.
+  const [recentAnimalIds, setRecentAnimalIds] = useState(() => {
+    const stored = loadStoredJson('serpentoraRecentAnimals', []);
+    return Array.isArray(stored) ? stored.map(String) : [];
+  });
+  useEffect(() => { saveStoredJson('serpentoraRecentAnimals', recentAnimalIds); }, [recentAnimalIds]);
   const [speciesScope, setSpeciesScope] = useState(null);
 
   // Animals recorded before species tracking carry no species and resolve to ball python on
@@ -10228,7 +10257,45 @@ export default function BreedingPlannerApp() {
     setTab('animals');
     setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
     openSnakeEditor(snake);
+    setRecentAnimalIds(prev => pushRecentAnimal(prev, snake.id));
   }, [animalView, tab, speciesScope, openSnakeEditor]);
+
+  // Quick logs from the Field tab write straight into the store, like the desktop's quick-add,
+  // and the normal sync carries them. `fieldNotice` is the one-line confirmation with Undo.
+  const [quickLogTarget, setQuickLogTarget] = useState(null); // { snakeId, type }
+  const [fieldNotice, setFieldNotice] = useState(null);
+  const quickLogSnake = useMemo(
+    () => (quickLogTarget ? snakes.find(x => x.id === quickLogTarget.snakeId) || null : null),
+    [quickLogTarget, snakes]
+  );
+  const openQuickLog = useCallback((snake, type = 'feed') => {
+    if (!snake?.id) return;
+    setQuickLogTarget({ snakeId: snake.id, type });
+  }, []);
+  const closeQuickLog = useCallback(() => setQuickLogTarget(null), []);
+  const saveQuickLog = useCallback((type, key, entry) => {
+    const snakeId = quickLogTarget?.snakeId;
+    if (!snakeId) return;
+    setSnakes(prev => prev.map(x => (x.id === snakeId ? appendLogToSnake(x, key, entry) : x)));
+    if (key === 'feeds' && typeof setLastFeedDefaults === 'function') {
+      setLastFeedDefaults(prev => ({ ...prev, feed: entry.feed, size: entry.size, refused: false }));
+    }
+    const target = snakes.find(x => x.id === snakeId);
+    const name = target?.name || snakeId;
+    const message = type === 'feed'
+      ? (entry.refused
+        ? t('field.saved.refused', { name, defaultValue: '{{name}} refused.' })
+        : t('field.saved.fed', { name, defaultValue: '{{name}} fed.' }))
+      : type === 'weight' ? t('field.saved.weight', { name, grams: entry.grams, defaultValue: '{{name}}: {{grams}} g.' })
+      : type === 'shed' ? t('field.saved.shed', { name, defaultValue: 'Shed logged for {{name}}.' })
+      : t('field.saved.clean', { name, defaultValue: '{{name}} cleaned.' });
+    setFieldNotice({
+      message,
+      onUndo: () => setSnakes(prev => prev.map(x => (x.id === snakeId ? removeLogFromSnake(x, key, entry.id) : x))),
+    });
+    haptic('success');
+    setQuickLogTarget(null);
+  }, [quickLogTarget, snakes, setSnakes, setLastFeedDefaults, t]);
 
   const editDraftSpeciesId = editSnakeDraft ? resolveSpeciesId(editSnakeDraft.species) : '';
 
@@ -11820,9 +11887,11 @@ export default function BreedingPlannerApp() {
   backStateRef.current = {
     mobileMoreOpen, animalActionSheetOpen, filterSheetOpen, showScanner, editSnake, showExportModal,
     showImportModal, showAddModal, showFeedPrepModal, showPairingModal, showPairingQrModal, qrFor, tab,
+    quickLogTarget,
   };
   useEffect(() => onBackButton(() => {
     const st = backStateRef.current;
+    if (st.quickLogTarget) { setQuickLogTarget(null); return true; }
     if (st.mobileMoreOpen) { setMobileMoreOpen(false); return true; }
     if (st.animalActionSheetOpen) { setAnimalActionSheetOpen(false); return true; }
     if (st.filterSheetOpen) { setFilterSheetOpen(false); return true; }
@@ -11842,7 +11911,11 @@ export default function BreedingPlannerApp() {
         return true;
       }
     }
-    if (st.tab !== 'dashboard') { leaveSpeciesWorkspace(); return true; }
+    const home = isNativeShell ? 'field' : 'dashboard';
+    if (st.tab !== home) {
+      if (home === 'field') setTab('field'); else leaveSpeciesWorkspace();
+      return true;
+    }
     return false;
   }), [closeSnakeEditor, leaveSpeciesWorkspace]);
 
@@ -11944,29 +12017,35 @@ export default function BreedingPlannerApp() {
       <nav className="bp-mobile-bottom-nav">
         <div className="bp-mobile-bottom-nav__items">
           {[
-            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }) },
-            { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }) },
-            { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }) },
-            { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }) },
-            { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }) },
-            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }) },
-          ].map(({ key, icon, label }) => (
-            <button
-              key={key}
-              type="button"
-              aria-current={tab === key ? 'page' : undefined}
-              className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','quarantine','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
-              onClick={() => {
-                if (key === '__more') { setMobileMoreOpen(prev => !prev); }
-                // Dashboard closes any open species, exactly like the desktop tab does.
-                else if (key === 'dashboard') { leaveSpeciesWorkspace(); setMobileMoreOpen(false); }
-                else { setTab(key); setMobileMoreOpen(false); }
-              }}
-            >
-              <span className="bp-mobile-bottom-nav__icon" aria-hidden="true">{icon}</span>
-              <span className="bp-mobile-bottom-nav__label">{label}</span>
-            </button>
-          ))}
+            { key: 'field', Icon: FieldIcon, label: t("nav.field", { defaultValue: "Field" }) },
+            { key: 'dashboard', Icon: HomeIcon, label: t("nav.home", { defaultValue: "Home" }) },
+            { key: 'animals', Icon: AnimalsIcon, label: t("nav.animals", { defaultValue: "Animals" }) },
+            { key: 'pairings', Icon: BreedingIcon, label: t("nav.pairings", { defaultValue: "Breeding" }) },
+            { key: '__more', Icon: MoreIcon, label: t("nav.more", { defaultValue: "More" }) },
+          ].map(({ key, Icon, label }) => {
+            const active = key === '__more'
+              ? (mobileMoreOpen || MOBILE_MORE_TABS.includes(tab))
+              : tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-current={active && key !== '__more' ? 'page' : undefined}
+                aria-expanded={key === '__more' ? mobileMoreOpen : undefined}
+                className={cx('bp-mobile-bottom-nav__item', active ? 'is-active' : '')}
+                onClick={() => {
+                  if (key === '__more') { setMobileMoreOpen(prev => !prev); return; }
+                  setMobileMoreOpen(false);
+                  // Home closes any open species, exactly like the desktop tab does.
+                  if (key === 'dashboard') { leaveSpeciesWorkspace(); return; }
+                  setTab(key);
+                }}
+              >
+                <span className="bp-mobile-bottom-nav__icon" aria-hidden="true"><Icon size={22} weight={active ? 'fill' : 'regular'} /></span>
+                <span className="bp-mobile-bottom-nav__label">{label}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
@@ -11974,22 +12053,31 @@ export default function BreedingPlannerApp() {
       {mobileMoreOpen && (
         <div className="bp-more-menu">
           <div className="bp-more-menu__backdrop" onClick={() => setMobileMoreOpen(false)} />
-          <div className="bp-more-menu__panel">
+          <div className="bp-more-menu__panel bp-more-menu__panel--list" role="dialog" aria-modal="true" aria-label={t("nav.more", { defaultValue: "More" })}>
             {[
-              { key: 'advisor', icon: '🧠', label: t("nav.advisor", { defaultValue: "Breeding Advisor" }) },
-              { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }) },
-              { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
-              { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }) },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }) },
-            ].map(({ key, icon, label }) => (
+              { key: 'calendar', Icon: CalendarIcon, label: t("nav.calendar", { defaultValue: "Calendar" }) },
+              { key: 'spaces', Icon: SpacesIcon, label: t("nav.spaces", { defaultValue: "Spaces" }) },
+              { key: 'quarantine', Icon: QuarantineIcon, label: t("nav.quarantine", { defaultValue: "Quarantine" }), badge: quarantineCount || 0 },
+              { key: '__feedPrep', Icon: FeedPrepIcon, label: t("nav.feedPrep", { defaultValue: "Feed Prep" }) },
+              { key: 'advisor', Icon: BrainIcon, label: t("nav.advisor", { defaultValue: "Breeding Advisor" }) },
+              { key: 'familyTree', Icon: FamilyTreeIcon, label: t("nav.familyTree", { defaultValue: "Family Tree" }) },
+              { key: 'shedTerminal', Icon: LabIcon, label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }) },
+              { key: 'setup', Icon: SettingsIcon, label: t("nav.setup", { defaultValue: "Settings" }) },
+            ].map(({ key, Icon, label, badge }) => (
               <button
                 key={key}
                 type="button"
-                className="bp-more-menu__btn"
-                onClick={() => { setTab(key); setMobileMoreOpen(false); }}
+                className={cx('bp-more-menu__row', tab === key ? 'is-active' : '')}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => {
+                  setMobileMoreOpen(false);
+                  if (key === '__feedPrep') { setShowFeedPrepModal(true); return; }
+                  setTab(key);
+                }}
               >
-                <span className="bp-more-menu__btn-icon" aria-hidden="true">{icon}</span>
-                {label}
+                <span className="bp-more-menu__row-icon" aria-hidden="true"><Icon size={22} weight={tab === key ? 'fill' : 'regular'} /></span>
+                <span className="bp-more-menu__row-label">{label}</span>
+                {badge ? <span className="bp-more-menu__row-badge">{badge}</span> : null}
               </button>
             ))}
           </div>
@@ -12028,8 +12116,9 @@ export default function BreedingPlannerApp() {
       )}
 
       {/* Species scope bar. Persistent on purpose: without it a keeper can add a crested
-          gecko while looking at ball pythons and never understand where it went. */}
-      {speciesScope && (
+          gecko while looking at ball pythons and never understand where it went. Field is
+          the one cross-species screen, so it stays off there. */}
+      {speciesScope && tab !== 'field' && (
         <div className="border-b bg-[#f4f1f8]">
           <div className="max-w-7xl mx-auto px-5 py-2 flex flex-wrap items-center gap-3">
             <button
@@ -12946,6 +13035,20 @@ export default function BreedingPlannerApp() {
             />
             )}
           </div>
+        )}
+
+        {tab === "field" && (
+          <FieldScreen
+            snakes={snakes}
+            spaces={spacesState}
+            recentIds={recentAnimalIds}
+            getNextFeedCycleEvent={getNextFeedCycleEvent}
+            onScan={() => setShowScanner(true)}
+            onOpenSnake={openSnakeCard}
+            onQuickLog={openQuickLog}
+            notice={fieldNotice}
+            onDismissNotice={() => setFieldNotice(null)}
+          />
         )}
 
         {tab === "calendar" && (
@@ -14592,6 +14695,17 @@ export default function BreedingPlannerApp() {
               showAppAlert={showAppAlert}
             />
           )}
+      {quickLogSnake && (
+        <QuickLogSheet
+          snake={quickLogSnake}
+          type={quickLogTarget?.type || 'feed'}
+          onSave={saveQuickLog}
+          onClose={closeQuickLog}
+          lastFeedDefaults={lastFeedDefaults}
+          feedTypeOptions={FEEDER_TYPE_OPTIONS}
+          feedSizeOptionsByType={FEEDER_SIZE_OPTIONS_BY_TYPE}
+        />
+      )}
       <ConfirmDeleteSnakeModal
         snake={pendingDeleteSnake}
         onCancel={cancelDeleteSnake}
