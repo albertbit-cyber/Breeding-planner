@@ -8,6 +8,13 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
+**Latest breeder APK (2026-10-12): `app-release-2026-10-12-android-rebuild-real-app.apk`**
+SHA256 `13F45CC7197CD92C1E8D9ACBF405151E1C1ECA36753C308367FBAB1FF3D59B65`, package `com.serpentora.mobile`,
+versionCode 10085 / 0.1.85, release-signed, staging backend. First build in which the phone runs the real
+Serpentora app instead of the separate mobile app (deleted). Backups save through the share sheet; new Field
+tab for scan and quick logs. Built from `feature/mobile-rebuild`, not yet merged. Not run on a device. Build
+guide: `docs/mobile/android-build-and-install.md`. Everything below this paragraph predates the rebuild.
+
 **IMPORTANT — two separate Android projects (discovered 2026-07-27):** this repo contains two divergent Capacitor Android projects that both use appId `com.breedingplanner.mobile`: the repo-root `android/` (legacy, still named "Breeding Planner Mobile", last touched 2026-07-03, built via `npm run android:release:apk` at repo root) and `breeding-app-breeder/android/` (the actively developed one — matches the real "Serpentora" branding and icons). Because they share an appId, whichever one you build+install last silently replaces the other on-device. Every APK in the inventory below except the 2026-07-27 entry was built from the **root** project. Root's `scripts/android-build.ps1` was never repointed at `breeding-app-breeder/` (known issue, see apk-workflow reference memory) — building `breeding-app-breeder` for real requires running `npm run build` + `npx cap sync android` + `gradlew assembleDebug`/`assembleRelease` directly inside `breeding-app-breeder/` (its copy of `scripts/android-build.ps1` is present but NOT wired up — it still calls nonexistent `build:android:dev/staging/prod` npm scripts and will fail). This should be fixed properly (either repoint root's pipeline at `breeding-app-breeder`, or retire root's `android/` project entirely) rather than worked around indefinitely.
 
 Most recent **breeder** app build overall, and the first one built from the correct (`breeding-app-breeder/`) project:
