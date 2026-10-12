@@ -63,12 +63,24 @@ export const applyTheme = async (mode) => {
 };
 
 let backListener = null;
+let resumeListener = null;
 
 export const init = async ({ runBackHandlers }) => {
   if (!backListener) {
     backListener = await App.addListener("backButton", () => {
       if (runBackHandlers()) return;
       App.minimizeApp();
+    });
+  }
+  if (!resumeListener) {
+    // The app's cloud sync pulls on window focus. A WebView does not get a focus event when
+    // the phone reopens the app, so the native resume event is mapped onto it.
+    resumeListener = await App.addListener("resume", () => {
+      try {
+        window.dispatchEvent(new Event("focus"));
+      } catch {
+        // Nothing to do if the window is gone.
+      }
     });
   }
   try {
