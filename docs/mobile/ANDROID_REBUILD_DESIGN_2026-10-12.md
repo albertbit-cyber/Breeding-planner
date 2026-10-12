@@ -37,31 +37,36 @@ targets, not a restyle.
 Bottom tab bar, five items, thumb-reachable, with safe-area padding:
 
 ```
-Field | Animals | Breeding | Calendar | More
+Field | Home | Animals | Breeding | More
 ```
+
+(Built 12 October: Home is the dashboard, because Animals and Breeding only mean something
+inside a species and the dashboard is where a species is opened. Calendar moved into More.)
 
 - **Field** (phone home). Top: a big Scan button that opens the camera. Below: "Due
   today" (feeds due from the feed cycle, overdue first), then "Recent" (last animals
   opened on this device). Scanning a tag or tapping a row opens the animal's card with
   the quick-log row in reach. Manual entry of an ID stays as a fallback under the
   scanner.
-- **Animals**, **Breeding**, **Calendar**: the real app's tabs, as they are.
-- **More**: a full-screen list, not a popover: Dashboard, Breeding cards, Breeding
-  Advisor, Family Tree, Spaces, Quarantine, Lab tests, Settings (with Backups),
-  Account, Help, Sign out. Grouped with section labels; this is also where "start on
-  Field / start on Dashboard" is chosen.
+- **Home**, **Animals**, **Breeding**: the real app's dashboard and tabs, as they are.
+- **More**: a full list, not a popover: Calendar, Spaces, Quarantine, Feed Prep,
+  Breeding Advisor, Family Tree, Lab tests, Settings (with Backups and Account). The phone
+  always starts on Field; a start-screen preference was dropped as a setting nobody asked
+  for yet.
 
 The animal card on the phone:
 
 ```
 [< Back]  Name                      [⋯]
 hero: photo, name, sex, status, genetics, location
-quick-log row: Feed · Weight · Shed · Clean · Water · Note · Photo
-tabs: Overview · Logs · Breeding · Details · Photos
+quick-log sheet: Feed · Weight · Shed · Clean
 ```
 
-Each quick log is a bottom sheet with one or two fields and a single primary button.
-Clean and Water log in one tap with an undo toast. Weight prefills the last value.
+As built: the animal card is the real app's edit card, unchanged. Quick logs live on the
+Field rows (the "Log" button) and open one bottom sheet with four tabs. Water and Note
+were dropped because the desktop editor has no bucket that displays them; writing them
+would have been invisible data. Each log confirms with a toast that carries Undo. Weight
+prefills the last value.
 
 Hardware back: closes the topmost sheet or modal, then goes back to the previous tab
 or list, and only on the Field screen asks "Leave Serpentora?" once.
@@ -75,7 +80,7 @@ plugin directly. Each function has a browser, Electron and Android implementatio
 |---|---|---|---|
 | `saveFile({name, mime, data})` | anchor download | existing IPC | Filesystem write to cache, then Share sheet |
 | `pickFile(accept)` | input element | input element | input element |
-| `takePhoto()` | input capture | input capture | Camera plugin, native downscale |
+| photos | existing camera-capable file input on every platform; the Camera plugin was not needed |
 | `scanQr()` | html5-qrcode | html5-qrcode | html5-qrcode over getUserMedia (same) |
 | `haptic(kind)` | no-op | no-op | Haptics plugin |
 | `onBackButton(handler)` | no-op | no-op | App plugin listener |
@@ -115,6 +120,10 @@ Restore stays "replace", as on desktop. Tombstone interaction with restore is ch
 and documented in the same change.
 
 ## Phases
+
+Status 12 October 2026: phases 1 to 3 built on `feature/mobile-rebuild`; phase 4 in
+progress (release APK, changelog, PR). Code splitting of pdf.js was left as is: jsPDF and
+XLSX were already lazy, and pdf.js is the only remaining eager heavy import.
 
 **Phase 1, foundation.** `src/platform/` with the Android implementations, AppEntry
 mounting the real app on Android, hardware back, safe areas, status bar, version from
