@@ -213,6 +213,18 @@ import {
 } from "./features/labels/presets";
 import defaultMorphAliasesJson from "./config/morphAliases.json";
 import {
+  BACKUP_FILE_DOT_EXTENSION,
+  BACKUP_FILE_MIME,
+  assertBackupFileSelectable,
+  assertRestorableBackup,
+  buildBackupFilename,
+  describeBackupPayload,
+  fileSafeName,
+  isoToFileTimestamp,
+  saveBackupFile,
+} from "./features/backup/backupFile.js";
+import { onBackButton } from "./platform/index.js";
+import {
   LOGO_PRESET,
   PHOTO_PRESET,
   mapWithConcurrency,
@@ -1226,10 +1238,7 @@ const DEFAULT_FAVICON_HREF = `${process.env.PUBLIC_URL || ''}/app-icons/icon_512
 const BACKUP_FREQUENCIES = ['off', 'nightly', 'weekly', 'monthly'];
 const DEFAULT_BACKUP_LIMIT = 20;
 const VAULT_LIMIT_OPTIONS = [5, 10, 20, 50, 100, 200, 'unlimited'];
-const BACKUP_FILE_EXTENSION = 'bpbackup';
-const BACKUP_FILE_DOT_EXTENSION = `.${BACKUP_FILE_EXTENSION}`;
-const BACKUP_FILE_MIME = 'application/x-breeding-planner-backup+json';
-const buildBackupFilename = (basename, timestamp) => `${basename}-${timestamp}${BACKUP_FILE_DOT_EXTENSION}`;
+// The backup file format and the save path live in features/backup; see backupFile.js.
 const DEFAULT_LAST_FEED_DEFAULTS = {
   feed: 'Mouse',
   size: 'pinky',
@@ -2714,6 +2723,14 @@ function saveStoredJson(key, value) {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
     console.warn(`Failed to persist ${key} to storage`, err);
+    // A full store means the next change is lost silently. On a phone the WebView quota is
+    // small and photos are stored inline, so this is the realistic data-loss path; the app
+    // listens for this event and tells the keeper once.
+    try {
+      window.dispatchEvent(new CustomEvent('serpentora:storage-full', { detail: { key, error: String(err?.name || err) } }));
+    } catch {
+      // Event construction failed; nothing more to do.
+    }
   }
 }
 
@@ -8662,6 +8679,8 @@ export default function BreedingPlannerApp() {
     follicleExams,
     breedingSettings,
     groups,
+    // `groups` is only the open species' list; a restore needs all of them.
+    groupsBySpecies,
     morphAliases: normalizeMorphAliasDatabase(morphAliases),
     geneAliases: mergeGeneAliasRows(geneAliases),
     leucisticType: lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel',
@@ -8672,12 +8691,10 @@ export default function BreedingPlannerApp() {
     heatRacks,
     terrariums,
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
-  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
+  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, groupsBySpecies, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
   const handleRestoreBackup = useCallback((payload) => {
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Backup file is invalid.');
-    }
+    assertRestorableBackup(payload);
 
     const incomingSnakes = Array.isArray(payload.snakes)
       ? payload.snakes.map(sanitizeSnakeRecord).filter(Boolean)
@@ -11796,6 +11813,51 @@ export default function BreedingPlannerApp() {
       }
     }
   }, [pairings, snakes, showAppAlert]);
+
+  // Hardware back on the phone. Closes whatever is on top first, then returns to the
+  // dashboard, and only from there lets Android send the app to the background.
+  const backStateRef = useRef({});
+  backStateRef.current = {
+    mobileMoreOpen, animalActionSheetOpen, filterSheetOpen, showScanner, editSnake, showExportModal,
+    showImportModal, showAddModal, showFeedPrepModal, showPairingModal, showPairingQrModal, qrFor, tab,
+  };
+  useEffect(() => onBackButton(() => {
+    const st = backStateRef.current;
+    if (st.mobileMoreOpen) { setMobileMoreOpen(false); return true; }
+    if (st.animalActionSheetOpen) { setAnimalActionSheetOpen(false); return true; }
+    if (st.filterSheetOpen) { setFilterSheetOpen(false); return true; }
+    if (st.showScanner) { setShowScanner(false); return true; }
+    if (st.qrFor) { setQrFor(null); return true; }
+    if (st.showExportModal) { setShowExportModal(false); return true; }
+    if (st.showImportModal) { setShowImportModal(false); return true; }
+    if (st.showPairingQrModal) { setShowPairingQrModal(false); return true; }
+    if (st.showPairingModal) { setShowPairingModal(false); return true; }
+    if (st.showFeedPrepModal) { setShowFeedPrepModal(false); return true; }
+    if (st.showAddModal) { setShowAddModal(false); return true; }
+    if (st.editSnake) { closeSnakeEditor(); return true; }
+    if (typeof document !== 'undefined') {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (dialog) {
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        return true;
+      }
+    }
+    if (st.tab !== 'dashboard') { leaveSpeciesWorkspace(); return true; }
+    return false;
+  }), [closeSnakeEditor, leaveSpeciesWorkspace]);
+
+  // The storage layer cannot show UI; it raises an event when the local store is full.
+  const storageFullWarnedRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onFull = () => {
+      if (storageFullWarnedRef.current) return;
+      storageFullWarnedRef.current = true;
+      showAppAlert(t('storage.full', { defaultValue: 'Local storage is full, so your latest change could not be saved on this device. Free space by compressing stored photos in Settings, or save a backup and remove old vault entries.' }));
+    };
+    window.addEventListener('serpentora:storage-full', onFull);
+    return () => window.removeEventListener('serpentora:storage-full', onFull);
+  }, [showAppAlert, t]);
 
   return (
     <div
@@ -19654,7 +19716,7 @@ function BreederSection({
     }
   }, [onCompressStoredPhotos, photoCompressionRunning, photoCompressionWork, showAppConfirm, t]);
 
-  const handleManualBackupDownload = useCallback(() => {
+  const handleManualBackupDownload = useCallback(async () => {
     if (typeof createBackupPayload !== 'function') {
       setBackupFeedback({
         type: 'error',
@@ -19666,25 +19728,14 @@ function BreederSection({
     }
     try {
       const payload = createBackupPayload();
-      const serialized = JSON.stringify(payload, null, 2);
       const iso = new Date().toISOString();
-      const timestamp = iso.replace(/[:.]/g, '-');
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
-      const filename = buildBackupFilename('breeding-planner-backup', timestamp);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename('serpentora-backup', isoToFileTimestamp(iso));
+      const result = await saveBackupFile(payload, { filename, title: 'Serpentora backup' });
+      if (result?.cancelled) return;
+      const counts = describeBackupPayload(payload);
       setBackupFeedback({
         type: 'success',
-        message: `Backup downloaded (${Array.isArray(payload.snakes) ? payload.snakes.length : 0} snakes, ${Array.isArray(payload.pairings) ? payload.pairings.length : 0} pairings).`,
+        message: `Backup saved (${counts.snakes} snakes, ${counts.pairings} pairings).`,
         context: 'manual',
         timestamp: iso,
       });
@@ -19745,7 +19796,7 @@ function BreederSection({
     }
   }, [createBackupPayload, onCreateVaultEntry, showAppPrompt, t]);
 
-  const handleAutoBackupDownload = useCallback(() => {
+  const handleAutoBackupDownload = useCallback(async () => {
     if (!autoBackupSnapshot || !autoBackupSnapshot.payload) {
       setBackupFeedback({
         type: 'error',
@@ -19756,26 +19807,14 @@ function BreederSection({
       return;
     }
     try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
       const payload = autoBackupSnapshot.payload;
-      const serialized = JSON.stringify(payload, null, 2);
       const sourceIso = autoBackupSnapshot.savedAt || new Date().toISOString();
-      const timestamp = sourceIso.replace(/[:.]/g, '-');
-      const filename = buildBackupFilename('breeding-planner-auto-backup', timestamp);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename('serpentora-auto-backup', isoToFileTimestamp(sourceIso));
+      const result = await saveBackupFile(payload, { filename, title: 'Serpentora automatic backup' });
+      if (result?.cancelled) return;
       setBackupFeedback({
         type: 'success',
-        message: 'Latest automatic backup downloaded.',
+        message: 'Latest automatic backup saved.',
         context: 'auto-download',
         timestamp: new Date().toISOString(),
       });
@@ -20682,7 +20721,7 @@ function BreederSection({
     }
   }, [onSyncCloudDatabase]);
 
-  const handleDownloadVaultEntry = useCallback((entryId) => {
+  const handleDownloadVaultEntry = useCallback(async (entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
     if (!entry) {
       setBackupFeedback({
@@ -20694,25 +20733,12 @@ function BreederSection({
       return;
     }
     try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
-      const serialized = JSON.stringify(entry.payload, null, 2);
-      const fileSafeName = entry.name.replace(/[\\/:*?"<>|]+/g, '-');
-      const filenameBase = fileSafeName || 'breeding-planner-backup';
-      const filename = buildBackupFilename(filenameBase, entry.id);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename(fileSafeName(entry.name), entry.id);
+      const result = await saveBackupFile(entry.payload, { filename, title: entry.name });
+      if (result?.cancelled) return;
       setBackupFeedback({
         type: 'success',
-        message: `Downloaded "${entry.name}".`,
+        message: `Saved "${entry.name}".`,
         context: 'vault-download',
         timestamp: new Date().toISOString(),
       });
@@ -20815,28 +20841,7 @@ function BreederSection({
     if (!file) return;
     try {
       const allowLegacyJson = event?.target?.dataset?.allowLegacyJson === 'true';
-      const name = typeof file.name === 'string' ? file.name : '';
-      const lowerName = name.toLowerCase();
-      const isNativeBackup = !!name && lowerName.endsWith(BACKUP_FILE_DOT_EXTENSION);
-      const isLegacyJson = !!name && lowerName.endsWith('.json');
-
-      if (!isNativeBackup) {
-        if (!allowLegacyJson || !isLegacyJson) {
-          throw new Error(`Select a ${BACKUP_FILE_DOT_EXTENSION} backup${allowLegacyJson ? ' or legacy .json file' : ''}.`);
-        }
-      }
-
-      if (file.type) {
-        const normalizedType = file.type.toLowerCase();
-        const allowedNativeTypes = [BACKUP_FILE_MIME, 'application/octet-stream'];
-        const allowedLegacyTypes = ['application/json', 'text/json', 'application/octet-stream'];
-        if (isNativeBackup && !allowedNativeTypes.includes(normalizedType)) {
-          throw new Error('Unsupported backup file type.');
-        }
-        if (!isNativeBackup && allowLegacyJson && isLegacyJson && !allowedLegacyTypes.includes(normalizedType)) {
-          throw new Error('Unsupported legacy backup file type.');
-        }
-      }
+      assertBackupFileSelectable(file, { allowLegacyJson });
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (typeof onRestoreBackup !== 'function') {

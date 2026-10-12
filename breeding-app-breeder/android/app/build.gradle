@@ -7,8 +7,10 @@ android {
         applicationId "com.serpentora.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Versions follow the web app's package.json so every APK build installs over the
+        // previous one: 0.1.83 -> versionCode 10083, versionName "0.1.83".
+        versionCode rootProject.ext.appVersionCode
+        versionName rootProject.ext.appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
