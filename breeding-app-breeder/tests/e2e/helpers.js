@@ -271,5 +271,14 @@ export const openSeedSnakeEditor = async (page) => {
   await expect(page.getByText(expectedSeedSnakeName)).toBeVisible();
   await page.getByRole("button", { name: /^Edit$/i }).first().click();
   await expect(page.getByText(expectedSeedSnakeName).last()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Order Genetic Test/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /More actions/i })).toBeVisible();
+};
+
+/**
+ * The snake editor's redesign moved "Order Genetic Test" off the toolbar and
+ * into its "More actions" menu, where it is a menu item rather than a button.
+ */
+export const openOrderGeneticTest = async (page) => {
+  await page.getByRole("button", { name: /More actions/i }).click();
+  await page.getByRole("menuitem", { name: /Order Genetic Test/i }).click();
 };
