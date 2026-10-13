@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Full replace from a backup file, against the in-memory Prisma: the file becomes the account, a
@@ -56,6 +56,10 @@ beforeEach(async () => {
     pairings: [{ id: "p1", maleId: "a1", femaleId: "a2", updatedAt: EARLY }],
     plannerState: { groups: ["Cloud group"], updatedAt: EARLY },
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const backupFile = () => ({
@@ -166,6 +170,9 @@ describe("replaceBreederData", () => {
 
 describe("undoBreederDataReplacement", () => {
   it("puts the account back as it was before the replace, under a new generation", async () => {
+    // Replace and undo in the same millisecond, as on a fast machine: the history must still list the undo first.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-13T12:00:00.000Z"));
     const replaced = await replaceBreederData(OWNER, backupFile());
     const undone = await undoBreederDataReplacement(OWNER, replaced.replacementId!);
 
