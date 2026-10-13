@@ -1,12 +1,12 @@
 import base from "@playwright/test";
-import { expect, expectedSeedSnakeName, openSeedSnakeEditor, chooseLabInOrderModal } from "./helpers.js";
+import { expect, expectedSeedSnakeName, openEditorMenuItem, openGeneticTestOrder, openSeedSnakeEditor, chooseLabInOrderModal } from "./helpers.js";
 
 const test = base;
 
 test("breeder can view order status in the snake testing panel", async ({ page }) => {
   await openSeedSnakeEditor(page);
 
-  await page.getByRole("button", { name: /Order Genetic Test/i }).click();
+  await openGeneticTestOrder(page);
   await expect(page.getByText(/Add to Batch Order/i)).toBeVisible();
   await chooseLabInOrderModal(page);
   const firstTest = page.getByRole("checkbox", { name: /Clown/i }).first();
@@ -33,5 +33,5 @@ test("breeder can view order status in the snake testing panel", async ({ page }
 test("breeder seed snake editor opens from the animals list", async ({ page }) => {
   await openSeedSnakeEditor(page);
   await expect(page.getByText(expectedSeedSnakeName).last()).toBeVisible();
-  await expect(page.getByRole("button", { name: /QR label/i })).toBeVisible();
+  await openEditorMenuItem(page, /QR label/i);
 });

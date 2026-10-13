@@ -271,5 +271,21 @@ export const openSeedSnakeEditor = async (page) => {
   await expect(page.getByText(expectedSeedSnakeName)).toBeVisible();
   await page.getByRole("button", { name: /^Edit$/i }).first().click();
   await expect(page.getByText(expectedSeedSnakeName).last()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Order Genetic Test/i })).toBeVisible();
+  await expect(editorMoreActions(page)).toBeVisible();
+};
+
+// The editor keeps its secondary commands (QR label, Order Genetic Test, ...) in a "More actions"
+// menu since the editor redesign (8d2bf27); they are menu items there, not buttons in the header.
+// Scoped to the editor's own command bar: the animal list behind it has a "More actions" too.
+export const editorMoreActions = (page) => page.locator(".snake-editor-commands").getByRole("button", { name: /^More actions/i });
+
+export const openEditorMenuItem = async (page, name) => {
+  await editorMoreActions(page).click();
+  const item = page.getByRole("menuitem", { name });
+  await expect(item).toBeVisible();
+  return item;
+};
+
+export const openGeneticTestOrder = async (page) => {
+  await (await openEditorMenuItem(page, /Order Genetic Test/i)).click();
 };
