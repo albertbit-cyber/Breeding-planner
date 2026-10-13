@@ -79,6 +79,7 @@ import {
 import {
   getSyncTimestamp,
   backfillLogIds,
+  collapseDuplicateLogEntries,
   selectRecordsToUpload,
   applyRemoteDeletions,
   applyChangedRecords,
@@ -2859,7 +2860,7 @@ function sanitizeSnakeRecord(raw) {
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
-  snake.logs = backfillLogIds(cloneLogs(raw.logs));
+  snake.logs = collapseDuplicateLogEntries(backfillLogIds(cloneLogs(raw.logs)));
   snake.photos = normalizeSnakePhotos(raw.photos);
   snake.labGeneticsConfirmation = normalizeLabGeneticsConfirmation(raw.labGeneticsConfirmation);
   // Shape only -- never reconciled against the status tag here. sanitizeSnakeRecord runs on every

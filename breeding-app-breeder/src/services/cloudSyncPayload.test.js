@@ -3,6 +3,7 @@ import {
   applyChangedRecords,
   applyRemoteDeletions,
   backfillLogIds,
+  collapseDuplicateLogEntries,
   mergeGeneticsLists,
   selectRecordsToUpload,
 } from "./cloudSyncPayload";
@@ -42,6 +43,47 @@ describe("backfillLogIds", () => {
 
   it("leaves non-array log buckets alone", () => {
     expect(backfillLogIds({ weights: null }).weights).toBeNull();
+  });
+});
+
+describe("collapseDuplicateLogEntries", () => {
+  // The leftovers of the random-id bug: one reading stored many times, each copy under its own
+  // UUID. An id-keyed merge keeps every copy, so they reached the PDF export as pages of
+  // identical 2025-11-29 rows.
+  it("keeps one copy of a reading stored under many ids", () => {
+    const logs = {
+      weights: [
+        { id: "c-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "a-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "b-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "d-uuid", date: "2025-12-06", grams: 1602 },
+      ],
+    };
+    expect(collapseDuplicateLogEntries(logs).weights).toEqual([
+      { id: "a-uuid", date: "2025-11-29", grams: 1550 },
+      { id: "d-uuid", date: "2025-12-06", grams: 1602 },
+    ]);
+  });
+
+  it("keeps the same survivor whatever order the copies arrive in", () => {
+    const copies = [{ id: "z", date: "2025-11-29", feed: "Rat" }, { id: "m", date: "2025-11-29", feed: "Rat" }];
+    const forward = collapseDuplicateLogEntries({ feeds: copies }).feeds;
+    const reversed = collapseDuplicateLogEntries({ feeds: copies.slice().reverse() }).feeds;
+    expect(forward).toEqual([{ id: "m", date: "2025-11-29", feed: "Rat" }]);
+    expect(reversed).toEqual(forward);
+  });
+
+  it("keeps readings that differ in any recorded field", () => {
+    const logs = { feeds: [
+      { id: "1", date: "2025-11-29", feed: "Rat" },
+      { id: "2", date: "2025-11-29", feed: "Mouse" },
+      { id: "3", date: "2025-11-29", feed: "Rat", notes: "refused" },
+    ] };
+    expect(collapseDuplicateLogEntries(logs).feeds).toHaveLength(3);
+  });
+
+  it("leaves non-array log buckets alone", () => {
+    expect(collapseDuplicateLogEntries({ weights: null }).weights).toBeNull();
   });
 });
 
