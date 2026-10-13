@@ -1,5 +1,5 @@
 import base from "@playwright/test";
-import { expect, expectedSeedSnakeName, openSeedSnakeEditor, openOrderGeneticTest, chooseLabInOrderModal } from "./helpers.js";
+import { expect, expectedSeedSnakeName, openSeedSnakeEditor, openOrderGeneticTest, editorMoreActions, chooseLabInOrderModal } from "./helpers.js";
 
 const test = base;
 
@@ -33,5 +33,7 @@ test("breeder can view order status in the snake testing panel", async ({ page }
 test("breeder seed snake editor opens from the animals list", async ({ page }) => {
   await openSeedSnakeEditor(page);
   await expect(page.getByText(expectedSeedSnakeName).last()).toBeVisible();
-  await expect(page.getByRole("button", { name: /QR label/i })).toBeVisible();
+  // QR label now lives in the editor's More actions menu with the other record actions.
+  await editorMoreActions(page).click();
+  await expect(page.getByRole("menuitem", { name: /QR label/i })).toBeVisible();
 });

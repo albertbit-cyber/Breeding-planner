@@ -276,7 +276,7 @@ export const openSeedSnakeEditor = async (page) => {
 
 // The snake cards carry their own "More actions" overflow (an icon with an aria-label), so the
 // editor's menu button is picked out by its visible text and its menu popup.
-const editorMoreActions = (page) => page.locator('button[aria-haspopup="menu"]', { hasText: /More actions/i });
+export const editorMoreActions = (page) => page.locator('button[aria-haspopup="menu"]', { hasText: /More actions/i });
 
 /**
  * The snake editor's redesign moved "Order Genetic Test" off the toolbar and
