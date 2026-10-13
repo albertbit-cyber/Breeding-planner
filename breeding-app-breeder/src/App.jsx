@@ -81,6 +81,7 @@ import {
 import {
   getSyncTimestamp,
   backfillLogIds,
+  collapseDuplicateLogEntries,
   selectRecordsToUpload,
   applyRemoteDeletions,
   applyChangedRecords,
@@ -2788,10 +2789,6 @@ function cloneLogs(logs = {}) {
 
 const MAX_PHOTOS_PER_SNAKE = 60;
 
-// Every action in the snake editor's pinned header shares one footprint, so a long label like
-// "Order Genetic Test" does not make its button wider than "QR label" next to it.
-const SNAKE_EDITOR_ACTION_CLASS = 'snake-editor-action';
-
 function normalizePhotoEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const url = typeof raw.url === 'string' && raw.url.trim()
@@ -2875,7 +2872,7 @@ function sanitizeSnakeRecord(raw) {
   snake.groups = Array.isArray(raw.groups)
     ? raw.groups.map(token => String(token || '').trim()).filter(Boolean)
     : normalizeSingleGroupValue(raw.groups);
-  snake.logs = backfillLogIds(cloneLogs(raw.logs));
+  snake.logs = collapseDuplicateLogEntries(backfillLogIds(cloneLogs(raw.logs)));
   snake.photos = normalizeSnakePhotos(raw.photos);
   snake.labGeneticsConfirmation = normalizeLabGeneticsConfirmation(raw.labGeneticsConfirmation);
   // Shape only -- never reconciled against the status tag here. sanitizeSnakeRecord runs on every
@@ -8283,6 +8280,9 @@ export default function BreedingPlannerApp() {
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
+  const [editMoreMenuOpen, setEditMoreMenuOpen] = useState(false);
+  const editMoreMenuRef = useRef(null);
+  const [editNewGroupOpen, setEditNewGroupOpen] = useState(false);
   const [tagFilterMenuOpen, setTagFilterMenuOpen] = useState(false);
   const tagFilterMenuRef = useRef(null);
 
@@ -8379,6 +8379,28 @@ export default function BreedingPlannerApp() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [editStatusMenuOpen]);
+
+  useEffect(() => {
+    if (!editMoreMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (editMoreMenuRef.current && !editMoreMenuRef.current.contains(event.target)) {
+        setEditMoreMenuOpen(false);
+      }
+    };
+    const handleKey = (event) => { if (event.key === 'Escape') setEditMoreMenuOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [editMoreMenuOpen]);
+
+  // A menu or half-typed group left open on one animal must not greet the next one.
+  useEffect(() => {
+    setEditMoreMenuOpen(false);
+    setEditNewGroupOpen(false);
+  }, [editSnake?.id]);
 
   useEffect(() => {
     if (!tagFilterMenuOpen) return;
@@ -13759,72 +13781,168 @@ export default function BreedingPlannerApp() {
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
-      <div className="relative z-[10001] bg-white w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
-            {/* Thumbnail on the left, name over one row of actions on the right. The name is no
-                longer truncated: which animal is open is the one thing the header has to say, and
-                a wrapped second line costs less than a name cut off mid-morph. */}
-            <div className="shrink-0 p-5 border-b flex items-stretch gap-4">
-                        <div className="snake-editor-thumb shrink-0">
-                          {(() => {
-                            const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
-                            const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
-                            return headerUrl ? (
-                              <img src={headerUrl} alt={editSnakeDraft.name || ''} className="w-full h-full object-cover object-center" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-center text-[11px] leading-tight text-neutral-400 px-1">
-                                {t("snakeEdit.image.none")}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col gap-3">
-                        <div className="font-semibold text-lg leading-snug break-words" title={editSnake.name}>{editSnake.name}</div>
-                        <div className="snake-editor-actions">
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
-                            onClick={()=>requestDeleteSnake(editSnake)}>
-                            {t("actions.delete", { defaultValue: "Delete" })}
-                          </button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
-                            onClick={() => openFamilyTreeForSnake(editSnakeDraft || editSnake)}
-                          >
-                            {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
-                          </button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
-                            disabled={!((editSnakeDraft.id || '').trim())}
-                            onClick={async () => {
-                              const trimmedId = (editSnakeDraft.id || '').trim();
-                              if (!trimmedId) {
-                                await showAppAlert(t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }));
-                                return;
-                              }
-                              try {
-                                await exportQrToPdf([{
-                                  id: trimmedId,
-                                  name: editSnakeDraft.name,
-                                  sex: editSnakeDraft.sex,
-                                  morphs: editSnakeDraft.morphs,
-                                  hets: editSnakeDraft.hets,
-                                  possibleHets: editSnakeDraft.possibleHets,
-                                }], breederInfo);
-                              } catch (err) {
-                                console.error('QR export failed', err);
-                                await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Unable to create the QR label PDF." }));
-                              }
-                            }}
-                          >
-                            {t("actions.qrLabel", { defaultValue: "QR label" })}
-                          </button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
-                            onClick={() => setTestOrderSnake(editSnakeDraft)}
-                          >
-                            {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
-                          </button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))}
-                            onClick={()=>{
+      <div
+        className="snake-editor relative z-[10001] w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={editSnake.name || editSnake.id}
+        onClick={e=>e.stopPropagation()}
+      >
+            {/* One header: the photo and its controls, the name, then More / Cancel / Save. The
+                photo used to appear twice (a thumbnail here and a 318px frame in the body) and
+                seven equal buttons put Delete beside Save; the rarely used actions now sit in More. */}
+            <div className="snake-editor-header">
+              <div className="snake-editor-photo">
+                {(() => {
+                  const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
+                  const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
+                  return headerUrl ? (
+                    <img src={headerUrl} alt={editSnakeDraft.name || ''} />
+                  ) : (
+                    <div className="snake-editor-photo__empty">{t("snakeEdit.image.none")}</div>
+                  );
+                })()}
+                {editUploadingPhoto && (
+                  <div className="sk-scrim snake-editor-photo__busy">{t("snakeEdit.image.saving")}</div>
+                )}
+              </div>
+              <input
+                ref={editCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleEditCameraInputChange}
+              />
+              <input
+                ref={editUploadInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleEditUploadInputChange}
+              />
+              <div className="snake-editor-title">
+                <h2 className="snake-editor-name" title={editSnake.name}>{editSnake.name || editSnake.id}</h2>
+                <div className="snake-editor-meta">
+                  {(editSnakeDraft.id || '').trim() ? <bdi className="font-mono">{editSnakeDraft.id}</bdi> : null}
+                  {(editSnakeDraft.id || '').trim() ? ' · ' : null}
+                  {getSpeciesById(resolveSpeciesId(editSnakeDraft.species))?.name || ''}
+                </div>
+                <div className="snake-editor-photo-actions">
+                  <button type="button" className="snake-editor-link" onClick={triggerEditCameraCapture} disabled={editUploadingPhoto || !editSnake?.id}>
+                    {t("snakeEdit.image.take")}
+                  </button>
+                  <button type="button" className="snake-editor-link" onClick={triggerEditUploadPicker} disabled={editUploadingPhoto || !editSnake?.id}>
+                    {t("snakeEdit.image.upload")}
+                  </button>
+                  <button type="button" className="snake-editor-link" onClick={handleEditViewPictures} disabled={!editSnake?.id}>
+                    {editPhotoCount ? t("snakeEdit.image.viewWithCount", { count: editPhotoCount }) : t("snakeEdit.image.view")}
+                  </button>
+                  {editSnakeDraft?.imageUrl ? (
+                    <button
+                      type="button"
+                      className="snake-editor-link snake-editor-link--quiet"
+                      onClick={() => {
+                        setEditSnakeDraft(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
+                        setEditSnake(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
+                      }}
+                    >
+                      {t("snakeEdit.image.clear")}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="snake-editor-commands">
+                <div ref={editMoreMenuRef} className="relative">
+                  <button
+                    type="button"
+                    className={cx('snake-editor-btn', primaryBtnClass(theme, false))}
+                    aria-haspopup="menu"
+                    aria-expanded={editMoreMenuOpen}
+                    onClick={() => setEditMoreMenuOpen(open => !open)}
+                  >
+                    {t("actions.moreActions", { defaultValue: "More actions" })}
+                    <span className="snake-editor-caret" aria-hidden="true" />
+                  </button>
+                  {editMoreMenuOpen && (
+                    <div className="snake-editor-menu snake-editor-menu--end" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={() => { setEditMoreMenuOpen(false); openFamilyTreeForSnake(editSnakeDraft || editSnake); }}
+                      >
+                        {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={async () => {
+                          setEditMoreMenuOpen(false);
+                          try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); }
+                        }}
+                      >
+                        {t("actions.exportPdf", { defaultValue: "Export PDF" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        disabled={!((editSnakeDraft.id || '').trim())}
+                        title={!((editSnakeDraft.id || '').trim()) ? t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }) : undefined}
+                        onClick={async () => {
+                          setEditMoreMenuOpen(false);
+                          const trimmedId = (editSnakeDraft.id || '').trim();
+                          if (!trimmedId) {
+                            await showAppAlert(t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }));
+                            return;
+                          }
+                          try {
+                            await exportQrToPdf([{
+                              id: trimmedId,
+                              name: editSnakeDraft.name,
+                              sex: editSnakeDraft.sex,
+                              morphs: editSnakeDraft.morphs,
+                              hets: editSnakeDraft.hets,
+                              possibleHets: editSnakeDraft.possibleHets,
+                            }], breederInfo);
+                          } catch (err) {
+                            console.error('QR export failed', err);
+                            await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Unable to create the QR label PDF." }));
+                          }
+                        }}
+                      >
+                        {t("actions.qrLabel", { defaultValue: "QR label" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={() => { setEditMoreMenuOpen(false); setTestOrderSnake(editSnakeDraft); }}
+                      >
+                        {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
+                      </button>
+                      <div className="snake-editor-menu__sep" role="separator" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item snake-editor-menu__item--danger"
+                        onClick={() => { setEditMoreMenuOpen(false); requestDeleteSnake(editSnake); }}
+                      >
+                        {t("actions.delete", { defaultValue: "Delete" })}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button type="button" className={cx('snake-editor-btn', primaryBtnClass(theme, false))} onClick={closeSnakeEditor}>
+                  {t("actions.cancel", { defaultValue: "Cancel" })}
+                </button>
+                <button
+                  type="button"
+                  className={cx('snake-editor-btn', primaryBtnClass(theme, true))}
+                  onClick={()=>{
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
                               const normalizedSex = sexOrUnknown(editSnakeDraft.sex);
@@ -13841,6 +13959,13 @@ export default function BreedingPlannerApp() {
                                     .map(h => String(h).trim()).filter(Boolean)
                                 ),
                               };
+                              // The sort and the cards read `weight` before the log, so a manual
+                              // number left over from before the first weighing would outrank every
+                              // later one. Once there is a log, its latest entry is the weight.
+                              const latestWeighing = Number(getLatestLogEntry(editSnakeDraft.logs, 'weights')?.grams);
+                              const normalizedWeight = Number.isFinite(latestWeighing) && latestWeighing > 0
+                                ? latestWeighing
+                                : editSnakeDraft.weight;
                               const savedSnake = reconcileQuarantineWithStatus({
                                 ...editSnakeDraft,
                                 id: newId,
@@ -13851,6 +13976,7 @@ export default function BreedingPlannerApp() {
                                 morphs: normalizedGenetics.morphs,
                                 hets: normalizedGenetics.hets,
                                 feederProfile: normalizedFeederProfile,
+                                weight: normalizedWeight,
                               }, { today: quarantineTodayYmd() });
                               setSnakes(prev => prev.map(s => s.id === oldId ? savedSnake : (
                                 // Every offspring names its parents by ID, and that is what the
@@ -13938,111 +14064,45 @@ export default function BreedingPlannerApp() {
                               })));
                           }
                           closeSnakeEditor();
-                            }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
-                        </div>
-                        </div>
+                  }}
+                >
+                  {t("actions.saveChanges", { defaultValue: "Save changes" })}
+                </button>
+              </div>
             </div>
-
             <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* basics */}
-              <div className="md:col-span-1 flex flex-col gap-1">
-                <div ref={editStatusMenuRef} className="relative">
-                  <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
-                  <button
-                    type="button"
-                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
-                    onClick={() => setEditStatusMenuOpen(open => !open)}
-                  >
-                    <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
-                    <span className="text-[10px] text-neutral-500">v</span>
-                  </button>
-                  {editStatusMenuOpen && (
-                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
-                      <button
-                        type="button"
-                        className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
-                        onClick={handleClearEditStatus}
-                      >
-                        {t("snakeEdit.noTag")}
-                      </button>
-                      <div className="border-t border-neutral-100" />
-                      {statusTagOptions.length ? (
-                        statusTagOptions.map(option => (
-                          <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
-                            <button
-                              type="button"
-                              className="status-tag-menu-button flex-1 text-start"
-                              onClick={() => handleSelectEditStatus(option)}
-                            >
-                              {option}
-                            </button>
-                            <button
-                              type="button"
-                              className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
-                              onClick={() => handleDeleteEditStatus(option)}
-                              title={t("snakeEdit.deleteTag")}
-                            >
-                              -
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet")}</div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <input
-                      className="w-full border rounded-lg px-2 py-1 text-sm"
-                      value={editStatusTagInput}
-                      onChange={e => setEditStatusTagInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
-                      placeholder={t("snakeEdit.tagPlaceholder")}
-                    />
-                    <button
-                      type="button"
-                      className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', editStatusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
-                      onClick={handleAddEditStatusTag}
-                      disabled={!editStatusTagInput.trim()}
-                    >
-                      {t("snakeEdit.addTag")}
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.tagHelp")}</div>
-                </div>
+            <div className="snake-editor-body">
+              <SnakeEditorSection
+                id="snake-edit-identity"
+                title={t("snakeEdit.sections.identity", { defaultValue: "Identity" })}
+                hint={t("snakeEdit.sections.identityHint", { defaultValue: "Name, ID and genetics." })}
+              >
+                <div className="snake-editor-grid">
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.name")}</label>
-                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                  <label className="snake-editor-label">{t("snakeEdit.name")}</label>
+                  <input className="snake-editor-control"
                     value={editSnakeDraft.name}
                     onChange={e=>setEditSnakeDraft(d=>({...d,name:e.target.value}))}/>
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-medium">{t("snakeEdit.id")}</label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={handleGenerateIdForEditSnake}
-                        disabled={Boolean((editSnakeDraft.id || '').trim())}
-                      >
-                        {t("snakeEdit.generateId")}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700"
-                        onClick={handleUpdateIdForEditSnake}
-                      >
+                    <label className="snake-editor-label">{t("snakeEdit.id")}</label>
+                    {/* One button: an animal without an ID gets one generated, an animal with one
+                        has it rebuilt from the current name, sex and year. */}
+                    {(editSnakeDraft.id || '').trim() ? (
+                      <button type="button" className="snake-editor-link" onClick={handleUpdateIdForEditSnake}>
                         {t("snakeEdit.updateId")}
                       </button>
-                    </div>
+                    ) : (
+                      <button type="button" className="snake-editor-link" onClick={handleGenerateIdForEditSnake}>
+                        {t("snakeEdit.generateId")}
+                      </button>
+                    )}
                   </div>
-                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm font-mono" value={editSnakeDraft.id}
+                  <input className="snake-editor-control font-mono" value={editSnakeDraft.id}
                     onChange={e=>{ setEditIdRetagBlocked(false); setEditSnakeDraft(d=>({...d,id:e.target.value})); }} />
                   {!((editSnakeDraft.id || '').trim()) && (
-                    <div className="mt-0.5 text-[11px] text-neutral-500">{t("snakeEdit.idHint")}</div>
+                    <div className="snake-editor-help">{t("snakeEdit.idHint")}</div>
                   )}
                   {editIdRetagBlocked && (
                     <div className="mt-0.5 text-[11px] text-amber-600">
@@ -14053,8 +14113,8 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.sex")}</label>
-                  <select className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
+                  <label className="snake-editor-label">{t("snakeEdit.sex")}</label>
+                  <select className="snake-editor-control"
                     value={normalizeSexValue(editSnakeDraft.sex)}
                     onChange={e=>handleEditSnakeSexChange(e.target.value)}>
                     <option value="U">{t("snakeEdit.sexUnknown", { defaultValue: "Unknown" })}</option>
@@ -14063,9 +14123,9 @@ export default function BreedingPlannerApp() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.species", { defaultValue: "Species" })}</label>
+                  <label className="snake-editor-label">{t("snakeEdit.species", { defaultValue: "Species" })}</label>
                   <SpeciesSelect
-                    className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
+                    className="snake-editor-control"
                     value={resolveSpeciesId(editSnakeDraft.species)}
                     onChange={async value => {
                       const current = resolveSpeciesId(editSnakeDraft.species);
@@ -14088,7 +14148,7 @@ export default function BreedingPlannerApp() {
                     placeholder={t("ui.animals.addAnimal.selectSpecies", { defaultValue: "Select species" })}
                   />
                   {!editSnakeDraft.species && (
-                    <div className="mt-0.5 text-[11px] text-neutral-500">
+                    <div className="snake-editor-help">
                       {t("snakeEdit.speciesAssumed", {
                         defaultValue: "Recorded before species were tracked, so shown as Ball Python. Correct it here if that is wrong.",
                       })}
@@ -14096,16 +14156,46 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
-                  <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                  <label className="snake-editor-label">{t("snakeEdit.birthDate")}</label>
+                  <input type="text" className="snake-editor-control"
                     value={editSnakeDraft.birthDate || ''}
                     placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                     onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
-                  <div className="text-xs text-neutral-500 mt-0.5">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
+                  <div className="snake-editor-help">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
                 </div>
+                {(() => {
+                  const latestWeighing = getLatestLogEntry(editSnakeDraft.logs, 'weights');
+                  const loggedGrams = Number(latestWeighing?.grams);
+                  if (Number.isFinite(loggedGrams) && loggedGrams > 0) {
+                    return (
+                      <div>
+                        <div className="snake-editor-label">{t("snakeEdit.weight")}</div>
+                        <div className="snake-editor-readout">
+                          <span className="snake-editor-readout__value">{loggedGrams} g</span>
+                          <span className="snake-editor-readout__meta">
+                            {t("snakeEdit.weightFromLog", {
+                              defaultValue: "Latest weighing, {{date}}",
+                              date: formatDateForDisplay(latestWeighing.date) || latestWeighing.date || '',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div>
+                      <label className="snake-editor-label" htmlFor="snake-edit-weight">{t("snakeEdit.weight")}</label>
+                      <input id="snake-edit-weight" type="number" min="0" className="snake-editor-control"
+                        value={editSnakeDraft.weight || ''}
+                        onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                      <div className="snake-editor-help">{t("snakeEdit.weightLogHint", { defaultValue: "Log weighings under Care records to keep a history." })}</div>
+                    </div>
+                  );
+                })()}
+                <div className="snake-editor-span">
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.genetics")}</label>
-                  <div className="mt-0.5">
+                  <label className="snake-editor-label">{t("snakeEdit.genetics")}</label>
+                  <div className="">
                     <GeneAutocomplete
                       morphs={Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []}
                       hets={Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []}
@@ -14123,22 +14213,138 @@ export default function BreedingPlannerApp() {
                       }
                     />
                   </div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">{t("snakeEdit.geneticsHelp")}</div>
+                  <div className="snake-editor-help">{t("snakeEdit.geneticsHelp")}</div>
+                </div>
+                </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-status"
+                title={t("snakeEdit.sections.status", { defaultValue: "Status and group" })}
+                hint={t("snakeEdit.sections.statusHint", { defaultValue: "Where the animal stands in your collection." })}
+              >
+                <div className="snake-editor-grid">
+                <div ref={editStatusMenuRef} className="relative">
+                  <label className="snake-editor-label">{t("snakeEdit.tag")}</label>
+                  <button
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded={editStatusMenuOpen}
+                    className="status-tag-neutral-button snake-editor-control snake-editor-select"
+                    onClick={() => setEditStatusMenuOpen(open => !open)}
+                  >
+                    <span className="truncate">{currentEditStatus || t("snakeEdit.noTag")}</span>
+                  </button>
+                  {editStatusMenuOpen && (
+                    <div className="snake-editor-menu snake-editor-menu--field">
+                      <button
+                        type="button"
+                        className="status-tag-menu-button snake-editor-menu__item"
+                        onClick={handleClearEditStatus}
+                      >
+                        {t("snakeEdit.noTag")}
+                      </button>
+                      {statusTagOptions.length ? (
+                        statusTagOptions.map(option => (
+                          <div key={option} className="snake-editor-menu__row">
+                            <button
+                              type="button"
+                              className="status-tag-menu-button snake-editor-menu__item"
+                              onClick={() => handleSelectEditStatus(option)}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              className="status-tag-menu-button snake-editor-menu__remove"
+                              onClick={() => handleDeleteEditStatus(option)}
+                              title={t("snakeEdit.deleteTag")}
+                              aria-label={`${t("snakeEdit.deleteTag")}: ${option}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="snake-editor-menu__empty">{t("snakeEdit.noTagsYet")}</div>
+                      )}
+                      {/* Creating a status lives in the list it adds to, not in a second form beside it. */}
+                      <div className="snake-editor-menu__form">
+                        <input
+                          className="snake-editor-control"
+                          value={editStatusTagInput}
+                          onChange={e => setEditStatusTagInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
+                          placeholder={t("snakeEdit.tagPlaceholder")}
+                          aria-label={t("snakeEdit.tagPlaceholder")}
+                        />
+                        <button
+                          type="button"
+                          className="snake-editor-btn-sm"
+                          onClick={handleAddEditStatusTag}
+                          disabled={!editStatusTagInput.trim()}
+                        >
+                          {t("snakeEdit.addTag")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.weight")}</label>
-                  <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
-                    value={editSnakeDraft.weight}
-                    onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                  <label className="snake-editor-label" htmlFor="snake-edit-group">{t("snakeEdit.group")}</label>
+                  <select
+                    id="snake-edit-group"
+                    className="snake-editor-control"
+                    value={editNewGroupOpen ? NEW_GROUP_OPTION : ((Array.isArray(editSnakeDraft.groups) && editSnakeDraft.groups[0]) || '')}
+                    onChange={e => {
+                      const value = e.target.value;
+                      if (value === NEW_GROUP_OPTION) {
+                        setEditNewGroupOpen(true);
+                        return;
+                      }
+                      setEditNewGroupOpen(false);
+                      setEditSnakeDraft(d => ({
+                        ...d,
+                        groups: value.trim() ? [value.trim()] : [],
+                      }));
+                    }}
+                  >
+                    <option value="">{t("snakeEdit.noGroup", { defaultValue: "No group" })}</option>
+                    {editGroups.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                    <option value={NEW_GROUP_OPTION}>{t("snakeEdit.newGroupOption", { defaultValue: "New group…" })}</option>
+                  </select>
+                  {editNewGroupOpen && (
+                    <div className="mt-2">
+                      <AddGroupInline autoFocus onAdd={(g)=>{
+                        if (!g) return;
+                        setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
+                        setEditSnakeDraft(d=>({...d, groups: [g]}));
+                        setEditNewGroupOpen(false);
+                      }} />
+                    </div>
+                  )}
                 </div>
-                <div className="border rounded-xl p-2 bg-neutral-50 mt-1">
-                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    <div className="grid grid-cols-2 gap-1.5">
+                <div className="snake-editor-span">
+                {/* Quarantine record. Status above and quarantine here are the same thing: changing
+                    either one moves the animal in or out of the quarantine section. */}
+                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
+                </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-feeding"
+                title={t("snakeEdit.sections.feeding", { defaultValue: "Feeding" })}
+                hint={t("snakeEdit.sections.feedingHint", { defaultValue: "The plan first, then every feed as it happened." })}
+              >
+                <div className="snake-editor-subhead">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
+                  <div className="snake-editor-feedplan">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
                         <select
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.feedType || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14150,9 +14356,9 @@ export default function BreedingPlannerApp() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
                         <select
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.sizeClass || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14166,13 +14372,13 @@ export default function BreedingPlannerApp() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.weightGrams || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14182,12 +14388,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.quantity || 1}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14196,12 +14402,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.intervalDays || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14211,11 +14417,11 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                     </div>
-                    <div className="text-[10px] text-neutral-400">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
+                    <div className="snake-editor-help">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
                     <div>
-                      <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <label className="snake-editor-label">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
                       <input
-                        className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                        className="snake-editor-control"
                         value={editSnakeDraft.feederProfile?.notes || ''}
                         onChange={e => setEditSnakeDraft(d => ({
                           ...d,
@@ -14225,11 +14431,116 @@ export default function BreedingPlannerApp() {
                       />
                     </div>
                   </div>
+                <LogsEditor kinds={['feeds']} editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-records"
+                title={t("snakeEdit.sections.records", { defaultValue: "Care records" })}
+                hint={t("snakeEdit.sections.recordsHint", { defaultValue: "Weighings, sheds, cleanings and medication." })}
+              >
+                <LogsEditor kinds={['weights', 'sheds', 'cleanings', 'meds']} editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-breeding"
+                title={t("snakeEdit.sections.breeding", { defaultValue: "Breeding" })}
+                hint={t("snakeEdit.sections.breedingHint", { defaultValue: "Breeding cards, pairings and cycles." })}
+              >
+                <div className="space-y-4">
+                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
+                  <FemaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    exams={follicleExams}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
+                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
+                  />
+                )}
+                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
+                  <MaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
+                  />
+                )}
+                {/* Reproductive Intelligence — females only */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
+                  <ReproductiveIntelligencePanel snake={editSnake} />
+                )}
+                <div className="p-3 border rounded-xl bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
+                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
+                  </div>
+                  <div className="space-y-2">
+                    {(() => {
+                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
+                      const targetId = (editSnakeDraft.id || '').trim();
+                      const related = !targetId ? [] : pairings.filter(p => {
+                        if (!p) return false;
+                        const maleId = (p.maleId || '').trim();
+                        const femaleId = (p.femaleId || '').trim();
+                        if (!maleId && !femaleId) return false;
+                        return isFemale ? femaleId === targetId : maleId === targetId;
+                      });
+                      if (!related.length) {
+                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
+                      }
+                      const otherSnakes = isFemale ? malesById : femalesById;
+                      return related.map(pairing => {
+                        const stage = describePairingStage(pairing);
+                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
+                        const otherId = (otherIdRaw || '').trim();
+                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
+                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
+                        return (
+                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
+                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
+                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
+                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
+                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-lineage"
+                title={t("snakeEdit.sections.lineage", { defaultValue: "Lineage and origin" })}
+                hint={t("snakeEdit.sections.lineageHint", { defaultValue: "Parents, clutch and where the animal came from." })}
+              >
+                <div className="space-y-4">
+                <ParentagePanel
+                  draft={editSnakeDraft}
+                  setDraft={setEditSnakeDraft}
+                  animals={snakes}
+                  clutchOptions={clutchOptions}
+                />
+                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
+                <AcquisitionRecordPanel snake={editSnake} />
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-lab"
+                title={t("snakeEdit.sections.lab", { defaultValue: "Lab tests" })}
+                hint={t("snakeEdit.sections.labHint", { defaultValue: "Shed samples sent for genetic testing." })}
+              >
+                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-sale"
+                title={t("snakeEdit.sections.sale", { defaultValue: "Marketplace" })}
+                hint={t("snakeEdit.sections.saleHint", { defaultValue: "Price and listing on the Marketplace." })}
+              >
                 {/* For Sale */}
-                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
+                <div className="snake-editor-sale">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
+                    <label className="snake-editor-subhead">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
                     <button
                       type="button"
                       role="switch"
@@ -14321,200 +14632,7 @@ export default function BreedingPlannerApp() {
                     </div>
                   )}
                 </div>
-
-                {/* Image URL field removed per request */}
-
-                {/* group */}
-                <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.group")}</label>
-                  <select
-                    className="mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white"
-                    value={(Array.isArray(editSnakeDraft.groups) && editSnakeDraft.groups[0]) || ''}
-                    onChange={e => {
-                      const value = e.target.value.trim();
-                      setEditSnakeDraft(d => ({
-                        ...d,
-                        groups: value ? [value] : [],
-                      }));
-                    }}
-                  >
-                    <option value="">{t("snakeEdit.noGroup", { defaultValue: "No group" })}</option>
-                    {editGroups.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                  <div className="mt-2 border border-dashed border-neutral-200 rounded-xl p-3 bg-white">
-                    <AddGroupInline onAdd={(g)=>{
-                      if (!g) return;
-                      setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
-                      setEditSnakeDraft(d=>({...d, groups: [g]}));
-                    }} />
-                  </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.existingGroups", { defaultValue: "Existing" })}: {editGroups.join(", ")||"-"}</div>
-                </div>
-              </div>
-
-              {/* Genetics picker removed from edit modal per user request */}
-              <div className="md:col-span-2 space-y-5">
-                {/* The picture leads the column: it is how a keeper recognises the animal,
-                    so it sits above the record rather than buried under the logs. Upload,
-                    camera and gallery controls sit under the frame. */}
-                <div className="flex flex-col items-end gap-3">
-                  <div style={{width:318, height:318}} className="rounded-lg overflow-hidden border-2 border-neutral-200 relative">
-                    {(() => {
-                      const draftPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
-                      const frameUrl = editSnakeDraft.imageUrl || (draftPhotos.length ? draftPhotos[draftPhotos.length - 1]?.url : '');
-                      return frameUrl ? (
-                        <img src={frameUrl} alt={editSnakeDraft.name} className="w-full h-full object-contain object-center bg-neutral-50" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm text-neutral-500 bg-neutral-50">{t("snakeEdit.image.none")}</div>
-                      );
-                    })()}
-                    {editUploadingPhoto && (
-                      <div className="sk-scrim absolute inset-0 flex items-center justify-center text-sm text-neutral-600">
-                        {t("snakeEdit.image.saving")}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <input
-                      ref={editCameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handleEditCameraInputChange}
-                    />
-                    <input
-                      ref={editUploadInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleEditUploadInputChange}
-                    />
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={triggerEditCameraCapture}
-                      disabled={editUploadingPhoto || !editSnake?.id}
-                    >
-                      {t("snakeEdit.image.take")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={triggerEditUploadPicker}
-                      disabled={editUploadingPhoto || !editSnake?.id}
-                    >
-                      {t("snakeEdit.image.upload")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={handleEditViewPictures}
-                      disabled={!editSnake?.id}
-                    >
-                      {editPhotoCount ? t("snakeEdit.image.viewWithCount", { count: editPhotoCount }) : t("snakeEdit.image.view")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={() => {
-                        setEditSnakeDraft(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
-                        setEditSnake(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
-                      }}
-                      disabled={!editSnakeDraft?.imageUrl}
-                    >
-                      {t("snakeEdit.image.clear")}
-                    </button>
-                  </div>
-                </div>
-                <ParentagePanel
-                  draft={editSnakeDraft}
-                  setDraft={setEditSnakeDraft}
-                  animals={snakes}
-                  clutchOptions={clutchOptions}
-                />
-                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
-                <AcquisitionRecordPanel snake={editSnake} />
-                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
-
-                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
-                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
-                  <FemaleBreedingPanel
-                    snake={editSnake}
-                    cycles={breedingCycles}
-                    exams={follicleExams}
-                    snakesById={breedingSnakesById}
-                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
-                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
-                  />
-                )}
-                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
-                  <MaleBreedingPanel
-                    snake={editSnake}
-                    cycles={breedingCycles}
-                    snakesById={breedingSnakesById}
-                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
-                  />
-                )}
-
-                {/* Reproductive Intelligence — females only */}
-                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
-                  <ReproductiveIntelligencePanel snake={editSnake} />
-                )}
-
-                <div className="p-3 border rounded-xl bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
-                  </div>
-                  <div className="space-y-2">
-                    {(() => {
-                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
-                      const targetId = (editSnakeDraft.id || '').trim();
-                      const related = !targetId ? [] : pairings.filter(p => {
-                        if (!p) return false;
-                        const maleId = (p.maleId || '').trim();
-                        const femaleId = (p.femaleId || '').trim();
-                        if (!maleId && !femaleId) return false;
-                        return isFemale ? femaleId === targetId : maleId === targetId;
-                      });
-                      if (!related.length) {
-                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
-                      }
-                      const otherSnakes = isFemale ? malesById : femalesById;
-                      return related.map(pairing => {
-                        const stage = describePairingStage(pairing);
-                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
-                        const otherId = (otherIdRaw || '').trim();
-                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
-                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
-                        return (
-                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
-                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
-                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
-                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
-                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-                {/* Quarantine record. Status here and the tag above are the same thing: changing
-                    either one moves the animal in or out of the quarantine section. */}
-                <div className="mt-4">
-                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
-                </div>
-
-                {/* Re-add logs editor so feeds/weights/sheds/cleanings/meds can be edited */}
-                <div className="mt-4 p-2 border rounded-xl bg-neutral-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.logsTitle")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.logsHint")}</div>
-                  </div>
-                  <LogsEditor editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
-                </div>
-
-              </div>
+              </SnakeEditorSection>
             </div>
             </div>
           </div>
@@ -17649,6 +17767,25 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
   const [showPairingsModal, setShowPairingsModal] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const overflowMenuRef = useRef(null);
+  // .mt-card carries a transform, which makes every card its own containing block and stacking
+  // context: a `fixed inset-0` layer inside it covers only the card, and the next card in the
+  // grid paints over anything that spills out. So the click-outside is a document listener, not
+  // a full-screen layer, and the open card is lifted above its neighbours while its menu shows.
+  useEffect(() => {
+    if (!overflowMenuOpen) return;
+    const handlePointer = (event) => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(event.target)) {
+        setOverflowMenuOpen(false);
+      }
+    };
+    const handleKey = (event) => { if (event.key === 'Escape') setOverflowMenuOpen(false); };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [overflowMenuOpen]);
   const [quickTagOpen, setQuickTagOpen] = useState(null);
   const [quickDraft, setQuickDraft] = useState({
     date: localYMD(new Date()),
@@ -17864,7 +18001,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
     closeQuickAdd();
   }
   return (
-  <div ref={cardRef} className="bp-snake-card mt-card relative p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
+  <div ref={cardRef} className="bp-snake-card mt-card relative p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm" style={overflowMenuOpen ? { zIndex: 30 } : undefined}>
       <div className="flex items-start gap-3">
         {/* thumbnail top-left */}
         <div className="flex-shrink-0">
@@ -17943,7 +18080,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             </button>
             {overflowMenuOpen && (
               <>
-                <div className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
                 <div className="bp-overflow-menu z-[150]">
                   {hasFamilyTree && (
                     <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
@@ -18119,10 +18255,15 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       {/* weight display removed per user request */}
   {/* birth date moved to header */}
       </div>
-      {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
-      {quickTagOpen && (
+      {/* Quick-add dialog for activities (feeds, weights, cleanings, sheds, meds). Portalled to
+          the body: inside the card it was trapped by the card's transform, so its "full-screen"
+          scrim covered only this card and the next card in the grid drew over the dialog. */}
+      {quickTagOpen && typeof document !== 'undefined' && createPortal((
         <div
           className="sk-scrim fixed inset-0 z-[250] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeQuickAdd(); } }}
           onClick={(e) => {
             e.stopPropagation();
             closeQuickAdd();
@@ -18230,7 +18371,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
       
       <div className="mt-2 flex items-center gap-2">
         <StatusBadge status={displayStatus} />
@@ -18745,12 +18886,38 @@ function filterSnakes(list, query, tag) {
   });
 }
 
-function AddGroupInline({ onAdd }) {
+// Sentinel value for the "New group…" entry at the foot of a group <select>.
+const NEW_GROUP_OPTION = '__serpentora_new_group__';
+
+// One titled block of the snake editor: heading and hint in a narrow column on wide screens,
+// stacked above the fields on narrow ones.
+function SnakeEditorSection({ id, title, hint, children }) {
+  return (
+    <section className="snake-editor-section" aria-labelledby={id}>
+      <header className="snake-editor-section__head">
+        <h3 id={id} className="snake-editor-section__title">{title}</h3>
+        {hint ? <p className="snake-editor-section__hint">{hint}</p> : null}
+      </header>
+      <div className="snake-editor-section__body">{children}</div>
+    </section>
+  );
+}
+
+function AddGroupInline({ onAdd, autoFocus = false }) {
   const { t } = useTranslation();
   const [val, setVal] = useState("");
   return (
     <div className="flex gap-2 px-2">
       <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
+        autoFocus={autoFocus}
+        onKeyDown={e => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          const g = val.trim();
+          if (!g) return;
+          onAdd(g);
+          setVal("");
+        }}
         value={val} onChange={e=>setVal(e.target.value)} />
       <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
         const g = val.trim();
@@ -27833,7 +28000,10 @@ function ParentSelect({ label, placeholder, options, value, recordedName, disabl
   );
 }
 
-function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLastFeedDefaults }) {
+// `kinds` picks which logs to show, so the editor can put feeds beside the feed plan and the
+// rest under care records without two copies of the row markup.
+function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLastFeedDefaults, kinds = ['feeds', 'weights', 'sheds', 'cleanings', 'meds'] }) {
+  const show = (kind) => kinds.includes(kind);
   const { t } = useTranslation();
   const feedsRef = useRef(null);
   const weightsRef = useRef(null);
@@ -27858,9 +28028,10 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
   return (
     <>
       {/* Feeds */}
-      <section>
+      {show('feeds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.feeds")}</div>
+          <div className="snake-editor-subhead">{t("logs.feeds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
@@ -27871,7 +28042,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={feedsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.feeds.map((x,i)=>{
             const isRefused = !!x.refused;
             if (isRefused) {
@@ -27879,7 +28050,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 <div key={i} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center text-xs">
                   <input
                     type="date"
-                    className="border rounded-lg px-2 py-1 text-xs text-neutral-900 sm:col-span-2 min-w-[8rem] w-full"
+                    className="border rounded-lg px-2 py-1 text-sm text-neutral-900 sm:col-span-2 min-w-[8rem] w-full"
                     value={x.date}
                     onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{date:e.target.value})}
                   />
@@ -27899,11 +28070,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 
             return (
               <div key={i} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center text-xs">
-                <input type="date" className="border rounded-lg px-2 py-1 text-xs text-neutral-900 sm:col-span-2 min-w-[8rem] w-full" value={x.date}
+                <input type="date" className="border rounded-lg px-2 py-1 text-sm text-neutral-900 sm:col-span-2 min-w-[8rem] w-full" value={x.date}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{date:e.target.value})}/>
 
                 {/* feed type */}
-                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
+                <select className="border rounded-lg px-2 py-1 text-sm sm:col-span-1 w-full" value={x.feed||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
                   <option value="Mouse">{t("logs.mouse", { defaultValue: "Mouse" })}</option>
                   <option value="Rat">{t("logs.rat", { defaultValue: "Rat" })}</option>
@@ -27911,31 +28082,31 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 </select>
 
                 {/* weight class */}
-                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
+                <select className="border rounded-lg px-2 py-1 text-sm sm:col-span-1 w-full" value={x.size||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
                   <option value=""></option>
                   {(FEEDER_SIZE_OPTIONS_BY_TYPE[x.feed] || FEEDER_SIZE_OPTIONS).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
 
                 {/* weight in grams */}
-                <input type="number" className="border rounded-lg px-2 py-1 text-xs w-full sm:col-span-1" placeholder="g"
+                <input type="number" className="border rounded-lg px-2 py-1 text-sm w-full sm:col-span-1" placeholder="g"
                   value={typeof x.weightGrams === 'number' ? x.weightGrams : (x.weightGrams || 0)} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{weightGrams: Number(e.target.value) || 0})}/>
 
                 {/* method of feed */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:col-span-2">
-                  <select className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
+                  <select className="border rounded-lg px-2 py-1 text-sm w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
                       <option value="Live">{t("logs.live", { defaultValue: "Live" })}</option>
                       <option value="Freshly killed">{t("logs.freshKilled", { defaultValue: "Freshly killed" })}</option>
                       <option value="Frozen/thawed">{t("logs.frozenThawed", { defaultValue: "Frozen/thawed" })}</option>
                       <option value="Other">{t("logs.other", { defaultValue: "Other" })}</option>
                   </select>
                   {x.method === 'Other' && (
-                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
+                    <input className="border rounded-lg px-2 py-1 text-sm w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
                   )}
                 </div>
 
                 <div className="sm:col-span-7">
-                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
+                  <input className="border rounded-lg px-2 py-1 text-sm w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
                 </div>
 
                 <div className="sm:col-span-7 flex justify-end items-center gap-2 flex-wrap">
@@ -27953,116 +28124,125 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           {!editSnakeDraft.logs.feeds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Weights */}
-      <section>
+      {show('weights') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.weights")}</div>
+          <div className="snake-editor-subhead">{t("logs.weights")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{id:crypto.randomUUID(),date:today,grams:0,notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={weightsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.weights.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{date:e.target.value})}/>
-              <input type="number" className="border rounded-lg px-2 py-1" placeholder={t("logs.grams", { defaultValue: "grams" })}
+              <input type="number" className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.grams", { defaultValue: "grams" })}
                 value={x.grams} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{grams:Number(e.target.value)||0})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.weights.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Sheds */}
-      <section>
+      {show('sheds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.sheds")}</div>
+          <div className="snake-editor-subhead">{t("logs.sheds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => {
               const today = localYMD(new Date());
               setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { id: crypto.randomUUID(), date: today, complete: true, notes: '' }] } }));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={shedsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.sheds.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{date:e.target.value})}/>
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="w-4 h-4" checked={!!x.complete}
                   onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{complete:e.target.checked})}/>
                 {t("logs.complete", { defaultValue: "Complete" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.sheds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Cleanings */}
-      <section>
+      {show('cleanings') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.cleanings")}</div>
+          <div className="snake-editor-subhead">{t("logs.cleanings")}</div>
         <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today = localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{id:crypto.randomUUID(),date:today,deep:false,notes:''}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.cleanings.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{date:e.target.value})}/>
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="w-4 h-4" checked={!!x.deep}
                   onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{deep:e.target.checked})}/>
                 {t("logs.deepClean", { defaultValue: "Deep clean" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.cleanings.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Meds */}
-      <section>
+      {show('meds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.meds")}</div>
+          <div className="snake-editor-subhead">{t("logs.meds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{id:crypto.randomUUID(),date:today,drug:"",dose:"",notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={medsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.meds.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow snake-editor-logrow--meds">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{date:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1" placeholder={t("logs.drug")}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.drug")}
                 value={x.drug||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{drug:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1" placeholder={t("logs.dose")}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.dose")}
                 value={x.dose||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{dose:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.meds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
     </>
   );
 }
