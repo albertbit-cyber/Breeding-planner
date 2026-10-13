@@ -35,6 +35,32 @@ export type BreederSnapshotInput = {
   breedingCycles?: unknown[];
   /** Follicle examinations, owned by the female and optionally linked to a cycle. */
   follicleExams?: unknown[];
+  /** The account's data generation this device last loaded (see assertCurrentDataGeneration). */
+  dataGeneration?: unknown;
+};
+
+export const DATA_REPLACED_CODE = "DATA_REPLACED";
+
+/**
+ * Refuses a save from a device that has not loaded the latest full replace.
+ *
+ * A replace makes a backup file the account's whole truth. Every save merges, and a device still
+ * holding the old data would merge it straight back: records the file left out reappear, and log
+ * entries come back by the hundred (the duplicated-log episode was exactly this). So once an
+ * account has been replaced, a save must name the generation it was made against. A device that
+ * names an older one, or none (a build from before this existed), is turned away with
+ * DATA_REPLACED; the app then drops its copy and loads the replaced data. Accounts never
+ * replaced (generation 0) are not checked, so nothing changes for them.
+ */
+export const assertCurrentDataGeneration = (stored: unknown, sent: unknown): void => {
+  const current = Number(stored) || 0;
+  if (!current) return;
+  if (Number(sent) === current) return;
+  throw new HttpError(
+    409,
+    "This account's cloud data was replaced from a backup. This device has to load it before it can save.",
+    { code: DATA_REPLACED_CODE, dataGeneration: current },
+  );
 };
 
 const db = prisma as any;
@@ -89,7 +115,7 @@ const intValue = (value: unknown): number | null => {
 };
 
 
-const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: number): string => {
+export const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: number): string => {
   return textValue(record.id) || textValue(record.appId) || `${fallbackPrefix}-${index + 1}`;
 };
 
@@ -273,7 +299,7 @@ const mergeClutchPayload = (existing: JsonRecord, incomingPayload: JsonRecord): 
 // devices' copy.
 const DEVICE_LOCAL_PLANNER_KEYS = ["lastRun"];
 
-const stripDeviceLocalPlannerState = (state: JsonRecord): JsonRecord => {
+export const stripDeviceLocalPlannerState = (state: JsonRecord): JsonRecord => {
   const backupSettings = asRecord(state.backupSettings);
   if (!backupSettings) return state;
   const cleaned = { ...backupSettings };
@@ -284,7 +310,42 @@ const stripDeviceLocalPlannerState = (state: JsonRecord): JsonRecord => {
 const mergePlannerStatePayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord =>
   mergeSyncRecord(existing, stripDeviceLocalPlannerState(incomingPayload), { entryArrays: SYNC_ENTRY_ARRAYS.planner, sortEntries: false });
 
-const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
+// The searchable columns each row carries beside its payload. Shared with the full replace in
+// breederDataReplaceService, so a replaced row reads exactly like a synced one.
+export const animalColumns = (payload: JsonRecord) => ({
+  name: textValue(payload.name),
+  sex: textValue(payload.sex),
+  status: textValue(payload.status),
+  species: textValue(payload.species),
+  payload,
+});
+
+export const pairingColumns = (payload: JsonRecord) => ({
+  label: textValue(payload.label),
+  maleAnimalAppId: textValue(payload.maleId),
+  femaleAnimalAppId: textValue(payload.femaleId),
+  status: textValue(payload.status),
+  workflowStatus: enumTextValue(payload.workflowStatus ?? payload.status, workflowStatuses),
+  completionReason: enumTextValue(payload.completionReason, completionReasons),
+  outcomeConfidence: enumTextValue(payload.outcomeConfidence, outcomeConfidences),
+  completedAt: isoDateValue(payload.completedAt) ? new Date(isoDateValue(payload.completedAt) as string) : null,
+  completedByUserId: textValue(payload.completedBy),
+  completionNote: textValue(payload.completionNote),
+  reopenedAt: isoDateValue(payload.reopenedAt) ? new Date(isoDateValue(payload.reopenedAt) as string) : null,
+  reopenedByUserId: textValue(payload.reopenedBy),
+  startDate: textValue(payload.startDate),
+  payload,
+});
+
+export const clutchColumns = (payload: JsonRecord, pairingId: string | null) => ({
+  pairingId,
+  clutchNumber: intValue(payload.clutchNumber),
+  seasonYear: intValue(payload.seasonYear),
+  laidDate: textValue(payload.laidDate) || textValue(payload.date),
+  payload,
+});
+
+export const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   const clutch = asRecord(pairing.clutch);
   if (!clutch) return null;
   const recorded = clutch.recorded === true || !!textValue(clutch.date);
@@ -299,7 +360,7 @@ const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   };
 };
 
-const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord[] => {
+export const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord[] => {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new HttpError(400, `${label} must be an array.`);
   return value.map(asRecord).filter((item): item is JsonRecord => !!item);
@@ -385,6 +446,9 @@ export const listBreederSnapshot = async (ownerId: string, options: { since?: Da
     breedingCycles: breedingCycles.map(withBackendSyncMetadata),
     follicleExams: follicleExams.map(withBackendSyncMetadata),
     tombstones,
+    // Raised by every full replace. A device that holds a lower number drops its copy and takes
+    // this snapshot as it is, instead of merging (see breederDataReplaceService).
+    dataGeneration: Number(plannerState?.dataGeneration) || 0,
     serverTime,
   };
 
@@ -530,11 +594,12 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       loadExistingByAppId(tx.clutch, ownerId, "appClutchId"),
       tx.breederPlannerState.findUnique({
         where: { ownerId },
-        select: { id: true, payload: true, updatedAt: true },
+        select: { id: true, payload: true, updatedAt: true, dataGeneration: true },
       }),
       loadExistingByAppId(tx.breedingCycle, ownerId, "appCycleId"),
       loadExistingByAppId(tx.follicleExamination, ownerId, "appExamId"),
     ]);
+    assertCurrentDataGeneration(existingPlannerState?.dataGeneration, input.dataGeneration);
 
     // Every animal a card names should be one of this owner's rows (deleted rows count, so archiving
     // an animal keeps its breeding history), or arrive in this very request. A card naming any other
@@ -661,13 +726,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       examUpdates.push({ id: existing.id, appId, data: { ...examColumns(payload), payload } });
     }
 
-    const animalColumns = (payload: JsonRecord) => ({
-      name: textValue(payload.name),
-      sex: textValue(payload.sex),
-      status: textValue(payload.status),
-      species: textValue(payload.species),
-      payload,
-    });
     const animalCreates: JsonRecord[] = [];
     const animalUpdates: PlannedUpdate[] = [];
     let animalsResurrected = 0;
@@ -710,22 +768,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       animalUpdates,
     );
 
-    const pairingColumns = (payload: JsonRecord) => ({
-      label: textValue(payload.label),
-      maleAnimalAppId: textValue(payload.maleId),
-      femaleAnimalAppId: textValue(payload.femaleId),
-      status: textValue(payload.status),
-      workflowStatus: enumTextValue(payload.workflowStatus ?? payload.status, workflowStatuses),
-      completionReason: enumTextValue(payload.completionReason, completionReasons),
-      outcomeConfidence: enumTextValue(payload.outcomeConfidence, outcomeConfidences),
-      completedAt: isoDateValue(payload.completedAt) ? new Date(isoDateValue(payload.completedAt) as string) : null,
-      completedByUserId: textValue(payload.completedBy),
-      completionNote: textValue(payload.completionNote),
-      reopenedAt: isoDateValue(payload.reopenedAt) ? new Date(isoDateValue(payload.reopenedAt) as string) : null,
-      reopenedByUserId: textValue(payload.reopenedBy),
-      startDate: textValue(payload.startDate),
-      payload,
-    });
     // Row ids for every pairing the clutch loop may reference. Pairings created by this request
     // have no id until after the insert, so those are resolved in a single lookup below.
     const pairingRowsByAppId = new Map<string, string>();
@@ -803,13 +845,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       const existing = existingClutches.get(appClutchId) || null;
       if (existing?.deletedAt) continue;
       const payload = existing ? mergeClutchPayload(storedRecord(existing), clutch) : clutch;
-      const data = {
-        pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
-        clutchNumber: intValue(payload.clutchNumber),
-        seasonYear: intValue(payload.seasonYear),
-        laidDate: textValue(payload.laidDate) || textValue(payload.date),
-        payload,
-      };
+      const data = clutchColumns(payload, pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null);
       if (!existing) {
         clutchCreates.push({ ownerId, appClutchId, ...data });
         touched.clutches.add(appClutchId);

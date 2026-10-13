@@ -98,6 +98,33 @@ export const logEntrySignature = (entry: JsonRecord, label: string): string => [
   entry.notes || entry.note,
 ].map((part) => (part === undefined || part === null ? "" : String(part))).join("|");
 
+/**
+ * One entry per content signature in every log list, keeping the entry with the smallest id.
+ * Mirrors collapseDuplicateLogEntries in the breeder app's cloudSyncPayload.js, so a device and
+ * the server keep the same survivor. Used by the full replace: a backup made before the
+ * duplicated-log fix carries hundreds of thousands of copies of a hundred readings.
+ */
+export const collapseDuplicateLogEntries = (logs: unknown): unknown => {
+  if (!logs || typeof logs !== "object" || Array.isArray(logs)) return logs;
+  const result: JsonRecord = {};
+  Object.entries(logs as JsonRecord).forEach(([key, entries]) => {
+    if (!Array.isArray(entries)) {
+      result[key] = entries;
+      return;
+    }
+    const survivorBySignature = new Map<string, JsonRecord>();
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const signature = logEntrySignature(entry, key);
+      const kept = survivorBySignature.get(signature);
+      if (!kept || String(entry.id || "") < String(kept.id || "")) survivorBySignature.set(signature, entry);
+    });
+    const survivors = new Set(survivorBySignature.values());
+    result[key] = entries.filter((entry) => !entry || typeof entry !== "object" || survivors.has(entry));
+  });
+  return result;
+};
+
 export const hashString = (value: string): string => {
   let hash = 0x811c9dc5;
   for (let index = 0; index < value.length; index += 1) {

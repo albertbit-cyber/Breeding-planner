@@ -33,7 +33,7 @@ const identifyCallerForLogging = (req: Request): string => {
 
 export const errorHandler = (error: unknown, req: Request, res: Response, _next: NextFunction): void => {
   if (error instanceof HttpError) {
-    res.status(error.statusCode).json({ message: error.message });
+    res.status(error.statusCode).json({ ...(error.details || {}), message: error.message });
     return;
   }
 
