@@ -2843,5 +2843,6 @@
   "setup.backup.undoDone": "Tu colección ha vuelto al estado anterior a la restauración.",
   "setup.backup.undoHelp": "Vuelve a tu colección tal como estaba el {{date}}, antes de la restauración.",
   "setup.backup.vaultNoPhotos": "Las copias de la bóveda se guardan en este dispositivo sin fotos, para ahorrar espacio. Al restaurar una, se conservan las fotos que tienen ahora tus animales. Para una copia completa con fotos, guarda un archivo de copia de seguridad.",
-  "setup.storage.rowPhotos": "Fotos"
+  "setup.storage.rowPhotos": "Fotos",
+  "field.logShort": "Registrar"
 }

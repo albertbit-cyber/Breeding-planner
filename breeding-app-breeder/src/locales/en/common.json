@@ -2841,5 +2841,6 @@
   "setup.backup.undoDone": "Your collection is back as it was before the restore.",
   "setup.backup.undoHelp": "Goes back to your collection as it was on {{date}}, before the restore.",
   "setup.backup.vaultNoPhotos": "Vault copies are kept on this device without photos, to save space. Restoring one keeps the photos your animals have now. For a complete copy with photos, save a backup file.",
-  "setup.storage.rowPhotos": "Photos"
+  "setup.storage.rowPhotos": "Photos",
+  "field.logShort": "Log"
 }

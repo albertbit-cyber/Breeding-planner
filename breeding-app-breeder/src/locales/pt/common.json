@@ -2841,5 +2841,6 @@
   "setup.backup.undoDone": "A tua coleção voltou a estar como antes do restauro.",
   "setup.backup.undoHelp": "Volta à tua coleção tal como estava a {{date}}, antes do restauro.",
   "setup.backup.vaultNoPhotos": "As cópias do cofre ficam guardadas neste dispositivo sem fotos, para poupar espaço. Ao restaurar uma, os teus animais mantêm as fotos que têm agora. Para uma cópia completa com fotos, guarda um ficheiro de cópia de segurança.",
-  "setup.storage.rowPhotos": "Fotos"
+  "setup.storage.rowPhotos": "Fotos",
+  "field.logShort": "Registar"
 }

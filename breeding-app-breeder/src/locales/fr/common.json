@@ -2841,5 +2841,6 @@
   "setup.backup.undoDone": "Ta collection est revenue à son état d'avant la restauration.",
   "setup.backup.undoHelp": "Revient à ta collection telle qu'elle était le {{date}}, avant la restauration.",
   "setup.backup.vaultNoPhotos": "Les copies du coffre sont conservées sur cet appareil sans photos, pour gagner de la place. En restaurer une conserve les photos actuelles de tes animaux. Pour une copie complète avec photos, enregistre un fichier de sauvegarde.",
-  "setup.storage.rowPhotos": "Photos"
+  "setup.storage.rowPhotos": "Photos",
+  "field.logShort": "Noter"
 }

@@ -2855,5 +2855,6 @@
   "setup.backup.undoDone": "Tvoje sbírka je zpět ve stavu před obnovením.",
   "setup.backup.undoHelp": "Vrátí sbírku do stavu z {{date}}, před obnovením.",
   "setup.backup.vaultNoPhotos": "Kopie v trezoru se na tomto zařízení ukládají bez fotek, aby šetřily místo. Při obnovení některé z nich si zvířata ponechají své současné fotky. Pro úplnou kopii s fotkami ulož soubor zálohy.",
-  "setup.storage.rowPhotos": "Fotky"
+  "setup.storage.rowPhotos": "Fotky",
+  "field.logShort": "Zapsat"
 }

@@ -2855,5 +2855,6 @@
   "setup.backup.undoDone": "האוסף שלכם חזר למצבו לפני השחזור.",
   "setup.backup.undoHelp": "חוזר לאוסף כפי שהיה ב־{{date}}, לפני השחזור.",
   "setup.backup.vaultNoPhotos": "עותקים בכספת נשמרים במכשיר הזה בלי תמונות, כדי לחסוך מקום. בשחזור של אחד מהם, בעלי החיים שומרים על התמונות שיש להם עכשיו. לעותק מלא עם תמונות, שמרו קובץ גיבוי.",
-  "setup.storage.rowPhotos": "תמונות"
+  "setup.storage.rowPhotos": "תמונות",
+  "field.logShort": "תיעוד"
 }

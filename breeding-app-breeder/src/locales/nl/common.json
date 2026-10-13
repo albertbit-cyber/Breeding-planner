@@ -2843,5 +2843,6 @@
   "setup.backup.undoDone": "Je collectie is terug zoals ze was vóór het herstellen.",
   "setup.backup.undoHelp": "Gaat terug naar je collectie zoals die was op {{date}}, vóór het herstellen.",
   "setup.backup.vaultNoPhotos": "Kluiskopieën worden zonder foto's op dit apparaat bewaard, om ruimte te besparen. Bij het herstellen houden je dieren hun huidige foto's. Sla een back-upbestand op voor een volledige kopie met foto's.",
-  "setup.storage.rowPhotos": "Foto's"
+  "setup.storage.rowPhotos": "Foto's",
+  "field.logShort": "Loggen"
 }

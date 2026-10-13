@@ -2867,5 +2867,6 @@
   "setup.backup.undoDone": "Twoja kolekcja wróciła do stanu sprzed przywracania.",
   "setup.backup.undoHelp": "Wraca do kolekcji w stanie z {{date}}, sprzed przywracania.",
   "setup.backup.vaultNoPhotos": "Kopie w skarbcu są przechowywane na tym urządzeniu bez zdjęć, aby oszczędzać miejsce. Po przywróceniu jednej z nich zwierzęta zachowują obecne zdjęcia. Aby mieć pełną kopię ze zdjęciami, zapisz plik kopii zapasowej.",
-  "setup.storage.rowPhotos": "Zdjęcia"
+  "setup.storage.rowPhotos": "Zdjęcia",
+  "field.logShort": "Zapisz"
 }

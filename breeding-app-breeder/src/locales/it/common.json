@@ -2841,5 +2841,6 @@
   "setup.backup.undoDone": "La tua collezione è tornata com'era prima del ripristino.",
   "setup.backup.undoHelp": "Torna alla tua collezione com'era il {{date}}, prima del ripristino.",
   "setup.backup.vaultNoPhotos": "Le copie della cassaforte sono conservate su questo dispositivo senza foto, per risparmiare spazio. Ripristinandone una, i tuoi animali mantengono le foto attuali. Per una copia completa con foto, salva un file di backup.",
-  "setup.storage.rowPhotos": "Foto"
+  "setup.storage.rowPhotos": "Foto",
+  "field.logShort": "Registra"
 }

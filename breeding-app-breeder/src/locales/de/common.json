@@ -2843,5 +2843,6 @@
   "setup.backup.undoDone": "Deine Sammlung ist wieder auf dem Stand vor der Wiederherstellung.",
   "setup.backup.undoHelp": "Kehrt zu deiner Sammlung vom {{date}} zurück, wie sie vor der Wiederherstellung war.",
   "setup.backup.vaultNoPhotos": "Tresor-Kopien werden auf diesem Gerät ohne Fotos gespeichert, um Platz zu sparen. Beim Wiederherstellen bleiben die aktuellen Fotos deiner Tiere erhalten. Für eine vollständige Kopie mit Fotos sichere eine Backup-Datei.",
-  "setup.storage.rowPhotos": "Fotos"
+  "setup.storage.rowPhotos": "Fotos",
+  "field.logShort": "Erfassen"
 }
