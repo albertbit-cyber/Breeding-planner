@@ -128,8 +128,10 @@ function applyVisibility(animals: FamilyTreeAnimal[], requesterId: string): Fami
  * for use in the Family Tree animal picker.
  */
 export async function listMyAnimals(userId: string): Promise<FamilyTreeAnimal[]> {
+  // Deleted animals are sync tombstones, not animals. Archived ones (sold, died...) are still
+  // records and stay listed: they are parents in other animals' pedigrees.
   const animals = await prisma.animal.findMany({
-    where:   { ownerId: userId },
+    where:   { ownerId: userId, deletedAt: null },
     include: animalWithOwner,
     orderBy: { updatedAt: "desc" },
   });
@@ -155,16 +157,19 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
       include: animalWithOwner,
     });
   }
-  if (!animal) throw new HttpError(404, "Animal not found");
+  if (!animal || animal.deletedAt) throw new HttpError(404, "Animal not found");
 
   const selected = formatAnimal(animal);
+  // Relationships are keyed by the database id. The caller may have passed the app id, which
+  // matched no relationship at all and returned a pedigree with no parents or offspring.
+  const rowId = animal.id;
   if (!isVisible(selected, requesterId)) {
     throw new HttpError(403, "This animal is private");
   }
 
   // Gen -1: direct parents
   const parentRels = await (prisma as any).parentRelationship.findMany({
-    where:   { childId: animalId },
+    where:   { childId: rowId, parent: { deletedAt: null } },
     include: { parent: { include: animalWithOwner } },
   });
 
@@ -172,20 +177,20 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
   const parentIds = parentRels.map((r: any) => r.parentId);
   const grandparentRels = parentIds.length
     ? await (prisma as any).parentRelationship.findMany({
-        where:   { childId: { in: parentIds } },
+        where:   { childId: { in: parentIds }, parent: { deletedAt: null } },
         include: { parent: { include: animalWithOwner } },
       })
     : [];
 
   // Gen +1: direct offspring
   const offspringRels = await (prisma as any).parentRelationship.findMany({
-    where:   { parentId: animalId },
+    where:   { parentId: rowId, child: { deletedAt: null } },
     include: { child: { include: animalWithOwner } },
   });
 
   // Ownership history for the selected animal
   const ownershipRaw = await (prisma as any).ownershipHistory.findMany({
-    where:   { animalId },
+    where:   { animalId: rowId },
     orderBy: { fromDate: "desc" },
   });
 
@@ -196,8 +201,8 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
       : { femaleAnimalAppId: animal.appAnimalId };
 
   const pairings = await (prisma as any).pairing.findMany({
-    where:   { ownerId: requesterId, ...pairingWhere },
-    include: { clutches: true },
+    where:   { ownerId: requesterId, deletedAt: null, ...pairingWhere },
+    include: { clutches: { where: { deletedAt: null } } },
   });
 
   const clutches = pairings.flatMap((p: any) =>
@@ -263,7 +268,7 @@ export async function getMoreAncestors(animalId: string, depth: number, requeste
   for (let i = 0; i < depth; i++) {
     if (!frontier.length) break;
     const rels = await (prisma as any).parentRelationship.findMany({
-      where:   { childId: { in: frontier } },
+      where:   { childId: { in: frontier }, parent: { deletedAt: null } },
       include: { parent: { include: animalWithOwner } },
     });
     frontier.length = 0;
@@ -297,7 +302,7 @@ export async function getMoreDescendants(animalId: string, depth: number, reques
   for (let i = 0; i < depth; i++) {
     if (!frontier.length) break;
     const rels = await (prisma as any).parentRelationship.findMany({
-      where:   { parentId: { in: frontier } },
+      where:   { parentId: { in: frontier }, child: { deletedAt: null } },
       include: { child: { include: animalWithOwner } },
     });
     frontier.length = 0;
