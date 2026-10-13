@@ -8,7 +8,16 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-**Latest breeder APK (2026-10-13): `app-release-2026-10-13-duplicate-log-collapse.apk`**
+**Latest breeder APK (2026-10-13, 0.1.93): `app-release-2026-10-13-device-storage-indexeddb.apk`**
+SHA256 `C5F3B222D748A1B50703D8E457BBD463924D08BFF896CB2F6A340F66B28B0033`, package `com.serpentora.mobile`,
+versionCode 10093 / 0.1.93, release-signed (same certificate, installs over the previous one and keeps its data), staging
+backend. Fixes "Local storage is full" when opening a backup on the phone: the collection moves from localStorage (~5 MB
+WebView cap) to IndexedDB on first launch, photos are stored once in their own table, restore is all-or-nothing with
+"Undo last restore", Settings > Backups shows storage use. Built from `feature/device-storage` @ `acc877e`, which has
+`main` merged in (so it carries `feature/mobile-rebuild` and the multi-device sync fix). Browser-verified, not run on the
+phone. Full entry in `APK_CHANGELOG.md`.
+
+**Previous breeder APK (2026-10-13): `app-release-2026-10-13-duplicate-log-collapse.apk`**
 SHA256 `A17DCF8248F770376BD5CB98D1A583FFE462F831CF8A7A7BD3497206333C4FAD`, package `com.serpentora.mobile`,
 versionCode 10089 / 0.1.89, release-signed, staging backend. Supersedes `app-release-2026-10-13-backup-picker-fix.apk`
 (0.1.88): the phone now collapses duplicated log entries instead of re-uploading them, after the staging
