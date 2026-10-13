@@ -52,6 +52,8 @@ import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx"
 import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
 import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
 import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
+import MissingAnimalsPanel from "./features/sync/MissingAnimalsPanel.jsx";
+import { unlinkAnimalFromPairings } from "./features/sync/missingAnimals";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -1617,7 +1619,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'femaleName',
     label: 'Female name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleId || '',
+    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleName || pairing?.femaleId || '',
   },
   {
     key: 'femaleGenetics',
@@ -1635,7 +1637,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'maleName',
     label: 'Male name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleId || '',
+    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleName || pairing?.maleId || '',
   },
   {
     key: 'maleGenetics',
@@ -2030,10 +2032,10 @@ function buildPairingExportDataset(pairings = [], snakes = [], selected = DEFAUL
       derived,
       displayLabel,
       femaleSnake,
-      femaleName: femaleSnake?.name || pairing.femaleId || '',
+      femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       femaleGenetics: joinTokens(combineMorphsAndHetsForDisplay(femaleSnake?.morphs, femaleSnake?.hets, femaleSnake?.possibleHets)),
       maleSnake,
-      maleName: maleSnake?.name || pairing.maleId || '',
+      maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       maleGenetics: joinTokens(combineMorphsAndHetsForDisplay(maleSnake?.morphs, maleSnake?.hets, maleSnake?.possibleHets)),
       cycleYear,
       hatchlings,
@@ -2133,10 +2135,10 @@ function getPairingExportRows(pairings = [], snakes = [], options = {}) {
     const row = {
       pairingId: pairing.id,
       maleId: pairing.maleId || maleCode,
-      maleCode: maleCode || pairing.maleId || '',
+      maleCode: maleCode || pairing.maleName || pairing.maleId || '',
       maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       femaleId: pairing.femaleId || femaleCode,
-      femaleCode: femaleCode || pairing.femaleId || '',
+      femaleCode: femaleCode || pairing.femaleName || pairing.femaleId || '',
       femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       pairingOrder: numericSortIndex,
       pairingOrderDisplay: numericSortIndex === null ? 'order not set' : numericSortIndex,
@@ -9528,8 +9530,8 @@ export default function BreedingPlannerApp() {
         const sire = snakeById(snakes, pairing.maleId);
         const clutchDate = pairing.clutch.date;
         const year = String(clutchDate || '').slice(0, 4) || '';
-        const damName = dam?.name || pairing.femaleId || '';
-        const sireName = sire?.name || pairing.maleId || '';
+        const damName = dam?.name || pairing.femaleName || pairing.femaleId || '';
+        const sireName = sire?.name || pairing.maleName || pairing.maleId || '';
         return {
           pairingId: pairing.id,
           clutchId: buildClutchId(damName, sireName, year),
@@ -9575,8 +9577,8 @@ export default function BreedingPlannerApp() {
           eggBoxBadEggs: p?.clutch?.eggBoxBadEggs || {},
           clutchDate,
           pairingLabel,
-          femaleName: female?.name || p.femaleId || 'Female',
-          maleName: male?.name || p.maleId || 'Male',
+          femaleName: female?.name || p.femaleName || p.femaleId || 'Female',
+          maleName: male?.name || p.maleName || p.maleId || 'Male',
           clutchId: buildClutchId(female?.name || p.femaleId, male?.name || p.maleId, clutchYear),
           femaleGenetics: female ? (getDisplayedSnakeGeneticsTokens(female).length ? getDisplayedSnakeGeneticsTokens(female).join(', ') : 'Normal') : '\u2014',
           maleGenetics: male ? (getDisplayedSnakeGeneticsTokens(male).length ? getDisplayedSnakeGeneticsTokens(male).join(', ') : 'Normal') : '\u2014',
@@ -11123,6 +11125,15 @@ export default function BreedingPlannerApp() {
     addTombstone: addBreedingTombstone,
     snakesById: breedingSnakesById,
   });
+
+  // Settings → Backup → "Animals named but missing": settle a pairing or card that names an animal
+  // the collection does not have. Both go through the stamping setters, so they sync like any edit.
+  const handleUnlinkMissingAnimal = useCallback((animalId) => {
+    setPairings(prev => unlinkAnimalFromPairings(prev, animalId));
+  }, [setPairings]);
+  const handleDeleteCyclesNamingAnimal = useCallback((cycleIds) => {
+    (Array.isArray(cycleIds) ? cycleIds : []).forEach(id => breedingActions.deleteCycle(id));
+  }, [breedingActions]);
   const breedingGeneticsTokensFor = useCallback((snake) => (
     snake ? combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets) : []
   ), []);
@@ -12998,6 +13009,9 @@ export default function BreedingPlannerApp() {
             showAppConfirm={showAppConfirm}
             onCompressStoredPhotos={handleCompressStoredPhotos}
             onResetToDefaults={resetAppToDefaults}
+            breedingCycles={breedingCycles}
+            onUnlinkMissingAnimal={handleUnlinkMissingAnimal}
+            onDeleteCyclesNamingAnimal={handleDeleteCyclesNamingAnimal}
           />
         )}
 
@@ -15980,8 +15994,8 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
     return pairings.map(pairing => {
       const male = snakeById(snakes, pairing.maleId);
       const female = snakeById(snakes, pairing.femaleId);
-      const maleName = male?.name || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
-      const femaleName = female?.name || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
+      const maleName = male?.name || pairing.maleName || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
+      const femaleName = female?.name || pairing.femaleName || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
       const label = pairing.label || `${femaleName} × ${maleName}`;
       return {
         id: pairing.id,
@@ -16741,8 +16755,8 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
 
     const maleSnake = snakesById.get(pairing.maleId);
     const femaleSnake = snakesById.get(pairing.femaleId);
-    const maleName = maleSnake?.name || pairing.maleId || 'Male';
-    const femaleName = femaleSnake?.name || pairing.femaleId || 'Female';
+    const maleName = maleSnake?.name || pairing.maleName || pairing.maleId || 'Male';
+    const femaleName = femaleSnake?.name || pairing.femaleName || pairing.femaleId || 'Female';
     const pairingLabel = pairing.label || `${femaleName} × ${maleName}`;
     const link = `${window.location.origin}${window.location.pathname}#pairing=${encodeURIComponent(pairing.id)}`;
 
@@ -18754,6 +18768,9 @@ const OPTIONAL_EXPORT_GROUP_IDS = ACCOUNT_EXPORT_GROUPS.filter(group => !group.a
 
 // Breeder section for contact and logo
 function BreederSection({
+  breedingCycles = [],
+  onUnlinkMissingAnimal,
+  onDeleteCyclesNamingAnimal,
   breederInfo,
   setBreederInfo,
   morphAliases,
@@ -22443,6 +22460,14 @@ function BreederSection({
                 {cloudFeedback.timestamp ? ` - ${formatDateTimeForDisplay(cloudFeedback.timestamp)}` : ''}
               </div>
             )}
+            <MissingAnimalsPanel
+              snakes={snakes}
+              pairings={pairings}
+              cycles={breedingCycles}
+              onUnlinkFromPairings={onUnlinkMissingAnimal}
+              onDeleteCycles={onDeleteCyclesNamingAnimal}
+              showAppConfirm={showAppConfirm}
+            />
           </div>
 
           <div className="space-y-3 border-t pt-4">

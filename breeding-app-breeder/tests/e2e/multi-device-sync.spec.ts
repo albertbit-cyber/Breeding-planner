@@ -148,6 +148,30 @@ test.describe("two devices, one account", () => {
       return card?.reviewFlags?.find((flag: any) => flag.kind === "unresolved_animal_reference")?.animalIds || null;
     }, { timeout: 30_000 }).toEqual([ghostMale]);
     await expect(page.getByText(/Not synced/i)).toHaveCount(0);
+
+    // The keeper settles it in Settings → Backups: the pairing keeps the male's name without the
+    // link, and the card that named him is deleted for good.
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Backups", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Animals named but missing" });
+    await expect(panel.getByText(`${ghostMale}: 1 pairing(s), 1 breeding card(s)`)).toBeVisible();
+    await panel.getByRole("button", { name: "Keep name on pairings, remove link" }).click();
+    await panel.getByRole("button", { name: "Delete cards naming it" }).click();
+    await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(panel).toHaveCount(0);
+
+    await expect.poll(async () => {
+      const snapshot = await getSnapshot(request, auth.token);
+      const pairing = (snapshot.pairings || []).find((item: any) => item.id === pairingId);
+      const cardGone = !(snapshot.breedingCycles || []).some((cycle: any) => cycle.femaleId === femaleId);
+      return { maleId: pairing?.maleId, maleName: pairing?.maleName, cardGone };
+    }, { timeout: 30_000 }).toEqual({ maleId: "", maleName: ghostMale, cardGone: true });
+
+    // A reload does not bring the card back from the pairing.
+    await page.reload();
+    await page.waitForTimeout(8_000);
+    const after = await getSnapshot(request, auth.token);
+    expect((after.breedingCycles || []).some((cycle: any) => cycle.femaleId === femaleId)).toBe(false);
     await context.close();
   });
 
