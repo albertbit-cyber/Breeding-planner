@@ -1,6 +1,7 @@
 import type { TestOrder } from "../../types/lab";
 import type { LabAddress } from "../../types/labShipmentLabels";
 import { LAB_LABEL_DEBUG_STORAGE_KEY } from "../../features/lab/utils/labelLayout";
+import { readStoredJson } from "../../platform/deviceStore.js";
 
 const BREEDER_INFO_STORAGE_KEY = "breedingPlannerBreederInfo";
 
@@ -137,19 +138,10 @@ export const loadSnakeById = async (animalId: string): Promise<StoredSnake | nul
     return (match as StoredSnake) || null;
   }
 
-  if (typeof localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem("breedingPlannerSnakes");
-      const rows = raw ? JSON.parse(raw) : [];
-      const snakes = Array.isArray(rows) ? rows : [];
-      const match = snakes.find((entry) => String(entry?.id ?? "") === animalId);
-      return (match as StoredSnake) || null;
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
+  const rows = readStoredJson("breedingPlannerSnakes", []);
+  const snakes: Array<{ id?: unknown }> = Array.isArray(rows) ? rows : [];
+  const match = snakes.find((entry) => String(entry?.id ?? "") === animalId);
+  return (match as StoredSnake) || null;
 };
 
 export const loadBreederInfo = async (): Promise<BreederInfo> => {
@@ -162,19 +154,8 @@ export const loadBreederInfo = async (): Promise<BreederInfo> => {
     }
   }
 
-  if (typeof localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem(BREEDER_INFO_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === "object") {
-        return parsed as BreederInfo;
-      }
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
+  const parsed = readStoredJson(BREEDER_INFO_STORAGE_KEY, null);
+  return parsed && typeof parsed === "object" ? (parsed as BreederInfo) : {};
 };
 
 export const toBreederAddress = (info: BreederInfo): LabAddress | undefined => {

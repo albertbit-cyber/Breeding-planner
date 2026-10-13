@@ -1,6 +1,7 @@
 import { resolveCanonicalGene } from "../../genetics/geneDatabase";
 import { normalizeGeneCandidate } from "../../genetics/geneLibrary";
 import { createGeneticsChangeLogRecord } from "../../db/labStore";
+import { readStoredJson, writeStoredJson } from "../../platform/deviceStore.js";
 import type { GeneticsSnapshot, TestOrder, TestResult } from "../../types/lab";
 import type { ServiceActor } from "./testOrderService";
 
@@ -220,18 +221,9 @@ const defaultSnakeGateway: SnakeDataGateway = {
       return snakes.filter((entry): entry is StoredSnake => Boolean(entry) && typeof entry === "object");
     }
 
-    if (typeof localStorage === "undefined") {
-      throw new Error("Snake persistence is unavailable in this runtime.");
-    }
-
-    try {
-      const raw = localStorage.getItem(SNAKES_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const snakes = Array.isArray(parsed) ? parsed : [];
-      return snakes.filter((entry): entry is StoredSnake => Boolean(entry) && typeof entry === "object");
-    } catch {
-      return [];
-    }
+    const parsed = readStoredJson(SNAKES_STORAGE_KEY, []);
+    const snakes: unknown[] = Array.isArray(parsed) ? parsed : [];
+    return snakes.filter((entry): entry is StoredSnake => Boolean(entry) && typeof entry === "object");
   },
 
   async saveSnakes(snakes) {
@@ -247,11 +239,9 @@ const defaultSnakeGateway: SnakeDataGateway = {
       return;
     }
 
-    if (typeof localStorage === "undefined") {
-      throw new Error("Snake persistence is unavailable in this runtime.");
+    if (!writeStoredJson(SNAKES_STORAGE_KEY, safeSnakes)) {
+      throw new Error("Failed to persist snake genetics changes.");
     }
-
-    localStorage.setItem(SNAKES_STORAGE_KEY, JSON.stringify(safeSnakes));
   },
 };
 

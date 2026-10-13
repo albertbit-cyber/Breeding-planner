@@ -225,6 +225,9 @@ import {
   saveBackupFile,
 } from "./features/backup/backupFile.js";
 import { haptic, isNativeShell, onBackButton } from "./platform/index.js";
+import { DEVICE_STORE_DB_NAME, STORAGE_FULL_EVENT, getDeviceStore } from "./platform/deviceStore.js";
+import { reattachCurrentPhotos, stripInlinePhotos } from "./services/backupPhotos.js";
+import DeviceStorageSummary from "./components/DeviceStorageSummary.jsx";
 import FieldScreen from "./features/field/FieldScreen.jsx";
 import QuickLogSheet from "./features/field/QuickLogSheet.jsx";
 import { appendLog as appendLogToSnake, pushRecent as pushRecentAnimal, removeLog as removeLogFromSnake } from "./features/field/fieldLogic.js";
@@ -1184,6 +1187,8 @@ const STORAGE_KEYS = {
   backupSettings: 'breedingPlannerBackupSettings',
   backupSnapshot: 'breedingPlannerBackupSnapshot',
   backupVault: 'breedingPlannerBackupVault',
+  // The collection as it was just before the last restore, so the restore can be undone.
+  preRestoreSnapshot: 'breedingPlannerPreRestoreSnapshot',
   spaces: 'breedingPlannerSpaces',
   animalLayout: 'breedingPlannerAnimalLayout',
   animalSortBy: 'breedingPlannerAnimalSortBy',
@@ -1255,7 +1260,9 @@ function compareAnimalsBySort(a, b, sortBy, sortDir) {
 }
 const DEFAULT_FAVICON_HREF = `${process.env.PUBLIC_URL || ''}/app-icons/icon_512x512.png`;
 const BACKUP_FREQUENCIES = ['off', 'nightly', 'weekly', 'monthly'];
-const DEFAULT_BACKUP_LIMIT = 20;
+// Vault copies leave photos out, but the phone still keeps fewer: the backup file saved through
+// the share sheet is the real backup there, and the vault is only a set of undo points.
+const DEFAULT_BACKUP_LIMIT = isNativeShell ? 5 : 20;
 const VAULT_LIMIT_OPTIONS = [5, 10, 20, 50, 100, 200, 'unlimited'];
 // The backup file format and the save path live in features/backup; see backupFile.js.
 const DEFAULT_LAST_FEED_DEFAULTS = {
@@ -2726,7 +2733,7 @@ const ID_TEMPLATE_TOKENS = [
 function loadStoredJson(key, fallback) {
   if (typeof window === 'undefined') return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = getDeviceStore().getItem(key);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return parsed ?? fallback;
@@ -2736,20 +2743,20 @@ function loadStoredJson(key, fallback) {
   }
 }
 
+// The device store keeps the collection in IndexedDB behind an in-memory cache, so this stays
+// synchronous. A write that cannot reach the device raises STORAGE_FULL_EVENT from the store,
+// which the app turns into one alert.
 function saveStoredJson(key, value) {
   if (typeof window === 'undefined') return;
+  let text;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    text = JSON.stringify(value);
   } catch (err) {
-    console.warn(`Failed to persist ${key} to storage`, err);
-    // A full store means the next change is lost silently. On a phone the WebView quota is
-    // small and photos are stored inline, so this is the realistic data-loss path; the app
-    // listens for this event and tells the keeper once.
-    try {
-      window.dispatchEvent(new CustomEvent('serpentora:storage-full', { detail: { key, error: String(err?.name || err) } }));
-    } catch {
-      // Event construction failed; nothing more to do.
-    }
+    console.warn(`Failed to serialise ${key} for storage`, err);
+    return;
+  }
+  if (!getDeviceStore().setItem(key, text)) {
+    console.warn(`Failed to persist ${key} to storage`);
   }
 }
 
@@ -7004,14 +7011,14 @@ export default function BreedingPlannerApp() {
 
   const [syncTombstones, setSyncTombstones] = useState(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}');
+      const parsed = loadStoredJson('bpSyncTombstones', { snakes: {}, pairings: {} });
       return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {}, ...parsed };
     } catch { return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {} }; }
   });
   const syncTombstonesRef = useRef(syncTombstones);
   useEffect(() => {
     syncTombstonesRef.current = syncTombstones;
-    try { localStorage.setItem('bpSyncTombstones', JSON.stringify(syncTombstones)); } catch {}
+    saveStoredJson('bpSyncTombstones', syncTombstones);
   }, [syncTombstones]);
   // The dashboard is the landing page; a species workspace is entered from it. A null scope
   // means "no species chosen", which is only valid on the dashboard and the global tabs.
@@ -7400,6 +7407,11 @@ export default function BreedingPlannerApp() {
   const [backupSettings, setBackupSettings] = useState(() => normalizeBackupSettings(loadStoredJson(STORAGE_KEYS.backupSettings, null)));
   const [autoBackupSnapshot, setAutoBackupSnapshot] = useState(() => normalizeBackupSnapshot(loadStoredJson(STORAGE_KEYS.backupSnapshot, null)));
   const [backupVault, setBackupVault] = useState(() => normalizeBackupVault(loadStoredJson(STORAGE_KEYS.backupVault, [])));
+  // Only the summary lives in state; the full copy stays in the device store until it is used.
+  const [preRestoreInfo, setPreRestoreInfo] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.preRestoreSnapshot, null);
+    return stored?.payload ? { savedAt: stored.savedAt || null, animals: Number(stored.animals) || 0 } : null;
+  });
   const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
     const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
     return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
@@ -8670,13 +8682,7 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => {
     if (!autoBackupSnapshot) {
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.removeItem(STORAGE_KEYS.backupSnapshot);
-        } catch (err) {
-          console.warn('Failed to clear backup snapshot', err);
-        }
-      }
+      getDeviceStore().removeItem(STORAGE_KEYS.backupSnapshot);
       return;
     }
     saveStoredJson(STORAGE_KEYS.backupSnapshot, autoBackupSnapshot);
@@ -8723,12 +8729,17 @@ export default function BreedingPlannerApp() {
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
   }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, groupsBySpecies, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
-  const handleRestoreBackup = useCallback((payload) => {
+  // Restoring replaces the collection, so it must either keep the whole backup or change
+  // nothing. The restored data and a copy of the current collection (for undo) are written to
+  // the device in one transaction first; only once that succeeds does the app show them.
+  // Before this, the screen showed the backup while the device kept whatever fitted.
+  const handleRestoreBackup = useCallback(async (payload, { undo = false } = {}) => {
     assertRestorableBackup(payload);
 
-    const incomingSnakes = Array.isArray(payload.snakes)
+    let incomingSnakes = Array.isArray(payload.snakes)
       ? payload.snakes.map(sanitizeSnakeRecord).filter(Boolean)
       : [];
+    if (payload.photosOmitted) incomingSnakes = reattachCurrentPhotos(incomingSnakes, snakes);
     const incomingPairings = Array.isArray(payload.pairings)
       ? payload.pairings.map(sanitizePairingRecord).filter(Boolean)
       : [];
@@ -8737,12 +8748,53 @@ export default function BreedingPlannerApp() {
       throw new Error('Backup file does not contain any animals or pairings.');
     }
 
+    const incomingCycles = Array.isArray(payload.breedingCycles)
+      ? payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean)
+      : null;
+    const incomingExams = Array.isArray(payload.follicleExams)
+      ? payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean)
+      : null;
+    const incomingGroupsBySpecies = migrateFlatGroups(payload.groups, payload.groupsBySpecies);
+
+    // Electron keeps the collection in its own file through the bridge.
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (!bridge?.saveData) {
+      const store = getDeviceStore();
+      const entries = {
+        [STORAGE_KEYS.snakes]: JSON.stringify(incomingSnakes),
+        [STORAGE_KEYS.pairings]: JSON.stringify(incomingPairings),
+        [STORAGE_KEYS.groupsBySpecies]: JSON.stringify(incomingGroupsBySpecies),
+        [STORAGE_KEYS.groups]: JSON.stringify(flattenGroupsBySpecies(incomingGroupsBySpecies)),
+      };
+      if (incomingCycles) entries[STORAGE_KEYS.breedingCycles] = JSON.stringify(incomingCycles);
+      if (incomingExams) entries[STORAGE_KEYS.follicleExams] = JSON.stringify(incomingExams);
+      // The undo copy doubles what a restore writes; only IndexedDB has room for that.
+      let undoInfo = null;
+      if (!undo && store.status().mode === 'idb') {
+        const current = createBackupPayload();
+        undoInfo = { savedAt: new Date().toISOString(), animals: Array.isArray(current.snakes) ? current.snakes.length : 0 };
+        entries[STORAGE_KEYS.preRestoreSnapshot] = JSON.stringify({ ...undoInfo, payload: current });
+      }
+      try {
+        await store.commit(entries);
+      } catch (err) {
+        console.error('Restore could not be written to the device', err);
+        throw new Error(t('storage.restoreNotSaved', { defaultValue: 'This backup could not be saved on this device, so nothing was changed. Your current data is as it was.' }));
+      }
+      if (undo) {
+        store.removeItem(STORAGE_KEYS.preRestoreSnapshot);
+        setPreRestoreInfo(null);
+      } else if (undoInfo) {
+        setPreRestoreInfo(undoInfo);
+      }
+    }
+
     setSnakes(incomingSnakes);
     setPairings(incomingPairings);
-    if (Array.isArray(payload.breedingCycles)) setBreedingCycles(payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean));
-    if (Array.isArray(payload.follicleExams)) setFollicleExams(payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean));
+    if (incomingCycles) setBreedingCycles(incomingCycles);
+    if (incomingExams) setFollicleExams(incomingExams);
     if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
-    setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
+    setGroupsBySpecies(incomingGroupsBySpecies);
 
     if (Array.isArray(payload.morphAliases)) {
       const normalizedAliases = normalizeMorphAliasDatabase(payload.morphAliases);
@@ -8775,7 +8827,17 @@ export default function BreedingPlannerApp() {
         : normalizeSpacesDataset(payload.spaces || []);
       setSpacesState(normalizedSpaces);
     }
-  }, [setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState]);
+  }, [snakes, createBackupPayload, t, setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState]);
+
+  // Puts the collection back as it was before the last restore.
+  const handleUndoRestore = useCallback(async () => {
+    const snapshot = loadStoredJson(STORAGE_KEYS.preRestoreSnapshot, null);
+    if (!snapshot?.payload) {
+      setPreRestoreInfo(null);
+      throw new Error(t('setup.backup.undoMissing', { defaultValue: 'There is no earlier collection to go back to.' }));
+    }
+    await handleRestoreBackup(snapshot.payload, { undo: true });
+  }, [handleRestoreBackup, t]);
 
   const addBackupVaultEntry = useCallback((payload, meta = {}) => {
     if (!payload || typeof payload !== 'object') return null;
@@ -8790,7 +8852,7 @@ export default function BreedingPlannerApp() {
       createdAt: savedAt,
       updatedAt: savedAt,
       source,
-      payload,
+      payload: stripInlinePhotos(payload),
     });
     if (!entry) return null;
     const { maxVaultEntries: limit } = normalizeBackupSettings(backupSettings);
@@ -8837,7 +8899,7 @@ export default function BreedingPlannerApp() {
       return;
     }
     const savedAt = new Date().toISOString();
-    setAutoBackupSnapshot({ savedAt, payload: snapshotPayload });
+    setAutoBackupSnapshot({ savedAt, payload: stripInlinePhotos(snapshotPayload) });
     setBackupSettings(prev => normalizeBackupSettings({ ...(prev || {}), lastRun: savedAt }));
     addBackupVaultEntry(snapshotPayload, {
       source: 'auto',
@@ -8909,6 +8971,14 @@ export default function BreedingPlannerApp() {
       }
     }
 
+    // The collection's own database stays open for the writes the reset itself makes below,
+    // so it is emptied rather than deleted with the others.
+    try {
+      await getDeviceStore().clearAll();
+    } catch (error) {
+      console.warn('Failed to clear the device store during reset', error);
+    }
+
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.clear();
@@ -8926,7 +8996,7 @@ export default function BreedingPlannerApp() {
           await Promise.all(
             (Array.isArray(databases) ? databases : [])
               .map((db) => db?.name)
-              .filter(Boolean)
+              .filter((name) => name && name !== DEVICE_STORE_DB_NAME)
               .map((dbName) => new Promise((resolve) => {
                 const request = window.indexedDB.deleteDatabase(dbName);
                 request.onsuccess = () => resolve(true);
@@ -11924,13 +11994,20 @@ export default function BreedingPlannerApp() {
   const storageFullWarnedRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const onFull = () => {
+    // The store keeps retrying, so a later successful write clears the condition by itself;
+    // warning once per session is enough.
+    const onFull = (event) => {
       if (storageFullWarnedRef.current) return;
       storageFullWarnedRef.current = true;
-      showAppAlert(t('storage.full', { defaultValue: 'Local storage is full, so your latest change could not be saved on this device. Free space by compressing stored photos in Settings, or save a backup and remove old vault entries.' }));
+      const detail = event?.detail || {};
+      showAppAlert(detail.quota && detail.limited
+        ? t('storage.limitReached', { defaultValue: 'Your latest change could not be saved because this app has reached the storage limit this browser allows it. Save a backup from Settings, then compress stored photos or remove old vault entries.' })
+        : detail.quota
+        ? t('storage.full', { defaultValue: 'Your latest change could not be saved because this device is out of space. It stays open in the app for now, but it will be lost if the app is closed. Save a backup from Settings, then free up space on the device.' })
+        : t('storage.writeFailed', { defaultValue: 'Your latest change could not be saved on this device yet. The app will keep trying. Until it succeeds, save a backup from Settings before closing the app.' }));
     };
-    window.addEventListener('serpentora:storage-full', onFull);
-    return () => window.removeEventListener('serpentora:storage-full', onFull);
+    window.addEventListener(STORAGE_FULL_EVENT, onFull);
+    return () => window.removeEventListener(STORAGE_FULL_EVENT, onFull);
   }, [showAppAlert, t]);
 
   return (
@@ -13106,6 +13183,8 @@ export default function BreedingPlannerApp() {
             onSaved={() => setTab('animals')}
             createBackupPayload={createBackupPayload}
             onRestoreBackup={handleRestoreBackup}
+            onUndoRestore={handleUndoRestore}
+            preRestoreInfo={preRestoreInfo}
             backupSettings={backupSettings}
             updateBackupSettings={updateBackupSettings}
             autoBackupSnapshot={autoBackupSnapshot}
@@ -18909,6 +18988,8 @@ function BreederSection({
   onSaved,
   createBackupPayload,
   onRestoreBackup,
+  onUndoRestore,
+  preRestoreInfo = null,
   backupSettings,
   updateBackupSettings,
   autoBackupSnapshot,
@@ -20868,7 +20949,7 @@ function BreederSection({
     }
   }, [vaultEntries]);
 
-  const handleRestoreVaultEntry = useCallback((entryId) => {
+  const handleRestoreVaultEntry = useCallback(async (entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
     if (!entry) {
       setRestoreFeedback({
@@ -20882,7 +20963,7 @@ function BreederSection({
       if (typeof onRestoreBackup !== 'function') {
         throw new Error('Restore handler is unavailable.');
       }
-      onRestoreBackup(entry.payload);
+      await onRestoreBackup(entry.payload);
       setRestoreFeedback({
         type: 'success',
         message: `Restored data from "${entry.name}".`,
@@ -20950,6 +21031,35 @@ function BreederSection({
       timestamp: new Date().toISOString(),
     });
   }, [onDeleteVaultEntry, showAppConfirm, t, vaultEntries]);
+
+  const handleUndoRestoreClick = useCallback(async () => {
+    if (typeof onUndoRestore !== 'function') return;
+    const confirmed = typeof showAppConfirm === 'function'
+      ? await showAppConfirm(
+        t('setup.backup.undoConfirm', { defaultValue: 'Put your collection back as it was before the last restore? The restored data will be replaced.' }),
+        {
+          confirmLabel: t('setup.backup.undoRestore', { defaultValue: 'Undo last restore' }),
+          cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
+        },
+      )
+      : true;
+    if (!confirmed) return;
+    try {
+      await onUndoRestore();
+      setRestoreFeedback({
+        type: 'success',
+        message: t('setup.backup.undoDone', { defaultValue: 'Your collection is back as it was before the restore.' }),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(err);
+      setRestoreFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to undo the restore.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [onUndoRestore, showAppConfirm, t]);
 
   const handleRestoreFileSelected = useCallback(async (event) => {
     const file = event?.target?.files?.[0];
@@ -22347,7 +22457,9 @@ function BreederSection({
 
       {setupTab === 'backup' && (
         <div className="border-t pt-4 space-y-6">
-          <div className="space-y-3">
+          <DeviceStorageSummary snakes={snakes} refreshKey={`${vaultEntries.length}:${preRestoreInfo?.savedAt || ''}:${lastPhotoCompression?.completedAt || ''}`} />
+
+          <div className="space-y-3 border-t pt-4">
             <div>
               <div className="font-semibold text-sm">{t("setup.backup.compressTitle", { defaultValue: "Compress stored photos" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
@@ -22559,6 +22671,9 @@ function BreederSection({
               </select>
             </div>
             <div className="text-[11px] text-neutral-500">{vaultLimitDescription}</div>
+            <div className="text-[11px] text-neutral-500">
+              {t('setup.backup.vaultNoPhotos', { defaultValue: 'Vault copies are kept on this device without photos, to save space. Restoring one keeps the photos your animals have now. For a complete copy with photos, save a backup file.' })}
+            </div>
             <div className="text-xs text-neutral-500">
               {vaultEntries.length ? t("setup.backup.vaultCount", { count: vaultEntries.length, defaultValue_one: "{{count}} backup saved.", defaultValue_other: "{{count}} backups saved." }) : t("setup.backup.vaultEmpty", { defaultValue: "No backups saved yet." })}
             </div>
@@ -22685,6 +22800,23 @@ function BreederSection({
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {restoreFeedback.message}
                 {restoreFeedback.timestamp ? ` — ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
+              </div>
+            )}
+            {preRestoreInfo && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border text-sm"
+                  onClick={handleUndoRestoreClick}
+                >
+                  {t('setup.backup.undoRestore', { defaultValue: 'Undo last restore' })}
+                </button>
+                <span className="text-xs text-neutral-500">
+                  {t('setup.backup.undoHelp', {
+                    date: preRestoreInfo.savedAt ? formatDateTimeForDisplay(preRestoreInfo.savedAt) : '',
+                    defaultValue: 'Goes back to your collection as it was on {{date}}, before the restore.',
+                  })}
+                </span>
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
