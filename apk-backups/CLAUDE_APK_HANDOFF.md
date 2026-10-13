@@ -8,9 +8,11 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-**Latest breeder APK (2026-10-13): `app-release-2026-10-13-backup-picker-fix.apk`**
-SHA256 `621CEA606FB408E4A5274E7A2E19BC2B2CC12CBE2A570B74907D743479BD7441`, package `com.serpentora.mobile`,
-versionCode 10088 / 0.1.88, release-signed, staging backend. Supersedes the 12 Oct rebuild build: the phone's
+**Latest breeder APK (2026-10-13): `app-release-2026-10-13-duplicate-log-collapse.apk`**
+SHA256 `A17DCF8248F770376BD5CB98D1A583FFE462F831CF8A7A7BD3497206333C4FAD`, package `com.serpentora.mobile`,
+versionCode 10089 / 0.1.89, release-signed, staging backend. Supersedes `app-release-2026-10-13-backup-picker-fix.apk`
+(0.1.88): the phone now collapses duplicated log entries instead of re-uploading them, after the staging
+database was cleaned of 224k copies the same day. Also carries the 0.1.88 fix: the phone's
 file picker no longer greys out a transferred `.bpbackup`. First build in which the phone runs the real
 Serpentora app instead of the separate mobile app (deleted). Backups save through the share sheet; new Field
 tab for scan and quick logs. Built from `feature/mobile-rebuild`, not yet merged. Not run on a device. Build
