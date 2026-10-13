@@ -3209,5 +3209,18 @@
   "archive.record.eraseConfirmLabel": "Erase contact",
   "archive.record.eraseTitle": "Erase buyer contact?",
   "archive.record.feedWeight": "Prey weight",
-  "archive.record.food": "Food"
+  "archive.record.food": "Food",
+  "archive.delete.keepsCard": "{{name}} is part of your breeding records ({{summary}}). Feeding, weights, notes and photos are erased, but a small card keeps the ID, name, main photo and family links, so pairings, clutches and pedigrees still show it.",
+  "archive.delete.linkClutch": "a clutch",
+  "archive.delete.linkOffspring": "offspring: {{count}}",
+  "archive.delete.linkPairings": "pairings: {{count}}",
+  "archive.delete.linkParents": "parents on file",
+  "archive.delete.whyLeft": "Why did it leave?",
+  "archive.removed.dam": "Dam",
+  "archive.removed.explain": "This snake was deleted. Its records were erased; this card keeps its place in your pairings, clutches and pedigrees.",
+  "archive.removed.label": "No longer in the collection",
+  "archive.removed.noOffspring": "No offspring on file.",
+  "archive.removed.offspring": "Offspring",
+  "archive.removed.pairings": "Pairings",
+  "archive.removed.sire": "Sire"
 }

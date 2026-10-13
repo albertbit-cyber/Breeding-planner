@@ -3209,5 +3209,18 @@
   "archive.record.eraseTitle": "Apagar o contacto do comprador?",
   "archive.record.eraseConfirmLabel": "Apagar contacto",
   "archive.record.food": "Alimento",
-  "archive.record.feedWeight": "Peso da presa"
+  "archive.record.feedWeight": "Peso da presa",
+  "archive.delete.keepsCard": "{{name}} faz parte dos seus registos de criação ({{summary}}). Refeições, pesos, notas e fotos são apagados, mas uma pequena ficha mantém o ID, o nome, a foto principal e as ligações familiares, para que emparelhamentos, posturas e pedigrees continuem a mostrá-lo.",
+  "archive.delete.linkClutch": "uma postura",
+  "archive.delete.linkOffspring": "descendência: {{count}}",
+  "archive.delete.linkPairings": "emparelhamentos: {{count}}",
+  "archive.delete.linkParents": "progenitores registados",
+  "archive.delete.whyLeft": "Porque saiu da coleção?",
+  "archive.removed.dam": "Mãe",
+  "archive.removed.sire": "Pai",
+  "archive.removed.explain": "Esta serpente foi eliminada. Os seus dados foram apagados; esta ficha mantém o seu lugar nos emparelhamentos, posturas e pedigrees.",
+  "archive.removed.label": "Já não está na coleção",
+  "archive.removed.noOffspring": "Sem descendência registada.",
+  "archive.removed.offspring": "Descendência",
+  "archive.removed.pairings": "Emparelhamentos"
 }

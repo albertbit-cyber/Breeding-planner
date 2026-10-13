@@ -4395,3 +4395,34 @@
 }
 [data-motion-preference="reduced"] .archive-chip:active,
 [data-motion-preference="reduced"] .archive-list__row:active { transform: none; }
+
+/* "Died" / "Sold" next to a snake still named in a pairing, clutch or pedigree after it left. */
+.archive-departure-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+  background: var(--sk-surface-3, #eef0f2);
+  color: var(--sk-text-secondary, #3c4149);
+  border: 1px solid var(--sk-border, #d8d6d1);
+}
+.removed-card__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--sk-text-muted, #5c6169);
+}
+.removed-card__photo { filter: grayscale(0.6); }
+.removed-card__offspring { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.875rem; }
+.removed-card { animation: archive-pop-in 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (max-width: 639px) {
+  .removed-card { animation: archive-sheet-in 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .removed-card { animation: none; }
+}

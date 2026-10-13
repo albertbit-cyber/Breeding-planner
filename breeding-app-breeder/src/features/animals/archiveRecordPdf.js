@@ -194,7 +194,7 @@ export async function buildArchiveRecordPdf(data, labels, { locale, breederName 
   }
   if (data.offspring.length) {
     y += 1;
-    paragraph(`${labels.offspring}: ${data.offspring.map(o => (o.archived ? `${o.name} (${labels.archivedMarker})` : o.name)).join(', ')}`, { size: 9 });
+    paragraph(`${labels.offspring}: ${data.offspring.map(o => (o.left ? `${o.name} (${labels.reasons[o.left] || labels.archivedMarker})` : o.name)).join(', ')}`, { size: 9 });
   }
 
   heading(labels.feeding);

@@ -6,7 +6,15 @@
  * the server can tell without reading payloads: these are the statuses the app writes, mirrored
  * from breeding-app-breeder/src/features/animals/archive.js (ARCHIVED_STATUSES). Keep them equal.
  */
-export const ARCHIVED_ANIMAL_STATUSES = ["sold", "deceased", "archived"] as const;
+export const ARCHIVED_ANIMAL_STATUSES = ["sold", "deceased", "archived", "removed"] as const;
+
+/** A deleted snake kept as a small lineage card (status "Removed", payload.removed set). */
+export const isRemovedAnimalPayload = (payload: unknown): boolean => {
+  if (!payload || typeof payload !== "object") return false;
+  const record = payload as Record<string, unknown>;
+  if (record.removed && typeof record.removed === "object") return true;
+  return String(record.status ?? "").trim().toLowerCase() === "removed";
+};
 
 // Prisma's `in` is case-sensitive and the column has held hand-typed statuses for years, so
 // every casing the app and the older phone build have written is listed.

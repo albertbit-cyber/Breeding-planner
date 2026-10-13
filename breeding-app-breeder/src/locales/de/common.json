@@ -3211,5 +3211,18 @@
   "archive.record.eraseTitle": "Kontakt des Käufers löschen?",
   "archive.record.eraseConfirmLabel": "Kontakt löschen",
   "archive.record.food": "Futter",
-  "archive.record.feedWeight": "Gewicht des Futtertiers"
+  "archive.record.feedWeight": "Gewicht des Futtertiers",
+  "archive.delete.keepsCard": "{{name}} gehört zu deinen Zuchtunterlagen ({{summary}}). Fütterungen, Gewichte, Notizen und Fotos werden gelöscht, aber eine kleine Karte behält ID, Name, Hauptfoto und Familienverbindungen, damit Verpaarungen, Gelege und Stammbäume das Tier weiter zeigen.",
+  "archive.delete.linkClutch": "ein Gelege",
+  "archive.delete.linkOffspring": "Nachkommen: {{count}}",
+  "archive.delete.linkPairings": "Verpaarungen: {{count}}",
+  "archive.delete.linkParents": "Elterntiere erfasst",
+  "archive.delete.whyLeft": "Warum hat es den Bestand verlassen?",
+  "archive.removed.dam": "Mutter",
+  "archive.removed.sire": "Vater",
+  "archive.removed.explain": "Dieses Tier wurde gelöscht. Seine Daten sind entfernt; diese Karte hält seinen Platz in deinen Verpaarungen, Gelegen und Stammbäumen.",
+  "archive.removed.label": "Nicht mehr im Bestand",
+  "archive.removed.noOffspring": "Keine Nachkommen erfasst.",
+  "archive.removed.offspring": "Nachkommen",
+  "archive.removed.pairings": "Verpaarungen"
 }

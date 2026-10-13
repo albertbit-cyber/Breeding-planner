@@ -3209,5 +3209,18 @@
   "archive.record.eraseTitle": "Cancellare il contatto dell’acquirente?",
   "archive.record.eraseConfirmLabel": "Cancella contatto",
   "archive.record.food": "Cibo",
-  "archive.record.feedWeight": "Peso della preda"
+  "archive.record.feedWeight": "Peso della preda",
+  "archive.delete.keepsCard": "{{name}} fa parte dei tuoi registri di allevamento ({{summary}}). Pasti, pesi, note e foto vengono cancellati, ma una piccola scheda conserva ID, nome, foto principale e legami familiari, così accoppiamenti, covate e pedigree continuano a mostrarlo.",
+  "archive.delete.linkClutch": "una covata",
+  "archive.delete.linkOffspring": "prole: {{count}}",
+  "archive.delete.linkPairings": "accoppiamenti: {{count}}",
+  "archive.delete.linkParents": "genitori registrati",
+  "archive.delete.whyLeft": "Perché ha lasciato la collezione?",
+  "archive.removed.dam": "Madre",
+  "archive.removed.sire": "Padre",
+  "archive.removed.explain": "Questo serpente è stato eliminato. I suoi dati sono stati cancellati; questa scheda mantiene il suo posto in accoppiamenti, covate e pedigree.",
+  "archive.removed.label": "Non più nella collezione",
+  "archive.removed.noOffspring": "Nessuna prole registrata.",
+  "archive.removed.offspring": "Prole",
+  "archive.removed.pairings": "Accoppiamenti"
 }

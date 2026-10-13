@@ -32,7 +32,10 @@ export const ARCHIVE_STATUS_BY_REASON = Object.freeze({
 });
 
 /** Lower-case statuses that mean "no longer in the collection". Mirrored on the server. */
-export const ARCHIVED_STATUSES = Object.freeze(['sold', 'deceased', 'archived']);
+export const ARCHIVED_STATUSES = Object.freeze(['sold', 'deceased', 'archived', 'removed']);
+
+/** The status of a deleted snake kept as a small lineage card. */
+export const REMOVED_STATUS = 'Removed';
 
 /** The status a snake gets when it returns to the collection. */
 export const RETURNED_STATUS = 'Active';
@@ -106,8 +109,25 @@ export function isArchivedStatus(status) {
   return ARCHIVED_STATUSES.includes(value);
 }
 
+/**
+ * A deleted snake that is kept as a small card because other records point at it: it was in a
+ * pairing, it has offspring, or it is itself someone's offspring. Its data is gone; its identity
+ * (ID, name, main photo, genetics) and its family links stay so pairings and pedigrees still read.
+ */
+export function isRemovedAnimal(animal) {
+  if (!animal || typeof animal !== 'object') return false;
+  if (animal.removed && typeof animal.removed === 'object') return true;
+  return text(animal.status).toLowerCase() === 'removed';
+}
+
+/** Archived or removed: either way the snake is not in the collection any more. */
+export function isOutOfCollection(animal) {
+  return isRemovedAnimal(animal) || isArchivedAnimal(animal);
+}
+
 export function isArchivedAnimal(animal) {
   if (!animal || typeof animal !== 'object') return false;
+  if (isRemovedAnimal(animal)) return false;
   if (animal.archive && typeof animal.archive === 'object' && animal.archive.reason) return true;
   return isArchivedStatus(animal.status);
 }
@@ -311,7 +331,7 @@ export function buildReturnPatch(animal, { date, note = '' } = {}, { now = isoNo
 
 /** Collection animals only: the list every day-to-day surface works from. */
 export function activeAnimals(animals) {
-  return (Array.isArray(animals) ? animals : []).filter(animal => animal && !isArchivedAnimal(animal));
+  return (Array.isArray(animals) ? animals : []).filter(animal => animal && !isOutOfCollection(animal));
 }
 
 export function archivedAnimals(animals) {
@@ -356,4 +376,107 @@ export function closePairingsForArchivedFemale(pairings, femaleId, reason, { isO
     };
   });
   return { pairings: next, closedIds };
+}
+
+// ── Deleted snakes kept as lineage cards ──────────────────────────────────────
+
+/**
+ * Why a snake is no longer in the collection, for labels in pairings, clutches and pedigrees.
+ * `kind` is "archived" (full record kept) or "removed" (deleted, card kept); null when the snake
+ * is still in the collection.
+ */
+export function departureOf(animal) {
+  if (isRemovedAnimal(animal)) {
+    const removed = animal.removed && typeof animal.removed === 'object' ? animal.removed : {};
+    return {
+      kind: 'removed',
+      reason: ARCHIVE_REASONS.includes(removed.reason) ? removed.reason : 'other',
+      date: toYmd(removed.date) || toYmd(removed.at) || '',
+    };
+  }
+  const record = getArchiveRecord(animal);
+  if (!record) return null;
+  return { kind: 'archived', reason: record.reason, date: record.date };
+}
+
+/**
+ * Whether other records point at this snake: a pairing (or breeding card) it took part in,
+ * offspring that name it as a parent, or its own parents or clutch. Any of these keeps a card.
+ */
+export function familyLinksOf(animal, { animals = [], pairings = [], cycles = [] } = {}) {
+  if (!animal?.id) return { pairings: 0, offspring: 0, parents: 0, hasLinks: false };
+  const id = animal.id;
+  const ownPairings = (Array.isArray(pairings) ? pairings : [])
+    .filter(p => p && !p.deletedAt && (p.femaleId === id || p.maleId === id));
+  const pairingCount = ownPairings.length;
+  // A breeding card mapped from a legacy pairing ("bc-legacy-<pairing id>") is the same breeding
+  // seen twice, so it is counted once.
+  const mirrored = new Set(ownPairings.map(p => `bc-legacy-${p.id}`));
+  const cycleCount = (Array.isArray(cycles) ? cycles : [])
+    .filter(c => c && !c.deletedAt && !mirrored.has(c.id) && (c.femaleId === id || (Array.isArray(c.males) && c.males.some(m => m?.maleId === id)))).length;
+  const offspring = (Array.isArray(animals) ? animals : [])
+    .filter(a => a && a.id !== id && (text(a.sireId) === id || text(a.damId) === id)).length;
+  const parents = [animal.sireId, animal.damId].filter(v => text(v)).length;
+  const inClutch = Boolean(text(animal.clutchId) || text(animal.pairingId) || text(animal.metadata?.pairingId) || text(animal.metadata?.clutchId));
+  return {
+    pairings: pairingCount + cycleCount,
+    offspring,
+    parents,
+    hasLinks: pairingCount + cycleCount + offspring + parents > 0 || inClutch,
+  };
+}
+
+/** What a deleted snake keeps: who it is and how it is related. Everything else is erased. */
+const REMOVAL_KEEP_FIELDS = Object.freeze([
+  'id', 'name', 'sex', 'species', 'morphs', 'hets', 'possibleHets',
+  'sireId', 'damId', 'clutchId', 'pairingId', 'hatchlingIndex',
+  'birthDate', 'hatchDate', 'year', 'tags', 'autoId', 'idSequence', 'displayId', 'isDemo',
+]);
+
+function firstPhoto(animal) {
+  const photos = Array.isArray(animal?.photos) ? animal.photos.filter(p => p && (p.url || p.dataUrl)) : [];
+  return photos[0] || null;
+}
+
+/**
+ * The card a deleted snake leaves behind. Keeps ID, name, the main (thumbnail) photo, sex,
+ * species, genetics and every family link; erases logs, notes, prices, the rest of the photos and
+ * any archive record. Throws on an unknown reason so the dialog can say so.
+ */
+export function buildRemovalStub(animal, { reason, now = isoNow() } = {}) {
+  if (!animal?.id) throw new Error('No animal to delete.');
+  const chosen = reason || getArchiveRecord(animal)?.reason || 'other';
+  if (!ARCHIVE_REASONS.includes(chosen)) throw new Error('Choose why the animal left the collection.');
+  const stub = {};
+  REMOVAL_KEEP_FIELDS.forEach((key) => {
+    if (animal[key] !== undefined) stub[key] = animal[key];
+  });
+  const photo = firstPhoto(animal);
+  const metadata = animal.metadata && typeof animal.metadata === 'object' ? animal.metadata : null;
+  return {
+    ...stub,
+    status: REMOVED_STATUS,
+    photos: photo ? [photo] : [],
+    imageUrl: photo?.url || text(animal.imageUrl, 4000) || '',
+    groups: [],
+    logs: { feeds: [], weights: [], sheds: [], cleanings: [], meds: [] },
+    ...(metadata && (metadata.pairingId || metadata.clutchId || metadata.hatchlingIndex !== undefined)
+      ? { metadata: { pairingId: metadata.pairingId, clutchId: metadata.clutchId, hatchlingIndex: metadata.hatchlingIndex } }
+      : {}),
+    removed: { at: now, date: toYmd(now), reason: chosen },
+    updatedAt: now,
+  };
+}
+
+/**
+ * Merge two copies of one animal when either is a deleted-snake card. Deletion is sticky: a card
+ * is never merged back together with a full copy, which would hand the erased logs and photos
+ * back from a device that had not synced yet. When both are cards the later one wins.
+ */
+export function mergeWithRemoval(a, b, timestampOf) {
+  const aRemoved = isRemovedAnimal(a);
+  const bRemoved = isRemovedAnimal(b);
+  if (!aRemoved && !bRemoved) return null;
+  if (aRemoved && bRemoved) return (timestampOf(b) > timestampOf(a)) ? b : a;
+  return aRemoved ? a : b;
 }

@@ -3225,5 +3225,18 @@
   "archive.record.eraseTitle": "למחוק את פרטי הקשר של הקונה?",
   "archive.record.eraseConfirmLabel": "מחיקת פרטי הקשר",
   "archive.record.food": "מזון",
-  "archive.record.feedWeight": "משקל הטרף"
+  "archive.record.feedWeight": "משקל הטרף",
+  "archive.delete.keepsCard": "{{name}} הוא חלק מרשומות הרבייה שלכם ({{summary}}). האכלות, שקילות, הערות ותמונות יימחקו, אבל כרטיס קטן ישמור את המזהה, השם, התמונה הראשית והקשרים המשפחתיים, כך שזיווגים, תטולות ואילנות יוחסין ימשיכו להציג אותו.",
+  "archive.delete.linkClutch": "תטולה",
+  "archive.delete.linkOffspring": "צאצאים: {{count}}",
+  "archive.delete.linkPairings": "זיווגים: {{count}}",
+  "archive.delete.linkParents": "הורים רשומים",
+  "archive.delete.whyLeft": "למה הוא עזב את האוסף?",
+  "archive.removed.dam": "אם",
+  "archive.removed.sire": "אב",
+  "archive.removed.explain": "הנחש הזה נמחק. הנתונים שלו נמחקו; הכרטיס הזה שומר על מקומו בזיווגים, בתטולות ובאילנות היוחסין.",
+  "archive.removed.label": "כבר לא באוסף",
+  "archive.removed.noOffspring": "אין צאצאים רשומים.",
+  "archive.removed.offspring": "צאצאים",
+  "archive.removed.pairings": "זיווגים"
 }

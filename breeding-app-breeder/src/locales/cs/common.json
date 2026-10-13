@@ -3225,5 +3225,18 @@
   "archive.record.eraseTitle": "Smazat kontakt kupujícího?",
   "archive.record.eraseConfirmLabel": "Smazat kontakt",
   "archive.record.food": "Potrava",
-  "archive.record.feedWeight": "Hmotnost krmiva"
+  "archive.record.feedWeight": "Hmotnost krmiva",
+  "archive.delete.keepsCard": "{{name}} je součástí tvých chovatelských záznamů ({{summary}}). Krmení, vážení, poznámky a fotky se smažou, ale malá karta zachová ID, jméno, hlavní fotku a rodinné vazby, aby ho párování, snůšky a rodokmeny dál ukazovaly.",
+  "archive.delete.linkClutch": "snůška",
+  "archive.delete.linkOffspring": "potomci: {{count}}",
+  "archive.delete.linkPairings": "párování: {{count}}",
+  "archive.delete.linkParents": "rodiče v záznamech",
+  "archive.delete.whyLeft": "Proč opustil sbírku?",
+  "archive.removed.dam": "Matka",
+  "archive.removed.sire": "Otec",
+  "archive.removed.explain": "Tento had byl smazán. Jeho data byla vymazána; tato karta drží jeho místo v párováních, snůškách a rodokmenech.",
+  "archive.removed.label": "Už není ve sbírce",
+  "archive.removed.noOffspring": "Žádní potomci v záznamech.",
+  "archive.removed.offspring": "Potomci",
+  "archive.removed.pairings": "Párování"
 }

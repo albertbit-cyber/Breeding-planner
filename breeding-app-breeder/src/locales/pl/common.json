@@ -3239,5 +3239,18 @@
   "archive.record.eraseTitle": "Usunąć dane kontaktowe kupującego?",
   "archive.record.eraseConfirmLabel": "Usuń kontakt",
   "archive.record.food": "Pokarm",
-  "archive.record.feedWeight": "Waga pokarmu"
+  "archive.record.feedWeight": "Waga pokarmu",
+  "archive.delete.keepsCard": "{{name}} należy do twoich zapisów hodowlanych ({{summary}}). Karmienia, wagi, notatki i zdjęcia zostaną usunięte, ale mała karta zachowa ID, nazwę, główne zdjęcie i powiązania rodzinne, aby pary, zniesienia i rodowody nadal je pokazywały.",
+  "archive.delete.linkClutch": "zniesienie",
+  "archive.delete.linkOffspring": "potomstwo: {{count}}",
+  "archive.delete.linkPairings": "pary: {{count}}",
+  "archive.delete.linkParents": "rodzice w zapisach",
+  "archive.delete.whyLeft": "Dlaczego opuścił kolekcję?",
+  "archive.removed.dam": "Matka",
+  "archive.removed.sire": "Ojciec",
+  "archive.removed.explain": "To zwierzę zostało usunięte. Jego dane skasowano; ta karta zachowuje jego miejsce w parach, zniesieniach i rodowodach.",
+  "archive.removed.label": "Nie ma go już w kolekcji",
+  "archive.removed.noOffspring": "Brak potomstwa w zapisach.",
+  "archive.removed.offspring": "Potomstwo",
+  "archive.removed.pairings": "Pary"
 }

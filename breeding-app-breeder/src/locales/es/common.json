@@ -3211,5 +3211,18 @@
   "archive.record.eraseTitle": "¿Borrar el contacto del comprador?",
   "archive.record.eraseConfirmLabel": "Borrar contacto",
   "archive.record.food": "Alimento",
-  "archive.record.feedWeight": "Peso de la presa"
+  "archive.record.feedWeight": "Peso de la presa",
+  "archive.delete.keepsCard": "{{name}} forma parte de tus registros de cría ({{summary}}). Se borran alimentaciones, pesos, notas y fotos, pero una pequeña ficha conserva el ID, el nombre, la foto principal y los vínculos familiares, para que apareamientos, puestas y pedigríes lo sigan mostrando.",
+  "archive.delete.linkClutch": "una puesta",
+  "archive.delete.linkOffspring": "descendencia: {{count}}",
+  "archive.delete.linkPairings": "apareamientos: {{count}}",
+  "archive.delete.linkParents": "padres registrados",
+  "archive.delete.whyLeft": "¿Por qué salió de la colección?",
+  "archive.removed.dam": "Madre",
+  "archive.removed.sire": "Padre",
+  "archive.removed.explain": "Esta serpiente se eliminó. Sus datos se borraron; esta ficha conserva su lugar en tus apareamientos, puestas y pedigríes.",
+  "archive.removed.label": "Ya no está en la colección",
+  "archive.removed.noOffspring": "No hay descendencia registrada.",
+  "archive.removed.offspring": "Descendencia",
+  "archive.removed.pairings": "Apareamientos"
 }

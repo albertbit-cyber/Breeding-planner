@@ -6,6 +6,7 @@
  * and review prompts; follicle chart and shared timeline; clutch and hatchling outcome; the
  * small, collapsible previous-cycles section. Detailed records are behind disclosures.
  */
+import DepartureTag from '../../animals/DepartureTag.jsx';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -432,6 +433,7 @@ export function BreedingCard({
                 return (
                   <li key={item.animalId} className="flex flex-wrap items-center gap-2">
                     {onOpenSnake && snake ? <button type="button" className="underline" onClick={() => onOpenSnake(snake)}>{animalName(snake, item.animalId)}</button> : <span>{animalName(snake, item.animalId)}</span>}
+                    <DepartureTag animal={snake} />
                     <span className="text-neutral-600">
                       {t('breeding.offspring.sire', { defaultValue: 'Sire' })}: {item.sireAssignment?.maleId ? `${animalName(sire, item.sireAssignment.maleId)} (${item.sireAssignment.method.replace(/_/g, ' ')}, ${item.sireAssignment.certainty})` : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' })}
                     </span>

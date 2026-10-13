@@ -180,3 +180,59 @@ describe('breeding when a snake is archived', () => {
     expect(cycles[0].plannedPairings.map(p => p.status)).toEqual(['cancelled', 'pending']);
   });
 });
+
+import { isRemovedAnimal, isOutOfCollection, familyLinksOf, buildRemovalStub, mergeWithRemoval, departureOf } from './archive';
+
+describe('deleting a snake that has family links', () => {
+  const clown = {
+    id: 'M-1', name: 'Clown male', sex: 'M', species: 'ball-python', status: 'Breeder',
+    morphs: ['Clown'], hets: [], sireId: 'M-0', damId: 'F-0', price: 900, notes: 'calm',
+    photos: [{ id: 'p1', url: 'data:image/png;base64,AAA' }, { id: 'p2', url: 'data:image/png;base64,BBB' }],
+    logs: { feeds: [{ id: 'f1', date: '2026-01-01' }], weights: [{ id: 'w1', date: '2026-01-01', grams: 900 }] },
+    groups: ['Breeders'], tags: ['hatchling'], metadata: { pairingId: 'P-0', secret: 'x' },
+  };
+  const hatchling = { id: 'H-1', name: 'Clown Pied', sireId: 'M-1', damId: 'F-2' };
+  const loner = { id: 'B-1', name: 'Bought in' };
+  const pairings = [{ id: 'P-1', femaleId: 'F-2', maleId: 'M-1' }];
+
+  it('finds pairings, offspring and own parents as links', () => {
+    expect(familyLinksOf(clown, { animals: [clown, hatchling], pairings })).toMatchObject({ pairings: 1, offspring: 1, parents: 2, hasLinks: true });
+    expect(familyLinksOf(hatchling, { animals: [clown, hatchling], pairings: [] })).toMatchObject({ parents: 2, hasLinks: true });
+    expect(familyLinksOf(loner, { animals: [loner], pairings }).hasLinks).toBe(false);
+  });
+
+  it('keeps identity, the main photo and family links, and erases the rest', () => {
+    const stub = buildRemovalStub(clown, { reason: 'died', now: NOW });
+    expect(stub).toMatchObject({ id: 'M-1', name: 'Clown male', morphs: ['Clown'], sireId: 'M-0', damId: 'F-0', status: 'Removed', removed: { reason: 'died', date: '2026-10-13' } });
+    expect(stub.photos).toHaveLength(1);
+    expect(stub.photos[0].id).toBe('p1');
+    expect(stub.logs.feeds).toEqual([]);
+    expect(stub.logs.weights).toEqual([]);
+    expect(stub.price).toBeUndefined();
+    expect(stub.notes).toBeUndefined();
+    expect(stub.groups).toEqual([]);
+    expect(stub.tags).toEqual(['hatchling']);
+    expect(stub.metadata).toEqual({ pairingId: 'P-0', clutchId: undefined, hatchlingIndex: undefined });
+    expect(isRemovedAnimal(stub)).toBe(true);
+    expect(isArchivedAnimal(stub)).toBe(false);
+    expect(isOutOfCollection(stub)).toBe(true);
+    expect(activeAnimals([stub, hatchling]).map(a => a.id)).toEqual(['H-1']);
+    expect(archivedAnimals([stub])).toEqual([]);
+    expect(departureOf(stub)).toEqual({ kind: 'removed', reason: 'died', date: '2026-10-13' });
+  });
+
+  it('takes the reason from the archive when an archived snake is deleted', () => {
+    const archived = { ...clown, status: 'Sold', archive: { reason: 'sold', date: '2026-05-01' } };
+    expect(buildRemovalStub(archived, { now: NOW }).removed.reason).toBe('sold');
+    expect(() => buildRemovalStub(clown, { reason: 'vanished', now: NOW })).toThrow(/why/);
+  });
+
+  it('never merges a deleted card back together with a full copy', () => {
+    const stub = buildRemovalStub(clown, { reason: 'died', now: NOW });
+    const ts = (a) => Date.parse(a.updatedAt || 0) || 0;
+    const newerFull = { ...clown, updatedAt: '2027-01-01T00:00:00.000Z' };
+    expect(mergeWithRemoval(newerFull, stub, ts)).toBe(stub);
+    expect(mergeWithRemoval(stub, newerFull, ts)).toBe(stub);
+    expect(mergeWithRemoval(clown, hatchling, ts)).toBeNull();
+  });
+});

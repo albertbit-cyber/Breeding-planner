@@ -3209,5 +3209,18 @@
   "archive.record.eraseTitle": "Effacer le contact de l’acheteur ?",
   "archive.record.eraseConfirmLabel": "Effacer le contact",
   "archive.record.food": "Nourriture",
-  "archive.record.feedWeight": "Poids de la proie"
+  "archive.record.feedWeight": "Poids de la proie",
+  "archive.delete.keepsCard": "{{name}} fait partie de vos registres d'élevage ({{summary}}). Repas, pesées, notes et photos sont effacés, mais une petite fiche conserve l'ID, le nom, la photo principale et les liens familiaux, pour que les accouplements, pontes et pedigrees l'affichent toujours.",
+  "archive.delete.linkClutch": "une ponte",
+  "archive.delete.linkOffspring": "descendants : {{count}}",
+  "archive.delete.linkPairings": "accouplements : {{count}}",
+  "archive.delete.linkParents": "parents enregistrés",
+  "archive.delete.whyLeft": "Pourquoi a-t-il quitté la collection ?",
+  "archive.removed.dam": "Mère",
+  "archive.removed.sire": "Père",
+  "archive.removed.explain": "Ce serpent a été supprimé. Ses données ont été effacées ; cette fiche garde sa place dans vos accouplements, pontes et pedigrees.",
+  "archive.removed.label": "Ne fait plus partie de la collection",
+  "archive.removed.noOffspring": "Aucun descendant enregistré.",
+  "archive.removed.offspring": "Descendants",
+  "archive.removed.pairings": "Accouplements"
 }

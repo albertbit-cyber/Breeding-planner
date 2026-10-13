@@ -3211,5 +3211,18 @@
   "archive.record.eraseTitle": "Contact van koper wissen?",
   "archive.record.eraseConfirmLabel": "Contact wissen",
   "archive.record.food": "Voer",
-  "archive.record.feedWeight": "Gewicht voerdier"
+  "archive.record.feedWeight": "Gewicht voerdier",
+  "archive.delete.keepsCard": "{{name}} hoort bij je kweekgegevens ({{summary}}). Voedingen, gewichten, notities en foto's worden gewist, maar een kleine kaart bewaart ID, naam, hoofdfoto en familiebanden, zodat koppels, legsels en stambomen het dier blijven tonen.",
+  "archive.delete.linkClutch": "een legsel",
+  "archive.delete.linkOffspring": "nakomelingen: {{count}}",
+  "archive.delete.linkPairings": "koppels: {{count}}",
+  "archive.delete.linkParents": "ouders vastgelegd",
+  "archive.delete.whyLeft": "Waarom heeft het de collectie verlaten?",
+  "archive.removed.dam": "Moeder",
+  "archive.removed.sire": "Vader",
+  "archive.removed.explain": "Dit dier is verwijderd. De gegevens zijn gewist; deze kaart bewaart zijn plaats in je koppels, legsels en stambomen.",
+  "archive.removed.label": "Niet meer in de collectie",
+  "archive.removed.noOffspring": "Geen nakomelingen vastgelegd.",
+  "archive.removed.offspring": "Nakomelingen",
+  "archive.removed.pairings": "Koppels"
 }

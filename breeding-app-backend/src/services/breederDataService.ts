@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma";
 import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
-import { countedAnimalWhere, isArchivedAnimalStatus } from "./animalArchive";
+import { countedAnimalWhere, isArchivedAnimalStatus, isRemovedAnimalPayload } from "./animalArchive";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
 import {
   validateBreedingReferences,
@@ -348,6 +348,17 @@ const mergeSnapshotPayload = (
 };
 
 const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
+  // A deleted snake kept as a lineage card wins whole. Merging it with the full copy would
+  // union the erased logs and photos straight back in. Two cards: the later one.
+  const existingRecord = asRecord(existingPayload);
+  const existingRemoved = isRemovedAnimalPayload(existingRecord);
+  const incomingRemoved = isRemovedAnimalPayload(incomingPayload);
+  if (existingRemoved || incomingRemoved) {
+    if (existingRemoved && incomingRemoved) {
+      return payloadUpdatedAtMs(incomingPayload) >= payloadUpdatedAtMs(existingRecord || {}) ? incomingPayload : (existingRecord as JsonRecord);
+    }
+    return incomingRemoved ? incomingPayload : (existingRecord as JsonRecord);
+  }
   const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
     stringArrayKeys: ["tags", "groups"],
     lastWriterStringArrayKeys: ["morphs", "hets", "possibleHets"],
@@ -555,8 +566,9 @@ const recordArchiveOwnership = async (ownerId: string, transitions: ArchiveTrans
   for (const transition of transitions) {
     const archive = asRecord(transition.payload?.archive);
     if (transition.archived) {
-      const leftAt = new Date(isoDateValue(archive?.date) || new Date().toISOString());
-      const reason = textValue(archive?.reason)?.replace(/_/g, " ") || "archived";
+      const leftAt = new Date(isoDateValue(archive?.date) || isoDateValue(asRecord(transition.payload?.removed)?.date) || new Date().toISOString());
+      const removed = asRecord(transition.payload?.removed);
+      const reason = (textValue(archive?.reason) || textValue(removed?.reason))?.replace(/_/g, " ") || "archived";
       const history = await db.ownershipHistory.findMany({ where: { animalId: transition.rowId }, orderBy: { fromDate: "asc" } });
       const open = history.find((row: any) => row.ownerId === ownerId && !row.toDate);
       if (open) {
@@ -759,12 +771,16 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       }
       continue;
     }
+    // Columns follow the merged record, not the incoming one: when the stored copy wins (a
+    // deleted snake's card against a stale full copy), the status column must say so too, or the
+    // card would count toward the plan's animal limit again.
+    const payload = existing ? mergeAnimalPayload(existing.payload, animal) : animal;
     const data = {
-      name: textValue(animal.name),
-      sex: textValue(animal.sex),
-      status: textValue(animal.status),
-      species: textValue(animal.species),
-      payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
+      name: textValue(payload.name),
+      sex: textValue(payload.sex),
+      status: textValue(payload.status),
+      species: textValue(payload.species),
+      payload,
     };
     if (!existing) {
       animalCreates.push({ ownerId, appAnimalId, ...data });

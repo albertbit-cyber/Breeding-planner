@@ -6,7 +6,7 @@
  * through `t`, the i18next function, with the English as its default.
  */
 
-import { getArchiveRecord, getArchiveHistory, isArchivedAnimal } from './archive';
+import { getArchiveRecord, getArchiveHistory, isArchivedAnimal, departureOf } from './archive';
 import { formatSexCode } from './animalTextList';
 import { normalizeSexValue } from './animalSex';
 
@@ -187,7 +187,7 @@ export function buildArchiveRecordData({ animal, animals = [], pairings = [], is
   const damId = text(animal.damId);
   const offspring = (Array.isArray(animals) ? animals : [])
     .filter(a => a && a.id !== animal.id && (text(a.sireId) === animal.id || text(a.damId) === animal.id))
-    .map(a => ({ id: a.id, name: nameOf(a), sex: normalizeSexValue(a.sex) || 'U', archived: isArchivedAnimal(a), birthDate: text(a.birthDate) || text(a.hatchDate) }))
+    .map(a => ({ id: a.id, name: nameOf(a), sex: normalizeSexValue(a.sex) || 'U', archived: Boolean(departureOf(a)), left: departureOf(a)?.reason || '', birthDate: text(a.birthDate) || text(a.hatchDate) }))
     .sort((a, b) => text(b.birthDate).localeCompare(text(a.birthDate)));
   return {
     animal: {
@@ -294,7 +294,7 @@ export function formatArchiveRecordText(data, labels = archiveLabels(), { locale
     });
   }
   if (data.offspring.length) {
-    lines.push(`${labels.offspring}: ${data.offspring.map(o => (o.archived ? `${o.name} (${labels.archivedMarker})` : o.name)).join(', ')}`);
+    lines.push(`${labels.offspring}: ${data.offspring.map(o => (o.left ? `${o.name} (${labels.reasons[o.left] || labels.archivedMarker})` : o.name)).join(', ')}`);
   }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

@@ -214,6 +214,41 @@ describe("the tier's animal cap", () => {
   });
 });
 
+describe("a deleted snake kept as a lineage card", () => {
+  const full = {
+    id: "M-1", name: "Clown male", status: "Breeder", morphs: ["Clown"],
+    logs: { feeds: [{ id: "f1", date: "2026-01-01" }] },
+    photos: [{ id: "p1", url: "a" }, { id: "p2", url: "b" }],
+  };
+  const card = {
+    id: "M-1", name: "Clown male", status: "Removed", morphs: ["Clown"],
+    logs: { feeds: [] }, photos: [{ id: "p1", url: "a" }],
+    removed: { reason: "died", date: "2026-10-13" },
+  };
+
+  it("replaces the full record whole, so the erased logs and photos stay erased", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...full, updatedAt: "2026-01-01T00:00:00.000Z" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...card, updatedAt: "2026-10-13T00:00:00.000Z" }] });
+    const written = tx.animal.update.mock.calls[0][0].data;
+    expect(written.status).toBe("Removed");
+    expect(written.payload.logs.feeds).toEqual([]);
+    expect(written.payload.photos).toHaveLength(1);
+  });
+
+  it("is not merged back together with a full copy from a device that had not synced", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...card, updatedAt: "2026-10-13T00:00:00.000Z" }, "2026-10-13T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...full, updatedAt: "2026-10-14T00:00:00.000Z" }] });
+    const update = tx.animal.update.mock.calls[0][0].data;
+    expect(update.status).toBe("Removed");
+    expect(update.payload.removed).toEqual({ reason: "died", date: "2026-10-13" });
+    expect(update.payload.logs.feeds).toEqual([]);
+  });
+});
+
 describe("breederDataService", () => {
   it("upserts animals, pairings, and nested clutches by owner scoped app ids", async () => {
     await upsertBreederSnapshot("breeder-1", {

@@ -301,7 +301,7 @@ export default function ArchivedAnimalRecord({
                     {onOpenAnimal ? (
                       <button type="button" className="archive-record__link" onClick={() => onOpenAnimal(o.id)}>{o.name}</button>
                     ) : o.name}
-                    {o.archived && <span className="text-neutral-500"> ({labels.archivedMarker})</span>}
+                    {o.left && <span className="text-neutral-500"> ({labels.reasons[o.left] || labels.archivedMarker})</span>}
                   </React.Fragment>
                 ))}
               </p>
