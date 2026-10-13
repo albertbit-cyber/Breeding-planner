@@ -28,7 +28,7 @@ import {
 } from "./features/breeding/domain/sync";
 import { planLegacyMigration } from "./features/breeding/domain/legacyMigration";
 import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
-import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE } from "./features/breeding/domain/cycleModel";
+import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE, closeCyclesForArchivedFemale, cancelPlannedPairingsForArchivedMale } from "./features/breeding/domain/cycleModel";
 import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
 import { timelineKindLabel as breedingTimelineKindLabel, certaintyLabel as breedingCertaintyLabel } from "./features/breeding/components/labels";
 import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
@@ -150,6 +150,33 @@ import MorphMarketImportReview from "./features/animals/import/MorphMarketImport
 import { BreedersGroupGate } from "./features/animals/BreedersGroupPicker.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import { FOR_SALE_STATUS, canonicalStatusValue } from "./features/animals/statusValue";
+import {
+  activeAnimals,
+  archivedAnimals,
+  isArchivedAnimal,
+  isArchivedStatus,
+  isRemovedAnimal,
+  isOutOfCollection,
+  departureOf,
+  familyLinksOf,
+  buildRemovalStub,
+  mergeWithRemoval,
+  buildArchivePatch,
+  buildExitDetailsPatch,
+  buildEraseContactPatch,
+  buildAddNotePatch,
+  buildReturnPatch,
+  closePairingsForArchivedFemale,
+  cycleOutcomeForArchive,
+  ARCHIVE_REASONS,
+} from "./features/animals/archive";
+import { archiveLabels, buildArchiveRecordData } from "./features/animals/archiveRecord";
+import ArchiveAnimalDialog from "./features/animals/ArchiveAnimalDialog.jsx";
+import ArchivedAnimalRecord from "./features/animals/ArchivedAnimalRecord.jsx";
+import ArchiveList from "./features/animals/ArchiveList.jsx";
+import RemovedAnimalCard from "./features/animals/RemovedAnimalCard.jsx";
+import DepartureTag from "./features/animals/DepartureTag.jsx";
+import useDialogFocus from "./features/animals/useDialogFocus";
 import { ARRIVAL, IMPORT_DEFAULT_ARRIVAL, MANUAL_ADD_DEFAULT_ARRIVAL, admitAnimal } from "./features/animals/quarantineDefault";
 import {
   buildMarketplaceListingPayload,
@@ -3273,6 +3300,10 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   // 2025 "Athena" is 25Ath-1, like the demo) replaces it whole: merged, it kept isDemo and
   // was hidden as a demo.
   if (isDemoSnakeRecord(localAnimal) && !isDemoSnakeRecord(backendAnimal)) return sanitizeSnakeRecord(backendAnimal);
+  // A deleted snake's card wins whole: merging it with a full copy from another device would
+  // hand back the logs and photos the delete erased.
+  const removedCopy = mergeWithRemoval(localAnimal, backendAnimal, getSyncTimestamp);
+  if (removedCopy) return sanitizeSnakeRecord(removedCopy);
   const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
   if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
   return sanitizeSnakeRecord(merged);
@@ -6988,6 +7019,13 @@ export default function BreedingPlannerApp() {
       return normalizeSnakeListForDisplay(stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal'));
     });
   }, []);
+  /**
+   * The collection: every animal that has not left it. Archived snakes (sold, died, given away...)
+   * keep their whole record in `snakes`, but every day-to-day surface -- lists, counts, pickers,
+   * feeding, racks, the plan's animal limit -- works from this list instead. Sync, ID generation,
+   * parent pickers, pedigrees and backups keep reading `snakes`, archive included.
+   */
+  const collectionSnakes = useMemo(() => activeAnimals(snakes), [snakes]);
   const setPairings = useCallback((updater) => {
     setPairingsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -7088,6 +7126,13 @@ export default function BreedingPlannerApp() {
           isDemo: true,
         };
         buckets.set(speciesId, bucket);
+      }
+      // An archived snake keeps its species on the dashboard (so its archive stays reachable)
+      // but is not counted: the numbers describe the collection the keeper has now.
+      if (isOutOfCollection(snake)) {
+        bucket.archived = (bucket.archived || 0) + 1;
+        if (!isDemoSnakeRecord(snake)) bucket.isDemo = false;
+        return;
       }
       bucket.total += 1;
       const sex = normalizeSexValue(snake.sex);
@@ -7541,7 +7586,8 @@ export default function BreedingPlannerApp() {
   const { setUpgradeHandler, access: featureAccessMap } = useFeatureAccess();
   // Known from the access fetched at sign-in; unknown means "let the backend decide".
   const marketplaceListingDenied = featureAccessMap?.['marketplace.create_listing']?.allowed === false;
-  const addAnimalCap = useAnimalCap(Array.isArray(snakes) ? snakes.length : 0, 1);
+  // Archived animals do not count toward the plan's limit (the server counts the same way).
+  const addAnimalCap = useAnimalCap(collectionSnakes.length, 1);
   useEffect(() => {
     setUpgradeHandler(() => {
       // The add and import dialogs sit over the page; My Account has to be in view.
@@ -8423,6 +8469,12 @@ export default function BreedingPlannerApp() {
   const [showScanner, setShowScanner] = useState(false);
   const [passiveScanNotice, setPassiveScanNotice] = useState(null);
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
+  // The archive: the "Move to archive" / "Correct details" form ({ id, mode }), and the id of the
+  // archived snake whose record is open.
+  const [archiveDialog, setArchiveDialog] = useState(null);
+  const [archiveRecordId, setArchiveRecordId] = useState(null);
+  // The card of a deleted snake kept for its family links.
+  const [removedCardId, setRemovedCardId] = useState(null);
   const [familyTreeFocusSnakeId, setFamilyTreeFocusSnakeId] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
   const pendingHatchWizardPayloadRef = useRef(null);
@@ -8503,8 +8555,10 @@ export default function BreedingPlannerApp() {
     const editTag = typeof editDraftStatusValue === 'string' ? editDraftStatusValue.trim() : '';
     if (editTag) set.add(editTag);
     const removedSet = new Set(removedStatusTags.map(tag => tag.toLowerCase()));
+    // Sold, Deceased and Archived are not statuses you pick: they mean the snake left the
+    // collection, which goes through "Move to archive" so the date and details are recorded.
     return Array.from(set)
-      .filter(option => !removedSet.has(option.toLowerCase()))
+      .filter(option => !removedSet.has(option.toLowerCase()) && !isArchivedStatus(option))
       .sort((a, b) => a.localeCompare(b));
   }, [customStatusTags, removedStatusTags, snakes, newAnimal.status, editDraftStatusValue]);
   const currentEditStatus = (editDraftStatusValue || '').trim();
@@ -9477,6 +9531,11 @@ export default function BreedingPlannerApp() {
     return snakes.filter(snake => resolveSpeciesId(snake?.species) === speciesScope);
   }, [snakes, speciesScope]);
 
+  /** The open species' collection: scopedSnakes without the archive. Lists and pickers read this. */
+  const scopedCollection = useMemo(() => activeAnimals(scopedSnakes), [scopedSnakes]);
+  /** The open species' archive, for the Archive view of the Animals tab. */
+  const scopedArchive = useMemo(() => archivedAnimals(scopedSnakes), [scopedSnakes]);
+
   /** Pairings belonging to the open species. Both sides are the same species by construction. */
   const scopedPairings = useMemo(() => {
     if (!speciesScope) return pairings;
@@ -9490,13 +9549,13 @@ export default function BreedingPlannerApp() {
   const currentMale   = snakeById(snakes, draft.maleId || "");
 
   const females = useMemo(
-    () => scopedSnakes.filter(isFemaleSnake).filter(isBreederGroupMember),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isFemaleSnake).filter(isBreederGroupMember),
+    [scopedCollection, isBreederGroupMember]
   );
 
   const males = useMemo(
-    () => scopedSnakes.filter(isMaleSnake).filter(isBreederGroupMember),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isMaleSnake).filter(isBreederGroupMember),
+    [scopedCollection, isBreederGroupMember]
   );
 
   // Cross-species pairing is not allowed, so once one side is chosen the other side offers
@@ -10009,16 +10068,16 @@ export default function BreedingPlannerApp() {
     return base;
   }, [query, tag, selectedStatusTags, showGroups, hiddenGroups, groupFilter, showUnassigned]);
 
-  const filteredAll = useMemo(() => filterSnakesByCriteria(scopedSnakes), [filterSnakesByCriteria, scopedSnakes]);
+  const filteredAll = useMemo(() => filterSnakesByCriteria(scopedCollection), [filterSnakesByCriteria, scopedCollection]);
 
   const filteredFemales = useMemo(
-    () => filterSnakesByCriteria(scopedSnakes.filter(isFemaleSnake)),
-    [filterSnakesByCriteria, scopedSnakes]
+    () => filterSnakesByCriteria(scopedCollection.filter(isFemaleSnake)),
+    [filterSnakesByCriteria, scopedCollection]
   );
 
   const filteredMales = useMemo(
-    () => filterSnakesByCriteria(scopedSnakes.filter(isMaleSnake)),
-    [filterSnakesByCriteria, scopedSnakes]
+    () => filterSnakesByCriteria(scopedCollection.filter(isMaleSnake)),
+    [filterSnakesByCriteria, scopedCollection]
   );
 
   const activeAnimalList = useMemo(() => {
@@ -10190,12 +10249,12 @@ export default function BreedingPlannerApp() {
   // Who the Breeders gate in pairing and the Advisor can offer: sexed animals of the open
   // species that are not breeders yet.
   const breederCandidateMales = useMemo(
-    () => scopedSnakes.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedCollection, isBreederGroupMember]
   );
   const breederCandidateFemales = useMemo(
-    () => scopedSnakes.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedCollection, isBreederGroupMember]
   );
 
   const handleAddSnakePhotos = useCallback(async (snakeId, files, options = {}) => {
@@ -10478,6 +10537,16 @@ export default function BreedingPlannerApp() {
 
   const openSnakeEditor = useCallback((snake) => {
     if (!snake) return;
+    // An archived snake has no editor: it opens as its read-only record. Every way into an
+    // animal (cards, scans, search, pedigree, breeding) comes through here.
+    if (isRemovedAnimal(snake)) {
+      setRemovedCardId(snake.id);
+      return;
+    }
+    if (isArchivedAnimal(snake)) {
+      setArchiveRecordId(snake.id);
+      return;
+    }
     setEditSnake(snake);
     const draft = withParentsDetectedFromName(initSnakeDraft(snake), snakes);
     setEditSnakeDraft(reconcileDraftWithListing(draft, marketplaceListingsByAnimal[snake.id]));
@@ -10485,6 +10554,11 @@ export default function BreedingPlannerApp() {
 
   const openSnakeCard = useCallback((snake) => {
     if (!snake) return;
+    // A deleted snake's card opens where the keeper is (a pairing, a pedigree), without a jump.
+    if (isRemovedAnimal(snake)) {
+      setRemovedCardId(snake.id);
+      return;
+    }
     // A scanned QR or a search hit can belong to a species other than the open one. Follow
     // the animal rather than opening it inside a workspace it is not part of.
     const snakeSpecies = resolveSpeciesId(snake.species);
@@ -10494,7 +10568,7 @@ export default function BreedingPlannerApp() {
     }
     setReturnToGroupsAfterEdit(tab === 'animals' && animalView === 'groups');
     setTab('animals');
-    setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
+    setAnimalView(isArchivedAnimal(snake) ? 'archive' : (isFemaleSnake(snake) ? 'females' : 'males'));
     openSnakeEditor(snake);
   }, [animalView, tab, speciesScope, openSnakeEditor]);
 
@@ -10770,20 +10844,79 @@ export default function BreedingPlannerApp() {
   const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
   const passiveScannerLabel = passiveScanNotice?.text ?? t("animals.scanner.ready", { defaultValue: "Scanner ready" });
 
-  const performSnakeDeletion = useCallback((id) => {
+  /**
+   * What leaving the collection does to everything around a snake, shared by archiving and by
+   * deleting a snake that keeps a card: her open pairings and breeding cards are completed with
+   * the reason (no clutch expected), a male's still-planned pairings are cancelled (the female
+   * may already be gravid), its rack slot or terrarium is freed, and a live listing comes down.
+   * Returns the ids it closed so the archive record can name them.
+   */
+  const releaseFromCollection = useCallback((snake, reason, now) => {
+    let closedPairingIds = [];
+    let closedCycleIds = [];
+    if (isFemaleSnake(snake)) {
+      const pairingResult = closePairingsForArchivedFemale(pairings, snake.id, reason, { isOpen: p => !isPairingCompleted(p), now });
+      const cycleResult = closeCyclesForArchivedFemale(breedingCycles, snake.id, cycleOutcomeForArchive(reason), { now });
+      closedPairingIds = pairingResult.closedIds;
+      closedCycleIds = cycleResult.closedIds;
+      if (closedPairingIds.length) setPairings(pairingResult.pairings);
+      if (closedCycleIds.length) setBreedingCycles(cycleResult.cycles);
+    } else if (isMaleSnake(snake)) {
+      const cycleResult = cancelPlannedPairingsForArchivedMale(breedingCycles, snake.id, { now });
+      if (cycleResult.changedIds.length) setBreedingCycles(cycleResult.cycles);
+    }
+    updateSpacesState(prev => ({
+      ...prev,
+      heatRacks: prev.heatRacks.map((rack) => {
+        const slots = Array.isArray(rack?.slots) ? rack.slots : [];
+        if (!slots.some(slot => slot?.snakeId === snake.id)) return rack;
+        return { ...rack, slots: slots.map(slot => (slot?.snakeId === snake.id ? { ...slot, snakeId: null } : slot)), updatedAt: now };
+      }),
+      terrariums: prev.terrariums.map((terrarium) => {
+        const ids = Array.isArray(terrarium?.occupantIds) ? terrarium.occupantIds : [];
+        if (!ids.includes(snake.id)) return terrarium;
+        return { ...terrarium, occupantIds: ids.filter(id => id !== snake.id), updatedAt: now };
+      }),
+    }));
+    const listing = marketplaceListingsByAnimal[snake.id];
+    if (listing && listing.status !== 'sold') {
+      syncSnakeToMarketplace({ ...snake, forSale: false, isForSale: false }, { published: false }).catch((err) => {
+        console.warn('Could not take the animal off the marketplace', err);
+      });
+    }
+    return { closedPairingIds, closedCycleIds };
+  }, [breedingCycles, marketplaceListingsByAnimal, pairings, setBreedingCycles, setPairings, syncSnakeToMarketplace, updateSpacesState]);
+
+  /**
+   * Delete a snake. One that nothing else points at is erased completely. One with family links
+   * (pairings, offspring, its own parents or clutch) leaves a small card behind: its data goes,
+   * its identity and links stay, and its pairings and clutches are never touched.
+   */
+  const performSnakeDeletion = useCallback((id, { reason = null } = {}) => {
     if (!id) return;
-    const deletedAt = nowIsoString();
+    const snake = snakes.find(s => s.id === id);
+    const links = snake ? familyLinksOf(snake, { animals: snakes, pairings, cycles: breedingCycles }) : null;
+    const now = nowIsoString();
+    if (snake && links?.hasLinks && !isDemoSnakeRecord(snake)) {
+      const stub = buildRemovalStub(snake, { reason, now });
+      if (!isRemovedAnimal(snake)) releaseFromCollection(snake, stub.removed.reason, now);
+      setSnakes(prev => prev.map(s => (s.id === id ? stub : s)));
+      if (editSnake && editSnake.id === id) closeSnakeEditor();
+      setArchiveRecordId(current => (current === id ? null : current));
+      return;
+    }
     setSyncTombstones(prev => ({
       ...prev,
-      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt } },
+      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt: now } },
     }));
     setSnakes(prev => prev.filter(s => s.id !== id));
+    // Only reachable for a snake with no pairings (or a demo), so this removes demo pairings only.
     setPairings(prev => {
       const removed = prev.filter(p => p.maleId === id || p.femaleId === id);
       removed.forEach(p => {
         if (p.id) setSyncTombstones(t => ({
           ...t,
-          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt } },
+          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt: now } },
         }));
       });
       return prev.filter(p => p.maleId !== id && p.femaleId !== id);
@@ -10791,17 +10924,139 @@ export default function BreedingPlannerApp() {
     if (editSnake && editSnake.id === id) {
       closeSnakeEditor();
     }
-  }, [closeSnakeEditor, editSnake]);
+  }, [breedingCycles, closeSnakeEditor, editSnake, pairings, releaseFromCollection, setPairings, setSnakes, snakes]);
 
-  const confirmDeleteSnake = useCallback(() => {
+  const confirmDeleteSnake = useCallback((reason = null) => {
     if (!pendingDeleteSnake) return;
-    performSnakeDeletion(pendingDeleteSnake.id);
+    performSnakeDeletion(pendingDeleteSnake.id, { reason });
     setPendingDeleteSnake(null);
   }, [performSnakeDeletion, pendingDeleteSnake]);
+
+  const pendingDeleteLinks = useMemo(() => (
+    pendingDeleteSnake ? familyLinksOf(pendingDeleteSnake, { animals: snakes, pairings, cycles: breedingCycles }) : null
+  ), [breedingCycles, pairings, pendingDeleteSnake, snakes]);
 
   const cancelDeleteSnake = useCallback(() => {
     setPendingDeleteSnake(null);
   }, []);
+
+  // ── Animal archive ──────────────────────────────────────────────────────────
+  const patchSnakeById = useCallback((id, patch) => {
+    setSnakes(prev => prev.map(snake => (snake.id === id ? { ...snake, ...patch } : snake)));
+  }, [setSnakes]);
+
+  const requestArchiveSnake = useCallback((snake) => {
+    if (!snake?.id) return;
+    setPendingDeleteSnake(null);
+    setArchiveDialog({ id: snake.id, mode: 'archive' });
+  }, []);
+
+  const archiveDialogSnake = archiveDialog ? (snakes.find(snake => snake.id === archiveDialog.id) || null) : null;
+
+  /** What archiving this female will close: her open pairings and breeding cards. */
+  const openBreedingForSnake = useCallback((snake) => {
+    if (!snake || !isFemaleSnake(snake)) return { pairings: 0, cycles: 0 };
+    const openPairings = pairings.filter(p => p?.femaleId === snake.id && !isPairingCompleted(p));
+    // A breeding card mapped from a legacy pairing (id "bc-legacy-<pairing id>") is the same
+    // breeding seen twice; count it once.
+    const mirrored = new Set(openPairings.map(p => `bc-legacy-${p.id}`));
+    return {
+      pairings: openPairings.length,
+      cycles: breedingCycles.filter(c => c && !c.deletedAt && c.femaleId === snake.id && c.status !== BREEDING_CYCLE_STATUS.CLOSED && !mirrored.has(c.id)).length,
+    };
+  }, [pairings, breedingCycles]);
+
+  const submitArchiveDialog = useCallback(async (input) => {
+    const snake = archiveDialogSnake;
+    if (!snake || !archiveDialog) return;
+    const now = nowIsoString();
+
+    if (archiveDialog.mode === 'edit') {
+      patchSnakeById(snake.id, buildExitDetailsPatch(snake, input, { now }));
+      setArchiveDialog(null);
+      return;
+    }
+
+    // Throws on an incomplete form before anything is written.
+    buildArchivePatch(snake, input, { now });
+    const { closedPairingIds, closedCycleIds } = releaseFromCollection(snake, input.reason, now);
+    patchSnakeById(snake.id, buildArchivePatch(snake, input, { now, closedPairingIds, closedCycleIds }));
+
+    if (editSnake && editSnake.id === snake.id) closeSnakeEditor();
+    setArchiveDialog(null);
+    setArchiveRecordId(snake.id);
+  }, [archiveDialog, archiveDialogSnake, closeSnakeEditor, editSnake, patchSnakeById, releaseFromCollection]);
+
+  const archiveRecordSnake = archiveRecordId ? (snakes.find(snake => snake.id === archiveRecordId) || null) : null;
+  const archiveRecordData = useMemo(() => {
+    if (!archiveRecordSnake || !isArchivedAnimal(archiveRecordSnake)) return null;
+    return buildArchiveRecordData({
+      animal: archiveRecordSnake,
+      animals: snakes,
+      pairings,
+      isPairingCompleted,
+      speciesName: getSpeciesById(resolveSpeciesId(archiveRecordSnake.species))?.name || '',
+    });
+  }, [archiveRecordSnake, snakes, pairings]);
+
+  const closeArchiveRecord = useCallback(() => setArchiveRecordId(null), []);
+
+  const handleArchiveAddNote = useCallback((noteText) => {
+    if (!archiveRecordSnake) return;
+    patchSnakeById(archiveRecordSnake.id, buildAddNotePatch(archiveRecordSnake, noteText));
+  }, [archiveRecordSnake, patchSnakeById]);
+
+  const handleArchiveEraseContact = useCallback(() => {
+    if (!archiveRecordSnake) return;
+    patchSnakeById(archiveRecordSnake.id, buildEraseContactPatch(archiveRecordSnake));
+  }, [archiveRecordSnake, patchSnakeById]);
+
+  const handleArchiveReturn = useCallback(({ date, note }) => {
+    if (!archiveRecordSnake) return;
+    if (addAnimalCap?.blocked) {
+      throw new Error(t('archive.record.returnBlocked', {
+        defaultValue: 'Your plan keeps {{limit}} animals and the collection is full. Make room or upgrade before bringing this snake back.',
+        limit: addAnimalCap.limit,
+      }));
+    }
+    patchSnakeById(archiveRecordSnake.id, buildReturnPatch(archiveRecordSnake, { date, note }));
+    setArchiveRecordId(null);
+    setAnimalView(isFemaleSnake(archiveRecordSnake) ? 'females' : 'males');
+  }, [addAnimalCap, archiveRecordSnake, t, patchSnakeById]);
+
+  // The confirmation opens over the record; Cancel leaves the keeper where they were, and a
+  // confirmed delete closes the record by itself (the animal it shows no longer exists).
+  const handleArchiveDelete = useCallback(() => {
+    if (!archiveRecordSnake) return;
+    setPendingDeleteSnake(archiveRecordSnake);
+  }, [archiveRecordSnake]);
+
+  const handleArchivePdf = useCallback(async () => {
+    if (!archiveRecordData) return;
+    const { downloadArchiveRecordPdf } = await import('./features/animals/archiveRecordPdf');
+    await downloadArchiveRecordPdf(archiveRecordData, archiveLabels(t), {
+      locale: i18n.language,
+      breederName: String(breederInfo?.businessName || breederInfo?.name || '').trim(),
+    });
+  }, [archiveRecordData, breederInfo, t]);
+
+  const openAnimalFromArchive = useCallback((id) => {
+    const target = snakes.find(snake => snake.id === id);
+    if (!target) return;
+    setArchiveRecordId(null);
+    setRemovedCardId(null);
+    openSnakeCard(target);
+  }, [openSnakeCard, snakes]);
+
+  const removedCardSnake = removedCardId ? (snakes.find(snake => snake.id === removedCardId) || null) : null;
+  const openPairingFromCard = useCallback((pairingId) => {
+    const pairing = pairings.find(p => p.id === pairingId);
+    if (!pairing) return;
+    setRemovedCardId(null);
+    setArchiveRecordId(null);
+    setTab('pairings');
+    setFocusedPairingId(pairing.id);
+  }, [pairings]);
 
   function findActivePairingForFemale(femaleId, ignorePairingId = null) {
     if (!femaleId) return null;
@@ -12278,7 +12533,7 @@ export default function BreedingPlannerApp() {
             <span className="ms-auto text-xs text-neutral-600 tabular-nums">
               {t('species.scope.summary', {
                 defaultValue: '{{animals}} animals · {{genes}} genes',
-                animals: scopedSnakes.length,
+                animals: scopedCollection.length,
                 genes: getSpeciesById(speciesScope)?.traitCount || 0,
               })}
             </span>
@@ -12328,6 +12583,7 @@ export default function BreedingPlannerApp() {
                   { key: 'males', label: t("filters.males") },
                   { key: 'females', label: t("filters.females") },
                   { key: 'groups', label: t("filters.groups") },
+                  { key: 'archive', label: t("archive.tab", { defaultValue: "Archive" }), count: scopedArchive.length },
                 ].map(filter => (
                   <button
                     key={filter.key}
@@ -12340,10 +12596,13 @@ export default function BreedingPlannerApp() {
                     onClick={() => handleAnimalViewTabChange(filter.key)}
                   >
                     {filter.label}
+                    {typeof filter.count === 'number' && filter.count > 0 && (
+                      <span className="tabular-nums opacity-70 font-medium">{filter.count}</span>
+                    )}
                   </button>
                 ))}
               </div>
-              {animalView !== "groups" && (
+              {animalView !== "groups" && animalView !== "archive" && (
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Layout and sort are one control: all three decide how the same list is
                       drawn. They share a single pill with hairline dividers so the row reads as
@@ -12428,14 +12687,20 @@ export default function BreedingPlannerApp() {
                 {/* Adding animals comes first: it is what this row is mostly used for. The two
                     QR actions sit last, next to the scanner status they belong with. Feed prep
                     moved out to the header — it plans the whole collection, not this list. */}
-                <button
-                  onClick={startNewAnimalDraft}
-                  className={cx(toolbarControlClass, 'bp-toolbar-action')}
-                >
-                  + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
-                </button>
-                <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
-                <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                {/* Adding, importing and labelling act on the collection, so the Archive view
+                    leaves them out. Scanning stays: a scanned label opens an archived record too. */}
+                {animalView !== 'archive' && (
+                  <>
+                    <button
+                      onClick={startNewAnimalDraft}
+                      className={cx(toolbarControlClass, 'bp-toolbar-action')}
+                    >
+                      + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
+                    </button>
+                    <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                    <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                  </>
+                )}
                 <button onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
@@ -12469,7 +12734,7 @@ export default function BreedingPlannerApp() {
                 filterSnakes. Sitting directly under the toolbar it lines up with the controls
                 that filter alongside it, and it is absent from Groups view, which the query
                 does not filter. */}
-            {animalView !== "groups" && (
+            {animalView !== "groups" && animalView !== "archive" && (
               <div className="header-search-shell w-full">
                 <input
                   value={query}
@@ -12504,11 +12769,11 @@ export default function BreedingPlannerApp() {
               <GroupsSection
                 groups={groups}
                 setGroups={setGroups}
-                snakes={snakes}
+                snakes={collectionSnakes}
                 theme={theme}
                 onOpenSnake={openSnakeCard}
                 onDeleteGroup={(g)=>{
-                  const inUse = snakes.some(s => (s.groups||[]).includes(g));
+                  const inUse = collectionSnakes.some(s => (s.groups||[]).includes(g));
                   if (inUse) {
                     showAppAlert("Group in use by some snakes. Remove from those snakes first.");
                     return;
@@ -12517,6 +12782,8 @@ export default function BreedingPlannerApp() {
                   if (groupFilter === g) setGroupFilter("all");
                 }}
               />
+            ) : animalView === "archive" ? (
+              <ArchiveList animals={scopedArchive} locale={i18n.language} onOpen={(snake) => setArchiveRecordId(snake.id)} />
             ) : (
               <Card title={animalsCardTitle}>
                 <div className="mb-3">
@@ -12736,6 +13003,7 @@ export default function BreedingPlannerApp() {
                       onOpenFamilyTree={openFamilyTreeForSnake}
                       onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                       onDelete={requestDeleteSnake}
+                      onArchive={requestArchiveSnake}
                       pairings={pairings}
                       onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
                       sortBy={animalSortBy}
@@ -12759,6 +13027,7 @@ export default function BreedingPlannerApp() {
                           onOpenFamilyTree={openFamilyTreeForSnake}
                           onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                           onDelete={requestDeleteSnake}
+                          onArchive={requestArchiveSnake}
                           pairings={pairings}
                           onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
                           lastFeedDefaults={lastFeedDefaults}
@@ -12782,7 +13051,7 @@ export default function BreedingPlannerApp() {
             rooms={rooms}
             heatRacks={heatRacks}
             terrariums={terrariums}
-            snakes={snakes}
+            snakes={collectionSnakes}
             theme={theme}
             showAppPrompt={showAppPrompt}
             showAppConfirm={showAppConfirm}
@@ -13205,7 +13474,7 @@ export default function BreedingPlannerApp() {
 
         {tab === "quarantine" && (
           <QuarantineSection
-            snakes={snakes}
+            snakes={collectionSnakes}
             onUpdateSnake={updateSnakeById}
             onOpenAnimal={openSnakeEditor}
             showAppPrompt={showAppPrompt}
@@ -14157,6 +14426,16 @@ export default function BreedingPlannerApp() {
                         {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
                       </button>
                       <div className="snake-editor-menu__sep" role="separator" />
+                      {!isDemoSnakeRecord(editSnake) && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="snake-editor-menu__item"
+                          onClick={() => { setEditMoreMenuOpen(false); requestArchiveSnake(editSnake); }}
+                        >
+                          {t("archive.action", { defaultValue: "Move to archive" })}
+                        </button>
+                      )}
                       <button
                         type="button"
                         role="menuitem"
@@ -14893,11 +15172,11 @@ export default function BreedingPlannerApp() {
           />
         );
       })()}
-  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
+  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={collectionSnakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
       <FeedPrepModal
         open={showFeedPrepModal}
         onClose={() => setShowFeedPrepModal(false)}
-        snakes={snakes}
+        snakes={collectionSnakes}
         pairings={pairings}
         onEditSnake={(snake) => {
           setShowFeedPrepModal(false);
@@ -14927,11 +15206,53 @@ export default function BreedingPlannerApp() {
             />
           )}
       <ConfirmDeleteSnakeModal
+        key={pendingDeleteSnake?.id || 'none'}
         snake={pendingDeleteSnake}
+        links={pendingDeleteLinks}
         onCancel={cancelDeleteSnake}
         onConfirm={confirmDeleteSnake}
+        onArchiveInstead={requestArchiveSnake}
         theme={theme}
       />
+      {archiveDialogSnake && (
+        <ArchiveAnimalDialog
+          key={`${archiveDialog.id}-${archiveDialog.mode}`}
+          animal={archiveDialogSnake}
+          mode={archiveDialog.mode}
+          isFemale={isFemaleSnake(archiveDialogSnake)}
+          openBreeding={openBreedingForSnake(archiveDialogSnake)}
+          defaultCurrency={archiveDialogSnake.currency || 'EUR'}
+          onSubmit={submitArchiveDialog}
+          onCancel={() => setArchiveDialog(null)}
+        />
+      )}
+      {removedCardSnake && isRemovedAnimal(removedCardSnake) && (
+        <RemovedAnimalCard
+          animal={removedCardSnake}
+          animals={snakes}
+          pairings={pairings}
+          locale={i18n.language}
+          onClose={() => setRemovedCardId(null)}
+          onOpenAnimal={openAnimalFromArchive}
+          onOpenPairing={openPairingFromCard}
+        />
+      )}
+      {archiveRecordData && (
+        <ArchivedAnimalRecord
+          data={archiveRecordData}
+          locale={i18n.language}
+          onClose={closeArchiveRecord}
+          onEditExit={() => setArchiveDialog({ id: archiveRecordSnake.id, mode: 'edit' })}
+          onEraseContact={handleArchiveEraseContact}
+          onAddNote={handleArchiveAddNote}
+          onReturn={handleArchiveReturn}
+          onDelete={handleArchiveDelete}
+          onDownloadPdf={handleArchivePdf}
+          onOpenAnimal={openAnimalFromArchive}
+          showAppAlert={showAppAlert}
+          showAppConfirm={showAppConfirm}
+        />
+      )}
       <EggBoxModal
         box={eggBoxModal}
         onClose={() => setEggBoxModal(null)}
@@ -15469,24 +15790,84 @@ function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInte
 }
 
 // small comps
-function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
+function ConfirmDeleteSnakeModal({ snake, links = null, onCancel, onConfirm, onArchiveInstead }) {
   const { t } = useTranslation();
+  // Opens over an archived record too, so it sits above it (z 10040) and takes the keyboard.
+  const dialogRef = useDialogFocus(onCancel, { active: Boolean(snake) });
+  const archivedReason = snake ? (departureOf(snake)?.reason || '') : '';
+  const [reason, setReason] = useState(archivedReason);
   if (!snake) return null;
   if (typeof document === 'undefined') return null;
+  const archived = isArchivedAnimal(snake);
+  const canArchive = !archived && !isDemoSnakeRecord(snake) && typeof onArchiveInstead === 'function';
+  // A snake other records point at (pairings, offspring, its own parents or clutch) leaves a
+  // small card behind instead of vanishing, so the keeper says why it left.
+  const keepsCard = Boolean(links?.hasLinks) && !isDemoSnakeRecord(snake);
+  const labels = archiveLabels(t);
+  const name = snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" });
   return createPortal((
-    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
-      <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
-        <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-          {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10040]" onClick={onCancel}>
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-delete-snake-title"
+        className="relative z-[10041] bg-white w-full max-w-md rounded-2xl shadow-2xl border p-5 max-h-[92vh] overflow-y-auto"
+        onClick={e=>e.stopPropagation()}
+      >
+        <div id="confirm-delete-snake-title" className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name, defaultValue: "Delete {{name}}?" })}</div>
+        {keepsCard ? (
+          <>
+            <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+              {t("archive.delete.keepsCard", {
+                defaultValue: "{{name}} is part of your breeding records ({{summary}}). Feeding, weights, notes and photos are erased, but a small card keeps the ID, name, main photo and family links, so pairings, clutches and pedigrees still show it.",
+                name,
+                summary: [
+                  links.pairings ? t("archive.delete.linkPairings", { defaultValue: "pairings: {{count}}", count: links.pairings }) : '',
+                  links.offspring ? t("archive.delete.linkOffspring", { defaultValue: "offspring: {{count}}", count: links.offspring }) : '',
+                  links.parents ? t("archive.delete.linkParents", { defaultValue: "parents on file" }) : '',
+                ].filter(Boolean).join(', ') || t("archive.delete.linkClutch", { defaultValue: "a clutch" }),
+              })}
+            </p>
+            <fieldset className="mt-3">
+              <legend className="text-xs font-medium mb-2">{t("archive.delete.whyLeft", { defaultValue: "Why did it leave?" })}</legend>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {ARCHIVE_REASONS.map(option => (
+                  <label key={option} className={`archive-reason-option flex items-center gap-2 rounded-xl border px-3 py-2 text-sm cursor-pointer ${reason === option ? 'archive-reason-option--selected' : ''}`}>
+                    <input type="radio" name="delete-reason" value={option} checked={reason === option} onChange={() => setReason(option)} />
+                    <span>{labels.reasons[option]}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+            {archived
+              ? t("archive.delete.archivedBody", { defaultValue: "This permanently removes the archived record, its pairings and its history. It cannot be undone." })
+              : t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
+          </p>
+        )}
+        {canArchive && (
+          <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+            {t("archive.delete.suggest", { defaultValue: "Sold, died or gave it away? Archive it instead: it leaves the collection and its record and breeding history are kept." })}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          {canArchive && (
+            <button className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" onClick={() => onArchiveInstead(snake)}>
+              {t("archive.delete.archiveInstead", { defaultValue: "Archive instead" })}
+            </button>
+          )}
           <button
             className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
-            onClick={onConfirm}
+            onClick={() => onConfirm(keepsCard ? reason : null)}
+            disabled={keepsCard && !reason}
           >
-            {t("common.delete", { defaultValue: "Delete" })}
+            {archived || keepsCard
+              ? t("archive.delete.confirmPermanent", { defaultValue: "Delete permanently" })
+              : t("common.delete", { defaultValue: "Delete" })}
           </button>
         </div>
       </div>
@@ -17990,7 +18371,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
   ), document.body);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
+function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, onArchive, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
   const { t } = useTranslation();
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
@@ -18316,6 +18697,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                   {hasFamilyTree && (
                     <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
                       🌳 {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                    </button>
+                  )}
+                  {typeof onArchive === 'function' && !isDemoSnakeRecord(s) && (
+                    <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onArchive(s); }}>
+                      {t("archive.action", { defaultValue: "Move to archive" })}
                     </button>
                   )}
                   {hasDelete && (
@@ -18868,7 +19254,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   );
 }
 
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, onArchive, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
 
@@ -19057,6 +19443,9 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
                     >
                       {t('snakeEdit.pairingsLabel', { defaultValue: 'Pairings' })}{relatedPairings.length ? ` (${relatedPairings.length})` : ''}
                     </button>
+                    {typeof onArchive === 'function' && !isDemoSnakeRecord(snake) && (
+                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onArchive(snake)}>{t('archive.actionShort', { defaultValue: 'Archive' })}</button>
+                    )}
                     {typeof onDelete === 'function' && (
                       <button className="text-[11px] px-2 py-1 border rounded-lg text-rose-600" onClick={() => onDelete(snake)}>{t('actions.delete')}</button>
                     )}
@@ -24481,7 +24870,7 @@ function ProjectCompletionPanel({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">{t("pairing.completion.reason", { defaultValue: "Completion reason" })}</span>
               <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
-                {COMPLETION_REASON_GROUPS.map(group => (
+                {COMPLETION_REASON_GROUPS.filter(group => !group.automatic).map(group => (
                   <optgroup key={group.key} label={group.label}>
                     {group.options.map(option => (
                       <option key={option.value} value={option.value}>{option.label}</option>
@@ -24993,6 +25382,7 @@ function PairingInlineCard({
                   onClick={handleOpenMale}
                 >
                   {maleName}
+                  <DepartureTag animal={maleSnake} className="ms-1" />
                 </button>
               ) : (
                 <span className="font-medium truncate">{maleName}</span>
@@ -25007,6 +25397,7 @@ function PairingInlineCard({
                   onClick={handleOpenFemale}
                 >
                   {femaleName}
+                  <DepartureTag animal={femaleSnake} className="ms-1" />
                 </button>
               ) : (
                 <span className="font-medium truncate">{femaleName}</span>
@@ -25069,6 +25460,7 @@ function PairingInlineCard({
                       onClick={handleOpenMale}
                     >
                       {maleName}
+                      <DepartureTag animal={maleSnake} className="ms-1" />
                     </button>
                   ) : (
                     <span className="truncate">{maleName}</span>
@@ -25105,6 +25497,7 @@ function PairingInlineCard({
                       onClick={handleOpenFemale}
                     >
                       {femaleName}
+                      <DepartureTag animal={femaleSnake} className="ms-1" />
                     </button>
                   ) : (
                     <span className="truncate">{femaleName}</span>
@@ -25466,6 +25859,7 @@ function PairingInlineCard({
                 title={h.name || h.id}
               >
                 <bdi>{h.name || h.id}</bdi>
+                <DepartureTag animal={h} className="ms-1" />
               </button>
             ))}
           </div>
@@ -27448,7 +27842,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
   // Duplicates of animals already here are dropped on apply, so this can count a few too many;
   // erring that way never lets an import past the plan's cap.
-  const importCapResult = useAnimalCap(Array.isArray(existingAnimals) ? existingAnimals.length : 0, importCount);
+  const importCapResult = useAnimalCap(activeAnimals(existingAnimals).length, importCount);
   const canImport = importCount > 0 && Boolean(importSpecies) && !importCapResult?.blocked;
   const importButtonLabel = importCount
     ? t("ui.animals.import.importButtonWithCount", { count: importCount, defaultValue: "Import ({{count}})" })
@@ -28820,7 +29214,8 @@ function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams 
       };
       ['feeds', 'weights', 'sheds', 'cleanings', 'meds'].forEach(addLogs);
 
-      const feedDueEvent = getNextFeedCycleEvent(s);
+      // Past logs stay on the calendar as history; a snake that left the collection is never due.
+      const feedDueEvent = isOutOfCollection(s) ? null : getNextFeedCycleEvent(s);
       if (feedDueEvent) {
         const dt = new Date(`${feedDueEvent.date}T00:00:00`);
         if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === targetYear && dt.getMonth() === targetMonth) {
@@ -28831,7 +29226,7 @@ function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams 
 
     // Quarantine start/clear days, derived the same way everything else on this calendar is --
     // there is no stored event row anywhere in the app.
-    deriveQuarantineEvents(snakes).forEach(event => {
+    deriveQuarantineEvents(activeAnimals(snakes)).forEach(event => {
       const dt = new Date(`${event.date}T00:00:00`);
       if (Number.isNaN(dt.getTime())) return;
       if (dt.getFullYear() !== targetYear || dt.getMonth() !== targetMonth) return;

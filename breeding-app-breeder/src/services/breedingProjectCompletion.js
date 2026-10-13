@@ -30,6 +30,17 @@ export const COMPLETION_REASON_GROUPS = [
     ],
   },
   {
+    // Written only when the female is moved to the archive; never offered as a manual choice.
+    key: 'female_left_collection',
+    label: 'Female left the collection',
+    automatic: true,
+    options: [
+      { value: 'female_sold', label: 'Female sold' },
+      { value: 'female_died', label: 'Female died' },
+      { value: 'female_left_collection', label: 'Female left the collection' },
+    ],
+  },
+  {
     key: 'uncertain',
     label: 'Uncertain',
     options: [

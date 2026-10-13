@@ -25,7 +25,14 @@ export const CLOSURE_OUTCOMES = Object.freeze([
   'failed_clutch',
   'cancelled',
   'other',
+  // Written only by archiving the female (sold, died, left the collection); never offered in
+  // the close dialog, since the card closes itself the moment she leaves.
+  'female_sold',
+  'female_died',
+  'female_left_collection',
 ]);
+/** Closure outcomes the archive writes. The close dialog leaves these out. */
+export const ARCHIVE_CLOSURE_OUTCOMES = Object.freeze(['female_sold', 'female_died', 'female_left_collection']);
 export const EVENT_TYPES = Object.freeze([
   'ovulation',
   'pre_lay_shed',
@@ -658,6 +665,45 @@ export function completeHatchingOutcome(cycle, { finalHatchDate, hatchlingsRecor
     next = closeCycle(next, { outcome: 'hatching_complete', note: notes, biologicalCompletionDate: day, closedAt: completedAt || now }, { now });
   }
   return next;
+}
+
+/**
+ * The female left the collection: close each of her open or paused cards with the archive
+ * outcome. Pending planned pairings are cancelled by closeCycle itself.
+ */
+export function closeCyclesForArchivedFemale(cycles = [], femaleId, outcome, { now = nowIso(), note = '' } = {}) {
+  const id = text(femaleId);
+  const closedIds = [];
+  const next = asArray(cycles).map((cycle) => {
+    if (!cycle || cycle.deletedAt || cycle.femaleId !== id || cycle.status === CYCLE_STATUS.CLOSED) return cycle;
+    closedIds.push(cycle.id);
+    return closeCycle(cycle, { outcome, note, closedAt: now }, { now });
+  });
+  return { cycles: next, closedIds };
+}
+
+/**
+ * A male left the collection. The females' cards stay open (one may already be gravid by him),
+ * but pairings still planned with him cannot happen, so those are cancelled.
+ */
+export function cancelPlannedPairingsForArchivedMale(cycles = [], maleId, { now = nowIso() } = {}) {
+  const id = text(maleId);
+  const changedIds = [];
+  const next = asArray(cycles).map((cycle) => {
+    if (!cycle || cycle.deletedAt || cycle.status === CYCLE_STATUS.CLOSED) return cycle;
+    const planned = asArray(cycle.plannedPairings);
+    if (!planned.some((p) => p.maleId === id && p.status === 'pending')) return cycle;
+    changedIds.push(cycle.id);
+    return touch({
+      ...cycle,
+      plannedPairings: planned.map((p) => (
+        p.maleId === id && p.status === 'pending'
+          ? { ...p, status: 'cancelled', resolution: { kind: 'male_left_collection', at: now }, updatedAt: now }
+          : p
+      )),
+    }, now);
+  });
+  return { cycles: next, changedIds };
 }
 
 export function closeCycle(cycle, { outcome, note = '', closedAt, biologicalCompletionDate = null } = {}, { now = nowIso() } = {}) {

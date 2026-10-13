@@ -75,6 +75,9 @@ export const closureOutcomeLabel = (t, outcome) => ({
   failed_clutch: t('breeding.closure.failedClutch', { defaultValue: 'Failed clutch' }),
   cancelled: t('breeding.closure.cancelled', { defaultValue: 'Cancelled' }),
   other: t('breeding.closure.other', { defaultValue: 'Other (see note)' }),
+  female_sold: t('breeding.closure.femaleSold', { defaultValue: 'Female sold' }),
+  female_died: t('breeding.closure.femaleDied', { defaultValue: 'Female died' }),
+  female_left_collection: t('breeding.closure.femaleLeftCollection', { defaultValue: 'Female left the collection' }),
 }[outcome] || outcome);
 
 export const metricLabel = (t, key) => ({
