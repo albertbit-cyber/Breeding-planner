@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import { HttpError } from "../utils/errors";
 import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederDataService";
+import {
+  listBreederDataReplacements,
+  replaceBreederData,
+  undoBreederDataReplacement,
+} from "../services/breederDataReplaceService";
 
 // Cloud sync carries an account's whole dataset, so it grows quietly until it breaks something --
 // first as 413s, later as a transaction timeout. Logging the shape of every upload means the next
@@ -52,4 +57,26 @@ export const putBreederSnapshot = async (req: Request, res: Response): Promise<v
   // until those have aged out.
   const wantsChangedOnly = req.query.ack === "changed";
   res.status(200).json(wantsChangedOnly ? changed : snapshot);
+};
+
+// Full replace from a backup file. `?dryRun=1` reports what would change and writes nothing; the
+// app shows that as the confirmation step.
+export const replaceBreederDataHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const body = (req.body || {}) as Record<string, unknown>;
+  logUploadSize(req, body);
+  const dryRun = req.query.dryRun === "1" || req.query.dryRun === "true";
+  const result = await replaceBreederData(req.user.id, body, { dryRun });
+  res.status(200).json(result);
+};
+
+export const listBreederDataReplacementsHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json({ replacements: await listBreederDataReplacements(req.user.id) });
+};
+
+export const undoBreederDataReplacementHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  const result = await undoBreederDataReplacement(req.user.id, String(req.params.id || ""));
+  res.status(200).json(result);
 };

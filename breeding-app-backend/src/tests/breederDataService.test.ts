@@ -695,6 +695,7 @@ describe("breederDataService", () => {
       breedingCycles: [],
       follicleExams: [],
       plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+      dataGeneration: 0,
       serverTime: expect.any(String),
     });
   });
@@ -712,6 +713,7 @@ describe("breederDataService", () => {
       breedingCycles: [],
       follicleExams: [],
       plannerState: null,
+      dataGeneration: 0,
       serverTime: expect.any(String),
     });
   });
