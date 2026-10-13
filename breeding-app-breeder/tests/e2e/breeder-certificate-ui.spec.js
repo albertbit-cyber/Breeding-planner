@@ -5,6 +5,7 @@ import {
   loginLabViaApi,
   loadBreederAuthFromStorageState,
   openSeedSnakeEditor,
+  openOrderGeneticTest,
 } from "./helpers.js";
 
 const test = base;
@@ -14,7 +15,7 @@ test("breeder can download a certificate for a completed owned order", async ({ 
   const labAuth = await loginLabViaApi(request);
 
   await openSeedSnakeEditor(page);
-  await page.getByRole("button", { name: /Order Genetic Test/i }).click();
+  await openOrderGeneticTest(page);
   await expect(page.getByText(/Add to Batch Order/i)).toBeVisible();
   const snakeId = (await page.locator("div.font-mono.text-xs.text-neutral-500").last().innerText()).trim();
   await page.getByRole("button", { name: /^Close$/i }).click();

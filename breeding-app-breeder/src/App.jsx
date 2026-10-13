@@ -69,6 +69,7 @@ import {
   checkFeatureAccess,
   clearAuthToken,
   createMarketplaceListing,
+  fetchBreederDataReplacements,
   fetchBreederSnapshot,
   fetchSellerDashboard,
   updateMarketplaceListing,
@@ -76,7 +77,9 @@ import {
   fetchMySubscription,
   fetchPublicSubscriptionTiers,
   getCurrentUser,
+  replaceBreederData,
   saveBreederSnapshot,
+  undoBreederDataReplacement,
 } from "./shared/apiClient";
 import {
   getSyncTimestamp,
@@ -1193,6 +1196,8 @@ const STORAGE_KEYS = {
   backupSettings: 'breedingPlannerBackupSettings',
   backupSnapshot: 'breedingPlannerBackupSnapshot',
   backupVault: 'breedingPlannerBackupVault',
+  // The cloud data generation this device last loaded (see adoptReplacedCloudData).
+  dataGeneration: 'breedingPlannerDataGeneration',
   spaces: 'breedingPlannerSpaces',
   animalLayout: 'breedingPlannerAnimalLayout',
   animalSortBy: 'breedingPlannerAnimalSortBy',
@@ -3004,6 +3009,86 @@ function normalizeCloudSnapshotForDisplay(syncedSnapshot = {}, localSnapshot = {
     ...breedingCollections,
     plannerState: normalizePlannerStateRecord(syncedSnapshot.plannerState || localSnapshot.plannerState),
   };
+}
+
+// --- Full replace from a backup file --------------------------------------------------------
+// A replace makes one backup file the whole of the account's cloud data and raises the account's
+// data generation. Every device that sees a generation other than its own drops its copy and
+// loads the cloud as it is (adoptReplacedCloudData in the app), instead of merging its old data
+// back in. The server refuses saves made against an older generation with DATA_REPLACED.
+
+const DATA_REPLACED_CODE = 'DATA_REPLACED';
+const isDataReplacedError = (error) => error?.status === 409 && error?.details?.code === DATA_REPLACED_CODE;
+
+const BACKUP_PLANNER_KEYS = [
+  'groupsBySpecies', 'groups', 'showGroups', 'hiddenGroups', 'customStatusTags', 'removedStatusTags',
+  'morphAliases', 'geneAliases', 'leucisticType', 'breederInfo', 'theme', 'appearance', 'lastFeedDefaults',
+];
+const BACKUP_SPACE_KEYS = ['rooms', 'heatRacks', 'terrariums', 'spaces'];
+
+// The planner part of a backup file, laid over the account's current planner state: what the file
+// carries wins, and what it does not carry (appearance, status tags in an older file) stays.
+function plannerStateForReplace(payload = {}, currentPlannerState = null) {
+  const state = { ...(currentPlannerState && typeof currentPlannerState === 'object' ? currentPlannerState : {}) };
+  BACKUP_PLANNER_KEYS.forEach(key => {
+    if (payload[key] !== undefined && payload[key] !== null) state[key] = payload[key];
+  });
+  if (payload.groups || payload.groupsBySpecies) {
+    const groupsBySpecies = migrateFlatGroups(payload.groups, payload.groupsBySpecies);
+    state.groupsBySpecies = groupsBySpecies;
+    state.groups = flattenGroupsBySpecies(groupsBySpecies);
+  }
+  // Racks come as a set: a file with only the legacy `spaces` list must not be outvoted by the
+  // account's current structured rooms.
+  if (BACKUP_SPACE_KEYS.some(key => Array.isArray(payload[key]))) {
+    BACKUP_SPACE_KEYS.forEach(key => {
+      delete state[key];
+      if (Array.isArray(payload[key])) state[key] = payload[key];
+    });
+  }
+  return normalizePlannerStateRecord({ version: 1, ...state });
+}
+
+const countLogEntries = (snakes = []) => (Array.isArray(snakes) ? snakes : []).reduce((total, snake) => {
+  const logs = snake?.logs && typeof snake.logs === 'object' ? snake.logs : {};
+  return total + Object.values(logs).reduce((sum, entries) => sum + (Array.isArray(entries) ? entries.length : 0), 0);
+}, 0);
+
+// A backup file as the upload a full replace sends. sanitizeSnakeRecord collapses duplicated log
+// entries on the way, which is what turns a 20 MB file from the duplicated-log era into a few
+// hundred kilobytes. The server then finds none left, so the count of what was cleaned up is
+// taken here.
+function buildReplaceUploadFromBackup(payload, currentPlannerState = null) {
+  if (!payload || typeof payload !== 'object') throw new Error('Backup file is invalid.');
+  const rawSnakes = Array.isArray(payload.snakes) ? payload.snakes : [];
+  const snakes = rawSnakes.map(sanitizeSnakeRecord).filter(Boolean);
+  const pairings = (Array.isArray(payload.pairings) ? payload.pairings : []).map(sanitizePairingRecord).filter(Boolean);
+  if (!snakes.length && !pairings.length) throw new Error('Backup file does not contain any animals or pairings.');
+  const breedingCycles = (Array.isArray(payload.breedingCycles) ? payload.breedingCycles : []).map(sanitizeBreedingCycleRecord).filter(Boolean);
+  const follicleExams = (Array.isArray(payload.follicleExams) ? payload.follicleExams : []).map(sanitizeFollicleExamRecord).filter(Boolean);
+  return {
+    upload: prepareSnapshotForBackend(snakes, pairings, plannerStateForReplace(payload, currentPlannerState), {}, { breedingCycles, follicleExams }),
+    duplicateLogEntriesRemoved: Math.max(0, countLogEntries(rawSnakes) - countLogEntries(snakes)),
+  };
+}
+
+// Photos never leave the device (stripEmbeddedMediaForSync), so the cloud copy of an animal lacks
+// the ones taken here. Loading a replaced account keeps them for every animal that is still in it.
+function keepLocalPhotos(cloudSnakes = [], localSnakes = []) {
+  const localById = new Map();
+  (Array.isArray(localSnakes) ? localSnakes : []).forEach(snake => {
+    if (snake?.id) localById.set(String(snake.id), snake);
+  });
+  return (Array.isArray(cloudSnakes) ? cloudSnakes : []).map(snake => {
+    const local = localById.get(String(snake?.id));
+    const localPhotos = Array.isArray(local?.photos) ? local.photos : [];
+    if (!localPhotos.length) return snake;
+    const cloudPhotos = Array.isArray(snake.photos) ? snake.photos : [];
+    const known = new Set(cloudPhotos.map(photo => photo?.id || photo?.url).filter(Boolean));
+    const missing = localPhotos.filter(photo => !known.has(photo?.id || photo?.url));
+    if (!missing.length) return snake;
+    return { ...snake, photos: trimSnakePhotoList([...cloudPhotos, ...missing]), imageUrl: snake.imageUrl || local.imageUrl };
+  });
 }
 
 const BACKEND_MEDIA_FIELD_KEYS = new Set([
@@ -7475,6 +7560,12 @@ export default function BreedingPlannerApp() {
   // falls back to a whole-account sync whenever either is missing.
   const remoteSnapshotRef = useRef({ snakes: [], pairings: [], plannerState: null });
   const remoteCursorRef = useRef(null);
+  // The account's data generation this device last loaded, kept across restarts: a device that
+  // was closed while the account was replaced must still notice on its next start.
+  const dataGenerationRef = useRef(Number(loadStoredJson(STORAGE_KEYS.dataGeneration, 0)) || 0);
+  // Filled in once the backup vault exists further down, so loading a replace can first keep
+  // this device's own copy.
+  const addBackupVaultEntryRef = useRef(null);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
     lastSyncedAt: null,
@@ -7949,6 +8040,55 @@ export default function BreedingPlannerApp() {
   const syncAgainRef = useRef(false);
   const syncBroadcastRef = useRef(null);
 
+  // The account was replaced from a backup file (its data generation is not the one this device
+  // holds): show the cloud exactly as it is, with no merge. Merging would bring back every record
+  // the file left out. This device's own copy goes into the backup vault first, so nothing it
+  // held is gone for good.
+  const adoptReplacedCloudData = useCallback((fullSnapshot, localState) => {
+    const generation = Number(fullSnapshot?.dataGeneration) || 0;
+    const now = new Date().toISOString();
+    const local = localState || {};
+    if ((Array.isArray(local.snakes) ? local.snakes : []).some(snake => snake && !isDemoSnakeRecord(snake))) {
+      addBackupVaultEntryRef.current?.({
+        ...(local.plannerState || {}),
+        version: 1,
+        generatedAt: now,
+        snakes: local.snakes,
+        pairings: local.pairings || [],
+        breedingCycles: local.breedingCycles || [],
+        follicleExams: local.follicleExams || [],
+      }, { source: 'auto', name: `Before the cloud data was replaced • ${formatDateTimeForDisplay(now)}`, savedAt: now });
+    }
+
+    const backendSnapshot = normalizeBackendBreederSnapshot(fullSnapshot);
+    const tombstones = reconcileTombstones({ snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {} }, fullSnapshot?.tombstones);
+    syncTombstonesRef.current = tombstones;
+    setSyncTombstones(tombstones);
+    remoteSnapshotRef.current = backendSnapshot;
+    remoteCursorRef.current = fullSnapshot?.serverTime || null;
+
+    const shown = normalizeCloudSnapshotForDisplay({ ...backendSnapshot, snakes: keepLocalPhotos(backendSnapshot.snakes, local.snakes) }, local);
+    setSyncedSnakes(shown.snakes);
+    setSyncedPairings(shown.pairings);
+    setSyncedBreedingCycles(shown.breedingCycles);
+    setSyncedFollicleExams(shown.follicleExams);
+    applyPlannerSyncState(shown.plannerState);
+    latestPlannerSnapshotRef.current = shown;
+    cloudBaselineSnapshotRef.current = shown;
+    backendPlannerSyncRef.current.seeded = true;
+    backendPlannerSyncRef.current.status = 'ready';
+    backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(shown);
+
+    dataGenerationRef.current = generation;
+    saveStoredJson(STORAGE_KEYS.dataGeneration, generation);
+    setCloudSyncStatus({
+      state: 'success',
+      lastSyncedAt: now,
+      message: `The cloud data was replaced from a backup. This device now shows it: ${shown.snakes.length} snakes and ${shown.pairings.length} pairings.`,
+    });
+    return { ...shown, syncedAt: now };
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams]);
+
   const performCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
     backendPlannerSyncRef.current.status = 'loading';
     if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
@@ -7962,6 +8102,10 @@ export default function BreedingPlannerApp() {
       const snapshot = await fetchBreederSnapshot(cursorForRequest(remoteCursorRef.current));
       noteServerTime(snapshot?.serverTime, fetchStartedAt);
       const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
+      if ((Number(snapshot?.dataGeneration) || 0) !== dataGenerationRef.current) {
+        // A replace is loaded whole: a delta only names what changed since the cursor.
+        return adoptReplacedCloudData(isDelta ? await fetchBreederSnapshot(null) : snapshot, startedFrom);
+      }
       const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
 
       // The server names what was deleted, in a full snapshot as well as a delta. Folded into the
@@ -7993,6 +8137,8 @@ export default function BreedingPlannerApp() {
       const plannerUnchanged = stableStringify(plannerStateComparable(merged.plannerState))
         === stableStringify(plannerStateComparable(remoteState.plannerState));
       if (plannerUnchanged) delete upload.plannerState;
+      // The server refuses a save made against an older replace (DATA_REPLACED).
+      upload.dataGeneration = dataGenerationRef.current;
       const nothingToSend = ['animals', 'pairings', 'breedingCycles', 'follicleExams']
         .every(key => !Array.isArray(upload[key]) || !upload[key].length) && !upload.plannerState;
       // Puts a result on screen, merging in edits made while the requests were in flight instead of
@@ -8022,6 +8168,14 @@ export default function BreedingPlannerApp() {
           ? { serverTime: snapshot?.serverTime }
           : await saveBreederSnapshot(upload, { changedOnly: true });
       } catch (uploadError) {
+        if (isDataReplacedError(uploadError)) {
+          // The account was replaced between this sync's download and its upload. Nothing was
+          // saved; the next pass downloads the whole account and loads the replace.
+          remoteCursorRef.current = null;
+          syncAgainRef.current = true;
+          backendPlannerSyncRef.current.status = 'ready';
+          return { ...startedFrom, syncedAt: null };
+        }
         // The download still happened. Show it: this device used to keep displaying whatever it
         // started with (the demo animals, when its local storage could not be read) for as long as
         // its uploads kept failing, while the keeper's real collection sat on the server.
@@ -8085,7 +8239,7 @@ export default function BreedingPlannerApp() {
       setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
       throw error;
     }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams]);
+  }, [adoptReplacedCloudData, applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams]);
 
   const runCloudBreederSync = useCallback(({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
@@ -8784,7 +8938,8 @@ export default function BreedingPlannerApp() {
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
   }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
-  const handleRestoreBackup = useCallback((payload) => {
+  // Restore on this device only: used when the app is not signed in to the cloud.
+  const restoreBackupOnThisDevice = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Backup file is invalid.');
     }
@@ -8798,6 +8953,31 @@ export default function BreedingPlannerApp() {
 
     if (!incomingSnakes.length && !incomingPairings.length) {
       throw new Error('Backup file does not contain any animals or pairings.');
+    }
+
+    // Written before anything changes on screen. A restore that did not fit in this device's
+    // storage (a phone keeps a few MB) used to show the data until the app closed and then lose
+    // all of it; now it is refused while the old data is still intact.
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const previous = {};
+      const written = [[STORAGE_KEYS.snakes, incomingSnakes], [STORAGE_KEYS.pairings, incomingPairings]];
+      try {
+        written.forEach(([key, value]) => {
+          previous[key] = window.localStorage.getItem(key);
+          window.localStorage.setItem(key, JSON.stringify(value));
+        });
+      } catch (err) {
+        Object.entries(previous).forEach(([key, value]) => {
+          try {
+            if (value === null) window.localStorage.removeItem(key);
+            else window.localStorage.setItem(key, value);
+          } catch {}
+        });
+        console.warn('Backup does not fit in local storage', err);
+        throw new Error(t('cloudReplace.tooLargeForDevice', {
+          defaultValue: 'This backup is too large to keep on this device, so nothing was restored. Sign in and restore it again: it then goes to the cloud, and this device loads it from there.',
+        }));
+      }
     }
 
     setSnakes(incomingSnakes);
@@ -8838,7 +9018,53 @@ export default function BreedingPlannerApp() {
         : normalizeSpacesDataset(payload.spaces || []);
       setSpacesState(normalizedSpaces);
     }
-  }, [setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState]);
+  }, [setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState, t]);
+
+  // Signed in, a restore replaces the cloud: the file becomes the whole account and every device
+  // signed in to it switches over on its next sync. The keeper first sees what that changes.
+  const replaceCloudFromBackup = useCallback(async (payload) => {
+    const { upload, duplicateLogEntriesRemoved } = buildReplaceUploadFromBackup(payload, plannerSyncState);
+    const preview = await replaceBreederData(upload, { dryRun: true });
+    const duplicatesCleaned = duplicateLogEntriesRemoved + (Number(preview.duplicateLogEntriesRemoved) || 0);
+    const lines = [
+      t('cloudReplace.preview.intro', { defaultValue: 'Replace all cloud data with this file?' }),
+      '',
+      t('cloudReplace.preview.now', { animals: preview.before.animals, pairings: preview.before.pairings, defaultValue: 'In the cloud now: {{animals}} animals, {{pairings}} pairings.' }),
+      t('cloudReplace.preview.after', { animals: preview.after.animals, pairings: preview.after.pairings, defaultValue: 'After the replace: {{animals}} animals, {{pairings}} pairings.' }),
+    ];
+    if (preview.removed.animals || preview.removed.pairings) {
+      lines.push(t('cloudReplace.preview.removed', { animals: preview.removed.animals, pairings: preview.removed.pairings, defaultValue: 'Not in the file, so removed from the cloud: {{animals}} animals, {{pairings}} pairings.' }));
+    }
+    if (duplicatesCleaned) {
+      lines.push(t('cloudReplace.preview.duplicates', { count: duplicatesCleaned, defaultValue: 'Duplicated log entries cleaned up: {{count}}.' }));
+    }
+    lines.push('', t('cloudReplace.preview.devices', { defaultValue: 'Every device signed in to this account switches to this data. The current cloud data is kept, and Undo puts it back.' }));
+    const confirmed = await showAppConfirm(lines.join('\n'), {
+      title: t('cloudReplace.preview.title', { defaultValue: 'Replace cloud data' }),
+      confirmLabel: t('cloudReplace.preview.confirm', { defaultValue: 'Replace cloud data' }),
+      tone: 'danger',
+    });
+    if (!confirmed) return { mode: 'cancelled' };
+
+    const result = await replaceBreederData(upload);
+    // Breeding settings are this device's own and never synced; the file's apply here.
+    if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
+    // This device loads the replace like every other one: its next sync sees the new generation.
+    await runCloudBreederSync({ silent: true }).catch(error => console.warn('Sync after the cloud replace failed', error));
+    return { mode: 'cloud', result };
+  }, [plannerSyncState, runCloudBreederSync, showAppConfirm, t]);
+
+  const handleRestoreBackup = useCallback(async (payload) => {
+    if (sharedBreederDataReady) return replaceCloudFromBackup(payload);
+    restoreBackupOnThisDevice(payload);
+    return { mode: 'local' };
+  }, [replaceCloudFromBackup, restoreBackupOnThisDevice, sharedBreederDataReady]);
+
+  const undoCloudReplace = useCallback(async (replacementId) => {
+    const result = await undoBreederDataReplacement(replacementId);
+    await runCloudBreederSync({ silent: true }).catch(error => console.warn('Sync after undoing the cloud replace failed', error));
+    return result;
+  }, [runCloudBreederSync]);
 
   const addBackupVaultEntry = useCallback((payload, meta = {}) => {
     if (!payload || typeof payload !== 'object') return null;
@@ -8869,6 +9095,9 @@ export default function BreedingPlannerApp() {
     });
     return entry;
   }, [setBackupVault, backupSettings]);
+  useEffect(() => {
+    addBackupVaultEntryRef.current = addBackupVaultEntry;
+  }, [addBackupVaultEntry]);
 
   const renameBackupVaultEntry = useCallback((id, nextName) => {
     const trimmed = typeof nextName === 'string' ? nextName.trim() : '';
@@ -13274,6 +13503,9 @@ export default function BreedingPlannerApp() {
             onSaved={() => setTab('animals')}
             createBackupPayload={createBackupPayload}
             onRestoreBackup={handleRestoreBackup}
+            cloudReplaceAvailable={sharedBreederDataReady}
+            onFetchCloudReplacements={fetchBreederDataReplacements}
+            onUndoCloudReplace={undoCloudReplace}
             backupSettings={backupSettings}
             updateBackupSettings={updateBackupSettings}
             autoBackupSnapshot={autoBackupSnapshot}
@@ -19337,6 +19569,9 @@ function BreederSection({
   onSaved,
   createBackupPayload,
   onRestoreBackup,
+  cloudReplaceAvailable = false,
+  onFetchCloudReplacements,
+  onUndoCloudReplace,
   backupSettings,
   updateBackupSettings,
   autoBackupSnapshot,
@@ -19523,6 +19758,62 @@ function BreederSection({
   const [animalTextListCopied, setAnimalTextListCopied] = useState(false);
   const restoreInputRef = useRef(null);
   const legacyRestoreInputRef = useRef(null);
+  // The account's full replaces (newest first), each of which can be undone. Null until loaded.
+  const [cloudReplacements, setCloudReplacements] = useState(null);
+  const [cloudReplacementsError, setCloudReplacementsError] = useState('');
+  const [undoingReplacementId, setUndoingReplacementId] = useState(null);
+  const loadCloudReplacements = useCallback(async () => {
+    if (!cloudReplaceAvailable || typeof onFetchCloudReplacements !== 'function') return;
+    try {
+      const response = await onFetchCloudReplacements();
+      setCloudReplacements(Array.isArray(response?.replacements) ? response.replacements : []);
+      setCloudReplacementsError('');
+    } catch (err) {
+      setCloudReplacementsError(err?.message || 'Could not load the replace history.');
+    }
+  }, [cloudReplaceAvailable, onFetchCloudReplacements]);
+  useEffect(() => {
+    if (setupTab === 'backup') loadCloudReplacements();
+  }, [loadCloudReplacements, setupTab]);
+  // What a restore did, in words: the cloud replaced, this device only, or nothing (cancelled).
+  const describeRestoreOutcome = useCallback((outcome, sourceName) => {
+    if (outcome?.mode === 'cancelled') return null;
+    if (outcome?.mode === 'cloud') {
+      return t('cloudReplace.done', {
+        name: sourceName,
+        animals: outcome.result?.after?.animals ?? 0,
+        defaultValue: 'Cloud data replaced from {{name}}: {{animals}} animals. Every device signed in to this account switches to it.',
+      });
+    }
+    return t('cloudReplace.restoredLocally', { name: sourceName, defaultValue: 'Restored {{name}} on this device.' });
+  }, [t]);
+  const handleUndoCloudReplace = useCallback(async (entry) => {
+    if (!entry || typeof onUndoCloudReplace !== 'function') return;
+    const confirmed = typeof showAppConfirm === 'function'
+      ? await showAppConfirm(
+        t('cloudReplace.undoConfirm', {
+          date: formatDateTimeForDisplay(entry.createdAt),
+          defaultValue: 'Put the cloud data back the way it was before {{date}}? Every device signed in to this account switches to it.',
+        }),
+        { confirmLabel: t('cloudReplace.undo', { defaultValue: 'Undo' }), tone: 'warning' },
+      )
+      : true;
+    if (!confirmed) return;
+    setUndoingReplacementId(entry.id);
+    try {
+      const result = await onUndoCloudReplace(entry.id);
+      setRestoreFeedback({
+        type: 'success',
+        message: t('cloudReplace.undone', { animals: result?.after?.animals ?? 0, defaultValue: 'Cloud data put back: {{animals}} animals.' }),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      setRestoreFeedback({ type: 'error', message: err?.message || 'Undo failed.', timestamp: new Date().toISOString() });
+    } finally {
+      setUndoingReplacementId(null);
+      loadCloudReplacements();
+    }
+  }, [loadCloudReplacements, onUndoCloudReplace, showAppConfirm, t]);
   const normalizedBackupSettings = useMemo(() => normalizeBackupSettings(backupSettings), [backupSettings]);
   const vaultEntries = useMemo(() => (Array.isArray(backupVault) ? backupVault : []), [backupVault]);
   const normalizedAnimalExportFields = useMemo(
@@ -21332,7 +21623,7 @@ function BreederSection({
     }
   }, [vaultEntries]);
 
-  const handleRestoreVaultEntry = useCallback((entryId) => {
+  const handleRestoreVaultEntry = useCallback(async (entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
     if (!entry) {
       setRestoreFeedback({
@@ -21346,12 +21637,10 @@ function BreederSection({
       if (typeof onRestoreBackup !== 'function') {
         throw new Error('Restore handler is unavailable.');
       }
-      onRestoreBackup(entry.payload);
-      setRestoreFeedback({
-        type: 'success',
-        message: `Restored data from "${entry.name}".`,
-        timestamp: new Date().toISOString(),
-      });
+      const outcome = await Promise.resolve(onRestoreBackup(entry.payload));
+      const message = describeRestoreOutcome(outcome, `"${entry.name}"`);
+      setRestoreFeedback(message ? { type: 'success', message, timestamp: new Date().toISOString() } : null);
+      if (outcome?.mode === 'cloud') loadCloudReplacements();
     } catch (err) {
       console.error(err);
       setRestoreFeedback({
@@ -21360,7 +21649,7 @@ function BreederSection({
         timestamp: new Date().toISOString(),
       });
     }
-  }, [vaultEntries, onRestoreBackup]);
+  }, [vaultEntries, onRestoreBackup, describeRestoreOutcome, loadCloudReplacements]);
 
   const handleRenameVaultEntry = useCallback(async (entryId) => {
     if (typeof onRenameVaultEntry !== 'function') return;
@@ -21447,12 +21736,10 @@ function BreederSection({
       if (typeof onRestoreBackup !== 'function') {
         throw new Error('Restore handler is unavailable.');
       }
-      await Promise.resolve(onRestoreBackup(parsed));
-      setRestoreFeedback({
-        type: 'success',
-        message: `Restored data from ${file.name}`,
-        timestamp: new Date().toISOString(),
-      });
+      const outcome = await Promise.resolve(onRestoreBackup(parsed));
+      const message = describeRestoreOutcome(outcome, file.name);
+      setRestoreFeedback(message ? { type: 'success', message, timestamp: new Date().toISOString() } : null);
+      if (outcome?.mode === 'cloud') loadCloudReplacements();
     } catch (err) {
       console.error(err);
       setRestoreFeedback({
@@ -21465,7 +21752,7 @@ function BreederSection({
         event.target.value = '';
       }
     }
-  }, [onRestoreBackup]);
+  }, [onRestoreBackup, describeRestoreOutcome, loadCloudReplacements]);
 
   useEffect(() => {
     const fallback = info.name || info.businessName;
@@ -23178,9 +23465,65 @@ function BreederSection({
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
-              {t("setup.backup.restoreWarning", { defaultValue: "Restoring replaces everything in the app. Download a backup first to stay safe." })}
+              {cloudReplaceAvailable
+                ? t("cloudReplace.restoreWarning", { defaultValue: "Signed in, a restore replaces the cloud data: the file becomes the whole account, and every device signed in to it switches over. You see what changes before anything is replaced, and Undo below puts the previous data back." })
+                : t("setup.backup.restoreWarning", { defaultValue: "Restoring replaces everything in the app. Download a backup first to stay safe." })}
             </div>
           </div>
+
+          {cloudReplaceAvailable && (
+            <div className="space-y-3 border-t pt-4">
+              <div>
+                <div className="font-semibold text-sm">{t("cloudReplace.historyTitle", { defaultValue: "Cloud replace history" })}</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {t("cloudReplace.historyHelp", { defaultValue: "Each replace keeps the cloud data as it was just before. Undo puts that back on every device." })}
+                </div>
+              </div>
+              {cloudReplacementsError && <div className="text-xs text-red-600">{cloudReplacementsError}</div>}
+              {Array.isArray(cloudReplacements) && cloudReplacements.length > 0 ? (
+                <ul className="space-y-2">
+                  {cloudReplacements.map(entry => {
+                    const before = entry.summary?.before || {};
+                    const after = entry.summary?.after || {};
+                    return (
+                      <li key={entry.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="text-sm text-neutral-800">
+                            {entry.reason === 'undo'
+                              ? t("cloudReplace.entryUndo", { defaultValue: "Undo of an earlier replace" })
+                              : t("cloudReplace.entryReplace", { defaultValue: "Replaced from a backup file" })}
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            {formatDateTimeForDisplay(entry.createdAt)}
+                            {' · '}
+                            {t("cloudReplace.entryCounts", {
+                              before: before.animals ?? 0,
+                              after: after.animals ?? 0,
+                              defaultValue: "{{before}} → {{after}} animals",
+                            })}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 rounded-lg border text-xs self-start sm:self-auto disabled:opacity-50"
+                          disabled={!!undoingReplacementId}
+                          onClick={() => handleUndoCloudReplace(entry)}
+                        >
+                          {undoingReplacementId === entry.id
+                            ? t("cloudReplace.undoing", { defaultValue: "Undoing…" })
+                            : t("cloudReplace.undo", { defaultValue: "Undo" })}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                Array.isArray(cloudReplacements) && (
+                  <div className="text-xs text-neutral-500">{t("cloudReplace.historyEmpty", { defaultValue: "The cloud data has not been replaced from a file yet." })}</div>
+                )
+              )}
+            </div>
+          )}
         </div>
       )}
 
