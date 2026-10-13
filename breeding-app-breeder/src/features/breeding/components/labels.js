@@ -111,6 +111,7 @@ export const flagLabel = (t, kind) => ({
   same_day_sessions_same_male: t('breeding.flag.sameDaySessions', { defaultValue: 'Two sessions with the same male on one day' }),
   multiple_active_cycles: t('breeding.flag.multipleActive', { defaultValue: 'More than one open card for this female' }),
   duplicate_active_cycle: t('breeding.flag.duplicateActive', { defaultValue: 'A second open card arrived from another device; this one was paused for review' }),
+  unresolved_animal_reference: t('breeding.flag.unresolvedAnimal', { defaultValue: 'This card names an animal that is not in your collection' }),
 }[kind] || kind);
 
 export const legacyReasonLabel = (t, reason) => ({

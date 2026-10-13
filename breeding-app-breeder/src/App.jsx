@@ -52,6 +52,8 @@ import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx"
 import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
 import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
 import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
+import MissingAnimalsPanel from "./features/sync/MissingAnimalsPanel.jsx";
+import { unlinkAnimalFromPairings } from "./features/sync/missingAnimals";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -83,9 +85,18 @@ import {
   selectRecordsToUpload,
   applyRemoteDeletions,
   applyChangedRecords,
-  mergeGeneticsLists,
-  mergeStringValues,
+  cursorForRequest,
+  pendingTombstones,
+  reconcileTombstones,
 } from "./services/cloudSyncPayload";
+import {
+  SYNC_ENTRY_ARRAYS,
+  mergeSyncRecord,
+  noteServerTime,
+  stableStringify,
+  stampRecordChanges,
+  syncNow,
+} from "./services/syncMerge";
 import {
   getGeneGroups,
   getGeneAliases,
@@ -108,7 +119,6 @@ import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import SpeciesGate from "./features/species/SpeciesGate";
 import {
   flattenGroupsBySpecies,
-  mergeGroupsBySpecies,
   migrateFlatGroups,
   normalizeGroupNames,
   normalizeGroupsBySpecies,
@@ -1125,7 +1135,9 @@ const localYMD = (d = new Date()) => {
   const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 };
-const nowIsoString = () => new Date().toISOString();
+// On the server's clock as far as this device can tell (services/syncMerge.js), so the edit and
+// deletion times this device stamps compare honestly with every other device's.
+const nowIsoString = () => syncNow();
 function formatDateTimeForDisplay(dateLike) {
   if (!dateLike) return '';
   const dt = dateLike instanceof Date ? dateLike : new Date(dateLike);
@@ -1642,7 +1654,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'femaleName',
     label: 'Female name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleId || '',
+    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleName || pairing?.femaleId || '',
   },
   {
     key: 'femaleGenetics',
@@ -1660,7 +1672,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'maleName',
     label: 'Male name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleId || '',
+    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleName || pairing?.maleId || '',
   },
   {
     key: 'maleGenetics',
@@ -2055,10 +2067,10 @@ function buildPairingExportDataset(pairings = [], snakes = [], selected = DEFAUL
       derived,
       displayLabel,
       femaleSnake,
-      femaleName: femaleSnake?.name || pairing.femaleId || '',
+      femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       femaleGenetics: joinTokens(combineMorphsAndHetsForDisplay(femaleSnake?.morphs, femaleSnake?.hets, femaleSnake?.possibleHets)),
       maleSnake,
-      maleName: maleSnake?.name || pairing.maleId || '',
+      maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       maleGenetics: joinTokens(combineMorphsAndHetsForDisplay(maleSnake?.morphs, maleSnake?.hets, maleSnake?.possibleHets)),
       cycleYear,
       hatchlings,
@@ -2158,10 +2170,10 @@ function getPairingExportRows(pairings = [], snakes = [], options = {}) {
     const row = {
       pairingId: pairing.id,
       maleId: pairing.maleId || maleCode,
-      maleCode: maleCode || pairing.maleId || '',
+      maleCode: maleCode || pairing.maleName || pairing.maleId || '',
       maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       femaleId: pairing.femaleId || femaleCode,
-      femaleCode: femaleCode || pairing.femaleId || '',
+      femaleCode: femaleCode || pairing.femaleName || pairing.femaleId || '',
       femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       pairingOrder: numericSortIndex,
       pairingOrderDisplay: numericSortIndex === null ? 'order not set' : numericSortIndex,
@@ -2819,10 +2831,6 @@ function cloneLogs(logs = {}) {
 
 const MAX_PHOTOS_PER_SNAKE = 60;
 
-// Every action in the snake editor's pinned header shares one footprint, so a long label like
-// "Order Genetic Test" does not make its button wider than "QR label" next to it.
-const SNAKE_EDITOR_ACTION_CLASS = 'snake-editor-action';
-
 function normalizePhotoEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const url = typeof raw.url === 'string' && raw.url.trim()
@@ -3068,10 +3076,12 @@ function prepareAnimalForBackend(snake) {
 
 function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}, breeding = {}) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
-  const snakeTombstones = Object.values(tombstones?.snakes || {});
-  const pairingTombstones = Object.values(tombstones?.pairings || {});
-  const cycleTombstones = Object.values(tombstones?.breedingCycles || {});
-  const examTombstones = Object.values(tombstones?.follicleExams || {});
+  // Only the deletions the server does not have yet. Every tombstone ever made used to ride along
+  // on every sync.
+  const snakeTombstones = pendingTombstones(tombstones?.snakes);
+  const pairingTombstones = pendingTombstones(tombstones?.pairings);
+  const cycleTombstones = pendingTombstones(tombstones?.breedingCycles);
+  const examTombstones = pendingTombstones(tombstones?.follicleExams);
   // Cards and examinations that belong to a demo animal are placeholders and never leave the device.
   const demoSnakeIds = getDemoSnakeIds(Array.isArray(animals) ? animals : []);
   const cycles = (Array.isArray(breeding.breedingCycles) ? breeding.breedingCycles : []).filter(cycle => cycle && !demoSnakeIds.has(cycle.femaleId));
@@ -3083,14 +3093,12 @@ function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombs
     breedingCycles: [...cycles, ...cycleTombstones],
     follicleExams: [...exams, ...examTombstones],
   };
-  const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
+  const normalizedPlannerState = normalizePlannerStateRecord(withoutDeviceLocalPlannerState(plannerState));
   if (normalizedPlannerState) {
     payload.plannerState = sanitizeBackendMediaValue(normalizedPlannerState);
   }
   return payload;
 }
-
-const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
 
 // Tabs that live behind the phone's More sheet rather than on the bar itself.
 const MOBILE_MORE_TABS = ['calendar', 'spaces', 'quarantine', 'advisor', 'familyTree', 'shedTerminal', 'setup'];
@@ -3105,44 +3113,6 @@ function getSyncRecordKey(record, fallbackPrefix, index) {
   ];
   const value = candidates.map(item => String(item || '').trim()).find(Boolean);
   return value || `${fallbackPrefix}-${index + 1}`;
-}
-
-function getLogEntryKey(entry, key, index) {
-  if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
-  return (
-    String(entry.id || '').trim() ||
-    String(entry.logId || '').trim() ||
-    (entry.createdAt ? `${entry.createdAt}:${entry.actionType || key}` : '') ||
-    `${key}-${index}`
-  );
-}
-
-function mergeLogArrays(localEntries = [], backendEntries = [], key) {
-  const rows = [
-    ...(Array.isArray(localEntries) ? localEntries : []),
-    ...(Array.isArray(backendEntries) ? backendEntries : []),
-  ].filter(entry => entry && typeof entry === 'object');
-  const byKey = new Map();
-  rows.forEach((entry, index) => {
-    const entryKey = getLogEntryKey(entry, key, index);
-    const existing = byKey.get(entryKey);
-    if (!existing || getSyncTimestamp(entry) >= getSyncTimestamp(existing)) {
-      byKey.set(entryKey, { ...existing, ...entry });
-    }
-  });
-  return Array.from(byKey.values()).sort((a, b) => {
-    const aTime = getSyncTimestamp(a) || new Date(a.date || a.createdAt || 0).getTime() || 0;
-    const bTime = getSyncTimestamp(b) || new Date(b.date || b.createdAt || 0).getTime() || 0;
-    return bTime - aTime;
-  });
-}
-
-function mergeArrayValues(...values) {
-  return mergeStringValues(...values);
-}
-
-function sanitizePlannerObjectRecord(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : null;
 }
 
 function normalizePlannerStringList(value) {
@@ -3187,7 +3157,7 @@ function normalizePlannerStateRecord(value) {
 }
 
 function plannerStateComparable(state) {
-  const normalized = normalizePlannerStateRecord(state);
+  const normalized = normalizePlannerStateRecord(withoutDeviceLocalPlannerState(state));
   if (!normalized) return null;
   const clone = JSON.parse(JSON.stringify(normalized));
   delete clone.updatedAt;
@@ -3204,7 +3174,7 @@ function plannerStateComparable(state) {
 }
 
 function plannerSnapshotSignature(snapshot = {}) {
-  return JSON.stringify({
+  return stableStringify({
     snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
     pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
     breedingCycles: Array.isArray(snapshot.breedingCycles) ? snapshot.breedingCycles : [],
@@ -3213,62 +3183,46 @@ function plannerSnapshotSignature(snapshot = {}) {
   });
 }
 
-function markPlannerStateUpdated(state, updatedAt = nowIsoString()) {
-  if (!state || typeof state !== 'object') return state;
-  return {
-    ...state,
-    updatedAt,
-    metadata: {
-      ...(state.metadata && typeof state.metadata === 'object' ? state.metadata : {}),
-      updatedAt,
-    },
-  };
-}
-
+// The planner state has no setter wrapper of its own (it is assembled from a dozen separate
+// pieces of state), so its fields are stamped here, against the last synced copy, a debounce
+// after the edit.
 function stampPlannerStateForSync(localState, baselineState) {
   const normalized = normalizePlannerStateRecord(localState);
   if (!normalized) return null;
-  if (!baselineState) return normalized;
-  if (JSON.stringify(plannerStateComparable(normalized)) === JSON.stringify(plannerStateComparable(baselineState))) {
+  const baseline = normalizePlannerStateRecord(baselineState);
+  if (!baseline) return normalized;
+  if (stableStringify(plannerStateComparable(normalized)) === stableStringify(plannerStateComparable(baseline))) {
     return normalized;
   }
-  return markPlannerStateUpdated(normalized);
+  return stampRecordChanges(normalized, baseline, { entryArrays: SYNC_ENTRY_ARRAYS.planner, now: nowIsoString() });
 }
 
-function mergePlannerObjectRecord(localRecord, backendRecord) {
-  if (!localRecord) return backendRecord;
-  if (!backendRecord) return localRecord;
-  return getSyncTimestamp(backendRecord) >= getSyncTimestamp(localRecord)
-    ? { ...localRecord, ...backendRecord }
-    : { ...backendRecord, ...localRecord };
+const ANIMAL_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.animal, mergeLogs: true };
+const PAIRING_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.pairing, mergeLogs: true };
+const PLANNER_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.planner, sortEntries: false };
+
+// Per-device bookkeeping that is not the keeper's data. Every device's automatic backup rewrote
+// `lastRun`, so each backup became a planner-state change that overwrote the other devices' copy
+// and made the next device run its backup again.
+function withoutDeviceLocalPlannerState(state) {
+  if (!state || typeof state !== 'object' || !state.backupSettings || typeof state.backupSettings !== 'object') return state;
+  const { lastRun, ...backupSettings } = state.backupSettings;
+  return { ...state, backupSettings };
 }
 
-
+// Field by field, the later edit of each field winning, with rooms, racks and terrariums merged
+// entry by entry so one removed on one device stays removed. See services/syncMerge.js.
 function mergePlannerStates(localState, backendState) {
   const local = normalizePlannerStateRecord(localState);
   const backend = normalizePlannerStateRecord(backendState);
   if (!local) return backend;
   if (!backend) return local;
-  const localTime = getSyncTimestamp(local);
-  const backendTime = getSyncTimestamp(backend);
-  const base = backendTime > localTime ? backend : local;
-  const other = backendTime > localTime ? local : backend;
-  const merged = {
-    ...other,
-    ...base,
-    // Per species, so two devices editing different species both keep their lists. The flat
-    // `groups` union is still merged for older clients that only understand that field.
-    groupsBySpecies: mergeGroupsBySpecies(other.groupsBySpecies, base.groupsBySpecies),
-    groups: mergeArrayValues(other.groups, base.groups),
-    showGroups: mergeArrayValues(other.showGroups, base.showGroups),
-    hiddenGroups: mergeArrayValues(other.hiddenGroups, base.hiddenGroups),
-    customStatusTags: mergeArrayValues(other.customStatusTags, base.customStatusTags),
-    removedStatusTags: mergeArrayValues(other.removedStatusTags, base.removedStatusTags),
-    rooms: mergeRecordsByKey(other.rooms, base.rooms, sanitizePlannerObjectRecord, 'room', mergePlannerObjectRecord),
-    heatRacks: mergeRecordsByKey(other.heatRacks, base.heatRacks, sanitizePlannerObjectRecord, 'heatRack', mergePlannerObjectRecord),
-    terrariums: mergeRecordsByKey(other.terrariums, base.terrariums, sanitizePlannerObjectRecord, 'terrarium', mergePlannerObjectRecord),
-  };
-  merged.spaces = buildLegacySpacesSnapshot(merged.rooms, merged.heatRacks, merged.terrariums);
+  const merged = mergeSyncRecord(withoutDeviceLocalPlannerState(backend), withoutDeviceLocalPlannerState(local), PLANNER_MERGE);
+  // This device's own backup bookkeeping stays this device's.
+  if (local.backupSettings && typeof local.backupSettings === 'object' && 'lastRun' in local.backupSettings) {
+    merged.backupSettings = { ...(merged.backupSettings || {}), lastRun: local.backupSettings.lastRun };
+  }
+  merged.spaces = buildLegacySpacesSnapshot(merged.rooms || [], merged.heatRacks || [], merged.terrariums || []);
   return normalizePlannerStateRecord(merged);
 }
 
@@ -3279,79 +3233,54 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   // 2025 "Athena" is 25Ath-1, like the demo) replaces it whole: merged, it kept isDemo and
   // was hidden as a demo.
   if (isDemoSnakeRecord(localAnimal) && !isDemoSnakeRecord(backendAnimal)) return sanitizeSnakeRecord(backendAnimal);
-  const localTime = getSyncTimestamp(localAnimal);
-  const backendTime = getSyncTimestamp(backendAnimal);
-  const base = backendTime > localTime ? backendAnimal : localAnimal;
-  const other = backendTime > localTime ? localAnimal : backendAnimal;
-  const logs = {};
-  const allLogKeys = Array.from(new Set([
-    ...SYNC_LOG_KEYS,
-    ...Object.keys(localAnimal.logs || {}),
-    ...Object.keys(backendAnimal.logs || {}),
-  ]));
-  allLogKeys.forEach(key => {
-    logs[key] = mergeLogArrays(localAnimal.logs?.[key], backendAnimal.logs?.[key], key);
-  });
-  // Genetics follow the timestamp instead of unioning, so a gene the keeper deleted stays
-  // deleted rather than being handed back by whichever side still held it. See
-  // mergeGeneticsLists. Tags and groups keep the union: nobody expects two devices adding a
-  // tag each to lose one, and unlike genetics they are not the record of what the animal is.
-  const tiedTimestamps = localTime === backendTime;
-  return sanitizeSnakeRecord({
-    ...other,
-    ...base,
-    morphs: mergeGeneticsLists(base.morphs, other.morphs, { tied: tiedTimestamps }),
-    hets: mergeGeneticsLists(base.hets, other.hets, { tied: tiedTimestamps }),
-    possibleHets: mergeGeneticsLists(base.possibleHets, other.possibleHets, { tied: tiedTimestamps }),
-    tags: mergeArrayValues(other.tags, base.tags),
-    groups: mergeArrayValues(other.groups, base.groups),
-    photos: mergeLogArrays(other.photos, base.photos, 'photo').slice(0, MAX_PHOTOS_PER_SNAKE),
-    logs,
-  });
+  const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
+  if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
+  return sanitizeSnakeRecord(merged);
 }
 
 function mergePairingRecord(localPairing, backendPairing) {
   if (!localPairing) return sanitizePairingRecord(backendPairing);
   if (!backendPairing) return sanitizePairingRecord(localPairing);
-  const localTime = getSyncTimestamp(localPairing);
-  const backendTime = getSyncTimestamp(backendPairing);
-  const base = backendTime > localTime ? backendPairing : localPairing;
-  const other = backendTime > localTime ? localPairing : backendPairing;
+  const merged = mergeSyncRecord(backendPairing, localPairing, PAIRING_MERGE);
   // hatchlingsGeneratedThrough is a monotonic high-water mark *within a reset generation*:
   // inside one generation we always keep the max seen across devices, so a stale write from
   // a tab that hasn't generated a litter yet can't regress it and let the hatch wizard
   // duplicate an already-created batch. hatchlingsResetCount is bumped only when the breeder
   // deliberately deletes a hatchling batch to re-log it; the side with the newer generation
   // then wins outright, otherwise the old high-water mark would come back on the next sync
-  // and permanently block re-logging that clutch.
+  // and permanently block re-logging that clutch. The server applies the same rule.
   const localReset = Number(localPairing?.hatch?.hatchlingsResetCount || 0);
   const backendReset = Number(backendPairing?.hatch?.hatchlingsResetCount || 0);
   const localThrough = Number(localPairing?.hatch?.hatchlingsGeneratedThrough || 0);
   const backendThrough = Number(backendPairing?.hatch?.hatchlingsGeneratedThrough || 0);
-  const hatchlingsResetCount = Math.max(localReset, backendReset);
-  let hatchlingsGeneratedThrough;
-  if (localReset === backendReset) {
-    hatchlingsGeneratedThrough = Math.max(localThrough, backendThrough);
-  } else {
-    hatchlingsGeneratedThrough = localReset > backendReset ? localThrough : backendThrough;
+  if (localPairing?.hatch || backendPairing?.hatch) {
+    const hatchlingsResetCount = Math.max(localReset, backendReset);
+    const hatchlingsGeneratedThrough = localReset === backendReset
+      ? Math.max(localThrough, backendThrough)
+      : (localReset > backendReset ? localThrough : backendThrough);
+    merged.hatch = { ...(merged.hatch || {}), hatchlingsGeneratedThrough, hatchlingsResetCount };
   }
-  return sanitizePairingRecord({
-    ...other,
-    ...base,
-    hatch: { ...other.hatch, ...base.hatch, hatchlingsGeneratedThrough, hatchlingsResetCount },
-  });
+  return sanitizePairingRecord(merged);
+}
+
+// A tombstone hides a record only if the record was not edited after the deletion. Matching by
+// id alone made a reused id (a hatchling re-minted after a batch was redone, a re-added animal)
+// silently unrecoverable: every copy of it was dropped forever.
+function isTombstonedRecord(record, tombstoneMap) {
+  if (!tombstoneMap) return false;
+  const id = record?.id != null ? String(record.id) : '';
+  if (!id || !Object.prototype.hasOwnProperty.call(tombstoneMap, id)) return false;
+  const tombstone = tombstoneMap[id];
+  const deletedAt = new Date(tombstone?.deletedAt || 0).getTime();
+  if (!Number.isFinite(deletedAt) || !deletedAt) return true;
+  return getSyncTimestamp(record) <= deletedAt;
 }
 
 function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord, tombstoneMap = null) {
   const map = new Map();
-  const isTombstoned = (sanitized) => {
-    if (!tombstoneMap) return false;
-    const id = sanitized?.id != null ? String(sanitized.id) : '';
-    return id ? Object.prototype.hasOwnProperty.call(tombstoneMap, id) : false;
-  };
   const add = (item, source, index) => {
     const sanitized = sanitizer(item);
-    if (!sanitized || isTombstoned(sanitized)) return;
+    if (!sanitized || isTombstonedRecord(sanitized, tombstoneMap)) return;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const existing = map.get(key);
     if (!existing) {
@@ -3409,26 +3338,32 @@ function syncComparableRecord(record) {
   return clone;
 }
 
+// How each collection stamps its edits: which nested lists merge entry by entry.
+const SYNC_STAMP_OPTIONS = {
+  animal: ANIMAL_MERGE,
+  pairing: PAIRING_MERGE,
+  cycle: {},
+  exam: {},
+};
+
+// Stamps, against the last synced copy, whatever changed without passing a setter wrapper. Edits
+// that did pass one were stamped when they were made and keep that time (stampRecordChanges never
+// moves an existing edit stamp), so a change made offline keeps its own time instead of taking
+// the time it finally synced, which used to let a day-old edit beat a newer one.
 function stampChangedSyncRecords(items = [], baselineItems = [], sanitizer, fallbackPrefix) {
   const baselineMap = buildSyncRecordMap(baselineItems, sanitizer, fallbackPrefix);
+  const options = SYNC_STAMP_OPTIONS[fallbackPrefix] || {};
+  const now = nowIsoString();
   return (Array.isArray(items) ? items : []).map((item, index) => {
     const sanitized = sanitizer(item);
     if (!sanitized) return item;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const baseline = baselineMap.get(key);
     if (!baseline) return sanitized;
-    if (JSON.stringify(syncComparableRecord(sanitized)) === JSON.stringify(syncComparableRecord(baseline))) {
+    if (stableStringify(syncComparableRecord(sanitized)) === stableStringify(syncComparableRecord(baseline))) {
       return sanitized;
     }
-    const updatedAt = nowIsoString();
-    return {
-      ...sanitized,
-      updatedAt,
-      metadata: {
-        ...(sanitized.metadata && typeof sanitized.metadata === 'object' ? sanitized.metadata : {}),
-        updatedAt,
-      },
-    };
+    return stampRecordChanges(sanitized, baseline, { ...options, now });
   });
 }
 
@@ -3493,35 +3428,37 @@ function syncRecordForLocalChangeCompare(record) {
   return clone;
 }
 
-function markLocalSyncRecordUpdated(record, updatedAt = nowIsoString()) {
-  if (!record || typeof record !== 'object') return record;
-  const metadata = record.metadata && typeof record.metadata === 'object' ? record.metadata : {};
-  return {
-    ...record,
-    updatedAt,
-    metadata: {
-      ...metadata,
-      updatedAt,
-    },
-  };
-}
-
+// Stamps an edit when it is made: the edit time of each changed field, and a removal marker for
+// every log entry, photo, lock or appointment that disappeared, so the other copies cannot hand
+// it back. Runs inside the setters for animals, pairings, cards and examinations.
 function stampLocallyChangedSyncRecords(nextItems = [], previousItems = [], sanitizer, fallbackPrefix) {
   const previousMap = buildSyncRecordMap(previousItems, sanitizer, fallbackPrefix);
-  const updatedAt = nowIsoString();
-  return (Array.isArray(nextItems) ? nextItems : [])
+  const options = SYNC_STAMP_OPTIONS[fallbackPrefix] || {};
+  const now = nowIsoString();
+  let changed = !Array.isArray(previousItems) || !Array.isArray(nextItems) || nextItems.length !== previousItems.length;
+  const result = (Array.isArray(nextItems) ? nextItems : [])
     .map((item, index) => {
       const sanitized = sanitizer(item);
-      if (!sanitized) return null;
+      if (!sanitized) {
+        changed = true;
+        return null;
+      }
       const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
       const previous = previousMap.get(key);
-      if (!previous) return markLocalSyncRecordUpdated(sanitized, updatedAt);
-      if (JSON.stringify(syncRecordForLocalChangeCompare(sanitized)) !== JSON.stringify(syncRecordForLocalChangeCompare(previous))) {
-        return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      if (!previous) {
+        changed = true;
+        return stampRecordChanges(sanitized, null, { ...options, now });
+      }
+      if (getSyncRecordKey(sanitizer(previousItems[index]) || {}, fallbackPrefix, index) !== key) changed = true;
+      if (stableStringify(syncRecordForLocalChangeCompare(sanitized)) !== stableStringify(syncRecordForLocalChangeCompare(previous))) {
+        changed = true;
+        return stampRecordChanges(sanitized, previous, { ...options, now });
       }
       return sanitized;
     })
     .filter(Boolean);
+  // The same records in the same order: keep the existing array, for the same reason as above.
+  return changed ? result : previousItems;
 }
 
 function normalizeBackupFileEntry(raw) {
@@ -5867,6 +5804,15 @@ function extractSequenceFromId(id, idConfig = null) {
 }
 
 // Generate snake id using configurable template rules
+// Ids of deleted animals, from this device's tombstones and the server's. Never handed out again:
+// the generator starts at "count + 1" and skips only ids still in use, so a freed number used to
+// come straight back (redoing a hatch batch re-minted the same ids), and a new animal under an old
+// id was taken for the deleted one on the other devices.
+let RETIRED_SNAKE_IDS = new Set();
+function setRetiredSnakeIds(ids) {
+  RETIRED_SNAKE_IDS = new Set(Array.from(ids || []).map(id => String(id || '').trim().toLowerCase()).filter(Boolean));
+}
+
 function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber = null, opts = {}) {
   const {
     hadYear = false,
@@ -5914,6 +5860,7 @@ function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber =
   const existingIdsLower = existingIds.map(id => id.toLowerCase());
   const existingIdSetLower = new Set(existingIdsLower);
   const existingUniqueCount = existingIdSetLower.size;
+  RETIRED_SNAKE_IDS.forEach(id => existingIdSetLower.add(id));
   const reservedSequences = new Set();
   existingEntries.forEach(entry => {
     const value = Number(entry.idSequence);
@@ -6968,12 +6915,22 @@ export default function BreedingPlannerApp() {
   const setBreedingCycles = useCallback((updater) => {
     setBreedingCyclesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizeBreedingCycleRecord, 'cycle');
     });
   }, []);
   const setFollicleExams = useCallback((updater) => {
     setFollicleExamsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizeFollicleExamRecord, 'exam');
     });
   }, []);
@@ -6983,12 +6940,22 @@ export default function BreedingPlannerApp() {
   const setSnakes = useCallback((updater) => {
     setSnakesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return normalizeSnakeListForDisplay(stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal'));
     });
   }, []);
   const setPairings = useCallback((updater) => {
     setPairingsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
     });
   }, []);
@@ -7018,6 +6985,7 @@ export default function BreedingPlannerApp() {
   const syncTombstonesRef = useRef(syncTombstones);
   useEffect(() => {
     syncTombstonesRef.current = syncTombstones;
+    setRetiredSnakeIds(Object.keys(syncTombstones?.snakes || {}));
     saveStoredJson('bpSyncTombstones', syncTombstones);
   }, [syncTombstones]);
   // The dashboard is the landing page; a species workspace is entered from it. A null scope
@@ -7520,7 +7488,6 @@ export default function BreedingPlannerApp() {
   // falls back to a whole-account sync whenever either is missing.
   const remoteSnapshotRef = useRef({ snakes: [], pairings: [], plannerState: null });
   const remoteCursorRef = useRef(null);
-  const cloudSaveRequestIdRef = useRef(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
     lastSyncedAt: null,
@@ -7961,7 +7928,10 @@ export default function BreedingPlannerApp() {
     if (Array.isArray(state.geneAliases)) setGeneAliases(mergeGeneAliasRows(state.geneAliases));
     if (state.leucisticType === 'blackEye' || state.leucisticType === 'bel') setLastLeucisticType(state.leucisticType);
     if (state.breederInfo && typeof state.breederInfo === 'object') setBreederInfo(normalizeBreederInfo(state.breederInfo));
-    if (state.backupSettings && typeof state.backupSettings === 'object') setBackupSettings(normalizeBackupSettings(state.backupSettings));
+    // When this device last ran its own backup is not something another device can tell it.
+    if (state.backupSettings && typeof state.backupSettings === 'object') {
+      setBackupSettings(prev => normalizeBackupSettings({ ...state.backupSettings, lastRun: prev?.lastRun }));
+    }
     if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
       setLastFeedDefaults(prev => ({ ...prev, ...state.lastFeedDefaults }));
     }
@@ -7982,7 +7952,154 @@ export default function BreedingPlannerApp() {
     latestPlannerSnapshotRef.current = { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState };
   }, [snakes, pairings, breedingCycles, follicleExams, plannerSyncState]);
 
-  const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+  // One sync at a time. The startup sync, the Sync button, the laboratory refresh, the debounced
+  // autosave and the background pull all come through here; a request that arrives while a sync
+  // is running asks for one more pass after it instead of starting a second one alongside. Two
+  // concurrent syncs used to download the same state, merge separately and overwrite each other's
+  // result, and whichever finished last decided what the keeper saw.
+  const syncRunRef = useRef(null);
+  const syncAgainRef = useRef(false);
+  const syncBroadcastRef = useRef(null);
+
+  const performCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+    backendPlannerSyncRef.current.status = 'loading';
+    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+
+    try {
+      const startedFrom = latestPlannerSnapshotRef.current;
+      const localSnapshot = stampChangedSnapshotForSync(startedFrom, cloudBaselineSnapshotRef.current);
+      // First sync of a session has no cursor and fetches everything; later ones ask only for
+      // what changed since the server's own timestamp, from a little before it (cursorForRequest).
+      const fetchStartedAt = Date.now();
+      const snapshot = await fetchBreederSnapshot(cursorForRequest(remoteCursorRef.current));
+      noteServerTime(snapshot?.serverTime, fetchStartedAt);
+      const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
+      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
+
+      // The server names what was deleted, in a full snapshot as well as a delta. Folded into the
+      // tombstone map, each deletion hides this device's copy unless it was edited afterwards.
+      // A full snapshot used to convey deletions only by omission, which the merge could not tell
+      // from "not uploaded yet", so an animal deleted on another device lived on here forever.
+      syncTombstonesRef.current = reconcileTombstones(syncTombstonesRef.current, snapshot?.tombstones);
+      const remoteState = isDelta
+        ? applyRemoteDeletions(applyChangedRecords(remoteSnapshotRef.current, backendSnapshot), snapshot?.deleted)
+        : backendSnapshot;
+      const merged = applyRemoteDeletions(
+        mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
+        isDelta ? snapshot?.deleted : null,
+      );
+      const tombstones = syncTombstonesRef.current;
+      // Upload only what the server does not already have, and only the tombstones it lacks.
+      const upload = prepareSnapshotForBackend(
+        selectRecordsToUpload(merged.snakes, remoteState.snakes),
+        selectRecordsToUpload(merged.pairings, remoteState.pairings),
+        merged.plannerState,
+        tombstones,
+        {
+          breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
+          follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
+        }
+      );
+      // A pull that finds this device already in step sends nothing. The planner state used to ride
+      // along on every sync, so each background pull was also a write.
+      const plannerUnchanged = stableStringify(plannerStateComparable(merged.plannerState))
+        === stableStringify(plannerStateComparable(remoteState.plannerState));
+      if (plannerUnchanged) delete upload.plannerState;
+      const nothingToSend = ['animals', 'pairings', 'breedingCycles', 'follicleExams']
+        .every(key => !Array.isArray(upload[key]) || !upload[key].length) && !upload.plannerState;
+      // Puts a result on screen, merging in edits made while the requests were in flight instead of
+      // overwriting them: replacing the state with a result computed from before them reverted
+      // whatever the keeper had just typed.
+      const showSnapshot = (shown) => {
+        const current = latestPlannerSnapshotRef.current;
+        const editedMeanwhile = current !== startedFrom;
+        const next = editedMeanwhile
+          ? normalizeCloudSnapshotForDisplay(
+              mergeBreederSnapshots(stampChangedSnapshotForSync(current, localSnapshot), shown, syncTombstonesRef.current),
+              current,
+            )
+          : shown;
+        setSyncedSnakes(next.snakes);
+        setSyncedPairings(next.pairings);
+        setSyncedBreedingCycles(next.breedingCycles);
+        setSyncedFollicleExams(next.follicleExams);
+        applyPlannerSyncState(next.plannerState);
+        latestPlannerSnapshotRef.current = next;
+        return { next, editedMeanwhile };
+      };
+
+      let savedSnapshot;
+      try {
+        savedSnapshot = nothingToSend
+          ? { serverTime: snapshot?.serverTime }
+          : await saveBreederSnapshot(upload, { changedOnly: true });
+      } catch (uploadError) {
+        // The download still happened. Show it: this device used to keep displaying whatever it
+        // started with (the demo animals, when its local storage could not be read) for as long as
+        // its uploads kept failing, while the keeper's real collection sat on the server.
+        remoteSnapshotRef.current = remoteState;
+        if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
+        setSyncTombstones(prev => reconcileTombstones(prev, snapshot?.tombstones));
+        const { next } = showSnapshot(normalizeCloudSnapshotForDisplay(merged, localSnapshot));
+        backendPlannerSyncRef.current.seeded = true;
+        // What is on screen counts as attempted, so the autosave does not retry the same failing
+        // upload in a tight loop; the next pull or edit tries again.
+        backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(next);
+        throw uploadError;
+      }
+      syncTombstonesRef.current = reconcileTombstones(syncTombstonesRef.current, savedSnapshot?.tombstones);
+      // Functional, so a deletion made while the requests were in flight is kept.
+      setSyncTombstones(prev => reconcileTombstones(reconcileTombstones(prev, snapshot?.tombstones), savedSnapshot?.tombstones));
+      const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
+      // ?ack=changed returns only the rows the server wrote, so they are patched over the merge
+      // we already hold rather than replacing it.
+      const persistedSnapshot = applyChangedRecords(merged, changedRecords);
+      remoteSnapshotRef.current = applyChangedRecords(remoteState, changedRecords);
+      // The cursor is the download's server time, never the upload's: a write another device made
+      // between this device's download and its upload is older than the upload and was skipped
+      // by every later delta.
+      if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
+      const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
+      const { next: nextSnapshot, editedMeanwhile } = showSnapshot(syncedSnapshot);
+
+      const syncedAt = new Date().toISOString();
+      backendPlannerSyncRef.current.seeded = true;
+      backendPlannerSyncRef.current.status = 'ready';
+      // The signature of what the server holds: edits merged in from meanwhile differ from it, so
+      // the autosave picks them up and sends them on the next pass.
+      backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(syncedSnapshot);
+      cloudBaselineSnapshotRef.current = syncedSnapshot;
+      if (editedMeanwhile) syncAgainRef.current = true;
+
+      const wroteSomething = ['snakes', 'pairings', 'breedingCycles', 'follicleExams']
+        .some(key => Array.isArray(changedRecords[key]) && changedRecords[key].length) || !!savedSnapshot?.plannerState;
+      if (wroteSomething) {
+        // Other tabs of this app on this device pull now rather than at their next interval.
+        try { syncBroadcastRef.current?.postMessage({ type: 'cloud-sync-wrote' }); } catch {}
+      }
+
+      // Records the server could not read are left out one by one rather than failing the save;
+      // say which, so a card that never syncs is not a silent mystery.
+      const skipped = Array.isArray(savedSnapshot?.skipped) ? savedSnapshot.skipped : [];
+      if (skipped.length) console.warn('[cloud-sync] the server left out records it could not read', skipped);
+      setCloudSyncStatus({
+        state: 'success',
+        lastSyncedAt: syncedAt,
+        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`
+          + (skipped.length ? ` ${skipped.length} breeding record(s) were not saved: ${skipped.map(record => record.reason).join('; ')}` : ''),
+      });
+      return { ...nextSnapshot, syncedAt };
+    } catch (error) {
+      backendPlannerSyncRef.current.status = backendPlannerSyncRef.current.seeded ? 'ready' : 'idle';
+      const message = error?.message || 'Cloud sync failed.';
+      // Shown as a "Not synced" pill in the header and one toast, with the reason in plain words
+      // (see cloudSyncFailure). The console line stays for diagnosis.
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
+      throw error;
+    }
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams]);
+
+  const runCloudBreederSync = useCallback(({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
       const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
       if (!silent) {
@@ -7995,83 +8112,30 @@ export default function BreedingPlannerApp() {
             : { kind: 'connection', message },
         });
       }
-      throw new Error(message);
+      return Promise.reject(new Error(message));
     }
-    if (backendPlannerSyncRef.current.status === 'loading') {
-      const message = 'Cloud sync is already running.';
-      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message }));
-      return null;
+    if (syncRunRef.current) {
+      syncAgainRef.current = true;
+      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+      return syncRunRef.current;
     }
-
-    backendPlannerSyncRef.current.status = 'loading';
-    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
-
-    try {
-      const localSnapshot = stampChangedSnapshotForSync(
-        latestPlannerSnapshotRef.current,
-        cloudBaselineSnapshotRef.current
-      );
-      // First sync of a session has no cursor and fetches everything; later ones ask only for
-      // what changed since the server's own timestamp.
-      const snapshot = await fetchBreederSnapshot(remoteCursorRef.current);
-      const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
-      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-      const remoteState = isDelta
-        ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
-        : backendSnapshot;
-      const merged = applyRemoteDeletions(
-        mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
-        isDelta ? snapshot?.deleted : null
-      );
-      // Upload only what the server does not already have. Tombstones are added by
-      // prepareSnapshotForBackend and are never filtered out.
-      const savedSnapshot = await saveBreederSnapshot(
-        prepareSnapshotForBackend(
-          selectRecordsToUpload(merged.snakes, remoteState.snakes),
-          selectRecordsToUpload(merged.pairings, remoteState.pairings),
-          merged.plannerState,
-          syncTombstonesRef.current,
-          {
-            breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
-            follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
-          }
-        ),
-        { changedOnly: true }
-      );
-      const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
-      // ?ack=changed returns only the rows the server wrote, so they are patched over the merge
-      // we already hold rather than replacing it.
-      const persistedSnapshot = applyChangedRecords(merged, changedRecords);
-      remoteSnapshotRef.current = applyChangedRecords(remoteState, changedRecords);
-      if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
-      const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-      const signature = plannerSnapshotSignature(syncedSnapshot);
-
-      setSyncedSnakes(syncedSnapshot.snakes);
-      setSyncedPairings(syncedSnapshot.pairings);
-      setSyncedBreedingCycles(syncedSnapshot.breedingCycles);
-      setSyncedFollicleExams(syncedSnapshot.follicleExams);
-      applyPlannerSyncState(syncedSnapshot.plannerState);
-      latestPlannerSnapshotRef.current = syncedSnapshot;
-
-      const syncedAt = new Date().toISOString();
-      backendPlannerSyncRef.current.seeded = true;
-      backendPlannerSyncRef.current.status = 'ready';
-      backendPlannerSyncRef.current.lastSavedSignature = signature;
-      cloudBaselineSnapshotRef.current = syncedSnapshot;
-      setCloudSyncStatus({
-        state: 'success',
-        lastSyncedAt: syncedAt,
-        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`,
-      });
-      return { ...syncedSnapshot, syncedAt };
-    } catch (error) {
-      backendPlannerSyncRef.current.status = 'idle';
-      const message = error?.message || 'Cloud sync failed.';
-      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
-      throw error;
-    }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+    const run = (async () => {
+      try {
+        let result = null;
+        let passes = 0;
+        do {
+          syncAgainRef.current = false;
+          passes += 1;
+          result = await performCloudBreederSync({ silent: silent || passes > 1 });
+        } while (syncAgainRef.current && passes < 5);
+        return result;
+      } finally {
+        syncRunRef.current = null;
+      }
+    })();
+    syncRunRef.current = run;
+    return run;
+  }, [performCloudBreederSync, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
@@ -8090,6 +8154,44 @@ export default function BreedingPlannerApp() {
     return () => window.removeEventListener('lab:cloud-sync-requested', handleLabCloudSyncRequested);
   }, [runCloudBreederSync]);
 
+  // Changes made on another device arrive without this one having to edit something first: on
+  // returning to the window, on reconnecting, from another tab, and once a minute while visible.
+  // Before, the desktop only pulled at startup or when the keeper changed something, so a desktop
+  // left open showed whatever it had loaded that morning.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !electronDataReady || !sharedBreederDataReady) return undefined;
+    // Also the retry for a first sync that failed (backend asleep, network down): it used to wait
+    // for the keeper to press Sync.
+    const pull = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      runCloudBreederSync({ silent: true }).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') pull(); };
+    window.addEventListener('focus', pull);
+    window.addEventListener('online', pull);
+    document.addEventListener('visibilitychange', onVisibility);
+    const timer = window.setInterval(pull, 60 * 1000);
+
+    let channel = null;
+    try {
+      channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('serpentora-cloud-sync') : null;
+    } catch { channel = null; }
+    if (channel) channel.onmessage = (event) => { if (event?.data?.type === 'cloud-sync-wrote') pull(); };
+    syncBroadcastRef.current = channel;
+
+    return () => {
+      window.removeEventListener('focus', pull);
+      window.removeEventListener('online', pull);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(timer);
+      if (channel) {
+        channel.onmessage = null;
+        try { channel.close(); } catch {}
+      }
+      if (syncBroadcastRef.current === channel) syncBroadcastRef.current = null;
+    };
+  }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
+
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'idle') return;
@@ -8103,9 +8205,6 @@ export default function BreedingPlannerApp() {
 
     return () => {
       cancelled = true;
-      if (!backendPlannerSyncRef.current.seeded && backendPlannerSyncRef.current.status === 'loading') {
-        backendPlannerSyncRef.current.status = 'idle';
-      }
     };
   }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
 
@@ -8239,6 +8338,9 @@ export default function BreedingPlannerApp() {
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
+  const [editMoreMenuOpen, setEditMoreMenuOpen] = useState(false);
+  const editMoreMenuRef = useRef(null);
+  const [editNewGroupOpen, setEditNewGroupOpen] = useState(false);
   const [tagFilterMenuOpen, setTagFilterMenuOpen] = useState(false);
   const tagFilterMenuRef = useRef(null);
 
@@ -8335,6 +8437,28 @@ export default function BreedingPlannerApp() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [editStatusMenuOpen]);
+
+  useEffect(() => {
+    if (!editMoreMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (editMoreMenuRef.current && !editMoreMenuRef.current.contains(event.target)) {
+        setEditMoreMenuOpen(false);
+      }
+    };
+    const handleKey = (event) => { if (event.key === 'Escape') setEditMoreMenuOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [editMoreMenuOpen]);
+
+  // A menu or half-typed group left open on one animal must not greet the next one.
+  useEffect(() => {
+    setEditMoreMenuOpen(false);
+    setEditNewGroupOpen(false);
+  }, [editSnake?.id]);
 
   useEffect(() => {
     if (!tagFilterMenuOpen) return;
@@ -8558,95 +8682,26 @@ export default function BreedingPlannerApp() {
     snakes,
   ]);
 
+  // Autosave: a local change, settled for 600 ms, becomes a sync. It goes through the same
+  // serialized runCloudBreederSync as everything else, so it can no longer race the startup sync,
+  // the Sync button or a background pull.
   useEffect(() => {
-    if (!electronDataReady || !sharedBreederDataReady) return;
-    if (!backendPlannerSyncRef.current.seeded) return;
+    if (!electronDataReady || !sharedBreederDataReady) return undefined;
+    if (!backendPlannerSyncRef.current.seeded) return undefined;
 
     const signature = plannerSnapshotSignature({ snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState });
-    const saveRequestId = ++cloudSaveRequestIdRef.current;
-    if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
-      backendPlannerSyncRef.current.status = 'ready';
-      return;
-    }
+    if (signature === backendPlannerSyncRef.current.lastSavedSignature) return undefined;
 
     const saveTimer = setTimeout(() => {
-      if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-      backendPlannerSyncRef.current.status = 'loading';
-      const localSnapshot = stampChangedSnapshotForSync(
-        { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState },
-        cloudBaselineSnapshotRef.current
-      );
-
-      let mergedForSave = null;
-      let remoteStateForSave = null;
-
-      fetchBreederSnapshot(remoteCursorRef.current)
-        .then((snapshot) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
-          const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
-          const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-          remoteStateForSave = isDelta
-            ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
-            : backendSnapshot;
-          mergedForSave = applyRemoteDeletions(
-            mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
-            isDelta ? snapshot?.deleted : null
-          );
-          return saveBreederSnapshot(
-            prepareSnapshotForBackend(
-              selectRecordsToUpload(mergedForSave.snakes, remoteStateForSave.snakes),
-              selectRecordsToUpload(mergedForSave.pairings, remoteStateForSave.pairings),
-              mergedForSave.plannerState,
-              syncTombstonesRef.current,
-              {
-                breedingCycles: selectRecordsToUpload(mergedForSave.breedingCycles, remoteStateForSave.breedingCycles),
-                follicleExams: selectRecordsToUpload(mergedForSave.follicleExams, remoteStateForSave.follicleExams),
-              }
-            ),
-            { changedOnly: true }
-          );
-        })
-        .then((savedSnapshot) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
-          const persistedSnapshot = applyChangedRecords(mergedForSave, changedRecords);
-          remoteSnapshotRef.current = applyChangedRecords(remoteStateForSave, changedRecords);
-          if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
-          const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-          setSyncedSnakes(currentSnapshot.snakes);
-          setSyncedPairings(currentSnapshot.pairings);
-          setSyncedBreedingCycles(currentSnapshot.breedingCycles);
-          setSyncedFollicleExams(currentSnapshot.follicleExams);
-          applyPlannerSyncState(currentSnapshot.plannerState);
-          latestPlannerSnapshotRef.current = currentSnapshot;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(currentSnapshot);
-          cloudBaselineSnapshotRef.current = currentSnapshot;
-          setCloudSyncStatus({
-            state: 'success',
-            lastSyncedAt: new Date().toISOString(),
-            message: `Saved ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings to the cloud database.`,
-          });
-        })
-        .catch((error) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          backendPlannerSyncRef.current.status = 'ready';
-          // Shown as a "Not synced" pill in the header and one toast, with the reason
-          // in plain words (see cloudSyncFailure). The console line stays for diagnosis.
-          setCloudSyncStatus(prev => ({
-            ...prev,
-            state: 'error',
-            message: error?.message || 'Failed to save shared breeder snapshot.',
-            error: syncErrorDetails(error),
-          }));
-          console.warn('Failed to save shared breeder snapshot', error);
-        });
+      runCloudBreederSync({ silent: true }).catch((error) => {
+        console.warn('Failed to save shared breeder snapshot', error);
+      });
     }, 600);
 
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [applyPlannerSyncState, electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBreederDataReady, snakes]);
+  }, [electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, runCloudBreederSync, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -9613,8 +9668,8 @@ export default function BreedingPlannerApp() {
         const sire = snakeById(snakes, pairing.maleId);
         const clutchDate = pairing.clutch.date;
         const year = String(clutchDate || '').slice(0, 4) || '';
-        const damName = dam?.name || pairing.femaleId || '';
-        const sireName = sire?.name || pairing.maleId || '';
+        const damName = dam?.name || pairing.femaleName || pairing.femaleId || '';
+        const sireName = sire?.name || pairing.maleName || pairing.maleId || '';
         return {
           pairingId: pairing.id,
           clutchId: buildClutchId(damName, sireName, year),
@@ -9660,8 +9715,8 @@ export default function BreedingPlannerApp() {
           eggBoxBadEggs: p?.clutch?.eggBoxBadEggs || {},
           clutchDate,
           pairingLabel,
-          femaleName: female?.name || p.femaleId || 'Female',
-          maleName: male?.name || p.maleId || 'Male',
+          femaleName: female?.name || p.femaleName || p.femaleId || 'Female',
+          maleName: male?.name || p.maleName || p.maleId || 'Male',
           clutchId: buildClutchId(female?.name || p.femaleId, male?.name || p.maleId, clutchYear),
           femaleGenetics: female ? (getDisplayedSnakeGeneticsTokens(female).length ? getDisplayedSnakeGeneticsTokens(female).join(', ') : 'Normal') : '\u2014',
           maleGenetics: male ? (getDisplayedSnakeGeneticsTokens(male).length ? getDisplayedSnakeGeneticsTokens(male).join(', ') : 'Normal') : '\u2014',
@@ -11246,6 +11301,15 @@ export default function BreedingPlannerApp() {
     addTombstone: addBreedingTombstone,
     snakesById: breedingSnakesById,
   });
+
+  // Settings → Backup → "Animals named but missing": settle a pairing or card that names an animal
+  // the collection does not have. Both go through the stamping setters, so they sync like any edit.
+  const handleUnlinkMissingAnimal = useCallback((animalId) => {
+    setPairings(prev => unlinkAnimalFromPairings(prev, animalId));
+  }, [setPairings]);
+  const handleDeleteCyclesNamingAnimal = useCallback((cycleIds) => {
+    (Array.isArray(cycleIds) ? cycleIds : []).forEach(id => breedingActions.deleteCycle(id));
+  }, [breedingActions]);
   const breedingGeneticsTokensFor = useCallback((snake) => (
     snake ? combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets) : []
   ), []);
@@ -13211,6 +13275,9 @@ export default function BreedingPlannerApp() {
             showAppConfirm={showAppConfirm}
             onCompressStoredPhotos={handleCompressStoredPhotos}
             onResetToDefaults={resetAppToDefaults}
+            breedingCycles={breedingCycles}
+            onUnlinkMissingAnimal={handleUnlinkMissingAnimal}
+            onDeleteCyclesNamingAnimal={handleDeleteCyclesNamingAnimal}
           />
         )}
 
@@ -13958,72 +14025,168 @@ export default function BreedingPlannerApp() {
       {/* edit snake */}
     {editSnake && editSnakeDraft && typeof document !== 'undefined' && createPortal((
     <div className={cx("fixed inset-0 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 z-[10000]", overlayClass(theme))}>
-      <div className="relative z-[10001] bg-white w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col" onClick={e=>e.stopPropagation()}>
-            {/* Thumbnail on the left, name over one row of actions on the right. The name is no
-                longer truncated: which animal is open is the one thing the header has to say, and
-                a wrapped second line costs less than a name cut off mid-morph. */}
-            <div className="shrink-0 p-5 border-b flex items-stretch gap-4">
-                        <div className="snake-editor-thumb shrink-0">
-                          {(() => {
-                            const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
-                            const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
-                            return headerUrl ? (
-                              <img src={headerUrl} alt={editSnakeDraft.name || ''} className="w-full h-full object-cover object-center" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-center text-[11px] leading-tight text-neutral-400 px-1">
-                                {t("snakeEdit.image.none")}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col gap-3">
-                        <div className="font-semibold text-lg leading-snug break-words" title={editSnake.name}>{editSnake.name}</div>
-                        <div className="snake-editor-actions">
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, 'appearance-btn appearance-btn--danger')}
-                            onClick={()=>requestDeleteSnake(editSnake)}>
-                            {t("actions.delete", { defaultValue: "Delete" })}
-                          </button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
-                            onClick={() => openFamilyTreeForSnake(editSnakeDraft || editSnake)}
-                          >
-                            {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
-                          </button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={async ()=>{ try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); } }}>{t("actions.exportPdf", { defaultValue: "Export PDF" })}</button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, Boolean((editSnakeDraft.id || '').trim())))}
-                            disabled={!((editSnakeDraft.id || '').trim())}
-                            onClick={async () => {
-                              const trimmedId = (editSnakeDraft.id || '').trim();
-                              if (!trimmedId) {
-                                await showAppAlert(t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }));
-                                return;
-                              }
-                              try {
-                                await exportQrToPdf([{
-                                  id: trimmedId,
-                                  name: editSnakeDraft.name,
-                                  sex: editSnakeDraft.sex,
-                                  morphs: editSnakeDraft.morphs,
-                                  hets: editSnakeDraft.hets,
-                                  possibleHets: editSnakeDraft.possibleHets,
-                                }], breederInfo);
-                              } catch (err) {
-                                console.error('QR export failed', err);
-                                await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Unable to create the QR label PDF." }));
-                              }
-                            }}
-                          >
-                            {t("actions.qrLabel", { defaultValue: "QR label" })}
-                          </button>
-                          <button
-                            className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme, true))}
-                            onClick={() => setTestOrderSnake(editSnakeDraft)}
-                          >
-                            {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
-                          </button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))}
-                            onClick={()=>{
+      <div
+        className="snake-editor relative z-[10001] w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl border flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={editSnake.name || editSnake.id}
+        onClick={e=>e.stopPropagation()}
+      >
+            {/* One header: the photo and its controls, the name, then More / Cancel / Save. The
+                photo used to appear twice (a thumbnail here and a 318px frame in the body) and
+                seven equal buttons put Delete beside Save; the rarely used actions now sit in More. */}
+            <div className="snake-editor-header">
+              <div className="snake-editor-photo">
+                {(() => {
+                  const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
+                  const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
+                  return headerUrl ? (
+                    <img src={headerUrl} alt={editSnakeDraft.name || ''} />
+                  ) : (
+                    <div className="snake-editor-photo__empty">{t("snakeEdit.image.none")}</div>
+                  );
+                })()}
+                {editUploadingPhoto && (
+                  <div className="sk-scrim snake-editor-photo__busy">{t("snakeEdit.image.saving")}</div>
+                )}
+              </div>
+              <input
+                ref={editCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleEditCameraInputChange}
+              />
+              <input
+                ref={editUploadInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleEditUploadInputChange}
+              />
+              <div className="snake-editor-title">
+                <h2 className="snake-editor-name" title={editSnake.name}>{editSnake.name || editSnake.id}</h2>
+                <div className="snake-editor-meta">
+                  {(editSnakeDraft.id || '').trim() ? <bdi className="font-mono">{editSnakeDraft.id}</bdi> : null}
+                  {(editSnakeDraft.id || '').trim() ? ' · ' : null}
+                  {getSpeciesById(resolveSpeciesId(editSnakeDraft.species))?.name || ''}
+                </div>
+                <div className="snake-editor-photo-actions">
+                  <button type="button" className="snake-editor-link" onClick={triggerEditCameraCapture} disabled={editUploadingPhoto || !editSnake?.id}>
+                    {t("snakeEdit.image.take")}
+                  </button>
+                  <button type="button" className="snake-editor-link" onClick={triggerEditUploadPicker} disabled={editUploadingPhoto || !editSnake?.id}>
+                    {t("snakeEdit.image.upload")}
+                  </button>
+                  <button type="button" className="snake-editor-link" onClick={handleEditViewPictures} disabled={!editSnake?.id}>
+                    {editPhotoCount ? t("snakeEdit.image.viewWithCount", { count: editPhotoCount }) : t("snakeEdit.image.view")}
+                  </button>
+                  {editSnakeDraft?.imageUrl ? (
+                    <button
+                      type="button"
+                      className="snake-editor-link snake-editor-link--quiet"
+                      onClick={() => {
+                        setEditSnakeDraft(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
+                        setEditSnake(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
+                      }}
+                    >
+                      {t("snakeEdit.image.clear")}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="snake-editor-commands">
+                <div ref={editMoreMenuRef} className="relative">
+                  <button
+                    type="button"
+                    className={cx('snake-editor-btn', primaryBtnClass(theme, false))}
+                    aria-haspopup="menu"
+                    aria-expanded={editMoreMenuOpen}
+                    onClick={() => setEditMoreMenuOpen(open => !open)}
+                  >
+                    {t("actions.moreActions", { defaultValue: "More actions" })}
+                    <span className="snake-editor-caret" aria-hidden="true" />
+                  </button>
+                  {editMoreMenuOpen && (
+                    <div className="snake-editor-menu snake-editor-menu--end" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={() => { setEditMoreMenuOpen(false); openFamilyTreeForSnake(editSnakeDraft || editSnake); }}
+                      >
+                        {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={async () => {
+                          setEditMoreMenuOpen(false);
+                          try { await exportSnakeToPdf(editSnakeDraft, breederInfo, theme, pairings); } catch(e){ console.error(e); await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Export failed" })); }
+                        }}
+                      >
+                        {t("actions.exportPdf", { defaultValue: "Export PDF" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        disabled={!((editSnakeDraft.id || '').trim())}
+                        title={!((editSnakeDraft.id || '').trim()) ? t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }) : undefined}
+                        onClick={async () => {
+                          setEditMoreMenuOpen(false);
+                          const trimmedId = (editSnakeDraft.id || '').trim();
+                          if (!trimmedId) {
+                            await showAppAlert(t("snakeEdit.assignIdFirst", { defaultValue: "Assign an ID before creating a QR label." }));
+                            return;
+                          }
+                          try {
+                            await exportQrToPdf([{
+                              id: trimmedId,
+                              name: editSnakeDraft.name,
+                              sex: editSnakeDraft.sex,
+                              morphs: editSnakeDraft.morphs,
+                              hets: editSnakeDraft.hets,
+                              possibleHets: editSnakeDraft.possibleHets,
+                            }], breederInfo);
+                          } catch (err) {
+                            console.error('QR export failed', err);
+                            await showAppAlert(t("snakeEdit.qrExportFailed", { defaultValue: "Unable to create the QR label PDF." }));
+                          }
+                        }}
+                      >
+                        {t("actions.qrLabel", { defaultValue: "QR label" })}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item"
+                        onClick={() => { setEditMoreMenuOpen(false); setTestOrderSnake(editSnakeDraft); }}
+                      >
+                        {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
+                      </button>
+                      <div className="snake-editor-menu__sep" role="separator" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="snake-editor-menu__item snake-editor-menu__item--danger"
+                        onClick={() => { setEditMoreMenuOpen(false); requestDeleteSnake(editSnake); }}
+                      >
+                        {t("actions.delete", { defaultValue: "Delete" })}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button type="button" className={cx('snake-editor-btn', primaryBtnClass(theme, false))} onClick={closeSnakeEditor}>
+                  {t("actions.cancel", { defaultValue: "Cancel" })}
+                </button>
+                <button
+                  type="button"
+                  className={cx('snake-editor-btn', primaryBtnClass(theme, true))}
+                  onClick={()=>{
                               const oldId = editSnake.id;
                               const newId = editSnakeDraft.id || oldId;
                               const normalizedSex = sexOrUnknown(editSnakeDraft.sex);
@@ -14040,6 +14203,13 @@ export default function BreedingPlannerApp() {
                                     .map(h => String(h).trim()).filter(Boolean)
                                 ),
                               };
+                              // The sort and the cards read `weight` before the log, so a manual
+                              // number left over from before the first weighing would outrank every
+                              // later one. Once there is a log, its latest entry is the weight.
+                              const latestWeighing = Number(getLatestLogEntry(editSnakeDraft.logs, 'weights')?.grams);
+                              const normalizedWeight = Number.isFinite(latestWeighing) && latestWeighing > 0
+                                ? latestWeighing
+                                : editSnakeDraft.weight;
                               const savedSnake = reconcileQuarantineWithStatus({
                                 ...editSnakeDraft,
                                 id: newId,
@@ -14050,6 +14220,7 @@ export default function BreedingPlannerApp() {
                                 morphs: normalizedGenetics.morphs,
                                 hets: normalizedGenetics.hets,
                                 feederProfile: normalizedFeederProfile,
+                                weight: normalizedWeight,
                               }, { today: quarantineTodayYmd() });
                               setSnakes(prev => prev.map(s => s.id === oldId ? savedSnake : (
                                 // Every offspring names its parents by ID, and that is what the
@@ -14137,111 +14308,45 @@ export default function BreedingPlannerApp() {
                               })));
                           }
                           closeSnakeEditor();
-                            }}>{t("actions.saveChanges", { defaultValue: "Save changes" })}</button>
-                          <button className={cx(SNAKE_EDITOR_ACTION_CLASS, primaryBtnClass(theme,true))} onClick={closeSnakeEditor}>{t("actions.cancel", { defaultValue: "Cancel" })}</button>
-                        </div>
-                        </div>
+                  }}
+                >
+                  {t("actions.saveChanges", { defaultValue: "Save changes" })}
+                </button>
+              </div>
             </div>
-
             <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* basics */}
-              <div className="md:col-span-1 flex flex-col gap-1">
-                <div ref={editStatusMenuRef} className="relative">
-                  <label className="text-xs font-medium">{t("snakeEdit.tag")}</label>
-                  <button
-                    type="button"
-                    className="status-tag-neutral-button mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white text-start flex items-center justify-between"
-                    onClick={() => setEditStatusMenuOpen(open => !open)}
-                  >
-                    <span>{currentEditStatus || t("snakeEdit.noTag")}</span>
-                    <span className="text-[10px] text-neutral-500">v</span>
-                  </button>
-                  {editStatusMenuOpen && (
-                    <div className="absolute z-40 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">
-                      <button
-                        type="button"
-                        className="status-tag-menu-button w-full px-3 py-2 text-start text-sm hover:bg-neutral-100"
-                        onClick={handleClearEditStatus}
-                      >
-                        {t("snakeEdit.noTag")}
-                      </button>
-                      <div className="border-t border-neutral-100" />
-                      {statusTagOptions.length ? (
-                        statusTagOptions.map(option => (
-                          <div key={option} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50">
-                            <button
-                              type="button"
-                              className="status-tag-menu-button flex-1 text-start"
-                              onClick={() => handleSelectEditStatus(option)}
-                            >
-                              {option}
-                            </button>
-                            <button
-                              type="button"
-                              className="status-tag-menu-button ms-3 text-sm font-semibold text-rose-500 hover:text-rose-600"
-                              onClick={() => handleDeleteEditStatus(option)}
-                              title={t("snakeEdit.deleteTag")}
-                            >
-                              -
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-neutral-400">{t("snakeEdit.noTagsYet")}</div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <input
-                      className="w-full border rounded-lg px-2 py-1 text-sm"
-                      value={editStatusTagInput}
-                      onChange={e => setEditStatusTagInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
-                      placeholder={t("snakeEdit.tagPlaceholder")}
-                    />
-                    <button
-                      type="button"
-                      className={cx('status-tag-neutral-button px-2.5 py-1 rounded-lg text-sm border transition-colors whitespace-nowrap', editStatusTagInput.trim() ? 'text-neutral-700 border-neutral-300' : 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed')}
-                      onClick={handleAddEditStatusTag}
-                      disabled={!editStatusTagInput.trim()}
-                    >
-                      {t("snakeEdit.addTag")}
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.tagHelp")}</div>
-                </div>
+            <div className="snake-editor-body">
+              <SnakeEditorSection
+                id="snake-edit-identity"
+                title={t("snakeEdit.sections.identity", { defaultValue: "Identity" })}
+                hint={t("snakeEdit.sections.identityHint", { defaultValue: "Name, ID and genetics." })}
+              >
+                <div className="snake-editor-grid">
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.name")}</label>
-                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                  <label className="snake-editor-label">{t("snakeEdit.name")}</label>
+                  <input className="snake-editor-control"
                     value={editSnakeDraft.name}
                     onChange={e=>setEditSnakeDraft(d=>({...d,name:e.target.value}))}/>
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-medium">{t("snakeEdit.id")}</label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={handleGenerateIdForEditSnake}
-                        disabled={Boolean((editSnakeDraft.id || '').trim())}
-                      >
-                        {t("snakeEdit.generateId")}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[11px] px-2 py-1 border rounded-lg text-neutral-700"
-                        onClick={handleUpdateIdForEditSnake}
-                      >
+                    <label className="snake-editor-label">{t("snakeEdit.id")}</label>
+                    {/* One button: an animal without an ID gets one generated, an animal with one
+                        has it rebuilt from the current name, sex and year. */}
+                    {(editSnakeDraft.id || '').trim() ? (
+                      <button type="button" className="snake-editor-link" onClick={handleUpdateIdForEditSnake}>
                         {t("snakeEdit.updateId")}
                       </button>
-                    </div>
+                    ) : (
+                      <button type="button" className="snake-editor-link" onClick={handleGenerateIdForEditSnake}>
+                        {t("snakeEdit.generateId")}
+                      </button>
+                    )}
                   </div>
-                  <input className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm font-mono" value={editSnakeDraft.id}
+                  <input className="snake-editor-control font-mono" value={editSnakeDraft.id}
                     onChange={e=>{ setEditIdRetagBlocked(false); setEditSnakeDraft(d=>({...d,id:e.target.value})); }} />
                   {!((editSnakeDraft.id || '').trim()) && (
-                    <div className="mt-0.5 text-[11px] text-neutral-500">{t("snakeEdit.idHint")}</div>
+                    <div className="snake-editor-help">{t("snakeEdit.idHint")}</div>
                   )}
                   {editIdRetagBlocked && (
                     <div className="mt-0.5 text-[11px] text-amber-600">
@@ -14252,8 +14357,8 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.sex")}</label>
-                  <select className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
+                  <label className="snake-editor-label">{t("snakeEdit.sex")}</label>
+                  <select className="snake-editor-control"
                     value={normalizeSexValue(editSnakeDraft.sex)}
                     onChange={e=>handleEditSnakeSexChange(e.target.value)}>
                     <option value="U">{t("snakeEdit.sexUnknown", { defaultValue: "Unknown" })}</option>
@@ -14262,9 +14367,9 @@ export default function BreedingPlannerApp() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.species", { defaultValue: "Species" })}</label>
+                  <label className="snake-editor-label">{t("snakeEdit.species", { defaultValue: "Species" })}</label>
                   <SpeciesSelect
-                    className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm bg-white"
+                    className="snake-editor-control"
                     value={resolveSpeciesId(editSnakeDraft.species)}
                     onChange={async value => {
                       const current = resolveSpeciesId(editSnakeDraft.species);
@@ -14287,7 +14392,7 @@ export default function BreedingPlannerApp() {
                     placeholder={t("ui.animals.addAnimal.selectSpecies", { defaultValue: "Select species" })}
                   />
                   {!editSnakeDraft.species && (
-                    <div className="mt-0.5 text-[11px] text-neutral-500">
+                    <div className="snake-editor-help">
                       {t("snakeEdit.speciesAssumed", {
                         defaultValue: "Recorded before species were tracked, so shown as Ball Python. Correct it here if that is wrong.",
                       })}
@@ -14295,16 +14400,46 @@ export default function BreedingPlannerApp() {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.birthDate")}</label>
-                  <input type="text" className="mt-0.5 w-full border rounded-xl px-2 py-1 text-sm"
+                  <label className="snake-editor-label">{t("snakeEdit.birthDate")}</label>
+                  <input type="text" className="snake-editor-control"
                     value={editSnakeDraft.birthDate || ''}
                     placeholder={t("snakeEdit.birthDatePlaceholder", { defaultValue: "YYYY-MM-DD, YYYY-MM, or YYYY" })}
                     onChange={e=>setEditSnakeDraft(d=>({...d,birthDate: normalizeBirthDateValue(e.target.value) || e.target.value}))} />
-                  <div className="text-xs text-neutral-500 mt-0.5">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
+                  <div className="snake-editor-help">{editSnakeDraft.birthDate ? formatDateForDisplay(editSnakeDraft.birthDate) : ''}</div>
                 </div>
+                {(() => {
+                  const latestWeighing = getLatestLogEntry(editSnakeDraft.logs, 'weights');
+                  const loggedGrams = Number(latestWeighing?.grams);
+                  if (Number.isFinite(loggedGrams) && loggedGrams > 0) {
+                    return (
+                      <div>
+                        <div className="snake-editor-label">{t("snakeEdit.weight")}</div>
+                        <div className="snake-editor-readout">
+                          <span className="snake-editor-readout__value">{loggedGrams} g</span>
+                          <span className="snake-editor-readout__meta">
+                            {t("snakeEdit.weightFromLog", {
+                              defaultValue: "Latest weighing, {{date}}",
+                              date: formatDateForDisplay(latestWeighing.date) || latestWeighing.date || '',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div>
+                      <label className="snake-editor-label" htmlFor="snake-edit-weight">{t("snakeEdit.weight")}</label>
+                      <input id="snake-edit-weight" type="number" min="0" className="snake-editor-control"
+                        value={editSnakeDraft.weight || ''}
+                        onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                      <div className="snake-editor-help">{t("snakeEdit.weightLogHint", { defaultValue: "Log weighings under Care records to keep a history." })}</div>
+                    </div>
+                  );
+                })()}
+                <div className="snake-editor-span">
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.genetics")}</label>
-                  <div className="mt-0.5">
+                  <label className="snake-editor-label">{t("snakeEdit.genetics")}</label>
+                  <div className="">
                     <GeneAutocomplete
                       morphs={Array.isArray(editSnakeDraft.morphs) ? editSnakeDraft.morphs : []}
                       hets={Array.isArray(editSnakeDraft.hets) ? editSnakeDraft.hets : []}
@@ -14322,22 +14457,138 @@ export default function BreedingPlannerApp() {
                       }
                     />
                   </div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">{t("snakeEdit.geneticsHelp")}</div>
+                  <div className="snake-editor-help">{t("snakeEdit.geneticsHelp")}</div>
+                </div>
+                </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-status"
+                title={t("snakeEdit.sections.status", { defaultValue: "Status and group" })}
+                hint={t("snakeEdit.sections.statusHint", { defaultValue: "Where the animal stands in your collection." })}
+              >
+                <div className="snake-editor-grid">
+                <div ref={editStatusMenuRef} className="relative">
+                  <label className="snake-editor-label">{t("snakeEdit.tag")}</label>
+                  <button
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded={editStatusMenuOpen}
+                    className="status-tag-neutral-button snake-editor-control snake-editor-select"
+                    onClick={() => setEditStatusMenuOpen(open => !open)}
+                  >
+                    <span className="truncate">{currentEditStatus || t("snakeEdit.noTag")}</span>
+                  </button>
+                  {editStatusMenuOpen && (
+                    <div className="snake-editor-menu snake-editor-menu--field">
+                      <button
+                        type="button"
+                        className="status-tag-menu-button snake-editor-menu__item"
+                        onClick={handleClearEditStatus}
+                      >
+                        {t("snakeEdit.noTag")}
+                      </button>
+                      {statusTagOptions.length ? (
+                        statusTagOptions.map(option => (
+                          <div key={option} className="snake-editor-menu__row">
+                            <button
+                              type="button"
+                              className="status-tag-menu-button snake-editor-menu__item"
+                              onClick={() => handleSelectEditStatus(option)}
+                            >
+                              {option}
+                            </button>
+                            <button
+                              type="button"
+                              className="status-tag-menu-button snake-editor-menu__remove"
+                              onClick={() => handleDeleteEditStatus(option)}
+                              title={t("snakeEdit.deleteTag")}
+                              aria-label={`${t("snakeEdit.deleteTag")}: ${option}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="snake-editor-menu__empty">{t("snakeEdit.noTagsYet")}</div>
+                      )}
+                      {/* Creating a status lives in the list it adds to, not in a second form beside it. */}
+                      <div className="snake-editor-menu__form">
+                        <input
+                          className="snake-editor-control"
+                          value={editStatusTagInput}
+                          onChange={e => setEditStatusTagInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEditStatusTag(); } }}
+                          placeholder={t("snakeEdit.tagPlaceholder")}
+                          aria-label={t("snakeEdit.tagPlaceholder")}
+                        />
+                        <button
+                          type="button"
+                          className="snake-editor-btn-sm"
+                          onClick={handleAddEditStatusTag}
+                          disabled={!editStatusTagInput.trim()}
+                        >
+                          {t("snakeEdit.addTag")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.weight")}</label>
-                  <input type="number" className="mt-1 w-full border rounded-xl px-2 py-1 text-sm"
-                    value={editSnakeDraft.weight}
-                    onChange={e=>setEditSnakeDraft(d=>({...d,weight:Number(e.target.value)||0}))}/>
+                  <label className="snake-editor-label" htmlFor="snake-edit-group">{t("snakeEdit.group")}</label>
+                  <select
+                    id="snake-edit-group"
+                    className="snake-editor-control"
+                    value={editNewGroupOpen ? NEW_GROUP_OPTION : ((Array.isArray(editSnakeDraft.groups) && editSnakeDraft.groups[0]) || '')}
+                    onChange={e => {
+                      const value = e.target.value;
+                      if (value === NEW_GROUP_OPTION) {
+                        setEditNewGroupOpen(true);
+                        return;
+                      }
+                      setEditNewGroupOpen(false);
+                      setEditSnakeDraft(d => ({
+                        ...d,
+                        groups: value.trim() ? [value.trim()] : [],
+                      }));
+                    }}
+                  >
+                    <option value="">{t("snakeEdit.noGroup", { defaultValue: "No group" })}</option>
+                    {editGroups.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                    <option value={NEW_GROUP_OPTION}>{t("snakeEdit.newGroupOption", { defaultValue: "New group…" })}</option>
+                  </select>
+                  {editNewGroupOpen && (
+                    <div className="mt-2">
+                      <AddGroupInline autoFocus onAdd={(g)=>{
+                        if (!g) return;
+                        setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
+                        setEditSnakeDraft(d=>({...d, groups: [g]}));
+                        setEditNewGroupOpen(false);
+                      }} />
+                    </div>
+                  )}
                 </div>
-                <div className="border rounded-xl p-2 bg-neutral-50 mt-1">
-                  <div className="text-[10px] font-semibold text-neutral-600 mb-1.5 uppercase tracking-wide">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    <div className="grid grid-cols-2 gap-1.5">
+                <div className="snake-editor-span">
+                {/* Quarantine record. Status above and quarantine here are the same thing: changing
+                    either one moves the animal in or out of the quarantine section. */}
+                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
+                </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-feeding"
+                title={t("snakeEdit.sections.feeding", { defaultValue: "Feeding" })}
+                hint={t("snakeEdit.sections.feedingHint", { defaultValue: "The plan first, then every feed as it happened." })}
+              >
+                <div className="snake-editor-subhead">{t("feedPrep.profileTitle", { defaultValue: "Feed Cycle" })}</div>
+                  <div className="snake-editor-feedplan">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.foodType", { defaultValue: "Food type" })}</label>
                         <select
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.feedType || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14349,9 +14600,9 @@ export default function BreedingPlannerApp() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.sizeClass", { defaultValue: "Weight class" })}</label>
                         <select
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs bg-white"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.sizeClass || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14365,13 +14616,13 @@ export default function BreedingPlannerApp() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.weightGrams", { defaultValue: "Weight (g)" })}</label>
                         <input
                           type="number"
                           min="0"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.weightGrams || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14381,12 +14632,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.quantity", { defaultValue: "Qty" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.quantity || 1}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14395,12 +14646,12 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
+                        <label className="snake-editor-label">{t("feedPrep.intervalDays", { defaultValue: "Interval (d)" })}</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                          className="snake-editor-control"
                           value={editSnakeDraft.feederProfile?.intervalDays || ''}
                           onChange={e => setEditSnakeDraft(d => ({
                             ...d,
@@ -14410,11 +14661,11 @@ export default function BreedingPlannerApp() {
                         />
                       </div>
                     </div>
-                    <div className="text-[10px] text-neutral-400">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
+                    <div className="snake-editor-help">{t("feedPrep.intervalHelp", { defaultValue: "Reminder starts after the first accepted feed log." })}</div>
                     <div>
-                      <label className="text-[10px] font-medium text-neutral-500">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
+                      <label className="snake-editor-label">{t("feedPrep.notes", { defaultValue: "Notes" })}</label>
                       <input
-                        className="mt-0.5 w-full border rounded-md px-1.5 py-0.5 text-xs"
+                        className="snake-editor-control"
                         value={editSnakeDraft.feederProfile?.notes || ''}
                         onChange={e => setEditSnakeDraft(d => ({
                           ...d,
@@ -14424,11 +14675,116 @@ export default function BreedingPlannerApp() {
                       />
                     </div>
                   </div>
+                <LogsEditor kinds={['feeds']} editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-records"
+                title={t("snakeEdit.sections.records", { defaultValue: "Care records" })}
+                hint={t("snakeEdit.sections.recordsHint", { defaultValue: "Weighings, sheds, cleanings and medication." })}
+              >
+                <LogsEditor kinds={['weights', 'sheds', 'cleanings', 'meds']} editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-breeding"
+                title={t("snakeEdit.sections.breeding", { defaultValue: "Breeding" })}
+                hint={t("snakeEdit.sections.breedingHint", { defaultValue: "Breeding cards, pairings and cycles." })}
+              >
+                <div className="space-y-4">
+                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
+                  <FemaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    exams={follicleExams}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
+                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
+                  />
+                )}
+                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
+                  <MaleBreedingPanel
+                    snake={editSnake}
+                    cycles={breedingCycles}
+                    snakesById={breedingSnakesById}
+                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
+                  />
+                )}
+                {/* Reproductive Intelligence — females only */}
+                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
+                  <ReproductiveIntelligencePanel snake={editSnake} />
+                )}
+                <div className="p-3 border rounded-xl bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
+                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
+                  </div>
+                  <div className="space-y-2">
+                    {(() => {
+                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
+                      const targetId = (editSnakeDraft.id || '').trim();
+                      const related = !targetId ? [] : pairings.filter(p => {
+                        if (!p) return false;
+                        const maleId = (p.maleId || '').trim();
+                        const femaleId = (p.femaleId || '').trim();
+                        if (!maleId && !femaleId) return false;
+                        return isFemale ? femaleId === targetId : maleId === targetId;
+                      });
+                      if (!related.length) {
+                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
+                      }
+                      const otherSnakes = isFemale ? malesById : femalesById;
+                      return related.map(pairing => {
+                        const stage = describePairingStage(pairing);
+                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
+                        const otherId = (otherIdRaw || '').trim();
+                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
+                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
+                        return (
+                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
+                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
+                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
+                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
+                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-lineage"
+                title={t("snakeEdit.sections.lineage", { defaultValue: "Lineage and origin" })}
+                hint={t("snakeEdit.sections.lineageHint", { defaultValue: "Parents, clutch and where the animal came from." })}
+              >
+                <div className="space-y-4">
+                <ParentagePanel
+                  draft={editSnakeDraft}
+                  setDraft={setEditSnakeDraft}
+                  animals={snakes}
+                  clutchOptions={clutchOptions}
+                />
+                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
+                <AcquisitionRecordPanel snake={editSnake} />
+                </div>
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-lab"
+                title={t("snakeEdit.sections.lab", { defaultValue: "Lab tests" })}
+                hint={t("snakeEdit.sections.labHint", { defaultValue: "Shed samples sent for genetic testing." })}
+              >
+                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
+              </SnakeEditorSection>
+              <SnakeEditorSection
+                id="snake-edit-sale"
+                title={t("snakeEdit.sections.sale", { defaultValue: "Marketplace" })}
+                hint={t("snakeEdit.sections.saleHint", { defaultValue: "Price and listing on the Marketplace." })}
+              >
                 {/* For Sale */}
-                <div className="border rounded-xl p-3 bg-neutral-50 mt-1">
+                <div className="snake-editor-sale">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
+                    <label className="snake-editor-subhead">{t("snakeEdit.forSale", { defaultValue: "For sale" })}</label>
                     <button
                       type="button"
                       role="switch"
@@ -14520,200 +14876,7 @@ export default function BreedingPlannerApp() {
                     </div>
                   )}
                 </div>
-
-                {/* Image URL field removed per request */}
-
-                {/* group */}
-                <div>
-                  <label className="text-xs font-medium">{t("snakeEdit.group")}</label>
-                  <select
-                    className="mt-1 w-full border rounded-xl px-2 py-1 text-sm bg-white"
-                    value={(Array.isArray(editSnakeDraft.groups) && editSnakeDraft.groups[0]) || ''}
-                    onChange={e => {
-                      const value = e.target.value.trim();
-                      setEditSnakeDraft(d => ({
-                        ...d,
-                        groups: value ? [value] : [],
-                      }));
-                    }}
-                  >
-                    <option value="">{t("snakeEdit.noGroup", { defaultValue: "No group" })}</option>
-                    {editGroups.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                  <div className="mt-2 border border-dashed border-neutral-200 rounded-xl p-3 bg-white">
-                    <AddGroupInline onAdd={(g)=>{
-                      if (!g) return;
-                      setGroupsForSpecies(editDraftSpeciesId, prev => prev.includes(g) ? prev : [...prev, g]);
-                      setEditSnakeDraft(d=>({...d, groups: [g]}));
-                    }} />
-                  </div>
-                  <div className="text-[11px] text-neutral-500 mt-1">{t("snakeEdit.existingGroups", { defaultValue: "Existing" })}: {editGroups.join(", ")||"-"}</div>
-                </div>
-              </div>
-
-              {/* Genetics picker removed from edit modal per user request */}
-              <div className="md:col-span-2 space-y-5">
-                {/* The picture leads the column: it is how a keeper recognises the animal,
-                    so it sits above the record rather than buried under the logs. Upload,
-                    camera and gallery controls sit under the frame. */}
-                <div className="flex flex-col items-end gap-3">
-                  <div style={{width:318, height:318}} className="rounded-lg overflow-hidden border-2 border-neutral-200 relative">
-                    {(() => {
-                      const draftPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
-                      const frameUrl = editSnakeDraft.imageUrl || (draftPhotos.length ? draftPhotos[draftPhotos.length - 1]?.url : '');
-                      return frameUrl ? (
-                        <img src={frameUrl} alt={editSnakeDraft.name} className="w-full h-full object-contain object-center bg-neutral-50" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm text-neutral-500 bg-neutral-50">{t("snakeEdit.image.none")}</div>
-                      );
-                    })()}
-                    {editUploadingPhoto && (
-                      <div className="sk-scrim absolute inset-0 flex items-center justify-center text-sm text-neutral-600">
-                        {t("snakeEdit.image.saving")}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <input
-                      ref={editCameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handleEditCameraInputChange}
-                    />
-                    <input
-                      ref={editUploadInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleEditUploadInputChange}
-                    />
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={triggerEditCameraCapture}
-                      disabled={editUploadingPhoto || !editSnake?.id}
-                    >
-                      {t("snakeEdit.image.take")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={triggerEditUploadPicker}
-                      disabled={editUploadingPhoto || !editSnake?.id}
-                    >
-                      {t("snakeEdit.image.upload")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={handleEditViewPictures}
-                      disabled={!editSnake?.id}
-                    >
-                      {editPhotoCount ? t("snakeEdit.image.viewWithCount", { count: editPhotoCount }) : t("snakeEdit.image.view")}
-                    </button>
-                    <button
-                      className="text-xs px-2 py-1 border rounded-lg"
-                      onClick={() => {
-                        setEditSnakeDraft(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
-                        setEditSnake(prev => prev ? ({ ...prev, imageUrl: undefined }) : prev);
-                      }}
-                      disabled={!editSnakeDraft?.imageUrl}
-                    >
-                      {t("snakeEdit.image.clear")}
-                    </button>
-                  </div>
-                </div>
-                <ParentagePanel
-                  draft={editSnakeDraft}
-                  setDraft={setEditSnakeDraft}
-                  animals={snakes}
-                  clutchOptions={clutchOptions}
-                />
-                {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
-                <AcquisitionRecordPanel snake={editSnake} />
-                <BreederShedTestingPanel snake={editSnake} refreshToken={panelRefreshToken} />
-
-                {/* Breeding card summary: the female's open card and her history, or the male's participation. */}
-                {normalizeSexValue(editSnakeDraft.sex) === 'F' && editSnake?.id && (
-                  <FemaleBreedingPanel
-                    snake={editSnake}
-                    cycles={breedingCycles}
-                    exams={follicleExams}
-                    snakesById={breedingSnakesById}
-                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId, editSnake.id); }}
-                    openDialog={(request) => { closeSnakeEditor(); requestBreedingDialog(request); }}
-                  />
-                )}
-                {normalizeSexValue(editSnakeDraft.sex) === 'M' && editSnake?.id && (
-                  <MaleBreedingPanel
-                    snake={editSnake}
-                    cycles={breedingCycles}
-                    snakesById={breedingSnakesById}
-                    onOpenCycle={(cycleId) => { closeSnakeEditor(); openBreedingCycle(cycleId); }}
-                  />
-                )}
-
-                {/* Reproductive Intelligence — females only */}
-                {normalizeSexValue(editSnakeDraft.sex) === 'F' && (
-                  <ReproductiveIntelligencePanel snake={editSnake} />
-                )}
-
-                <div className="p-3 border rounded-xl bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.pairingOverview")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.pairingHint")}</div>
-                  </div>
-                  <div className="space-y-2">
-                    {(() => {
-                      const isFemale = normalizeSexValue(editSnakeDraft.sex) === 'F';
-                      const targetId = (editSnakeDraft.id || '').trim();
-                      const related = !targetId ? [] : pairings.filter(p => {
-                        if (!p) return false;
-                        const maleId = (p.maleId || '').trim();
-                        const femaleId = (p.femaleId || '').trim();
-                        if (!maleId && !femaleId) return false;
-                        return isFemale ? femaleId === targetId : maleId === targetId;
-                      });
-                      if (!related.length) {
-                        return <div className="text-xs text-neutral-500">{t("snakeEdit.noPairingsYet")}</div>;
-                      }
-                      const otherSnakes = isFemale ? malesById : femalesById;
-                      return related.map(pairing => {
-                        const stage = describePairingStage(pairing);
-                        const otherIdRaw = isFemale ? pairing.maleId : pairing.femaleId;
-                        const otherId = (otherIdRaw || '').trim();
-                        const otherName = otherId ? (otherSnakes[otherId]?.name || otherId) : t("snakeEdit.partnerUnknown", { defaultValue: "Partner not set" });
-                        const appointCount = Array.isArray(pairing.appointments) ? pairing.appointments.length : 0;
-                        return (
-                          <div key={pairing.id} className="border rounded-lg px-3 py-2 bg-neutral-50">
-                            <div className="text-xs font-semibold text-neutral-700 truncate">{pairing.label || t("snakeEdit.pairingLabel", { defaultValue: "Pairing" })} (#<bdi>{pairing.id}</bdi>)</div>
-                            <div className="text-xs text-neutral-600 truncate">{t("snakeEdit.partner", { defaultValue: "Partner" })}: {otherName || t("snakeEdit.partnerUnknown", { defaultValue: "Unknown partner" })}</div>
-                            <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.appointments", { count: appointCount })}</div>
-                            {stage ? <div className="text-[11px] text-neutral-500 truncate">{t("snakeEdit.status")}: {stage}</div> : null}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-                {/* Quarantine record. Status here and the tag above are the same thing: changing
-                    either one moves the animal in or out of the quarantine section. */}
-                <div className="mt-4">
-                  <QuarantinePanel draft={editSnakeDraft} setDraft={setEditSnakeDraft} />
-                </div>
-
-                {/* Re-add logs editor so feeds/weights/sheds/cleanings/meds can be edited */}
-                <div className="mt-4 p-2 border rounded-xl bg-neutral-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{t("snakeEdit.logsTitle")}</div>
-                    <div className="text-xs text-neutral-500">{t("snakeEdit.logsHint")}</div>
-                  </div>
-                  <LogsEditor editSnakeDraft={editSnakeDraft} setEditSnakeDraft={setEditSnakeDraft} lastFeedDefaults={lastFeedDefaults} setLastFeedDefaults={setLastFeedDefaults} />
-                </div>
-
-              </div>
+              </SnakeEditorSection>
             </div>
             </div>
           </div>
@@ -16204,8 +16367,8 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
     return pairings.map(pairing => {
       const male = snakeById(snakes, pairing.maleId);
       const female = snakeById(snakes, pairing.femaleId);
-      const maleName = male?.name || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
-      const femaleName = female?.name || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
+      const maleName = male?.name || pairing.maleName || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
+      const femaleName = female?.name || pairing.femaleName || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
       const label = pairing.label || `${femaleName} × ${maleName}`;
       return {
         id: pairing.id,
@@ -16965,8 +17128,8 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
 
     const maleSnake = snakesById.get(pairing.maleId);
     const femaleSnake = snakesById.get(pairing.femaleId);
-    const maleName = maleSnake?.name || pairing.maleId || 'Male';
-    const femaleName = femaleSnake?.name || pairing.femaleId || 'Female';
+    const maleName = maleSnake?.name || pairing.maleName || pairing.maleId || 'Male';
+    const femaleName = femaleSnake?.name || pairing.femaleName || pairing.femaleId || 'Female';
     const pairingLabel = pairing.label || `${femaleName} × ${maleName}`;
     const link = `${window.location.origin}${window.location.pathname}#pairing=${encodeURIComponent(pairing.id)}`;
 
@@ -17859,6 +18022,25 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
   const [showPairingsModal, setShowPairingsModal] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const overflowMenuRef = useRef(null);
+  // .mt-card carries a transform, which makes every card its own containing block and stacking
+  // context: a `fixed inset-0` layer inside it covers only the card, and the next card in the
+  // grid paints over anything that spills out. So the click-outside is a document listener, not
+  // a full-screen layer, and the open card is lifted above its neighbours while its menu shows.
+  useEffect(() => {
+    if (!overflowMenuOpen) return;
+    const handlePointer = (event) => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(event.target)) {
+        setOverflowMenuOpen(false);
+      }
+    };
+    const handleKey = (event) => { if (event.key === 'Escape') setOverflowMenuOpen(false); };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [overflowMenuOpen]);
   const [quickTagOpen, setQuickTagOpen] = useState(null);
   const [quickDraft, setQuickDraft] = useState({
     date: localYMD(new Date()),
@@ -18074,7 +18256,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
     closeQuickAdd();
   }
   return (
-  <div ref={cardRef} className="bp-snake-card mt-card relative p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm">
+  <div ref={cardRef} className="bp-snake-card mt-card relative p-2 flex flex-col gap-1 min-h-[280px] max-h-[520px] min-w-0 text-sm" style={overflowMenuOpen ? { zIndex: 30 } : undefined}>
       <div className="flex items-start gap-3">
         {/* thumbnail top-left */}
         <div className="flex-shrink-0">
@@ -18153,7 +18335,6 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             </button>
             {overflowMenuOpen && (
               <>
-                <div className="fixed inset-0 z-[140]" onClick={() => setOverflowMenuOpen(false)} />
                 <div className="bp-overflow-menu z-[150]">
                   {hasFamilyTree && (
                     <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
@@ -18329,10 +18510,15 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
       {/* weight display removed per user request */}
   {/* birth date moved to header */}
       </div>
-      {/* Quick-add popover for activities (feeds, weights, cleanings, sheds, meds) */}
-      {quickTagOpen && (
+      {/* Quick-add dialog for activities (feeds, weights, cleanings, sheds, meds). Portalled to
+          the body: inside the card it was trapped by the card's transform, so its "full-screen"
+          scrim covered only this card and the next card in the grid drew over the dialog. */}
+      {quickTagOpen && typeof document !== 'undefined' && createPortal((
         <div
           className="sk-scrim fixed inset-0 z-[250] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeQuickAdd(); } }}
           onClick={(e) => {
             e.stopPropagation();
             closeQuickAdd();
@@ -18440,7 +18626,7 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
       
       <div className="mt-2 flex items-center gap-2">
         <StatusBadge status={displayStatus} />
@@ -18955,12 +19141,38 @@ function filterSnakes(list, query, tag) {
   });
 }
 
-function AddGroupInline({ onAdd }) {
+// Sentinel value for the "New group…" entry at the foot of a group <select>.
+const NEW_GROUP_OPTION = '__serpentora_new_group__';
+
+// One titled block of the snake editor: heading and hint in a narrow column on wide screens,
+// stacked above the fields on narrow ones.
+function SnakeEditorSection({ id, title, hint, children }) {
+  return (
+    <section className="snake-editor-section" aria-labelledby={id}>
+      <header className="snake-editor-section__head">
+        <h3 id={id} className="snake-editor-section__title">{title}</h3>
+        {hint ? <p className="snake-editor-section__hint">{hint}</p> : null}
+      </header>
+      <div className="snake-editor-section__body">{children}</div>
+    </section>
+  );
+}
+
+function AddGroupInline({ onAdd, autoFocus = false }) {
   const { t } = useTranslation();
   const [val, setVal] = useState("");
   return (
     <div className="flex gap-2 px-2">
       <input className="flex-1 border rounded-lg px-2 py-1 text-sm" placeholder={t("groups.addGroupPlaceholder", { defaultValue: "Add new group" })}
+        autoFocus={autoFocus}
+        onKeyDown={e => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          const g = val.trim();
+          if (!g) return;
+          onAdd(g);
+          setVal("");
+        }}
         value={val} onChange={e=>setVal(e.target.value)} />
       <button className="text-xs px-2 py-1 border rounded-lg" onClick={()=>{
         const g = val.trim();
@@ -18978,6 +19190,9 @@ const OPTIONAL_EXPORT_GROUP_IDS = ACCOUNT_EXPORT_GROUPS.filter(group => !group.a
 
 // Breeder section for contact and logo
 function BreederSection({
+  breedingCycles = [],
+  onUnlinkMissingAnimal,
+  onDeleteCyclesNamingAnimal,
   breederInfo,
   setBreederInfo,
   morphAliases,
@@ -22643,6 +22858,14 @@ function BreederSection({
                 {cloudFeedback.timestamp ? ` - ${formatDateTimeForDisplay(cloudFeedback.timestamp)}` : ''}
               </div>
             )}
+            <MissingAnimalsPanel
+              snakes={snakes}
+              pairings={pairings}
+              cycles={breedingCycles}
+              onUnlinkFromPairings={onUnlinkMissingAnimal}
+              onDeleteCycles={onDeleteCyclesNamingAnimal}
+              showAppConfirm={showAppConfirm}
+            />
           </div>
 
           <div className="space-y-3 border-t pt-4">
@@ -28031,7 +28254,10 @@ function ParentSelect({ label, placeholder, options, value, recordedName, disabl
   );
 }
 
-function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLastFeedDefaults }) {
+// `kinds` picks which logs to show, so the editor can put feeds beside the feed plan and the
+// rest under care records without two copies of the row markup.
+function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLastFeedDefaults, kinds = ['feeds', 'weights', 'sheds', 'cleanings', 'meds'] }) {
+  const show = (kind) => kinds.includes(kind);
   const { t } = useTranslation();
   const feedsRef = useRef(null);
   const weightsRef = useRef(null);
@@ -28056,9 +28282,10 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
   return (
     <>
       {/* Feeds */}
-      <section>
+      {show('feeds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.feeds")}</div>
+          <div className="snake-editor-subhead">{t("logs.feeds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
@@ -28069,7 +28296,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,feeds:[...d.logs.feeds,{id:crypto.randomUUID(),date:today,feed: def.feed || 'Mouse',size: def.size || '',weightGrams:0,method: method,methodDetail: methodDetail,notes: def.notes || '',refused: false}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={feedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={feedsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.feeds.map((x,i)=>{
             const isRefused = !!x.refused;
             if (isRefused) {
@@ -28077,7 +28304,7 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 <div key={i} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center text-xs">
                   <input
                     type="date"
-                    className="border rounded-lg px-2 py-1 text-xs text-neutral-900 sm:col-span-2 min-w-[8rem] w-full"
+                    className="border rounded-lg px-2 py-1 text-sm text-neutral-900 sm:col-span-2 min-w-[8rem] w-full"
                     value={x.date}
                     onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{date:e.target.value})}
                   />
@@ -28097,11 +28324,11 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
 
             return (
               <div key={i} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center text-xs">
-                <input type="date" className="border rounded-lg px-2 py-1 text-xs text-neutral-900 sm:col-span-2 min-w-[8rem] w-full" value={x.date}
+                <input type="date" className="border rounded-lg px-2 py-1 text-sm text-neutral-900 sm:col-span-2 min-w-[8rem] w-full" value={x.date}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{date:e.target.value})}/>
 
                 {/* feed type */}
-                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.feed||''}
+                <select className="border rounded-lg px-2 py-1 text-sm sm:col-span-1 w-full" value={x.feed||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{feed:e.target.value, size: ''})}>
                   <option value="Mouse">{t("logs.mouse", { defaultValue: "Mouse" })}</option>
                   <option value="Rat">{t("logs.rat", { defaultValue: "Rat" })}</option>
@@ -28109,31 +28336,31 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
                 </select>
 
                 {/* weight class */}
-                <select className="border rounded-lg px-2 py-1 text-xs sm:col-span-1 w-full" value={x.size||''}
+                <select className="border rounded-lg px-2 py-1 text-sm sm:col-span-1 w-full" value={x.size||''}
                   onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{size:e.target.value})}>
                   <option value=""></option>
                   {(FEEDER_SIZE_OPTIONS_BY_TYPE[x.feed] || FEEDER_SIZE_OPTIONS).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
 
                 {/* weight in grams */}
-                <input type="number" className="border rounded-lg px-2 py-1 text-xs w-full sm:col-span-1" placeholder="g"
+                <input type="number" className="border rounded-lg px-2 py-1 text-sm w-full sm:col-span-1" placeholder="g"
                   value={typeof x.weightGrams === 'number' ? x.weightGrams : (x.weightGrams || 0)} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{weightGrams: Number(e.target.value) || 0})}/>
 
                 {/* method of feed */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:col-span-2">
-                  <select className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
+                  <select className="border rounded-lg px-2 py-1 text-sm w-full sm:w-auto" value={x.method||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{method: e.target.value})}>
                       <option value="Live">{t("logs.live", { defaultValue: "Live" })}</option>
                       <option value="Freshly killed">{t("logs.freshKilled", { defaultValue: "Freshly killed" })}</option>
                       <option value="Frozen/thawed">{t("logs.frozenThawed", { defaultValue: "Frozen/thawed" })}</option>
                       <option value="Other">{t("logs.other", { defaultValue: "Other" })}</option>
                   </select>
                   {x.method === 'Other' && (
-                    <input className="border rounded-lg px-2 py-1 text-xs w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
+                    <input className="border rounded-lg px-2 py-1 text-sm w-full sm:w-auto" placeholder={t("logs.methodDetails", { defaultValue: "Method details" })} value={x.methodDetail||''} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{methodDetail: e.target.value})} />
                   )}
                 </div>
 
                 <div className="sm:col-span-7">
-                  <input className="border rounded-lg px-2 py-1 text-xs w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
+                  <input className="border rounded-lg px-2 py-1 text-sm w-full" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,'feeds',i,{notes:e.target.value})}/>
                 </div>
 
                 <div className="sm:col-span-7 flex justify-end items-center gap-2 flex-wrap">
@@ -28151,116 +28378,125 @@ function LogsEditor({ editSnakeDraft, setEditSnakeDraft, lastFeedDefaults, setLa
           {!editSnakeDraft.logs.feeds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Weights */}
-      <section>
+      {show('weights') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.weights")}</div>
+          <div className="snake-editor-subhead">{t("logs.weights")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,weights:[...d.logs.weights,{id:crypto.randomUUID(),date:today,grams:0,notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={weightsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={weightsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.weights.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{date:e.target.value})}/>
-              <input type="number" className="border rounded-lg px-2 py-1" placeholder={t("logs.grams", { defaultValue: "grams" })}
+              <input type="number" className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.grams", { defaultValue: "grams" })}
                 value={x.grams} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{grams:Number(e.target.value)||0})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"weights",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('weights', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.weights.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Sheds */}
-      <section>
+      {show('sheds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.sheds")}</div>
+          <div className="snake-editor-subhead">{t("logs.sheds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={() => {
               const today = localYMD(new Date());
               setEditSnakeDraft(d => ({ ...d, logs: { ...d.logs, sheds: [...d.logs.sheds, { id: crypto.randomUUID(), date: today, complete: true, notes: '' }] } }));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={shedsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={shedsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.sheds.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{date:e.target.value})}/>
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="w-4 h-4" checked={!!x.complete}
                   onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{complete:e.target.checked})}/>
                 {t("logs.complete", { defaultValue: "Complete" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'sheds',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('sheds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.sheds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Cleanings */}
-      <section>
+      {show('cleanings') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.cleanings")}</div>
+          <div className="snake-editor-subhead">{t("logs.cleanings")}</div>
         <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today = localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,cleanings:[...d.logs.cleanings,{id:crypto.randomUUID(),date:today,deep:false,notes:''}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={cleaningsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.cleanings.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{date:e.target.value})}/>
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="w-4 h-4" checked={!!x.deep}
                   onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{deep:e.target.checked})}/>
                 {t("logs.deepClean", { defaultValue: "Deep clean" })}
               </label>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-5" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })} value={x.notes||''} onChange={e=>updateLog(setEditSnakeDraft,'cleanings',i,{notes:e.target.value})} />
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('cleanings', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.cleanings.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
 
       {/* Meds */}
-      <section>
+      {show('meds') && (
+      <section className="snake-editor-log">
         <div className="flex items-center justify-between">
-          <div className="font-medium text-sm">{t("logs.meds")}</div>
+          <div className="snake-editor-subhead">{t("logs.meds")}</div>
           <button className="text-xs px-2 py-1 border rounded-lg"
             onClick={()=>{
               const today=localYMD(new Date());
               setEditSnakeDraft(d=>({...d,logs:{...d.logs,meds:[...d.logs.meds,{id:crypto.randomUUID(),date:today,drug:"",dose:"",notes:""}]}}));
             }}>{t("logs.addEntry", { defaultValue: "+ Add" })}</button>
         </div>
-        <div ref={medsRef} className="mt-2 space-y-2 max-h-40 overflow-auto">
+        <div ref={medsRef} className="mt-2 space-y-2 max-h-64 overflow-auto">
           {editSnakeDraft.logs.meds.map((x,i)=>(
-            <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
-              <input type="date" className="border rounded-lg px-2 py-1" value={x.date}
+            <div key={i} className="snake-editor-logrow snake-editor-logrow--meds">
+              <input type="date" className="border rounded-lg px-2 py-1 text-sm" value={x.date}
                 onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{date:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1" placeholder={t("logs.drug")}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.drug")}
                 value={x.drug||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{drug:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1" placeholder={t("logs.dose")}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.dose")}
                 value={x.dose||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{dose:e.target.value})}/>
-              <input className="border rounded-lg px-2 py-1 md:col-span-2" placeholder={t("logs.notes", { defaultValue: "Notes" })}
+              <input className="border rounded-lg px-2 py-1 text-sm" placeholder={t("logs.notes", { defaultValue: "Notes" })}
                 value={x.notes||""} onChange={e=>updateLog(setEditSnakeDraft,"meds",i,{notes:e.target.value})}/>
-              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600 md:col-start-6" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
+              <button className="text-xs px-2 py-1 border rounded-lg text-rose-600" onClick={()=>removeLog('meds', i)}>{t("actions.delete", { defaultValue: "Delete" })}</button>
             </div>
           ))}
           {!editSnakeDraft.logs.meds.length && <div className="text-xs text-neutral-500">{t("logs.none", { defaultValue: "No records." })}</div>}
         </div>
       </section>
+      )}
     </>
   );
 }
