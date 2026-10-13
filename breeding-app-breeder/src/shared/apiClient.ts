@@ -904,6 +904,39 @@ export type BreederSnapshotPayload = {
   pairings: unknown[];
   clutches?: unknown[];
   plannerState?: Record<string, unknown> | null;
+  breedingCycles?: unknown[];
+  follicleExams?: unknown[];
+  /** The account's data generation this device last loaded; the server refuses an older one. */
+  dataGeneration?: number;
+};
+
+export type BreederDataSummary = {
+  animals: number;
+  pairings: number;
+  clutches: number;
+  breedingCycles: number;
+  follicleExams: number;
+  logEntries: number;
+};
+
+export type BreederDataReplaceResult = {
+  dryRun: boolean;
+  before: BreederDataSummary;
+  after: BreederDataSummary;
+  removed: BreederDataSummary;
+  duplicateLogEntriesRemoved: number;
+  skipped: { collection: string; id: string | null; reason: string }[];
+  dataGeneration: number;
+  replacementId: string | null;
+  replacedAt: string | null;
+};
+
+export type BreederDataReplacement = {
+  id: string;
+  reason: "replace" | "undo";
+  dataGeneration: number;
+  summary: { before?: BreederDataSummary; after?: BreederDataSummary; removed?: BreederDataSummary; duplicateLogEntriesRemoved?: number };
+  createdAt: string;
 };
 
 const BREEDER_SNAPSHOT_FETCH_TIMEOUT_MS = 30_000;
@@ -1008,6 +1041,31 @@ export const saveBreederSnapshot = async (
       timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
     },
   );
+
+// Full replace: the payload (snapshot upload shape, built from a backup file) becomes the whole
+// account. With dryRun nothing is written and the response says what would change. Every device
+// loads the result on its next sync, because the account's dataGeneration moves.
+export const replaceBreederData = async (
+  payload: BreederSnapshotPayload,
+  options: { dryRun?: boolean } = {},
+) =>
+  request<BreederDataReplaceResult>(
+    options.dryRun ? "/breeder/replace?dryRun=1" : "/breeder/replace",
+    {
+      method: "POST",
+      body: JSON.stringify(stripEmbeddedMediaForSync(payload)),
+      timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
+    },
+  );
+
+export const fetchBreederDataReplacements = async () =>
+  request<{ replacements: BreederDataReplacement[] }>("/breeder/replacements");
+
+export const undoBreederDataReplacement = async (id: string) =>
+  request<BreederDataReplaceResult>(`/breeder/replacements/${encodeURIComponent(id)}/undo`, {
+    method: "POST",
+    timeoutMs: BREEDER_SNAPSHOT_SAVE_TIMEOUT_MS,
+  });
 
 export const fetchMyBreederProfile = async () =>
   request<{ profile: unknown | null }>("/profiles/me");
