@@ -61,70 +61,137 @@ export const cycleAppId = (record: JsonRecord): string | null => text(record.id)
 export const examAppId = (record: JsonRecord): string | null => text(record.id) || text(record.appExamId);
 
 /** Every animal a cycle names must be the owner's. Deleted animals still count: history is kept. */
-export const validateBreedingReferences = (
+export const UNRESOLVED_ANIMAL_FLAG = "unresolved_animal_reference";
+
+export type SkippedBreedingRecord = { collection: "breedingCycles" | "follicleExams"; id: string | null; reason: string };
+
+/**
+ * Screens incoming cards and examinations one record at a time.
+ *
+ * This used to throw on the first problem, which rejected the whole save: one card naming a male
+ * the server had never seen (an animal kept on one device only) stopped every animal, pairing and
+ * log on that device from syncing, indefinitely, with a "Not synced" pill as the only sign.
+ *
+ * - A card that names an animal this account does not have is still saved, with an open
+ *   `unresolved_animal_reference` review flag listing the ids, so the keeper sees it on the card.
+ *   The flag clears itself once those animals arrive. An id outside the account resolves to
+ *   nothing on the server, so keeping it reaches no other account's data.
+ * - A malformed record (no id, no female, an invalid status or count) is left out on its own and
+ *   reported back; everything else in the save goes through.
+ */
+export const screenBreedingRecords = (
   cycles: JsonRecord[],
   exams: JsonRecord[],
   knownAnimalAppIds: Set<string>,
-): void => {
-  const check = (animalAppId: string | null, where: string) => {
-    if (!animalAppId) return;
-    if (!knownAnimalAppIds.has(animalAppId)) {
-      throw new HttpError(400, `${where} refers to animal "${animalAppId}", which is not in this account.`);
-    }
-  };
+): { cycles: JsonRecord[]; exams: JsonRecord[]; skipped: SkippedBreedingRecord[]; unresolvedByCycleId: Map<string, string[]> } => {
+  const skipped: SkippedBreedingRecord[] = [];
+  const unresolvedByCycleId = new Map<string, string[]>();
+  const keptCycles: JsonRecord[] = [];
+  const keptExams: JsonRecord[] = [];
+
   cycles.forEach((cycle, index) => {
-    if (cycle.deletedAt) return;
-    const id = cycleAppId(cycle);
-    if (!id) throw new HttpError(400, `breedingCycles[${index}] is missing an id.`);
-    const femaleId = text(cycle.femaleId);
-    if (!femaleId) throw new HttpError(400, `breedingCycles[${index}] is missing its female.`);
-    check(femaleId, `breedingCycles[${index}].femaleId`);
-    const status = text(cycle.status);
-    if (status && !CYCLE_STATUSES.has(status)) throw new HttpError(400, `breedingCycles[${index}].status "${status}" is not valid.`);
-    asArray(cycle.males).forEach((male) => check(text(asRecord(male)?.maleId), `breedingCycles[${index}].males`));
-    asArray(cycle.sessions).forEach((session, sIndex) => {
-      const s = asRecord(session);
-      check(text(s?.maleId), `breedingCycles[${index}].sessions[${sIndex}]`);
-      if (s && !ymd(s.introductionDate)) throw new HttpError(400, `breedingCycles[${index}].sessions[${sIndex}] needs an introduction date.`);
-      asArray(s?.locks).forEach((lock, lIndex) => {
-        const l = asRecord(lock);
-        const lockStatus = text(l?.status);
-        if (lockStatus && !LOCK_STATUSES.has(lockStatus)) throw new HttpError(400, `breedingCycles[${index}].sessions[${sIndex}].locks[${lIndex}].status "${lockStatus}" is not valid.`);
-      });
-    });
-    asArray(cycle.plannedPairings).forEach((planned) => check(text(asRecord(planned)?.maleId), `breedingCycles[${index}].plannedPairings`));
-    asArray(cycle.offspring).forEach((item) => {
-      const o = asRecord(item);
-      check(text(o?.animalId), `breedingCycles[${index}].offspring`);
-      check(text(asRecord(o?.sireAssignment)?.maleId), `breedingCycles[${index}].offspring.sireAssignment`);
-    });
-    const clutch = asRecord(cycle.clutch);
-    if (clutch) {
-      ["eggsTotal", "fertileEggs", "slugs", "lostEggs", "hatchlingsRecorded"].forEach((key) => {
-        const value = clutch[key];
-        if (value === null || value === undefined || value === "") return;
-        const n = Number(value);
-        if (!Number.isFinite(n) || n < 0) throw new HttpError(400, `breedingCycles[${index}].clutch.${key} must be a non-negative count.`);
-      });
+    if (cycle.deletedAt) {
+      keptCycles.push(cycle);
+      return;
     }
+    const unresolved = new Set<string>();
+    const check = (animalAppId: string | null) => {
+      if (animalAppId && !knownAnimalAppIds.has(animalAppId)) unresolved.add(animalAppId);
+    };
+    try {
+      const id = cycleAppId(cycle);
+      if (!id) throw new HttpError(400, `breedingCycles[${index}] is missing an id.`);
+      const femaleId = text(cycle.femaleId);
+      if (!femaleId) throw new HttpError(400, `breedingCycles[${index}] is missing its female.`);
+      check(femaleId);
+      const status = text(cycle.status);
+      if (status && !CYCLE_STATUSES.has(status)) throw new HttpError(400, `breedingCycles[${index}].status "${status}" is not valid.`);
+      asArray(cycle.males).forEach((male) => check(text(asRecord(male)?.maleId)));
+      asArray(cycle.sessions).forEach((session, sIndex) => {
+        const s = asRecord(session);
+        check(text(s?.maleId));
+        if (s && !ymd(s.introductionDate)) throw new HttpError(400, `breedingCycles[${index}].sessions[${sIndex}] needs an introduction date.`);
+        asArray(s?.locks).forEach((lock, lIndex) => {
+          const lockStatus = text(asRecord(lock)?.status);
+          if (lockStatus && !LOCK_STATUSES.has(lockStatus)) throw new HttpError(400, `breedingCycles[${index}].sessions[${sIndex}].locks[${lIndex}].status "${lockStatus}" is not valid.`);
+        });
+      });
+      asArray(cycle.plannedPairings).forEach((planned) => check(text(asRecord(planned)?.maleId)));
+      asArray(cycle.offspring).forEach((item) => {
+        const o = asRecord(item);
+        check(text(o?.animalId));
+        check(text(asRecord(o?.sireAssignment)?.maleId));
+      });
+      const clutch = asRecord(cycle.clutch);
+      if (clutch) {
+        ["eggsTotal", "fertileEggs", "slugs", "lostEggs", "hatchlingsRecorded"].forEach((key) => {
+          const value = clutch[key];
+          if (value === null || value === undefined || value === "") return;
+          const n = Number(value);
+          if (!Number.isFinite(n) || n < 0) throw new HttpError(400, `breedingCycles[${index}].clutch.${key} must be a non-negative count.`);
+        });
+      }
+    } catch (error) {
+      skipped.push({ collection: "breedingCycles", id: cycleAppId(cycle) || null, reason: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    unresolvedByCycleId.set(cycleAppId(cycle) as string, Array.from(unresolved));
+    keptCycles.push(cycle);
   });
+
   exams.forEach((exam, index) => {
-    if (exam.deletedAt) return;
-    const id = examAppId(exam);
-    if (!id) throw new HttpError(400, `follicleExams[${index}] is missing an id.`);
-    const femaleId = text(exam.femaleId);
-    if (!femaleId) throw new HttpError(400, `follicleExams[${index}] is missing its female.`);
-    check(femaleId, `follicleExams[${index}].femaleId`);
-    if (!ymd(exam.date)) throw new HttpError(400, `follicleExams[${index}] needs an examination date.`);
-    const method = text(exam.method);
-    if (method && !EXAM_METHODS.has(method)) throw new HttpError(400, `follicleExams[${index}].method "${method}" is not valid.`);
-    const diameter = exam.largestDiameterMm;
-    if (diameter !== null && diameter !== undefined && diameter !== "") {
-      const n = Number(diameter);
-      if (!Number.isFinite(n) || n <= 0) throw new HttpError(400, `follicleExams[${index}].largestDiameterMm must be a positive number.`);
-      if (method === "external") throw new HttpError(400, `follicleExams[${index}]: an external observation cannot carry a measured diameter.`);
+    if (exam.deletedAt) {
+      keptExams.push(exam);
+      return;
     }
+    try {
+      const id = examAppId(exam);
+      if (!id) throw new HttpError(400, `follicleExams[${index}] is missing an id.`);
+      const femaleId = text(exam.femaleId);
+      if (!femaleId) throw new HttpError(400, `follicleExams[${index}] is missing its female.`);
+      if (!ymd(exam.date)) throw new HttpError(400, `follicleExams[${index}] needs an examination date.`);
+      const method = text(exam.method);
+      if (method && !EXAM_METHODS.has(method)) throw new HttpError(400, `follicleExams[${index}].method "${method}" is not valid.`);
+      const diameter = exam.largestDiameterMm;
+      if (diameter !== null && diameter !== undefined && diameter !== "") {
+        const n = Number(diameter);
+        if (!Number.isFinite(n) || n <= 0) throw new HttpError(400, `follicleExams[${index}].largestDiameterMm must be a positive number.`);
+        if (method === "external") throw new HttpError(400, `follicleExams[${index}]: an external observation cannot carry a measured diameter.`);
+      }
+    } catch (error) {
+      skipped.push({ collection: "follicleExams", id: examAppId(exam) || null, reason: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    // An examination of a female this account does not have yet is kept as recorded; it joins
+    // her card once she arrives.
+    keptExams.push(exam);
   });
+
+  return { cycles: keptCycles, exams: keptExams, skipped, unresolvedByCycleId };
+};
+
+// Adds, refreshes or clears the card's open unresolved-animal flag, on the card as it will be
+// stored (after the merge with the stored copy, which would otherwise keep a stale flag).
+// Idempotent: the same unresolved ids produce the same flag, so a re-sent card does not change.
+export const withUnresolvedAnimalFlag = (cycle: JsonRecord, animalIds: string[], now: string = new Date().toISOString()): JsonRecord => {
+  const flags = asArray(cycle.reviewFlags).map(asRecord).filter((flag): flag is JsonRecord => !!flag);
+  const others = flags.filter((flag) => text(flag.kind) !== UNRESOLVED_ANIMAL_FLAG);
+  const current = flags.find((flag) => text(flag.kind) === UNRESOLVED_ANIMAL_FLAG && !flag.resolvedAt);
+  if (!animalIds.length) {
+    return current ? { ...cycle, reviewFlags: others } : cycle;
+  }
+  const sorted = [...animalIds].sort();
+  const sameIds = (flag: JsonRecord | undefined) => !!flag && JSON.stringify(asArray(flag.animalIds).map(String).sort()) === JSON.stringify(sorted);
+  if (current && sameIds(current)) return cycle;
+  // The keeper marked this exact set reviewed: it stays reviewed until the set changes.
+  if (flags.some((flag) => text(flag.kind) === UNRESOLVED_ANIMAL_FLAG && flag.resolvedAt && sameIds(flag))) return cycle;
+  return {
+    ...cycle,
+    reviewFlags: [
+      ...others,
+      { id: `unresolved-${cycleAppId(cycle)}`, kind: UNRESOLVED_ANIMAL_FLAG, animalIds: sorted, raisedAt: text(current?.raisedAt) || now },
+    ],
+  };
 };
 
 // ── Columns ───────────────────────────────────────────────────────────────────

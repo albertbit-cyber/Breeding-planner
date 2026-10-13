@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import type { AuthenticatedUser } from "../types/auth";
 import { HttpError } from "../utils/errors";
 import { createNotification } from "./notificationService";
+import { lockBreederAccount, stampServerEdit } from "./syncMerge";
 import { parseGeneticClaims, withLabResults, geneKey, type GeneticClaim } from "./marketplaceGenetics";
 import { summarizeTests, type CertifiedTestLine } from "./publicCertificateService";
 
@@ -318,26 +319,37 @@ export const markSold = async (actor: AuthenticatedUser, input: MarkSoldInput) =
     // The seller's animal: kept, marked Sold, its ownership closed.
     let priorHistory: any[] = [];
     if (sellerAnimal) {
+      // Re-read under the seller's sync lock, and stamp what the sale changes: written from the
+      // copy read before the transaction, a device save in between was erased, and unstamped,
+      // the seller's next sync from a device that had not seen the sale set it back to For sale.
+      await lockBreederAccount(tx, listing.sellerUserId);
+      const current = await tx.animal.findUnique({ where: { id: sellerAnimal.id } });
+      const currentPayload = asRecord(current?.payload) || sellerPayload || {};
       await tx.animal.update({
         where: { id: sellerAnimal.id },
         data: {
           status: "Sold",
-          payload: {
-            ...sellerPayload,
-            status: "Sold",
-            // The breeder app files a Sold animal in its archive and reads the sale's details
-            // from here, so the archive record shows who bought it and for how much.
-            soldVia: {
-              source: ACQUISITION_SOURCE,
-              saleId: sale.id,
-              listingId,
-              soldAt: now.toISOString(),
-              buyerName: buyer.fullName || null,
-              price: sale.salePrice ?? null,
-              currency: sale.currency || listing.currency || null,
-              handoverMethod: sale.handoverMethod || null,
+          payload: stampServerEdit(
+            {
+              ...currentPayload,
+              status: "Sold",
+              // The breeder app files a Sold animal in its archive and reads the sale's details
+              // from here, so the archive record shows who bought it and for how much.
+              soldVia: {
+                source: ACQUISITION_SOURCE,
+                saleId: sale.id,
+                listingId,
+                soldAt: now.toISOString(),
+                buyerName: buyer.fullName || null,
+                price: sale.salePrice ?? null,
+                currency: sale.currency || listing.currency || null,
+                handoverMethod: sale.handoverMethod || null,
+              },
             },
-          },
+            ["status", "soldVia"],
+            now.toISOString(),
+            current?.updatedAt,
+          ),
         },
       });
       const history = await tx.ownershipHistory.findMany({

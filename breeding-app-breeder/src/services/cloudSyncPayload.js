@@ -198,3 +198,65 @@ export function mergeGeneticsLists(winnerValue, loserValue, { tied = false } = {
   if (winnerValue === undefined || winnerValue === null) return mergeStringValues(toGeneticsList(loserValue));
   return mergeStringValues(toGeneticsList(winnerValue));
 }
+
+// --- Cursor and tombstones -----------------------------------------------------------------
+
+// A delta asks for rows written since the cursor, minus this much. A write is stamped when its
+// statement runs but becomes visible only when its transaction commits (up to the backend's 60 s
+// transaction budget later), so a read that started after the stamp can still miss it. Asking
+// again for the last couple of minutes costs a few already-known rows; the merge is idempotent.
+export const SYNC_CURSOR_OVERLAP_MS = 2 * 60 * 1000;
+
+export function cursorForRequest(cursor) {
+  const time = new Date(cursor || "").getTime();
+  if (!Number.isFinite(time)) return null;
+  return new Date(time - SYNC_CURSOR_OVERLAP_MS).toISOString();
+}
+
+// The server names collections the way the API does; the app's tombstone map uses its own keys.
+const TOMBSTONE_COLLECTIONS = [
+  ["animals", "snakes"],
+  ["pairings", "pairings"],
+  ["breedingCycles", "breedingCycles"],
+  ["follicleExams", "follicleExams"],
+];
+
+/**
+ * Folds the server's deletions into this device's tombstone map. A server deletion is recorded as
+ * `confirmed`: the server already has it, so it is never uploaded again (each device used to
+ * re-send every tombstone it had ever made, on every sync), but it still hides this device's stale
+ * copy of the record and keeps the id from being handed out again. A local deletion the server now
+ * reports becomes confirmed too, which is how the local list stops growing.
+ */
+export function reconcileTombstones(local = {}, serverTombstones = null) {
+  if (!serverTombstones || typeof serverTombstones !== "object") return local;
+  let changed = false;
+  const next = { ...local };
+  TOMBSTONE_COLLECTIONS.forEach(([serverKey, localKey]) => {
+    const serverMap = serverTombstones[serverKey];
+    if (!serverMap || typeof serverMap !== "object") return;
+    const collection = { ...(next[localKey] || {}) };
+    Object.entries(serverMap).forEach(([id, deletedAt]) => {
+      const current = collection[id];
+      if (current?.confirmed) return;
+      const localTime = new Date(current?.deletedAt || 0).getTime() || 0;
+      const serverTime = new Date(deletedAt || 0).getTime() || 0;
+      collection[id] = {
+        ...(current || {}),
+        id,
+        deletedAt: new Date(Math.max(localTime, serverTime) || Date.now()).toISOString(),
+        confirmed: true,
+      };
+      changed = true;
+    });
+    next[localKey] = collection;
+  });
+  return changed ? next : local;
+}
+
+// Tombstones the server does not have yet, in the shape the upload expects.
+export function pendingTombstones(collection = {}) {
+  return Object.values(collection || {})
+    .filter(tombstone => tombstone && !tombstone.confirmed)
+    .map(({ confirmed, ...tombstone }) => tombstone);
+}

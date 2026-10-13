@@ -52,6 +52,8 @@ import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx"
 import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
 import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
 import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
+import MissingAnimalsPanel from "./features/sync/MissingAnimalsPanel.jsx";
+import { unlinkAnimalFromPairings } from "./features/sync/missingAnimals";
 import {
   changeAccountEmail,
   changeAccountPassword,
@@ -83,9 +85,18 @@ import {
   selectRecordsToUpload,
   applyRemoteDeletions,
   applyChangedRecords,
-  mergeGeneticsLists,
-  mergeStringValues,
+  cursorForRequest,
+  pendingTombstones,
+  reconcileTombstones,
 } from "./services/cloudSyncPayload";
+import {
+  SYNC_ENTRY_ARRAYS,
+  mergeSyncRecord,
+  noteServerTime,
+  stableStringify,
+  stampRecordChanges,
+  syncNow,
+} from "./services/syncMerge";
 import {
   getGeneGroups,
   getGeneAliases,
@@ -108,7 +119,6 @@ import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import SpeciesGate from "./features/species/SpeciesGate";
 import {
   flattenGroupsBySpecies,
-  mergeGroupsBySpecies,
   migrateFlatGroups,
   normalizeGroupNames,
   normalizeGroupsBySpecies,
@@ -1119,7 +1129,9 @@ const localYMD = (d = new Date()) => {
   const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 };
-const nowIsoString = () => new Date().toISOString();
+// On the server's clock as far as this device can tell (services/syncMerge.js), so the edit and
+// deletion times this device stamps compare honestly with every other device's.
+const nowIsoString = () => syncNow();
 function formatDateTimeForDisplay(dateLike) {
   if (!dateLike) return '';
   const dt = dateLike instanceof Date ? dateLike : new Date(dateLike);
@@ -1635,7 +1647,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'femaleName',
     label: 'Female name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleId || '',
+    getter: (pairing, ctx = {}) => ctx.femaleName || pairing?.femaleName || pairing?.femaleId || '',
   },
   {
     key: 'femaleGenetics',
@@ -1653,7 +1665,7 @@ export const PAIRING_EXPORT_FIELD_DEFS = [
     key: 'maleName',
     label: 'Male name',
     section: 'Participants',
-    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleId || '',
+    getter: (pairing, ctx = {}) => ctx.maleName || pairing?.maleName || pairing?.maleId || '',
   },
   {
     key: 'maleGenetics',
@@ -2048,10 +2060,10 @@ function buildPairingExportDataset(pairings = [], snakes = [], selected = DEFAUL
       derived,
       displayLabel,
       femaleSnake,
-      femaleName: femaleSnake?.name || pairing.femaleId || '',
+      femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       femaleGenetics: joinTokens(combineMorphsAndHetsForDisplay(femaleSnake?.morphs, femaleSnake?.hets, femaleSnake?.possibleHets)),
       maleSnake,
-      maleName: maleSnake?.name || pairing.maleId || '',
+      maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       maleGenetics: joinTokens(combineMorphsAndHetsForDisplay(maleSnake?.morphs, maleSnake?.hets, maleSnake?.possibleHets)),
       cycleYear,
       hatchlings,
@@ -2151,10 +2163,10 @@ function getPairingExportRows(pairings = [], snakes = [], options = {}) {
     const row = {
       pairingId: pairing.id,
       maleId: pairing.maleId || maleCode,
-      maleCode: maleCode || pairing.maleId || '',
+      maleCode: maleCode || pairing.maleName || pairing.maleId || '',
       maleName: maleSnake?.name || pairing.maleName || pairing.maleId || '',
       femaleId: pairing.femaleId || femaleCode,
-      femaleCode: femaleCode || pairing.femaleId || '',
+      femaleCode: femaleCode || pairing.femaleName || pairing.femaleId || '',
       femaleName: femaleSnake?.name || pairing.femaleName || pairing.femaleId || '',
       pairingOrder: numericSortIndex,
       pairingOrderDisplay: numericSortIndex === null ? 'order not set' : numericSortIndex,
@@ -3049,10 +3061,12 @@ function prepareAnimalForBackend(snake) {
 
 function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombstones = {}, breeding = {}) {
   const persistable = getPersistablePlannerSnapshot(animals, pairings);
-  const snakeTombstones = Object.values(tombstones?.snakes || {});
-  const pairingTombstones = Object.values(tombstones?.pairings || {});
-  const cycleTombstones = Object.values(tombstones?.breedingCycles || {});
-  const examTombstones = Object.values(tombstones?.follicleExams || {});
+  // Only the deletions the server does not have yet. Every tombstone ever made used to ride along
+  // on every sync.
+  const snakeTombstones = pendingTombstones(tombstones?.snakes);
+  const pairingTombstones = pendingTombstones(tombstones?.pairings);
+  const cycleTombstones = pendingTombstones(tombstones?.breedingCycles);
+  const examTombstones = pendingTombstones(tombstones?.follicleExams);
   // Cards and examinations that belong to a demo animal are placeholders and never leave the device.
   const demoSnakeIds = getDemoSnakeIds(Array.isArray(animals) ? animals : []);
   const cycles = (Array.isArray(breeding.breedingCycles) ? breeding.breedingCycles : []).filter(cycle => cycle && !demoSnakeIds.has(cycle.femaleId));
@@ -3064,14 +3078,12 @@ function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombs
     breedingCycles: [...cycles, ...cycleTombstones],
     follicleExams: [...exams, ...examTombstones],
   };
-  const normalizedPlannerState = normalizePlannerStateRecord(plannerState);
+  const normalizedPlannerState = normalizePlannerStateRecord(withoutDeviceLocalPlannerState(plannerState));
   if (normalizedPlannerState) {
     payload.plannerState = sanitizeBackendMediaValue(normalizedPlannerState);
   }
   return payload;
 }
-
-const SYNC_LOG_KEYS = ['feeds', 'weights', 'sheds', 'cleanings', 'meds', 'water', 'notes', 'health'];
 
 function getSyncRecordKey(record, fallbackPrefix, index) {
   const candidates = [
@@ -3083,44 +3095,6 @@ function getSyncRecordKey(record, fallbackPrefix, index) {
   ];
   const value = candidates.map(item => String(item || '').trim()).find(Boolean);
   return value || `${fallbackPrefix}-${index + 1}`;
-}
-
-function getLogEntryKey(entry, key, index) {
-  if (!entry || typeof entry !== 'object') return `${key}-blank-${index}`;
-  return (
-    String(entry.id || '').trim() ||
-    String(entry.logId || '').trim() ||
-    (entry.createdAt ? `${entry.createdAt}:${entry.actionType || key}` : '') ||
-    `${key}-${index}`
-  );
-}
-
-function mergeLogArrays(localEntries = [], backendEntries = [], key) {
-  const rows = [
-    ...(Array.isArray(localEntries) ? localEntries : []),
-    ...(Array.isArray(backendEntries) ? backendEntries : []),
-  ].filter(entry => entry && typeof entry === 'object');
-  const byKey = new Map();
-  rows.forEach((entry, index) => {
-    const entryKey = getLogEntryKey(entry, key, index);
-    const existing = byKey.get(entryKey);
-    if (!existing || getSyncTimestamp(entry) >= getSyncTimestamp(existing)) {
-      byKey.set(entryKey, { ...existing, ...entry });
-    }
-  });
-  return Array.from(byKey.values()).sort((a, b) => {
-    const aTime = getSyncTimestamp(a) || new Date(a.date || a.createdAt || 0).getTime() || 0;
-    const bTime = getSyncTimestamp(b) || new Date(b.date || b.createdAt || 0).getTime() || 0;
-    return bTime - aTime;
-  });
-}
-
-function mergeArrayValues(...values) {
-  return mergeStringValues(...values);
-}
-
-function sanitizePlannerObjectRecord(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : null;
 }
 
 function normalizePlannerStringList(value) {
@@ -3165,7 +3139,7 @@ function normalizePlannerStateRecord(value) {
 }
 
 function plannerStateComparable(state) {
-  const normalized = normalizePlannerStateRecord(state);
+  const normalized = normalizePlannerStateRecord(withoutDeviceLocalPlannerState(state));
   if (!normalized) return null;
   const clone = JSON.parse(JSON.stringify(normalized));
   delete clone.updatedAt;
@@ -3182,7 +3156,7 @@ function plannerStateComparable(state) {
 }
 
 function plannerSnapshotSignature(snapshot = {}) {
-  return JSON.stringify({
+  return stableStringify({
     snakes: Array.isArray(snapshot.snakes) ? snapshot.snakes : [],
     pairings: Array.isArray(snapshot.pairings) ? snapshot.pairings : [],
     breedingCycles: Array.isArray(snapshot.breedingCycles) ? snapshot.breedingCycles : [],
@@ -3191,62 +3165,46 @@ function plannerSnapshotSignature(snapshot = {}) {
   });
 }
 
-function markPlannerStateUpdated(state, updatedAt = nowIsoString()) {
-  if (!state || typeof state !== 'object') return state;
-  return {
-    ...state,
-    updatedAt,
-    metadata: {
-      ...(state.metadata && typeof state.metadata === 'object' ? state.metadata : {}),
-      updatedAt,
-    },
-  };
-}
-
+// The planner state has no setter wrapper of its own (it is assembled from a dozen separate
+// pieces of state), so its fields are stamped here, against the last synced copy, a debounce
+// after the edit.
 function stampPlannerStateForSync(localState, baselineState) {
   const normalized = normalizePlannerStateRecord(localState);
   if (!normalized) return null;
-  if (!baselineState) return normalized;
-  if (JSON.stringify(plannerStateComparable(normalized)) === JSON.stringify(plannerStateComparable(baselineState))) {
+  const baseline = normalizePlannerStateRecord(baselineState);
+  if (!baseline) return normalized;
+  if (stableStringify(plannerStateComparable(normalized)) === stableStringify(plannerStateComparable(baseline))) {
     return normalized;
   }
-  return markPlannerStateUpdated(normalized);
+  return stampRecordChanges(normalized, baseline, { entryArrays: SYNC_ENTRY_ARRAYS.planner, now: nowIsoString() });
 }
 
-function mergePlannerObjectRecord(localRecord, backendRecord) {
-  if (!localRecord) return backendRecord;
-  if (!backendRecord) return localRecord;
-  return getSyncTimestamp(backendRecord) >= getSyncTimestamp(localRecord)
-    ? { ...localRecord, ...backendRecord }
-    : { ...backendRecord, ...localRecord };
+const ANIMAL_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.animal, mergeLogs: true };
+const PAIRING_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.pairing, mergeLogs: true };
+const PLANNER_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.planner, sortEntries: false };
+
+// Per-device bookkeeping that is not the keeper's data. Every device's automatic backup rewrote
+// `lastRun`, so each backup became a planner-state change that overwrote the other devices' copy
+// and made the next device run its backup again.
+function withoutDeviceLocalPlannerState(state) {
+  if (!state || typeof state !== 'object' || !state.backupSettings || typeof state.backupSettings !== 'object') return state;
+  const { lastRun, ...backupSettings } = state.backupSettings;
+  return { ...state, backupSettings };
 }
 
-
+// Field by field, the later edit of each field winning, with rooms, racks and terrariums merged
+// entry by entry so one removed on one device stays removed. See services/syncMerge.js.
 function mergePlannerStates(localState, backendState) {
   const local = normalizePlannerStateRecord(localState);
   const backend = normalizePlannerStateRecord(backendState);
   if (!local) return backend;
   if (!backend) return local;
-  const localTime = getSyncTimestamp(local);
-  const backendTime = getSyncTimestamp(backend);
-  const base = backendTime > localTime ? backend : local;
-  const other = backendTime > localTime ? local : backend;
-  const merged = {
-    ...other,
-    ...base,
-    // Per species, so two devices editing different species both keep their lists. The flat
-    // `groups` union is still merged for older clients that only understand that field.
-    groupsBySpecies: mergeGroupsBySpecies(other.groupsBySpecies, base.groupsBySpecies),
-    groups: mergeArrayValues(other.groups, base.groups),
-    showGroups: mergeArrayValues(other.showGroups, base.showGroups),
-    hiddenGroups: mergeArrayValues(other.hiddenGroups, base.hiddenGroups),
-    customStatusTags: mergeArrayValues(other.customStatusTags, base.customStatusTags),
-    removedStatusTags: mergeArrayValues(other.removedStatusTags, base.removedStatusTags),
-    rooms: mergeRecordsByKey(other.rooms, base.rooms, sanitizePlannerObjectRecord, 'room', mergePlannerObjectRecord),
-    heatRacks: mergeRecordsByKey(other.heatRacks, base.heatRacks, sanitizePlannerObjectRecord, 'heatRack', mergePlannerObjectRecord),
-    terrariums: mergeRecordsByKey(other.terrariums, base.terrariums, sanitizePlannerObjectRecord, 'terrarium', mergePlannerObjectRecord),
-  };
-  merged.spaces = buildLegacySpacesSnapshot(merged.rooms, merged.heatRacks, merged.terrariums);
+  const merged = mergeSyncRecord(withoutDeviceLocalPlannerState(backend), withoutDeviceLocalPlannerState(local), PLANNER_MERGE);
+  // This device's own backup bookkeeping stays this device's.
+  if (local.backupSettings && typeof local.backupSettings === 'object' && 'lastRun' in local.backupSettings) {
+    merged.backupSettings = { ...(merged.backupSettings || {}), lastRun: local.backupSettings.lastRun };
+  }
+  merged.spaces = buildLegacySpacesSnapshot(merged.rooms || [], merged.heatRacks || [], merged.terrariums || []);
   return normalizePlannerStateRecord(merged);
 }
 
@@ -3261,79 +3219,54 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   // hand back the logs and photos the delete erased.
   const removedCopy = mergeWithRemoval(localAnimal, backendAnimal, getSyncTimestamp);
   if (removedCopy) return sanitizeSnakeRecord(removedCopy);
-  const localTime = getSyncTimestamp(localAnimal);
-  const backendTime = getSyncTimestamp(backendAnimal);
-  const base = backendTime > localTime ? backendAnimal : localAnimal;
-  const other = backendTime > localTime ? localAnimal : backendAnimal;
-  const logs = {};
-  const allLogKeys = Array.from(new Set([
-    ...SYNC_LOG_KEYS,
-    ...Object.keys(localAnimal.logs || {}),
-    ...Object.keys(backendAnimal.logs || {}),
-  ]));
-  allLogKeys.forEach(key => {
-    logs[key] = mergeLogArrays(localAnimal.logs?.[key], backendAnimal.logs?.[key], key);
-  });
-  // Genetics follow the timestamp instead of unioning, so a gene the keeper deleted stays
-  // deleted rather than being handed back by whichever side still held it. See
-  // mergeGeneticsLists. Tags and groups keep the union: nobody expects two devices adding a
-  // tag each to lose one, and unlike genetics they are not the record of what the animal is.
-  const tiedTimestamps = localTime === backendTime;
-  return sanitizeSnakeRecord({
-    ...other,
-    ...base,
-    morphs: mergeGeneticsLists(base.morphs, other.morphs, { tied: tiedTimestamps }),
-    hets: mergeGeneticsLists(base.hets, other.hets, { tied: tiedTimestamps }),
-    possibleHets: mergeGeneticsLists(base.possibleHets, other.possibleHets, { tied: tiedTimestamps }),
-    tags: mergeArrayValues(other.tags, base.tags),
-    groups: mergeArrayValues(other.groups, base.groups),
-    photos: mergeLogArrays(other.photos, base.photos, 'photo').slice(0, MAX_PHOTOS_PER_SNAKE),
-    logs,
-  });
+  const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
+  if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
+  return sanitizeSnakeRecord(merged);
 }
 
 function mergePairingRecord(localPairing, backendPairing) {
   if (!localPairing) return sanitizePairingRecord(backendPairing);
   if (!backendPairing) return sanitizePairingRecord(localPairing);
-  const localTime = getSyncTimestamp(localPairing);
-  const backendTime = getSyncTimestamp(backendPairing);
-  const base = backendTime > localTime ? backendPairing : localPairing;
-  const other = backendTime > localTime ? localPairing : backendPairing;
+  const merged = mergeSyncRecord(backendPairing, localPairing, PAIRING_MERGE);
   // hatchlingsGeneratedThrough is a monotonic high-water mark *within a reset generation*:
   // inside one generation we always keep the max seen across devices, so a stale write from
   // a tab that hasn't generated a litter yet can't regress it and let the hatch wizard
   // duplicate an already-created batch. hatchlingsResetCount is bumped only when the breeder
   // deliberately deletes a hatchling batch to re-log it; the side with the newer generation
   // then wins outright, otherwise the old high-water mark would come back on the next sync
-  // and permanently block re-logging that clutch.
+  // and permanently block re-logging that clutch. The server applies the same rule.
   const localReset = Number(localPairing?.hatch?.hatchlingsResetCount || 0);
   const backendReset = Number(backendPairing?.hatch?.hatchlingsResetCount || 0);
   const localThrough = Number(localPairing?.hatch?.hatchlingsGeneratedThrough || 0);
   const backendThrough = Number(backendPairing?.hatch?.hatchlingsGeneratedThrough || 0);
-  const hatchlingsResetCount = Math.max(localReset, backendReset);
-  let hatchlingsGeneratedThrough;
-  if (localReset === backendReset) {
-    hatchlingsGeneratedThrough = Math.max(localThrough, backendThrough);
-  } else {
-    hatchlingsGeneratedThrough = localReset > backendReset ? localThrough : backendThrough;
+  if (localPairing?.hatch || backendPairing?.hatch) {
+    const hatchlingsResetCount = Math.max(localReset, backendReset);
+    const hatchlingsGeneratedThrough = localReset === backendReset
+      ? Math.max(localThrough, backendThrough)
+      : (localReset > backendReset ? localThrough : backendThrough);
+    merged.hatch = { ...(merged.hatch || {}), hatchlingsGeneratedThrough, hatchlingsResetCount };
   }
-  return sanitizePairingRecord({
-    ...other,
-    ...base,
-    hatch: { ...other.hatch, ...base.hatch, hatchlingsGeneratedThrough, hatchlingsResetCount },
-  });
+  return sanitizePairingRecord(merged);
+}
+
+// A tombstone hides a record only if the record was not edited after the deletion. Matching by
+// id alone made a reused id (a hatchling re-minted after a batch was redone, a re-added animal)
+// silently unrecoverable: every copy of it was dropped forever.
+function isTombstonedRecord(record, tombstoneMap) {
+  if (!tombstoneMap) return false;
+  const id = record?.id != null ? String(record.id) : '';
+  if (!id || !Object.prototype.hasOwnProperty.call(tombstoneMap, id)) return false;
+  const tombstone = tombstoneMap[id];
+  const deletedAt = new Date(tombstone?.deletedAt || 0).getTime();
+  if (!Number.isFinite(deletedAt) || !deletedAt) return true;
+  return getSyncTimestamp(record) <= deletedAt;
 }
 
 function mergeRecordsByKey(localItems = [], backendItems = [], sanitizer, fallbackPrefix, mergeRecord, tombstoneMap = null) {
   const map = new Map();
-  const isTombstoned = (sanitized) => {
-    if (!tombstoneMap) return false;
-    const id = sanitized?.id != null ? String(sanitized.id) : '';
-    return id ? Object.prototype.hasOwnProperty.call(tombstoneMap, id) : false;
-  };
   const add = (item, source, index) => {
     const sanitized = sanitizer(item);
-    if (!sanitized || isTombstoned(sanitized)) return;
+    if (!sanitized || isTombstonedRecord(sanitized, tombstoneMap)) return;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const existing = map.get(key);
     if (!existing) {
@@ -3391,26 +3324,32 @@ function syncComparableRecord(record) {
   return clone;
 }
 
+// How each collection stamps its edits: which nested lists merge entry by entry.
+const SYNC_STAMP_OPTIONS = {
+  animal: ANIMAL_MERGE,
+  pairing: PAIRING_MERGE,
+  cycle: {},
+  exam: {},
+};
+
+// Stamps, against the last synced copy, whatever changed without passing a setter wrapper. Edits
+// that did pass one were stamped when they were made and keep that time (stampRecordChanges never
+// moves an existing edit stamp), so a change made offline keeps its own time instead of taking
+// the time it finally synced, which used to let a day-old edit beat a newer one.
 function stampChangedSyncRecords(items = [], baselineItems = [], sanitizer, fallbackPrefix) {
   const baselineMap = buildSyncRecordMap(baselineItems, sanitizer, fallbackPrefix);
+  const options = SYNC_STAMP_OPTIONS[fallbackPrefix] || {};
+  const now = nowIsoString();
   return (Array.isArray(items) ? items : []).map((item, index) => {
     const sanitized = sanitizer(item);
     if (!sanitized) return item;
     const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
     const baseline = baselineMap.get(key);
     if (!baseline) return sanitized;
-    if (JSON.stringify(syncComparableRecord(sanitized)) === JSON.stringify(syncComparableRecord(baseline))) {
+    if (stableStringify(syncComparableRecord(sanitized)) === stableStringify(syncComparableRecord(baseline))) {
       return sanitized;
     }
-    const updatedAt = nowIsoString();
-    return {
-      ...sanitized,
-      updatedAt,
-      metadata: {
-        ...(sanitized.metadata && typeof sanitized.metadata === 'object' ? sanitized.metadata : {}),
-        updatedAt,
-      },
-    };
+    return stampRecordChanges(sanitized, baseline, { ...options, now });
   });
 }
 
@@ -3475,35 +3414,37 @@ function syncRecordForLocalChangeCompare(record) {
   return clone;
 }
 
-function markLocalSyncRecordUpdated(record, updatedAt = nowIsoString()) {
-  if (!record || typeof record !== 'object') return record;
-  const metadata = record.metadata && typeof record.metadata === 'object' ? record.metadata : {};
-  return {
-    ...record,
-    updatedAt,
-    metadata: {
-      ...metadata,
-      updatedAt,
-    },
-  };
-}
-
+// Stamps an edit when it is made: the edit time of each changed field, and a removal marker for
+// every log entry, photo, lock or appointment that disappeared, so the other copies cannot hand
+// it back. Runs inside the setters for animals, pairings, cards and examinations.
 function stampLocallyChangedSyncRecords(nextItems = [], previousItems = [], sanitizer, fallbackPrefix) {
   const previousMap = buildSyncRecordMap(previousItems, sanitizer, fallbackPrefix);
-  const updatedAt = nowIsoString();
-  return (Array.isArray(nextItems) ? nextItems : [])
+  const options = SYNC_STAMP_OPTIONS[fallbackPrefix] || {};
+  const now = nowIsoString();
+  let changed = !Array.isArray(previousItems) || !Array.isArray(nextItems) || nextItems.length !== previousItems.length;
+  const result = (Array.isArray(nextItems) ? nextItems : [])
     .map((item, index) => {
       const sanitized = sanitizer(item);
-      if (!sanitized) return null;
+      if (!sanitized) {
+        changed = true;
+        return null;
+      }
       const key = getSyncRecordKey(sanitized, fallbackPrefix, index);
       const previous = previousMap.get(key);
-      if (!previous) return markLocalSyncRecordUpdated(sanitized, updatedAt);
-      if (JSON.stringify(syncRecordForLocalChangeCompare(sanitized)) !== JSON.stringify(syncRecordForLocalChangeCompare(previous))) {
-        return markLocalSyncRecordUpdated(sanitized, updatedAt);
+      if (!previous) {
+        changed = true;
+        return stampRecordChanges(sanitized, null, { ...options, now });
+      }
+      if (getSyncRecordKey(sanitizer(previousItems[index]) || {}, fallbackPrefix, index) !== key) changed = true;
+      if (stableStringify(syncRecordForLocalChangeCompare(sanitized)) !== stableStringify(syncRecordForLocalChangeCompare(previous))) {
+        changed = true;
+        return stampRecordChanges(sanitized, previous, { ...options, now });
       }
       return sanitized;
     })
     .filter(Boolean);
+  // The same records in the same order: keep the existing array, for the same reason as above.
+  return changed ? result : previousItems;
 }
 
 function normalizeBackupFileEntry(raw) {
@@ -5849,6 +5790,15 @@ function extractSequenceFromId(id, idConfig = null) {
 }
 
 // Generate snake id using configurable template rules
+// Ids of deleted animals, from this device's tombstones and the server's. Never handed out again:
+// the generator starts at "count + 1" and skips only ids still in use, so a freed number used to
+// come straight back (redoing a hatch batch re-minted the same ids), and a new animal under an old
+// id was taken for the deleted one on the other devices.
+let RETIRED_SNAKE_IDS = new Set();
+function setRetiredSnakeIds(ids) {
+  RETIRED_SNAKE_IDS = new Set(Array.from(ids || []).map(id => String(id || '').trim().toLowerCase()).filter(Boolean));
+}
+
 function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber = null, opts = {}) {
   const {
     hadYear = false,
@@ -5896,6 +5846,7 @@ function generateSnakeId(name, year, existingSnakesOrIds = [], preferredNumber =
   const existingIdsLower = existingIds.map(id => id.toLowerCase());
   const existingIdSetLower = new Set(existingIdsLower);
   const existingUniqueCount = existingIdSetLower.size;
+  RETIRED_SNAKE_IDS.forEach(id => existingIdSetLower.add(id));
   const reservedSequences = new Set();
   existingEntries.forEach(entry => {
     const value = Number(entry.idSequence);
@@ -6950,12 +6901,22 @@ export default function BreedingPlannerApp() {
   const setBreedingCycles = useCallback((updater) => {
     setBreedingCyclesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizeBreedingCycleRecord, 'cycle');
     });
   }, []);
   const setFollicleExams = useCallback((updater) => {
     setFollicleExamsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizeFollicleExamRecord, 'exam');
     });
   }, []);
@@ -6965,6 +6926,11 @@ export default function BreedingPlannerApp() {
   const setSnakes = useCallback((updater) => {
     setSnakesState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return normalizeSnakeListForDisplay(stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal'));
     });
   }, []);
@@ -6978,6 +6944,11 @@ export default function BreedingPlannerApp() {
   const setPairings = useCallback((updater) => {
     setPairingsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      // An updater that changed nothing keeps the same array. Handing back a fresh copy made every
+      // effect that depends on this list run again, which is the render loop React reported as
+      // "Maximum update depth exceeded"; it also kept resetting the autosave timer, so edits
+      // waited, sometimes indefinitely, before syncing.
+      if (next === prev) return prev;
       return stampLocallyChangedSyncRecords(next, prev, sanitizePairingRecord, 'pairing');
     });
   }, []);
@@ -7007,6 +6978,7 @@ export default function BreedingPlannerApp() {
   const syncTombstonesRef = useRef(syncTombstones);
   useEffect(() => {
     syncTombstonesRef.current = syncTombstones;
+    setRetiredSnakeIds(Object.keys(syncTombstones?.snakes || {}));
     try { localStorage.setItem('bpSyncTombstones', JSON.stringify(syncTombstones)); } catch {}
   }, [syncTombstones]);
   // The dashboard is the landing page; a species workspace is entered from it. A null scope
@@ -7503,7 +7475,6 @@ export default function BreedingPlannerApp() {
   // falls back to a whole-account sync whenever either is missing.
   const remoteSnapshotRef = useRef({ snakes: [], pairings: [], plannerState: null });
   const remoteCursorRef = useRef(null);
-  const cloudSaveRequestIdRef = useRef(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState({
     state: 'idle',
     lastSyncedAt: null,
@@ -7945,7 +7916,10 @@ export default function BreedingPlannerApp() {
     if (Array.isArray(state.geneAliases)) setGeneAliases(mergeGeneAliasRows(state.geneAliases));
     if (state.leucisticType === 'blackEye' || state.leucisticType === 'bel') setLastLeucisticType(state.leucisticType);
     if (state.breederInfo && typeof state.breederInfo === 'object') setBreederInfo(normalizeBreederInfo(state.breederInfo));
-    if (state.backupSettings && typeof state.backupSettings === 'object') setBackupSettings(normalizeBackupSettings(state.backupSettings));
+    // When this device last ran its own backup is not something another device can tell it.
+    if (state.backupSettings && typeof state.backupSettings === 'object') {
+      setBackupSettings(prev => normalizeBackupSettings({ ...state.backupSettings, lastRun: prev?.lastRun }));
+    }
     if (state.lastFeedDefaults && typeof state.lastFeedDefaults === 'object') {
       setLastFeedDefaults(prev => ({ ...prev, ...state.lastFeedDefaults }));
     }
@@ -7966,7 +7940,154 @@ export default function BreedingPlannerApp() {
     latestPlannerSnapshotRef.current = { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState };
   }, [snakes, pairings, breedingCycles, follicleExams, plannerSyncState]);
 
-  const runCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+  // One sync at a time. The startup sync, the Sync button, the laboratory refresh, the debounced
+  // autosave and the background pull all come through here; a request that arrives while a sync
+  // is running asks for one more pass after it instead of starting a second one alongside. Two
+  // concurrent syncs used to download the same state, merge separately and overwrite each other's
+  // result, and whichever finished last decided what the keeper saw.
+  const syncRunRef = useRef(null);
+  const syncAgainRef = useRef(false);
+  const syncBroadcastRef = useRef(null);
+
+  const performCloudBreederSync = useCallback(async ({ silent = false } = {}) => {
+    backendPlannerSyncRef.current.status = 'loading';
+    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+
+    try {
+      const startedFrom = latestPlannerSnapshotRef.current;
+      const localSnapshot = stampChangedSnapshotForSync(startedFrom, cloudBaselineSnapshotRef.current);
+      // First sync of a session has no cursor and fetches everything; later ones ask only for
+      // what changed since the server's own timestamp, from a little before it (cursorForRequest).
+      const fetchStartedAt = Date.now();
+      const snapshot = await fetchBreederSnapshot(cursorForRequest(remoteCursorRef.current));
+      noteServerTime(snapshot?.serverTime, fetchStartedAt);
+      const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
+      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
+
+      // The server names what was deleted, in a full snapshot as well as a delta. Folded into the
+      // tombstone map, each deletion hides this device's copy unless it was edited afterwards.
+      // A full snapshot used to convey deletions only by omission, which the merge could not tell
+      // from "not uploaded yet", so an animal deleted on another device lived on here forever.
+      syncTombstonesRef.current = reconcileTombstones(syncTombstonesRef.current, snapshot?.tombstones);
+      const remoteState = isDelta
+        ? applyRemoteDeletions(applyChangedRecords(remoteSnapshotRef.current, backendSnapshot), snapshot?.deleted)
+        : backendSnapshot;
+      const merged = applyRemoteDeletions(
+        mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
+        isDelta ? snapshot?.deleted : null,
+      );
+      const tombstones = syncTombstonesRef.current;
+      // Upload only what the server does not already have, and only the tombstones it lacks.
+      const upload = prepareSnapshotForBackend(
+        selectRecordsToUpload(merged.snakes, remoteState.snakes),
+        selectRecordsToUpload(merged.pairings, remoteState.pairings),
+        merged.plannerState,
+        tombstones,
+        {
+          breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
+          follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
+        }
+      );
+      // A pull that finds this device already in step sends nothing. The planner state used to ride
+      // along on every sync, so each background pull was also a write.
+      const plannerUnchanged = stableStringify(plannerStateComparable(merged.plannerState))
+        === stableStringify(plannerStateComparable(remoteState.plannerState));
+      if (plannerUnchanged) delete upload.plannerState;
+      const nothingToSend = ['animals', 'pairings', 'breedingCycles', 'follicleExams']
+        .every(key => !Array.isArray(upload[key]) || !upload[key].length) && !upload.plannerState;
+      // Puts a result on screen, merging in edits made while the requests were in flight instead of
+      // overwriting them: replacing the state with a result computed from before them reverted
+      // whatever the keeper had just typed.
+      const showSnapshot = (shown) => {
+        const current = latestPlannerSnapshotRef.current;
+        const editedMeanwhile = current !== startedFrom;
+        const next = editedMeanwhile
+          ? normalizeCloudSnapshotForDisplay(
+              mergeBreederSnapshots(stampChangedSnapshotForSync(current, localSnapshot), shown, syncTombstonesRef.current),
+              current,
+            )
+          : shown;
+        setSyncedSnakes(next.snakes);
+        setSyncedPairings(next.pairings);
+        setSyncedBreedingCycles(next.breedingCycles);
+        setSyncedFollicleExams(next.follicleExams);
+        applyPlannerSyncState(next.plannerState);
+        latestPlannerSnapshotRef.current = next;
+        return { next, editedMeanwhile };
+      };
+
+      let savedSnapshot;
+      try {
+        savedSnapshot = nothingToSend
+          ? { serverTime: snapshot?.serverTime }
+          : await saveBreederSnapshot(upload, { changedOnly: true });
+      } catch (uploadError) {
+        // The download still happened. Show it: this device used to keep displaying whatever it
+        // started with (the demo animals, when its local storage could not be read) for as long as
+        // its uploads kept failing, while the keeper's real collection sat on the server.
+        remoteSnapshotRef.current = remoteState;
+        if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
+        setSyncTombstones(prev => reconcileTombstones(prev, snapshot?.tombstones));
+        const { next } = showSnapshot(normalizeCloudSnapshotForDisplay(merged, localSnapshot));
+        backendPlannerSyncRef.current.seeded = true;
+        // What is on screen counts as attempted, so the autosave does not retry the same failing
+        // upload in a tight loop; the next pull or edit tries again.
+        backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(next);
+        throw uploadError;
+      }
+      syncTombstonesRef.current = reconcileTombstones(syncTombstonesRef.current, savedSnapshot?.tombstones);
+      // Functional, so a deletion made while the requests were in flight is kept.
+      setSyncTombstones(prev => reconcileTombstones(reconcileTombstones(prev, snapshot?.tombstones), savedSnapshot?.tombstones));
+      const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
+      // ?ack=changed returns only the rows the server wrote, so they are patched over the merge
+      // we already hold rather than replacing it.
+      const persistedSnapshot = applyChangedRecords(merged, changedRecords);
+      remoteSnapshotRef.current = applyChangedRecords(remoteState, changedRecords);
+      // The cursor is the download's server time, never the upload's: a write another device made
+      // between this device's download and its upload is older than the upload and was skipped
+      // by every later delta.
+      if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
+      const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
+      const { next: nextSnapshot, editedMeanwhile } = showSnapshot(syncedSnapshot);
+
+      const syncedAt = new Date().toISOString();
+      backendPlannerSyncRef.current.seeded = true;
+      backendPlannerSyncRef.current.status = 'ready';
+      // The signature of what the server holds: edits merged in from meanwhile differ from it, so
+      // the autosave picks them up and sends them on the next pass.
+      backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(syncedSnapshot);
+      cloudBaselineSnapshotRef.current = syncedSnapshot;
+      if (editedMeanwhile) syncAgainRef.current = true;
+
+      const wroteSomething = ['snakes', 'pairings', 'breedingCycles', 'follicleExams']
+        .some(key => Array.isArray(changedRecords[key]) && changedRecords[key].length) || !!savedSnapshot?.plannerState;
+      if (wroteSomething) {
+        // Other tabs of this app on this device pull now rather than at their next interval.
+        try { syncBroadcastRef.current?.postMessage({ type: 'cloud-sync-wrote' }); } catch {}
+      }
+
+      // Records the server could not read are left out one by one rather than failing the save;
+      // say which, so a card that never syncs is not a silent mystery.
+      const skipped = Array.isArray(savedSnapshot?.skipped) ? savedSnapshot.skipped : [];
+      if (skipped.length) console.warn('[cloud-sync] the server left out records it could not read', skipped);
+      setCloudSyncStatus({
+        state: 'success',
+        lastSyncedAt: syncedAt,
+        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`
+          + (skipped.length ? ` ${skipped.length} breeding record(s) were not saved: ${skipped.map(record => record.reason).join('; ')}` : ''),
+      });
+      return { ...nextSnapshot, syncedAt };
+    } catch (error) {
+      backendPlannerSyncRef.current.status = backendPlannerSyncRef.current.seeded ? 'ready' : 'idle';
+      const message = error?.message || 'Cloud sync failed.';
+      // Shown as a "Not synced" pill in the header and one toast, with the reason in plain words
+      // (see cloudSyncFailure). The console line stays for diagnosis.
+      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
+      throw error;
+    }
+  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams]);
+
+  const runCloudBreederSync = useCallback(({ silent = false } = {}) => {
     if (!sharedBreederDataReady) {
       const message = sharedBackendSnapshot?.message || 'Shared backend is not connected or this session is not signed in.';
       if (!silent) {
@@ -7979,83 +8100,30 @@ export default function BreedingPlannerApp() {
             : { kind: 'connection', message },
         });
       }
-      throw new Error(message);
+      return Promise.reject(new Error(message));
     }
-    if (backendPlannerSyncRef.current.status === 'loading') {
-      const message = 'Cloud sync is already running.';
-      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message }));
-      return null;
+    if (syncRunRef.current) {
+      syncAgainRef.current = true;
+      if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
+      return syncRunRef.current;
     }
-
-    backendPlannerSyncRef.current.status = 'loading';
-    if (!silent) setCloudSyncStatus(prev => ({ ...prev, state: 'loading', message: 'Syncing local data with cloud database.' }));
-
-    try {
-      const localSnapshot = stampChangedSnapshotForSync(
-        latestPlannerSnapshotRef.current,
-        cloudBaselineSnapshotRef.current
-      );
-      // First sync of a session has no cursor and fetches everything; later ones ask only for
-      // what changed since the server's own timestamp.
-      const snapshot = await fetchBreederSnapshot(remoteCursorRef.current);
-      const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
-      const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-      const remoteState = isDelta
-        ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
-        : backendSnapshot;
-      const merged = applyRemoteDeletions(
-        mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
-        isDelta ? snapshot?.deleted : null
-      );
-      // Upload only what the server does not already have. Tombstones are added by
-      // prepareSnapshotForBackend and are never filtered out.
-      const savedSnapshot = await saveBreederSnapshot(
-        prepareSnapshotForBackend(
-          selectRecordsToUpload(merged.snakes, remoteState.snakes),
-          selectRecordsToUpload(merged.pairings, remoteState.pairings),
-          merged.plannerState,
-          syncTombstonesRef.current,
-          {
-            breedingCycles: selectRecordsToUpload(merged.breedingCycles, remoteState.breedingCycles),
-            follicleExams: selectRecordsToUpload(merged.follicleExams, remoteState.follicleExams),
-          }
-        ),
-        { changedOnly: true }
-      );
-      const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
-      // ?ack=changed returns only the rows the server wrote, so they are patched over the merge
-      // we already hold rather than replacing it.
-      const persistedSnapshot = applyChangedRecords(merged, changedRecords);
-      remoteSnapshotRef.current = applyChangedRecords(remoteState, changedRecords);
-      if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
-      const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-      const signature = plannerSnapshotSignature(syncedSnapshot);
-
-      setSyncedSnakes(syncedSnapshot.snakes);
-      setSyncedPairings(syncedSnapshot.pairings);
-      setSyncedBreedingCycles(syncedSnapshot.breedingCycles);
-      setSyncedFollicleExams(syncedSnapshot.follicleExams);
-      applyPlannerSyncState(syncedSnapshot.plannerState);
-      latestPlannerSnapshotRef.current = syncedSnapshot;
-
-      const syncedAt = new Date().toISOString();
-      backendPlannerSyncRef.current.seeded = true;
-      backendPlannerSyncRef.current.status = 'ready';
-      backendPlannerSyncRef.current.lastSavedSignature = signature;
-      cloudBaselineSnapshotRef.current = syncedSnapshot;
-      setCloudSyncStatus({
-        state: 'success',
-        lastSyncedAt: syncedAt,
-        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`,
-      });
-      return { ...syncedSnapshot, syncedAt };
-    } catch (error) {
-      backendPlannerSyncRef.current.status = 'idle';
-      const message = error?.message || 'Cloud sync failed.';
-      setCloudSyncStatus(prev => ({ ...prev, state: 'error', message, error: syncErrorDetails(error) }));
-      throw error;
-    }
-  }, [applyPlannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
+    const run = (async () => {
+      try {
+        let result = null;
+        let passes = 0;
+        do {
+          syncAgainRef.current = false;
+          passes += 1;
+          result = await performCloudBreederSync({ silent: silent || passes > 1 });
+        } while (syncAgainRef.current && passes < 5);
+        return result;
+      } finally {
+        syncRunRef.current = null;
+      }
+    })();
+    syncRunRef.current = run;
+    return run;
+  }, [performCloudBreederSync, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
@@ -8074,6 +8142,44 @@ export default function BreedingPlannerApp() {
     return () => window.removeEventListener('lab:cloud-sync-requested', handleLabCloudSyncRequested);
   }, [runCloudBreederSync]);
 
+  // Changes made on another device arrive without this one having to edit something first: on
+  // returning to the window, on reconnecting, from another tab, and once a minute while visible.
+  // Before, the desktop only pulled at startup or when the keeper changed something, so a desktop
+  // left open showed whatever it had loaded that morning.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !electronDataReady || !sharedBreederDataReady) return undefined;
+    // Also the retry for a first sync that failed (backend asleep, network down): it used to wait
+    // for the keeper to press Sync.
+    const pull = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      runCloudBreederSync({ silent: true }).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') pull(); };
+    window.addEventListener('focus', pull);
+    window.addEventListener('online', pull);
+    document.addEventListener('visibilitychange', onVisibility);
+    const timer = window.setInterval(pull, 60 * 1000);
+
+    let channel = null;
+    try {
+      channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('serpentora-cloud-sync') : null;
+    } catch { channel = null; }
+    if (channel) channel.onmessage = (event) => { if (event?.data?.type === 'cloud-sync-wrote') pull(); };
+    syncBroadcastRef.current = channel;
+
+    return () => {
+      window.removeEventListener('focus', pull);
+      window.removeEventListener('online', pull);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(timer);
+      if (channel) {
+        channel.onmessage = null;
+        try { channel.close(); } catch {}
+      }
+      if (syncBroadcastRef.current === channel) syncBroadcastRef.current = null;
+    };
+  }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
+
   useEffect(() => {
     if (!electronDataReady || !sharedBreederDataReady) return;
     if (backendPlannerSyncRef.current.status !== 'idle') return;
@@ -8087,9 +8193,6 @@ export default function BreedingPlannerApp() {
 
     return () => {
       cancelled = true;
-      if (!backendPlannerSyncRef.current.seeded && backendPlannerSyncRef.current.status === 'loading') {
-        backendPlannerSyncRef.current.status = 'idle';
-      }
     };
   }, [electronDataReady, runCloudBreederSync, sharedBreederDataReady]);
 
@@ -8575,95 +8678,26 @@ export default function BreedingPlannerApp() {
     snakes,
   ]);
 
+  // Autosave: a local change, settled for 600 ms, becomes a sync. It goes through the same
+  // serialized runCloudBreederSync as everything else, so it can no longer race the startup sync,
+  // the Sync button or a background pull.
   useEffect(() => {
-    if (!electronDataReady || !sharedBreederDataReady) return;
-    if (!backendPlannerSyncRef.current.seeded) return;
+    if (!electronDataReady || !sharedBreederDataReady) return undefined;
+    if (!backendPlannerSyncRef.current.seeded) return undefined;
 
     const signature = plannerSnapshotSignature({ snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState });
-    const saveRequestId = ++cloudSaveRequestIdRef.current;
-    if (signature === backendPlannerSyncRef.current.lastSavedSignature) {
-      backendPlannerSyncRef.current.status = 'ready';
-      return;
-    }
+    if (signature === backendPlannerSyncRef.current.lastSavedSignature) return undefined;
 
     const saveTimer = setTimeout(() => {
-      if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-      backendPlannerSyncRef.current.status = 'loading';
-      const localSnapshot = stampChangedSnapshotForSync(
-        { snakes, pairings, breedingCycles, follicleExams, plannerState: plannerSyncState },
-        cloudBaselineSnapshotRef.current
-      );
-
-      let mergedForSave = null;
-      let remoteStateForSave = null;
-
-      fetchBreederSnapshot(remoteCursorRef.current)
-        .then((snapshot) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return null;
-          const isDelta = snapshot?.partial === true && !!remoteCursorRef.current;
-          const backendSnapshot = normalizeBackendBreederSnapshot(snapshot);
-          remoteStateForSave = isDelta
-            ? applyChangedRecords(remoteSnapshotRef.current, backendSnapshot)
-            : backendSnapshot;
-          mergedForSave = applyRemoteDeletions(
-            mergeBreederSnapshots(localSnapshot, backendSnapshot, syncTombstonesRef.current),
-            isDelta ? snapshot?.deleted : null
-          );
-          return saveBreederSnapshot(
-            prepareSnapshotForBackend(
-              selectRecordsToUpload(mergedForSave.snakes, remoteStateForSave.snakes),
-              selectRecordsToUpload(mergedForSave.pairings, remoteStateForSave.pairings),
-              mergedForSave.plannerState,
-              syncTombstonesRef.current,
-              {
-                breedingCycles: selectRecordsToUpload(mergedForSave.breedingCycles, remoteStateForSave.breedingCycles),
-                follicleExams: selectRecordsToUpload(mergedForSave.follicleExams, remoteStateForSave.follicleExams),
-              }
-            ),
-            { changedOnly: true }
-          );
-        })
-        .then((savedSnapshot) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          const changedRecords = normalizeBackendBreederSnapshot(savedSnapshot);
-          const persistedSnapshot = applyChangedRecords(mergedForSave, changedRecords);
-          remoteSnapshotRef.current = applyChangedRecords(remoteStateForSave, changedRecords);
-          if (savedSnapshot?.serverTime) remoteCursorRef.current = savedSnapshot.serverTime;
-          const currentSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-          setSyncedSnakes(currentSnapshot.snakes);
-          setSyncedPairings(currentSnapshot.pairings);
-          setSyncedBreedingCycles(currentSnapshot.breedingCycles);
-          setSyncedFollicleExams(currentSnapshot.follicleExams);
-          applyPlannerSyncState(currentSnapshot.plannerState);
-          latestPlannerSnapshotRef.current = currentSnapshot;
-          backendPlannerSyncRef.current.status = 'ready';
-          backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(currentSnapshot);
-          cloudBaselineSnapshotRef.current = currentSnapshot;
-          setCloudSyncStatus({
-            state: 'success',
-            lastSyncedAt: new Date().toISOString(),
-            message: `Saved ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings to the cloud database.`,
-          });
-        })
-        .catch((error) => {
-          if (saveRequestId !== cloudSaveRequestIdRef.current) return;
-          backendPlannerSyncRef.current.status = 'ready';
-          // Shown as a "Not synced" pill in the header and one toast, with the reason
-          // in plain words (see cloudSyncFailure). The console line stays for diagnosis.
-          setCloudSyncStatus(prev => ({
-            ...prev,
-            state: 'error',
-            message: error?.message || 'Failed to save shared breeder snapshot.',
-            error: syncErrorDetails(error),
-          }));
-          console.warn('Failed to save shared breeder snapshot', error);
-        });
+      runCloudBreederSync({ silent: true }).catch((error) => {
+        console.warn('Failed to save shared breeder snapshot', error);
+      });
     }, 600);
 
     return () => {
       clearTimeout(saveTimer);
     };
-  }, [applyPlannerSyncState, electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, setSyncedPairings, setSyncedSnakes, setSyncedBreedingCycles, setSyncedFollicleExams, sharedBreederDataReady, snakes]);
+  }, [electronDataReady, pairings, breedingCycles, follicleExams, plannerSyncState, runCloudBreederSync, sharedBreederDataReady, snakes]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -9577,8 +9611,8 @@ export default function BreedingPlannerApp() {
         const sire = snakeById(snakes, pairing.maleId);
         const clutchDate = pairing.clutch.date;
         const year = String(clutchDate || '').slice(0, 4) || '';
-        const damName = dam?.name || pairing.femaleId || '';
-        const sireName = sire?.name || pairing.maleId || '';
+        const damName = dam?.name || pairing.femaleName || pairing.femaleId || '';
+        const sireName = sire?.name || pairing.maleName || pairing.maleId || '';
         return {
           pairingId: pairing.id,
           clutchId: buildClutchId(damName, sireName, year),
@@ -9624,8 +9658,8 @@ export default function BreedingPlannerApp() {
           eggBoxBadEggs: p?.clutch?.eggBoxBadEggs || {},
           clutchDate,
           pairingLabel,
-          femaleName: female?.name || p.femaleId || 'Female',
-          maleName: male?.name || p.maleId || 'Male',
+          femaleName: female?.name || p.femaleName || p.femaleId || 'Female',
+          maleName: male?.name || p.maleName || p.maleId || 'Male',
           clutchId: buildClutchId(female?.name || p.femaleId, male?.name || p.maleId, clutchYear),
           femaleGenetics: female ? (getDisplayedSnakeGeneticsTokens(female).length ? getDisplayedSnakeGeneticsTokens(female).join(', ') : 'Normal') : '\u2014',
           maleGenetics: male ? (getDisplayedSnakeGeneticsTokens(male).length ? getDisplayedSnakeGeneticsTokens(male).join(', ') : 'Normal') : '\u2014',
@@ -11368,6 +11402,15 @@ export default function BreedingPlannerApp() {
     addTombstone: addBreedingTombstone,
     snakesById: breedingSnakesById,
   });
+
+  // Settings → Backup → "Animals named but missing": settle a pairing or card that names an animal
+  // the collection does not have. Both go through the stamping setters, so they sync like any edit.
+  const handleUnlinkMissingAnimal = useCallback((animalId) => {
+    setPairings(prev => unlinkAnimalFromPairings(prev, animalId));
+  }, [setPairings]);
+  const handleDeleteCyclesNamingAnimal = useCallback((cycleIds) => {
+    (Array.isArray(cycleIds) ? cycleIds : []).forEach(id => breedingActions.deleteCycle(id));
+  }, [breedingActions]);
   const breedingGeneticsTokensFor = useCallback((snake) => (
     snake ? combineMorphsAndHetsForDisplay(snake.morphs, snake.hets, snake.possibleHets) : []
   ), []);
@@ -13257,6 +13300,9 @@ export default function BreedingPlannerApp() {
             showAppConfirm={showAppConfirm}
             onCompressStoredPhotos={handleCompressStoredPhotos}
             onResetToDefaults={resetAppToDefaults}
+            breedingCycles={breedingCycles}
+            onUnlinkMissingAnimal={handleUnlinkMissingAnimal}
+            onDeleteCyclesNamingAnimal={handleDeleteCyclesNamingAnimal}
           />
         )}
 
@@ -16447,8 +16493,8 @@ function ExportPairingQrModal({ open, onClose, pairings = [], snakes = [], onGen
     return pairings.map(pairing => {
       const male = snakeById(snakes, pairing.maleId);
       const female = snakeById(snakes, pairing.femaleId);
-      const maleName = male?.name || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
-      const femaleName = female?.name || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
+      const maleName = male?.name || pairing.maleName || pairing.maleId || t('snake.sex.male', { defaultValue: 'Male' });
+      const femaleName = female?.name || pairing.femaleName || pairing.femaleId || t('snake.sex.female', { defaultValue: 'Female' });
       const label = pairing.label || `${femaleName} × ${maleName}`;
       return {
         id: pairing.id,
@@ -17208,8 +17254,8 @@ async function exportPairingQrLabels(pairingsToExport, { snakes = [], breederInf
 
     const maleSnake = snakesById.get(pairing.maleId);
     const femaleSnake = snakesById.get(pairing.femaleId);
-    const maleName = maleSnake?.name || pairing.maleId || 'Male';
-    const femaleName = femaleSnake?.name || pairing.femaleId || 'Female';
+    const maleName = maleSnake?.name || pairing.maleName || pairing.maleId || 'Male';
+    const femaleName = femaleSnake?.name || pairing.femaleName || pairing.femaleId || 'Female';
     const pairingLabel = pairing.label || `${femaleName} × ${maleName}`;
     const link = `${window.location.origin}${window.location.pathname}#pairing=${encodeURIComponent(pairing.id)}`;
 
@@ -19278,6 +19324,9 @@ const OPTIONAL_EXPORT_GROUP_IDS = ACCOUNT_EXPORT_GROUPS.filter(group => !group.a
 
 // Breeder section for contact and logo
 function BreederSection({
+  breedingCycles = [],
+  onUnlinkMissingAnimal,
+  onDeleteCyclesNamingAnimal,
   breederInfo,
   setBreederInfo,
   morphAliases,
@@ -22967,6 +23016,14 @@ function BreederSection({
                 {cloudFeedback.timestamp ? ` - ${formatDateTimeForDisplay(cloudFeedback.timestamp)}` : ''}
               </div>
             )}
+            <MissingAnimalsPanel
+              snakes={snakes}
+              pairings={pairings}
+              cycles={breedingCycles}
+              onUnlinkFromPairings={onUnlinkMissingAnimal}
+              onDeleteCycles={onDeleteCyclesNamingAnimal}
+              showAppConfirm={showAppConfirm}
+            />
           </div>
 
           <div className="space-y-3 border-t pt-4">
