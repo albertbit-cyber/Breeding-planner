@@ -56,8 +56,11 @@ const dedupeLogArray = (entries: unknown[], label: string): JsonRecord[] => {
       bySignature.set(key, entry);
       continue;
     }
-    // Prefer the copy that already has an id; otherwise keep what we had.
-    if (!explicitId(kept) && explicitId(entry)) bySignature.set(key, entry);
+    // Prefer a copy that carries an id, and among those the smallest -- the breeder app's
+    // collapseDuplicateLogEntries keeps the same one, so devices and server agree on the survivor.
+    const keptId = explicitId(kept);
+    const entryId = explicitId(entry);
+    if (entryId && (!keptId || entryId < keptId)) bySignature.set(key, entry);
   }
   return [...bySignature.values()];
 };

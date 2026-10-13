@@ -66,6 +66,33 @@ export function backfillLogIds(logs) {
   return result;
 }
 
+// The random-id bug left each affected reading stored hundreds of times, every copy under its own
+// UUID, and an id-keyed merge keeps all of them: a device still holding the copies hands them back
+// to the server on its next sync, undoing scripts/dedupeAnimalLogs.ts. Entries with the same content
+// signature are one reading, so only one survives. The survivor is the smallest id, so every device
+// (and the cleanup script) keeps the same copy and the sync settles instead of trading survivors.
+export function collapseDuplicateLogEntries(logs) {
+  if (!logs || typeof logs !== 'object') return logs;
+  const result = {};
+  for (const key of Object.keys(logs)) {
+    const entries = logs[key];
+    if (!Array.isArray(entries)) {
+      result[key] = entries;
+      continue;
+    }
+    const survivorBySignature = new Map();
+    entries.forEach(entry => {
+      if (!entry || typeof entry !== 'object') return;
+      const signature = logEntrySignature(entry, key);
+      const kept = survivorBySignature.get(signature);
+      if (!kept || String(entry.id || '') < String(kept.id || '')) survivorBySignature.set(signature, entry);
+    });
+    const survivors = new Set(survivorBySignature.values());
+    result[key] = entries.filter(entry => !entry || typeof entry !== 'object' || survivors.has(entry));
+  }
+  return result;
+}
+
 // --- Incremental cloud sync ----------------------------------------------------------------
 // The snapshot endpoints used to move an account's entire dataset three times per sync: a full
 // GET, a full PUT, and the full snapshot echoed back. These narrow each leg to what actually
