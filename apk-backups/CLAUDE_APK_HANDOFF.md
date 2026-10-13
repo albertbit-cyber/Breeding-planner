@@ -8,7 +8,15 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-**Latest breeder APK (2026-10-13, 0.1.93): `app-release-2026-10-13-device-storage-indexeddb.apk`**
+**Latest breeder APK (2026-10-13 16:11, 0.1.96): `app-release-2026-10-13-cloud-replace.apk`**
+SHA256 `08A453C43CF2BA98A0D0AE28205C8F3FF071C15DFEEEF5B1D3D6FF62497A746C`, package `com.serpentora.mobile`,
+versionCode 10096 / 0.1.96, release-signed (same certificate), staging backend. Everything in the 0.1.93 build below
+plus PR #18: signed in, restoring a backup previews the change and then replaces the cloud data, every device follows on
+its next sync, and Settings > Backups lists replaces with Undo. Needs the PR #18 backend on staging for the signed-in
+restore. Built from `build/apk-cloud-replace` @ `5e5a5ab`. Browser-verified, not run on the phone. Full entry in
+`APK_CHANGELOG.md`.
+
+**Previous breeder APK (2026-10-13, 0.1.93): `app-release-2026-10-13-device-storage-indexeddb.apk`**
 SHA256 `C5F3B222D748A1B50703D8E457BBD463924D08BFF896CB2F6A340F66B28B0033`, package `com.serpentora.mobile`,
 versionCode 10093 / 0.1.93, release-signed (same certificate, installs over the previous one and keeps its data), staging
 backend. Fixes "Local storage is full" when opening a backup on the phone: the collection moves from localStorage (~5 MB
