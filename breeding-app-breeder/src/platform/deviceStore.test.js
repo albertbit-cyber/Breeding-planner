@@ -79,8 +79,8 @@ describe("deviceStore init", () => {
     const backend = createMemoryBackend();
     backend.loadAll = vi
       .fn()
-      .mockResolvedValueOnce(new Map())
-      .mockResolvedValueOnce(new Map([[SNAKES, "corrupt"]]));
+      .mockResolvedValueOnce({ entries: new Map(), photos: new Map() })
+      .mockResolvedValueOnce({ entries: new Map([[SNAKES, "corrupt"]]), photos: new Map() });
     const store = createDeviceStore({ backend, localStorage: ls, dispatch: () => {} });
 
     const status = await store.init();
@@ -223,8 +223,110 @@ describe("deviceStore usage", () => {
     await store.init();
 
     expect(store.usage()).toEqual([
-      { key: SNAKES, bytes: 20 },
-      { key: PAIRINGS, bytes: 6 },
+      { key: SNAKES, bytes: 10 },
+      { key: PAIRINGS, bytes: 3 },
     ]);
+  });
+});
+
+describe("deviceStore photos", () => {
+  const photo = (seed) => `data:image/jpeg;base64,${String(seed).repeat(4000)}`;
+  const snakesWith = (...urls) => JSON.stringify(urls.map((url, i) => ({ id: `a${i}`, imageUrl: url, photos: [{ url }] })));
+  let n = 0;
+  const idFactory = () => `id${(n += 1)}`;
+
+  it("stores each photo once and gives readers back exactly what was written", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    const text = snakesWith(photo(1), photo(2));
+
+    store.setItem(SNAKES, text);
+    await store.flush();
+
+    expect(store.getItem(SNAKES)).toBe(text);
+    // Two photos, each used twice (photo list and cover), stored once each.
+    expect(backend.photos.size).toBe(2);
+    expect(backend.data.get(SNAKES)).not.toContain("data:");
+    expect(backend.data.get(SNAKES).length).toBeLessThan(400);
+  });
+
+  it("shares one stored photo between the collection and a snapshot of it", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    const text = snakesWith(photo(3));
+
+    store.setItem(SNAKES, text);
+    store.setItem("breedingPlannerPreRestoreSnapshot", JSON.stringify({ payload: { snakes: JSON.parse(text) } }));
+    await store.flush();
+
+    expect(backend.photos.size).toBe(1);
+  });
+
+  it("removes a photo once nothing refers to it", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    store.setItem(SNAKES, snakesWith(photo(4), photo(5)));
+    await store.flush();
+
+    store.setItem(SNAKES, snakesWith(photo(5)));
+    await store.flush();
+
+    expect(backend.photos.size).toBe(1);
+    expect(store.getItem(SNAKES)).toBe(snakesWith(photo(5)));
+  });
+
+  it("loads stored photos back, and converts values that still carry them inline", async () => {
+    const inline = snakesWith(photo(6));
+    const backend = createMemoryBackend({ [SNAKES]: inline });
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    await store.flush();
+
+    expect(backend.photos.size).toBe(1);
+    expect(backend.data.get(SNAKES)).not.toContain("data:");
+
+    const reopened = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await reopened.init();
+    expect(reopened.getItem(SNAKES)).toBe(inline);
+    expect(reopened.status().pendingWrites).toBe(0);
+  });
+
+  it("commits restored photos in the same transaction as the records", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    const text = snakesWith(photo(7));
+
+    await store.commit({ [SNAKES]: text });
+
+    expect(backend.photos.size).toBe(1);
+    expect(store.getItem(SNAKES)).toBe(text);
+  });
+
+  it("leaves nothing behind when a commit with new photos fails", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    backend.failNextWrite = new Error("disk full");
+
+    await expect(store.commit({ [SNAKES]: snakesWith(photo(8)) })).rejects.toThrow("disk full");
+
+    expect(store.status().storedPhotos).toBe(0);
+    expect(store.getItem(SNAKES)).toBeNull();
+  });
+
+  it("reports photos as their own usage row", async () => {
+    const backend = createMemoryBackend();
+    const store = createDeviceStore({ backend, localStorage: createLocalStorage(), dispatch: () => {}, idFactory });
+    await store.init();
+    store.setItem(SNAKES, snakesWith(photo(9)));
+
+    const rows = store.usage();
+
+    expect(rows[0].key).toBe("photos");
+    expect(rows[0].bytes).toBeGreaterThan(4000);
   });
 });

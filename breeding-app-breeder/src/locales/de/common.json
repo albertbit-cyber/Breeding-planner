@@ -2804,11 +2804,10 @@
   "setup.storage.title": "Speicher auf diesem Gerät",
   "setup.storage.total": "Deine Sammlung belegt hier {{size}}.",
   "setup.storage.available": "Der App stehen noch {{size}} zur Verfügung.",
-  "setup.storage.rowAnimals": "Tiere und ihre Fotos",
+  "setup.storage.rowAnimals": "Tierdaten und Protokolle",
   "setup.storage.rowVault": "Backup-Tresor auf diesem Gerät",
   "setup.storage.rowUndo": "Kopie zum Rückgängigmachen der letzten Wiederherstellung",
   "setup.storage.rowOther": "Verpaarungen, Zuchtdaten und Einstellungen",
-  "setup.storage.photosShare": "(Fotos: {{size}})",
   "setup.storage.legacyMode": "Dieser Browser hat den Hauptspeicher der App nicht geöffnet, deshalb liegt deine Sammlung in einem kleinen Speicher mit etwa 5 MB. Große Sammlungen mit Fotos passen eventuell nicht hinein.",
   "setup.storage.unsaved": "Einige neue Änderungen sind noch nicht auf diesem Gerät gespeichert. Die App versucht es weiter; sichere vor dem Schließen eine Backup-Datei.",
   "setup.backup.undoMissing": "Es gibt keine frühere Sammlung, zu der du zurückkehren kannst.",
@@ -2816,5 +2815,6 @@
   "setup.backup.undoRestore": "Letzte Wiederherstellung rückgängig machen",
   "setup.backup.undoDone": "Deine Sammlung ist wieder auf dem Stand vor der Wiederherstellung.",
   "setup.backup.undoHelp": "Kehrt zu deiner Sammlung vom {{date}} zurück, wie sie vor der Wiederherstellung war.",
-  "setup.backup.vaultNoPhotos": "Tresor-Kopien werden auf diesem Gerät ohne Fotos gespeichert, um Platz zu sparen. Beim Wiederherstellen bleiben die aktuellen Fotos deiner Tiere erhalten. Für eine vollständige Kopie mit Fotos sichere eine Backup-Datei."
+  "setup.backup.vaultNoPhotos": "Tresor-Kopien werden auf diesem Gerät ohne Fotos gespeichert, um Platz zu sparen. Beim Wiederherstellen bleiben die aktuellen Fotos deiner Tiere erhalten. Für eine vollständige Kopie mit Fotos sichere eine Backup-Datei.",
+  "setup.storage.rowPhotos": "Fotos"
 }

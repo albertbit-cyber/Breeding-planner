@@ -2804,11 +2804,10 @@
   "setup.storage.title": "Opslag op dit apparaat",
   "setup.storage.total": "Je collectie neemt hier {{size}} in beslag.",
   "setup.storage.available": "Er is nog {{size}} beschikbaar voor de app.",
-  "setup.storage.rowAnimals": "Dieren en hun foto's",
+  "setup.storage.rowAnimals": "Dierengegevens en logboeken",
   "setup.storage.rowVault": "Back-upkluis op dit apparaat",
   "setup.storage.rowUndo": "Kopie om de laatste herstelactie ongedaan te maken",
   "setup.storage.rowOther": "Koppelingen, kweekgegevens en instellingen",
-  "setup.storage.photosShare": "(foto's: {{size}})",
   "setup.storage.legacyMode": "Deze browser opende de hoofdopslag van de app niet, dus je collectie staat in een kleine opslag van ongeveer 5 MB. Grote collecties met foto's passen daar mogelijk niet in.",
   "setup.storage.unsaved": "Sommige recente wijzigingen zijn nog niet op dit apparaat opgeslagen. De app blijft het proberen; sla een back-upbestand op voordat je hem sluit.",
   "setup.backup.undoMissing": "Er is geen eerdere collectie om naar terug te gaan.",
@@ -2816,5 +2815,6 @@
   "setup.backup.undoRestore": "Laatste herstelactie ongedaan maken",
   "setup.backup.undoDone": "Je collectie is terug zoals ze was vóór het herstellen.",
   "setup.backup.undoHelp": "Gaat terug naar je collectie zoals die was op {{date}}, vóór het herstellen.",
-  "setup.backup.vaultNoPhotos": "Kluiskopieën worden zonder foto's op dit apparaat bewaard, om ruimte te besparen. Bij het herstellen houden je dieren hun huidige foto's. Sla een back-upbestand op voor een volledige kopie met foto's."
+  "setup.backup.vaultNoPhotos": "Kluiskopieën worden zonder foto's op dit apparaat bewaard, om ruimte te besparen. Bij het herstellen houden je dieren hun huidige foto's. Sla een back-upbestand op voor een volledige kopie met foto's.",
+  "setup.storage.rowPhotos": "Foto's"
 }

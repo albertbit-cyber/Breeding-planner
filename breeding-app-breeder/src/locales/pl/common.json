@@ -2828,11 +2828,10 @@
   "setup.storage.title": "Pamięć na tym urządzeniu",
   "setup.storage.total": "Twoja kolekcja zajmuje tu {{size}}.",
   "setup.storage.available": "Aplikacja ma do dyspozycji jeszcze {{size}}.",
-  "setup.storage.rowAnimals": "Zwierzęta i ich zdjęcia",
+  "setup.storage.rowAnimals": "Karty zwierząt i dzienniki",
   "setup.storage.rowVault": "Skarbiec kopii na tym urządzeniu",
   "setup.storage.rowUndo": "Kopia do cofnięcia ostatniego przywracania",
   "setup.storage.rowOther": "Łączenia, dane hodowlane i ustawienia",
-  "setup.storage.photosShare": "(zdjęcia: {{size}})",
   "setup.storage.legacyMode": "Ta przeglądarka nie otworzyła głównej pamięci aplikacji, więc Twoja kolekcja jest trzymana w małym magazynie o pojemności około 5 MB. Duże kolekcje ze zdjęciami mogą się w nim nie zmieścić.",
   "setup.storage.unsaved": "Niektóre ostatnie zmiany nie są jeszcze zapisane na tym urządzeniu. Aplikacja próbuje dalej; przed jej zamknięciem zapisz plik kopii zapasowej.",
   "setup.backup.undoMissing": "Nie ma wcześniejszej kolekcji, do której można wrócić.",
@@ -2840,5 +2839,6 @@
   "setup.backup.undoRestore": "Cofnij ostatnie przywracanie",
   "setup.backup.undoDone": "Twoja kolekcja wróciła do stanu sprzed przywracania.",
   "setup.backup.undoHelp": "Wraca do kolekcji w stanie z {{date}}, sprzed przywracania.",
-  "setup.backup.vaultNoPhotos": "Kopie w skarbcu są przechowywane na tym urządzeniu bez zdjęć, aby oszczędzać miejsce. Po przywróceniu jednej z nich zwierzęta zachowują obecne zdjęcia. Aby mieć pełną kopię ze zdjęciami, zapisz plik kopii zapasowej."
+  "setup.backup.vaultNoPhotos": "Kopie w skarbcu są przechowywane na tym urządzeniu bez zdjęć, aby oszczędzać miejsce. Po przywróceniu jednej z nich zwierzęta zachowują obecne zdjęcia. Aby mieć pełną kopię ze zdjęciami, zapisz plik kopii zapasowej.",
+  "setup.storage.rowPhotos": "Zdjęcia"
 }

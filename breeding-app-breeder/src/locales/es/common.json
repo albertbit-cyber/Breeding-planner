@@ -2804,11 +2804,10 @@
   "setup.storage.title": "Almacenamiento en este dispositivo",
   "setup.storage.total": "Tu colección ocupa {{size}} aquí.",
   "setup.storage.available": "La app tiene {{size}} más disponibles.",
-  "setup.storage.rowAnimals": "Animales y sus fotos",
+  "setup.storage.rowAnimals": "Fichas de animales y registros",
   "setup.storage.rowVault": "Bóveda de copias en este dispositivo",
   "setup.storage.rowUndo": "Copia guardada para deshacer la última restauración",
   "setup.storage.rowOther": "Emparejamientos, registros de cría y ajustes",
-  "setup.storage.photosShare": "(fotos: {{size}})",
   "setup.storage.legacyMode": "Este navegador no abrió el almacenamiento principal de la app, así que tu colección se guarda en un espacio pequeño de unos 5 MB. Puede que las colecciones grandes con fotos no quepan.",
   "setup.storage.unsaved": "Algunos cambios recientes aún no se han guardado en este dispositivo. La app lo sigue intentando; guarda un archivo de copia de seguridad antes de cerrarla.",
   "setup.backup.undoMissing": "No hay ninguna colección anterior a la que volver.",
@@ -2816,5 +2815,6 @@
   "setup.backup.undoRestore": "Deshacer la última restauración",
   "setup.backup.undoDone": "Tu colección ha vuelto al estado anterior a la restauración.",
   "setup.backup.undoHelp": "Vuelve a tu colección tal como estaba el {{date}}, antes de la restauración.",
-  "setup.backup.vaultNoPhotos": "Las copias de la bóveda se guardan en este dispositivo sin fotos, para ahorrar espacio. Al restaurar una, se conservan las fotos que tienen ahora tus animales. Para una copia completa con fotos, guarda un archivo de copia de seguridad."
+  "setup.backup.vaultNoPhotos": "Las copias de la bóveda se guardan en este dispositivo sin fotos, para ahorrar espacio. Al restaurar una, se conservan las fotos que tienen ahora tus animales. Para una copia completa con fotos, guarda un archivo de copia de seguridad.",
+  "setup.storage.rowPhotos": "Fotos"
 }

@@ -2802,11 +2802,10 @@
   "setup.storage.title": "Stockage sur cet appareil",
   "setup.storage.total": "Ta collection occupe {{size}} ici.",
   "setup.storage.available": "{{size}} de plus sont disponibles pour l'app.",
-  "setup.storage.rowAnimals": "Animaux et leurs photos",
+  "setup.storage.rowAnimals": "Fiches des animaux et journaux",
   "setup.storage.rowVault": "Coffre de sauvegardes sur cet appareil",
   "setup.storage.rowUndo": "Copie gardée pour annuler la dernière restauration",
   "setup.storage.rowOther": "Accouplements, données d'élevage et réglages",
-  "setup.storage.photosShare": "(photos : {{size}})",
   "setup.storage.legacyMode": "Ce navigateur n'a pas ouvert le stockage principal de l'app, ta collection est donc conservée dans un petit espace limité à environ 5 Mo. Les grandes collections avec photos risquent de ne pas tenir.",
   "setup.storage.unsaved": "Certaines modifications récentes ne sont pas encore enregistrées sur cet appareil. L'app continue d'essayer ; enregistre un fichier de sauvegarde avant de la fermer.",
   "setup.backup.undoMissing": "Il n'y a aucune collection antérieure à laquelle revenir.",
@@ -2814,5 +2813,6 @@
   "setup.backup.undoRestore": "Annuler la dernière restauration",
   "setup.backup.undoDone": "Ta collection est revenue à son état d'avant la restauration.",
   "setup.backup.undoHelp": "Revient à ta collection telle qu'elle était le {{date}}, avant la restauration.",
-  "setup.backup.vaultNoPhotos": "Les copies du coffre sont conservées sur cet appareil sans photos, pour gagner de la place. En restaurer une conserve les photos actuelles de tes animaux. Pour une copie complète avec photos, enregistre un fichier de sauvegarde."
+  "setup.backup.vaultNoPhotos": "Les copies du coffre sont conservées sur cet appareil sans photos, pour gagner de la place. En restaurer une conserve les photos actuelles de tes animaux. Pour une copie complète avec photos, enregistre un fichier de sauvegarde.",
+  "setup.storage.rowPhotos": "Photos"
 }

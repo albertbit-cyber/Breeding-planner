@@ -2802,11 +2802,10 @@
   "setup.storage.title": "Storage on this device",
   "setup.storage.total": "Your collection takes up {{size}} here.",
   "setup.storage.available": "{{size}} more is available to the app.",
-  "setup.storage.rowAnimals": "Animals and their photos",
+  "setup.storage.rowAnimals": "Animal records and logs",
   "setup.storage.rowVault": "Backup vault on this device",
   "setup.storage.rowUndo": "Copy kept to undo the last restore",
   "setup.storage.rowOther": "Pairings, breeding records and settings",
-  "setup.storage.photosShare": "(photos: {{size}})",
   "setup.storage.legacyMode": "This browser would not open the app's main storage, so your collection is kept in a small store limited to about 5 MB. Large collections with photos may not fit.",
   "setup.storage.unsaved": "Some recent changes have not been saved on this device yet. The app keeps trying; save a backup file before closing it.",
   "setup.backup.undoMissing": "There is no earlier collection to go back to.",
@@ -2814,5 +2813,6 @@
   "setup.backup.undoRestore": "Undo last restore",
   "setup.backup.undoDone": "Your collection is back as it was before the restore.",
   "setup.backup.undoHelp": "Goes back to your collection as it was on {{date}}, before the restore.",
-  "setup.backup.vaultNoPhotos": "Vault copies are kept on this device without photos, to save space. Restoring one keeps the photos your animals have now. For a complete copy with photos, save a backup file."
+  "setup.backup.vaultNoPhotos": "Vault copies are kept on this device without photos, to save space. Restoring one keeps the photos your animals have now. For a complete copy with photos, save a backup file.",
+  "setup.storage.rowPhotos": "Photos"
 }

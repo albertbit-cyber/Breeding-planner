@@ -2802,11 +2802,10 @@
   "setup.storage.title": "Armazenamento neste dispositivo",
   "setup.storage.total": "A tua coleção ocupa {{size}} aqui.",
   "setup.storage.available": "A app tem mais {{size}} disponíveis.",
-  "setup.storage.rowAnimals": "Animais e as suas fotos",
+  "setup.storage.rowAnimals": "Fichas dos animais e registos",
   "setup.storage.rowVault": "Cofre de cópias neste dispositivo",
   "setup.storage.rowUndo": "Cópia guardada para anular o último restauro",
   "setup.storage.rowOther": "Acasalamentos, registos de reprodução e definições",
-  "setup.storage.photosShare": "(fotos: {{size}})",
   "setup.storage.legacyMode": "Este navegador não abriu o armazenamento principal da app, por isso a tua coleção fica num espaço pequeno de cerca de 5 MB. Coleções grandes com fotos podem não caber.",
   "setup.storage.unsaved": "Algumas alterações recentes ainda não foram guardadas neste dispositivo. A app continua a tentar; guarda um ficheiro de cópia de segurança antes de a fechar.",
   "setup.backup.undoMissing": "Não há nenhuma coleção anterior para onde voltar.",
@@ -2814,5 +2813,6 @@
   "setup.backup.undoRestore": "Anular o último restauro",
   "setup.backup.undoDone": "A tua coleção voltou a estar como antes do restauro.",
   "setup.backup.undoHelp": "Volta à tua coleção tal como estava a {{date}}, antes do restauro.",
-  "setup.backup.vaultNoPhotos": "As cópias do cofre ficam guardadas neste dispositivo sem fotos, para poupar espaço. Ao restaurar uma, os teus animais mantêm as fotos que têm agora. Para uma cópia completa com fotos, guarda um ficheiro de cópia de segurança."
+  "setup.backup.vaultNoPhotos": "As cópias do cofre ficam guardadas neste dispositivo sem fotos, para poupar espaço. Ao restaurar uma, os teus animais mantêm as fotos que têm agora. Para uma cópia completa com fotos, guarda um ficheiro de cópia de segurança.",
+  "setup.storage.rowPhotos": "Fotos"
 }

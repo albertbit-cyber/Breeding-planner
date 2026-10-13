@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { estimateDeviceStorage, getDeviceStore } from "../platform/deviceStore.js";
+import { PHOTOS_USAGE_KEY, estimateDeviceStorage, getDeviceStore } from "../platform/deviceStore.js";
 
 // What the collection takes up on this device, and how much room is left. Before this the
 // first sign of a full store was a change silently not being saved.
@@ -11,19 +11,6 @@ const formatBytes = (bytes) => {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(0)} KB`;
   if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-};
-
-// Inline photos are base64 text inside the animal records; UTF-16 doubles it in memory, which
-// is the same accounting the store's usage() uses.
-const inlinePhotoBytes = (snakes) => {
-  let total = 0;
-  (Array.isArray(snakes) ? snakes : []).forEach((snake) => {
-    (Array.isArray(snake?.photos) ? snake.photos : []).forEach((photo) => {
-      if (typeof photo?.url === "string" && photo.url.startsWith("data:")) total += photo.url.length * 2;
-    });
-    if (typeof snake?.imageUrl === "string" && snake.imageUrl.startsWith("data:")) total += snake.imageUrl.length * 2;
-  });
-  return total;
 };
 
 const measureRows = (store) => {
@@ -41,7 +28,9 @@ const measureRows = (store) => {
 // An empty list is stored as "[]"; a row for a few bytes is noise.
 const MIN_ROW_BYTES = 1024;
 
+// Photos are stored once, in their own table, whichever records use them.
 const GROUPS = [
+  { id: "photos", keys: [PHOTOS_USAGE_KEY] },
   { id: "animals", keys: ["breedingPlannerSnakes"] },
   { id: "vault", keys: ["breedingPlannerBackupVault", "breedingPlannerBackupSnapshot"] },
   { id: "undo", keys: ["breedingPlannerPreRestoreSnapshot"] },
@@ -71,11 +60,11 @@ export default function DeviceStorageSummary({ snakes, refreshKey }) {
     const timer = setTimeout(() => setRows(measureRows(store)), 0);
     return () => clearTimeout(timer);
   }, [store, snakes, refreshKey]);
-  const photoBytes = useMemo(() => inlinePhotoBytes(snakes), [snakes]);
   const total = rows.reduce((sum, row) => sum + row.bytes, 0);
 
   const labels = {
-    animals: t("setup.storage.rowAnimals", { defaultValue: "Animals and their photos" }),
+    photos: t("setup.storage.rowPhotos", { defaultValue: "Photos" }),
+    animals: t("setup.storage.rowAnimals", { defaultValue: "Animal records and logs" }),
     vault: t("setup.storage.rowVault", { defaultValue: "Backup vault on this device" }),
     undo: t("setup.storage.rowUndo", { defaultValue: "Copy kept to undo the last restore" }),
     other: t("setup.storage.rowOther", { defaultValue: "Pairings, breeding records and settings" }),
@@ -97,11 +86,6 @@ export default function DeviceStorageSummary({ snakes, refreshKey }) {
           <React.Fragment key={row.id}>
             <dt className="text-neutral-600">
               {labels[row.id]}
-              {row.id === "animals" && photoBytes > 0 ? (
-                <span className="text-neutral-400">
-                  {" "}{t("setup.storage.photosShare", { size: formatBytes(photoBytes), defaultValue: "(photos: {{size}})" })}
-                </span>
-              ) : null}
             </dt>
             <dd className="text-right tabular-nums text-neutral-700">{formatBytes(row.bytes)}</dd>
           </React.Fragment>

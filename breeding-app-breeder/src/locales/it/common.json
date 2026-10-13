@@ -2802,11 +2802,10 @@
   "setup.storage.title": "Memoria su questo dispositivo",
   "setup.storage.total": "La tua collezione occupa {{size}} qui.",
   "setup.storage.available": "All'app restano altri {{size}} disponibili.",
-  "setup.storage.rowAnimals": "Animali e le loro foto",
+  "setup.storage.rowAnimals": "Schede degli animali e registri",
   "setup.storage.rowVault": "Cassaforte dei backup su questo dispositivo",
   "setup.storage.rowUndo": "Copia conservata per annullare l'ultimo ripristino",
   "setup.storage.rowOther": "Accoppiamenti, dati di riproduzione e impostazioni",
-  "setup.storage.photosShare": "(foto: {{size}})",
   "setup.storage.legacyMode": "Questo browser non ha aperto la memoria principale dell'app, quindi la tua collezione è conservata in uno spazio ridotto di circa 5 MB. Le collezioni grandi con foto potrebbero non entrarci.",
   "setup.storage.unsaved": "Alcune modifiche recenti non sono ancora state salvate su questo dispositivo. L'app continua a riprovare; salva un file di backup prima di chiuderla.",
   "setup.backup.undoMissing": "Non c'è nessuna collezione precedente a cui tornare.",
@@ -2814,5 +2813,6 @@
   "setup.backup.undoRestore": "Annulla l'ultimo ripristino",
   "setup.backup.undoDone": "La tua collezione è tornata com'era prima del ripristino.",
   "setup.backup.undoHelp": "Torna alla tua collezione com'era il {{date}}, prima del ripristino.",
-  "setup.backup.vaultNoPhotos": "Le copie della cassaforte sono conservate su questo dispositivo senza foto, per risparmiare spazio. Ripristinandone una, i tuoi animali mantengono le foto attuali. Per una copia completa con foto, salva un file di backup."
+  "setup.backup.vaultNoPhotos": "Le copie della cassaforte sono conservate su questo dispositivo senza foto, per risparmiare spazio. Ripristinandone una, i tuoi animali mantengono le foto attuali. Per una copia completa con foto, salva un file di backup.",
+  "setup.storage.rowPhotos": "Foto"
 }
