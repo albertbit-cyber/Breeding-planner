@@ -2843,6 +2843,7 @@
   "breeding.flag.removalBeforeIntro": "הזכר הוצא לפני שהוכנס",
   "breeding.flag.sameDaySessions": "שני מפגשים עם אותו זכר ביום אחד",
   "breeding.flag.shedBeforeOvulation": "ההשלה טרום-ההטלה מתוארכת לפני הביוץ",
+  "breeding.flag.unresolvedAnimal": "הכרטיס הזה מציין בעל חיים שאינו נמצא באוסף שלך",
   "breeding.forecast.closed": "אין תחזיות לכרטיס סגור.",
   "breeding.forecast.descriptive": "תיאורי בלבד: {{n}} מחזורים קודמים, פחות מ-{{min}} הנדרשים לתחזית. מעוגן על {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "מ-{{n}} מחזורים שהושלמו של נקבות אחרות מהמין הזה באוסף שלכם; מעוגן על {{anchor}} {{date}}. טווח היסטורי.",

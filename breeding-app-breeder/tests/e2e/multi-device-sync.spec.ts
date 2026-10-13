@@ -116,6 +116,41 @@ test.describe("two devices, one account", () => {
     await desktop.context.close();
   });
 
+  // What a real keeper's Chrome looked like on 13 Oct: its local storage could not be read (the
+  // disk was full), so it started on the demo animals, while it still held a pairing whose male
+  // had never reached the server. The card made from that pairing was refused with a 400, the whole
+  // save failed, and the device kept showing demo animals although the collection was on the server.
+  test("a device that lost its local animals still shows the collection and syncs past a card with an unknown male", async ({ browser, request }) => {
+    const femaleId = uniqueId("broken-f");
+    const ghostMale = uniqueId("ghost-m");
+    const pairingId = uniqueId("broken-p");
+    await putSnapshot(request, auth.token, { animals: [{ id: femaleId, name: "Sync test, collection female", sex: "F", species: "Ball Python", updatedAt: soon(0) }] });
+
+    const context = await browser.newContext({ baseURL: breederFrontendUrl });
+    const page = await context.newPage();
+    await installBreederAuthInPage(page, auth);
+    await page.addInitScript(({ pairing }) => {
+      if (sessionStorage.getItem("e2e-broken-seeded")) return;
+      sessionStorage.setItem("e2e-broken-seeded", "1");
+      localStorage.setItem("breedingPlannerSnakes", "[]");
+      localStorage.setItem("breedingPlannerPairings", JSON.stringify([pairing]));
+    }, {
+      pairing: { id: pairingId, label: "Sync test pairing", femaleId, maleId: ghostMale, startDate: "2026-03-01", status: "active", updatedAt: soon(0) },
+    });
+    await page.goto("/");
+
+    // The collection from the server is on screen, not the demo set.
+    await expect.poll(() => storedAnimal(page, femaleId), { timeout: 30_000 }).not.toBeNull();
+    // And the save went through: the card is on the server, flagged for the unknown male.
+    await expect.poll(async () => {
+      const snapshot = await getSnapshot(request, auth.token);
+      const card = (snapshot.breedingCycles || []).find((cycle: any) => cycle.femaleId === femaleId);
+      return card?.reviewFlags?.find((flag: any) => flag.kind === "unresolved_animal_reference")?.animalIds || null;
+    }, { timeout: 30_000 }).toEqual([ghostMale]);
+    await expect(page.getByText(/Not synced/i)).toHaveCount(0);
+    await context.close();
+  });
+
   test("a desktop left open shows another device's edit when the keeper returns to it", async ({ browser, request }) => {
     const id = uniqueId("edited");
     await putSnapshot(request, auth.token, { animals: [{ id, name: "Sync test, before", sex: "M", species: "Ball Python", updatedAt: soon(0) }] });

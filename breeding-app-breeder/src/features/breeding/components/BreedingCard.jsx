@@ -212,7 +212,7 @@ export function BreedingCard({
           {flags.map((flag, i) => <div key={`${flag.kind}-${i}`} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{flagLabel(t, flag.kind)}{flag.date ? ` (${formatDate(flag.date)})` : ''}. {t('breeding.card.correctHint', { defaultValue: 'Open the record below to correct it.' })}</div>)}
           {openReviewFlags.map((flag) => (
             <div key={flag.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
-              <span>{flagLabel(t, flag.kind)}</span>
+              <span>{flagLabel(t, flag.kind)}{Array.isArray(flag.animalIds) && flag.animalIds.length ? `: ${flag.animalIds.join(', ')}` : ''}</span>
               <button type="button" className={smallBtn} onClick={() => run(() => actions.resolveReviewFlag(cycle.id, flag.id))}>{t('breeding.card.markReviewed', { defaultValue: 'Mark reviewed' })}</button>
             </div>
           ))}

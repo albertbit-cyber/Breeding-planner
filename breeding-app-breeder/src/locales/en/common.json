@@ -2826,6 +2826,7 @@
   "breeding.flag.removalBeforeIntro": "Male removed before he was introduced",
   "breeding.flag.sameDaySessions": "Two sessions with the same male on one day",
   "breeding.flag.shedBeforeOvulation": "Pre-lay shed is dated before ovulation",
+  "breeding.flag.unresolvedAnimal": "This card names an animal that is not in your collection",
   "breeding.forecast.closed": "No projections for a closed card.",
   "breeding.forecast.descriptive": "Descriptive only: {{n}} prior cycle(s), fewer than the {{min}} needed for a forecast. Anchored on {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "From {{n}} completed cycles of other females of this species in your collection; anchored on {{anchor}} {{date}}. Historical range.",

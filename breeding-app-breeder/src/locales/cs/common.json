@@ -2843,6 +2843,7 @@
   "breeding.flag.removalBeforeIntro": "Samec odebrán dřív, než byl přisazen",
   "breeding.flag.sameDaySessions": "Dvě relace se stejným samcem v jeden den",
   "breeding.flag.shedBeforeOvulation": "Svlek před kladením má datum před ovulací",
+  "breeding.flag.unresolvedAnimal": "Tato karta uvádí zvíře, které ve vaší sbírce není",
   "breeding.forecast.closed": "Pro uzavřenou kartu žádné projekce.",
   "breeding.forecast.descriptive": "Jen popisně: {{n}} předchozích cyklů, méně než {{min}} potřebných pro předpověď. Ukotveno na {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "Z {{n}} dokončených cyklů jiných samic tohoto druhu v tvé sbírce; ukotveno na {{anchor}} {{date}}. Historické rozpětí.",

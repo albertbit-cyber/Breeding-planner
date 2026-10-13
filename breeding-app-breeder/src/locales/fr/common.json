@@ -2826,6 +2826,7 @@
   "breeding.flag.removalBeforeIntro": "Mâle retiré avant d'avoir été introduit",
   "breeding.flag.sameDaySessions": "Deux séances avec le même mâle le même jour",
   "breeding.flag.shedBeforeOvulation": "La mue de pré-ponte est datée avant l'ovulation",
+  "breeding.flag.unresolvedAnimal": "Cette fiche mentionne un animal qui ne figure pas dans votre collection",
   "breeding.forecast.closed": "Aucune projection pour une fiche fermée.",
   "breeding.forecast.descriptive": "Descriptif seulement : {{n}} cycle(s) antérieur(s), moins que les {{min}} nécessaires à une prévision. Ancré sur {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "D'après {{n}} cycles terminés d'autres femelles de cette espèce dans votre collection ; ancré sur {{anchor}} {{date}}. Plage historique.",

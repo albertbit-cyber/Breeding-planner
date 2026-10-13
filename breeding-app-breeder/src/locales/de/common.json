@@ -2828,6 +2828,7 @@
   "breeding.flag.removalBeforeIntro": "Männchen getrennt, bevor es zugesetzt wurde",
   "breeding.flag.sameDaySessions": "Zwei Sitzungen mit demselben Männchen an einem Tag",
   "breeding.flag.shedBeforeOvulation": "Pre-Lay-Shed ist vor der Ovulation datiert",
+  "breeding.flag.unresolvedAnimal": "Diese Karte nennt ein Tier, das nicht in deinem Bestand ist",
   "breeding.forecast.closed": "Keine Prognosen für eine geschlossene Karte.",
   "breeding.forecast.descriptive": "Nur beschreibend: {{n}} frühere Zyklen, weniger als die {{min}}, die für eine Prognose nötig sind. Verankert an {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "Aus {{n}} abgeschlossenen Zyklen anderer Weibchen dieser Art in deinem Bestand; verankert an {{anchor}} {{date}}. Historische Spanne.",

@@ -2828,6 +2828,7 @@
   "breeding.flag.removalBeforeIntro": "Mannetje weggehaald voordat het was geïntroduceerd",
   "breeding.flag.sameDaySessions": "Twee sessies met hetzelfde mannetje op één dag",
   "breeding.flag.shedBeforeOvulation": "Pre-lay shed is gedateerd vóór de ovulatie",
+  "breeding.flag.unresolvedAnimal": "Deze kaart noemt een dier dat niet in je collectie staat",
   "breeding.forecast.closed": "Geen projecties voor een gesloten kaart.",
   "breeding.forecast.descriptive": "Alleen beschrijvend: {{n}} eerdere cyclus(sen), minder dan de {{min}} die nodig zijn voor een voorspelling. Verankerd op {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "Uit {{n}} afgeronde cycli van andere vrouwtjes van deze soort in je collectie; verankerd op {{anchor}} {{date}}. Historische spreiding.",

@@ -7950,9 +7950,46 @@ export default function BreedingPlannerApp() {
       if (plannerUnchanged) delete upload.plannerState;
       const nothingToSend = ['animals', 'pairings', 'breedingCycles', 'follicleExams']
         .every(key => !Array.isArray(upload[key]) || !upload[key].length) && !upload.plannerState;
-      const savedSnapshot = nothingToSend
-        ? { serverTime: snapshot?.serverTime }
-        : await saveBreederSnapshot(upload, { changedOnly: true });
+      // Puts a result on screen, merging in edits made while the requests were in flight instead of
+      // overwriting them: replacing the state with a result computed from before them reverted
+      // whatever the keeper had just typed.
+      const showSnapshot = (shown) => {
+        const current = latestPlannerSnapshotRef.current;
+        const editedMeanwhile = current !== startedFrom;
+        const next = editedMeanwhile
+          ? normalizeCloudSnapshotForDisplay(
+              mergeBreederSnapshots(stampChangedSnapshotForSync(current, localSnapshot), shown, syncTombstonesRef.current),
+              current,
+            )
+          : shown;
+        setSyncedSnakes(next.snakes);
+        setSyncedPairings(next.pairings);
+        setSyncedBreedingCycles(next.breedingCycles);
+        setSyncedFollicleExams(next.follicleExams);
+        applyPlannerSyncState(next.plannerState);
+        latestPlannerSnapshotRef.current = next;
+        return { next, editedMeanwhile };
+      };
+
+      let savedSnapshot;
+      try {
+        savedSnapshot = nothingToSend
+          ? { serverTime: snapshot?.serverTime }
+          : await saveBreederSnapshot(upload, { changedOnly: true });
+      } catch (uploadError) {
+        // The download still happened. Show it: this device used to keep displaying whatever it
+        // started with (the demo animals, when its local storage could not be read) for as long as
+        // its uploads kept failing, while the keeper's real collection sat on the server.
+        remoteSnapshotRef.current = remoteState;
+        if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
+        setSyncTombstones(prev => reconcileTombstones(prev, snapshot?.tombstones));
+        const { next } = showSnapshot(normalizeCloudSnapshotForDisplay(merged, localSnapshot));
+        backendPlannerSyncRef.current.seeded = true;
+        // What is on screen counts as attempted, so the autosave does not retry the same failing
+        // upload in a tight loop; the next pull or edit tries again.
+        backendPlannerSyncRef.current.lastSavedSignature = plannerSnapshotSignature(next);
+        throw uploadError;
+      }
       syncTombstonesRef.current = reconcileTombstones(syncTombstonesRef.current, savedSnapshot?.tombstones);
       // Functional, so a deletion made while the requests were in flight is kept.
       setSyncTombstones(prev => reconcileTombstones(reconcileTombstones(prev, snapshot?.tombstones), savedSnapshot?.tombstones));
@@ -7966,25 +8003,7 @@ export default function BreedingPlannerApp() {
       // by every later delta.
       if (snapshot?.serverTime) remoteCursorRef.current = snapshot.serverTime;
       const syncedSnapshot = normalizeCloudSnapshotForDisplay(persistedSnapshot, localSnapshot);
-
-      // Edits made while the requests were in flight are merged in, not overwritten. Replacing
-      // the app's state with a result computed from before them reverted whatever the keeper had
-      // just typed.
-      const current = latestPlannerSnapshotRef.current;
-      const editedMeanwhile = current !== startedFrom;
-      const nextSnapshot = editedMeanwhile
-        ? normalizeCloudSnapshotForDisplay(
-            mergeBreederSnapshots(stampChangedSnapshotForSync(current, localSnapshot), syncedSnapshot, syncTombstonesRef.current),
-            current,
-          )
-        : syncedSnapshot;
-
-      setSyncedSnakes(nextSnapshot.snakes);
-      setSyncedPairings(nextSnapshot.pairings);
-      setSyncedBreedingCycles(nextSnapshot.breedingCycles);
-      setSyncedFollicleExams(nextSnapshot.follicleExams);
-      applyPlannerSyncState(nextSnapshot.plannerState);
-      latestPlannerSnapshotRef.current = nextSnapshot;
+      const { next: nextSnapshot, editedMeanwhile } = showSnapshot(syncedSnapshot);
 
       const syncedAt = new Date().toISOString();
       backendPlannerSyncRef.current.seeded = true;
@@ -8002,10 +8021,15 @@ export default function BreedingPlannerApp() {
         try { syncBroadcastRef.current?.postMessage({ type: 'cloud-sync-wrote' }); } catch {}
       }
 
+      // Records the server could not read are left out one by one rather than failing the save;
+      // say which, so a card that never syncs is not a silent mystery.
+      const skipped = Array.isArray(savedSnapshot?.skipped) ? savedSnapshot.skipped : [];
+      if (skipped.length) console.warn('[cloud-sync] the server left out records it could not read', skipped);
       setCloudSyncStatus({
         state: 'success',
         lastSyncedAt: syncedAt,
-        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`,
+        message: `Synced ${persistedSnapshot.snakes.length} snakes and ${persistedSnapshot.pairings.length} pairings with the cloud database.`
+          + (skipped.length ? ` ${skipped.length} breeding record(s) were not saved: ${skipped.map(record => record.reason).join('; ')}` : ''),
       });
       return { ...nextSnapshot, syncedAt };
     } catch (error) {

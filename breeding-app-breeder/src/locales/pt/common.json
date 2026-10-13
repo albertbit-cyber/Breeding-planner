@@ -2826,6 +2826,7 @@
   "breeding.flag.removalBeforeIntro": "Macho removido antes de ter sido introduzido",
   "breeding.flag.sameDaySessions": "Duas sessões com o mesmo macho num só dia",
   "breeding.flag.shedBeforeOvulation": "A muda pré-postura tem data anterior à ovulação",
+  "breeding.flag.unresolvedAnimal": "Esta ficha indica um animal que não está na sua coleção",
   "breeding.forecast.closed": "Sem projeções para uma ficha fechada.",
   "breeding.forecast.descriptive": "Apenas descritivo: {{n}} ciclo(s) anterior(es), menos do que os {{min}} necessários para uma previsão. Ancorado em {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "A partir de {{n}} ciclos concluídos de outras fêmeas desta espécie na tua coleção; ancorado em {{anchor}} {{date}}. Intervalo histórico.",

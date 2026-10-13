@@ -2857,6 +2857,7 @@
   "breeding.flag.removalBeforeIntro": "Samiec odłączony przed wprowadzeniem",
   "breeding.flag.sameDaySessions": "Dwie sesje z tym samym samcem jednego dnia",
   "breeding.flag.shedBeforeOvulation": "Wylinka przed zniesieniem ma datę wcześniejszą niż owulacja",
+  "breeding.flag.unresolvedAnimal": "Ta karta wskazuje zwierzę, którego nie ma w Twojej kolekcji",
   "breeding.forecast.closed": "Brak prognoz dla zamkniętej karty.",
   "breeding.forecast.descriptive": "Tylko opisowo: {{n}} wcześniejszy(ch) cykl(i), mniej niż {{min}} potrzebnych do prognozy. Zakotwiczone na {{anchor}} {{date}}.",
   "breeding.forecast.fromCollection": "Z {{n}} zakończonych cykli innych samic tego gatunku w twojej kolekcji; zakotwiczone na {{anchor}} {{date}}. Zakres historyczny.",

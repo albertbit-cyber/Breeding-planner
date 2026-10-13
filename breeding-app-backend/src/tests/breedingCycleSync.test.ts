@@ -138,15 +138,60 @@ describe("breeding cards in the cloud sync", () => {
     expect(changes.get("late")).toMatchObject({ status: "paused" });
   });
 
-  it("rejects a card that names an animal from another account and an external exam with a measurement", async () => {
+  // One card naming a male the server never had used to reject the whole save with a 400, so that
+  // device could not sync anything at all. The card now saves with a review flag, a malformed
+  // record is left out on its own, and the rest of the save goes through.
+  it("keeps a card that names an unknown animal, flagged for review, without blocking the save", async () => {
     await upsertBreederSnapshot(OWNER_B, { animals: [{ id: "FB", sex: "F" }] });
-    await expect(upsertBreederSnapshot(OWNER_A, { animals: [{ id: "F1", sex: "F" }], breedingCycles: [femaleCard({ femaleId: "FB", males: [], sessions: [], plannedPairings: [] })] }))
-      .rejects.toMatchObject({ statusCode: 400 });
-    await expect(upsertBreederSnapshot(OWNER_A, { animals: [{ id: "F1", sex: "F" }, { id: "M1", sex: "M" }], breedingCycles: [femaleCard({ males: [{ maleId: "MX" }] })] }))
-      .rejects.toMatchObject({ statusCode: 400 });
-    await expect(upsertBreederSnapshot(OWNER_A, { animals: [{ id: "F1", sex: "F" }], follicleExams: [{ id: "fx-x", femaleId: "F1", date: "2026-01-01", method: "external", largestDiameterMm: 20 }] }))
-      .rejects.toMatchObject({ statusCode: 400 });
-    expect(rows("breedingCycle")).toHaveLength(0);
+    const { changed } = await upsertBreederSnapshot(OWNER_A, {
+      animals: [{ id: "F1", sex: "F" }, { id: "M1", sex: "M" }],
+      breedingCycles: [femaleCard({ males: [{ maleId: "MX" }] })],
+      follicleExams: [{ id: "fx-x", femaleId: "F1", date: "2026-01-01", method: "external", largestDiameterMm: 20 }],
+    });
+
+    // The animals in the same save were stored.
+    expect(rows("animal").filter((row) => row.ownerId === OWNER_A).map((row) => row.appAnimalId).sort()).toEqual(["F1", "M1"]);
+    // The card was stored, with the unknown male named in an open review flag.
+    const card = rows("breedingCycle").find((row) => row.ownerId === OWNER_A);
+    expect(card.payload.reviewFlags).toEqual([
+      expect.objectContaining({ kind: "unresolved_animal_reference", animalIds: ["MX"] }),
+    ]);
+    // The malformed examination alone was left out, and the response says so.
+    expect(rows("follicleExamination").filter((row) => row.ownerId === OWNER_A)).toHaveLength(0);
+    expect((changed as any).skipped).toEqual([
+      expect.objectContaining({ collection: "follicleExams", id: "fx-x" }),
+    ]);
+
+    // Once the male arrives, the flag clears itself.
+    await upsertBreederSnapshot(OWNER_A, {
+      animals: [{ id: "MX", sex: "M" }],
+      breedingCycles: [femaleCard({ males: [{ maleId: "MX" }], updatedAt: "2026-05-03T10:00:00.000Z" })],
+    });
+    const resolved = rows("breedingCycle").find((row) => row.ownerId === OWNER_A);
+    expect(resolved.payload.reviewFlags || []).toEqual([]);
+  });
+
+  it("leaves the unknown-animal flag reviewed once the keeper has marked it", async () => {
+    await upsertBreederSnapshot(OWNER_A, { animals: [{ id: "F1", sex: "F" }], breedingCycles: [femaleCard({ males: [{ maleId: "MX" }] })] });
+    const flag = rows("breedingCycle")[0].payload.reviewFlags[0];
+    await upsertBreederSnapshot(OWNER_A, {
+      breedingCycles: [femaleCard({ males: [{ maleId: "MX" }], reviewFlags: [{ ...flag, resolvedAt: "2026-10-13T09:00:00.000Z" }], updatedAt: "2099-01-01T00:00:00.000Z" })],
+    });
+    const flags = rows("breedingCycle")[0].payload.reviewFlags;
+    expect(flags).toHaveLength(1);
+    expect(flags[0].resolvedAt).toBe("2026-10-13T09:00:00.000Z");
+  });
+
+  it("never lets a card reach an animal of another account", async () => {
+    await upsertBreederSnapshot(OWNER_B, { animals: [{ id: "FB", sex: "F" }] });
+    await upsertBreederSnapshot(OWNER_A, {
+      animals: [{ id: "F1", sex: "F" }],
+      breedingCycles: [femaleCard({ id: "bc-x", femaleId: "FB", males: [], sessions: [], plannedPairings: [] })],
+    });
+    // Owner B's animal is untouched and owner A's card names an id that resolves to nothing there.
+    const card = rows("breedingCycle").find((row) => row.ownerId === OWNER_A);
+    expect(card.payload.reviewFlags).toEqual([expect.objectContaining({ animalIds: ["FB"] })]);
+    expect(rows("breedingCycle").filter((row) => row.ownerId === OWNER_B)).toHaveLength(0);
   });
 
   it("keeps history for an archived (deleted) animal and honours tombstones", async () => {

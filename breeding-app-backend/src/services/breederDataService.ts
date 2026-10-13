@@ -4,7 +4,9 @@ import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
 import {
-  validateBreedingReferences,
+  screenBreedingRecords,
+  withUnresolvedAnimalFlag,
+  type SkippedBreedingRecord,
   cycleAppId as breedingCycleAppId,
   examAppId as follicleExamAppId,
   cycleColumns,
@@ -492,8 +494,9 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const plannerState = asRecord(input.plannerState);
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
-  const breedingCycles = normalizeArray(input.breedingCycles, "breedingCycles");
-  const follicleExams = normalizeArray(input.follicleExams, "follicleExams");
+  const incomingCycles = normalizeArray(input.breedingCycles, "breedingCycles");
+  const incomingExams = normalizeArray(input.follicleExams, "follicleExams");
+  let skippedBreedingRecords: SkippedBreedingRecord[] = [];
   let animalAccess: any = { allowed: true, featureKey: "animals.create", source: "default", tier: "Unconfigured" };
   try {
     animalAccess = await canAccessFeature({ id: ownerId }, "animals.create");
@@ -533,12 +536,20 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       loadExistingByAppId(tx.follicleExamination, ownerId, "appExamId"),
     ]);
 
-    // Cross-account relationships cannot be forged: every animal a card names has to be one of
-    // this owner's rows (deleted rows count, so archiving an animal keeps its breeding history).
-    // Animals arriving in this very request are known too.
+    // Every animal a card names should be one of this owner's rows (deleted rows count, so archiving
+    // an animal keeps its breeding history), or arrive in this very request. A card naming any other
+    // id is kept with a review flag and a malformed record is left out on its own; neither blocks
+    // the rest of the save any more (screenBreedingRecords).
     const knownAnimalAppIds = new Set<string>(existingAnimals.keys());
     animals.forEach((animal, index) => knownAnimalAppIds.add(requireRecordId(animal, "animal", index)));
-    validateBreedingReferences(breedingCycles, follicleExams, knownAnimalAppIds);
+    const screened = screenBreedingRecords(incomingCycles, incomingExams, knownAnimalAppIds);
+    const breedingCycles = screened.cycles;
+    const follicleExams = screened.exams;
+    skippedBreedingRecords = screened.skipped;
+    const flagged = (appId: string, payload: JsonRecord) => withUnresolvedAnimalFlag(payload, screened.unresolvedByCycleId.get(appId) || []);
+    if (skippedBreedingRecords.length) {
+      console.warn("[breeder-sync] left out malformed breeding records", { ownerId, skipped: skippedBreedingRecords });
+    }
 
     const cycleCreates: JsonRecord[] = [];
     const cycleUpdates: PlannedUpdate[] = [];
@@ -564,22 +575,43 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         continue;
       }
       if (!existing) {
-        cycleCreates.push({ ownerId, appCycleId: appId, ...cycleColumns(cycle), payload: cycle });
-        resultingCyclePayloads.set(appId, cycle);
+        const payload = flagged(appId, cycle);
+        cycleCreates.push({ ownerId, appCycleId: appId, ...cycleColumns(payload), payload });
+        resultingCyclePayloads.set(appId, payload);
         continue;
       }
       if (existing.deletedAt) {
         if (!shouldResurrect(cycle, existing)) continue;
-        cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(cycle), payload: cycle, deletedAt: null } });
-        resultingCyclePayloads.set(appId, cycle);
+        const payload = flagged(appId, cycle);
+        cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload, deletedAt: null } });
+        resultingCyclePayloads.set(appId, payload);
         continue;
       }
       if (!shouldApplyIncomingPayload(cycle, existing)) continue;
-      const payload = mergeBreedingCyclePayload(existing.payload, cycle);
+      const payload = flagged(appId, mergeBreedingCyclePayload(existing.payload, cycle));
       if (sameSyncContent(payload, existing.payload)) continue;
       cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload } });
       resultingCyclePayloads.set(appId, payload);
     }
+    // A stored card flagged for an animal the account lacked is re-checked on every save, sent in
+    // this request or not: once the animal has arrived the flag clears itself, without waiting for
+    // some device to edit that card.
+    existingCycles.forEach((row, appId) => {
+      if (row.deletedAt || cycleCreates.some((c) => c.appCycleId === appId) || cycleUpdates.some((u) => u.appId === appId)) return;
+      const stored = asRecord(row.payload);
+      const open = (Array.isArray(stored?.reviewFlags) ? stored!.reviewFlags : [])
+        .map(asRecord)
+        .find((flag) => flag?.kind === "unresolved_animal_reference" && !flag.resolvedAt);
+      if (!stored || !open) return;
+      const stillUnknown = (Array.isArray(open.animalIds) ? open.animalIds : [])
+        .map((id) => String(id))
+        .filter((id) => !knownAnimalAppIds.has(id));
+      const payload = withUnresolvedAnimalFlag(stored, stillUnknown);
+      if (payload === stored) return;
+      cycleUpdates.push({ id: row.id, appId, data: { ...cycleColumns(payload), payload } });
+      resultingCyclePayloads.set(appId, payload);
+    });
+
     // Two devices can each start a card for the same female while offline. The earlier card stays
     // active; the other is paused with a review flag so the keeper decides, and the save succeeds.
     const conflictChanges = resolveActiveCycleConflicts(Array.from(resultingCyclePayloads.values()));
@@ -869,6 +901,8 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     follicleExams: pickTouched(savedSnapshot.follicleExams, touched.follicleExams),
     plannerState: plannerStateWritten ? savedSnapshot.plannerState : null,
     tombstones: savedSnapshot.tombstones,
+    // Records this save left out, so the app can say which card or examination did not sync.
+    skipped: skippedBreedingRecords,
     serverTime: savedSnapshot.serverTime,
     partial: true,
   };
