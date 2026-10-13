@@ -7,6 +7,7 @@ import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { estimateDataUrlBytes } from "../../utils/imageResize";
 import SuggestionsTab from "../suggestions/SuggestionsTab";
 import ShedTestTerminalPanel from "../lab/components/ShedTestTerminalPanel.jsx";
+import { activeAnimals } from "../animals/archive";
 import BreederOrderGeneticTestModal from "../lab/components/BreederOrderGeneticTestModal.jsx";
 import {
   clearAuthToken,
@@ -915,7 +916,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
     { key: "name",            label: t("mobile.edit.name", { defaultValue: "Name" }),                 type: "text" },
     { key: "sex",             label: t("mobile.edit.sex", { defaultValue: "Sex" }),                   type: "select", opts: ["", "Male", "Female", "Unknown"] },
     { key: "genetics",        label: t("mobile.edit.genetics", { defaultValue: "Genetics / Morph" }), type: "text" },
-    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Sold", "Deceased", "Quarantine"] },
+    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Quarantine"] },
     { key: "species",         label: t("mobile.edit.species", { defaultValue: "Species" }),           type: "text" },
     { key: "dob",             label: t("mobile.edit.dob", { defaultValue: "Date of birth" }),         type: "date" },
     { key: "weight",          label: t("mobile.edit.weight", { defaultValue: "Weight (g)" }),         type: "number" },
@@ -2541,19 +2542,23 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     [animals]
   );
 
+  // Archived snakes (sold, died, given away) stay in the synced data but out of the phone's lists;
+  // their record is read in the full app's Archive.
+  const collectionAnimals = useMemo(() => activeAnimals(animals), [animals]);
+
   const filteredAnimals = useMemo(() => {
-    let list = animals;
+    let list = collectionAnimals;
     if (sexFilter && sexFilter !== "groups") list = list.filter((a) => sexMatchesFilter(a, sexFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((a) => animalSearchBlob(a).includes(q));
     }
     return list;
-  }, [animals, search, sexFilter]);
+  }, [collectionAnimals, search, sexFilter]);
 
   const groupedAnimals = useMemo(() => {
     const map = new Map();
-    animals.forEach((a) => {
+    collectionAnimals.forEach((a) => {
       const gs = Array.isArray(a.groups) && a.groups.length ? a.groups : ["Ungrouped"];
       gs.forEach((g) => {
         if (!map.has(g)) map.set(g, []);
@@ -2565,15 +2570,15 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       if (b === "Ungrouped") return -1;
       return a.localeCompare(b);
     });
-  }, [animals]);
+  }, [collectionAnimals]);
 
   const advisorMales = useMemo(
-    () => animals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "male" || s === "m"; }),
-    [animals]
+    () => collectionAnimals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "male" || s === "m"; }),
+    [collectionAnimals]
   );
   const advisorFemales = useMemo(
-    () => animals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "female" || s === "f"; }),
-    [animals]
+    () => collectionAnimals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "female" || s === "f"; }),
+    [collectionAnimals]
   );
 
   const taskGroups = useMemo(() => {

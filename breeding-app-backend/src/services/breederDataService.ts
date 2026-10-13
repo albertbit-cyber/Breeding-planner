@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
+import { countedAnimalWhere, isArchivedAnimalStatus } from "./animalArchive";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
 import {
   validateBreedingReferences,
@@ -58,6 +59,10 @@ const completionReasons = new Set([
   "breeding_stopped",
   "unknown_outcome",
   "other",
+  // Written by the app when the female is moved to the animal archive.
+  "female_sold",
+  "female_died",
+  "female_left_collection",
 ]);
 
 const outcomeConfidences = new Set(["confirmed", "likely", "unknown"]);
@@ -518,35 +523,104 @@ const createManyChunked = async (model: any, rows: JsonRecord[], chunkSize = 200
   }
 };
 
+const wasArchivedBefore = (existingAnimals: Map<string, ExistingRow>, appId: string): boolean => (
+  isArchivedAnimalStatus(asRecord(existingAnimals.get(appId)?.payload)?.status)
+);
+
+type ArchiveTransition = { rowId: string; appId: string; archived: boolean; payload: JsonRecord | null };
+
+/** Animals this save moves into the archive (archived: true) or back out of it (false). */
+const planArchiveTransitions = (animalUpdates: PlannedUpdate[], existingAnimals: Map<string, ExistingRow>): ArchiveTransition[] => (
+  animalUpdates
+    .filter((update) => !update.data.deletedAt && update.data.status !== undefined)
+    .map((update) => ({
+      rowId: update.id,
+      appId: update.appId,
+      archived: isArchivedAnimalStatus(update.data.status),
+      before: wasArchivedBefore(existingAnimals, update.appId),
+      payload: asRecord(update.data.payload),
+    }))
+    .filter((row) => row.archived !== row.before)
+    .map(({ before, ...row }) => row)
+);
+
+/**
+ * Keep the ownership history (shown on the pedigree passport) in step with the archive: leaving
+ * closes the keeper's period, returning opens a new one. A marketplace sale already did this
+ * itself, and its animal arrives here already "Sold", so it is not a transition and is skipped.
+ * The buyer's name is deliberately not copied here: it lives in the archive record, where the
+ * keeper can erase it, and nowhere else.
+ */
+const recordArchiveOwnership = async (ownerId: string, transitions: ArchiveTransition[]): Promise<void> => {
+  for (const transition of transitions) {
+    const archive = asRecord(transition.payload?.archive);
+    if (transition.archived) {
+      const leftAt = new Date(isoDateValue(archive?.date) || new Date().toISOString());
+      const reason = textValue(archive?.reason)?.replace(/_/g, " ") || "archived";
+      const history = await db.ownershipHistory.findMany({ where: { animalId: transition.rowId }, orderBy: { fromDate: "asc" } });
+      const open = history.find((row: any) => row.ownerId === ownerId && !row.toDate);
+      if (open) {
+        await db.ownershipHistory.update({ where: { id: open.id }, data: { toDate: leftAt } });
+      } else if (!history.some((row: any) => row.ownerId === ownerId)) {
+        const animal = await db.animal.findUnique({ where: { id: transition.rowId }, select: { createdAt: true } });
+        const fromDate = animal?.createdAt && animal.createdAt < leftAt ? animal.createdAt : leftAt;
+        await db.ownershipHistory.create({
+          data: { animalId: transition.rowId, ownerId, fromDate, toDate: leftAt, transferType: "owned", notes: `Left the collection: ${reason}.` },
+        });
+      }
+    } else {
+      const history = Array.isArray(transition.payload?.archiveHistory) ? (transition.payload?.archiveHistory as unknown[]) : [];
+      const lastReturn = asRecord(history[history.length - 1]);
+      const returnedAt = new Date(isoDateValue(lastReturn?.returnDate) || new Date().toISOString());
+      await db.ownershipHistory.create({
+        data: { animalId: transition.rowId, ownerId, fromDate: returnedAt, transferType: "owned", notes: "Returned to the collection." },
+      });
+    }
+  }
+};
+
 /**
  * The tier's animal cap, judged on what this save leaves in the cloud.
  *
  * The app uploads only changed records, so the request size says nothing about the
  * collection: comparing it to the limit let a keeper pass the cap in small steps, and
  * the usage check that sat beside it counted deleted rows and refused every save --
- * edits included -- once an account reached its limit exactly. Only new live animals
- * can push an account over, so a save without any always goes through: edits,
- * deletions and pairings are never held hostage to the cap.
+ * edits included -- once an account reached its limit exactly. Only animals entering the
+ * collection can push an account over -- new ones, and archived ones returning -- so a save
+ * without any always goes through: edits, deletions, archiving and pairings are never held
+ * hostage to the cap. Archived animals (sold, died, given away...) do not count at all.
  */
 const assertAnimalCapacity = async (
   ownerId: string,
   access: any,
   animalCreates: JsonRecord[],
   animalUpdates: PlannedUpdate[],
+  existingAnimals: Map<string, ExistingRow>,
 ): Promise<void> => {
   const limit = access?.limit;
   if (limit === undefined || limit === null || !Number.isFinite(Number(limit))) return;
-  const added = animalCreates.filter((row) => !row.deletedAt).length;
+  const wasArchived = (appId: string) => wasArchivedBefore(existingAnimals, appId);
+  const created = animalCreates.filter((row) => !row.deletedAt && !isArchivedAnimalStatus(row.status)).length;
+  const returned = animalUpdates.filter((update) => (
+    !update.data.deletedAt
+    && update.data.status !== undefined
+    && !isArchivedAnimalStatus(update.data.status)
+    && wasArchived(update.appId)
+  )).length;
+  const added = created + returned;
   if (!added) return;
 
-  const deletedIds = animalUpdates.filter((update) => update.data.deletedAt).map((update) => update.appId);
-  const [liveNow, liveBeingDeleted] = await Promise.all([
-    db.animal.count({ where: { ownerId, deletedAt: null } }),
-    deletedIds.length
-      ? db.animal.count({ where: { ownerId, deletedAt: null, appAnimalId: { in: deletedIds } } })
+  // Room made in the same save: animals deleted, or moved to the archive.
+  const leavingIds = animalUpdates
+    .filter((update) => update.data.deletedAt || (isArchivedAnimalStatus(update.data.status) && !wasArchived(update.appId)))
+    .map((update) => update.appId);
+  const [liveNow, liveLeaving] = await Promise.all([
+    db.animal.count({ where: countedAnimalWhere(ownerId) }),
+    leavingIds.length
+      ? db.animal.count({ where: countedAnimalWhere(ownerId, { appAnimalId: { in: leavingIds } }) })
       : Promise.resolve(0),
   ]);
-  const liveAfter = liveNow - liveBeingDeleted + added;
+  const liveAfter = liveNow - liveLeaving + added;
   if (liveAfter <= Number(limit)) return;
 
   const tierName = access.tier || access.currentTier || "Your plan";
@@ -699,7 +773,7 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     }
   }
 
-  await assertAnimalCapacity(ownerId, animalAccess, animalCreates, animalUpdates);
+  await assertAnimalCapacity(ownerId, animalAccess, animalCreates, animalUpdates, existingAnimals);
 
   // Row ids for every pairing the clutch loop may reference. Pairings created by this request
   // have no id until after the insert, so those are resolved in a single lookup below.
@@ -830,6 +904,14 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       }
     }
   }, SNAPSHOT_TRANSACTION_OPTIONS);
+
+  const archiveTransitions = planArchiveTransitions(animalUpdates, existingAnimals);
+  if (archiveTransitions.length) {
+    // Best effort, after the save: a passport history problem must never cost the keeper a sync.
+    await recordArchiveOwnership(ownerId, archiveTransitions).catch((err) => {
+      console.error("[archive] ownership history update failed:", err);
+    });
+  }
 
   const savedSnapshot = await listBreederSnapshot(ownerId);
 

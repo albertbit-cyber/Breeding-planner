@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LOCK_STATUS, EVENT_TYPES, CLOSURE_OUTCOMES, EGG_LAYING_ONLY_EVENTS } from '../domain/cycleModel';
+import { LOCK_STATUS, EVENT_TYPES, CLOSURE_OUTCOMES, ARCHIVE_CLOSURE_OUTCOMES, EGG_LAYING_ONLY_EVENTS } from '../domain/cycleModel';
 import { EXAM_METHODS, EXAM_RESULTS, MEASUREMENT_AXES } from '../domain/follicles';
 import { addCalendarMonths, todayYmd } from '../domain/dates';
 import { animalLabel, formatDate } from './format';
@@ -649,7 +649,7 @@ export function HatchingDialog({ cycle, mode = 'partial', onSubmit, onClose }) {
 
 export function CloseCycleDialog({ cycle, onSubmit, onClose }) {
   const { t } = useTranslation();
-  const outcomes = CLOSURE_OUTCOMES.filter((o) => o !== 'hatching_complete' && (cycle?.reproductionMode === 'live_bearing' || o !== 'live_birth_complete'));
+  const outcomes = CLOSURE_OUTCOMES.filter((o) => o !== 'hatching_complete' && !ARCHIVE_CLOSURE_OUTCOMES.includes(o) && (cycle?.reproductionMode === 'live_bearing' || o !== 'live_birth_complete'));
   const [outcome, setOutcome] = useState('no_clutch');
   const [note, setNote] = useState('');
   const [biologicalDate, setBiologicalDate] = useState('');

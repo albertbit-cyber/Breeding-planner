@@ -325,7 +325,18 @@ export const markSold = async (actor: AuthenticatedUser, input: MarkSoldInput) =
           payload: {
             ...sellerPayload,
             status: "Sold",
-            soldVia: { source: ACQUISITION_SOURCE, saleId: sale.id, listingId, soldAt: now.toISOString() },
+            // The breeder app files a Sold animal in its archive and reads the sale's details
+            // from here, so the archive record shows who bought it and for how much.
+            soldVia: {
+              source: ACQUISITION_SOURCE,
+              saleId: sale.id,
+              listingId,
+              soldAt: now.toISOString(),
+              buyerName: buyer.fullName || null,
+              price: sale.salePrice ?? null,
+              currency: sale.currency || listing.currency || null,
+              handoverMethod: sale.handoverMethod || null,
+            },
           },
         },
       });

@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
+import { countedAnimalWhere } from "./animalArchive";
 import { FEATURE_CATALOG, LIMIT_FEATURE_KEYS } from "./subscriptionCatalog";
 
 const db = prisma as any;
@@ -294,9 +295,10 @@ const monthlyPeriod = () => {
 };
 
 const usageForFeature = async (userId: string, featureKey: string): Promise<number> => {
-  // Live animals only: a deleted animal is a tombstone row kept for sync, not an animal the
-  // keeper holds, and counting it would keep an account at its cap after it made room.
-  if (featureKey === "animals.create") return db.animal.count({ where: { ownerId: userId, deletedAt: null } });
+  // Animals in the collection only: a deleted animal is a tombstone row kept for sync, and an
+  // archived one (sold, died, given away) is a record the keeper chose to keep, not an animal
+  // they hold. Counting either would keep an account at its cap after it made room.
+  if (featureKey === "animals.create") return db.animal.count({ where: countedAnimalWhere(userId) });
   if (featureKey === "spaces.racks") return 0;
   if (featureKey === "spaces.rooms") return 0;
   const { start, end } = monthlyPeriod();
