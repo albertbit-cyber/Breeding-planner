@@ -8,9 +8,10 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-**Latest breeder APK (2026-10-12): `app-release-2026-10-12-android-rebuild-real-app.apk`**
-SHA256 `13F45CC7197CD92C1E8D9ACBF405151E1C1ECA36753C308367FBAB1FF3D59B65`, package `com.serpentora.mobile`,
-versionCode 10085 / 0.1.85, release-signed, staging backend. First build in which the phone runs the real
+**Latest breeder APK (2026-10-13): `app-release-2026-10-13-backup-picker-fix.apk`**
+SHA256 `621CEA606FB408E4A5274E7A2E19BC2B2CC12CBE2A570B74907D743479BD7441`, package `com.serpentora.mobile`,
+versionCode 10088 / 0.1.88, release-signed, staging backend. Supersedes the 12 Oct rebuild build: the phone's
+file picker no longer greys out a transferred `.bpbackup`. First build in which the phone runs the real
 Serpentora app instead of the separate mobile app (deleted). Backups save through the share sheet; new Field
 tab for scan and quick logs. Built from `feature/mobile-rebuild`, not yet merged. Not run on a device. Build
 guide: `docs/mobile/android-build-and-install.md`. Everything below this paragraph predates the rebuild.
