@@ -26,9 +26,12 @@ import {
   mergeFollicleExamRecords,
   stripLargeAttachments,
 } from "./features/breeding/domain/sync";
-import { planLegacyMigration } from "./features/breeding/domain/legacyMigration";
+import { planLegacyMigration, catchUpCycleFromLegacy } from "./features/breeding/domain/legacyMigration";
+import { initializeSeasonSettings, cyclesNeedingSeasonLabel, summarizeSeasons, currentSeasonLabel } from "./features/breeding/domain/season";
+import { cycleToPairingView, isIncubating as isCycleIncubating, clutchNumbersToAssign } from "./features/breeding/domain/pairingView";
+import { SeasonBar } from "./features/breeding/components/SeasonBar.jsx";
 import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
-import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE, closeCyclesForArchivedFemale, cancelPlannedPairingsForArchivedMale } from "./features/breeding/domain/cycleModel";
+import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE, closeCyclesForArchivedFemale, cancelPlannedPairingsForArchivedMale, completeIfRegistered as completeCycleIfRegistered, registrationStatus as cycleRegistrationStatus } from "./features/breeding/domain/cycleModel";
 import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
 import { timelineKindLabel as breedingTimelineKindLabel, certaintyLabel as breedingCertaintyLabel } from "./features/breeding/components/labels";
 import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
@@ -7096,6 +7099,27 @@ export default function BreedingPlannerApp() {
   }, [speciesOfAnimalId]);
 
   /**
+   * The breeding cards as the older screens (Breeding dashboard, incubator, species summary) read
+   * them: one pairing-shaped, read-only view per card. The cards are the record; these views are
+   * never saved. Incubator bookkeeping of a card that came from a legacy pairing is read from that
+   * pairing, where it was entered.
+   */
+  const pairingsById = useMemo(() => new Map((Array.isArray(pairings) ? pairings : []).filter(p => p?.id).map(p => [p.id, p])), [pairings]);
+  const breedingCycleViews = useMemo(() => (Array.isArray(breedingCycles) ? breedingCycles : [])
+    .filter(cycle => cycle && !cycle.deletedAt)
+    .map(cycle => {
+      const view = cycleToPairingView(cycle, { pairingsById });
+      const registration = cycleRegistrationStatus(cycle);
+      return {
+        ...view,
+        awaitingRegistration: cycle.status !== BREEDING_CYCLE_STATUS.CLOSED && registration.hatched && registration.missing > 0,
+        registration,
+        incubating: isCycleIncubating(cycle),
+      };
+    }), [breedingCycles, pairingsById]);
+  const openCycleViews = useMemo(() => breedingCycleViews.filter(view => view.workflowStatus !== 'completed'), [breedingCycleViews]);
+
+  /**
    * One entry per species the keeper actually owns, ordered by collection size. Species with
    * no animals are absent by design -- the catalogue lives in the add-animal picker.
    */
@@ -7148,8 +7172,9 @@ export default function BreedingPlannerApp() {
     });
 
     const today = localYMD(new Date());
-    (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
-      if (!pairing || isPairingCompleted(pairing)) return;
+    // Open breeding cards are the active pairings.
+    openCycleViews.forEach((pairing) => {
+      if (!pairing) return;
       const bucket = buckets.get(speciesOfPairing(pairing));
       if (!bucket) return;
       bucket.activePairings += 1;
@@ -7186,7 +7211,7 @@ export default function BreedingPlannerApp() {
     return Array.from(buckets.values()).sort((a, b) => (
       b.total - a.total || a.name.localeCompare(b.name)
     ));
-  }, [snakes, pairings, speciesOfPairing]);
+  }, [snakes, openCycleViews, speciesOfPairing]);
 
   const dashboardTotals = useMemo(() => ({
     animals: speciesSummaries.reduce((n, s) => n + s.total, 0),
@@ -7292,7 +7317,7 @@ export default function BreedingPlannerApp() {
   }, [animalActionSheetOpen]);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   // Breeding cards are the default view; the legacy pairing records stay reachable during rollout.
-  const [pairingsView, setPairingsView] = useState('cards');
+  const [pairingsView, setPairingsView] = useState('dashboard');
   const [focusedCycleId, setFocusedCycleId] = useState(null);
   const [breedingDialogRequest, setBreedingDialogRequest] = useState(null);
   // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
@@ -9598,10 +9623,29 @@ export default function BreedingPlannerApp() {
   const completedPairings = pairingsPartition.completed;
   const activePairingsCount = activePairings.length;
   const completedPairingsCount = completedPairings.length;
+  // Inside a species workspace only that species' cards count.
+  const scopedOpenCycleViews = useMemo(() => {
+    if (!speciesScope) return openCycleViews;
+    const inScope = new Set(scopedSnakes.map(snake => snake.id));
+    return openCycleViews.filter(view => inScope.has(view.femaleId));
+  }, [openCycleViews, scopedSnakes, speciesScope]);
+  const activeCyclesCount = scopedOpenCycleViews.length;
+  const completedCyclesCount = useMemo(() => {
+    const inScope = speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null;
+    return breedingCycleViews.filter(view => view.workflowStatus === 'completed' && (!inScope || inScope.has(view.femaleId))).length;
+  }, [breedingCycleViews, scopedSnakes, speciesScope]);
   const breedingDashboardItems = useMemo(() => {
     const today = new Date();
-    return activePairings
-      .map(pairing => buildPairingDashboardItem(pairing, snakes, today))
+    return scopedOpenCycleViews
+      .map(view => {
+        const item = buildPairingDashboardItem(view, snakes, today);
+        if (!item) return null;
+        // Hatched but not every hatchling is an animal yet: that registration is what is left.
+        if (view.awaitingRegistration) {
+          return { ...item, nextStage: `Register ${view.registration.missing} ${view.registration.missing === 1 ? 'hatchling' : 'hatchlings'}`, actionLabel: 'Register hatchlings', seasonLabel: view.seasonLabel || '' };
+        }
+        return { ...item, seasonLabel: view.seasonLabel || '' };
+      })
       .filter(Boolean)
       .sort((a, b) => {
         const stageWeight = { clutch: 0, preLay: 1, ovulation: 2, locks: 3, active: 4, hatched: 5 };
@@ -9617,7 +9661,7 @@ export default function BreedingPlannerApp() {
         if (aDays !== bDays) return aDays - bDays;
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
-  }, [activePairings, snakes]);
+  }, [scopedOpenCycleViews, snakes]);
 
   /**
    * The same urgency counts the Breeding dashboard shows, but for every species at
@@ -9639,8 +9683,8 @@ export default function BreedingPlannerApp() {
       tracking: 0,
     }]));
 
-    (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
-      if (!pairing || isPairingCompleted(pairing)) return;
+    openCycleViews.forEach((pairing) => {
+      if (!pairing) return;
       const bucket = buckets.get(speciesOfPairing(pairing));
       if (!bucket) return;
       const item = buildPairingDashboardItem(pairing, snakes, today);
@@ -9652,7 +9696,7 @@ export default function BreedingPlannerApp() {
     });
 
     return Array.from(buckets.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [speciesSummaries, pairings, snakes, speciesOfPairing]);
+  }, [speciesSummaries, openCycleViews, snakes, speciesOfPairing]);
 
   /**
    * Set only when a keeper presses an urgency count on the dashboard, and read only as the
@@ -9782,8 +9826,18 @@ export default function BreedingPlannerApp() {
         eggBoxCount: splitEggBoxCounts(eggs).length,
       });
     });
+    // Breeding cards are keyed by their own id; their numbers come from the card or from the
+    // legacy pairing that holds the clutch.
+    breedingCycleViews.forEach(view => {
+      if (!view?.clutch?.date) return;
+      const eggBoxNumber = Number(view.clutch.eggBoxNumber) || Number(view.clutch.clutchNumber) || 0;
+      const clutchNumber = Number(view.clutch.clutchNumber) || eggBoxNumber;
+      if (!eggBoxNumber && !clutchNumber) return;
+      const eggs = resolveEggCountForClutch(view.clutch.eggsTotal, view.clutch.fertileEggs) || 0;
+      map.set(view.id, { clutchNumber, eggBoxNumber, eggBoxCount: splitEggBoxCounts(eggs).length });
+    });
     return map;
-  }, [pairings]);
+  }, [pairings, breedingCycleViews]);
   // One-time (per missing entry) backfill: assigns a permanent number to any clutch that doesn't have
   // one yet. On the very first run after this fix ships, none of them do, so it reuses the old
   // chronological ordering to keep today's visible numbers stable. Afterward it only ever appends new
@@ -9857,8 +9911,22 @@ export default function BreedingPlannerApp() {
       .sort((a, b) => String(b.clutchDate).localeCompare(String(a.clutchDate)));
   }, [pairings, snakes]);
 
+  /**
+   * What is in the incubator: every breeding card whose eggs are laid and not hatched yet, plus
+   * any legacy pairing clutch that never got a card. A legacy pairing that a card already covers
+   * is left out, so a clutch is never counted twice.
+   */
+  const incubatorSources = useMemo(() => {
+    const covered = new Set();
+    (Array.isArray(breedingCycles) ? breedingCycles : []).forEach(cycle => {
+      if (!cycle || cycle.deletedAt) return;
+      (cycle.legacy?.pairingIds || []).forEach(id => covered.add(id));
+    });
+    const legacy = (Array.isArray(pairings) ? pairings : []).filter(p => p?.id && !covered.has(p.id));
+    return [...breedingCycleViews.filter(view => view.incubating), ...legacy];
+  }, [breedingCycles, breedingCycleViews, pairings]);
   const eggBoxes = useMemo(() => {
-    const list = Array.isArray(pairings) ? pairings : [];
+    const list = incubatorSources;
     const activeClutchesWithDates = list
       .filter(p => p?.clutch?.date && !isPairingCompleted(p))
       .map(p => {
@@ -9897,6 +9965,8 @@ export default function BreedingPlannerApp() {
           dueDate,
           remaining,
           year: clutchYear,
+          cycleId: p.isCycleView ? p.cycleId : null,
+          seasonLabel: p.seasonLabel || '',
         };
       })
       .sort((a, b) => new Date(a.clutchDate) - new Date(b.clutchDate));
@@ -9926,7 +9996,7 @@ export default function BreedingPlannerApp() {
         };
       });
     });
-  }, [pairings, snakes, t, clutchMetadataByPairingId]);
+  }, [incubatorSources, snakes, t, clutchMetadataByPairingId]);
   const incubatorSummary = useMemo(() => {
     const clutchIds = new Set();
     let totalEggs = 0;
@@ -9947,8 +10017,29 @@ export default function BreedingPlannerApp() {
     const maxEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
     const badEggsValue = Math.max(0, Math.min(maxEggs, Math.floor(Number(badEggs) || 0)));
     const indexKey = String(box.eggBoxIndexInClutch || 1);
+    // A breeding card's egg box: its notes live on the card unless the clutch was entered on a
+    // legacy pairing, which then keeps holding them.
+    if (box.pairing?.isCycleView && box.pairing.bookkeeping === 'cycle') {
+      const nowStamp = nowIsoString();
+      setBreedingCycles(prev => prev.map(cycle => {
+        if (!cycle || cycle.id !== box.pairing.cycleId) return cycle;
+        const eggBoxNotes = { ...(cycle.clutch?.eggBoxNotes || {}) };
+        const eggBoxBadEggs = { ...(cycle.clutch?.eggBoxBadEggs || {}) };
+        if (noteValue) eggBoxNotes[indexKey] = noteValue;
+        else delete eggBoxNotes[indexKey];
+        if (badEggsValue > 0) eggBoxBadEggs[indexKey] = badEggsValue;
+        else delete eggBoxBadEggs[indexKey];
+        const clutch = { ...cycle.clutch, eggBoxNotes, eggBoxBadEggs };
+        if ((box.eggBoxCount || 1) === 1) clutch.notes = noteValue;
+        return { ...cycle, clutch, updatedAt: nowStamp, metadata: { ...(cycle.metadata || {}), updatedAt: nowStamp } };
+      }));
+      setEggBoxModal(null);
+      return;
+    }
+    const targetPairingId = box.pairing?.isCycleView ? box.pairing.bookkeepingPairingId : box.pairingId;
+    if (!targetPairingId) return;
     setPairings(prev => prev.map(pairing => {
-      if (!pairing || pairing.id !== box.pairingId) return pairing;
+      if (!pairing || pairing.id !== targetPairingId) return pairing;
       const current = withPairingLifecycleDefaults({ ...pairing });
       const currentClutch = { ...(current.clutch || {}) };
       const nextEggBoxNotes = { ...(currentClutch.eggBoxNotes || {}) };
@@ -9974,19 +10065,19 @@ export default function BreedingPlannerApp() {
       });
     }));
     setEggBoxModal(null);
-  }, [setPairings]);
+  }, [setPairings, setBreedingCycles]);
   const filteredCompletedCount = filteredCompletedPairings.length;
 
+  // A link to a legacy pairing (from an animal's page, a reminder, the dashboard) opens the
+  // breeding card that pairing became: the cards are the one place a cycle lives now.
   useEffect(() => {
     if (!focusedPairingId) return;
-    if (activePairings.some(p => p.id === focusedPairingId)) {
-      if (pairingsView !== 'active') setPairingsView('active');
-      return;
-    }
-    if (completedPairings.some(p => p.id === focusedPairingId)) {
-      if (pairingsView !== 'completed') setPairingsView('completed');
-    }
-  }, [focusedPairingId, activePairings, completedPairings, pairingsView]);
+    const cycle = (Array.isArray(breedingCycles) ? breedingCycles : []).find(c => c && !c.deletedAt && (c.id === focusedPairingId || (c.legacy?.pairingIds || []).includes(focusedPairingId)));
+    if (!cycle) return;
+    setFocusedPairingId(null);
+    setFocusedCycleId(cycle.id);
+    setPairingsView(cycle.status === BREEDING_CYCLE_STATUS.CLOSED ? 'completed' : 'active');
+  }, [focusedPairingId, breedingCycles]);
 
   // open snake if URL contains #snake=id
   useEffect(()=>{
@@ -11666,13 +11757,14 @@ export default function BreedingPlannerApp() {
     if (!target && femaleId) {
       target = breedingCyclesForFemale(breedingCycles, femaleId).find(c => c.status !== BREEDING_CYCLE_STATUS.CLOSED)?.id || null;
     }
+    const cycle = target ? breedingCycles.find(c => c?.id === target) : null;
     setTab('pairings');
-    setPairingsView('cards');
+    setPairingsView(cycle?.status === BREEDING_CYCLE_STATUS.CLOSED ? 'completed' : 'active');
     setFocusedCycleId(target);
   }, [breedingCycles]);
   const requestBreedingDialog = useCallback((request) => {
     setTab('pairings');
-    setPairingsView('cards');
+    setPairingsView('active');
     setBreedingDialogRequest({ ...request, at: Date.now() });
   }, []);
 
@@ -11684,10 +11776,79 @@ export default function BreedingPlannerApp() {
     const tombstoned = new Set(Object.keys(syncTombstonesRef.current?.breedingCycles || {}));
     const { cycles: planned, report } = planLegacyMigration(pairings, breedingCycles);
     const fresh = planned.filter(cycle => !tombstoned.has(cycle.id));
-    if (!fresh.length) return;
-    console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
-    setBreedingCycles(prev => [...prev, ...fresh.filter(cycle => !prev.some(existing => existing?.id === cycle.id))]);
+    // Cards made earlier are brought up to date with anything recorded on their legacy pairing
+    // since (each pairing once per change; additive only).
+    const now = nowIsoString();
+    const caughtUp = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle?.legacy?.pairingIds?.length) return;
+      const next = catchUpCycleFromLegacy(cycle, pairings, { now });
+      if (next !== cycle) caughtUp.set(cycle.id, next);
+    });
+    if (!fresh.length && !caughtUp.size) return;
+    if (fresh.length) console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
+    if (caughtUp.size) console.info(`[breeding] caught ${caughtUp.size} breeding card(s) up with their legacy pairing record`);
+    setBreedingCycles(prev => {
+      const updated = prev.map(cycle => caughtUp.get(cycle?.id) || cycle);
+      const added = fresh
+        .filter(cycle => !updated.some(existing => existing?.id === cycle.id))
+        .map(cycle => catchUpCycleFromLegacy(cycle, pairings, { now }));
+      return [...updated, ...added];
+    });
   }, [pairings, breedingCycles, setBreedingCycles]);
+
+  // Seasons. Switched on once: cycles already running keep the season they were running in.
+  // After that every automatic label follows the season rule (1 September unless configured,
+  // or the day "Start new season" was pressed). A label the keeper typed is never changed.
+  const seasonSettings = breedingSettings?.seasons;
+  useEffect(() => {
+    if (seasonSettings?.initializedAt) return;
+    if (!Array.isArray(breedingCycles) || !breedingCycles.some(cycle => cycle && !cycle.deletedAt)) return;
+    const { settings: initialized, changed } = initializeSeasonSettings(seasonSettings, breedingCycles, { now: nowIsoString() });
+    if (!changed) return;
+    setBreedingSettings(prev => normalizeBreedingSettings({ ...normalizeBreedingSettings(prev), seasons: initialized, updatedAt: nowIsoString() }));
+  }, [seasonSettings, breedingCycles]);
+  useEffect(() => {
+    if (!seasonSettings?.initializedAt) return;
+    const relabel = cyclesNeedingSeasonLabel(breedingCycles, seasonSettings);
+    if (!relabel.length) return;
+    const labels = new Map(relabel.map(entry => [entry.id, entry.label]));
+    const now = nowIsoString();
+    setBreedingCycles(prev => prev.map(cycle => (
+      labels.has(cycle?.id)
+        ? { ...cycle, seasonLabel: labels.get(cycle.id), seasonLabelSource: 'auto', updatedAt: now, metadata: { ...(cycle.metadata || {}), updatedAt: now } }
+        : cycle
+    )));
+  }, [seasonSettings, breedingCycles, setBreedingCycles]);
+  const currentBreedingSeason = useMemo(() => currentSeasonLabel(seasonSettings), [seasonSettings]);
+  const breedingSeasonSummaries = useMemo(() => summarizeSeasons(breedingCycles, seasonSettings), [breedingCycles, seasonSettings]);
+
+  // A hatched cycle completes once every hatchling is registered as an animal; it then moves to
+  // Completed pairing on its own.
+  useEffect(() => {
+    const now = nowIsoString();
+    const completed = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle || cycle.deletedAt || cycle.status === BREEDING_CYCLE_STATUS.CLOSED) return;
+      const next = completeCycleIfRegistered(cycle, { now });
+      if (next !== cycle) completed.set(cycle.id, next);
+    });
+    if (!completed.size) return;
+    setBreedingCycles(prev => prev.map(cycle => completed.get(cycle?.id) || cycle));
+  }, [breedingCycles, setBreedingCycles]);
+
+  // A clutch laid on a card gets its permanent incubator number, above every number in use.
+  useEffect(() => {
+    const assign = clutchNumbersToAssign(breedingCycles, pairings, { pairingsById });
+    if (!assign.length) return;
+    const numbers = new Map(assign.map(entry => [entry.id, entry.number]));
+    const now = nowIsoString();
+    setBreedingCycles(prev => prev.map(cycle => (
+      numbers.has(cycle?.id)
+        ? { ...cycle, clutch: { ...cycle.clutch, clutchNumber: numbers.get(cycle.id), eggBoxNumber: numbers.get(cycle.id) }, updatedAt: now, metadata: { ...(cycle.metadata || {}), updatedAt: now } }
+        : cycle
+    )));
+  }, [breedingCycles, pairings, pairingsById, setBreedingCycles]);
 
   // Pre-pairing scans join the female's card once it exists; their dates never move.
   useEffect(() => {
@@ -13093,103 +13254,59 @@ export default function BreedingPlannerApp() {
 
         {tab === "pairings" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
+            <SeasonBar
+              summaries={breedingSeasonSummaries}
+              currentSeason={currentBreedingSeason}
+              onStartNewSeason={() => {
+                const outcome = breedingActions.startNewSeason();
+                if (outcome?.changed) showAppAlert(t('breeding.season.started', { defaultValue: 'Season {{season}} has started. Pairings from today on belong to it.', season: outcome.label }));
+              }}
+            />
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'cards'}
-                  onClick={() => {
-                    setPairingsView('cards');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                  }}
-                >
-                  {t('breeding.tabs.cards', { defaultValue: 'Breeding cards' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'follicles'}
-                  onClick={() => {
-                    setPairingsView('follicles');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                  }}
-                >
-                  {t('breeding.tabs.follicles', { defaultValue: 'Follicle tracking' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'dashboard'}
-                  onClick={() => {
-                    setPairingsView('dashboard');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t('pairing.dashboard', { defaultValue: 'Dashboard' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'active'}
-                  onClick={() => {
-                    setPairingsView('active');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.activeProjects", { count: activePairingsCount })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'completed'}
-                  onClick={() => {
-                    setPairingsView('completed');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.completedProjects", { count: completedPairingsCount })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'incubator'}
-                  onClick={() => {
-                    setPairingsView('incubator');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
-                </TabButton>
+              <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={t('nav.pairings', { defaultValue: 'Breeding' })}>
+                {[
+                  ['dashboard', t('pairing.dashboard', { defaultValue: 'Dashboard' })],
+                  ['active', t('breeding.tabs.active', { defaultValue: 'Active pairing ({{count}})', count: activeCyclesCount })],
+                  ['incubator', t('breeding.tabs.incubator', { defaultValue: 'Incubator ({{count}})', count: incubatorSummary.clutches })],
+                  ['completed', t('breeding.tabs.completed', { defaultValue: 'Completed pairing ({{count}})', count: completedCyclesCount })],
+                ].map(([key, label]) => (
+                  <TabButton
+                    key={key}
+                    theme={theme}
+                    active={pairingsView === key}
+                    onClick={() => {
+                      setPairingsView(key);
+                      setFocusedPairingId(null);
+                      setFocusedCycleId(null);
+                      setPairingsReturnView(null);
+                    }}
+                  >
+                    {label}
+                  </TabButton>
+                ))}
               </div>
               <div className="flex flex-wrap items-center gap-2 ms-auto">
-                <div className="relative w-full sm:w-64">
-                  <input
-                    type="text"
-                    className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
-                    placeholder={t('pairing.searchPlaceholder', { defaultValue: 'Search pairings or snakes' })}
-                    value={pairingsSearchQuery}
-                    onChange={e => setPairingsSearchQuery(e.target.value)}
-                  />
-                  {pairingsSearchQuery && (
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
-                      onClick={() => setPairingsSearchQuery('')}
-                      aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
+                {pairingsView === 'active' || pairingsView === 'completed' ? (
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
+                      placeholder={t('breeding.searchPlaceholder', { defaultValue: 'Search females, males or a season' })}
+                      value={pairingsSearchQuery}
+                      onChange={e => setPairingsSearchQuery(e.target.value)}
+                    />
+                    {pairingsSearchQuery && (
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
+                        onClick={() => setPairingsSearchQuery('')}
+                        aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setShowPairingQrModal(true)}
@@ -13199,62 +13316,14 @@ export default function BreedingPlannerApp() {
                 </button>
                 <button
                   type="button"
-                  onClick={openNewPairingModal}
+                  onClick={() => requestBreedingDialog({ kind: 'pairing', femaleId: null })}
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
                 >
-                  {t("pairing.new")}
+                  {t('breeding.cards.recordPairing', { defaultValue: 'Record a pairing' })}
                 </button>
               </div>
             </div>
-            {pairingsView === 'completed' && completedYearOptions.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <TabButton
-                    theme={theme}
-                    active={completedYearFilter === 'All'}
-                    onClick={() => setCompletedYearFilter('All')}
-                  >
-                    {t("pairing.filters.allYears", { defaultValue: "All years" })}
-                  </TabButton>
-                  {completedYearOptions.map(year => (
-                    <TabButton
-                      key={year}
-                      theme={theme}
-                      active={completedYearFilter === year}
-                      onClick={() => setCompletedYearFilter(year)}
-                    >
-                      {year}
-                    </TabButton>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <TabButton
-                    theme={theme}
-                    active={completedOutcomeFilter === 'all'}
-                    onClick={() => setCompletedOutcomeFilter('all')}
-                  >
-                    {t("pairing.filters.allOutcomes", { defaultValue: "All outcomes" })}
-                  </TabButton>
-                  {[
-                    ['productive', t("pairing.filters.outcome.productive", { defaultValue: "Eggs or live birth" })],
-                    ['no_ovulation_observed', t("pairing.filters.outcome.noOvulationObserved", { defaultValue: "No ovulation observed" })],
-                    ['follicles_reabsorbed', t("pairing.filters.outcome.folliclesReabsorbed", { defaultValue: "Follicles reabsorbed" })],
-                    ['late_outcome', t("pairing.filters.outcome.lateOutcome", { defaultValue: "Late outcome" })],
-                    ['reopened', t("pairing.filters.outcome.reopened", { defaultValue: "Reopened" })],
-                  ].map(([key, label]) => (
-                    <TabButton
-                      key={key}
-                      theme={theme}
-                      active={completedOutcomeFilter === key}
-                      onClick={() => setCompletedOutcomeFilter(key)}
-                    >
-                      {label}
-                    </TabButton>
-                  ))}
-                </div>
-              </div>
-            )}
-            {pairingsView === 'cards' || pairingsView === 'follicles' ? (
+            {pairingsView === 'active' || pairingsView === 'completed' ? (
               <BreedingWorkspace
                 view={pairingsView}
                 cycles={breedingCycles}
@@ -13278,22 +13347,8 @@ export default function BreedingPlannerApp() {
                 scopedFemaleIds={speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null}
                 dialogRequest={breedingDialogRequest}
                 onDialogRequestHandled={() => setBreedingDialogRequest(null)}
-              />
-            ) : pairingsView === 'dashboard' ? (
-              <BreedingDashboardSection
-                items={breedingDashboardItems}
-                initialUrgencyFilter={breedingUrgencyFocus}
-                theme={theme}
-                clutchNumberByPairingId={clutchNumberByPairingId}
-                clutchMetadataByPairingId={clutchMetadataByPairingId}
-                onOpenPairing={(pid) => {
-                  const p = pairings.find(x => x.id === pid);
-                  if (p) {
-                    setPairingsView(isPairingCompleted(p) ? 'completed' : 'active');
-                    setPairingsReturnView({ pairingId: p.id, view: 'dashboard' });
-                    setFocusedPairingId(p.id);
-                  }
-                }}
+                currentSeason={currentBreedingSeason}
+                seasonSummaries={breedingSeasonSummaries}
               />
             ) : pairingsView === 'incubator' ? (
               <Card title={t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}>
@@ -13327,7 +13382,7 @@ export default function BreedingPlannerApp() {
                                 })
                                 : t("pairing.eggBox.title", { number: box.eggBoxNumber })}
                             </div>
-                            <div className="text-xs text-neutral-500">{box.year || t("pairing.eggBox.yearFallback")}</div>
+                            <div className="text-xs text-neutral-500">{box.seasonLabel ? t('breeding.season.heading', { defaultValue: 'Season {{season}}', season: box.seasonLabel }) : (box.year || t("pairing.eggBox.yearFallback"))}</div>
                           </div>
                           <div className="text-xs leading-snug text-neutral-700">
                             {t("pairing.eggBox.clutchLabel", { number: box.clutchNumber || box.number, pairing: box.pairingLabel })}
@@ -13364,6 +13419,15 @@ export default function BreedingPlannerApp() {
                           >
                             {t("pairing.incubator.viewEditBox", { defaultValue: "View / edit egg box" })}
                           </button>
+                          {box.cycleId ? (
+                            <button
+                              type="button"
+                              className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
+                              onClick={() => openBreedingCycle(box.cycleId)}
+                            >
+                              {t('breeding.incubator.openCard', { defaultValue: 'Open breeding card' })}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className={cx('mt-1 w-fit px-2.5 py-1.5 rounded-xl text-xs', primaryBtnClass(theme, true))}
@@ -13399,52 +13463,14 @@ export default function BreedingPlannerApp() {
                 )}
               </Card>
             ) : (
-            <PairingsSection
-              snakes={snakes}
-              pairings={filteredPairingsBySearch}
-              breederMales={males}
-              breederFemales={females}
-              onDelete={(pid)=>{
-                if (pid) {
-                  const deletedAt = nowIsoString();
-                  setSyncTombstones(prev => ({
-                    ...prev,
-                    pairings: { ...prev.pairings, [pid]: { id: pid, appPairingId: pid, deletedAt } },
-                  }));
-                }
-                setPairings(ps=>ps.filter(x=>x.id!==pid));
-                setFocusedPairingId(prev=>prev===pid?null:prev);
-              }}
-              onOpenSnake={openSnakeCard}
-              onUpdatePairing={handleUpdatePairing}
-              onExportPairingQr={handleGeneratePairingQrLabels}
-              onResetHatchlings={handleResetPairingHatchlings}
-              getGeneratedHatchlings={listGeneratedHatchlings}
-              showAppAlert={showAppAlert}
-              clutchNumberByPairingId={clutchNumberByPairingId}
-              clutchMetadataByPairingId={clutchMetadataByPairingId}
-              focusedPairingId={focusedPairingId}
-              onFocusPairing={setFocusedPairingId}
-              onCollapsePairing={(pid) => {
-                // The focus has to go with the collapse: while it is set, the effect that
-                // keeps a focused pairing visible would drag the view straight back here.
-                setFocusedPairingId(prev => (prev === pid ? null : prev));
-                setPairingsView(prev => resolveCollapseView(prev, pairingsReturnView, pid));
-                setPairingsReturnView(prev => (prev?.pairingId === pid ? null : prev));
-              }}
-              theme={theme}
-              title={pairingsView === 'completed'
-                ? `${t('pairing.completedProjects', { count: filteredCompletedCount })}${completedYearFilter !== 'All' ? ` - ${completedYearFilter}` : ''}`
-                : t('pairing.cardTitle', { count: activePairingsCount })}
-              emptyMessage={pairingsSearchQuery.trim()
-                ? t('pairing.searchEmpty', { defaultValue: 'No pairings match your search.' })
-                : (pairingsView === 'completed'
-                  ? (completedYearFilter === 'All'
-                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed pairings yet. Hatchlings will land here once the cycle is marked finished.' })
-                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed pairings recorded for {{year}}.', year: completedYearFilter }))
-                  : t('pairing.emptyDefault'))}
-              variant="collapsed"
-            />
+              <BreedingDashboardSection
+                items={breedingDashboardItems}
+                initialUrgencyFilter={breedingUrgencyFocus}
+                theme={theme}
+                clutchNumberByPairingId={clutchNumberByPairingId}
+                clutchMetadataByPairingId={clutchMetadataByPairingId}
+                onOpenPairing={(id) => openBreedingCycle(id)}
+              />
             )}
           </div>
         )}
@@ -24647,7 +24673,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
-                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.seasonLabel || item.cycleYear}</span>
                       </div>
                       {(() => {
                         const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);

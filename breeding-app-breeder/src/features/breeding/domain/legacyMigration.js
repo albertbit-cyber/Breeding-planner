@@ -19,7 +19,7 @@
  */
 import { toYmd, compareYmd, nowIso, minYmd, maxYmd } from './dates';
 import { normalizeCycle, reconcileMales, CYCLE_STATUS, LOCK_STATUS, MALE_STATE } from './cycleModel';
-import { seasonLabelFromYear, normalizeSeasonLabel } from './season';
+import { seasonLabelFromYear, normalizeSeasonLabel, defaultSeasonLabel } from './season';
 
 const text = (value) => (value === null || value === undefined ? '' : String(value).trim());
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -52,7 +52,7 @@ function appointmentIsPlannedOnly(appointment) {
   return !legacyIntroductionDate(appointment) && !legacyLockDate(appointment) && !!toYmd(appointment?.date);
 }
 
-function convertPairing(pairing, { now }) {
+export function convertPairing(pairing, { now = nowIso() } = {}) {
   const sessions = [];
   const planned = [];
   const notes = [];
@@ -179,8 +179,10 @@ function convertPairing(pairing, { now }) {
   const cycle = normalizeCycle({
     id: legacyCycleId(pairing.id),
     femaleId: text(pairing.femaleId) || null,
-    seasonLabel: seasonLabel || (startDate || legacyStart ? seasonLabelFromYear(Number(String(startDate || legacyStart).slice(0, 4))) : ''),
-    seasonLabelSource: seasonLabel ? 'manual' : 'auto',
+    seasonLabel: (seasonLabel && !seasonYear ? seasonLabel : '') || defaultSeasonLabel(startDate || legacyStart),
+    // A bare year on a legacy record was the calendar year of the pairing, not a season the
+    // keeper named, so it stays automatic and follows the season rule. A named season is kept.
+    seasonLabelSource: seasonLabel && !seasonYear ? 'manual' : 'auto',
     startDate: startDate || legacyStart || null,
     status: completed ? CYCLE_STATUS.CLOSED : CYCLE_STATUS.ACTIVE,
     closure,
@@ -334,4 +336,103 @@ export function cycleCounts(cycles = []) {
     planned += asArray(cycle?.plannedPairings).length;
   });
   return { cycles: asArray(cycles).filter(Boolean).length, locks, sessions, planned };
+}
+
+// ── Catch-up: legacy records edited after their card was created ─────────────────────────────
+
+/** Only the facts the card mirrors. Incubator bookkeeping (egg box notes, numbers) is left out. */
+export function legacyFingerprint(pairing) {
+  if (!pairing || typeof pairing !== 'object') return '';
+  const clutch = pairing.clutch && typeof pairing.clutch === 'object' ? pairing.clutch : {};
+  const { eggBoxNotes, eggBoxBadEggs, clutchNumber, eggBoxNumber, ...clutchFacts } = clutch;
+  const facts = {
+    appointments: asArray(pairing.appointments).map((a) => ({
+      id: a?.id, date: a?.date, pairingDate: a?.pairingDate, pairingLoggedAt: a?.pairingLoggedAt, appointmentDone: a?.appointmentDone,
+      pairingObserved: a?.pairingObserved, lockObserved: a?.lockObserved, lockDate: a?.lockDate, lockLoggedAt: a?.lockLoggedAt,
+    })),
+    ovulation: pairing.ovulation || null,
+    preLayShed: pairing.preLayShed || null,
+    clutch: clutchFacts,
+    hatch: pairing.hatch || null,
+    workflow: pairing.workflowStatus || pairing.status || null,
+    completionReason: pairing.completionReason || null,
+  };
+  const json = JSON.stringify(facts);
+  let hash = 5381;
+  for (let i = 0; i < json.length; i += 1) hash = ((hash * 33) ^ json.charCodeAt(i)) >>> 0;
+  return `${json.length}:${hash.toString(36)}`;
+}
+
+/** The old model called a pairing done once it hatched, lost every egg or was marked complete. */
+function legacyIsComplete(pairing) {
+  const workflow = text(pairing?.workflowStatus || pairing?.status).toLowerCase();
+  return workflow === 'completed' || workflow === 'archived' || !!pairing?.clutch?.allEggsLost || !!pairing?.hatch?.recorded;
+}
+
+/**
+ * Bring a card up to date with its legacy pairing record(s): anything recorded in the old
+ * pairing screens after the card was made. Additive only: sessions, locks and milestones the
+ * card lacks are added by their deterministic ids, empty clutch counts are filled, and nothing
+ * the card already holds is overwritten. A legacy record the old screens treated as finished
+ * closes the card the way the keeper last saw it, unless the card was reopened since.
+ *
+ * Each pairing is caught up again only when its facts change (fingerprint), so a record the
+ * keeper removed from the card is not brought back on every load.
+ */
+export function catchUpCycleFromLegacy(cycle, pairings = [], { now = nowIso() } = {}) {
+  if (!cycle || cycle.deletedAt) return cycle;
+  const ids = asArray(cycle.legacy?.pairingIds);
+  if (!ids.length) return cycle;
+  const fingerprints = { ...(cycle.legacy?.fingerprints || {}) };
+  let next = cycle;
+  let changed = false;
+  ids.forEach((pairingId) => {
+    const pairing = asArray(pairings).find((p) => p && text(p.id) === pairingId);
+    if (!pairing) return;
+    const fingerprint = legacyFingerprint(pairing);
+    if (fingerprints[pairingId] === fingerprint) return;
+    fingerprints[pairingId] = fingerprint;
+    changed = true;
+    const source = convertPairing(pairing, { now });
+
+    const sessions = next.sessions.map((session) => {
+      const incoming = source.sessions.find((s) => s.id === session.id);
+      if (!incoming) return session;
+      const missing = incoming.locks.filter((l) => !session.locks.some((x) => x.id === l.id || x.observationDate === l.observationDate));
+      return missing.length ? { ...session, locks: [...session.locks, ...missing], updatedAt: now } : session;
+    });
+    source.sessions.forEach((s) => { if (!sessions.some((x) => x.id === s.id)) sessions.push(s); });
+
+    const events = [...next.events];
+    source.events.forEach((e) => {
+      if (events.some((x) => x.id === e.id || (x.type === e.type && x.certainty === 'recorded'))) return;
+      events.push(e);
+    });
+
+    const clutch = { ...next.clutch };
+    ['eggsTotal', 'fertileEggs', 'slugs', 'hatchlingsRecorded', 'firstHatchDate'].forEach((key) => {
+      if ((clutch[key] === null || clutch[key] === undefined) && source.clutch[key] !== null && source.clutch[key] !== undefined) clutch[key] = source.clutch[key];
+    });
+
+    next = reconcileMales(normalizeCycle({ ...next, sessions, events, clutch, updatedAt: now }));
+
+    if (next.status !== CYCLE_STATUS.CLOSED && !asArray(next.reopenings).length && legacyIsComplete(pairing)) {
+      const hatched = !!pairing.hatch?.recorded;
+      const reason = text(pairing.completionReason);
+      next = {
+        ...next,
+        status: CYCLE_STATUS.CLOSED,
+        pause: null,
+        plannedPairings: next.plannedPairings.map((p) => (p.status === 'pending' ? { ...p, status: 'cancelled', resolution: { kind: 'cycle_closed', at: now }, updatedAt: now } : p)),
+        closure: source.closure || {
+          outcome: hatched ? 'hatching_complete' : (pairing.clutch?.allEggsLost ? 'failed_clutch' : 'other'),
+          closedAt: text(pairing.completedAt) || now,
+          note: ['Finished in the old pairing screens.', reason ? `Legacy completion reason: ${reason}` : ''].filter(Boolean).join(' '),
+          biologicalCompletionDate: hatched ? toYmd(pairing.hatch?.date) : null,
+        },
+      };
+    }
+  });
+  if (!changed) return cycle;
+  return { ...next, legacy: { ...next.legacy, fingerprints, caughtUpAt: now }, updatedAt: now, metadata: { ...(next.metadata || {}), updatedAt: now } };
 }

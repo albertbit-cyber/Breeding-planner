@@ -12,6 +12,7 @@ import { addDays, compareYmd, diffDays, todayYmd } from './dates';
 import { CYCLE_STATUS, recordedEventDate } from './cycleModel';
 import { femaleStatistics } from './history';
 import { latestMeasurement, latestExam, latestChange } from './follicles';
+import { normalizeSeasonSettings } from './season';
 
 /** Minimum usable comparable cycles before a history-based window is called a forecast. */
 export const DEFAULT_MIN_CYCLES_FOR_FORECAST = 3;
@@ -73,6 +74,7 @@ export function normalizeBreedingSettings(raw = {}) {
     minCyclesForForecast: Number.isFinite(min) && min >= 1 ? Math.round(min) : DEFAULT_MIN_CYCLES_FOR_FORECAST,
     bySpecies,
     byFemale,
+    seasons: normalizeSeasonSettings(settings.seasons),
     updatedAt: settings.updatedAt || null,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recordPairingSession, recordEvent, updateClutch, completeHatchingOutcome, closeCycle, LOCK_STATUS } from './cycleModel';
+import { recordPairingSession, recordEvent, updateClutch, completeHatchingOutcome, linkOffspring, completeIfRegistered, closeCycle, LOCK_STATUS } from './cycleModel';
 import { summarizeCycle, femaleStatistics, compareWithHistory, pairingFrequency, median } from './history';
 import { createExam } from './follicles';
 
@@ -15,7 +15,12 @@ function completedCycle({ femaleId = 'F1', start, ovulation, shed, laying, first
   if (ovulation) cycle = recordEvent(cycle, { type: 'ovulation', date: ovulation }, { now: NOW });
   if (shed) cycle = recordEvent(cycle, { type: 'pre_lay_shed', date: shed }, { now: NOW });
   if (laying) cycle = updateClutch(cycle, { laidDate: laying, eggsTotal: eggs, fertileEggs: eggs, slugs: 0 }, { now: NOW });
-  if (finalHatch) cycle = completeHatchingOutcome(cycle, { finalHatchDate: finalHatch, hatchlingsRecorded: eggs }, { now: NOW });
+  if (finalHatch) {
+    cycle = completeHatchingOutcome(cycle, { finalHatchDate: finalHatch, hatchlingsRecorded: eggs }, { now: NOW });
+    // A cycle completes once its hatchlings are registered as animals.
+    for (let i = 0; i < Number(eggs); i += 1) cycle = linkOffspring(cycle, `${cycle.id}-h${i}`, { now: NOW });
+    cycle = completeIfRegistered(cycle, { now: NOW });
+  }
   if (firstHatch && !finalHatch) cycle = recordEvent(cycle, { type: 'first_hatch', date: firstHatch }, { now: NOW });
   if (!finalHatch && !laying) cycle = closeCycle(cycle, { outcome: 'no_clutch', note: 'none' }, { now: NOW });
   return state.cycles.map((c) => (c.id === cycle.id ? cycle : c));

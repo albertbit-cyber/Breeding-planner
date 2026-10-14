@@ -23,6 +23,7 @@ import {
   updateClutch as updateClutchDomain,
   recordHatching as recordHatchingDomain,
   completeHatchingOutcome,
+  completeIfRegistered,
   closeCycle as closeCycleDomain,
   reopenCycle as reopenCycleDomain,
   pauseCycle as pauseCycleDomain,
@@ -44,6 +45,7 @@ import {
 } from './domain/followUps';
 import { createExam, updateExam, associateExamsWithCycle, setInterpretationOverride as setOverrideDomain } from './domain/follicles';
 import { normalizeBreedingSettings } from './domain/reviewRules';
+import { resolveSeasonLabel, startNewSeason as startNewSeasonDomain } from './domain/season';
 import { nowIso, todayYmd, toYmd } from './domain/dates';
 
 function upsertById(list, record) {
@@ -65,7 +67,9 @@ export function previousCycleEnd(cycles, cycle) {
 export function useBreedingActions({ cycles, exams, settings, setCycles, setExams, setSettings, addTombstone, snakesById }) {
   const cyclesRef = useRef(cycles);
   const examsRef = useRef(exams);
+  const settingsRef = useRef(settings);
   useEffect(() => { cyclesRef.current = cycles; }, [cycles]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { examsRef.current = exams; }, [exams]);
 
   const writeCycle = useCallback((cycle) => {
@@ -102,6 +106,10 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
       const { speciesId, reproductionMode } = speciesFor(input.femaleId);
       const result = recordPairingSession(cyclesRef.current, { ...input, speciesId: input.speciesId || speciesId, reproductionMode: input.reproductionMode || reproductionMode }, { now });
       let cycle = result.cycle;
+      if (result.created && !input.seasonLabel) {
+        // A new card belongs to the season its first pairing falls in.
+        cycle = { ...cycle, seasonLabel: resolveSeasonLabel(cycle.startDate, settingsRef.current?.seasons) || cycle.seasonLabel, seasonLabelSource: 'auto' };
+      }
       let followUp = null;
       if (result.lock) {
         const scheduled = scheduleFollowUpForLock(cycle, { sessionId: result.session.id, lock: result.lock, today, now });
@@ -215,7 +223,7 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
       return withCycle(cycleId, (current) => resumeCycleDomain(current, { now: nowIso() }));
     },
     setSeasonLabel(cycleId, label) {
-      return withCycle(cycleId, (current) => setSeasonLabelDomain(current, label, { now: nowIso() }));
+      return withCycle(cycleId, (current) => setSeasonLabelDomain(current, label, { now: nowIso(), seasonSettings: settingsRef.current?.seasons }));
     },
 
     addPlannedPairing(cycleId, input) {
@@ -237,7 +245,8 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
       return withCycle(cycleId, (current) => assignOffspringSire(current, animalId, assignment, { now: nowIso() }));
     },
     linkOffspring(cycleId, animalId) {
-      return withCycle(cycleId, (current) => linkOffspringDomain(current, animalId, { now: nowIso() }));
+      const now = nowIso();
+      return withCycle(cycleId, (current) => completeIfRegistered(linkOffspringDomain(current, animalId, { now }), { now }));
     },
     resolveReviewFlag(cycleId, flagId, note = '') {
       const now = nowIso();
@@ -294,6 +303,18 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
       addTombstone?.('follicleExams', examId, deletedAt);
       examsRef.current = examsRef.current.filter((e) => e?.id !== examId);
       setExams((prev) => prev.filter((e) => e?.id !== examId));
+    },
+
+    /** "Start new season": the season after the current one begins today. */
+    startNewSeason() {
+      const current = normalizeBreedingSettings(settingsRef.current);
+      const outcome = startNewSeasonDomain(current.seasons, { today: todayYmd(), now: nowIso() });
+      if (outcome.changed) {
+        const next = normalizeBreedingSettings({ ...current, seasons: outcome.settings, updatedAt: nowIso() });
+        settingsRef.current = next;
+        setSettings(() => next);
+      }
+      return outcome;
     },
 
     updateSettings(updater) {

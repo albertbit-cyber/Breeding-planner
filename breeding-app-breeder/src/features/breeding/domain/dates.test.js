@@ -36,8 +36,10 @@ describe('date-only arithmetic', () => {
 });
 
 describe('season labels', () => {
-  it('defaults from the start year only', () => {
-    expect(defaultSeasonLabel('2026-02-10')).toBe('2026–27');
+  it('defaults to a 1 September boundary', () => {
+    expect(defaultSeasonLabel('2026-02-10')).toBe('2025–26');
+    expect(defaultSeasonLabel('2026-08-31')).toBe('2025–26');
+    expect(defaultSeasonLabel('2026-09-01')).toBe('2026–27');
     expect(defaultSeasonLabel('2026-11-10')).toBe('2026–27');
     expect(defaultSeasonLabel(null)).toBe('');
     expect(seasonStartYear('2026–27')).toBe(2026);

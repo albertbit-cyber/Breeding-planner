@@ -26,7 +26,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
   const update = (fn) => onChange((prev) => fn(normalizeBreedingSettings(prev)));
   return (
     <details className="rounded-xl border bg-white">
-      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700">{t('breeding.settings.title', { defaultValue: 'Review settings (follicle ranges, scan reminders, forecast threshold)' })}</summary>
+      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700">{t('breeding.settings.titleWithSeason', { defaultValue: 'Breeding settings (season start, follicle ranges, scan reminders, forecast threshold)' })}</summary>
       <div className="px-3 pb-3 space-y-3 text-xs">
         <p className="text-neutral-600">{t('breeding.settings.intro', { defaultValue: 'Nothing here is preset. A range you enter turns into a review prompt when a measured ultrasound diameter falls inside it; it is never an automatic decision to pair. Ball python settings stay separate from other species.' })}</p>
         <div className="space-y-2">
@@ -46,6 +46,33 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
           </select>
           {femaleId ? <RuleFields rule={normalized.byFemale[femaleId]} onChange={(rule) => update((prev) => ({ ...prev, byFemale: { ...prev.byFemale, [femaleId]: rule } }))} /> : null}
           {Object.keys(normalized.byFemale).length ? <div className="text-neutral-500">{t('breeding.settings.overridesCount', { defaultValue: '{{count}} female(s) have overrides.', count: Object.keys(normalized.byFemale).length })}</div> : null}
+        </div>
+        <div className="space-y-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.settings.seasonTitle', { defaultValue: 'Breeding season' })}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{t('breeding.settings.seasonStart', { defaultValue: 'A new season starts on' })}</span>
+            <input
+              type="number"
+              min="1"
+              max="31"
+              step="1"
+              className="border rounded-lg px-2 py-1 text-xs w-16 bg-white"
+              aria-label={t('breeding.settings.seasonStartDay', { defaultValue: 'Day' })}
+              value={normalized.seasons.startDay}
+              onChange={(e) => update((prev) => ({ ...prev, seasons: { ...prev.seasons, startDay: Number(e.target.value) || 1 } }))}
+            />
+            <select
+              className="border rounded-lg px-2 py-1 text-xs bg-white"
+              aria-label={t('breeding.settings.seasonStartMonth', { defaultValue: 'Month' })}
+              value={normalized.seasons.startMonth}
+              onChange={(e) => update((prev) => ({ ...prev, seasons: { ...prev.seasons, startMonth: Number(e.target.value) } }))}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                <option key={month} value={month}>{new Date(2001, month - 1, 1).toLocaleString(undefined, { month: 'long' })}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-neutral-500">{t('breeding.settings.seasonHint', { defaultValue: 'A cycle belongs to the season its first pairing falls in. "Start new season" on the Breeding page starts the next season early or late for one year without changing this date.' })}</p>
         </div>
         <label className="flex flex-wrap items-center gap-2">
           <span>{t('breeding.settings.minCycles', { defaultValue: 'Call a history window a forecast from this many completed cycles' })}</span>
