@@ -22,7 +22,7 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[70] p-0 sm:p-4" onClick={onClose} role="presentation">
+    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[10005] p-0 sm:p-4" onClick={onClose} role="presentation">
       <div
         role="dialog"
         aria-modal="true"
@@ -93,7 +93,7 @@ function AnimalSelect({ value, onChange, options, placeholder, disabled = false,
  * selection but visible and changeable; date defaults to today and may be backdated; lock status
  * is a three-way choice that never defaults to Yes.
  */
-export function QuickPairingDialog({ femaleId, females = [], males = [], defaultMaleId = null, seasonLabel = '', onSubmit, onClose, batch = null }) {
+export function QuickPairingDialog({ femaleId, females = [], males = [], defaultMaleId = null, seasonLabel = '', newCardSeasonLabel = '', onSubmit, onClose, batch = null }) {
   const { t } = useTranslation();
   const today = todayYmd();
   const [female, setFemale] = useState(femaleId || '');
@@ -157,7 +157,7 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
   return (
     <BreedingDialog
       title={t('breeding.quickPairing.title', { defaultValue: 'Record a pairing session' })}
-      subtitle={seasonLabel ? t('breeding.quickPairing.seasonInherited', { defaultValue: 'Season {{season}} (from the card)', season: seasonLabel }) : null}
+      subtitle={seasonLabel ? t('breeding.quickPairing.seasonInherited', { defaultValue: 'Season {{season}} (from the card)', season: seasonLabel }) : newCardSeasonLabel ? t('breeding.quickPairing.seasonNewCard', { defaultValue: 'Season {{season}} (a new card)', season: newCardSeasonLabel }) : null}
       onClose={onClose}
       onConfirm={() => submit(payload())}
       confirmLabel={t('breeding.quickPairing.save', { defaultValue: 'Save session' })}
@@ -621,7 +621,7 @@ export function HatchingDialog({ cycle, mode = 'partial', onSubmit, onClose }) {
     <BreedingDialog
       title={complete ? t('breeding.hatchDialog.completeTitle', { defaultValue: 'Record the final outcome (hatching complete)' }) : t('breeding.hatchDialog.partialTitle', { defaultValue: 'Record hatching' })}
       subtitle={complete
-        ? t('breeding.hatchDialog.completeSubtitle', { defaultValue: 'Completes the cycle: every egg\'s outcome is resolved. The first hatchling alone never closes a card.' })
+        ? t('breeding.hatchDialog.completeSubtitleRegister', { defaultValue: "Every egg's outcome is resolved. The cycle moves to Completed pairing once the hatchlings are registered as animals; with no hatchlings it closes now." })
         : t('breeding.hatchDialog.partialSubtitle', { defaultValue: 'Hatching in progress. The card stays open until you record the final outcome.' })}
       onClose={onClose}
       onConfirm={() => submit(complete

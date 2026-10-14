@@ -14,6 +14,9 @@ import {
   updateClutch,
   recordHatching,
   completeHatchingOutcome,
+  completeIfRegistered,
+  registrationStatus,
+  hatchingDone,
   closeCycle,
   reopenCycle,
   pauseCycle,
@@ -37,7 +40,7 @@ describe('A. first actual pairing creates one female cycle', () => {
     expect(first.created).toBe(true);
     expect(first.cycles).toHaveLength(1);
     expect(first.cycle.startDate).toBe('2026-03-01');
-    expect(first.cycle.seasonLabel).toBe('2026–27');
+    expect(first.cycle.seasonLabel).toBe('2025–26');
     expect(first.cycle.status).toBe(CYCLE_STATUS.ACTIVE);
 
     // Same request again (a retry) and a "concurrent" second call from the same base state.
@@ -211,22 +214,55 @@ describe('K/O. clutch, hatching and completion', () => {
     expect(() => updateClutch(cycle, { hatchlingsRecorded: 8 })).toThrow(/exceed/);
   });
 
-  it('first hatchling keeps the cycle open; the explicit final outcome completes it; retries do not duplicate', () => {
+  it('first hatchling keeps the cycle open; the final outcome waits for the hatchlings to be registered; retries do not duplicate', () => {
     let cycle = laidCycle();
     cycle = recordHatching(cycle, { date: '2026-08-01', hatchlingsRecorded: 2 }, { now: NOW });
     expect(cycle.status).toBe(CYCLE_STATUS.ACTIVE);
     expect(deriveStage(cycle)).toBe('hatching');
     expect(cycle.clutch.firstHatchDate).toBe('2026-08-01');
     cycle = completeHatchingOutcome(cycle, { finalHatchDate: '2026-08-04', hatchlingsRecorded: 5, lostEggs: 1 }, { now: '2026-08-05T09:00:00.000Z' });
-    expect(cycle.status).toBe(CYCLE_STATUS.CLOSED);
-    expect(cycle.closure.outcome).toBe('hatching_complete');
-    expect(cycle.closure.biologicalCompletionDate).toBe('2026-08-04');
-    expect(cycle.closure.closedAt).toBe('2026-08-05T09:00:00.000Z');
+    // Hatched, but no hatchling exists as an animal yet: the cycle is still an active pairing.
+    expect(cycle.status).toBe(CYCLE_STATUS.ACTIVE);
+    expect(registrationStatus(cycle)).toEqual({ hatched: true, expected: 5, registered: 0, missing: 5 });
     expect(deriveStage(cycle)).toBe('complete');
     const again = completeHatchingOutcome(cycle, { finalHatchDate: '2026-08-04', hatchlingsRecorded: 5, lostEggs: 1 }, { now: '2026-08-06T09:00:00.000Z' });
     expect(again.events.filter((e) => e.type === 'hatching_complete')).toHaveLength(1);
     expect(again.clutch.hatchlingsRecorded).toBe(5);
-    expect(again.closure.closedAt).toBe('2026-08-05T09:00:00.000Z');
+    // Registering four of five leaves it open; the fifth completes it.
+    let registered = again;
+    ['H1', 'H2', 'H3', 'H4'].forEach((id) => { registered = linkOffspring(registered, id, { now: NOW }); });
+    expect(completeIfRegistered(registered, { now: NOW }).status).toBe(CYCLE_STATUS.ACTIVE);
+    registered = completeIfRegistered(linkOffspring(registered, 'H5', { now: NOW }), { now: '2026-08-20T09:00:00.000Z' });
+    expect(registered.status).toBe(CYCLE_STATUS.CLOSED);
+    expect(registered.closure.outcome).toBe('hatching_complete');
+    expect(registered.closure.biologicalCompletionDate).toBe('2026-08-04');
+    expect(registered.closure.closedAt).toBe('2026-08-20T09:00:00.000Z');
+  });
+
+  it('a reopened card stays open until the final outcome is recorded again', () => {
+    let cycle = completeHatchingOutcome(laidCycle(), { finalHatchDate: '2026-08-04', hatchlingsRecorded: 1, lostEggs: 5 }, { now: NOW });
+    cycle = completeIfRegistered(linkOffspring(cycle, 'H1', { now: NOW }), { now: NOW });
+    expect(cycle.status).toBe(CYCLE_STATUS.CLOSED);
+    const reopened = reopenCycle(cycle, { note: 'fix a date' }, { now: NOW });
+    expect(completeIfRegistered(reopened, { now: NOW }).status).toBe(CYCLE_STATUS.ACTIVE);
+    const again = completeHatchingOutcome(reopened, { finalHatchDate: '2026-08-04' }, { now: NOW });
+    expect(again.status).toBe(CYCLE_STATUS.CLOSED);
+  });
+
+  it('a clutch with no hatchlings closes as a failed clutch at once: there is nothing to register', () => {
+    const cycle = completeHatchingOutcome(laidCycle(), { finalHatchDate: '2026-08-04', hatchlingsRecorded: 0, lostEggs: 6 }, { now: NOW });
+    expect(cycle.status).toBe(CYCLE_STATUS.CLOSED);
+    expect(cycle.closure.outcome).toBe('failed_clutch');
+  });
+
+  it('partial hatching never completes the cycle, even with every hatchling so far registered', () => {
+    let cycle = recordHatching(laidCycle(), { date: '2026-08-01', hatchlingsRecorded: 2 }, { now: NOW });
+    cycle = linkOffspring(linkOffspring(cycle, 'H1', { now: NOW }), 'H2', { now: NOW });
+    expect(hatchingDone(cycle)).toBe(false);
+    expect(completeIfRegistered(cycle, { now: NOW }).status).toBe(CYCLE_STATUS.ACTIVE);
+    // Once the counts account for every egg (5 hatched + 1 lost + 1 slug = 7), it has hatched.
+    cycle = updateClutch(cycle, { hatchlingsRecorded: 5, lostEggs: 1 }, { now: NOW });
+    expect(hatchingDone(cycle)).toBe(true);
   });
 
   it('closes without hatchlings for a documented reason and reopens deliberately with history kept', () => {
