@@ -22,7 +22,7 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[70] p-0 sm:p-4" onClick={onClose} role="presentation">
+    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[10005] p-0 sm:p-4" onClick={onClose} role="presentation">
       <div
         role="dialog"
         aria-modal="true"
