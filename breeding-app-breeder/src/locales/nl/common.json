@@ -1069,6 +1069,8 @@
   "filters.apply": "Toepassen",
   "filters.filters": "Filters",
   "filters.other": "Overig",
+  "filters.allGroups": "Alle groepen",
+  "filters.severalGroups": "Meerdere groepen",
   "groups.noSnakes": "Geen slangen in deze groep.",
   "groups.tip": "Tip: bewerk een slang om de groep toe te wijzen of te wijzigen.",
   "groups.title": "Groepen",

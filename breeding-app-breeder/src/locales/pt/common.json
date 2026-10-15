@@ -1067,6 +1067,8 @@
   "filters.apply": "Aplicar",
   "filters.filters": "Filtros",
   "filters.other": "Outro",
+  "filters.allGroups": "Todos os grupos",
+  "filters.severalGroups": "Vários grupos",
   "groups.noSnakes": "Não há serpentes neste grupo.",
   "groups.tip": "Sugestão: edite uma serpente para atribuir ou mudar o grupo.",
   "groups.title": "Grupos",

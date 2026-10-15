@@ -1069,6 +1069,8 @@
   "filters.apply": "Anwenden",
   "filters.filters": "Filter",
   "filters.other": "Sonstiges",
+  "filters.allGroups": "Alle Gruppen",
+  "filters.severalGroups": "Mehrere Gruppen",
   "groups.noSnakes": "Keine Schlangen in dieser Gruppe.",
   "groups.tip": "Tipp: Bearbeite eine Schlange, um ihr eine Gruppe zuzuweisen oder sie zu ändern.",
   "groups.title": "Gruppen",
