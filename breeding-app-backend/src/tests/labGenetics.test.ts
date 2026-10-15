@@ -31,6 +31,15 @@ describe("labGeneticsRules", () => {
       expect(decisions).toEqual([{ key: "house panel a", gene: "House Panel A", outcome: "positive" }]);
     });
 
+    it("prefers the genotype the result stored over the test-name mapping", () => {
+      const decisions = collectDecisions(
+        [{ marker: "Fire", outcome: "positive", genotype: "Super Fire" }],
+        () => "Fire"
+      );
+      // Keyed by the gene, written as the super form.
+      expect(decisions).toEqual([{ key: "fire", gene: "Super Fire", outcome: "positive" }]);
+    });
+
     it("ignores findings that decide nothing", () => {
       expect(collectDecisions([{ marker: "Albino", outcome: "inconclusive" }])).toEqual([]);
       expect(collectDecisions([{ marker: "", outcome: "positive" }])).toEqual([]);
@@ -59,20 +68,44 @@ describe("labGeneticsRules", () => {
       expect(after).toEqual({ morphs: [], hets: ["Piebald"], possibleHets: [] });
     });
 
-    it("does not add a het for an animal already visual for that gene", () => {
+    it("demotes an animal the breeder had as visual when the test finds only a carrier", () => {
       const before = snapshot({ morphs: ["Albino"] });
       const after = applyDecisions(before, [{ key: "albino", gene: "Albino", outcome: "carrierDetected" }]);
-      expect(after.hets).toEqual([]);
-      expect(after.morphs).toEqual(["Albino"]);
+      // The laboratory tested exactly this gene; its answer replaces the keeper's.
+      expect(after.hets).toEqual(["Albino"]);
+      expect(after.morphs).toEqual([]);
     });
 
-    it("clears only what the breeder was guessing when a test comes back negative", () => {
-      const before = snapshot({ hets: ["het Clown", "66% poss het Clown"], possibleHets: ["Clown"] });
+    it("removes the gene everywhere when a test comes back negative", () => {
+      const before = snapshot({
+        morphs: ["Pastel", "Clown"],
+        hets: ["het Clown", "66% poss het Clown", "100% het Clown"],
+        possibleHets: ["Clown", "possible Clown"],
+      });
       const after = applyDecisions(before, [{ key: "clown", gene: "Clown", outcome: "notDetected" }]);
-      // The certain het is the keeper's own stated fact and is left alone; the
-      // percentage guess and the possible-het entry are what the test settles.
-      expect(after.hets).toEqual(["het Clown"]);
-      expect(after.possibleHets).toEqual([]);
+      // Certain or guessed, visual or het: the test says the gene is not there.
+      expect(after).toEqual({ morphs: ["Pastel"], hets: [], possibleHets: [] });
+    });
+
+    it("clears a guessed dominant or incomplete dominant gene on a negative", () => {
+      const before = snapshot({ morphs: ["possible Fire", "ph Pinstripe", "Enchi"], possibleHets: ["66% Fire"] });
+      const after = applyDecisions(before, [
+        { key: "fire", gene: "Fire", outcome: "notDetected" },
+        { key: "pinstripe", gene: "Pinstripe", outcome: "notDetected" },
+      ]);
+      expect(after).toEqual({ morphs: ["Enchi"], hets: [], possibleHets: [] });
+    });
+
+    it("writes a super form and clears the single-gene and guessed entries it supersedes", () => {
+      const before = snapshot({ morphs: ["Fire", "Pastel"], possibleHets: ["possible Fire"] });
+      const after = applyDecisions(before, [{ key: "fire", gene: "Super Fire", outcome: "positive" }]);
+      expect(after).toEqual({ morphs: ["Pastel", "Super Fire"], hets: [], possibleHets: [] });
+    });
+
+    it("treats a recorded super form as the same gene", () => {
+      const before = snapshot({ morphs: ["Super Fire"] });
+      const after = applyDecisions(before, [{ key: "fire", gene: "Fire", outcome: "positive" }]);
+      expect(after.morphs).toEqual(["Fire"]);
     });
 
     it("is idempotent", () => {

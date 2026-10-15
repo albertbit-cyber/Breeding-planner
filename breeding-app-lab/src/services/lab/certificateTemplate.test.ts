@@ -56,8 +56,8 @@ describe("buildLabCertificateTemplateData", () => {
       phenotype: "Clown",
       snakeId: "ARUN-01",
       morph: "GHI, Het Clown",
-      result: "Het Clown",
-      genotype: "Het Clown",
+      result: "het Clown",
+      genotype: "het Clown",
     });
     expect(template.resultRows[1]).toMatchObject({
       test: "Pied",

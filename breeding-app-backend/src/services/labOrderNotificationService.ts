@@ -159,7 +159,11 @@ const OUTCOME_WORDS: Record<string, string> = {
   negative: "not detected",
 };
 
-/** "Jasmine — Piebald: visual, Albino: not detected" */
+/**
+ * "Jasmine — Piebald: het Piebald, Albino: Negative". A finding stores the
+ * genotype label the breeder should read; only findings from before that
+ * existed fall back to the outcome words.
+ */
 const buildFindingLines = (
   order: NotifiableOrder,
   results: Array<{ animalId: string; findingsJson: unknown }>
@@ -177,7 +181,7 @@ const buildFindingLines = (
       const parts = findings
         .map((finding) => {
           const marker = String(finding?.marker || "").trim();
-          const word = OUTCOME_WORDS[String(finding?.outcome || "")];
+          const word = String(finding?.label || "").trim() || OUTCOME_WORDS[String(finding?.outcome || "")];
           return marker && word ? `${marker}: ${word}` : "";
         })
         .filter(Boolean);

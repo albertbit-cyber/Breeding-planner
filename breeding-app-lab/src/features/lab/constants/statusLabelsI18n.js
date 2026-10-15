@@ -70,11 +70,41 @@ export const resultStatusLabel = (t, value, fallback) => {
   switch (value) {
     case "not_detected":
       return t("lab.status.result.notDetected", { defaultValue: "Negative" });
+    case "not_present":
+      return t("lab.status.result.notPresent", { defaultValue: "Not present" });
     case "heterozygous":
       return t("lab.status.result.heterozygous", { defaultValue: "Heterozygous" });
+    case "homozygous":
+      return t("lab.status.result.homozygous", { defaultValue: "Homozygous" });
+    case "single_gene":
+      return t("lab.status.result.singleGene", { defaultValue: "Single gene" });
+    case "super_form":
+      return t("lab.status.result.superForm", { defaultValue: "Super form" });
+    case "present":
+      return t("lab.status.result.present", { defaultValue: "Present" });
     case "visual":
       return t("lab.status.result.visual", { defaultValue: "Visual" });
+    case "male":
+      return t("lab.status.result.male", { defaultValue: "Male" });
+    case "female":
+      return t("lab.status.result.female", { defaultValue: "Female" });
     default:
       return fallback ?? value;
+  }
+};
+
+/** How a gene is inherited, shown next to its result dropdown. */
+export const inheritanceKindLabel = (t, kind) => {
+  switch (kind) {
+    case "recessive":
+      return t("lab.inheritance.recessive", { defaultValue: "Recessive" });
+    case "incomplete_dominant":
+      return t("lab.inheritance.incompleteDominant", { defaultValue: "Incomplete dominant" });
+    case "dominant":
+      return t("lab.inheritance.dominant", { defaultValue: "Dominant" });
+    case "sex":
+      return t("lab.inheritance.sex", { defaultValue: "Sex test" });
+    default:
+      return t("lab.inheritance.unknown", { defaultValue: "Inheritance unknown" });
   }
 };

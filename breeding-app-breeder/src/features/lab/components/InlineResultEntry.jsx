@@ -11,8 +11,15 @@ const ELIGIBLE_STATUSES = new Set(["received", "in_progress"]);
 
 const resultStatusLabel = (t, value) => ({
   not_detected: t("lab.resultEntry.status.notDetected", { defaultValue: "Negative" }),
+  not_present: t("lab.resultEntry.status.notPresent", { defaultValue: "Not present" }),
   heterozygous: t("lab.resultEntry.status.heterozygous", { defaultValue: "Heterozygous" }),
+  homozygous: t("lab.resultEntry.status.homozygous", { defaultValue: "Homozygous" }),
+  single_gene: t("lab.resultEntry.status.singleGene", { defaultValue: "Single gene" }),
+  super_form: t("lab.resultEntry.status.superForm", { defaultValue: "Super form" }),
+  present: t("lab.resultEntry.status.present", { defaultValue: "Present" }),
   visual: t("lab.resultEntry.status.visual", { defaultValue: "Visual" }),
+  male: t("lab.resultEntry.status.male", { defaultValue: "Male" }),
+  female: t("lab.resultEntry.status.female", { defaultValue: "Female" }),
 }[value]);
 
 // Build per-animal rows from a template animal group

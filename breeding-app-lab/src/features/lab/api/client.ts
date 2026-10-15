@@ -384,6 +384,8 @@ const buildSharedStatusHistory = (order: any): StatusHistory[] => {
   return entries;
 };
 
+// Findings recorded before the result carried its own `resultStatus` are read
+// back through the outcome they stored.
 const OUTCOME_TO_RESULT_STATUS = {
   notDetected: "not_detected",
   carrierDetected: "heterozygous",
@@ -401,6 +403,17 @@ const RESULT_OUTCOME_LABELS: Record<string, string> = {
 export const formatLabOutcomeLabel = (value: unknown): string => {
   const normalized = String(value || "").trim();
   return RESULT_OUTCOME_LABELS[normalized] || normalized || "-";
+};
+
+/**
+ * The genotype the breeder reads for a finding: "het Clown", "Super Fire",
+ * "Negative". Stored on the finding by the backend; the outcome words are only
+ * for findings from before that existed.
+ */
+export const formatLabFindingLabel = (finding: any): string => {
+  const stored = String(finding?.label || "").trim();
+  if (stored) return stored;
+  return formatLabOutcomeLabel(finding?.outcome);
 };
 
 export const formatLabTestNumber = (value: unknown, seed: unknown, dateLike?: string): string =>
@@ -426,11 +439,20 @@ const getSharedOrderedAnimalGroups = (order: any) => {
     const tests = Array.isArray(animal?.tests) ? animal.tests : [];
     const items = tests.map((test: any, index: number) => {
       const sourceOrderedName = String(test?.testNameSnapshot || test?.testId || "").trim();
+      const inheritance = test?.inheritance && typeof test.inheritance === "object"
+        ? {
+            kind: String(test.inheritance.kind || "unknown"),
+            gene: String(test.inheritance.gene || sourceOrderedName).trim() || sourceOrderedName,
+            superGeneName: test.inheritance.superGeneName || null,
+            speciesId: test.inheritance.speciesId || null,
+          }
+        : { kind: "unknown", gene: sourceOrderedName, superGeneName: null, speciesId: null };
       return {
         orderedTestKey: `${orderId}:${sanitizeFilePart(animalId)}:${index + 1}`,
         geneName: sourceOrderedName,
         sourceOrderedName,
         catalogTestId: String(test?.testId || "").trim() || undefined,
+        inheritance,
       };
     });
     return { animalId, animalName, items };
@@ -450,6 +472,10 @@ const parseSharedResultFindings = (result: any) => {
       sourceOrderedName: String(entry?.sourceOrderedName || "").trim() || undefined,
       catalogTestId: String(entry?.catalogTestId || "").trim() || undefined,
       outcome: String(entry?.outcome || "").trim(),
+      resultStatus: String(entry?.resultStatus || "").trim() || undefined,
+      label: String(entry?.label || "").trim() || undefined,
+      genotype: String(entry?.genotype || "").trim() || undefined,
+      inheritance: String(entry?.inheritance || "").trim() || undefined,
       confidence: typeof entry?.confidence === "number" ? entry.confidence : undefined,
       notes: String(entry?.notes || "").trim() || undefined,
     }))
@@ -559,7 +585,9 @@ const buildSharedTemplateExistingResult = (result: any) => {
 
   const items = parseSharedResultFindings(result)
     .map((finding: any) => {
-      const resultStatus = OUTCOME_TO_RESULT_STATUS[finding.outcome as keyof typeof OUTCOME_TO_RESULT_STATUS];
+      const resultStatus =
+        finding.resultStatus
+        || OUTCOME_TO_RESULT_STATUS[finding.outcome as keyof typeof OUTCOME_TO_RESULT_STATUS];
       if (!resultStatus || !finding.orderedTestKey) {
         return null;
       }
@@ -1197,13 +1225,43 @@ export const createLabApiClient = () => {
     };
   };
 
-  const submitLabSampleIntake = async (input: { orderId: string; sampleCondition: "acceptable" | "borderline" | "degraded" | "insufficient"; notes?: string; received: boolean; }): Promise<TestOrder> => {
+  /**
+   * The scan at the bench. A submitted sample goes straight into testing: the
+   * scan is the receipt, and the intake form it used to open asked for a
+   * condition and notes that were never stored anywhere. An order already past
+   * "submitted" is left where it is and reported back as unchanged, so a second
+   * scan of the same tube is harmless.
+   */
+  const receiveSampleAndStartTesting = async (rawInput: string) => {
     requireSessionRole("admin", "lab_staff");
-    if (!input.received) throw new Error("Sample must be marked as received.");
-    const backendStatus = input.sampleCondition === "insufficient" ? "received" : "in_progress";
-    const response = await apiRequest<{ order: any }>(`/lab/orders/${encodeURIComponent(String(input.orderId || "").trim())}/status`, {
+    const resolved = await resolveLabSampleByQrToken(rawInput);
+    const currentStatus = String(resolved?.testOrder?.status || "").trim();
+    if (currentStatus !== "submitted") {
+      return { ...resolved, changed: false };
+    }
+    const orderId = String(resolved?.testOrder?.id || "").trim();
+    const response = await apiRequest<{ order: any }>(`/lab/orders/${encodeURIComponent(orderId)}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status: backendStatus }),
+      body: JSON.stringify({ status: "in_progress" }),
+    });
+    const nextStatus = String(response?.order?.status || "in_progress");
+    return {
+      ...resolved,
+      testOrder: { ...resolved.testOrder, status: nextStatus },
+      changed: true,
+    };
+  };
+
+  /**
+   * Something is wrong with the tube (too little shed, wrong label, degraded).
+   * The order is held at "received" so the breeder knows it arrived and the
+   * lab can follow up before any testing starts.
+   */
+  const holdSampleAtReceived = async (orderId: string): Promise<TestOrder> => {
+    requireSessionRole("admin", "lab_staff");
+    const response = await apiRequest<{ order: any }>(`/lab/orders/${encodeURIComponent(String(orderId || "").trim())}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "received" }),
     });
     return toLegacyOrder(response?.order || null);
   };
@@ -1597,7 +1655,8 @@ export const createLabApiClient = () => {
     resolveLabSampleBySampleId,
     getLabSampleForOrder,
     markSampleAsReceived,
-    submitLabSampleIntake,
+    receiveSampleAndStartTesting,
+    holdSampleAtReceived,
     getLabTestOrderDetails,
     getLabOrderStatusHistory,
     updateLabOrderWorkflowStatus,
