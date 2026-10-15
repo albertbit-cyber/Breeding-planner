@@ -3910,7 +3910,7 @@
   .bp-fab {
     display: flex;
     position: fixed;
-    bottom: 76px;
+    bottom: calc(76px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     right: 16px;
     z-index: 190;
     align-items: center;
@@ -3931,6 +3931,11 @@
   .bp-fab:active {
     transform: scale(0.93);
     box-shadow: var(--sk-shadow-1);
+  }
+  /* Scroll-to-top stacks above the FAB, centred on it, instead of covering the bottom nav's More. */
+  .bp-scroll-top {
+    bottom: calc(144px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    inset-inline-end: 20px !important;
   }
 }
 
