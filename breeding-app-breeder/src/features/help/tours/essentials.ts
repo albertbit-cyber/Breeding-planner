@@ -90,7 +90,8 @@ export const essentials = defineTour('essentials', [
     target: 'pairing-new',
     route: ['pairings'],
     missing: true,
-    done: c => c.modal === 'create-pairing' || c.modal === 'breeders-guard',
+    // Record a pairing opens the breeding entry window (Record a pairing session).
+    done: c => c.modal === 'breeding-entry',
   },
   { id: 'choosing', part: 4, kind: 'info', target: 'dialog' },
   {

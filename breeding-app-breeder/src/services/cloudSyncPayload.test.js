@@ -3,7 +3,11 @@ import {
   applyChangedRecords,
   applyRemoteDeletions,
   backfillLogIds,
+  collapseDuplicateLogEntries,
+  cursorForRequest,
   mergeGeneticsLists,
+  pendingTombstones,
+  reconcileTombstones,
   selectRecordsToUpload,
 } from "./cloudSyncPayload";
 
@@ -42,6 +46,47 @@ describe("backfillLogIds", () => {
 
   it("leaves non-array log buckets alone", () => {
     expect(backfillLogIds({ weights: null }).weights).toBeNull();
+  });
+});
+
+describe("collapseDuplicateLogEntries", () => {
+  // The leftovers of the random-id bug: one reading stored many times, each copy under its own
+  // UUID. An id-keyed merge keeps every copy, so they reached the PDF export as pages of
+  // identical 2025-11-29 rows.
+  it("keeps one copy of a reading stored under many ids", () => {
+    const logs = {
+      weights: [
+        { id: "c-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "a-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "b-uuid", date: "2025-11-29", grams: 1550 },
+        { id: "d-uuid", date: "2025-12-06", grams: 1602 },
+      ],
+    };
+    expect(collapseDuplicateLogEntries(logs).weights).toEqual([
+      { id: "a-uuid", date: "2025-11-29", grams: 1550 },
+      { id: "d-uuid", date: "2025-12-06", grams: 1602 },
+    ]);
+  });
+
+  it("keeps the same survivor whatever order the copies arrive in", () => {
+    const copies = [{ id: "z", date: "2025-11-29", feed: "Rat" }, { id: "m", date: "2025-11-29", feed: "Rat" }];
+    const forward = collapseDuplicateLogEntries({ feeds: copies }).feeds;
+    const reversed = collapseDuplicateLogEntries({ feeds: copies.slice().reverse() }).feeds;
+    expect(forward).toEqual([{ id: "m", date: "2025-11-29", feed: "Rat" }]);
+    expect(reversed).toEqual(forward);
+  });
+
+  it("keeps readings that differ in any recorded field", () => {
+    const logs = { feeds: [
+      { id: "1", date: "2025-11-29", feed: "Rat" },
+      { id: "2", date: "2025-11-29", feed: "Mouse" },
+      { id: "3", date: "2025-11-29", feed: "Rat", notes: "refused" },
+    ] };
+    expect(collapseDuplicateLogEntries(logs).feeds).toHaveLength(3);
+  });
+
+  it("leaves non-array log buckets alone", () => {
+    expect(collapseDuplicateLogEntries({ weights: null }).weights).toBeNull();
   });
 });
 
@@ -147,5 +192,30 @@ describe("mergeGeneticsLists", () => {
 
   it("trims and de-duplicates whatever it keeps", () => {
     expect(mergeGeneticsLists([" Pastel ", "pastel", ""], [])).toEqual(["Pastel"]);
+  });
+});
+
+describe("cursor and tombstones", () => {
+  it("asks for a delta from a little before the cursor", () => {
+    expect(cursorForRequest("2026-10-12T10:02:00.000Z")).toBe("2026-10-12T10:00:00.000Z");
+    expect(cursorForRequest(null)).toBeNull();
+  });
+
+  it("records the server's deletions as confirmed and stops re-sending ones it now has", () => {
+    const local = {
+      snakes: { a1: { id: "a1", appAnimalId: "a1", deletedAt: "2026-10-12T09:00:00.000Z" } },
+      pairings: {},
+    };
+    const next = reconcileTombstones(local, { animals: { a1: "2026-10-12T09:00:01.000Z", a2: "2026-10-12T08:00:00.000Z" } });
+
+    expect(next.snakes.a1.confirmed).toBe(true);
+    expect(next.snakes.a2).toMatchObject({ id: "a2", confirmed: true });
+    expect(pendingTombstones(next.snakes)).toEqual([]);
+    expect(pendingTombstones(local.snakes)).toEqual([local.snakes.a1]);
+  });
+
+  it("returns the same map when the server reports nothing new", () => {
+    const local = { snakes: { a1: { id: "a1", deletedAt: "2026-10-12T09:00:00.000Z", confirmed: true } } };
+    expect(reconcileTombstones(local, { animals: { a1: "2026-10-12T09:00:00.000Z" } })).toBe(local);
   });
 });

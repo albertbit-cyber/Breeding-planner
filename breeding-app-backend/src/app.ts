@@ -23,6 +23,7 @@ import { authFoundationRoutes } from "./routes/authFoundationRoutes";
 import { systemRoutes } from "./routes/systemRoutes";
 import { familyTreeRoutes } from "./routes/familyTreeRoutes";
 import { reproductiveRoutes } from "./routes/reproductiveRoutes";
+import { breedingRoutes } from "./routes/breedingRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { inviteRoutes } from "./routes/inviteRoutes";
 import { partnerRoutes } from "./routes/partnerRoutes";
@@ -161,6 +162,7 @@ app.use("/api/lab/orders", orderRoutes);
 app.use("/api/lab/pending-sheds", pendingShedRoutes);
 app.use("/api/family-tree", familyTreeRoutes);
 app.use("/api/reproductive", reproductiveRoutes);
+app.use("/api/breeding", breedingRoutes);
 app.use("/api/emails", emailRoutes);
 // Unauthenticated: an invitee has a token instead of an account.
 app.use("/api/invites", inviteRoutes);

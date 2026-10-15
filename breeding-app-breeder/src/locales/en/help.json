@@ -49,9 +49,9 @@
       "words": "snakes collection list"
     },
     "nav-pairings": {
-      "short": "Follows the pairings of the open species, from planning to hatchlings.",
-      "more": "Each pairing is a card that moves through its stages: locks, ovulation, pre-lay shed, eggs, incubation and hatch. With no species open, it asks you to pick one first.",
-      "words": "pairings clutches projects breeding tracker"
+      "short": "Follows each female's breeding of the open species on a breeding card, from the first pairing to the hatchlings.",
+      "more": "A card moves through its stages: pairings and locks, ovulation, pre-lay shed, eggs, incubation and hatch. With no species open, it asks you to pick one first.",
+      "words": "pairings clutches breeding cards"
     },
     "nav-advisor": {
       "short": "Suggests pairings toward a goal you set, from the animals you have.",
@@ -640,8 +640,8 @@
     },
     "record-window": {
       "title": "Animal record",
-      "short": "Shows and edits everything recorded about one animal: its details, genetics, photos, parentage, sale details and logs.",
-      "more": "Edits in this window are a draft. Nothing in the form is kept until you press Save changes, and Cancel throws the draft away. A few things act at once and are not undone by Cancel: Delete, taking or uploading a photo, Set as cover and Remove in the photo window, Publish to Marketplace, adding or deleting a status, and creating a new group. Open family tree closes the window without saving.",
+      "short": "Shows and edits everything recorded about one animal: its details, genetics, photos, care records, breeding, lineage and sale details.",
+      "more": "Edits in this window are a draft. Nothing in the form is kept until you press Save changes, and Cancel throws the draft away. A few things act at once and are not undone by Cancel: taking, uploading or clearing a photo, Move to archive, Delete, Publish to Marketplace, adding or deleting a status, and creating a new group. Open family tree, under More actions, closes the window without saving.",
       "tips": [
         "Press Save changes before you open the family tree, or the edits in the form are lost."
       ],
@@ -654,12 +654,12 @@
     },
     "record-cancel": {
       "short": "Closes the window and throws away the changes in the form.",
-      "more": "Things that already acted at once stay as they are: photos you added, Set as cover, removed photos, a Publish to Marketplace, statuses you added or deleted and new groups.",
+      "more": "Things that already acted at once stay as they are: photos you added or cleared, a Publish to Marketplace, statuses you added or deleted and new groups.",
       "words": "close discard dismiss"
     },
     "record-delete": {
-      "short": "Asks you to confirm, then removes this animal from your collection.",
-      "more": "It acts at once, not on Save changes. Every pairing that includes this animal is removed with it. There is no undo inside the app; a backup file you downloaded earlier is the only way back.",
+      "short": "Asks you to confirm, then deletes this animal.",
+      "more": "It acts at once, not on Save changes. If the animal was sold, died or given away, Move to archive keeps its record and is usually the better choice.",
       "words": "remove delete animal erase"
     },
     "record-family-tree": {
@@ -847,9 +847,9 @@
       "words": "father male parent"
     },
     "record-pairing-overview": {
-      "short": "Lists the pairings this animal is part of, with its partner, the number of appointments and the current stage.",
-      "more": "It is read only. Pairings are changed under Breeding.",
-      "words": "pairings partners projects"
+      "short": "Lists the pairings this animal is part of, with its partner and the current stage.",
+      "more": "It is read only. Pairings are recorded under Breeding.",
+      "words": "pairings partners"
     },
     "record-logs": {
       "short": "Holds the animal's history: feeds, weights, sheds, cleanings and meds.",
@@ -898,14 +898,14 @@
     },
     "record-delete-dialog": {
       "title": "Delete animal",
-      "short": "Asks you to confirm before an animal is removed from your collection.",
-      "more": "Deleting also removes every pairing that includes the animal. There is no undo inside the app. The example animals are only shown until you add or import a real animal.",
+      "short": "Asks you to confirm before an animal is deleted, and offers to archive it instead.",
+      "more": "An animal that other records point at (pairings, offspring, its own parents or clutch) is not removed completely. Its feeding, weights, notes and photos are erased, and a small card keeps its ID, name, main photo and family links, so pairings, clutches and pedigrees still show it. For such an animal you choose why it left before you can delete it. An animal with no such links is removed entirely.",
       "words": "confirm delete remove"
     },
     "record-delete-confirm": {
-      "short": "Removes the animal and every pairing that includes it.",
-      "more": "This cannot be undone inside the app. A backup file you downloaded earlier is the only way to get it back.",
-      "words": "delete confirm remove"
+      "short": "Deletes the animal.",
+      "more": "An animal with family links leaves a small card behind and keeps its pairings; any other animal is removed entirely. This cannot be undone inside the app. A backup file you downloaded earlier is the only way to get the erased records back.",
+      "words": "delete confirm remove permanently"
     },
     "record-delete-cancel": {
       "short": "Closes this question and keeps the animal.",
@@ -1216,90 +1216,80 @@
     },
     "breeding-screen": {
       "title": "Breeding",
-      "short": "Follows the pairings of the open species, from the first appointment to the hatchlings.",
-      "more": "The tabs at the top switch between the Dashboard, Active pairings, Completed pairings and the Incubator. Each pairing is a card holding its appointments, locks, ovulation, pre-lay shed, clutch and hatch. Everything you change on a card is saved as you go.",
+      "short": "Follows each female's breeding of the open species on one breeding card, from the first pairing to the hatchlings.",
+      "more": "Every female gets one card per breeding cycle. It holds her pairing sessions, lock observations, follicle exams, milestones, clutch and hatchlings. The tabs at the top switch between the Dashboard, Active pairing, the Incubator and Completed pairing. Changes on a card are saved as you make them.",
       "tips": [
-        "Start with New pairing. Only animals in the Breeders group can be paired."
+        "Start with Record a pairing. A female's first pairing session opens her card."
       ],
-      "words": "pairings breeding tracker projects season"
+      "words": "pairings breeding cards season cycle"
     },
     "pairing-view-dashboard": {
-      "short": "Shows every active pairing as a short card with its current stage, next stage and target date.",
-      "more": "Use it to see what needs doing today. The counts at the top filter the cards by how soon the next step is due.",
+      "short": "Shows every open breeding card as a short item with its current stage, next stage and target date.",
+      "more": "Use it to see what needs doing today. The counts at the top filter the items by how soon the next step is due.",
       "words": "overview due today urgent"
     },
     "pairing-view-active": {
-      "title": "Active pairings",
-      "short": "Lists the pairings that are still running, one card each.",
-      "more": "A pairing leaves this list when you mark it completed, when its hatch is recorded, or when every egg is marked bad. The number on the tab is how many active pairings there are.",
-      "words": "current running open pairings"
+      "title": "Active pairing",
+      "short": "Lists the open breeding cards, one per female, grouped by season.",
+      "more": "A card moves to Completed pairing once its hatchlings are registered, or when you close it. The number on the tab is how many cards are open.",
+      "words": "current running open cards"
     },
     "pairing-view-completed": {
-      "title": "Completed pairings",
-      "short": "Lists finished pairings, with filters by year and by outcome.",
-      "more": "A pairing counts as completed when you mark it completed, when its hatch is recorded, or when all its eggs were marked bad. Completed pairings keep all their records, and you can reopen one.",
-      "words": "finished archive past history"
+      "title": "Completed pairing",
+      "short": "Lists the finished breeding cards, filed under the season they started in, with filters by season and outcome.",
+      "more": "Completed cards keep everything recorded on them. Reopen sends one back to Active pairing in the same season.",
+      "words": "finished past history closed"
     },
     "pairing-view-incubator": {
       "title": "Incubator",
-      "short": "Shows every recorded clutch as egg boxes, with laid and due dates and the eggs left.",
-      "more": "Egg boxes come from the clutches logged on your pairings. A clutch of more than 10 eggs is shown as two boxes. The number on the tab is how many clutches are incubating.",
+      "short": "Shows every clutch still incubating as egg boxes, with laid and due dates and the eggs left.",
+      "more": "A clutch appears here once its egg laying is recorded on the card, and leaves when the hatch is logged. The due date is 60 days after laying. The number on the tab is how many clutches are incubating.",
       "words": "eggs incubation boxes due"
     },
     "pairing-search": {
-      "title": "Search pairings or snakes",
-      "short": "Narrows the pairing lists to pairings whose label or parents match what you type.",
+      "title": "Search females, males or a season",
+      "short": "Narrows the cards to those whose female, male or season matches every word you type.",
+      "more": "It shows on Active pairing and Completed pairing.",
       "words": "find filter search"
     },
     "pairing-search-clear": {
       "short": "Empties the pairing search so every pairing shows again."
     },
     "pairing-qr-labels": {
-      "short": "Opens a window to print QR labels for all your pairings or for the ones you pick.",
-      "more": "You get a PDF file with one label per pairing. Each label shows the pairing, its parents and its appointment dates, and a QR code that links back to that pairing in Serpentora.",
+      "short": "Opens a window to print QR labels for your pairings as a PDF file.",
+      "more": "The labels are made from pairing records, not from breeding cards, so a card started on the new breeding screen may not have a label here.",
       "words": "qr label print tub sticker"
     },
     "pairing-new": {
-      "short": "Opens the Create pairing window to pair a breeder male with a breeder female.",
-      "more": "Only animals in the Breeders group can be chosen. A female can be in one active pairing at a time.",
-      "words": "add pairing create start breed"
-    },
-    "pairing-filter-year": {
-      "title": "All years",
-      "short": "Shows completed pairings from one breeding season, or from all of them.",
-      "words": "season year filter"
-    },
-    "pairing-filter-outcome": {
-      "title": "All outcomes",
-      "short": "Shows completed pairings with one kind of result, such as eggs or live birth, no ovulation observed, or follicles reabsorbed.",
-      "more": "Late outcome means an event was recorded after the pairing was marked completed. Reopened means the pairing was completed once and then opened again.",
-      "words": "result outcome filter"
+      "title": "Record a pairing",
+      "short": "Opens a window to record a pairing session: which male was introduced to which female, and when.",
+      "more": "The first session of a female opens her breeding card. Later sessions, with the same male or another one, are added to her open card.",
+      "words": "add pairing record session start breed"
     },
     "breeding-dashboard": {
       "title": "Breeding Dashboard",
-      "short": "Sums up your active pairings: what is overdue, what is due soon, and which stage each pairing has reached.",
+      "short": "Sums up your open breeding cards: what is overdue, what is due soon, and which stage each has reached.",
       "words": "summary overview due"
     },
     "breeding-urgency-card": {
       "title": "Overdue, Due in 3 days, Next 7 days, Tracking",
-      "short": "Counts pairings by how soon their next step is due. Press a count to show only those pairings, and press it again to show all.",
-      "more": "The due date is the target of the next stage: the pre-lay shed window after ovulation, egg laying after the pre-lay shed, or the hatch after the clutch. Tracking is the number of active pairings.",
+      "short": "Counts open cards by how soon their next step is due. Press a count to show only those cards, and press it again to show all.",
+      "more": "The due date is the next stage's target: the pre-lay shed 21 days after ovulation, egg laying 30 days after the pre-lay shed, or the hatch 60 days after laying. Tracking is the number of open cards.",
       "words": "overdue due soon filter urgent"
     },
     "breeding-stage-counts": {
       "title": "Clutch laid, Pre-lay shed, In ovulation, Locks observed",
-      "short": "Counts active pairings by the furthest stage each has reached.",
+      "short": "Counts open cards by the furthest stage each has reached.",
       "words": "stages counts progress"
     },
     "breeding-dashboard-item": {
-      "title": "Pairing on the dashboard",
-      "short": "Shows one pairing's current stage, next stage, target date and latest lock.",
-      "more": "The badge shows how many days are left to the target date, or how overdue it is.",
+      "title": "Card on the dashboard",
+      "short": "Shows one card's current stage, next stage, target date and latest lock. Press it to open the card.",
       "words": "card stage target"
     },
     "breeding-dashboard-open": {
       "title": "Open details",
-      "short": "Opens this pairing's full card so you can record the next step.",
+      "short": "Opens this breeding card so you can record the next step.",
       "more": "The button is named after the next step, such as Log ovulation or Log hatch, but it only opens the card. Nothing is recorded until you do it on the card.",
       "words": "open log next step"
     },
@@ -1343,10 +1333,10 @@
       "short": "Saves the bad eggs and notes for this egg box and closes the window."
     },
     "pairing-card": {
-      "title": "Pairing card",
-      "short": "Holds one pairing: its parents, appointments, locks, breeding cycle, notes and hatchlings. Press it to open it.",
-      "more": "The heading shows the clutch number, the egg box and the season. Every change on an open card is saved as you go; there is no Save button.",
-      "words": "pairing clutch card details"
+      "title": "Breeding card",
+      "short": "Holds one female's breeding cycle: her pairing sessions and males, lock observations, follicle exams, milestones, clutch and hatchlings. Press it to open it.",
+      "more": "A female has one open card at a time; later sessions with any male are added to it. The card shows its status (Active, Paused or Closed) and the stage it has reached. Every change on a card is saved as you go; there is no Save button.",
+      "words": "breeding card cycle female details"
     },
     "pairing-clutch-id": {
       "title": "Clutch ID",
@@ -1354,244 +1344,20 @@
       "more": "It is built from the parents' names, so renaming a parent changes it.",
       "words": "clutch id name"
     },
-    "pairing-sire": {
-      "title": "Sire",
-      "short": "Shows the male of this pairing and his genetics. Press his name to open his record."
-    },
-    "pairing-dam": {
-      "title": "Dam",
-      "short": "Shows the female of this pairing and her genetics. Press her name to open her record."
-    },
-    "pairing-qr-label": {
-      "short": "Downloads a QR label PDF for this one pairing.",
-      "more": "The QR code links back to this pairing in Serpentora."
-    },
-    "pairing-delete": {
-      "short": "Deletes this pairing at once, with all its appointments, locks, clutch and hatch records.",
-      "more": "There is no confirmation and it cannot be undone. Hatchlings already created from it stay in your animals. To keep the history, mark the pairing completed instead.",
-      "words": "remove delete pairing"
-    },
-    "pairing-edit": {
-      "short": "Shows the male and female choices so you can swap a parent. Press Done to hide them.",
-      "more": "Each female can be in only one active pairing.",
-      "words": "change parents swap"
-    },
-    "pairing-edit-male": {
-      "short": "Changes the male of this pairing. The change is saved straight away."
-    },
-    "pairing-edit-female": {
-      "short": "Changes the female of this pairing. The change is saved straight away."
-    },
     "pairing-collapse": {
-      "short": "Closes this pairing card back to its one line summary."
-    },
-    "pairing-stage-tracker": {
-      "short": "Shows how far this pairing has come: paired, locked, ovulated, pre-lay shed, clutch laid, incubating and hatched.",
-      "more": "Stages light up from what you record on the card. Paired comes from a ticked appointment and Locked from a ticked lock.",
-      "words": "progress stages"
-    },
-    "pairing-label": {
-      "short": "Names this pairing. It starts as female x male, and you can change it."
-    },
-    "pairing-start-date": {
-      "short": "Sets the date the pairing starts. Changing it moves the first appointment and spaces the later ones a month apart."
-    },
-    "pairing-appointments": {
-      "short": "Plans the dates you put the male in with the female, and records whether the pairing happened and whether you saw a lock.",
-      "more": "Appointments start monthly from the start date. Ticking one or setting its date moves the later appointments to follow a month apart. They also appear in the Calendar.",
-      "words": "introductions visits schedule locks"
-    },
-    "pairing-generate-months": {
-      "short": "Replaces the appointment list with five monthly appointments.",
-      "more": "Recorded pairing dates are kept as the dates of the new appointments, but ticks, locks, lock dates and notes on the old appointments are dropped. There is no confirmation.",
-      "words": "generate schedule monthly"
-    },
-    "pairing-add-appointment": {
-      "short": "Adds one more appointment, a month after the last recorded pairing date, or on the start date."
-    },
-    "pairing-appointment-done": {
-      "short": "Marks that the pairing on this appointment happened. Today's date is filled in if no pairing date is set."
-    },
-    "pairing-lock": {
-      "short": "Marks that you saw a lock on this appointment. Today's date is filled in if no lock date is set.",
-      "words": "lock copulation tie"
-    },
-    "pairing-date": {
-      "short": "Records the day the pair was actually put together. Setting it ticks the appointment."
-    },
-    "pairing-lock-date": {
-      "short": "Records the day you saw the lock. Setting it ticks Lock."
-    },
-    "pairing-appointment-notes": {
-      "title": "Notes",
-      "short": "Keeps a short note for this appointment."
-    },
-    "pairing-appointment-remove": {
-      "short": "Removes this appointment at once, without asking."
-    },
-    "pairing-notes": {
-      "short": "Keeps free notes for the whole pairing."
-    },
-    "pairing-hatchlings": {
-      "short": "Lists the hatchlings linked to this pairing. Press one to open its record."
-    },
-    "pairing-genetics-calculator": {
-      "short": "Shows or hides the genetics odds for this pairing.",
-      "more": "It appears only when the parents have genetics recorded that the calculator can work with.",
-      "words": "punnett odds calculator genetics"
-    },
-    "pairing-odds": {
-      "short": "Shows the chance of each outcome per hatchling, gene by gene and combined, from the genetics recorded on both parents.",
-      "more": "These are probabilities, not promises. A clutch can come out better or worse than the odds, and the odds are only as good as the genetics you recorded. Possible hets count with their percentage.",
-      "words": "odds chance probability punnett outcomes het visual"
-    },
-    "pairing-completion-reason": {
-      "short": "Says why the pairing is finished, such as eggs laid, live birth, or no expected offspring."
-    },
-    "pairing-outcome-confidence": {
-      "short": "Says how sure you are of the outcome: confirmed, likely or unknown.",
-      "more": "For eggs laid or live birth the outcome is confirmed, so this choice is locked."
-    },
-    "pairing-completion-note": {
-      "short": "Keeps a note about why and how the pairing ended."
-    },
-    "pairing-mark-completed": {
-      "short": "Ends active tracking of this pairing and moves it to Completed pairings, with the reason, confidence and note you chose.",
-      "more": "Nothing is deleted. You can still record ovulation, eggs or a hatch later, and you can reopen the pairing.",
-      "words": "complete finish close end season"
+      "title": "Collapse",
+      "short": "Closes this breeding card back to its short summary.",
+      "words": "collapse close"
     },
     "pairing-reopen": {
-      "short": "Moves a completed pairing back to Active pairings.",
-      "more": "The earlier completion is kept in its history."
-    },
-    "pairing-reopen-add-event": {
-      "short": "Reopens this completed pairing so you can keep recording its events as an active pairing.",
-      "more": "You do not have to reopen it. Events can also be recorded while the pairing stays completed."
-    },
-    "breeding-cycle": {
-      "title": "Breeding cycle",
-      "short": "Records the female's cycle on this pairing: ovulation, pre-lay shed, eggs laid and the hatch.",
-      "more": "Each step sets a target for the next one: about 21 days from ovulation to the pre-lay shed, 30 days from the pre-lay shed to laying, and 60 days from laying to hatch. These are fixed rough guides, not predictions for your animal.",
-      "words": "ovulation shed clutch hatch cycle"
-    },
-    "pairing-log-ovulation": {
-      "short": "Records the ovulation date and notes. Once recorded, the button reads Edit details.",
-      "more": "If at least three appointments fall on or before the ovulation date, appointments after it are removed.",
-      "words": "ovulation ovulate swelling"
-    },
-    "pairing-clear-ovulation": {
-      "title": "Clear (ovulation)",
-      "short": "Removes the ovulation record and the pre-lay shed record with it, without asking."
-    },
-    "pairing-log-prelay": {
-      "short": "Records the pre-lay shed date and notes. Once recorded, the button reads Edit details.",
-      "more": "If ovulation is recorded, the days between the two are shown.",
-      "words": "pre-lay shed prelay"
-    },
-    "pairing-clear-prelay": {
-      "title": "Clear (pre-lay shed)",
-      "short": "Removes the pre-lay shed record, without asking."
-    },
-    "pairing-ovulation-dialog": {
-      "short": "Records the date of ovulation and any notes. Save keeps them on the pairing."
-    },
-    "pairing-prelay-dialog": {
-      "short": "Records the date of the pre-lay shed and any notes. Save keeps them on the pairing."
-    },
-    "pairing-ovulation-date": {
-      "short": "The day you saw ovulation. It is needed to save."
-    },
-    "pairing-prelay-date": {
-      "short": "The day the pre-lay shed happened. It is needed to save."
-    },
-    "pairing-event-notes": {
-      "short": "Keeps notes with this event."
-    },
-    "pairing-eggs-laid": {
-      "short": "Records the clutch: how many fertile eggs and how many slugs were laid.",
-      "more": "The laying date is set to today and the hatch is expected 60 days later. You can correct the date afterwards on the card.",
-      "words": "clutch eggs laid lay"
-    },
-    "pairing-eggs-dialog": {
-      "short": "Records the number of fertile eggs and slugs. The total is saved as fertile eggs plus slugs."
-    },
-    "pairing-egg-date": {
-      "short": "The day the eggs were laid. The expected hatch date follows from it.",
-      "more": "It can be edited only after the clutch is recorded."
-    },
-    "pairing-fertile-eggs": {
-      "short": "How many good eggs were laid. It also caps how many hatchlings can be recorded."
-    },
-    "pairing-slugs": {
-      "short": "How many slugs, the infertile eggs, were laid.",
-      "words": "slugs infertile"
-    },
-    "pairing-clutch-card": {
-      "short": "Downloads a clutch card PDF with the parents, their genetics, the laying date and the egg count.",
-      "more": "It needs a laying date."
-    },
-    "pairing-clear-eggs": {
-      "short": "Wipes the clutch and hatch records of this pairing, without asking.",
-      "more": "The laying date, egg counts, egg box notes, bad eggs and the hatch record are all cleared. Hatchlings already created stay in your animals. It cannot be undone.",
-      "words": "clear reset eggs clutch"
-    },
-    "breeding-cycle-timers": {
-      "short": "Counts down to the next milestones of this pairing, such as the pre-lay shed window, egg laying or hatch.",
-      "more": "Timers start once ovulation, a pre-lay shed or a clutch is recorded. When the hatch is recorded it says the cycle is over."
-    },
-    "breeding-countdown": {
-      "title": "Countdown",
-      "short": "Shows one milestone: the day of the cycle, the time left or overdue, and the target date."
-    },
-    "hatch-eggs-hatched": {
-      "short": "Starts recording the hatch of this clutch. You are first asked whether you logged a hatch for it before.",
-      "words": "hatch hatched hatchlings"
-    },
-    "hatch-view-edit": {
-      "short": "Changes the recorded hatch. You are first asked whether you logged a hatch for this clutch before."
-    },
-    "hatch-clear-record": {
-      "short": "Clears the hatch date, count and notes, without asking.",
-      "more": "Hatchlings already created stay in your animals, and logging the hatch again will not create cards for them a second time. To start the hatch over and remove those animals, use Eggs hatched and answer that you logged it before."
-    },
-    "hatch-gate": {
-      "title": "Have you logged hatch before for this clutch?",
-      "short": "Asks whether this clutch already has a hatch logged, so hatchlings are not created twice.",
-      "more": "Hatchling cards are only made for hatchlings that are new to this clutch."
-    },
-    "hatch-gate-first": {
-      "title": "No, this is the first hatch log",
-      "short": "Opens hatch details, and then one card for each new hatchling."
-    },
-    "hatch-gate-again": {
-      "title": "Yes, I have logged hatch before",
-      "short": "Lets you choose between deleting the hatchlings made earlier and logging again, or only editing the hatch details."
-    },
-    "hatch-redo": {
-      "title": "Delete the old hatchling records?",
-      "short": "Decides what happens to the hatchlings created earlier for this clutch.",
-      "more": "Only animals made by the hatch wizard for this pairing are counted. Animals you linked to the clutch yourself are never touched."
-    },
-    "hatch-redo-delete": {
-      "title": "Delete hatchling records and log again",
-      "short": "Permanently deletes the hatchling animals the wizard created for this clutch, clears the hatch record, and opens hatch logging from scratch.",
-      "more": "The deletion also reaches your other signed in devices. It cannot be undone, so make a backup first if you are unsure.",
-      "words": "redo delete hatchlings reset"
-    },
-    "hatch-redo-keep": {
-      "title": "Keep them, just edit the hatch details",
-      "short": "Keeps the existing hatchlings and opens the hatch details. No new hatchling cards will open."
-    },
-    "hatch-details-dialog": {
-      "short": "Records the hatch date, how many hatched, and notes.",
-      "more": "After you save, the hatch wizard opens one card for each hatchling that is new to this clutch."
-    },
-    "hatch-count": {
-      "short": "How many eggs hatched. It cannot be more than the fertile eggs recorded."
+      "title": "Reopen",
+      "short": "Asks why, then sends a closed card back to Active pairing in the same season.",
+      "more": "The earlier closure is kept in the card's history. If the female already has another open card, this one comes back paused, for correcting its records only.",
+      "words": "reopen undo close"
     },
     "hatch-wizard": {
-      "short": "Creates an animal record for each hatchling, one at a time, linked to this pairing.",
-      "more": "Each hatchling gets an ID from your ID format, the pairing's parents, and is placed in a Hatchlings group for the year. Closing the window keeps the hatchlings saved so far; the rest are not created.",
+      "short": "Creates an animal record for each hatchling, one at a time.",
+      "more": "Each hatchling gets an ID from your ID format and the parents, and is placed in a Hatchlings group for the year. Closing the window keeps the hatchlings saved so far; the rest are not created.",
       "words": "hatchlings wizard new animals babies"
     },
     "hatch-id": {
@@ -1820,8 +1586,8 @@
     },
     "concept-clutch": {
       "title": "Clutch",
-      "short": "A clutch is the eggs one female lays from one pairing. In Serpentora it is recorded on the pairing, not as a record of its own.",
-      "more": "The laying date, fertile eggs, slugs, egg boxes, bad eggs and the hatch are all kept on the pairing card. Each clutch gets a number, a Clutch ID made from the parents and the season, and one or two egg boxes in the Incubator. Hatchlings created from it are linked back to the pairing, which is how the Family Tree finds them.",
+      "short": "A clutch is the eggs one female lays in one breeding cycle. In Serpentora it is recorded on her breeding card, not as a record of its own.",
+      "more": "The laying date, fertile eggs, slugs, egg boxes, bad eggs and the hatch are all kept on the card. Each clutch gets a Clutch ID and one or two egg boxes in the Incubator. Hatchlings logged from it are linked back to the card, which is how the Family Tree finds them.",
       "words": "clutch eggs laid egg box hatch"
     },
     "spaces-screen": {
@@ -3446,6 +3212,723 @@
     "account-see-plans": {
       "short": "Opens My Account in Settings, where the plans are listed.",
       "words": "plans account"
+    },
+    "record-more": {
+      "short": "Opens the less frequent actions for this animal: Open family tree, Export PDF, QR label, Order Genetic Test, Move to archive and Delete.",
+      "more": "Delete sits last and apart, so it is not pressed by accident.",
+      "words": "menu more options actions overflow"
+    },
+    "record-archive": {
+      "title": "Move to archive",
+      "short": "Takes an animal that was sold, died or left in another way out of your collection, and keeps its full record.",
+      "more": "It opens a short form for the reason, the date and the details. Afterwards the record can only be read, and the animal is listed under Archive on the Animals screen. It can be returned to the collection later. Example animals cannot be archived.",
+      "words": "archive sold died gone left given away"
+    },
+    "record-delete-reason": {
+      "title": "Why did it leave?",
+      "short": "Records why an animal with family links left, before it is deleted.",
+      "more": "The reason is shown on the small card that stays behind in its pairings and pedigrees.",
+      "words": "reason sold died why left"
+    },
+    "record-archive-instead": {
+      "title": "Archive instead",
+      "short": "Closes this question and opens Move to archive, which keeps the animal's whole record.",
+      "words": "archive keep record instead"
+    },
+    "animals-archive-view": {
+      "title": "Archive",
+      "short": "Lists the animals that left your collection, with their full records kept.",
+      "more": "Adding, importing and QR labels are hidden here, because they act on the collection. Scan QR stays: a scanned label opens an archived record too. The number on the tab is how many animals are archived.",
+      "words": "archive sold died former past animals"
+    },
+    "archive-filter-reason": {
+      "title": "Reason",
+      "short": "Shows only the archived animals that left for one reason, such as sold or died. All shows every one.",
+      "words": "filter reason sold died"
+    },
+    "archive-filter-year": {
+      "title": "Year",
+      "short": "Shows only the animals that left in one year.",
+      "words": "filter year date"
+    },
+    "archive-search": {
+      "title": "Search the archive",
+      "short": "Finds archived animals by name, ID, genetics or the buyer's name.",
+      "words": "search find buyer name"
+    },
+    "archive-open": {
+      "title": "Archived animal",
+      "short": "Opens the archived record of this animal.",
+      "words": "open record archived"
+    },
+    "archive-dialog": {
+      "title": "Move to archive",
+      "short": "Records why and when an animal left the collection, then moves it to the archive.",
+      "more": "The record is kept: feeding, weights, breeding, genetics and photos. From then on it can only be read, though the exit details can still be corrected and notes added. The fields change with the reason: a buyer and price for a sale, a cause for a death. For a female, her open breeding is completed with the reason, and no clutch or hatchlings are expected from it.",
+      "words": "archive exit sold died gave away"
+    },
+    "archive-reason": {
+      "title": "Reason",
+      "short": "Why the animal left: the choice decides which details the form asks for.",
+      "more": "A note is required when the reason is Other.",
+      "words": "reason sold died traded"
+    },
+    "archive-confirm": {
+      "title": "Move to archive",
+      "short": "Moves the animal to the archive with the details in the form.",
+      "more": "When you are correcting an archived animal's details, the same button reads Save details.",
+      "words": "confirm archive save"
+    },
+    "archive-record": {
+      "title": "Archived record",
+      "short": "Shows everything kept about an animal that left: the exit details, notes, breeding, offspring and feeding.",
+      "more": "The record can only be read. You can correct the exit details, add dated notes, download or copy it, return the animal to the collection, or delete it for good under Manage.",
+      "words": "archived record history former"
+    },
+    "archive-pdf": {
+      "title": "Download PDF",
+      "short": "Downloads the archived record as a PDF file.",
+      "words": "pdf download print"
+    },
+    "archive-copy": {
+      "title": "Copy as text",
+      "short": "Copies the archived record as plain text, to paste into a message or a note.",
+      "words": "copy text clipboard"
+    },
+    "archive-edit-details": {
+      "title": "Correct details",
+      "short": "Reopens the exit form so the reason, date, buyer or other details can be corrected.",
+      "words": "correct edit exit details"
+    },
+    "archive-erase-contact": {
+      "title": "Erase buyer contact",
+      "short": "Asks you to confirm, then erases the buyer or recipient's name and contact from this record.",
+      "more": "This cannot be undone. The rest of the record stays.",
+      "words": "erase buyer contact privacy remove"
+    },
+    "archive-add-note": {
+      "title": "Add note",
+      "short": "Adds a dated note to the archived record, such as a necropsy result or news from the buyer.",
+      "more": "Notes are kept as written; they cannot be edited or removed.",
+      "words": "note add dated"
+    },
+    "archive-return": {
+      "title": "Returned to the collection",
+      "short": "Brings an archived animal back into the collection, for a buyback, a returned sale or an animal found again.",
+      "more": "It asks for the date it came back and an optional note. The time it spent away stays on its record.",
+      "words": "return buyback back collection restore"
+    },
+    "archive-delete": {
+      "title": "Delete permanently",
+      "short": "Asks you to confirm, then deletes the archived animal for good.",
+      "more": "If other records point at it (pairings, offspring, parents), a small card keeps its ID, name, main photo and family links. This cannot be undone inside the app.",
+      "words": "delete permanently remove erase"
+    },
+    "archive-removed-card": {
+      "title": "No longer in the collection",
+      "short": "The small card left behind by a deleted animal that other records point at.",
+      "more": "Its records were erased; the card keeps its place in your pairings, clutches and pedigrees, with its parents, pairings and offspring.",
+      "words": "removed deleted card stub"
+    },
+    "breeding-season-bar": {
+      "title": "Current season",
+      "short": "Shows the breeding season pairings belong to now, since when, and how many cards are open in it.",
+      "more": "A card belongs to the season its first pairing falls in and keeps it. Earlier seasons that still have open cards or eggs in the incubator are listed as Finishing.",
+      "words": "season year current finishing"
+    },
+    "season-start-new": {
+      "title": "Start new season",
+      "short": "Asks you to confirm, then starts the next season today, so pairings from today on belong to it.",
+      "more": "A new season starts on 1 September unless you set another date in Breeding settings. Use this when your season starts on a different day this year. Cards already running keep their season.",
+      "words": "season new start year"
+    },
+    "breeding-mode": {
+      "title": "Breeding cards, Follicle overview",
+      "short": "Switches Active pairing between the breeding cards and the Follicle overview table.",
+      "more": "The Follicle overview lists every open card in one table, with its stage, latest follicle size and next planned pairing, and holds the Breeding settings.",
+      "words": "cards table overview follicles"
+    },
+    "breeding-record-exam": {
+      "title": "Record a follicle exam",
+      "short": "Opens a window to record a follicle examination for a female with an open card.",
+      "words": "follicle exam scan ultrasound"
+    },
+    "completed-filter-season": {
+      "title": "All seasons",
+      "short": "Shows only the completed cards of one season.",
+      "words": "filter season"
+    },
+    "completed-filter-outcome": {
+      "title": "All outcomes",
+      "short": "Shows only the completed cards with one outcome: Hatched, No clutch, Failed clutch, Stopped, Female left or Reopened.",
+      "words": "filter outcome"
+    },
+    "incubator-open-card": {
+      "title": "Open breeding card",
+      "short": "Opens the breeding card this clutch belongs to, where the hatch is logged.",
+      "words": "open card"
+    },
+    "card-female": {
+      "title": "Female",
+      "short": "Opens the female's animal record.",
+      "words": "female open record"
+    },
+    "card-season": {
+      "title": "Season",
+      "short": "Shows the season this card belongs to. Press it to correct the label by hand.",
+      "more": "Saving an empty label goes back to the automatic season, taken from the date of the first pairing.",
+      "words": "season label year"
+    },
+    "card-cycle-clock": {
+      "title": "Cycle clock",
+      "short": "Counts the days to the next expected step after a recorded milestone: pre-lay shed 21 days after ovulation, eggs 30 days after the shed, hatching 60 days after laying.",
+      "more": "These are fixed rules of thumb, not predictions. The clock starts only when ovulation or a later milestone is recorded as seen, and counts from the latest one. It turns blue two days before the expected day, amber when one or two days late, and red from three days late.",
+      "words": "clock days due countdown rule"
+    },
+    "card-mark-reviewed": {
+      "title": "Mark reviewed",
+      "short": "Dismisses this review prompt once you have looked at it.",
+      "more": "Review prompts point at something worth a look, such as a follicle size inside the range you set, or a card moved from an older pairing record. They never decide anything for you.",
+      "words": "review dismiss prompt"
+    },
+    "card-add-pairing": {
+      "title": "+ Pairing",
+      "short": "Records another pairing session on this card, with the card's last male chosen already.",
+      "words": "pairing session add"
+    },
+    "card-add-lock": {
+      "title": "+ Observed lock",
+      "short": "Records a lock observation on one of this card's pairing sessions.",
+      "more": "The window starts with Lock observed chosen; change it if you saw no lock or are not sure.",
+      "words": "lock observed record"
+    },
+    "card-add-exam": {
+      "title": "+ Follicle exam",
+      "short": "Records a follicle examination for this female: an ultrasound, a palpation or what you observed.",
+      "words": "follicle exam scan ultrasound palpation"
+    },
+    "card-add-milestone": {
+      "title": "+ Milestone",
+      "short": "Records a dated milestone on this card: ovulation, pre-lay shed, egg laying, live birth, first hatch or final hatch.",
+      "more": "A later milestone can be entered without the earlier ones.",
+      "words": "ovulation shed milestone"
+    },
+    "card-eggs-laid": {
+      "title": "Eggs laid",
+      "short": "Records the clutch: the laying date, the total eggs, the fertile eggs and the slugs.",
+      "more": "Once the egg laying is recorded, the clutch appears in the Incubator and the 60-day clock to hatching starts.",
+      "words": "eggs clutch laid"
+    },
+    "card-plan-pairing": {
+      "title": "Plan pairing",
+      "short": "Adds a reminder for a pairing you intend to do with a chosen male on a chosen date.",
+      "more": "A planned pairing is only a reminder: it is not a session and never counts as a lock. It does not add the male to the card.",
+      "words": "plan reminder schedule"
+    },
+    "card-pause": {
+      "title": "Pause",
+      "short": "Pauses this card, with an optional reason. No new pairing reminders are proposed while it is paused.",
+      "more": "Pausing cancels the pending reminders that were proposed after a lock; reminders you set yourself stay. Resume does not bring the cancelled ones back.",
+      "words": "pause hold stop"
+    },
+    "card-resume": {
+      "title": "Resume",
+      "short": "Makes a paused card active again. The pause stays in the card's history.",
+      "words": "resume continue"
+    },
+    "card-log-hatch": {
+      "title": "Log hatch",
+      "short": "Records the hatch in one step, once every hatchling is out of the egg.",
+      "words": "hatch hatched log"
+    },
+    "card-close": {
+      "title": "Close card",
+      "short": "Closes this card with an outcome, such as No clutch or Failed clutch.",
+      "more": "Everything recorded stays and the card can be reopened. Closing cancels the pending pairing reminders, and reopening does not bring them back.",
+      "words": "close finish end"
+    },
+    "card-register-hatchlings": {
+      "title": "Register hatchlings",
+      "short": "Creates the animal records still missing for this card's hatchlings.",
+      "more": "The card moves to Completed pairing once every hatchling is registered as an animal.",
+      "words": "hatchlings register create animals"
+    },
+    "card-tabs": {
+      "title": "Overview, Follicles, Clutch and hatchlings",
+      "short": "Switches the open card between its overview (males, planned pairings, timeline), its follicle exams and its clutch and hatchlings.",
+      "more": "For a live-bearing species the last tab is called Offspring.",
+      "words": "tabs sections"
+    },
+    "card-males": {
+      "title": "Males (candidate sires)",
+      "short": "Lists the males on this card, with their pairing sessions and lock records.",
+      "more": "A male is Participated once he has a session, and Planned only before that.",
+      "words": "males sires candidates"
+    },
+    "card-multiple-sires": {
+      "title": "Multiple sires",
+      "short": "Allows more than one male on this card. It turns on by itself when a second male is paired.",
+      "more": "Each male keeps his own sessions and locks, and a lock never decides who the father is. It cannot be turned off once two males have sessions. Turning it off otherwise keeps only the first male; the others and their pending reminders are removed.",
+      "words": "multiple sires males father"
+    },
+    "card-male-row": {
+      "title": "Male",
+      "short": "Opens this male's sessions on the card: introduction and removal dates, lock records and notes.",
+      "words": "male sessions history"
+    },
+    "card-lock-status": {
+      "title": "Status",
+      "short": "Changes a lock record between Lock observed, Not observed and Unknown.",
+      "more": "Only records marked Lock observed count as observed locks, so changing it changes the count.",
+      "words": "lock status observed"
+    },
+    "card-lock-remove": {
+      "title": "Remove",
+      "short": "Removes this lock record at once, without asking.",
+      "words": "remove lock delete"
+    },
+    "card-session-add-lock": {
+      "title": "+ Lock",
+      "short": "Records a lock observation on this pairing session.",
+      "words": "lock add"
+    },
+    "card-session-edit": {
+      "title": "Edit",
+      "short": "Corrects this pairing session's dates, times and notes.",
+      "words": "edit correct session"
+    },
+    "card-session-remove": {
+      "title": "Remove",
+      "short": "Asks you to confirm, then removes this pairing session and its lock records.",
+      "more": "A male left with no sessions goes back to Planned only.",
+      "words": "remove session delete"
+    },
+    "card-male-remove-planned": {
+      "title": "Remove planned male",
+      "short": "Takes a male who has no sessions off this card, at once, and cancels his pending reminders.",
+      "words": "remove male planned"
+    },
+    "card-add-male": {
+      "title": "Add candidate male",
+      "short": "Adds a male to this card as planned, before any session.",
+      "more": "Once the card has a male, another can only be added with Multiple sires on.",
+      "words": "add male candidate sire"
+    },
+    "card-planned": {
+      "title": "Planned pairings (reminders)",
+      "short": "Lists the pairings planned on this card, with their date, male and where they came from.",
+      "more": "An observed lock proposes the next pairing with that male one calendar month later. You can also plan one yourself. Pending reminders appear in the Calendar and, when enabled in your notification settings, by email. Recording ovulation cancels the proposed ones and leaves yours for you to review.",
+      "words": "planned reminders next pairing"
+    },
+    "card-planned-record": {
+      "title": "Record session",
+      "short": "Opens Record a pairing session with this reminder's male.",
+      "more": "The date starts at today. The reminder is marked done only when the session's date matches the planned date.",
+      "words": "record session planned"
+    },
+    "card-planned-move": {
+      "title": "Move",
+      "short": "Changes the date of this planned pairing. A date you moved is never overwritten by a proposal.",
+      "words": "move reschedule date"
+    },
+    "card-planned-skip": {
+      "title": "Skip",
+      "short": "Marks this planned pairing as skipped. It stays in the timeline, struck through.",
+      "words": "skip"
+    },
+    "card-planned-cancel": {
+      "title": "Cancel",
+      "short": "Marks this planned pairing as cancelled. Its record is kept.",
+      "words": "cancel reminder"
+    },
+    "card-forecast": {
+      "title": "Expected windows (history-based)",
+      "short": "Shows when the next steps might fall, from this female's earlier cycles or, failing that, from others of her species in your collection.",
+      "more": "With fewer earlier cycles than the threshold in Breeding settings, the windows are only a description of past cycles, not a forecast.",
+      "words": "forecast expected history"
+    },
+    "card-timeline": {
+      "title": "Timeline",
+      "short": "Lists everything recorded on the card in date order. Press an entry to correct it.",
+      "words": "timeline history events"
+    },
+    "card-previous": {
+      "title": "Previous breeding cycles",
+      "short": "Lists this female's earlier cards, most recent first, with her typical intervals from them.",
+      "more": "Only exact, recorded milestone dates are used for her statistics; estimated or suspected dates are left out.",
+      "words": "previous history cycles statistics"
+    },
+    "card-previous-open": {
+      "title": "Open card",
+      "short": "Opens that earlier breeding card.",
+      "words": "open card"
+    },
+    "card-exams": {
+      "title": "Follicle examinations",
+      "short": "Lists the follicle exams on this card, with the largest size and the follicle count of each.",
+      "more": "A trend is shown only between two comparable scans: the same method, at least a day apart.",
+      "words": "follicle exams scans"
+    },
+    "card-chart-view": {
+      "title": "Chart, Table",
+      "short": "Shows the follicle measurements as a chart or as a table.",
+      "words": "chart table view"
+    },
+    "card-chart-overlay": {
+      "title": "Overlay previous cycles (day 0 = first pairing)",
+      "short": "Draws this female's earlier ultrasound curves on the chart, lined up on the first pairing.",
+      "words": "overlay compare previous"
+    },
+    "card-exam-edit": {
+      "title": "Edit",
+      "short": "Opens this follicle exam to correct it.",
+      "words": "edit exam"
+    },
+    "card-clutch": {
+      "title": "Clutch and hatchlings",
+      "short": "Shows the clutch counts (eggs laid, fertile, slugs, hatchlings, lost) and the hatchlings linked to this card.",
+      "words": "clutch hatchlings offspring"
+    },
+    "card-offspring-assign": {
+      "title": "Assign / correct",
+      "short": "Records which of the card's males sired this hatchling, how you know, and how sure you are.",
+      "more": "With one male the sire is filled in for you as reported. With several, parentage stays unresolved until you assign it.",
+      "words": "sire father assign parentage"
+    },
+    "overview-batch-scan": {
+      "title": "Scan walk: save and next female",
+      "short": "Records follicle exams for the listed females one after another, for a walk along the racks.",
+      "words": "batch scan walk rack"
+    },
+    "overview-batch-pairing": {
+      "title": "Pairing walk: save and next female",
+      "short": "Records pairing sessions for the listed females one after another.",
+      "words": "batch pairing walk"
+    },
+    "overview-filter-stage": {
+      "title": "Filter by stage",
+      "short": "Shows only the females at one stage.",
+      "words": "filter stage"
+    },
+    "overview-filter-male": {
+      "title": "Filter by male",
+      "short": "Shows only the females paired or planned with one male.",
+      "words": "filter male"
+    },
+    "overview-sort": {
+      "title": "Sort",
+      "short": "Sorts the table by this column. Press it again to reverse the order.",
+      "words": "sort order column"
+    },
+    "overview-open-card": {
+      "title": "Open card",
+      "short": "Opens the female's breeding card. Without an open card the button reads Record first pairing and opens Record a pairing session instead.",
+      "words": "open card first pairing"
+    },
+    "breeding-settings": {
+      "title": "Breeding settings",
+      "short": "Sets the season start, the follicle review ranges, the scan reminders and the forecast threshold.",
+      "more": "Nothing here is preset, and every change is saved as you make it. A review range only prompts you to look; it never decides to pair. Settings for ball pythons are kept apart from other species.",
+      "words": "settings season range reminders"
+    },
+    "settings-review-range": {
+      "title": "Review range from (mm), to (mm)",
+      "short": "When a measured ultrasound size falls inside this range, the card shows a prompt to review the pairing.",
+      "words": "range follicle size review"
+    },
+    "settings-scan-days": {
+      "title": "Scan reminder every (days)",
+      "short": "Reminds you to check follicles again this many days after the last exam.",
+      "words": "scan reminder days"
+    },
+    "settings-pause-reminders": {
+      "title": "Pause scan reminders",
+      "short": "Stops the automatic scan reminders until you untick it.",
+      "words": "pause reminders"
+    },
+    "settings-female-override": {
+      "title": "Individual override",
+      "short": "Picks a female to give her own review range and scan reminder, instead of her species' settings.",
+      "words": "override female individual"
+    },
+    "settings-season-start": {
+      "title": "A new season starts on",
+      "short": "The day and month every new breeding season starts. It is 1 September unless you change it.",
+      "more": "A card belongs to the season its first pairing falls in. Start new season on the Breeding page starts one season early or late without changing this date.",
+      "words": "season start date"
+    },
+    "settings-min-cycles": {
+      "title": "Call a history window a forecast from this many completed cycles",
+      "short": "How many completed earlier cycles a female needs before her expected windows are called a forecast.",
+      "more": "This threshold is a choice in Serpentora, not a biological finding.",
+      "words": "forecast threshold cycles"
+    },
+    "dlg-pairing": {
+      "title": "Record a pairing session",
+      "short": "Records one pairing session: the female, the male, the day he was introduced, and whether a lock was seen.",
+      "more": "It opens the female's breeding card if she has none, adds to it if she has. A paused card becomes active again. An observed lock proposes the next pairing with this male one calendar month later, unless that date has already passed.",
+      "words": "pairing session record introduce"
+    },
+    "dlg-lock": {
+      "title": "Record a lock observation",
+      "short": "Records a lock seen (or not seen) on one pairing session, with its date.",
+      "more": "There is one record per session per day: a second sighting on the same day updates the same record. An observed lock on an active card proposes the next pairing one calendar month later.",
+      "words": "lock observation record"
+    },
+    "dlg-exam": {
+      "title": "Record a follicle examination",
+      "short": "Records one follicle exam of a female: when, how, what was seen and the sizes measured.",
+      "more": "When you open an existing exam the window reads Edit follicle examination.",
+      "words": "follicle exam ultrasound palpation"
+    },
+    "dlg-milestone": {
+      "title": "Record a milestone",
+      "short": "Records the date of one milestone, how sure you are, and whether the date is exact.",
+      "more": "Conflicting dates are flagged on the card, never changed for you. Recording ovulation cancels the pairing reminders that were proposed after a lock, and asks you to review the ones you set yourself.",
+      "words": "milestone ovulation shed date"
+    },
+    "dlg-clutch": {
+      "title": "Record the clutch",
+      "short": "Records the laying date and the egg counts. Leave a count empty if you do not know it.",
+      "more": "Eggs laid are not follicles and not hatchlings. Fertile eggs plus slugs cannot be more than the total.",
+      "words": "clutch eggs laid counts"
+    },
+    "dlg-log-hatch": {
+      "title": "Log hatch",
+      "short": "Records the hatch date and how many hatched, then adds that many hatchlings as new animals.",
+      "more": "The hatchlings go into the group Hatchlings and the hatch year, with the clutch, birth date and dam filled in, and the sire when only one male took part. Once all are linked the card moves to Completed pairing. If none hatched, enter 0: the card closes as Failed clutch.",
+      "words": "hatch hatchlings log"
+    },
+    "dlg-close": {
+      "title": "Close this breeding card",
+      "short": "Closes the card with an outcome. Everything recorded stays, and the card can be reopened.",
+      "more": "A note is required only when the outcome is Other. Pending pairing reminders are cancelled.",
+      "words": "close outcome finish"
+    },
+    "dlg-planned": {
+      "title": "Plan a pairing",
+      "short": "Sets a reminder for a pairing with a male on a date.",
+      "more": "When you move an existing reminder, the window reads Move the planned pairing. A planned pairing is not a session and never counts as a lock.",
+      "words": "plan reminder schedule"
+    },
+    "dlg-sire": {
+      "title": "Sire",
+      "short": "Assigns the sire of one hatchling from the card's males, or leaves parentage unresolved.",
+      "more": "The earlier assignment is kept in its history.",
+      "words": "sire father parentage"
+    },
+    "dlg-edit-session": {
+      "title": "Correct a pairing session",
+      "short": "Corrects the dates, times and notes of one pairing session.",
+      "more": "Lock records on the session keep their own dates. The male cannot be changed here; record a new session instead, so the history stays attributable.",
+      "words": "correct edit session"
+    },
+    "bfield-female": {
+      "title": "Female",
+      "short": "The female this record belongs to.",
+      "words": "female dam"
+    },
+    "bfield-male": {
+      "title": "Male",
+      "short": "The male for this pairing.",
+      "more": "Changing the male in a new session applies to that session only; earlier sessions keep their male.",
+      "words": "male sire"
+    },
+    "bfield-pairing-date": {
+      "title": "Pairing date (introduction)",
+      "short": "The day the male was introduced. It cannot be in the future.",
+      "more": "The first pairing date of a card decides its season.",
+      "words": "date introduction"
+    },
+    "bfield-lock-observed": {
+      "title": "Lock observed?",
+      "short": "Whether you saw a lock during this session: Yes, Not observed, or Unknown.",
+      "more": "Not observed means no lock was seen; it is not proof that mating did not happen. You can give the lock a different day than the introduction.",
+      "words": "lock observed yes unknown"
+    },
+    "bfield-more-details": {
+      "title": "More details",
+      "short": "Shows the introduction time, removal date and removal time. A removal cannot be before the introduction.",
+      "words": "time removal details"
+    },
+    "bfield-notes": {
+      "title": "Notes (optional)",
+      "short": "Free text kept with this record.",
+      "words": "notes"
+    },
+    "bfield-time": {
+      "title": "Time (optional)",
+      "short": "The time of day, if you want it on record.",
+      "words": "time"
+    },
+    "bfield-date": {
+      "title": "Date",
+      "short": "The day this happened, or for a planned pairing the day you plan it.",
+      "words": "date"
+    },
+    "bfield-save-next": {
+      "title": "Save and next female",
+      "short": "Saves this entry and moves straight on to the next female in the list.",
+      "words": "save next batch walk"
+    },
+    "bfield-session": {
+      "title": "Pairing session",
+      "short": "The session (male and date) the lock belongs to. Record a pairing session first if there is none.",
+      "words": "session"
+    },
+    "bfield-lock-status": {
+      "title": "Status",
+      "short": "Lock observed, Not observed or Unknown. Only Lock observed counts as an observed lock.",
+      "words": "lock status"
+    },
+    "bfield-observation-date": {
+      "title": "Observation date",
+      "short": "The day you saw the lock. It cannot be before the session's introduction or in the future.",
+      "words": "date observation"
+    },
+    "bfield-exam-date": {
+      "title": "Examination date",
+      "short": "The day of the exam. It cannot be in the future.",
+      "words": "date exam"
+    },
+    "bfield-method": {
+      "title": "Method",
+      "short": "How the female was examined: Ultrasound, Palpation (estimate) or External observation.",
+      "more": "Palpation sizes are kept as estimates, apart from ultrasound measurements. An external observation cannot carry a measured size.",
+      "words": "method ultrasound palpation"
+    },
+    "bfield-result": {
+      "title": "Result",
+      "short": "What the exam found: Follicles seen, Not visualized, Inconclusive or Post-ovulation structures.",
+      "more": "Not visualized and Inconclusive carry no size. Sizes of post-ovulation structures are kept with the exam but never drawn on the follicle curve.",
+      "words": "result follicles seen"
+    },
+    "bfield-largest": {
+      "title": "Largest measured diameter (mm)",
+      "short": "The diameter of the largest follicle, in millimetres. With palpation it is recorded as an estimate.",
+      "words": "size diameter mm largest"
+    },
+    "bfield-extra-measurements": {
+      "title": "Additional measurements",
+      "short": "More follicle sizes from the same exam, each with its axis.",
+      "words": "measurements sizes"
+    },
+    "bfield-visible-count": {
+      "title": "Visible follicle count",
+      "short": "How many follicles you could see.",
+      "words": "count follicles"
+    },
+    "bfield-count-certainty": {
+      "title": "Count certainty",
+      "short": "Whether the count is Exact, Approximate or Unknown.",
+      "words": "certainty count"
+    },
+    "bfield-coverage": {
+      "title": "Examination coverage",
+      "short": "Whether the whole female was examined (Complete) or only part of her (Partial).",
+      "words": "coverage complete partial"
+    },
+    "bfield-exam-notes": {
+      "title": "Notes (appearance, behaviour, feeding, other observations)",
+      "short": "Anything else you noticed at the exam.",
+      "words": "notes observations"
+    },
+    "bfield-next-check": {
+      "title": "Next check date",
+      "short": "When to examine her again. It appears as a reminder on the card and in the Calendar, unless scan reminders are paused.",
+      "words": "next check reminder"
+    },
+    "bfield-attachments": {
+      "title": "Images / video (evidence for your review)",
+      "short": "Attaches scan images or video to the exam. Files over 8 MB are refused, and images are scaled down.",
+      "more": "Very large attachments may stay on the device that added them instead of reaching your other devices.",
+      "words": "images video attachments evidence"
+    },
+    "bfield-exam-advanced": {
+      "title": "Operator, equipment, image quality",
+      "short": "Shows fields for who did the exam, with what equipment, and how good the image was.",
+      "words": "operator equipment quality"
+    },
+    "bfield-milestone": {
+      "title": "Milestone",
+      "short": "Which milestone happened: Ovulation, Pre-lay shed, Egg laying, Live birth, First hatch or Final hatch.",
+      "words": "milestone ovulation shed laying"
+    },
+    "bfield-certainty": {
+      "title": "Observation",
+      "short": "Recorded (seen) or Suspected (interpretation).",
+      "more": "Suspected dates are shown on the card but left out of the female's statistics, and they do not start the cycle clock.",
+      "words": "seen suspected certainty"
+    },
+    "bfield-precision": {
+      "title": "Date precision",
+      "short": "Whether the date is exact or estimated. Estimated dates are left out of the female's statistics.",
+      "words": "exact estimated precision"
+    },
+    "bfield-laying-date": {
+      "title": "Laying date",
+      "short": "The day the eggs were laid. It starts the 60-day count to hatching.",
+      "words": "laying date eggs"
+    },
+    "bfield-eggs-total": {
+      "title": "Total eggs",
+      "short": "All the eggs laid in this clutch.",
+      "words": "eggs total"
+    },
+    "bfield-fertile": {
+      "title": "Fertile",
+      "short": "The good, fertile eggs.",
+      "words": "fertile good eggs"
+    },
+    "bfield-slugs": {
+      "title": "Slugs",
+      "short": "The infertile eggs.",
+      "words": "slugs infertile"
+    },
+    "bfield-hatch-date": {
+      "title": "Hatch date",
+      "short": "The day the hatch finished. It cannot be in the future.",
+      "words": "hatch date"
+    },
+    "bfield-hatched": {
+      "title": "How many hatched",
+      "short": "The number of hatchlings, 0 if none. It cannot be more than the eggs laid.",
+      "words": "hatched count hatchlings"
+    },
+    "bfield-not-hatched": {
+      "title": "Did not hatch (optional)",
+      "short": "Eggs that did not hatch.",
+      "words": "lost unhatched"
+    },
+    "bfield-outcome": {
+      "title": "Outcome",
+      "short": "Why the card closes: No clutch, Failed clutch, Cancelled or Other. A live-bearing species also offers Live birth complete.",
+      "words": "outcome reason close"
+    },
+    "bfield-final-birth": {
+      "title": "Date of the final birth",
+      "short": "For a live birth, the day the last baby was born.",
+      "words": "birth date live"
+    },
+    "bfield-close-note": {
+      "title": "Note (required)",
+      "short": "Explains an Other outcome. With any other outcome the note is optional.",
+      "words": "note reason"
+    },
+    "bfield-sire": {
+      "title": "Sire",
+      "short": "The male that sired this hatchling, chosen from the card's males. Leave it empty to keep parentage unresolved.",
+      "words": "sire father"
+    },
+    "bfield-sire-basis": {
+      "title": "Basis",
+      "short": "How you know: Breeder's judgement, DNA test, Visual genetics, or Only one male was paired.",
+      "words": "basis method dna"
+    },
+    "bfield-sire-certainty": {
+      "title": "Certainty",
+      "short": "Reported or Confirmed.",
+      "words": "certainty confirmed reported"
     }
   },
   "ui": {
@@ -3612,21 +4095,21 @@
           "missing": "Breeding appears once a species is open. On a phone it is in the bottom bar."
         },
         "new-pairing": {
-          "title": "Press New pairing",
-          "text": "Press New pairing to see how a pairing starts.",
-          "missing": "New pairing is at the top of the Breeding screen."
+          "title": "Press Record a pairing",
+          "text": "Press Record a pairing to see how a female's breeding card starts.",
+          "missing": "Record a pairing is at the top of the Breeding screen."
         },
         "choosing": {
           "title": "A male and a female",
-          "text": "A pairing joins a male and a female from the Breeders group. If no animal is in Breeders yet, Serpentora says so here. This is your choice: nothing here starts a pairing for you."
+          "text": "A pairing session records which male was introduced to which female, on which day, and whether you saw a lock. Her first session opens her breeding card. This is your choice: nothing here records a pairing for you."
         },
         "close-pairing": {
           "title": "Close the window",
-          "text": "Close it. If you do have a real pair to plan, you can pick them and add the pairing instead: that is your call."
+          "text": "Close it. If you do have a real pairing to record, you can fill it in and save the session instead: that is your call."
         },
         "stages": {
           "title": "From pairing to hatchling",
-          "text": "A pairing moves through its stages: locks, ovulation, pre-lay shed, eggs laid, the incubator, then the hatch. Each stage is a button you press when it happens."
+          "text": "A breeding card follows one female through her cycle: pairing sessions and locks, follicle exams, ovulation, the pre-lay shed, eggs in the incubator, then the hatch. You record each one on the card when it happens."
         },
         "import": {
           "title": "Bringing a collection in",
@@ -3746,7 +4229,7 @@
     },
     "tour-breeding": {
       "title": "Breeding",
-      "description": "The views of the Breeding screen and how a pairing moves.",
+      "description": "The views of the Breeding screen and how a breeding card moves.",
       "parts": {
         "1": "Breeding"
       },
@@ -3758,16 +4241,16 @@
         },
         "dashboard": {
           "title": "Back to the dashboard",
-          "text": "Press Dashboard: what needs doing now across your pairings.",
+          "text": "Press Dashboard: what needs doing now across your breeding cards.",
           "missing": "The views are at the top of the Breeding screen."
         },
         "new": {
-          "title": "New pairing",
-          "text": "Starts a pairing between a male and a female from the Breeders group."
+          "title": "Record a pairing",
+          "text": "Records a pairing session. A female's first session opens her breeding card; later ones are added to it."
         },
         "stages": {
-          "title": "From lock to hatch",
-          "text": "A pairing moves through locks, ovulation, pre-lay shed, eggs, the incubator and the hatch. Each is a button you press when it happens. Deleting a pairing happens at once and cannot be undone."
+          "title": "From pairing to hatch",
+          "text": "A card moves through pairings and locks, ovulation, the pre-lay shed, eggs, the incubator and the hatch. A card closes when its hatchlings are registered, or when you close it with an outcome; a closed card can be reopened."
         }
       }
     },

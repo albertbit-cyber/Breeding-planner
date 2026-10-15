@@ -1,4 +1,7 @@
-// Run in Railway console: node seedBreeder.js
+// A development seed. It must not be run in the Railway console: it writes
+// accounts whose passwords are published in this repository. See
+// docs/runbooks/staff-accounts.md.
+const { assertSeedAllowed } = require("./scripts/seedGuard.js");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
@@ -176,6 +179,7 @@ const TIERS = [
 const DEMO_HASH = "$2b$10$K7L4OJ5xsAq1a3b6Y2uJOeHLrWpMn8vYtXAGBZ0VqT5bJe6Zs7Yya";
 
 async function main() {
+  assertSeedAllowed("seedBreeder.js");
   // 1. Seed FeatureCatalog (required by TierFeature FK)
   for (const f of FEATURE_CATALOG) {
     await prisma.featureCatalog.upsert({

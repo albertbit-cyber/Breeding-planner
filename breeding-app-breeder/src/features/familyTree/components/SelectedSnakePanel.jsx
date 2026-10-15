@@ -1,3 +1,4 @@
+import DepartureTag from '../../animals/DepartureTag.jsx';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { help } from '../../help/help';
@@ -100,9 +101,13 @@ const SelectedSnakePanel = ({ snake, parents, onSnakeSelect, allSnakes }) => {
           </div>
           <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
             <span className={`text-xl font-bold ${sexColor}`}>{sexIcon}</span>
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>
-              {snake.status}
-            </span>
+            {snake.departure ? (
+              <DepartureTag departure={snake.departure} />
+            ) : (
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>
+                {snake.status}
+              </span>
+            )}
           </div>
         </div>
 

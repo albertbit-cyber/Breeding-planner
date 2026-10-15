@@ -66,6 +66,33 @@ export function backfillLogIds(logs) {
   return result;
 }
 
+// The random-id bug left each affected reading stored hundreds of times, every copy under its own
+// UUID, and an id-keyed merge keeps all of them: a device still holding the copies hands them back
+// to the server on its next sync, undoing scripts/dedupeAnimalLogs.ts. Entries with the same content
+// signature are one reading, so only one survives. The survivor is the smallest id, so every device
+// (and the cleanup script) keeps the same copy and the sync settles instead of trading survivors.
+export function collapseDuplicateLogEntries(logs) {
+  if (!logs || typeof logs !== 'object') return logs;
+  const result = {};
+  for (const key of Object.keys(logs)) {
+    const entries = logs[key];
+    if (!Array.isArray(entries)) {
+      result[key] = entries;
+      continue;
+    }
+    const survivorBySignature = new Map();
+    entries.forEach(entry => {
+      if (!entry || typeof entry !== 'object') return;
+      const signature = logEntrySignature(entry, key);
+      const kept = survivorBySignature.get(signature);
+      if (!kept || String(entry.id || '') < String(kept.id || '')) survivorBySignature.set(signature, entry);
+    });
+    const survivors = new Set(survivorBySignature.values());
+    result[key] = entries.filter(entry => !entry || typeof entry !== 'object' || survivors.has(entry));
+  }
+  return result;
+}
+
 // --- Incremental cloud sync ----------------------------------------------------------------
 // The snapshot endpoints used to move an account's entire dataset three times per sync: a full
 // GET, a full PUT, and the full snapshot echoed back. These narrow each leg to what actually
@@ -93,11 +120,15 @@ export function applyRemoteDeletions(snapshot = {}, deleted = null) {
   if (!deleted) return snapshot;
   const deadSnakes = new Set(Array.isArray(deleted.animals) ? deleted.animals : []);
   const deadPairings = new Set(Array.isArray(deleted.pairings) ? deleted.pairings : []);
-  if (!deadSnakes.size && !deadPairings.size) return snapshot;
+  const deadCycles = new Set(Array.isArray(deleted.breedingCycles) ? deleted.breedingCycles : []);
+  const deadExams = new Set(Array.isArray(deleted.follicleExams) ? deleted.follicleExams : []);
+  if (!deadSnakes.size && !deadPairings.size && !deadCycles.size && !deadExams.size) return snapshot;
   return {
     ...snapshot,
     snakes: (snapshot.snakes || []).filter(record => !deadSnakes.has(record?.id)),
     pairings: (snapshot.pairings || []).filter(record => !deadPairings.has(record?.id)),
+    breedingCycles: (snapshot.breedingCycles || []).filter(record => !deadCycles.has(record?.id)),
+    follicleExams: (snapshot.follicleExams || []).filter(record => !deadExams.has(record?.id)),
   };
 }
 
@@ -116,6 +147,8 @@ export function applyChangedRecords(snapshot = {}, changed = {}) {
     ...snapshot,
     snakes: overlay(snapshot.snakes, changed.snakes),
     pairings: overlay(snapshot.pairings, changed.pairings),
+    breedingCycles: overlay(snapshot.breedingCycles, changed.breedingCycles),
+    follicleExams: overlay(snapshot.follicleExams, changed.follicleExams),
     plannerState: changed.plannerState || snapshot.plannerState,
   };
 }
@@ -164,4 +197,66 @@ export function mergeGeneticsLists(winnerValue, loserValue, { tied = false } = {
   // actually holds genetics can speak for them, otherwise a partial payload wipes the animal.
   if (winnerValue === undefined || winnerValue === null) return mergeStringValues(toGeneticsList(loserValue));
   return mergeStringValues(toGeneticsList(winnerValue));
+}
+
+// --- Cursor and tombstones -----------------------------------------------------------------
+
+// A delta asks for rows written since the cursor, minus this much. A write is stamped when its
+// statement runs but becomes visible only when its transaction commits (up to the backend's 60 s
+// transaction budget later), so a read that started after the stamp can still miss it. Asking
+// again for the last couple of minutes costs a few already-known rows; the merge is idempotent.
+export const SYNC_CURSOR_OVERLAP_MS = 2 * 60 * 1000;
+
+export function cursorForRequest(cursor) {
+  const time = new Date(cursor || "").getTime();
+  if (!Number.isFinite(time)) return null;
+  return new Date(time - SYNC_CURSOR_OVERLAP_MS).toISOString();
+}
+
+// The server names collections the way the API does; the app's tombstone map uses its own keys.
+const TOMBSTONE_COLLECTIONS = [
+  ["animals", "snakes"],
+  ["pairings", "pairings"],
+  ["breedingCycles", "breedingCycles"],
+  ["follicleExams", "follicleExams"],
+];
+
+/**
+ * Folds the server's deletions into this device's tombstone map. A server deletion is recorded as
+ * `confirmed`: the server already has it, so it is never uploaded again (each device used to
+ * re-send every tombstone it had ever made, on every sync), but it still hides this device's stale
+ * copy of the record and keeps the id from being handed out again. A local deletion the server now
+ * reports becomes confirmed too, which is how the local list stops growing.
+ */
+export function reconcileTombstones(local = {}, serverTombstones = null) {
+  if (!serverTombstones || typeof serverTombstones !== "object") return local;
+  let changed = false;
+  const next = { ...local };
+  TOMBSTONE_COLLECTIONS.forEach(([serverKey, localKey]) => {
+    const serverMap = serverTombstones[serverKey];
+    if (!serverMap || typeof serverMap !== "object") return;
+    const collection = { ...(next[localKey] || {}) };
+    Object.entries(serverMap).forEach(([id, deletedAt]) => {
+      const current = collection[id];
+      if (current?.confirmed) return;
+      const localTime = new Date(current?.deletedAt || 0).getTime() || 0;
+      const serverTime = new Date(deletedAt || 0).getTime() || 0;
+      collection[id] = {
+        ...(current || {}),
+        id,
+        deletedAt: new Date(Math.max(localTime, serverTime) || Date.now()).toISOString(),
+        confirmed: true,
+      };
+      changed = true;
+    });
+    next[localKey] = collection;
+  });
+  return changed ? next : local;
+}
+
+// Tombstones the server does not have yet, in the shape the upload expects.
+export function pendingTombstones(collection = {}) {
+  return Object.values(collection || {})
+    .filter(tombstone => tombstone && !tombstone.confirmed)
+    .map(({ confirmed, ...tombstone }) => tombstone);
 }

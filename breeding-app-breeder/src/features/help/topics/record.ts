@@ -7,6 +7,8 @@ export const record = {
   'record-save': topic('animal-record', { title: 'common:actions.saveChanges', see: ['record-cancel', 'record-window', 'sell-for-sale'] }),
   'record-cancel': topic('animal-record', { title: 'common:actions.cancel', see: ['record-save', 'record-window'] }),
   'record-delete': topic('animal-record', { title: 'common:actions.delete', see: ['record-delete-dialog', 'record-save'] }),
+  'record-more': topic('animal-record', { title: 'common:actions.moreActions', see: ['record-family-tree', 'record-export-pdf', 'record-archive', 'record-delete'] }),
+  'record-archive': topic('animal-record', { see: ['archive-dialog', 'animals-archive-view', 'record-delete'] }),
   'record-family-tree': topic('animal-record', { title: 'common:actions.openFamilyTree', see: ['record-parentage', 'nav-family-tree', 'record-save'] }),
   'record-export-pdf': topic('animal-record', { title: 'common:actions.exportPdf', see: ['record-qr-label', 'record-window'] }),
   'record-qr-label': topic('animal-record', { title: 'common:actions.qrLabel', see: ['record-id', 'record-export-pdf'] }),
@@ -75,7 +77,9 @@ export const record = {
   'record-meds': topic('animal-record', { title: 'common:logs.meds', see: ['record-logs', 'record-log-add'] }),
 
   // The delete confirmation.
-  'record-delete-dialog': topic('animal-record', { see: ['record-delete-confirm', 'record-delete-cancel', 'record-delete'] }),
+  'record-delete-dialog': topic('animal-record', { see: ['record-delete-confirm', 'record-archive-instead', 'record-delete-reason', 'record-delete-cancel'] }),
+  'record-delete-reason': topic('animal-record', { see: ['record-delete-dialog', 'archive-removed-card'], minor: true }),
+  'record-archive-instead': topic('animal-record', { see: ['record-archive', 'archive-dialog', 'record-delete-dialog'] }),
   'record-delete-confirm': topic('animal-record', { title: 'common:common.delete', see: ['record-delete-dialog', 'record-delete-cancel'], minor: true }),
   'record-delete-cancel': topic('animal-record', { title: 'common:common.cancel', see: ['record-delete-dialog'], minor: true }),
 

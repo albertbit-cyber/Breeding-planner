@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
 import { canAccessFeature } from "./subscriptionService";
+import { lockBreederAccount, stampServerEdit } from "./syncMerge";
 
 const db = prisma as any;
 
@@ -143,11 +144,14 @@ const normalizeAnimal = (row: any) => {
   };
 };
 
-const findAnimalByQr = async (userId: string, qrCode: string) => {
+// Deleted animals are not found: a deleted row stays in the table as the record of the deletion,
+// and a quick log written into it was invisible on every device.
+const findAnimalByQr = async (userId: string, qrCode: string, client: any = db) => {
   const appAnimalId = parseQrCode(qrCode);
-  const row = await db.animal.findFirst({
+  const row = await client.animal.findFirst({
     where: {
       ownerId: userId,
+      deletedAt: null,
       OR: [
         { appAnimalId },
         { id: appAnimalId },
@@ -261,27 +265,37 @@ export const getMobileAnimal = async (actor: AuthenticatedUser, qrCode: string) 
 const appendAnimalLog = async (actor: AuthenticatedUser, actionType: string, payload: Record<string, unknown>) => {
   await ensureAccess(actor, ACTION_FEATURES[actionType] || "mobile.profile");
   const animalId = text(payload.animalId || payload.appAnimalId || payload.qrCode, 240);
-  const animal = await findAnimalByQr(actor.id, animalId);
-  const animalPayload = { ...asRecord(animal.payload) };
-  const logs = { ...asRecord(animalPayload.logs) };
-  const now = new Date().toISOString();
-  const entry = { ...payload, id: randomUUID(), actionType, createdAt: now, date: text(payload.date, 80) || now.slice(0, 10) };
-  const logKey = actionType === "feed" ? "feeds" : actionType === "weight" ? "weights" : actionType === "shed" ? "sheds" : actionType === "clean" ? "cleanings" : actionType === "water" ? "water" : actionType === "note" ? "notes" : actionType;
-  logs[logKey] = [entry, ...(Array.isArray(logs[logKey]) ? logs[logKey] : [])].slice(0, 500);
-  if (actionType === "weight") animalPayload.weight = Number(payload.grams || payload.weight || payload.weightGrams || 0) || animalPayload.weight;
-  if (actionType === "feed") animalPayload.feedingStatus = payload.result === "refused" ? "refused" : "fed";
-  if (actionType === "shed") animalPayload.shedStatus = payload.result === "bad" ? "bad shed" : "shed complete";
-  animalPayload.logs = logs;
-  const updated = await db.animal.update({
-    where: { id: animal.id },
-    data: {
-      payload: animalPayload,
-      name: text(animalPayload.name, 200) || animal.name,
-      sex: text(animalPayload.sex, 40) || animal.sex,
-      status: text(animalPayload.status, 80) || animal.status,
-    },
+  // Read and written under the account sync lock, so a desktop save landing at the same moment
+  // cannot merge against the copy from before this log and write it away again.
+  return db.$transaction(async (tx: any) => {
+    await lockBreederAccount(tx, actor.id);
+    const animal = await findAnimalByQr(actor.id, animalId, tx);
+    const before = { ...asRecord(animal.payload) };
+    let animalPayload = { ...before };
+    const logs = { ...asRecord(animalPayload.logs) };
+    const now = new Date().toISOString();
+    const entry = { ...payload, id: randomUUID(), actionType, createdAt: now, date: text(payload.date, 80) || now.slice(0, 10) };
+    const logKey = actionType === "feed" ? "feeds" : actionType === "weight" ? "weights" : actionType === "shed" ? "sheds" : actionType === "clean" ? "cleanings" : actionType === "water" ? "water" : actionType === "note" ? "notes" : actionType;
+    logs[logKey] = [entry, ...(Array.isArray(logs[logKey]) ? logs[logKey] : [])].slice(0, 500);
+    if (actionType === "weight") animalPayload.weight = Number(payload.grams || payload.weight || payload.weightGrams || 0) || animalPayload.weight;
+    if (actionType === "feed") animalPayload.feedingStatus = payload.result === "refused" ? "refused" : "fed";
+    if (actionType === "shed") animalPayload.shedStatus = payload.result === "bad" ? "bad shed" : "shed complete";
+    animalPayload.logs = logs;
+    // The status fields a quick log sets are edits like any other: stamped, so a device holding
+    // the older value does not put it back on its next sync.
+    const changedFields = ["weight", "feedingStatus", "shedStatus"].filter((field) => before[field] !== animalPayload[field]);
+    animalPayload = stampServerEdit(animalPayload, changedFields, now, animal.updatedAt);
+    const updated = await tx.animal.update({
+      where: { id: animal.id },
+      data: {
+        payload: animalPayload,
+        name: text(animalPayload.name, 200) || animal.name,
+        sex: text(animalPayload.sex, 40) || animal.sex,
+        status: text(animalPayload.status, 80) || animal.status,
+      },
+    });
+    return { animal: normalizeAnimal(updated), log: entry };
   });
-  return { animal: normalizeAnimal(updated), log: entry };
 };
 
 export const logMobileAction = appendAnimalLog;

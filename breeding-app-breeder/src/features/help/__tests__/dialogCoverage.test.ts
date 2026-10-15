@@ -30,7 +30,8 @@ describe('every app window is a dialog with its own ?', () => {
 
   for (const file of files) {
     file.lines.forEach((line, index) => {
-      if (line.includes('fixed inset-0')) {
+      // A comment can name the class without drawing a layer.
+      if (line.includes('fixed inset-0') && !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(line)) {
         const window = file.lines.slice(index, index + LOOKAHEAD_DIALOG).join('\n');
         // A layer whose panel sits further down (after an injected <style>, say) names it.
         const layer = line.match(/data-dialog-layer="([a-z0-9-]+)"/);

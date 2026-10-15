@@ -2,7 +2,28 @@ import { prisma } from "../lib/prisma";
 import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
+import { countedAnimalWhere, isArchivedAnimalStatus, isRemovedAnimalPayload } from "./animalArchive";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
+import {
+  screenBreedingRecords,
+  withUnresolvedAnimalFlag,
+  type SkippedBreedingRecord,
+  cycleAppId as breedingCycleAppId,
+  examAppId as follicleExamAppId,
+  cycleColumns,
+  examColumns,
+  mergeBreedingCyclePayload,
+  mergeFollicleExamPayload,
+  resolveActiveCycleConflicts,
+  syncPlannedPairingReminders,
+} from "./breedingCycleSyncService";
+import {
+  SYNC_ENTRY_ARRAYS,
+  lockBreederAccount,
+  mergeSyncRecord,
+  recordTime,
+  sameSyncContent,
+} from "./syncMerge";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -11,6 +32,36 @@ export type BreederSnapshotInput = {
   pairings?: unknown[];
   clutches?: unknown[];
   plannerState?: unknown;
+  /** Female breeding cards (SBR-02). Same sync contract as pairings: app ids, tombstones, timestamps. */
+  breedingCycles?: unknown[];
+  /** Follicle examinations, owned by the female and optionally linked to a cycle. */
+  follicleExams?: unknown[];
+  /** The account's data generation this device last loaded (see assertCurrentDataGeneration). */
+  dataGeneration?: unknown;
+};
+
+export const DATA_REPLACED_CODE = "DATA_REPLACED";
+
+/**
+ * Refuses a save from a device that has not loaded the latest full replace.
+ *
+ * A replace makes a backup file the account's whole truth. Every save merges, and a device still
+ * holding the old data would merge it straight back: records the file left out reappear, and log
+ * entries come back by the hundred (the duplicated-log episode was exactly this). So once an
+ * account has been replaced, a save must name the generation it was made against. A device that
+ * names an older one, or none (a build from before this existed), is turned away with
+ * DATA_REPLACED; the app then drops its copy and loads the replaced data. Accounts never
+ * replaced (generation 0) are not checked, so nothing changes for them.
+ */
+export const assertCurrentDataGeneration = (stored: unknown, sent: unknown): void => {
+  const current = Number(stored) || 0;
+  if (!current) return;
+  if (Number(sent) === current) return;
+  throw new HttpError(
+    409,
+    "This account's cloud data was replaced from a backup. This device has to load it before it can save.",
+    { code: DATA_REPLACED_CODE, dataGeneration: current },
+  );
 };
 
 const db = prisma as any;
@@ -43,6 +94,10 @@ const completionReasons = new Set([
   "breeding_stopped",
   "unknown_outcome",
   "other",
+  // Written by the app when the female is moved to the animal archive.
+  "female_sold",
+  "female_died",
+  "female_left_collection",
 ]);
 
 const outcomeConfidences = new Set(["confirmed", "likely", "unknown"]);
@@ -65,7 +120,7 @@ const intValue = (value: unknown): number | null => {
 };
 
 
-const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: number): string => {
+export const requireRecordId = (record: JsonRecord, fallbackPrefix: string, index: number): string => {
   return textValue(record.id) || textValue(record.appId) || `${fallbackPrefix}-${index + 1}`;
 };
 
@@ -171,6 +226,9 @@ const rowUpdatedAtMs = (row: { payload?: unknown; updatedAt?: unknown } | null):
   return Math.max(timestampMs(row.updatedAt), payloadUpdatedAtMs(asRecord(row.payload)));
 };
 
+// Breeding cards and examinations keep their own merge (breedingCycleSyncService) and the
+// record-level rule below. Animals, pairings, clutches and planner state merge field by field
+// through syncMerge, which needs no such gate.
 const shouldApplyIncomingPayload = (
   incoming: JsonRecord,
   existing: { payload?: unknown; updatedAt?: unknown } | null,
@@ -183,157 +241,27 @@ const shouldApplyIncomingPayload = (
   return incomingTimestamp >= existingTimestamp;
 };
 
-const mergeStringArrays = (...values: unknown[]): string[] => {
-  const merged: string[] = [];
-  const seen = new Set<string>();
-  values.flatMap((value) => Array.isArray(value) ? value : []).forEach((item) => {
-    const text = textValue(item);
-    if (!text) return;
-    const key = text.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    merged.push(text);
-  });
-  return merged;
+// The stored copy as a device sees it: the row's own write time stands for the record's time. A
+// device echoing back what it last read then carries exactly the stored time, ties, and changes
+// nothing; comparing against the bare payload instead let the echo look newer than a lab result or
+// a sale the server had written since.
+const storedRecord = (row: { payload?: unknown; updatedAt?: unknown }): JsonRecord => {
+  const record = withBackendSyncMetadata({ payload: row.payload, updatedAt: row.updatedAt });
+  return asRecord(record) || {};
 };
 
-const explicitRecordId = (record: JsonRecord, label: string): string | null => (
-  [
-    record.id,
-    record.logId,
-    record.uuid,
-    record.appId,
-    record.createdAt && `${record.createdAt}:${record.actionType || label}`,
-    record.addedAt && `${record.addedAt}:${record.source || label}`,
-  ].map(textValue).find(Boolean) || null
-);
-
-// Identity of an entry that carries no id of its own, derived from the fields a breeder actually
-// fills in. The client derives its backfilled ids from the same fields, so both sides agree on
-// what counts as "the same reading".
-const recordContentSignature = (record: JsonRecord, label: string): string => [
-  label,
-  record.date,
-  record.time,
-  record.result || record.outcome,
-  record.feed || record.food || record.prey,
-  record.size || record.weight || record.grams,
-  record.notes || record.note,
-].map((part) => textValue(part) || "").join("|");
-
-const mergeRecordKey = (record: JsonRecord, label: string, index: number): string => {
-  const explicit = explicitRecordId(record, label);
-  if (explicit) return explicit;
-  return recordContentSignature(record, label) || `${label}-${index + 1}`;
-};
-
-const mergeRecordArrays = (olderValue: unknown, newerValue: unknown, label: string): JsonRecord[] => {
-  const rows = [
-    ...(Array.isArray(olderValue) ? olderValue : []),
-    ...(Array.isArray(newerValue) ? newerValue : []),
-  ].map(asRecord).filter((item): item is JsonRecord => !!item);
-
-  // An id-less entry and an identical entry that has since been given an id are the same reading,
-  // and keying them separately is what let one account accumulate 222k weight entries for 116 real
-  // readings: the id-less original survived every merge, and each sync minted a fresh id for it.
-  // Whenever both forms are present, the one carrying an id wins and the bare copy is dropped.
-  const identified = new Set<string>();
-  for (const row of rows) {
-    if (explicitRecordId(row, label)) identified.add(recordContentSignature(row, label));
-  }
-
-  const merged = new Map<string, JsonRecord>();
-  rows.forEach((row, index) => {
-    if (!explicitRecordId(row, label) && identified.has(recordContentSignature(row, label))) return;
-    const key = mergeRecordKey(row, label, index);
-    const existing = merged.get(key);
-    if (!existing || payloadUpdatedAtMs(row) >= payloadUpdatedAtMs(existing)) {
-      merged.set(key, existing ? { ...existing, ...row } : row);
+const mergeAnimalPayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord => {
+  // A deleted snake kept as a lineage card wins whole. Merging it with the full copy would
+  // union the erased logs and photos straight back in. Two cards: the later one.
+  const existingRemoved = isRemovedAnimalPayload(existing);
+  const incomingRemoved = isRemovedAnimalPayload(incomingPayload);
+  if (existingRemoved || incomingRemoved) {
+    if (existingRemoved && incomingRemoved) {
+      return payloadUpdatedAtMs(incomingPayload) >= payloadUpdatedAtMs(existing) ? incomingPayload : existing;
     }
-  });
-  return Array.from(merged.values()).sort((a, b) => payloadUpdatedAtMs(b) - payloadUpdatedAtMs(a));
-};
-
-const mergeLogsObject = (olderValue: unknown, newerValue: unknown): JsonRecord => {
-  const older = asRecord(olderValue) || {};
-  const newer = asRecord(newerValue) || {};
-  const result: JsonRecord = {};
-  const keys = Array.from(new Set([...Object.keys(older), ...Object.keys(newer)]));
-  keys.forEach((key) => {
-    result[key] = mergeRecordArrays(older[key], newer[key], key);
-  });
-  return result;
-};
-
-const mergePayloadMetadata = (older: JsonRecord, newer: JsonRecord): JsonRecord | undefined => {
-  const olderMetadata = asRecord(older.metadata) || {};
-  const newerMetadata = asRecord(newer.metadata) || {};
-  const metadata = { ...olderMetadata, ...newerMetadata };
-  return Object.keys(metadata).length ? metadata : undefined;
-};
-
-// possibleHets was a comma/newline string on older records. While these lists unioned, a stale
-// array on the other side covered for the raw form; now that one side owns the list outright it
-// has to be read properly, or an old client's save empties the animal's genetics.
-const geneticsListValue = (value: unknown): unknown[] => {
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") return value.split(/[,\n]/);
-  return [];
-};
-
-const mergeSnapshotPayload = (
-  existingPayload: unknown,
-  incomingPayload: JsonRecord,
-  options: {
-    stringArrayKeys?: string[];
-    lastWriterStringArrayKeys?: string[];
-    recordArrayKeys?: string[];
-    mergeLogs?: boolean;
-  } = {},
-): JsonRecord => {
-  const existing = asRecord(existingPayload) || {};
-  const incomingTime = payloadUpdatedAtMs(incomingPayload);
-  const existingTime = payloadUpdatedAtMs(existing);
-  const newer = incomingTime >= existingTime ? incomingPayload : existing;
-  const older = incomingTime >= existingTime ? existing : incomingPayload;
-  const merged: JsonRecord = { ...older, ...newer };
-  (options.stringArrayKeys || []).forEach((key) => {
-    merged[key] = mergeStringArrays(older[key], newer[key]);
-  });
-  // Lists the keeper deletes from, so a union would be a one-way ratchet: removing a gene and
-  // syncing handed it straight back from the copy that still had it, and that resurrected value
-  // was then stored as canonical. These follow the record's timestamp instead — the later save
-  // owns the whole list — while equal timestamps stay a union, since neither side is later and
-  // dropping a concurrent addition would be its own kind of loss.
-  (options.lastWriterStringArrayKeys || []).forEach((key) => {
-    if (incomingTime === existingTime) {
-      merged[key] = mergeStringArrays(geneticsListValue(older[key]), geneticsListValue(newer[key]));
-      return;
-    }
-    // Absence is not deletion. A payload that never carried the key cannot speak for it, so the
-    // other side's list stands rather than being wiped by a partial write.
-    merged[key] = newer[key] === undefined || newer[key] === null
-      ? mergeStringArrays(geneticsListValue(older[key]))
-      : mergeStringArrays(geneticsListValue(newer[key]));
-  });
-  (options.recordArrayKeys || []).forEach((key) => {
-    merged[key] = mergeRecordArrays(older[key], newer[key], key);
-  });
-  if (options.mergeLogs) {
-    merged.logs = mergeLogsObject(older.logs, newer.logs);
+    return incomingRemoved ? incomingPayload : existing;
   }
-  const metadata = mergePayloadMetadata(older, newer);
-  if (metadata) merged.metadata = metadata;
-  return merged;
-};
-
-const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
-  const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
-    stringArrayKeys: ["tags", "groups"],
-    lastWriterStringArrayKeys: ["morphs", "hets", "possibleHets"],
-    recordArrayKeys: ["photos"],
-    mergeLogs: true,
-  });
+  const merged = mergeSyncRecord(existing, incomingPayload, { entryArrays: SYNC_ENTRY_ARRAYS.animal, mergeLogs: true });
 
   // A device that has not synced since the test still holds the animal's pre-test genetics, and
   // if it saves last its list now wins outright — reintroducing exactly what a laboratory just
@@ -351,37 +279,88 @@ const mergeAnimalPayload = (existingPayload: unknown, incomingPayload: JsonRecor
   return merged;
 };
 
-const mergePairingPayload = (existingPayload: unknown, incomingPayload: JsonRecord): JsonRecord => {
-  const merged = mergeSnapshotPayload(existingPayload, incomingPayload, {
-    stringArrayKeys: ["goals", "tags"],
-    recordArrayKeys: [
-      "locks",
-      "lockLogs",
-      "appointments",
-      "mobileOvulationLogs",
-      "mobilePreLayShedLogs",
-      "mobileClutchLogs",
-      "mobileHatchLogs",
-    ],
-    mergeLogs: true,
-  });
-  // hatchlingsGeneratedThrough is a monotonic high-water mark used to stop the hatch
-  // wizard from duplicating an already-created litter. mergeSnapshotPayload otherwise
-  // replaces the whole `hatch` object with whichever side is newer, which could regress
-  // this value if two devices write concurrently, so pin it to the max of both sides.
-  const existingHatch = asRecord(asRecord(existingPayload)?.hatch);
+const mergePairingPayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord => {
+  const merged = mergeSyncRecord(existing, incomingPayload, { entryArrays: SYNC_ENTRY_ARRAYS.pairing, mergeLogs: true });
+  // hatchlingsGeneratedThrough is a monotonic high-water mark within one reset generation: it
+  // stops the hatch wizard duplicating an already-created litter, so a stale write must not lower
+  // it. hatchlingsResetCount is bumped when the keeper deletes a batch to re-log it, and then the
+  // newer generation's mark wins outright. Pinning the max across generations (the old rule) put
+  // the old mark back and blocked re-logging that clutch for good. Same rule as the app.
+  const existingHatch = asRecord(existing?.hatch);
   const incomingHatch = asRecord(incomingPayload?.hatch);
   if (existingHatch || incomingHatch) {
-    const hatchlingsGeneratedThrough = Math.max(
-      Number(existingHatch?.hatchlingsGeneratedThrough) || 0,
-      Number(incomingHatch?.hatchlingsGeneratedThrough) || 0,
-    );
-    merged.hatch = { ...asRecord(merged.hatch), hatchlingsGeneratedThrough };
+    const existingReset = Number(existingHatch?.hatchlingsResetCount) || 0;
+    const incomingReset = Number(incomingHatch?.hatchlingsResetCount) || 0;
+    const existingThrough = Number(existingHatch?.hatchlingsGeneratedThrough) || 0;
+    const incomingThrough = Number(incomingHatch?.hatchlingsGeneratedThrough) || 0;
+    const hatchlingsGeneratedThrough = existingReset === incomingReset
+      ? Math.max(existingThrough, incomingThrough)
+      : (incomingReset > existingReset ? incomingThrough : existingThrough);
+    const hatchlingsResetCount = Math.max(existingReset, incomingReset);
+    merged.hatch = {
+      ...asRecord(merged.hatch),
+      hatchlingsGeneratedThrough,
+      ...(hatchlingsResetCount ? { hatchlingsResetCount } : {}),
+    };
   }
   return merged;
 };
 
-const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
+const mergeClutchPayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord =>
+  mergeSyncRecord(existing, incomingPayload, { entryArrays: ["photos"], mergeLogs: true });
+
+// Per-device bookkeeping that used to ride along in the planner state: every device's automatic
+// backup rewrote `lastRun`, which made each backup a planner-state change that overwrote the other
+// devices' copy.
+const DEVICE_LOCAL_PLANNER_KEYS = ["lastRun"];
+
+export const stripDeviceLocalPlannerState = (state: JsonRecord): JsonRecord => {
+  const backupSettings = asRecord(state.backupSettings);
+  if (!backupSettings) return state;
+  const cleaned = { ...backupSettings };
+  DEVICE_LOCAL_PLANNER_KEYS.forEach((key) => delete cleaned[key]);
+  return { ...state, backupSettings: cleaned };
+};
+
+const mergePlannerStatePayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord =>
+  mergeSyncRecord(existing, stripDeviceLocalPlannerState(incomingPayload), { entryArrays: SYNC_ENTRY_ARRAYS.planner, sortEntries: false });
+
+// The searchable columns each row carries beside its payload. Shared with the full replace in
+// breederDataReplaceService, so a replaced row reads exactly like a synced one.
+export const animalColumns = (payload: JsonRecord) => ({
+  name: textValue(payload.name),
+  sex: textValue(payload.sex),
+  status: textValue(payload.status),
+  species: textValue(payload.species),
+  payload,
+});
+
+export const pairingColumns = (payload: JsonRecord) => ({
+  label: textValue(payload.label),
+  maleAnimalAppId: textValue(payload.maleId),
+  femaleAnimalAppId: textValue(payload.femaleId),
+  status: textValue(payload.status),
+  workflowStatus: enumTextValue(payload.workflowStatus ?? payload.status, workflowStatuses),
+  completionReason: enumTextValue(payload.completionReason, completionReasons),
+  outcomeConfidence: enumTextValue(payload.outcomeConfidence, outcomeConfidences),
+  completedAt: isoDateValue(payload.completedAt) ? new Date(isoDateValue(payload.completedAt) as string) : null,
+  completedByUserId: textValue(payload.completedBy),
+  completionNote: textValue(payload.completionNote),
+  reopenedAt: isoDateValue(payload.reopenedAt) ? new Date(isoDateValue(payload.reopenedAt) as string) : null,
+  reopenedByUserId: textValue(payload.reopenedBy),
+  startDate: textValue(payload.startDate),
+  payload,
+});
+
+export const clutchColumns = (payload: JsonRecord, pairingId: string | null) => ({
+  pairingId,
+  clutchNumber: intValue(payload.clutchNumber),
+  seasonYear: intValue(payload.seasonYear),
+  laidDate: textValue(payload.laidDate) || textValue(payload.date),
+  payload,
+});
+
+export const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   const clutch = asRecord(pairing.clutch);
   if (!clutch) return null;
   const recorded = clutch.recorded === true || !!textValue(clutch.date);
@@ -396,7 +375,7 @@ const extractClutchFromPairing = (pairing: JsonRecord): JsonRecord | null => {
   };
 };
 
-const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord[] => {
+export const normalizeArray = (value: unknown[] | undefined, label: string): JsonRecord[] => {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new HttpError(400, `${label} must be an array.`);
   return value.map(asRecord).filter((item): item is JsonRecord => !!item);
@@ -418,54 +397,85 @@ const validatePairingCompletion = (pairing: JsonRecord, index: number): void => 
 };
 
 
+// Deleted rows, by app id, with the time the server recorded the deletion. A full snapshot
+// carries all of them: a device that was closed when another one deleted an animal still holds
+// it, and "absent from the list" could not tell it whether the animal was deleted or simply never
+// uploaded, so the old copy survived the merge and was uploaded again on every sync.
+const SNAPSHOT_TABLES = [
+  { key: "animals", model: "animal", appIdField: "appAnimalId" },
+  { key: "pairings", model: "pairing", appIdField: "appPairingId" },
+  { key: "clutches", model: "clutch", appIdField: "appClutchId" },
+  { key: "breedingCycles", model: "breedingCycle", appIdField: "appCycleId" },
+  { key: "follicleExams", model: "follicleExamination", appIdField: "appExamId" },
+] as const;
+
 export const listBreederSnapshot = async (ownerId: string, options: { since?: Date | null } = {}) => {
   const since = options.since && Number.isFinite(options.since.getTime()) ? options.since : null;
 
   // Captured before the reads, not after: anything written while these queries run then falls
   // inside the next window rather than slipping between the two. Re-sending a record costs
-  // nothing (the merge is idempotent); missing one loses data.
+  // nothing (the merge is idempotent); missing one loses data. Clients also ask from a little
+  // before this time (see the app's SYNC_CURSOR_OVERLAP_MS), because a write can commit after a
+  // read that started later than the write's own timestamp.
   const serverTime = new Date().toISOString();
 
   const liveWhere = since
     ? { ownerId, deletedAt: null, updatedAt: { gt: since } }
     : { ownerId, deletedAt: null };
+  // A deletion's window is judged by when the server wrote it (updatedAt), never by the deleting
+  // device's own clock: a delete made offline and uploaded hours later is older than every other
+  // device's cursor and was never reported to them.
+  const deletedWhere = since
+    ? { ownerId, deletedAt: { not: null }, updatedAt: { gt: since } }
+    : { ownerId, deletedAt: { not: null } };
 
-  const [animals, pairings, clutches, plannerState] = await Promise.all([
+  const [animals, pairings, clutches, plannerState, breedingCycles, follicleExams] = await Promise.all([
     db.animal.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.pairing.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.clutch.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
     db.breederPlannerState.findUnique({ where: { ownerId } }),
+    db.breedingCycle.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
+    db.follicleExamination.findMany({ where: liveWhere, orderBy: { updatedAt: "desc" } }),
   ]);
+
+  const deletedRows = await Promise.all(SNAPSHOT_TABLES.map((table) => (
+    db[table.model].findMany({ where: deletedWhere, select: { [table.appIdField]: true, updatedAt: true } })
+  )));
+  const tombstones: Record<string, Record<string, string>> = {};
+  const deleted: Record<string, string[]> = {};
+  SNAPSHOT_TABLES.forEach((table, index) => {
+    const byId: Record<string, string> = {};
+    (deletedRows[index] || []).forEach((row: any) => {
+      const appId = textValue(row[table.appIdField]);
+      if (appId) byId[appId] = isoDateValue(row.updatedAt) || serverTime;
+    });
+    tombstones[table.key] = byId;
+    deleted[table.key] = Object.keys(byId);
+  });
 
   const snapshot: JsonRecord = {
     animals: animals.map(withBackendSyncMetadata),
     pairings: pairings.map(withBackendSyncMetadata),
     clutches: clutches.map(withBackendSyncMetadata),
     plannerState: plannerState ? withBackendSyncMetadata(plannerState) : null,
+    breedingCycles: breedingCycles.map(withBackendSyncMetadata),
+    follicleExams: follicleExams.map(withBackendSyncMetadata),
+    tombstones,
+    // Raised by every full replace. A device that holds a lower number drops its copy and takes
+    // this snapshot as it is, instead of merging (see breederDataReplaceService).
+    dataGeneration: Number(plannerState?.dataGeneration) || 0,
     serverTime,
   };
 
   if (!since) return snapshot;
 
-  // A full snapshot conveys a deletion by omission; an incremental one cannot, so tombstones
-  // raised inside the window have to be named explicitly.
-  const [deletedAnimals, deletedPairings, deletedClutches] = await Promise.all([
-    db.animal.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appAnimalId: true } }),
-    db.pairing.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appPairingId: true } }),
-    db.clutch.findMany({ where: { ownerId, deletedAt: { gt: since } }, select: { appClutchId: true } }),
-  ]);
-
   snapshot.since = since.toISOString();
   snapshot.partial = true;
-  snapshot.deleted = {
-    animals: deletedAnimals.map((row: any) => row.appAnimalId).filter(Boolean),
-    pairings: deletedPairings.map((row: any) => row.appPairingId).filter(Boolean),
-    clutches: deletedClutches.map((row: any) => row.appClutchId).filter(Boolean),
-  };
+  snapshot.deleted = deleted;
   return snapshot;
 };
 
-type ExistingRow = { id: string; payload: unknown; updatedAt: unknown };
+type ExistingRow = { id: string; payload: unknown; updatedAt: unknown; deletedAt: unknown };
 type PlannedUpdate = { id: string; appId: string; data: JsonRecord };
 
 // One query per table, keyed by the app-side id, replacing a findUnique per incoming record.
@@ -476,15 +486,37 @@ const loadExistingByAppId = async (
 ): Promise<Map<string, ExistingRow>> => {
   const rows = await model.findMany({
     where: { ownerId },
-    select: { id: true, payload: true, updatedAt: true, [appIdField]: true },
+    select: { id: true, payload: true, updatedAt: true, deletedAt: true, [appIdField]: true },
   });
   const byAppId = new Map<string, ExistingRow>();
   for (const row of rows) {
     const appId = textValue(row[appIdField]);
-    if (appId) byAppId.set(appId, { id: row.id, payload: row.payload, updatedAt: row.updatedAt });
+    if (appId) byAppId.set(appId, { id: row.id, payload: row.payload, updatedAt: row.updatedAt, deletedAt: row.deletedAt ?? null });
   }
   return byAppId;
 };
+
+// What a tombstone does to the stored row. Both rules compare edit times with edit times: the
+// deletion time a device sends against when the record's content was last edited (its payload
+// stamps), never against the row's own write time, which is the server's clock and moves for
+// reasons a keeper never sees.
+//  - "skip" when the row is already deleted: every device re-sends its tombstones on each sync,
+//    and re-deleting bumped the row on every one of them, so each sync reported the same deletions
+//    to every other device again.
+//  - "skip" when the record was edited after the deletion happened: a device deleted its copy
+//    while another kept editing, and the later edit stands, exactly as it would for a field.
+//  - "create" when the server never had the record, so other devices still learn of the deletion.
+const planTombstone = (existing: ExistingRow | null, tombstoneAt: string): "delete" | "create" | "skip" => {
+  if (!existing) return "create";
+  if (existing.deletedAt) return "skip";
+  return new Date(tombstoneAt).getTime() >= recordTime(existing.payload) ? "delete" : "skip";
+};
+
+// A live copy of a deleted row comes back only if it was edited after the deletion. A stale copy
+// (a device that had not heard about the deletion and re-sent what it held) carries the time it
+// last read the row, which is before the deletion, and stays deleted.
+const shouldResurrect = (incoming: JsonRecord, existing: ExistingRow): boolean =>
+  recordTime(incoming) > Math.max(timestampMs(existing.deletedAt), recordTime(existing.payload));
 
 // Inserts in batches to stay well under Postgres' bind-parameter ceiling. skipDuplicates keeps a
 // concurrent sync from turning a racing insert into a failed request; the loser's data arrives on
@@ -495,35 +527,109 @@ const createManyChunked = async (model: any, rows: JsonRecord[], chunkSize = 200
   }
 };
 
+const wasArchivedBefore = (existingAnimals: Map<string, ExistingRow>, appId: string): boolean => (
+  isArchivedAnimalStatus(asRecord(existingAnimals.get(appId)?.payload)?.status)
+);
+
+type ArchiveTransition = { rowId: string; appId: string; archived: boolean; payload: JsonRecord | null };
+
+/** Animals this save moves into the archive (archived: true) or back out of it (false). */
+const planArchiveTransitions = (animalUpdates: PlannedUpdate[], existingAnimals: Map<string, ExistingRow>): ArchiveTransition[] => (
+  animalUpdates
+    .filter((update) => !update.data.deletedAt && update.data.status !== undefined)
+    .map((update) => ({
+      rowId: update.id,
+      appId: update.appId,
+      archived: isArchivedAnimalStatus(update.data.status),
+      before: wasArchivedBefore(existingAnimals, update.appId),
+      payload: asRecord(update.data.payload),
+    }))
+    .filter((row) => row.archived !== row.before)
+    .map(({ before, ...row }) => row)
+);
+
+/**
+ * Keep the ownership history (shown on the pedigree passport) in step with the archive: leaving
+ * closes the keeper's period, returning opens a new one. A marketplace sale already did this
+ * itself, and its animal arrives here already "Sold", so it is not a transition and is skipped.
+ * The buyer's name is deliberately not copied here: it lives in the archive record, where the
+ * keeper can erase it, and nowhere else.
+ */
+const recordArchiveOwnership = async (ownerId: string, transitions: ArchiveTransition[]): Promise<void> => {
+  for (const transition of transitions) {
+    const archive = asRecord(transition.payload?.archive);
+    if (transition.archived) {
+      const leftAt = new Date(isoDateValue(archive?.date) || isoDateValue(asRecord(transition.payload?.removed)?.date) || new Date().toISOString());
+      const removed = asRecord(transition.payload?.removed);
+      const reason = (textValue(archive?.reason) || textValue(removed?.reason))?.replace(/_/g, " ") || "archived";
+      const history = await db.ownershipHistory.findMany({ where: { animalId: transition.rowId }, orderBy: { fromDate: "asc" } });
+      const open = history.find((row: any) => row.ownerId === ownerId && !row.toDate);
+      if (open) {
+        await db.ownershipHistory.update({ where: { id: open.id }, data: { toDate: leftAt } });
+      } else if (!history.some((row: any) => row.ownerId === ownerId)) {
+        const animal = await db.animal.findUnique({ where: { id: transition.rowId }, select: { createdAt: true } });
+        const fromDate = animal?.createdAt && animal.createdAt < leftAt ? animal.createdAt : leftAt;
+        await db.ownershipHistory.create({
+          data: { animalId: transition.rowId, ownerId, fromDate, toDate: leftAt, transferType: "owned", notes: `Left the collection: ${reason}.` },
+        });
+      }
+    } else {
+      const history = Array.isArray(transition.payload?.archiveHistory) ? (transition.payload?.archiveHistory as unknown[]) : [];
+      const lastReturn = asRecord(history[history.length - 1]);
+      const returnedAt = new Date(isoDateValue(lastReturn?.returnDate) || new Date().toISOString());
+      await db.ownershipHistory.create({
+        data: { animalId: transition.rowId, ownerId, fromDate: returnedAt, transferType: "owned", notes: "Returned to the collection." },
+      });
+    }
+  }
+};
+
 /**
  * The tier's animal cap, judged on what this save leaves in the cloud.
  *
  * The app uploads only changed records, so the request size says nothing about the
  * collection: comparing it to the limit let a keeper pass the cap in small steps, and
  * the usage check that sat beside it counted deleted rows and refused every save --
- * edits included -- once an account reached its limit exactly. Only new live animals
- * can push an account over, so a save without any always goes through: edits,
- * deletions and pairings are never held hostage to the cap.
+ * edits included -- once an account reached its limit exactly. Only animals entering the
+ * collection can push an account over -- new ones, and archived ones returning -- so a save
+ * without any always goes through: edits, deletions, archiving and pairings are never held
+ * hostage to the cap. Archived animals (sold, died, given away...) do not count at all.
  */
 const assertAnimalCapacity = async (
+  tx: any,
   ownerId: string,
   access: any,
   animalCreates: JsonRecord[],
   animalUpdates: PlannedUpdate[],
+  existingAnimals: Map<string, ExistingRow>,
 ): Promise<void> => {
   const limit = access?.limit;
   if (limit === undefined || limit === null || !Number.isFinite(Number(limit))) return;
-  const added = animalCreates.filter((row) => !row.deletedAt).length;
+  const wasArchived = (appId: string) => wasArchivedBefore(existingAnimals, appId);
+  const created = animalCreates.filter((row) => !row.deletedAt && !isArchivedAnimalStatus(row.status)).length;
+  // Entering the collection: a deleted row brought back live (its data clears deletedAt), or an
+  // archived animal returning. Either way only when the animal it now is counts.
+  const entering = animalUpdates.filter((update) => {
+    if (update.data.deletedAt) return false;
+    if (update.data.status === undefined || isArchivedAnimalStatus(update.data.status)) return false;
+    const resurrected = "deletedAt" in update.data && update.data.deletedAt === null;
+    return resurrected || wasArchived(update.appId);
+  }).length;
+  const added = created + entering;
   if (!added) return;
 
-  const deletedIds = animalUpdates.filter((update) => update.data.deletedAt).map((update) => update.appId);
-  const [liveNow, liveBeingDeleted] = await Promise.all([
-    db.animal.count({ where: { ownerId, deletedAt: null } }),
-    deletedIds.length
-      ? db.animal.count({ where: { ownerId, deletedAt: null, appAnimalId: { in: deletedIds } } })
+  // Room made in the same save: animals deleted, or moved to the archive. countedAnimalWhere only
+  // matches rows that count now, so a row already deleted or archived frees nothing twice.
+  const leavingIds = animalUpdates
+    .filter((update) => update.data.deletedAt || (isArchivedAnimalStatus(update.data.status) && !wasArchived(update.appId)))
+    .map((update) => update.appId);
+  const [liveNow, liveLeaving] = await Promise.all([
+    tx.animal.count({ where: countedAnimalWhere(ownerId) }),
+    leavingIds.length
+      ? tx.animal.count({ where: countedAnimalWhere(ownerId, { appAnimalId: { in: leavingIds } }) })
       : Promise.resolve(0),
   ]);
-  const liveAfter = liveNow - liveBeingDeleted + added;
+  const liveAfter = liveNow - liveLeaving + added;
   if (liveAfter <= Number(limit)) return;
 
   const tierName = access.tier || access.currentTier || "Your plan";
@@ -541,6 +647,9 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   const plannerState = asRecord(input.plannerState);
   const nestedClutches = pairings.map(extractClutchFromPairing).filter((item): item is JsonRecord => !!item);
   const clutches = [...explicitClutches, ...nestedClutches];
+  const incomingCycles = normalizeArray(input.breedingCycles, "breedingCycles");
+  const incomingExams = normalizeArray(input.follicleExams, "follicleExams");
+  let skippedBreedingRecords: SkippedBreedingRecord[] = [];
   let animalAccess: any = { allowed: true, featureKey: "animals.create", source: "default", tier: "Unconfigured" };
   try {
     animalAccess = await canAccessFeature({ id: ownerId }, "animals.create");
@@ -549,106 +658,245 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     console.warn("[breeder-sync] canAccessFeature error (proceeding without limit check):", error);
   }
 
-  // Read the owner's current rows in bulk, outside the write transaction. The previous
-  // implementation issued a findUnique per incoming record *inside* the transaction, so a sync
-  // cost two sequential round-trips per record. Past a few thousand records that exceeded the
-  // transaction budget: Prisma closed the transaction mid-flight and the next query failed with
-  // P2028, surfacing to the app as a bare 500. Almost all of those reads were wasted anyway --
-  // on a routine sync nothing has changed, and the row was read only to decide not to write it.
-  const [existingAnimals, existingPairings, existingClutches, existingPlannerState] = await Promise.all([
-    loadExistingByAppId(db.animal, ownerId, "appAnimalId"),
-    loadExistingByAppId(db.pairing, ownerId, "appPairingId"),
-    loadExistingByAppId(db.clutch, ownerId, "appClutchId"),
-    db.breederPlannerState.findUnique({
-      where: { ownerId },
-      select: { id: true, payload: true, updatedAt: true },
-    }),
-  ]);
-
-  const animalCreates: JsonRecord[] = [];
-  const animalUpdates: PlannedUpdate[] = [];
-  for (const [index, animal] of animals.entries()) {
-    const appAnimalId = requireRecordId(animal, "animal", index);
-    const existing = existingAnimals.get(appAnimalId) || null;
-    const tombstoneAt = isoDateValue(animal.deletedAt);
-    if (tombstoneAt) {
-      if (existing) {
-        animalUpdates.push({ id: existing.id, appId: appAnimalId, data: { deletedAt: new Date(tombstoneAt) } });
-      } else {
-        animalCreates.push({ ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) });
-      }
-      continue;
-    }
-    const data = {
-      name: textValue(animal.name),
-      sex: textValue(animal.sex),
-      status: textValue(animal.status),
-      species: textValue(animal.species),
-      payload: existing ? mergeAnimalPayload(existing.payload, animal) : animal,
-    };
-    if (!existing) {
-      animalCreates.push({ ownerId, appAnimalId, ...data });
-    } else if (shouldApplyIncomingPayload(animal, existing)) {
-      animalUpdates.push({ id: existing.id, appId: appAnimalId, data });
-    }
-  }
-
-  await assertAnimalCapacity(ownerId, animalAccess, animalCreates, animalUpdates);
-
-  // Row ids for every pairing the clutch loop may reference. Pairings created by this request
-  // have no id until after the insert, so those are resolved in a single lookup below.
-  const pairingRowsByAppId = new Map<string, string>();
-  const pairingCreates: JsonRecord[] = [];
-  const pairingUpdates: PlannedUpdate[] = [];
-  const createdPairingAppIds: string[] = [];
-  for (const [index, pairing] of pairings.entries()) {
-    const appPairingId = requireRecordId(pairing, "pairing", index);
-    const existing = existingPairings.get(appPairingId) || null;
-    const tombstoneAt = isoDateValue(pairing.deletedAt);
-    if (tombstoneAt) {
-      if (existing) {
-        pairingUpdates.push({ id: existing.id, appId: appPairingId, data: { deletedAt: new Date(tombstoneAt) } });
-      } else {
-        pairingCreates.push({ ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) });
-      }
-      pairingRowsByAppId.set(appPairingId, existing?.id || "");
-      continue;
-    }
-    const mergedPairingPayload = existing ? mergePairingPayload(existing.payload, pairing) : pairing;
-    const data = {
-      label: textValue(pairing.label),
-      maleAnimalAppId: textValue(pairing.maleId),
-      femaleAnimalAppId: textValue(pairing.femaleId),
-      status: textValue(mergedPairingPayload.status),
-      workflowStatus: enumTextValue(mergedPairingPayload.workflowStatus ?? mergedPairingPayload.status, workflowStatuses),
-      completionReason: enumTextValue(mergedPairingPayload.completionReason, completionReasons),
-      outcomeConfidence: enumTextValue(mergedPairingPayload.outcomeConfidence, outcomeConfidences),
-      completedAt: isoDateValue(mergedPairingPayload.completedAt) ? new Date(isoDateValue(mergedPairingPayload.completedAt) as string) : null,
-      completedByUserId: textValue(mergedPairingPayload.completedBy),
-      completionNote: textValue(mergedPairingPayload.completionNote),
-      reopenedAt: isoDateValue(mergedPairingPayload.reopenedAt) ? new Date(isoDateValue(mergedPairingPayload.reopenedAt) as string) : null,
-      reopenedByUserId: textValue(mergedPairingPayload.reopenedBy),
-      startDate: textValue(pairing.startDate),
-      payload: mergedPairingPayload,
-    };
-    if (!existing) {
-      pairingCreates.push({ ownerId, appPairingId, ...data });
-      createdPairingAppIds.push(appPairingId);
-      pairingRowsByAppId.set(appPairingId, "");
-    } else {
-      if (shouldApplyIncomingPayload(pairing, existing)) {
-        pairingUpdates.push({ id: existing.id, appId: appPairingId, data });
-      }
-      pairingRowsByAppId.set(appPairingId, existing.id);
-    }
-  }
-
-  // Clutches and planner state are planned inside the transaction (they depend on row ids created
-  // there), so what they wrote is recorded out here for the response below.
-  const clutchAppIdsWritten: string[] = [];
+  // What this request wrote, recorded for the response below.
+  const touched = {
+    animals: new Set<string>(),
+    pairings: new Set<string>(),
+    clutches: new Set<string>(),
+    breedingCycles: new Set<string>(),
+    follicleExams: new Set<string>(),
+  };
   let plannerStateWritten = false;
+  let cycleChangesForReminders = false;
+  // Animals this save moves into or out of the archive, for the ownership history written after.
+  let archiveTransitions: ArchiveTransition[] = [];
 
+  // One transaction for the whole save, reads included, holding the account's sync lock. Reading
+  // the stored rows before the transaction (the old shape) let two devices saving at once merge
+  // against the same stale copy, and the second write erased whatever the first had added. The
+  // reads are still one bulk query per table, so a sync of thousands of records stays well inside
+  // the transaction budget.
   await db.$transaction(async (tx: any) => {
+    await lockBreederAccount(tx, ownerId);
+
+    const [existingAnimals, existingPairings, existingClutches, existingPlannerState, existingCycles, existingExams] = await Promise.all([
+      loadExistingByAppId(tx.animal, ownerId, "appAnimalId"),
+      loadExistingByAppId(tx.pairing, ownerId, "appPairingId"),
+      loadExistingByAppId(tx.clutch, ownerId, "appClutchId"),
+      tx.breederPlannerState.findUnique({
+        where: { ownerId },
+        select: { id: true, payload: true, updatedAt: true, dataGeneration: true },
+      }),
+      loadExistingByAppId(tx.breedingCycle, ownerId, "appCycleId"),
+      loadExistingByAppId(tx.follicleExamination, ownerId, "appExamId"),
+    ]);
+    assertCurrentDataGeneration(existingPlannerState?.dataGeneration, input.dataGeneration);
+
+    // Every animal a card names should be one of this owner's rows (deleted rows count, so archiving
+    // an animal keeps its breeding history), or arrive in this very request. A card naming any other
+    // id is kept with a review flag and a malformed record is left out on its own; neither blocks
+    // the rest of the save any more (screenBreedingRecords).
+    const knownAnimalAppIds = new Set<string>(existingAnimals.keys());
+    animals.forEach((animal, index) => knownAnimalAppIds.add(requireRecordId(animal, "animal", index)));
+    const screened = screenBreedingRecords(incomingCycles, incomingExams, knownAnimalAppIds);
+    const breedingCycles = screened.cycles;
+    const follicleExams = screened.exams;
+    skippedBreedingRecords = screened.skipped;
+    const flagged = (appId: string, payload: JsonRecord) => withUnresolvedAnimalFlag(payload, screened.unresolvedByCycleId.get(appId) || []);
+    if (skippedBreedingRecords.length) {
+      console.warn("[breeder-sync] left out malformed breeding records", { ownerId, skipped: skippedBreedingRecords });
+    }
+
+    const cycleCreates: JsonRecord[] = [];
+    const cycleUpdates: PlannedUpdate[] = [];
+    // The payload each live cycle will hold after this save, keyed by app id, so the
+    // one-active-cycle rule can be judged over the whole account rather than this request.
+    const resultingCyclePayloads = new Map<string, JsonRecord>();
+    existingCycles.forEach((row, appId) => {
+      const payload = asRecord(row.payload);
+      if (payload && !row.deletedAt && !payload.deletedAt) resultingCyclePayloads.set(appId, payload);
+    });
+    for (const [index, cycle] of breedingCycles.entries()) {
+      const appId = breedingCycleAppId(cycle) || `cycle-${index + 1}`;
+      const existing = existingCycles.get(appId) || null;
+      const tombstoneAt = isoDateValue(cycle.deletedAt);
+      if (tombstoneAt) {
+        const plan = planTombstone(existing, tombstoneAt);
+        if (plan === "delete") {
+          cycleUpdates.push({ id: existing!.id, appId, data: { deletedAt: new Date(tombstoneAt) } });
+          resultingCyclePayloads.delete(appId);
+        } else if (plan === "create") {
+          cycleCreates.push({ ownerId, appCycleId: appId, femaleAnimalAppId: textValue(cycle.femaleId) || "", payload: { ...cycle }, deletedAt: new Date(tombstoneAt) });
+        }
+        continue;
+      }
+      if (!existing) {
+        const payload = flagged(appId, cycle);
+        cycleCreates.push({ ownerId, appCycleId: appId, ...cycleColumns(payload), payload });
+        resultingCyclePayloads.set(appId, payload);
+        continue;
+      }
+      if (existing.deletedAt) {
+        if (!shouldResurrect(cycle, existing)) continue;
+        const payload = flagged(appId, cycle);
+        cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload, deletedAt: null } });
+        resultingCyclePayloads.set(appId, payload);
+        continue;
+      }
+      if (!shouldApplyIncomingPayload(cycle, existing)) continue;
+      const payload = flagged(appId, mergeBreedingCyclePayload(existing.payload, cycle));
+      if (sameSyncContent(payload, existing.payload)) continue;
+      cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload } });
+      resultingCyclePayloads.set(appId, payload);
+    }
+    // A stored card flagged for an animal the account lacked is re-checked on every save, sent in
+    // this request or not: once the animal has arrived the flag clears itself, without waiting for
+    // some device to edit that card.
+    existingCycles.forEach((row, appId) => {
+      if (row.deletedAt || cycleCreates.some((c) => c.appCycleId === appId) || cycleUpdates.some((u) => u.appId === appId)) return;
+      const stored = asRecord(row.payload);
+      const open = (Array.isArray(stored?.reviewFlags) ? stored!.reviewFlags : [])
+        .map(asRecord)
+        .find((flag) => flag?.kind === "unresolved_animal_reference" && !flag.resolvedAt);
+      if (!stored || !open) return;
+      const stillUnknown = (Array.isArray(open.animalIds) ? open.animalIds : [])
+        .map((id) => String(id))
+        .filter((id) => !knownAnimalAppIds.has(id));
+      const payload = withUnresolvedAnimalFlag(stored, stillUnknown);
+      if (payload === stored) return;
+      cycleUpdates.push({ id: row.id, appId, data: { ...cycleColumns(payload), payload } });
+      resultingCyclePayloads.set(appId, payload);
+    });
+
+    // Two devices can each start a card for the same female while offline. The earlier card stays
+    // active; the other is paused with a review flag so the keeper decides, and the save succeeds.
+    const conflictChanges = resolveActiveCycleConflicts(Array.from(resultingCyclePayloads.values()));
+    conflictChanges.forEach((payload, appId) => {
+      const planned = cycleCreates.find((row) => row.appCycleId === appId);
+      if (planned) {
+        Object.assign(planned, cycleColumns(payload), { payload });
+        return;
+      }
+      const update = cycleUpdates.find((row) => row.appId === appId);
+      if (update) {
+        update.data = { ...update.data, ...cycleColumns(payload), payload };
+        return;
+      }
+      const existing = existingCycles.get(appId);
+      if (existing) cycleUpdates.push({ id: existing.id, appId, data: { ...cycleColumns(payload), payload } });
+    });
+
+    const examCreates: JsonRecord[] = [];
+    const examUpdates: PlannedUpdate[] = [];
+    for (const [index, exam] of follicleExams.entries()) {
+      const appId = follicleExamAppId(exam) || `exam-${index + 1}`;
+      const existing = existingExams.get(appId) || null;
+      const tombstoneAt = isoDateValue(exam.deletedAt);
+      if (tombstoneAt) {
+        const plan = planTombstone(existing, tombstoneAt);
+        if (plan === "delete") {
+          examUpdates.push({ id: existing!.id, appId, data: { deletedAt: new Date(tombstoneAt) } });
+        } else if (plan === "create") {
+          examCreates.push({ ownerId, appExamId: appId, femaleAnimalAppId: textValue(exam.femaleId) || "", payload: { ...exam }, deletedAt: new Date(tombstoneAt) });
+        }
+        continue;
+      }
+      if (!existing) {
+        examCreates.push({ ownerId, appExamId: appId, ...examColumns(exam), payload: exam });
+        continue;
+      }
+      if (existing.deletedAt) {
+        if (shouldResurrect(exam, existing)) {
+          examUpdates.push({ id: existing.id, appId, data: { ...examColumns(exam), payload: exam, deletedAt: null } });
+        }
+        continue;
+      }
+      if (!shouldApplyIncomingPayload(exam, existing)) continue;
+      const payload = mergeFollicleExamPayload(existing.payload, exam);
+      if (sameSyncContent(payload, existing.payload)) continue;
+      examUpdates.push({ id: existing.id, appId, data: { ...examColumns(payload), payload } });
+    }
+
+    const animalCreates: JsonRecord[] = [];
+    const animalUpdates: PlannedUpdate[] = [];
+    for (const [index, animal] of animals.entries()) {
+      const appAnimalId = requireRecordId(animal, "animal", index);
+      const existing = existingAnimals.get(appAnimalId) || null;
+      const tombstoneAt = isoDateValue(animal.deletedAt);
+      if (tombstoneAt) {
+        const plan = planTombstone(existing, tombstoneAt);
+        if (plan === "delete") {
+          animalUpdates.push({ id: existing!.id, appId: appAnimalId, data: { deletedAt: new Date(tombstoneAt) } });
+        } else if (plan === "create") {
+          animalCreates.push({ ownerId, appAnimalId, payload: {}, deletedAt: new Date(tombstoneAt) });
+        }
+        continue;
+      }
+      if (!existing) {
+        animalCreates.push({ ownerId, appAnimalId, ...animalColumns(animal) });
+        continue;
+      }
+      if (existing.deletedAt) {
+        // Deleted here, but this copy was edited after the deletion: a real edit made on a device
+        // that had not heard about it yet, or a new animal that reuses the id. It comes back as
+        // sent, not merged with the dead row's payload.
+        if (!shouldResurrect(animal, existing)) continue;
+        animalUpdates.push({ id: existing.id, appId: appAnimalId, data: { ...animalColumns(animal), deletedAt: null } });
+        continue;
+      }
+      const merged = mergeAnimalPayload(storedRecord(existing), animal);
+      if (sameSyncContent(merged, existing.payload)) continue;
+      animalUpdates.push({ id: existing.id, appId: appAnimalId, data: animalColumns(merged) });
+    }
+
+    await assertAnimalCapacity(
+      tx,
+      ownerId,
+      animalAccess,
+      animalCreates,
+      animalUpdates,
+      existingAnimals,
+    );
+    archiveTransitions = planArchiveTransitions(animalUpdates, existingAnimals);
+
+    // Row ids for every pairing the clutch loop may reference. Pairings created by this request
+    // have no id until after the insert, so those are resolved in a single lookup below.
+    const pairingRowsByAppId = new Map<string, string>();
+    const pairingCreates: JsonRecord[] = [];
+    const pairingUpdates: PlannedUpdate[] = [];
+    const createdPairingAppIds: string[] = [];
+    for (const [index, pairing] of pairings.entries()) {
+      const appPairingId = requireRecordId(pairing, "pairing", index);
+      const existing = existingPairings.get(appPairingId) || null;
+      if (existing) pairingRowsByAppId.set(appPairingId, existing.id);
+      const tombstoneAt = isoDateValue(pairing.deletedAt);
+      if (tombstoneAt) {
+        const plan = planTombstone(existing, tombstoneAt);
+        if (plan === "delete") {
+          pairingUpdates.push({ id: existing!.id, appId: appPairingId, data: { deletedAt: new Date(tombstoneAt) } });
+        } else if (plan === "create") {
+          pairingCreates.push({ ownerId, appPairingId, payload: {}, deletedAt: new Date(tombstoneAt) });
+          pairingRowsByAppId.set(appPairingId, "");
+        }
+        continue;
+      }
+      if (!existing) {
+        pairingCreates.push({ ownerId, appPairingId, ...pairingColumns(pairing) });
+        createdPairingAppIds.push(appPairingId);
+        pairingRowsByAppId.set(appPairingId, "");
+        continue;
+      }
+      if (existing.deletedAt) {
+        if (shouldResurrect(pairing, existing)) {
+          pairingUpdates.push({ id: existing.id, appId: appPairingId, data: { ...pairingColumns(pairing), deletedAt: null } });
+        }
+        continue;
+      }
+      const merged = mergePairingPayload(storedRecord(existing), pairing);
+      if (sameSyncContent(merged, existing.payload)) continue;
+      pairingUpdates.push({ id: existing.id, appId: appPairingId, data: pairingColumns(merged) });
+    }
+
     await createManyChunked(tx.animal, animalCreates);
     for (const update of animalUpdates) {
       await tx.animal.update({ where: { id: update.id }, data: update.data });
@@ -657,6 +905,15 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     await createManyChunked(tx.pairing, pairingCreates);
     for (const update of pairingUpdates) {
       await tx.pairing.update({ where: { id: update.id }, data: update.data });
+    }
+
+    await createManyChunked(tx.breedingCycle, cycleCreates);
+    for (const update of cycleUpdates) {
+      await tx.breedingCycle.update({ where: { id: update.id }, data: update.data });
+    }
+    await createManyChunked(tx.follicleExamination, examCreates);
+    for (const update of examUpdates) {
+      await tx.follicleExamination.update({ where: { id: update.id }, data: update.data });
     }
 
     if (createdPairingAppIds.length) {
@@ -677,19 +934,15 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       const appClutchId = requireRecordId(clutch, "clutch", index);
       const pairingAppId = textValue(clutch.pairingAppId) || textValue(clutch.pairingId);
       const existing = existingClutches.get(appClutchId) || null;
-      const data = {
-        pairingId: pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null,
-        clutchNumber: intValue(clutch.clutchNumber),
-        seasonYear: intValue(clutch.seasonYear),
-        laidDate: textValue(clutch.laidDate) || textValue(clutch.date),
-        payload: existing ? mergeSnapshotPayload(existing.payload, clutch, { recordArrayKeys: ["photos"], mergeLogs: true }) : clutch,
-      };
+      if (existing?.deletedAt) continue;
+      const payload = existing ? mergeClutchPayload(storedRecord(existing), clutch) : clutch;
+      const data = clutchColumns(payload, pairingAppId ? pairingRowsByAppId.get(pairingAppId) || null : null);
       if (!existing) {
         clutchCreates.push({ ownerId, appClutchId, ...data });
-        clutchAppIdsWritten.push(appClutchId);
-      } else if (shouldApplyIncomingPayload(clutch, existing)) {
+        touched.clutches.add(appClutchId);
+      } else if (!sameSyncContent(payload, existing.payload)) {
         clutchUpdates.push({ id: existing.id, appId: appClutchId, data: { ...data, pairingId: data.pairingId || undefined } });
-        clutchAppIdsWritten.push(appClutchId);
+        touched.clutches.add(appClutchId);
       }
     }
 
@@ -699,22 +952,35 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     }
 
     if (plannerState) {
-      const data = {
-        payload: existingPlannerState
-          ? mergeSnapshotPayload(existingPlannerState.payload, plannerState, {
-            stringArrayKeys: ["groups", "showGroups", "hiddenGroups", "customStatusTags", "removedStatusTags"],
-          })
-          : plannerState,
-      };
       if (!existingPlannerState) {
-        await tx.breederPlannerState.create({ data: { ownerId, ...data } });
+        await tx.breederPlannerState.create({ data: { ownerId, payload: stripDeviceLocalPlannerState(plannerState) } });
         plannerStateWritten = true;
-      } else if (shouldApplyIncomingPayload(plannerState, existingPlannerState)) {
-        await tx.breederPlannerState.update({ where: { id: existingPlannerState.id }, data });
-        plannerStateWritten = true;
+      } else {
+        const payload = mergePlannerStatePayload(storedRecord(existingPlannerState), plannerState);
+        if (!sameSyncContent(payload, existingPlannerState.payload)) {
+          await tx.breederPlannerState.update({ where: { id: existingPlannerState.id }, data: { payload } });
+          plannerStateWritten = true;
+        }
       }
     }
+
+    animalCreates.forEach((row) => touched.animals.add(String(row.appAnimalId)));
+    animalUpdates.forEach((row) => touched.animals.add(row.appId));
+    pairingCreates.forEach((row) => touched.pairings.add(String(row.appPairingId)));
+    pairingUpdates.forEach((row) => touched.pairings.add(row.appId));
+    cycleCreates.forEach((row) => touched.breedingCycles.add(String(row.appCycleId)));
+    cycleUpdates.forEach((row) => touched.breedingCycles.add(row.appId));
+    examCreates.forEach((row) => touched.follicleExams.add(String(row.appExamId)));
+    examUpdates.forEach((row) => touched.follicleExams.add(row.appId));
+    cycleChangesForReminders = cycleCreates.length > 0 || cycleUpdates.length > 0;
   }, SNAPSHOT_TRANSACTION_OPTIONS);
+
+  if (archiveTransitions.length) {
+    // Best effort, after the save: a passport history problem must never cost the keeper a sync.
+    await recordArchiveOwnership(ownerId, archiveTransitions).catch((err) => {
+      console.error("[archive] ownership history update failed:", err);
+    });
+  }
 
   const savedSnapshot = await listBreederSnapshot(ownerId);
 
@@ -733,31 +999,44 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     console.error("[reproductive] ingestion error:", err);
   });
 
+  // Planned-pairing reminders ride on the email queue, idempotent per planned entry. Only run
+  // when this request carried cards; fire-and-forget like the ingestion above.
+  if (cycleChangesForReminders) {
+    const animalNames = new Map<string, string>();
+    (Array.isArray(savedSnapshot.animals) ? savedSnapshot.animals : []).forEach((animal: any) => {
+      const record = asRecord(animal);
+      const id = record ? textValue(record.id) : null;
+      if (id) animalNames.set(id, textValue(record?.name) || id);
+    });
+    const touchedCycleIds = touched.breedingCycles;
+    const touchedCycles = (Array.isArray(savedSnapshot.breedingCycles) ? savedSnapshot.breedingCycles : [])
+      .map(asRecord)
+      .filter((record): record is JsonRecord => !!record && touchedCycleIds.has(String(record.id)));
+    syncPlannedPairingReminders(ownerId, touchedCycles, animalNames).catch((err) => {
+      console.error("[breeding] planned pairing reminder sync failed:", err);
+    });
+  }
+
   // The rows this request actually wrote, in the same shape as a snapshot so a caller can treat
   // either response the same way. On a routine sync this is a handful of records instead of the
   // account's entire dataset; callers opt in with ?ack=changed so older installed builds, which
   // expect the full snapshot back, keep getting exactly what they got before.
-  const touchedAnimals = new Set<string>([
-    ...animalCreates.map((row) => String(row.appAnimalId)),
-    ...animalUpdates.map((row) => row.appId),
-  ]);
-  const touchedPairings = new Set<string>([
-    ...pairingCreates.map((row) => String(row.appPairingId)),
-    ...pairingUpdates.map((row) => row.appId),
-  ]);
-  const touchedClutches = new Set<string>(clutchAppIdsWritten);
-
-  const pickTouched = (records: unknown, touched: Set<string>): JsonRecord[] => (
+  const pickTouched = (records: unknown, ids: Set<string>): JsonRecord[] => (
     (Array.isArray(records) ? records : [])
       .map(asRecord)
-      .filter((record): record is JsonRecord => !!record && touched.has(String(record.id)))
+      .filter((record): record is JsonRecord => !!record && ids.has(String(record.id)))
   );
 
   const changed = {
-    animals: pickTouched(savedSnapshot.animals, touchedAnimals),
-    pairings: pickTouched(savedSnapshot.pairings, touchedPairings),
-    clutches: pickTouched(savedSnapshot.clutches, touchedClutches),
+    animals: pickTouched(savedSnapshot.animals, touched.animals),
+    pairings: pickTouched(savedSnapshot.pairings, touched.pairings),
+    clutches: pickTouched(savedSnapshot.clutches, touched.clutches),
+    breedingCycles: pickTouched(savedSnapshot.breedingCycles, touched.breedingCycles),
+    follicleExams: pickTouched(savedSnapshot.follicleExams, touched.follicleExams),
     plannerState: plannerStateWritten ? savedSnapshot.plannerState : null,
+    tombstones: savedSnapshot.tombstones,
+    // Records this save left out, so the app can say which card or examination did not sync.
+    skipped: skippedBreedingRecords,
     serverTime: savedSnapshot.serverTime,
     partial: true,
   };

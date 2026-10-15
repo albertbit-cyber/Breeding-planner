@@ -160,8 +160,8 @@ describe('essentials predicates', () => {
     ['feed', { data: data({ feeds: 4 }), base: { feeds: 4 } }, { data: data({ feeds: 5 }), base: { feeds: 4 } }],
     ['close-record', { modal: 'edit-animal' }, { modal: null }],
     ['open-breeding', { route: ['animals', 'all'] }, { route: ['pairings', 'dashboard'] }],
-    ['new-pairing', { modal: null }, { modal: 'create-pairing' }],
-    ['close-pairing', { modal: 'create-pairing' }, { modal: null }],
+    ['new-pairing', { modal: null }, { modal: 'breeding-entry' }],
+    ['close-pairing', { modal: 'breeding-entry' }, { modal: null }],
   ];
   for (const [id, before, after] of cases) {
     it(`${id}: false before the real change, true after`, () => {
@@ -181,8 +181,8 @@ describe('essentials predicates', () => {
     expect(add.done!(fakeContext({ data: data({ exampleAnimal: true, realAnimals: 1 }), base: { realAnimals: 1 }, modal: null }))).toBe(true);
   });
 
-  it('accepts the breeders-only notice as the pairing window opening', () => {
-    expect(step('new-pairing').done!(fakeContext({ modal: 'breeders-guard' }))).toBe(true);
+  it('waits for the pairing window itself, not some other window', () => {
+    expect(step('new-pairing').done!(fakeContext({ modal: 'edit-animal' }))).toBe(false);
   });
 });
 

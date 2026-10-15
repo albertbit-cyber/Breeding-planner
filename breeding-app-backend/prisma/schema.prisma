@@ -108,6 +108,7 @@ model User {
   pairings                       Pairing[]
   clutches                       Clutch[]
   plannerState                   BreederPlannerState?
+  dataReplacements               BreederDataReplacement[]
   listings                       Listing[]
   inquiriesSent                  ListingInquiry[]           @relation("ListingInquiryBuyer")
   inquiriesReceived              ListingInquiry[]           @relation("ListingInquiryBreeder")
@@ -151,6 +152,8 @@ model User {
   refreshSessions                RefreshSession[]
   securityEvents                 SecurityEvent[]
   reproductiveCycles             ReproductiveCycle[]
+  breedingCycles                 BreedingCycle[]
+  follicleExaminations           FollicleExamination[]
   marketplaceMedia               MarketplaceMedia[]         @relation("MarketplaceMediaOwner")
   marketplaceMessageReports      MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
   marketplaceBlocks              MarketplaceUserBlock[]     @relation("MarketplaceUserBlockBlocker")
@@ -529,15 +532,80 @@ model Clutch {
 }
 
 model BreederPlannerState {
-  id        String   @id @default(cuid())
-  ownerId   String   @unique
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  payload   Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  ownerId        String    @unique
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  payload        Json
+  /// Raised by one on every full replace of the account ("this file is the truth"). Written
+  /// only by the server; a device whose saves carry an older value is told to reload instead of
+  /// merging its copy back in. 0 means the account was never replaced.
+  dataGeneration Int       @default(0)
+  dataReplacedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([ownerId])
   @@map("breeder_planner_states")
+}
+
+/// A female's breeding cycle: one card per female per cycle (SBR-01/02). The breeder app owns
+/// the record and syncs it like a pairing: `payload` is the full card (males, sessions, dated
+/// lock records, planned pairings, milestones, clutch outcome, parentage, legacy provenance);
+/// the columns beside it are the indexed facts the server needs to query and to keep the
+/// one-active-cycle-per-female rule. The migration adds a partial unique index on
+/// (ownerId, femaleAnimalAppId) WHERE status = 'active' AND deletedAt IS NULL, which the sync
+/// service honours by pausing a conflicting duplicate for review instead of failing the save.
+model BreedingCycle {
+  id                String    @id @default(cuid())
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appCycleId        String
+  femaleAnimalAppId String
+  seasonLabel       String?
+  startDate         String?
+  status            String    @default("active")
+  closureOutcome    String?
+  closedAt          DateTime?
+  multipleSires     Boolean   @default(false)
+  payload           Json
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([ownerId, appCycleId])
+  @@index([ownerId])
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, femaleAnimalAppId])
+  @@index([ownerId, status])
+  @@map("breeding_cycles")
+}
+
+/// A follicle examination belongs to the FEMALE; `cycleAppId` is the optional association with
+/// a breeding cycle and never changes the examination's date (SBR-06). `largestDiameterMm` is
+/// the measured largest follicular diameter in millimetres, null when the method cannot
+/// measure (external observation) or the result has no number (not visualized, inconclusive).
+model FollicleExamination {
+  id                String    @id @default(cuid())
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  appExamId         String
+  femaleAnimalAppId String
+  cycleAppId        String?
+  examDate          String?
+  method            String?
+  result            String?
+  largestDiameterMm Float?
+  payload           Json
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([ownerId, appExamId])
+  @@index([ownerId])
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, femaleAnimalAppId])
+  @@index([ownerId, cycleAppId])
+  @@map("follicle_examinations")
 }
 
 /// RETIRED 2026-10-05 -- frozen, nothing writes it. `marketplace_listings` is the
@@ -1947,4 +2015,23 @@ model AdminEscalation {
   @@index([subjectUserId])
   @@index([createdAt])
   @@map("admin_escalations")
+}
+
+/// The account as it stood right before a full replace, kept so the replace can be undone.
+model BreederDataReplacement {
+  id             String   @id @default(cuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// "replace" or "undo"
+  reason         String
+  /// The generation the account moved to with this replace.
+  dataGeneration Int
+  /// Live record counts before and after, for the history list.
+  summary        Json
+  /// The account before the replace, in the snapshot upload shape.
+  previous       Json
+  createdAt      DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+  @@map("breeder_data_replacements")
 }

@@ -102,13 +102,13 @@ test.describe("help", () => {
     await page.locator('[data-help="record-save"]').click();
     // Saving closes the record, so "Close the record" is done the moment it appears.
     await expect(stepTitle(page)).toHaveText("Open Breeding", { timeout: 8_000 });
-    await doStep(page, "Open Breeding", "Press New pairing", () =>
+    await doStep(page, "Open Breeding", "Press Record a pairing", () =>
       page.locator('[data-help="nav-pairings"]:visible').first().click());
-    await doStep(page, "Press New pairing", "A male and a female", () =>
+    await doStep(page, "Press Record a pairing", "A male and a female", () =>
       page.locator('[data-help="pairing-new"]:visible').first().click());
     await readStep(page, "A male and a female", "Close the window");
     await doStep(page, "Close the window", "From pairing to hatchling", async () => {
-      const window = page.locator('[data-dialog="create-pairing"], [data-dialog="breeders-guard"]').first();
+      const window = page.locator('[data-dialog="breeding-entry"]').first();
       await window.getByRole("button", { name: /^(Close|Cancel)$/ }).first().click();
     });
     await readStep(page, "From pairing to hatchling", "Bringing a collection in");

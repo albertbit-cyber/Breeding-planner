@@ -2,6 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
+const { assertSeedAllowed } = require("../scripts/seedGuard.js");
+
 const prisma = new PrismaClient();
 
 const E2E_RESET_CONFIRM_VALUE = "local";
@@ -125,6 +127,29 @@ const E2E_SERVED_SPECIES = ["ball-python"];
 const E2E_ANIMAL = {
   id: "25Ath-1",
   name: "Athena - DEMO",
+};
+
+/**
+ * The breeder specs open this animal by name. It used to come from the app's
+ * demo collection, which only shows while an account owns nothing; once the
+ * marketplace seed gave this breeder a real animal, Athena vanished. So she is
+ * seeded as a real record too, matching the demo entry in demoAnimals.js.
+ */
+const E2E_ANIMAL_PAYLOAD = {
+  id: E2E_ANIMAL.id,
+  name: E2E_ANIMAL.name,
+  species: "ball-python",
+  sex: "F",
+  morphs: ["Clown", "Pastel"],
+  hets: ["Hypo"],
+  possibleHets: [],
+  weight: 850,
+  year: 2025,
+  birthDate: "2024-06-15",
+  tags: ["proven", "female"],
+  groups: ["Breeders"],
+  status: "Active",
+  logs: { feeds: [], weights: [], sheds: [], cleanings: [], meds: [] },
 };
 
 const E2E_BASELINE_ORDER = {
@@ -412,6 +437,33 @@ const resetBreederLabOrders = async (breederId: string) => {
   });
 };
 
+// What the browser specs create through the cloud sync: breeding cards, examinations, pairings
+// and clutches, and the multi-device spec's own animals. Left in place, the breeding-card spec
+// found the previous run's open card and could only pass on a fresh database.
+const resetBreederSyncedRecords = async (breederId: string) => {
+  await prisma.follicleExamination.deleteMany({ where: { ownerId: breederId } });
+  await prisma.breedingCycle.deleteMany({ where: { ownerId: breederId } });
+  await prisma.clutch.deleteMany({ where: { ownerId: breederId } });
+  await prisma.pairing.deleteMany({ where: { ownerId: breederId } });
+  await prisma.animal.deleteMany({ where: { ownerId: breederId, appAnimalId: { startsWith: "e2e-sync-" } } });
+};
+
+const ensureBreederAnimal = async (breederId: string) => {
+  const animalData = {
+    name: E2E_ANIMAL.name,
+    sex: "F",
+    species: "ball-python",
+    status: "Active",
+    payload: E2E_ANIMAL_PAYLOAD,
+    deletedAt: null,
+  };
+  await prisma.animal.upsert({
+    where: { ownerId_appAnimalId: { ownerId: breederId, appAnimalId: E2E_ANIMAL.id } },
+    update: animalData,
+    create: { ownerId: breederId, appAnimalId: E2E_ANIMAL.id, ...animalData },
+  });
+};
+
 const createBaselineOrder = async (breederId: string, labOrganizationId: string) => {
   const orderData = {
     orderNumber: E2E_BASELINE_ORDER.orderNumber,
@@ -595,6 +647,7 @@ const resetMarketplace = async (sellerId: string, buyerId: string, labOrganizati
 };
 
 const main = async () => {
+  assertSeedAllowed("prisma/e2eReset.ts");
   const database = assertLocalDatabaseUrl();
 
   const [adminUser, breederUser, labUser, labBUser, buyerUser] = await Promise.all([
@@ -626,6 +679,8 @@ const main = async () => {
   await ensureLabOfferingsAndPricing(labOrganizationId);
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
+  await resetBreederSyncedRecords(breederUser.id);
+  await ensureBreederAnimal(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
   await resetMarketplace(breederUser.id, buyerUser.id, labOrganizationId);
 
