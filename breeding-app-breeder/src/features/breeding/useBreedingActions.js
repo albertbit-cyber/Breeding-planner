@@ -4,8 +4,9 @@
  * Every action reads the current records from refs, runs the domain function (which throws on
  * an invalid input, so the dialog can keep the keeper's entry and show why), then writes the
  * changed record back with a by-id upsert. Follow-ups that the product rules attach to an
- * action (the one-calendar-month proposal after an observed lock, the review of pending
- * reminders after ovulation, linking pre-pairing scans to a new card) happen here, in one place.
+ * action (ending the pairing plan at ovulation, linking pre-pairing scans to a new card) happen
+ * here, in one place. A lock no longer proposes a reminder: the pairing plan's next row is one
+ * calendar month after the latest pairing (see domain/pairingPlan.js).
  */
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
   addLockObservation,
   setLockStatus as setLockStatusDomain,
   removeLock as removeLockDomain,
+  setLockDate as setLockDateDomain,
   updateSession as updateSessionDomain,
   removeSession as removeSessionDomain,
   addCandidateMale,
@@ -35,7 +37,6 @@ import {
   CYCLE_STATUS,
 } from './domain/cycleModel';
 import {
-  scheduleFollowUpForLock,
   applyProposal,
   reviewPlannedAfterOvulation,
   addManualPlannedPairing,
@@ -43,6 +44,15 @@ import {
   skipPlannedPairing,
   cancelPlannedPairing,
 } from './domain/followUps';
+import {
+  markPaired,
+  unmarkPaired,
+  markLock,
+  unmarkLock,
+  setPairedDate as setPairedDateDomain,
+  setRowNote as setRowNoteDomain,
+  clutchCountsPatch,
+} from './domain/pairingPlan';
 import { createExam, updateExam, associateExamsWithCycle, setInterpretationOverride as setOverrideDomain } from './domain/follicles';
 import { normalizeBreedingSettings } from './domain/reviewRules';
 import { resolveSeasonLabel, startNewSeason as startNewSeasonDomain } from './domain/season';
@@ -102,7 +112,6 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
     /** Quick pairing entry. Returns the card, the session, and what happened to the follow-up. */
     recordPairing(input) {
       const now = nowIso();
-      const today = todayYmd();
       const { speciesId, reproductionMode } = speciesFor(input.femaleId);
       const result = recordPairingSession(cyclesRef.current, { ...input, speciesId: input.speciesId || speciesId, reproductionMode: input.reproductionMode || reproductionMode }, { now });
       let cycle = result.cycle;
@@ -110,31 +119,15 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
         // A new card belongs to the season its first pairing falls in.
         cycle = { ...cycle, seasonLabel: resolveSeasonLabel(cycle.startDate, settingsRef.current?.seasons) || cycle.seasonLabel, seasonLabelSource: 'auto' };
       }
-      let followUp = null;
-      if (result.lock) {
-        const scheduled = scheduleFollowUpForLock(cycle, { sessionId: result.session.id, lock: result.lock, today, now });
-        cycle = scheduled.cycle;
-        followUp = { proposal: scheduled.proposal, planned: scheduled.planned };
-      }
       cyclesRef.current = result.created ? [...cyclesRef.current.filter((c) => c.id !== cycle.id), cycle] : cyclesRef.current;
       writeCycle(cycle);
       const associated = linkExamsToCycle(cycle);
-      return { cycle, session: result.session, lock: result.lock, created: result.created, followUp, associatedExamIds: associated };
+      return { cycle, session: result.session, lock: result.lock, created: result.created, followUp: null, associatedExamIds: associated };
     },
 
     addLock(cycleId, sessionId, input) {
-      const now = nowIso();
-      const today = todayYmd();
-      let followUp = null;
-      const cycle = withCycle(cycleId, (current) => {
-        const added = addLockObservation(current, sessionId, input, { now });
-        let next = added.cycle;
-        const scheduled = scheduleFollowUpForLock(next, { sessionId, lock: added.lock, today, now });
-        next = scheduled.cycle;
-        followUp = { proposal: scheduled.proposal, planned: scheduled.planned, merged: added.merged };
-        return next;
-      });
-      return { cycle, followUp };
+      const cycle = withCycle(cycleId, (current) => addLockObservation(current, sessionId, input, { now: nowIso() }).cycle);
+      return { cycle, followUp: null };
     },
 
     /** Accept a suppressed-as-historical proposal deliberately: create the planned pairing anyway. */
@@ -167,6 +160,51 @@ export function useBreedingActions({ cycles, exams, settings, setCycles, setExam
       let outcome = null;
       withCycle(cycleId, (current) => { outcome = setMultipleSiresDomain(current, enabled, { now: nowIso() }); return outcome.cycle; });
       return outcome;
+    },
+
+    // ── Pairing plan rows (BreedingCard "Pairing plan and milestones") ──
+    /** "Paired" ticked: today's date unless one is given. Ticking "Lock observed" first pairs too. */
+    planMarkPaired(cycleId, row, { date, withLock = false } = {}) {
+      const now = nowIso();
+      const day = date || todayYmd();
+      return withCycle(cycleId, (current) => {
+        const paired = markPaired(current, row, { date: day, now });
+        return withLock ? markLock(paired.cycle, paired.session.id, { date: day, now }) : paired.cycle;
+      });
+    },
+    planUnmarkPaired(cycleId, sessionId) {
+      return withCycle(cycleId, (current) => unmarkPaired(current, sessionId, { now: nowIso() }));
+    },
+    planSetPairedDate(cycleId, sessionId, date) {
+      return withCycle(cycleId, (current) => setPairedDateDomain(current, sessionId, date, { now: nowIso() }));
+    },
+    planMarkLock(cycleId, sessionId, date) {
+      return withCycle(cycleId, (current) => markLock(current, sessionId, { date: date || todayYmd(), now: nowIso() }));
+    },
+    planUnmarkLock(cycleId, sessionId, lockId) {
+      return withCycle(cycleId, (current) => unmarkLock(current, sessionId, lockId, { now: nowIso() }));
+    },
+    planSetLockDate(cycleId, sessionId, lockId, date) {
+      return withCycle(cycleId, (current) => setLockDateDomain(current, sessionId, lockId, date, { now: nowIso() }));
+    },
+    planSetNote(cycleId, row, note) {
+      return withCycle(cycleId, (current) => setRowNoteDomain(current, row, note, { now: nowIso() }));
+    },
+    /** A milestone tick or date: `date` null removes the recorded milestone. */
+    planSetMilestone(cycleId, type, date) {
+      const now = nowIso();
+      return withCycle(cycleId, (current) => {
+        const recorded = current.events.filter((e) => e.type === type && e.certainty === 'recorded');
+        if (!date) return recorded.reduce((next, e) => removeEvent(next, e.id, { now }), current);
+        let next = recorded[0]
+          ? recordEvent(current, { ...recorded[0], date }, { now })
+          : recordEvent(current, { type, date }, { now });
+        if (type === 'ovulation') next = reviewPlannedAfterOvulation(next, { now }).cycle;
+        return next;
+      });
+    },
+    planSetClutchCounts(cycleId, counts) {
+      return withCycle(cycleId, (current) => updateClutchDomain(current, clutchCountsPatch(current, counts), { now: nowIso() }));
     },
 
     recordMilestone(cycleId, event) {

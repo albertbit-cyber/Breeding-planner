@@ -63,6 +63,8 @@ export function mergeBreedingCycleRecords(local, backend) {
     sessions: unionById(base.sessions, other.sessions, mergeSession),
     plannedPairings: unionById(base.plannedPairings, other.plannedPairings),
     events: unionById(base.events, other.events),
+    // Removed on either copy stays removed; normalizeCycle drops these ids from the lists above.
+    removedIds: [...(other.removedIds || []), ...(base.removedIds || [])],
     offspring: unionById(base.offspring?.map((o) => ({ ...o, id: o.animalId })), other.offspring?.map((o) => ({ ...o, id: o.animalId }))).map(({ id, ...o }) => o),
     reopenings: [...(other.reopenings || []), ...(base.reopenings || [])].filter((r, i, arr) => arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(r)) === i),
   });

@@ -115,6 +115,31 @@ describe("breeding cards in the cloud sync", () => {
     expect(payload.males).toHaveLength(2);
   });
 
+  it("keeps a removed session, lock or milestone removed when the other copy still has it", async () => {
+    const animals = [{ id: "F1", sex: "F" }, { id: "M1", sex: "M" }];
+    const withMore = femaleCard({
+      sessions: [
+        { id: "s1", maleId: "M1", introductionDate: "2026-03-01", locks: [{ id: "l1", observationDate: "2026-03-01", status: "observed" }, { id: "l2", observationDate: "2026-03-03", status: "observed" }] },
+        { id: "s2", maleId: "M1", introductionDate: "2026-04-01", locks: [] },
+      ],
+      events: [{ id: "ev1", type: "ovulation", date: "2026-04-20" }],
+    });
+    await upsertBreederSnapshot(OWNER_A, { animals, breedingCycles: [withMore] });
+    // The keeper unticked the April pairing and one lock and the ovulation on another device.
+    const unticked = femaleCard({
+      updatedAt: new Date(Date.now() + 1000).toISOString(),
+      sessions: [{ id: "s1", maleId: "M1", introductionDate: "2026-03-01", locks: [{ id: "l1", observationDate: "2026-03-01", status: "observed" }] }],
+      events: [],
+      removedIds: ["s2", "l2", "ev1"],
+    });
+    await upsertBreederSnapshot(OWNER_A, { animals, breedingCycles: [unticked] });
+    const payload = rows("breedingCycle")[0].payload;
+    expect(payload.sessions.map((s: any) => s.id)).toEqual(["s1"]);
+    expect(payload.sessions[0].locks.map((l: any) => l.id)).toEqual(["l1"]);
+    expect(payload.events).toEqual([]);
+    expect(payload.removedIds).toEqual(expect.arrayContaining(["s2", "l2", "ev1"]));
+  });
+
   it("pauses a second active card for the same female and flags it for review instead of failing", async () => {
     const animals = [{ id: "F1", sex: "F" }, { id: "M1", sex: "M" }];
     await upsertBreederSnapshot(OWNER_A, { animals, breedingCycles: [femaleCard()] });
