@@ -1,6 +1,10 @@
 /**
  * The female breeding cycle: one card per female per cycle.
  *
+ * Where a cycle shows up: from the first pairing it is an Active pairing; from "egg laid" its
+ * clutch is in the Incubator; once the clutch hatched and every hatchling is registered as an
+ * animal it closes and moves to Completed pairing (completeIfRegistered).
+ *
  * Rules this module enforces (see docs/status/breeding-upgrade-tracker.md, SBR-01/03/04):
  *  - the first ACTUAL pairing session starts the cycle; planned appointments never do;
  *  - one active cycle per female; later sessions, with any male, attach to it;
@@ -25,7 +29,14 @@ export const CLOSURE_OUTCOMES = Object.freeze([
   'failed_clutch',
   'cancelled',
   'other',
+  // Written only by archiving the female (sold, died, left the collection); never offered in
+  // the close dialog, since the card closes itself the moment she leaves.
+  'female_sold',
+  'female_died',
+  'female_left_collection',
 ]);
+/** Closure outcomes the archive writes. The close dialog leaves these out. */
+export const ARCHIVE_CLOSURE_OUTCOMES = Object.freeze(['female_sold', 'female_died', 'female_left_collection']);
 export const EVENT_TYPES = Object.freeze([
   'ovulation',
   'pre_lay_shed',
@@ -140,7 +151,23 @@ export function normalizeClutch(raw = {}) {
     outcomeCompletedAt: text(clutch.outcomeCompletedAt) || null,
     notes: text(clutch.notes),
     legacyPairingId: text(clutch.legacyPairingId) || null,
+    // Incubator bookkeeping: a clutch keeps its number for good once it is laid, and each egg
+    // box keeps its own notes and bad-egg count (keyed "1", "2", ...).
+    clutchNumber: countOrNull(clutch.clutchNumber) || null,
+    eggBoxNumber: countOrNull(clutch.eggBoxNumber) || null,
+    eggBoxNotes: countMap(clutch.eggBoxNotes, text),
+    eggBoxBadEggs: countMap(clutch.eggBoxBadEggs, countOrNull),
   };
+}
+
+function countMap(value, read) {
+  const source = asObject(value) || {};
+  const out = {};
+  Object.entries(source).forEach(([key, raw]) => {
+    const v = read(raw);
+    if (v !== null && v !== '' && v !== 0) out[String(key)] = v;
+  });
+  return out;
 }
 
 export function normalizeOffspring(raw = {}) {
@@ -316,7 +343,7 @@ export function deriveStage(cycle) {
   if (!cycle) return 'none';
   const closure = cycle.status === CYCLE_STATUS.CLOSED ? cycle.closure : null;
   if (closure && closure.outcome !== 'hatching_complete' && closure.outcome !== 'live_birth_complete') return 'closed_without_offspring';
-  if (cycle.clutch?.outcomeComplete || recordedEventDate(cycle, 'hatching_complete')) return 'complete';
+  if (closure?.outcome === 'hatching_complete' || closure?.outcome === 'live_birth_complete' || cycle.clutch?.outcomeComplete || recordedEventDate(cycle, 'hatching_complete')) return 'complete';
   if (recordedEventDate(cycle, 'live_birth')) return 'live_birth';
   if (recordedEventDate(cycle, 'first_hatch') || (cycle.clutch?.hatchlingsRecorded || 0) > 0) return 'hatching';
   if (recordedEventDate(cycle, 'egg_laying')) return 'incubating';
@@ -635,9 +662,10 @@ export function recordHatching(cycle, { date, hatchlingsRecorded, notes = '' } =
 }
 
 /**
- * Hatching complete: the explicit action that resolves every egg's outcome and completes the
- * cycle. Idempotent: calling it again with the same facts changes nothing and never duplicates
- * hatchlings (hatchling records themselves are created by the caller once per index).
+ * Hatching complete: the explicit action that resolves every egg's outcome. It does NOT finish
+ * the cycle by itself: the cycle is complete once the hatchlings are registered in the app as
+ * individual animals (see completeIfRegistered). With no hatchlings at all there is nothing to
+ * register, so the card closes right away as a failed clutch. Idempotent.
  */
 export function completeHatchingOutcome(cycle, { finalHatchDate, hatchlingsRecorded, lostEggs, notes = '', completedAt } = {}, { now = nowIso() } = {}) {
   const day = toYmd(finalHatchDate) || cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate;
@@ -654,10 +682,93 @@ export function completeHatchingOutcome(cycle, { finalHatchDate, hatchlingsRecor
   if (!recordedEventDate(next, 'first_hatch')) next = recordEvent(next, { type: 'first_hatch', date: next.clutch.firstHatchDate || day }, { now });
   if (!recordedEventDate(next, 'final_hatch')) next = recordEvent(next, { type: 'final_hatch', date: day }, { now });
   if (!recordedEventDate(next, 'hatching_complete')) next = recordEvent(next, { type: 'hatching_complete', date: day, notes }, { now });
-  if (next.status !== CYCLE_STATUS.CLOSED) {
-    next = closeCycle(next, { outcome: 'hatching_complete', note: notes, biologicalCompletionDate: day, closedAt: completedAt || now }, { now });
+  if (next.status !== CYCLE_STATUS.CLOSED && (next.clutch.hatchlingsRecorded || 0) === 0) {
+    return closeCycle(next, { outcome: 'failed_clutch', note: notes, biologicalCompletionDate: day, closedAt: completedAt || now }, { now });
   }
-  return next;
+  return completeIfRegistered(next, { now });
+}
+
+/** A hatch carried over from a legacy pairing record: the old model only knew "hatched". */
+function hasLegacyHatch(cycle) {
+  return asArray(cycle?.events).some((e) => e.type === 'first_hatch' && e.source?.type === 'legacy_pairing');
+}
+
+/**
+ * Has the clutch finished hatching? Either the keeper recorded the final outcome, the hatch came
+ * from a legacy record (which only ever recorded a finished hatch), or the counts account for
+ * every egg laid.
+ */
+export function hatchingDone(cycle) {
+  const clutch = cycle?.clutch || {};
+  if (clutch.outcomeComplete) return true;
+  if (hasLegacyHatch(cycle) && (clutch.hatchlingsRecorded || 0) > 0) return true;
+  if (clutch.eggsTotal !== null && clutch.eggsTotal !== undefined && (clutch.hatchlingsRecorded || 0) > 0) {
+    const accounted = (clutch.hatchlingsRecorded || 0) + (clutch.lostEggs || 0) + (clutch.slugs || 0);
+    return accounted >= clutch.eggsTotal;
+  }
+  return false;
+}
+
+/** Hatchlings that still have to be registered as animals before the cycle can complete. */
+export function registrationStatus(cycle) {
+  const expected = Math.max(0, Number(cycle?.clutch?.hatchlingsRecorded) || 0);
+  const registered = asArray(cycle?.offspring).length;
+  const hatched = hatchingDone(cycle);
+  return { hatched, expected, registered, missing: Math.max(0, expected - registered) };
+}
+
+/**
+ * The cycle is complete when the clutch has hatched and every hatchling is registered in the app
+ * as an individual animal. Then, and only then, the card closes as "hatching complete".
+ */
+export function completeIfRegistered(cycle, { now = nowIso() } = {}) {
+  if (!cycle || cycle.status === CYCLE_STATUS.CLOSED || cycle.reproductionMode === 'live_bearing') return cycle;
+  // A card the keeper reopened stays open until they record the final outcome again; otherwise
+  // its already registered hatchlings would close it again the moment it was reopened.
+  if (asArray(cycle.reopenings).some((r) => r?.reopenedAt) && !cycle.clutch?.outcomeComplete) return cycle;
+  const status = registrationStatus(cycle);
+  if (!status.hatched || status.expected === 0 || status.missing > 0) return cycle;
+  const day = cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate || recordedEventDate(cycle, 'first_hatch');
+  return closeCycle(cycle, { outcome: 'hatching_complete', biologicalCompletionDate: day, closedAt: now }, { now });
+}
+
+/**
+ * The female left the collection: close each of her open or paused cards with the archive
+ * outcome. Pending planned pairings are cancelled by closeCycle itself.
+ */
+export function closeCyclesForArchivedFemale(cycles = [], femaleId, outcome, { now = nowIso(), note = '' } = {}) {
+  const id = text(femaleId);
+  const closedIds = [];
+  const next = asArray(cycles).map((cycle) => {
+    if (!cycle || cycle.deletedAt || cycle.femaleId !== id || cycle.status === CYCLE_STATUS.CLOSED) return cycle;
+    closedIds.push(cycle.id);
+    return closeCycle(cycle, { outcome, note, closedAt: now }, { now });
+  });
+  return { cycles: next, closedIds };
+}
+
+/**
+ * A male left the collection. The females' cards stay open (one may already be gravid by him),
+ * but pairings still planned with him cannot happen, so those are cancelled.
+ */
+export function cancelPlannedPairingsForArchivedMale(cycles = [], maleId, { now = nowIso() } = {}) {
+  const id = text(maleId);
+  const changedIds = [];
+  const next = asArray(cycles).map((cycle) => {
+    if (!cycle || cycle.deletedAt || cycle.status === CYCLE_STATUS.CLOSED) return cycle;
+    const planned = asArray(cycle.plannedPairings);
+    if (!planned.some((p) => p.maleId === id && p.status === 'pending')) return cycle;
+    changedIds.push(cycle.id);
+    return touch({
+      ...cycle,
+      plannedPairings: planned.map((p) => (
+        p.maleId === id && p.status === 'pending'
+          ? { ...p, status: 'cancelled', resolution: { kind: 'male_left_collection', at: now }, updatedAt: now }
+          : p
+      )),
+    }, now);
+  });
+  return { cycles: next, changedIds };
 }
 
 export function closeCycle(cycle, { outcome, note = '', closedAt, biologicalCompletionDate = null } = {}, { now = nowIso() } = {}) {
@@ -707,9 +818,9 @@ export function resumeCycle(cycle, { now = nowIso() } = {}) {
   return touch({ ...cycle, status: CYCLE_STATUS.ACTIVE, pause: null, reopenings: [...cycle.reopenings, { resumedAt: now, previousPause: cycle.pause }] }, now);
 }
 
-export function setSeasonLabel(cycle, label, { now = nowIso() } = {}) {
+export function setSeasonLabel(cycle, label, { now = nowIso(), seasonSettings = null } = {}) {
   const normalized = normalizeSeasonLabel(label);
-  if (!normalized) return touch({ ...cycle, seasonLabel: defaultSeasonLabel(cycle.startDate), seasonLabelSource: 'auto' }, now);
+  if (!normalized) return touch({ ...cycle, seasonLabel: defaultSeasonLabel(cycle.startDate, seasonSettings), seasonLabelSource: 'auto' }, now);
   return touch({ ...cycle, seasonLabel: normalized, seasonLabelSource: 'manual' }, now);
 }
 

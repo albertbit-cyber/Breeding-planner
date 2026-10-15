@@ -61,6 +61,7 @@ vi.mock("../services/subscriptionService", () => ({
 import { prisma } from "../lib/prisma";
 import { canAccessFeature } from "../services/subscriptionService";
 import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederDataService";
+import { countedAnimalWhere } from "../services/animalArchive";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -120,7 +121,7 @@ describe("the tier's animal cap", () => {
 
     await upsertBreederSnapshot("breeder-1", { animals: newAnimals(1) });
 
-    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: { ownerId: "breeder-1", deletedAt: null } });
+    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: countedAnimalWhere("breeder-1") });
     expect(tx.animal.createMany).toHaveBeenCalled();
   });
 
@@ -156,8 +157,65 @@ describe("the tier's animal cap", () => {
     });
 
     expect((prisma as any).animal.count).toHaveBeenLastCalledWith({
-      where: { ownerId: "breeder-1", deletedAt: null, appAnimalId: { in: ["snake-1"] } },
+      where: countedAnimalWhere("breeder-1", { appAnimalId: { in: ["snake-1"] } }),
     });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("does not count archived animals toward the cap", async () => {
+    const where = countedAnimalWhere("breeder-1") as any;
+    expect(where.deletedAt).toBeNull();
+    expect(where.OR).toContainEqual({ status: null });
+    const excluded = where.OR.find((clause: any) => clause.status?.notIn).status.notIn;
+    expect(excluded).toEqual(expect.arrayContaining(["Sold", "Deceased", "Archived", "sold"]));
+  });
+
+  it("lets an account at its cap archive an animal without a capacity check", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Breeder" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Sold", archive: { reason: "sold" }, updatedAt: "2026-02-01T00:00:00.000Z" }],
+    });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.update).toHaveBeenCalled();
+  });
+
+  it("does not count a new animal that arrives already archived", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+
+    await upsertBreederSnapshot("breeder-1", { animals: [{ id: "old-sale", status: "Sold" }] });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("counts an archived animal returning to the collection", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Sold" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(20);
+
+    await expect(upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Active", archive: null, updatedAt: "2026-02-01T00:00:00.000Z" }],
+    })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("makes room for a new animal when the same save archives one", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Breeder" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValueOnce(20).mockResolvedValueOnce(1);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Deceased", updatedAt: "2026-02-01T00:00:00.000Z" }, ...newAnimals(1)],
+    });
+
     expect(tx.animal.createMany).toHaveBeenCalled();
   });
 
@@ -170,6 +228,43 @@ describe("the tier's animal cap", () => {
 
     expect((prisma as any).animal.count).not.toHaveBeenCalled();
     expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+});
+
+describe("a deleted snake kept as a lineage card", () => {
+  const full = {
+    id: "M-1", name: "Clown male", status: "Breeder", morphs: ["Clown"],
+    logs: { feeds: [{ id: "f1", date: "2026-01-01" }] },
+    photos: [{ id: "p1", url: "a" }, { id: "p2", url: "b" }],
+  };
+  const card = {
+    id: "M-1", name: "Clown male", status: "Removed", morphs: ["Clown"],
+    logs: { feeds: [] }, photos: [{ id: "p1", url: "a" }],
+    removed: { reason: "died", date: "2026-10-13" },
+  };
+
+  it("replaces the full record whole, so the erased logs and photos stay erased", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...full, updatedAt: "2026-01-01T00:00:00.000Z" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...card, updatedAt: "2026-10-13T00:00:00.000Z" }] });
+    const written = tx.animal.update.mock.calls[0][0].data;
+    expect(written.status).toBe("Removed");
+    expect(written.payload.logs.feeds).toEqual([]);
+    expect(written.payload.photos).toHaveLength(1);
+  });
+
+  it("is not merged back together with a full copy from a device that had not synced", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...card, updatedAt: "2026-10-13T00:00:00.000Z" }, "2026-10-13T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...full, updatedAt: "2026-10-14T00:00:00.000Z" }] });
+    // The stored card wins whole, and a merge that changes nothing is not written at all
+    // (sameSyncContent), so the row keeps the card, untouched by the stale full copy.
+    expect(tx.animal.update).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([expect.objectContaining({ appAnimalId: "M-1" })]),
+    }));
   });
 });
 

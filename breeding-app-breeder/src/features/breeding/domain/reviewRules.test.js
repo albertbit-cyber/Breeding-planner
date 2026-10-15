@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveRule, evaluateReview, buildForecasts, normalizeBreedingSettings } from './reviewRules';
 import { createExam } from './follicles';
-import { recordPairingSession, recordEvent, updateClutch, completeHatchingOutcome } from './cycleModel';
+import { recordPairingSession, recordEvent, updateClutch, completeHatchingOutcome, linkOffspring, completeIfRegistered } from './cycleModel';
 
 const NOW = '2026-03-01T10:00:00.000Z';
 const us = (date, mm, femaleId = 'F1') => createExam({ femaleId, date, method: 'ultrasound', result: 'follicles_seen', largestDiameterMm: mm }, { now: NOW });
@@ -43,7 +43,12 @@ describe('history-based date windows', () => {
     let cycle = recordEvent(state.cycle, { type: 'ovulation', date: ovulation }, { now: NOW });
     if (shed) cycle = recordEvent(cycle, { type: 'pre_lay_shed', date: shed }, { now: NOW });
     if (laying) cycle = updateClutch(cycle, { laidDate: laying, eggsTotal: 5 }, { now: NOW });
-    if (finalHatch) cycle = completeHatchingOutcome(cycle, { finalHatchDate: finalHatch, hatchlingsRecorded: 5 }, { now: NOW });
+    if (finalHatch) {
+    cycle = completeHatchingOutcome(cycle, { finalHatchDate: finalHatch, hatchlingsRecorded: 5 }, { now: NOW });
+    // A cycle completes once its hatchlings are registered as animals.
+    for (let i = 0; i < Number(5); i += 1) cycle = linkOffspring(cycle, `${cycle.id}-h${i}`, { now: NOW });
+    cycle = completeIfRegistered(cycle, { now: NOW });
+  }
     return state.cycles.map((c) => (c.id === cycle.id ? cycle : c));
   }
 

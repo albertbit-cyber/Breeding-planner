@@ -271,7 +271,20 @@ export const openSeedSnakeEditor = async (page) => {
   await expect(page.getByText(expectedSeedSnakeName)).toBeVisible();
   await page.getByRole("button", { name: /^Edit$/i }).first().click();
   await expect(page.getByText(expectedSeedSnakeName).last()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Order Genetic Test/i })).toBeVisible();
+  await expect(editorMoreActions(page)).toBeVisible();
+};
+
+// The snake cards carry their own "More actions" overflow (an icon with an aria-label), so the
+// editor's menu button is picked out by its visible text and its menu popup.
+export const editorMoreActions = (page) => page.locator('button[aria-haspopup="menu"]', { hasText: /More actions/i });
+
+/**
+ * The snake editor's redesign moved "Order Genetic Test" off the toolbar and
+ * into its "More actions" menu, where it is a menu item rather than a button.
+ */
+export const openOrderGeneticTest = async (page) => {
+  await editorMoreActions(page).click();
+  await page.getByRole("menuitem", { name: /Order Genetic Test/i }).click();
 };
 
 // Since the collection moved to IndexedDB (src/platform/deviceStore.js), the animals, pairings

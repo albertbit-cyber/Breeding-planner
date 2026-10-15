@@ -3,8 +3,9 @@
  * the reason; none defaults a lock to "observed" or invents a date.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { LOCK_STATUS, EVENT_TYPES, CLOSURE_OUTCOMES, EGG_LAYING_ONLY_EVENTS } from '../domain/cycleModel';
+import { LOCK_STATUS, EVENT_TYPES, CLOSURE_OUTCOMES, ARCHIVE_CLOSURE_OUTCOMES, EGG_LAYING_ONLY_EVENTS } from '../domain/cycleModel';
 import { EXAM_METHODS, EXAM_RESULTS, MEASUREMENT_AXES } from '../domain/follicles';
 import { addCalendarMonths, todayYmd } from '../domain/dates';
 import { animalLabel, formatDate } from './format';
@@ -21,8 +22,10 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  return (
-    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[70] p-0 sm:p-4" onClick={onClose} role="presentation">
+  // Rendered on the page body, like the app's other modals, so nothing positioned in the page
+  // (the phone navigation bar, the scroll-to-top button) can sit on top of its buttons.
+  const dialog = (
+    <div className="sk-scrim fixed inset-0 flex items-end sm:items-center justify-center z-[10005] p-0 sm:p-4" onClick={onClose} role="presentation">
       <div
         role="dialog"
         aria-modal="true"
@@ -56,6 +59,7 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body);
 }
 
 /** Shared save handling: run, keep input and show the error on failure. */
@@ -93,7 +97,7 @@ function AnimalSelect({ value, onChange, options, placeholder, disabled = false,
  * selection but visible and changeable; date defaults to today and may be backdated; lock status
  * is a three-way choice that never defaults to Yes.
  */
-export function QuickPairingDialog({ femaleId, females = [], males = [], defaultMaleId = null, seasonLabel = '', onSubmit, onClose, batch = null }) {
+export function QuickPairingDialog({ femaleId, females = [], males = [], defaultMaleId = null, seasonLabel = '', newCardSeasonLabel = '', onSubmit, onClose, batch = null }) {
   const { t } = useTranslation();
   const today = todayYmd();
   const [female, setFemale] = useState(femaleId || '');
@@ -157,7 +161,7 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
   return (
     <BreedingDialog
       title={t('breeding.quickPairing.title', { defaultValue: 'Record a pairing session' })}
-      subtitle={seasonLabel ? t('breeding.quickPairing.seasonInherited', { defaultValue: 'Season {{season}} (from the card)', season: seasonLabel }) : null}
+      subtitle={seasonLabel ? t('breeding.quickPairing.seasonInherited', { defaultValue: 'Season {{season}} (from the card)', season: seasonLabel }) : newCardSeasonLabel ? t('breeding.quickPairing.seasonNewCard', { defaultValue: 'Season {{season}} (a new card)', season: newCardSeasonLabel }) : null}
       onClose={onClose}
       onConfirm={() => submit(payload())}
       confirmLabel={t('breeding.quickPairing.save', { defaultValue: 'Save session' })}
@@ -621,7 +625,7 @@ export function HatchingDialog({ cycle, mode = 'partial', onSubmit, onClose }) {
     <BreedingDialog
       title={complete ? t('breeding.hatchDialog.completeTitle', { defaultValue: 'Record the final outcome (hatching complete)' }) : t('breeding.hatchDialog.partialTitle', { defaultValue: 'Record hatching' })}
       subtitle={complete
-        ? t('breeding.hatchDialog.completeSubtitle', { defaultValue: 'Completes the cycle: every egg\'s outcome is resolved. The first hatchling alone never closes a card.' })
+        ? t('breeding.hatchDialog.completeSubtitleRegister', { defaultValue: "Every egg's outcome is resolved. The cycle moves to Completed pairing once the hatchlings are registered as animals; with no hatchlings it closes now." })
         : t('breeding.hatchDialog.partialSubtitle', { defaultValue: 'Hatching in progress. The card stays open until you record the final outcome.' })}
       onClose={onClose}
       onConfirm={() => submit(complete
@@ -647,9 +651,57 @@ export function HatchingDialog({ cycle, mode = 'partial', onSubmit, onClose }) {
   );
 }
 
+/**
+ * Log hatch: one step, done once every hatchling is out of the egg. The hatchlings are then
+ * created as animals in that year's hatchlings group, which completes the cycle.
+ */
+export function LogHatchDialog({ cycle, onSubmit, onClose }) {
+  const { t } = useTranslation();
+  const today = todayYmd();
+  const [date, setDate] = useState(cycle?.clutch?.finalHatchDate || today);
+  const [count, setCount] = useState(cycle?.clutch?.hatchlingsRecorded ?? '');
+  const [lost, setLost] = useState(cycle?.clutch?.lostEggs ?? '');
+  const { busy, error, setError, submit } = useSubmit(onSubmit, onClose);
+  const eggs = cycle?.clutch?.eggsTotal;
+  const year = String(date || today).slice(0, 4);
+  return (
+    <BreedingDialog
+      title={t('breeding.logHatch.title', { defaultValue: 'Log hatch' })}
+      subtitle={t('breeding.logHatch.subtitle', { defaultValue: 'Log it once every hatchling is out of the egg. The hatchlings are added to Hatchlings {{year}} and the cycle moves to Completed pairing.', year })}
+      onClose={onClose}
+      onConfirm={() => {
+        if (count === '' || !Number.isFinite(Number(count)) || Number(count) < 0) {
+          setError(t('breeding.logHatch.countRequired', { defaultValue: 'Enter how many hatched (0 if none).' }));
+          return null;
+        }
+        return submit({ finalHatchDate: date, hatchlingsRecorded: Math.floor(Number(count)), lostEggs: lost === '' ? null : Math.floor(Number(lost)) });
+      }}
+      confirmLabel={t('breeding.logHatch.action', { defaultValue: 'Log hatch' })}
+      busy={busy}
+      error={error}
+    >
+      <label className="flex flex-col gap-1">
+        <span className={labelClass}>{t('breeding.field.hatchDate', { defaultValue: 'Hatch date' })}</span>
+        <input type="date" className={inputClass} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className={labelClass}>{t('breeding.logHatch.hatched', { defaultValue: 'How many hatched' })}</span>
+          <input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={count} onChange={(e) => setCount(e.target.value)} autoFocus />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={labelClass}>{t('breeding.logHatch.notHatched', { defaultValue: 'Did not hatch (optional)' })}</span>
+          <input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={lost} onChange={(e) => setLost(e.target.value)} />
+        </label>
+      </div>
+      {eggs !== null && eggs !== undefined ? <div className={hintClass}>{t('breeding.logHatch.eggsHint', { defaultValue: '{{count}} eggs were laid.', count: eggs })}</div> : null}
+    </BreedingDialog>
+  );
+}
+
 export function CloseCycleDialog({ cycle, onSubmit, onClose }) {
   const { t } = useTranslation();
-  const outcomes = CLOSURE_OUTCOMES.filter((o) => o !== 'hatching_complete' && (cycle?.reproductionMode === 'live_bearing' || o !== 'live_birth_complete'));
+  const outcomes = CLOSURE_OUTCOMES.filter((o) => o !== 'hatching_complete' && !ARCHIVE_CLOSURE_OUTCOMES.includes(o) && (cycle?.reproductionMode === 'live_bearing' || o !== 'live_birth_complete'));
   const [outcome, setOutcome] = useState('no_clutch');
   const [note, setNote] = useState('');
   const [biologicalDate, setBiologicalDate] = useState('');

@@ -8,7 +8,6 @@ import GeneAutocomplete from "./components/GeneAutocomplete.jsx";
 import jsQR from 'jsqr';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { applyPdfUnicodeFont, setPdfFont } from './utils/pdfFonts';
-import { resolveCollapseView } from './utils/pairingsViewReturn';
 import SuggestionsTab from "./features/suggestions/SuggestionsTab";
 import FamilyTreePage from "./features/familyTree/index.jsx";
 import BreederOrderGeneticTestModal from "./features/lab/components/BreederOrderGeneticTestModal.jsx";
@@ -26,9 +25,14 @@ import {
   mergeFollicleExamRecords,
   stripLargeAttachments,
 } from "./features/breeding/domain/sync";
-import { planLegacyMigration } from "./features/breeding/domain/legacyMigration";
+import { planLegacyMigration, catchUpCycleFromLegacy } from "./features/breeding/domain/legacyMigration";
+import { initializeSeasonSettings, cyclesNeedingSeasonLabel, summarizeSeasons, currentSeasonLabel } from "./features/breeding/domain/season";
+import { cycleToPairingView, isIncubating as isCycleIncubating, clutchNumbersToAssign } from "./features/breeding/domain/pairingView";
+import { SeasonBar } from "./features/breeding/components/SeasonBar.jsx";
+import { CycleClock } from "./features/breeding/components/CycleClock.jsx";
+import { cycleClock } from "./features/breeding/domain/cycleClock";
 import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
-import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE } from "./features/breeding/domain/cycleModel";
+import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE, closeCyclesForArchivedFemale, cancelPlannedPairingsForArchivedMale, completeIfRegistered as completeCycleIfRegistered, registrationStatus as cycleRegistrationStatus } from "./features/breeding/domain/cycleModel";
 import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
 import { timelineKindLabel as breedingTimelineKindLabel, certaintyLabel as breedingCertaintyLabel } from "./features/breeding/components/labels";
 import { AcquisitionRecordPanel } from "./features/animals/AcquisitionRecordPanel.jsx";
@@ -104,7 +108,6 @@ import {
   getGeneGroups,
   getGeneAliases,
   getGeneDisplayGroup,
-  normalizeGeneCandidate,
 } from "./genetics/geneLibrary";
 import {
   getDefaultGeneAliasRows,
@@ -150,6 +153,32 @@ import MorphMarketImportReview from "./features/animals/import/MorphMarketImport
 import { BreedersGroupGate } from "./features/animals/BreedersGroupPicker.jsx";
 import { buildAnimalTextList } from "./features/animals/animalTextList";
 import { FOR_SALE_STATUS, canonicalStatusValue } from "./features/animals/statusValue";
+import {
+  activeAnimals,
+  archivedAnimals,
+  isArchivedAnimal,
+  isArchivedStatus,
+  isRemovedAnimal,
+  isOutOfCollection,
+  departureOf,
+  familyLinksOf,
+  buildRemovalStub,
+  mergeWithRemoval,
+  buildArchivePatch,
+  buildExitDetailsPatch,
+  buildEraseContactPatch,
+  buildAddNotePatch,
+  buildReturnPatch,
+  closePairingsForArchivedFemale,
+  cycleOutcomeForArchive,
+  ARCHIVE_REASONS,
+} from "./features/animals/archive";
+import { archiveLabels, buildArchiveRecordData } from "./features/animals/archiveRecord";
+import ArchiveAnimalDialog from "./features/animals/ArchiveAnimalDialog.jsx";
+import ArchivedAnimalRecord from "./features/animals/ArchivedAnimalRecord.jsx";
+import ArchiveList from "./features/animals/ArchiveList.jsx";
+import RemovedAnimalCard from "./features/animals/RemovedAnimalCard.jsx";
+import useDialogFocus from "./features/animals/useDialogFocus";
 import { ARRIVAL, IMPORT_DEFAULT_ARRIVAL, MANUAL_ADD_DEFAULT_ARRIVAL, admitAnimal } from "./features/animals/quarantineDefault";
 import {
   buildMarketplaceListingPayload,
@@ -205,17 +234,8 @@ import {
 } from "./services/quarantine";
 import { SOURCE_LABELS, SOURCE_NOTES, makeLabeller as makeQuarantineLabeller } from "./features/quarantine/labels";
 import {
-  COMPLETION_REASON_GROUPS,
-  OUTCOME_CONFIDENCE_OPTIONS,
-  buildCompletionPatch,
-  buildReopenPatch,
-  didLateOutcomeOccur,
-  getCompletionReasonLabel,
-  getFinalKnownBiologicalOutcome,
-  getOutcomeConfidenceLabel,
   normalizeCompletionMetadata,
   normalizeWorkflowStatus,
-  needsOutcomeConfidence,
 } from "./services/breedingProjectCompletion";
 import {
   getLabelBrands,
@@ -3318,6 +3338,10 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   // 2025 "Athena" is 25Ath-1, like the demo) replaces it whole: merged, it kept isDemo and
   // was hidden as a demo.
   if (isDemoSnakeRecord(localAnimal) && !isDemoSnakeRecord(backendAnimal)) return sanitizeSnakeRecord(backendAnimal);
+  // A deleted snake's card wins whole: merging it with a full copy from another device would
+  // hand back the logs and photos the delete erased.
+  const removedCopy = mergeWithRemoval(localAnimal, backendAnimal, getSyncTimestamp);
+  if (removedCopy) return sanitizeSnakeRecord(removedCopy);
   const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
   if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
   return sanitizeSnakeRecord(merged);
@@ -4977,40 +5001,8 @@ function genMonthlyAppointments(startDate, months=3) {
   return out;
 }
 
-function addMonthsClamped(date, months) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return new Date();
-  const next = new Date(date.getTime());
-  const desiredDay = next.getDate();
-  next.setMonth(next.getMonth() + months, 1);
-  const maxDay = daysInMonth(next.getFullYear(), next.getMonth());
-  next.setDate(Math.min(desiredDay, maxDay));
-  return next;
-}
 
-function datesApproximatelyEqual(a, b, toleranceMs = 36 * 60 * 60 * 1000) {
-  if (!(a instanceof Date) || Number.isNaN(a.getTime())) return false;
-  if (!(b instanceof Date) || Number.isNaN(b.getTime())) return false;
-  return Math.abs(a.getTime() - b.getTime()) <= toleranceMs;
-}
 
-function getEarliestAppointmentTimestamp(appointments = [], fallbackStartDate) {
-  const timestamps = [];
-  (appointments || []).forEach(ap => {
-    if (!ap || !ap.date) return;
-    const parsed = parseYmd(ap.date);
-    if (parsed && !Number.isNaN(parsed.getTime())) {
-      timestamps.push(parsed.getTime());
-    }
-  });
-  if (!timestamps.length && fallbackStartDate) {
-    const parsedFallback = parseYmd(fallbackStartDate);
-    if (parsedFallback && !Number.isNaN(parsedFallback.getTime())) {
-      return parsedFallback.getTime();
-    }
-  }
-  if (!timestamps.length) return Number.POSITIVE_INFINITY;
-  return Math.min(...timestamps);
-}
 
 function cloneAndShiftDays(baseDate, days) {
   const shifted = new Date(baseDate.getTime());
@@ -5018,110 +5010,10 @@ function cloneAndShiftDays(baseDate, days) {
   return shifted;
 }
 
-function blockMaleSpan(maleSchedule, maleId, date) {
-  if (!maleId || !(date instanceof Date) || Number.isNaN(date.getTime())) return;
-  const set = maleSchedule.get(maleId) || new Set();
-  for (let offset = 0; offset < 3; offset++) {
-    const spanDate = cloneAndShiftDays(date, offset);
-    set.add(localYMD(spanDate));
-  }
-  maleSchedule.set(maleId, set);
-}
 
-function isMaleSpanBlocked(maleSchedule, maleId, date) {
-  if (!maleId || !(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-  const set = maleSchedule.get(maleId);
-  if (!set) return false;
-  for (let offset = 0; offset < 3; offset++) {
-    const spanDate = cloneAndShiftDays(date, offset);
-    if (set.has(localYMD(spanDate))) return true;
-  }
-  return false;
-}
 
-function findNextAvailableDate(preferred, maleId, maleSchedule) {
-  if (!maleId) return preferred;
-  let candidate = new Date(preferred.getTime());
-  for (let i = 0; i < 120; i++) {
-    if (!isMaleSpanBlocked(maleSchedule, maleId, candidate)) {
-      return candidate;
-    }
-    candidate = cloneAndShiftDays(candidate, 1);
-  }
-  return null;
-}
 
-function autoAdjustPairingAppointments(pairing, maleSchedule) {
-  if (!pairing) return pairing;
-  const sourceAppointments = Array.isArray(pairing.appointments) ? pairing.appointments : [];
-  if (!sourceAppointments.length) return pairing;
 
-  const orderedAppointments = [...sourceAppointments].sort((a, b) => {
-    const aDate = a?.date || '';
-    const bDate = b?.date || '';
-    return aDate.localeCompare(bDate);
-  });
-
-  const adjusted = [];
-  const fallbackStart = pairing.startDate ? parseYmd(pairing.startDate) : null;
-  let previousDate = null;
-
-  orderedAppointments.forEach((appt, idx) => {
-    const originalDate = appt?.date ? parseYmd(appt.date) : null;
-    let target = null;
-    if (idx === 0) {
-      target = (originalDate && !Number.isNaN(originalDate.getTime()))
-        ? originalDate
-        : (fallbackStart && !Number.isNaN(fallbackStart.getTime()) ? new Date(fallbackStart.getTime()) : new Date());
-    } else if (originalDate && !Number.isNaN(originalDate.getTime())) {
-      const expected = previousDate ? addMonthsClamped(previousDate, 1) : originalDate;
-      if (datesApproximatelyEqual(originalDate, expected)) {
-        target = expected;
-      } else {
-        target = originalDate;
-      }
-    } else if (previousDate) {
-      target = addMonthsClamped(previousDate, 1);
-    } else {
-      target = new Date();
-    }
-
-    if (!(target instanceof Date) || Number.isNaN(target.getTime())) {
-      target = previousDate ? addMonthsClamped(previousDate, 1) : new Date();
-    }
-
-    const conflictFree = findNextAvailableDate(target, pairing.maleId, maleSchedule);
-    if (conflictFree === null) {
-      adjusted.push({ ...appt, scheduleConflict: true });
-      return;
-    }
-    blockMaleSpan(maleSchedule, pairing.maleId, conflictFree);
-    previousDate = new Date(conflictFree.getTime());
-    adjusted.push({ ...appt, date: localYMD(conflictFree) });
-  });
-
-  const hasConflict = adjusted.some(a => a.scheduleConflict);
-  return {
-    ...pairing,
-    appointments: adjusted,
-    startDate: adjusted[0]?.date || pairing.startDate || null,
-    ...(hasConflict && { scheduleWarning: 'No available slot found in the next 4 months.' }),
-  };
-}
-
-function autoAdjustAllPairingAppointments(pairings = []) {
-  if (!Array.isArray(pairings) || !pairings.length) return pairings;
-  const maleSchedule = new Map();
-  const order = pairings
-    .map(p => ({ pairing: p, key: getEarliestAppointmentTimestamp(p.appointments, p.startDate) }))
-    .sort((a, b) => a.key - b.key);
-  const updated = new Map();
-  order.forEach(({ pairing }) => {
-    const adjusted = autoAdjustPairingAppointments(pairing, maleSchedule);
-    updated.set(pairing.id, adjusted);
-  });
-  return pairings.map(p => updated.get(p.id) || p);
-}
 
 function readFileAsDataURL(file) {
   return new Promise((res, rej) => {
@@ -7033,6 +6925,13 @@ export default function BreedingPlannerApp() {
       return normalizeSnakeListForDisplay(stampLocallyChangedSyncRecords(next, prev, sanitizeSnakeRecord, 'animal'));
     });
   }, []);
+  /**
+   * The collection: every animal that has not left it. Archived snakes (sold, died, given away...)
+   * keep their whole record in `snakes`, but every day-to-day surface -- lists, counts, pickers,
+   * feeding, racks, the plan's animal limit -- works from this list instead. Sync, ID generation,
+   * parent pickers, pedigrees and backups keep reading `snakes`, archive included.
+   */
+  const collectionSnakes = useMemo(() => activeAnimals(snakes), [snakes]);
   const setPairings = useCallback((updater) => {
     setPairingsState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -7111,6 +7010,27 @@ export default function BreedingPlannerApp() {
   }, [speciesOfAnimalId]);
 
   /**
+   * The breeding cards as the older screens (Breeding dashboard, incubator, species summary) read
+   * them: one pairing-shaped, read-only view per card. The cards are the record; these views are
+   * never saved. Incubator bookkeeping of a card that came from a legacy pairing is read from that
+   * pairing, where it was entered.
+   */
+  const pairingsById = useMemo(() => new Map((Array.isArray(pairings) ? pairings : []).filter(p => p?.id).map(p => [p.id, p])), [pairings]);
+  const breedingCycleViews = useMemo(() => (Array.isArray(breedingCycles) ? breedingCycles : [])
+    .filter(cycle => cycle && !cycle.deletedAt)
+    .map(cycle => {
+      const view = cycleToPairingView(cycle, { pairingsById });
+      const registration = cycleRegistrationStatus(cycle);
+      return {
+        ...view,
+        awaitingRegistration: cycle.status !== BREEDING_CYCLE_STATUS.CLOSED && registration.hatched && registration.missing > 0,
+        registration,
+        incubating: isCycleIncubating(cycle),
+      };
+    }), [breedingCycles, pairingsById]);
+  const openCycleViews = useMemo(() => breedingCycleViews.filter(view => view.workflowStatus !== 'completed'), [breedingCycleViews]);
+
+  /**
    * One entry per species the keeper actually owns, ordered by collection size. Species with
    * no animals are absent by design -- the catalogue lives in the add-animal picker.
    */
@@ -7142,6 +7062,13 @@ export default function BreedingPlannerApp() {
         };
         buckets.set(speciesId, bucket);
       }
+      // An archived snake keeps its species on the dashboard (so its archive stays reachable)
+      // but is not counted: the numbers describe the collection the keeper has now.
+      if (isOutOfCollection(snake)) {
+        bucket.archived = (bucket.archived || 0) + 1;
+        if (!isDemoSnakeRecord(snake)) bucket.isDemo = false;
+        return;
+      }
       bucket.total += 1;
       const sex = normalizeSexValue(snake.sex);
       if (sex === 'F') bucket.females += 1;
@@ -7156,8 +7083,9 @@ export default function BreedingPlannerApp() {
     });
 
     const today = localYMD(new Date());
-    (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
-      if (!pairing || isPairingCompleted(pairing)) return;
+    // Open breeding cards are the active pairings.
+    openCycleViews.forEach((pairing) => {
+      if (!pairing) return;
       const bucket = buckets.get(speciesOfPairing(pairing));
       if (!bucket) return;
       bucket.activePairings += 1;
@@ -7194,7 +7122,7 @@ export default function BreedingPlannerApp() {
     return Array.from(buckets.values()).sort((a, b) => (
       b.total - a.total || a.name.localeCompare(b.name)
     ));
-  }, [snakes, pairings, speciesOfPairing]);
+  }, [snakes, openCycleViews, speciesOfPairing]);
 
   const dashboardTotals = useMemo(() => ({
     animals: speciesSummaries.reduce((n, s) => n + s.total, 0),
@@ -7300,14 +7228,11 @@ export default function BreedingPlannerApp() {
   }, [animalActionSheetOpen]);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   // Breeding cards are the default view; the legacy pairing records stay reachable during rollout.
-  const [pairingsView, setPairingsView] = useState('cards');
+  const [pairingsView, setPairingsView] = useState('dashboard');
   const [focusedCycleId, setFocusedCycleId] = useState(null);
   const [breedingDialogRequest, setBreedingDialogRequest] = useState(null);
   // Which view a pairing was opened from, so collapsing its card can hand the keeper back.
   // Only the dashboard asks for a return trip; every other entry point leaves this null.
-  const [pairingsReturnView, setPairingsReturnView] = useState(null);
-  const [completedYearFilter, setCompletedYearFilter] = useState('All');
-  const [completedOutcomeFilter, setCompletedOutcomeFilter] = useState('all');
   const [animalView, setAnimalView] = useState('all');
   const [animalLayout, setAnimalLayout] = useState(() => {
     if (typeof window === 'undefined') return 'cards';
@@ -7599,7 +7524,8 @@ export default function BreedingPlannerApp() {
   const { setUpgradeHandler, access: featureAccessMap } = useFeatureAccess();
   // Known from the access fetched at sign-in; unknown means "let the backend decide".
   const marketplaceListingDenied = featureAccessMap?.['marketplace.create_listing']?.allowed === false;
-  const addAnimalCap = useAnimalCap(Array.isArray(snakes) ? snakes.length : 0, 1);
+  // Archived animals do not count toward the plan's limit (the server counts the same way).
+  const addAnimalCap = useAnimalCap(collectionSnakes.length, 1);
   useEffect(() => {
     setUpgradeHandler(() => {
       // The add and import dialogs sit over the page; My Account has to be in view.
@@ -8481,10 +8407,14 @@ export default function BreedingPlannerApp() {
   const [showScanner, setShowScanner] = useState(false);
   const [passiveScanNotice, setPassiveScanNotice] = useState(null);
   const [pendingDeleteSnake, setPendingDeleteSnake] = useState(null);
+  // The archive: the "Move to archive" / "Correct details" form ({ id, mode }), and the id of the
+  // archived snake whose record is open.
+  const [archiveDialog, setArchiveDialog] = useState(null);
+  const [archiveRecordId, setArchiveRecordId] = useState(null);
+  // The card of a deleted snake kept for its family links.
+  const [removedCardId, setRemovedCardId] = useState(null);
   const [familyTreeFocusSnakeId, setFamilyTreeFocusSnakeId] = useState(null);
   const [hatchWizard, setHatchWizard] = useState(null);
-  const pendingHatchWizardPayloadRef = useRef(null);
-  const [pendingHatchWizardTick, setPendingHatchWizardTick] = useState(0);
   const [photoGallerySnakeId, setPhotoGallerySnakeId] = useState(null);
   const editCameraInputRef = useRef(null);
   const editUploadInputRef = useRef(null);
@@ -8561,8 +8491,10 @@ export default function BreedingPlannerApp() {
     const editTag = typeof editDraftStatusValue === 'string' ? editDraftStatusValue.trim() : '';
     if (editTag) set.add(editTag);
     const removedSet = new Set(removedStatusTags.map(tag => tag.toLowerCase()));
+    // Sold, Deceased and Archived are not statuses you pick: they mean the snake left the
+    // collection, which goes through "Move to archive" so the date and details are recorded.
     return Array.from(set)
-      .filter(option => !removedSet.has(option.toLowerCase()))
+      .filter(option => !removedSet.has(option.toLowerCase()) && !isArchivedStatus(option))
       .sort((a, b) => a.localeCompare(b));
   }, [customStatusTags, removedStatusTags, snakes, newAnimal.status, editDraftStatusValue]);
   const currentEditStatus = (editDraftStatusValue || '').trim();
@@ -9290,7 +9222,6 @@ export default function BreedingPlannerApp() {
     setSpeciesScope(null);
     setTab('dashboard');
     setPairingsView('active');
-    setCompletedYearFilter('All');
     setAnimalView('all');
     setAnimalLayout('cards');
     setQuery('');
@@ -9569,6 +9500,11 @@ export default function BreedingPlannerApp() {
     return snakes.filter(snake => resolveSpeciesId(snake?.species) === speciesScope);
   }, [snakes, speciesScope]);
 
+  /** The open species' collection: scopedSnakes without the archive. Lists and pickers read this. */
+  const scopedCollection = useMemo(() => activeAnimals(scopedSnakes), [scopedSnakes]);
+  /** The open species' archive, for the Archive view of the Animals tab. */
+  const scopedArchive = useMemo(() => archivedAnimals(scopedSnakes), [scopedSnakes]);
+
   /** Pairings belonging to the open species. Both sides are the same species by construction. */
   const scopedPairings = useMemo(() => {
     if (!speciesScope) return pairings;
@@ -9582,13 +9518,13 @@ export default function BreedingPlannerApp() {
   const currentMale   = snakeById(snakes, draft.maleId || "");
 
   const females = useMemo(
-    () => scopedSnakes.filter(isFemaleSnake).filter(isBreederGroupMember),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isFemaleSnake).filter(isBreederGroupMember),
+    [scopedCollection, isBreederGroupMember]
   );
 
   const males = useMemo(
-    () => scopedSnakes.filter(isMaleSnake).filter(isBreederGroupMember),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isMaleSnake).filter(isBreederGroupMember),
+    [scopedCollection, isBreederGroupMember]
   );
 
   // Cross-species pairing is not allowed, so once one side is chosen the other side offers
@@ -9614,27 +9550,33 @@ export default function BreedingPlannerApp() {
     return list.slice(0, 25);
   }, [females, femaleSearchQuery, currentMale, sameSpeciesAs]);
 
-  const pairingsPartition = useMemo(() => {
-    const active = [];
-    const completed = [];
-    scopedPairings.forEach(p => {
-      if (isPairingCompleted(p)) {
-        completed.push(p);
-      } else {
-        active.push(p);
-      }
-    });
-    return { active, completed };
-  }, [scopedPairings]);
 
-  const activePairings = pairingsPartition.active;
-  const completedPairings = pairingsPartition.completed;
-  const activePairingsCount = activePairings.length;
-  const completedPairingsCount = completedPairings.length;
+  // Inside a species workspace only that species' cards count.
+  const scopedOpenCycleViews = useMemo(() => {
+    if (!speciesScope) return openCycleViews;
+    const inScope = new Set(scopedSnakes.map(snake => snake.id));
+    return openCycleViews.filter(view => inScope.has(view.femaleId));
+  }, [openCycleViews, scopedSnakes, speciesScope]);
+  const activeCyclesCount = scopedOpenCycleViews.length;
+  const completedCyclesCount = useMemo(() => {
+    const inScope = speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null;
+    return breedingCycleViews.filter(view => view.workflowStatus === 'completed' && (!inScope || inScope.has(view.femaleId))).length;
+  }, [breedingCycleViews, scopedSnakes, speciesScope]);
   const breedingDashboardItems = useMemo(() => {
     const today = new Date();
-    return activePairings
-      .map(pairing => buildPairingDashboardItem(pairing, snakes, today))
+    const cyclesById = new Map((Array.isArray(breedingCycles) ? breedingCycles : []).map(cycle => [cycle?.id, cycle]));
+    return scopedOpenCycleViews
+      .map(view => {
+        const base = buildPairingDashboardItem(view, snakes, today);
+        if (!base) return null;
+        // The same clock the breeding card shows, so both always agree.
+        const item = { ...base, clock: cycleClock(cyclesById.get(view.cycleId)) };
+        // Hatched but not every hatchling is an animal yet: that registration is what is left.
+        if (view.awaitingRegistration) {
+          return { ...item, nextStage: `Register ${view.registration.missing} ${view.registration.missing === 1 ? 'hatchling' : 'hatchlings'}`, actionLabel: 'Register hatchlings', seasonLabel: view.seasonLabel || '' };
+        }
+        return { ...item, seasonLabel: view.seasonLabel || '' };
+      })
       .filter(Boolean)
       .sort((a, b) => {
         const stageWeight = { clutch: 0, preLay: 1, ovulation: 2, locks: 3, active: 4, hatched: 5 };
@@ -9650,7 +9592,7 @@ export default function BreedingPlannerApp() {
         if (aDays !== bDays) return aDays - bDays;
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
-  }, [activePairings, snakes]);
+  }, [scopedOpenCycleViews, snakes, breedingCycles]);
 
   /**
    * The same urgency counts the Breeding dashboard shows, but for every species at
@@ -9672,8 +9614,8 @@ export default function BreedingPlannerApp() {
       tracking: 0,
     }]));
 
-    (Array.isArray(pairings) ? pairings : []).forEach((pairing) => {
-      if (!pairing || isPairingCompleted(pairing)) return;
+    openCycleViews.forEach((pairing) => {
+      if (!pairing) return;
       const bucket = buckets.get(speciesOfPairing(pairing));
       if (!bucket) return;
       const item = buildPairingDashboardItem(pairing, snakes, today);
@@ -9685,7 +9627,7 @@ export default function BreedingPlannerApp() {
     });
 
     return Array.from(buckets.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [speciesSummaries, pairings, snakes, speciesOfPairing]);
+  }, [speciesSummaries, openCycleViews, snakes, speciesOfPairing]);
 
   /**
    * Set only when a keeper presses an urgency count on the dashboard, and read only as the
@@ -9708,94 +9650,7 @@ export default function BreedingPlannerApp() {
   useEffect(() => {
     if (tab !== 'pairings' || pairingsView !== 'dashboard') setBreedingUrgencyFocus(null);
   }, [tab, pairingsView]);
-  const completedPairingsWithYear = useMemo(() => {
-    return completedPairings.map(pairing => {
-      const normalized = withPairingLifecycleDefaults({ ...pairing });
-      const derived = getBreedingCycleDerived(normalized);
-      const yearValue = computeBreedingCycleYear({
-        clutchDate: derived?.clutchDate || '',
-        preLayDate: derived?.preLayDate || '',
-        ovulationDate: derived?.ovulationDate || '',
-        hatchDate: derived?.hatchDate || '',
-        startDate: normalized.startDate || '',
-      });
-      const year = (yearValue && typeof yearValue === 'string' && yearValue.trim()) ? yearValue : 'Unknown';
-      return { pairing, year };
-    });
-  }, [completedPairings]);
-
-  const completedYearOptions = useMemo(() => {
-    const set = new Set();
-    completedPairingsWithYear.forEach(({ year }) => {
-      set.add(year || 'Unknown');
-    });
-    const list = Array.from(set);
-    list.sort((a, b) => {
-      const parseYear = (value) => (/^\d{4}$/.test(value) ? Number(value) : null);
-      const aNum = parseYear(a);
-      const bNum = parseYear(b);
-      if (aNum !== null && bNum !== null) return bNum - aNum;
-      if (aNum !== null) return -1;
-      if (bNum !== null) return 1;
-      return a.localeCompare(b);
-    });
-    return list;
-  }, [completedPairingsWithYear]);
-
-  useEffect(() => {
-    if (pairingsView !== 'completed') return;
-    if (completedYearFilter === 'All') return;
-    if (!completedYearOptions.includes(completedYearFilter)) {
-      setCompletedYearFilter(completedYearOptions[0] || 'All');
-    }
-  }, [pairingsView, completedYearFilter, completedYearOptions]);
-
-  const filteredCompletedPairings = useMemo(() => {
-    if (pairingsView !== 'completed') return completedPairings;
-    const byYear = completedYearFilter === 'All'
-      ? completedPairingsWithYear.map(item => item.pairing)
-      : completedPairingsWithYear
-        .filter(item => item.year === completedYearFilter)
-        .map(item => item.pairing);
-    if (completedOutcomeFilter === 'all') return byYear;
-    return byYear.filter(pairing => {
-      const normalized = withPairingLifecycleDefaults({ ...pairing });
-      if (completedOutcomeFilter === 'productive') {
-        const outcome = getFinalKnownBiologicalOutcome(normalized);
-        return outcome === 'eggs_laid' || outcome === 'live_birth';
-      }
-      if (completedOutcomeFilter === 'no_ovulation_observed') return normalized.completionReason === 'no_ovulation_observed';
-      if (completedOutcomeFilter === 'follicles_reabsorbed') return normalized.completionReason === 'follicles_reabsorbed';
-      if (completedOutcomeFilter === 'late_outcome') return didLateOutcomeOccur(normalized);
-      if (completedOutcomeFilter === 'reopened') return !!normalized.reopenedAt;
-      return true;
-    });
-  }, [pairingsView, completedPairings, completedPairingsWithYear, completedYearFilter, completedOutcomeFilter]);
-
-  const displayedPairings = pairingsView === 'completed' ? filteredCompletedPairings : activePairings;
-  const filteredPairingsBySearch = useMemo(() => {
-    const normalized = String(pairingsSearchQuery || '').trim().toLowerCase();
-    const tokens = normalized ? normalized.split(/\s+/).filter(Boolean) : [];
-    if (!tokens.length) return displayedPairings;
-    return displayedPairings.filter(pairing => {
-      if (!pairing) return false;
-      const female = snakeById(snakes, pairing.femaleId);
-      const male = snakeById(snakes, pairing.maleId);
-      const fields = [
-        pairing.label,
-        pairing.id,
-        female?.name,
-        female?.id,
-        male?.name,
-        male?.id,
-      ]
-        .map(value => String(value || '').trim().toLowerCase())
-        .filter(Boolean);
-      if (!fields.length) return false;
-      return tokens.every(token => fields.some(field => field.includes(token)));
-    });
-  }, [displayedPairings, pairingsSearchQuery, snakes]);
-  // Numbers are assigned once (see handleUpdatePairing / the backfill effect below) and persisted on
+  // Numbers are assigned once (see the backfill effect below) and persisted on
   // pairing.clutch, so a clutch keeps its number permanently even after it's completed/removed from
   // the incubator. This just reads what was stored — it must never re-derive numbers from list position.
   const clutchMetadataByPairingId = useMemo(() => {
@@ -9815,8 +9670,18 @@ export default function BreedingPlannerApp() {
         eggBoxCount: splitEggBoxCounts(eggs).length,
       });
     });
+    // Breeding cards are keyed by their own id; their numbers come from the card or from the
+    // legacy pairing that holds the clutch.
+    breedingCycleViews.forEach(view => {
+      if (!view?.clutch?.date) return;
+      const eggBoxNumber = Number(view.clutch.eggBoxNumber) || Number(view.clutch.clutchNumber) || 0;
+      const clutchNumber = Number(view.clutch.clutchNumber) || eggBoxNumber;
+      if (!eggBoxNumber && !clutchNumber) return;
+      const eggs = resolveEggCountForClutch(view.clutch.eggsTotal, view.clutch.fertileEggs) || 0;
+      map.set(view.id, { clutchNumber, eggBoxNumber, eggBoxCount: splitEggBoxCounts(eggs).length });
+    });
     return map;
-  }, [pairings]);
+  }, [pairings, breedingCycleViews]);
   // One-time (per missing entry) backfill: assigns a permanent number to any clutch that doesn't have
   // one yet. On the very first run after this fix ships, none of them do, so it reuses the old
   // chronological ordering to keep today's visible numbers stable. Afterward it only ever appends new
@@ -9890,8 +9755,22 @@ export default function BreedingPlannerApp() {
       .sort((a, b) => String(b.clutchDate).localeCompare(String(a.clutchDate)));
   }, [pairings, snakes]);
 
+  /**
+   * What is in the incubator: every breeding card whose eggs are laid and not hatched yet, plus
+   * any legacy pairing clutch that never got a card. A legacy pairing that a card already covers
+   * is left out, so a clutch is never counted twice.
+   */
+  const incubatorSources = useMemo(() => {
+    const covered = new Set();
+    (Array.isArray(breedingCycles) ? breedingCycles : []).forEach(cycle => {
+      if (!cycle || cycle.deletedAt) return;
+      (cycle.legacy?.pairingIds || []).forEach(id => covered.add(id));
+    });
+    const legacy = (Array.isArray(pairings) ? pairings : []).filter(p => p?.id && !covered.has(p.id));
+    return [...breedingCycleViews.filter(view => view.incubating), ...legacy];
+  }, [breedingCycles, breedingCycleViews, pairings]);
   const eggBoxes = useMemo(() => {
-    const list = Array.isArray(pairings) ? pairings : [];
+    const list = incubatorSources;
     const activeClutchesWithDates = list
       .filter(p => p?.clutch?.date && !isPairingCompleted(p))
       .map(p => {
@@ -9930,6 +9809,8 @@ export default function BreedingPlannerApp() {
           dueDate,
           remaining,
           year: clutchYear,
+          cycleId: p.isCycleView ? p.cycleId : null,
+          seasonLabel: p.seasonLabel || '',
         };
       })
       .sort((a, b) => new Date(a.clutchDate) - new Date(b.clutchDate));
@@ -9959,7 +9840,7 @@ export default function BreedingPlannerApp() {
         };
       });
     });
-  }, [pairings, snakes, t, clutchMetadataByPairingId]);
+  }, [incubatorSources, snakes, t, clutchMetadataByPairingId]);
   const incubatorSummary = useMemo(() => {
     const clutchIds = new Set();
     let totalEggs = 0;
@@ -9980,8 +9861,29 @@ export default function BreedingPlannerApp() {
     const maxEggs = Math.max(0, Number(box.originalEggs ?? box.eggs) || 0);
     const badEggsValue = Math.max(0, Math.min(maxEggs, Math.floor(Number(badEggs) || 0)));
     const indexKey = String(box.eggBoxIndexInClutch || 1);
+    // A breeding card's egg box: its notes live on the card unless the clutch was entered on a
+    // legacy pairing, which then keeps holding them.
+    if (box.pairing?.isCycleView && box.pairing.bookkeeping === 'cycle') {
+      const nowStamp = nowIsoString();
+      setBreedingCycles(prev => prev.map(cycle => {
+        if (!cycle || cycle.id !== box.pairing.cycleId) return cycle;
+        const eggBoxNotes = { ...(cycle.clutch?.eggBoxNotes || {}) };
+        const eggBoxBadEggs = { ...(cycle.clutch?.eggBoxBadEggs || {}) };
+        if (noteValue) eggBoxNotes[indexKey] = noteValue;
+        else delete eggBoxNotes[indexKey];
+        if (badEggsValue > 0) eggBoxBadEggs[indexKey] = badEggsValue;
+        else delete eggBoxBadEggs[indexKey];
+        const clutch = { ...cycle.clutch, eggBoxNotes, eggBoxBadEggs };
+        if ((box.eggBoxCount || 1) === 1) clutch.notes = noteValue;
+        return { ...cycle, clutch, updatedAt: nowStamp, metadata: { ...(cycle.metadata || {}), updatedAt: nowStamp } };
+      }));
+      setEggBoxModal(null);
+      return;
+    }
+    const targetPairingId = box.pairing?.isCycleView ? box.pairing.bookkeepingPairingId : box.pairingId;
+    if (!targetPairingId) return;
     setPairings(prev => prev.map(pairing => {
-      if (!pairing || pairing.id !== box.pairingId) return pairing;
+      if (!pairing || pairing.id !== targetPairingId) return pairing;
       const current = withPairingLifecycleDefaults({ ...pairing });
       const currentClutch = { ...(current.clutch || {}) };
       const nextEggBoxNotes = { ...(currentClutch.eggBoxNotes || {}) };
@@ -10007,19 +9909,18 @@ export default function BreedingPlannerApp() {
       });
     }));
     setEggBoxModal(null);
-  }, [setPairings]);
-  const filteredCompletedCount = filteredCompletedPairings.length;
+  }, [setPairings, setBreedingCycles]);
 
+  // A link to a legacy pairing (from an animal's page, a reminder, the dashboard) opens the
+  // breeding card that pairing became: the cards are the one place a cycle lives now.
   useEffect(() => {
     if (!focusedPairingId) return;
-    if (activePairings.some(p => p.id === focusedPairingId)) {
-      if (pairingsView !== 'active') setPairingsView('active');
-      return;
-    }
-    if (completedPairings.some(p => p.id === focusedPairingId)) {
-      if (pairingsView !== 'completed') setPairingsView('completed');
-    }
-  }, [focusedPairingId, activePairings, completedPairings, pairingsView]);
+    const cycle = (Array.isArray(breedingCycles) ? breedingCycles : []).find(c => c && !c.deletedAt && (c.id === focusedPairingId || (c.legacy?.pairingIds || []).includes(focusedPairingId)));
+    if (!cycle) return;
+    setFocusedPairingId(null);
+    setFocusedCycleId(cycle.id);
+    setPairingsView(cycle.status === BREEDING_CYCLE_STATUS.CLOSED ? 'completed' : 'active');
+  }, [focusedPairingId, breedingCycles]);
 
   // open snake if URL contains #snake=id
   useEffect(()=>{
@@ -10101,16 +10002,16 @@ export default function BreedingPlannerApp() {
     return base;
   }, [query, tag, selectedStatusTags, showGroups, hiddenGroups, groupFilter, showUnassigned]);
 
-  const filteredAll = useMemo(() => filterSnakesByCriteria(scopedSnakes), [filterSnakesByCriteria, scopedSnakes]);
+  const filteredAll = useMemo(() => filterSnakesByCriteria(scopedCollection), [filterSnakesByCriteria, scopedCollection]);
 
   const filteredFemales = useMemo(
-    () => filterSnakesByCriteria(scopedSnakes.filter(isFemaleSnake)),
-    [filterSnakesByCriteria, scopedSnakes]
+    () => filterSnakesByCriteria(scopedCollection.filter(isFemaleSnake)),
+    [filterSnakesByCriteria, scopedCollection]
   );
 
   const filteredMales = useMemo(
-    () => filterSnakesByCriteria(scopedSnakes.filter(isMaleSnake)),
-    [filterSnakesByCriteria, scopedSnakes]
+    () => filterSnakesByCriteria(scopedCollection.filter(isMaleSnake)),
+    [filterSnakesByCriteria, scopedCollection]
   );
 
   const activeAnimalList = useMemo(() => {
@@ -10282,12 +10183,12 @@ export default function BreedingPlannerApp() {
   // Who the Breeders gate in pairing and the Advisor can offer: sexed animals of the open
   // species that are not breeders yet.
   const breederCandidateMales = useMemo(
-    () => scopedSnakes.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isMaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedCollection, isBreederGroupMember]
   );
   const breederCandidateFemales = useMemo(
-    () => scopedSnakes.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
-    [scopedSnakes, isBreederGroupMember]
+    () => scopedCollection.filter(isFemaleSnake).filter(s => !isBreederGroupMember(s)),
+    [scopedCollection, isBreederGroupMember]
   );
 
   const handleAddSnakePhotos = useCallback(async (snakeId, files, options = {}) => {
@@ -10486,20 +10387,6 @@ export default function BreedingPlannerApp() {
     handleOpenPhotoGallery(editSnake.id);
   }, [editSnake, handleOpenPhotoGallery]);
 
-  function openNewPairingModal() {
-    setDraft({
-      maleId: "",
-      femaleId: "",
-      goals: [],
-      notes: "",
-      startDate: localYMD(new Date())
-    });
-    setMaleSearchQuery("");
-    setFemaleSearchQuery("");
-    setPairingSearchTarget("male");
-    setPairingsView('active');
-    setShowPairingModal(true);
-  }
 
   const handleAdvisorSuggestionToPlan = useCallback((suggestion) => {
     if (!suggestion) return;
@@ -10570,6 +10457,16 @@ export default function BreedingPlannerApp() {
 
   const openSnakeEditor = useCallback((snake) => {
     if (!snake) return;
+    // An archived snake has no editor: it opens as its read-only record. Every way into an
+    // animal (cards, scans, search, pedigree, breeding) comes through here.
+    if (isRemovedAnimal(snake)) {
+      setRemovedCardId(snake.id);
+      return;
+    }
+    if (isArchivedAnimal(snake)) {
+      setArchiveRecordId(snake.id);
+      return;
+    }
     setEditSnake(snake);
     const draft = withParentsDetectedFromName(initSnakeDraft(snake), snakes);
     setEditSnakeDraft(reconcileDraftWithListing(draft, marketplaceListingsByAnimal[snake.id]));
@@ -10577,6 +10474,11 @@ export default function BreedingPlannerApp() {
 
   const openSnakeCard = useCallback((snake) => {
     if (!snake) return;
+    // A deleted snake's card opens where the keeper is (a pairing, a pedigree), without a jump.
+    if (isRemovedAnimal(snake)) {
+      setRemovedCardId(snake.id);
+      return;
+    }
     // A scanned QR or a search hit can belong to a species other than the open one. Follow
     // the animal rather than opening it inside a workspace it is not part of.
     const snakeSpecies = resolveSpeciesId(snake.species);
@@ -10586,7 +10488,7 @@ export default function BreedingPlannerApp() {
     }
     setReturnToGroupsAfterEdit(tab === 'animals' && animalView === 'groups');
     setTab('animals');
-    setAnimalView(isFemaleSnake(snake) ? 'females' : 'males');
+    setAnimalView(isArchivedAnimal(snake) ? 'archive' : (isFemaleSnake(snake) ? 'females' : 'males'));
     openSnakeEditor(snake);
     setRecentAnimalIds(prev => pushRecentAnimal(prev, snake.id));
   }, [animalView, tab, speciesScope, openSnakeEditor]);
@@ -10900,20 +10802,79 @@ export default function BreedingPlannerApp() {
   const passiveScannerStatus = passiveScanNotice?.type ?? 'idle';
   const passiveScannerLabel = passiveScanNotice?.text ?? t("animals.scanner.ready", { defaultValue: "Scanner ready" });
 
-  const performSnakeDeletion = useCallback((id) => {
+  /**
+   * What leaving the collection does to everything around a snake, shared by archiving and by
+   * deleting a snake that keeps a card: her open pairings and breeding cards are completed with
+   * the reason (no clutch expected), a male's still-planned pairings are cancelled (the female
+   * may already be gravid), its rack slot or terrarium is freed, and a live listing comes down.
+   * Returns the ids it closed so the archive record can name them.
+   */
+  const releaseFromCollection = useCallback((snake, reason, now) => {
+    let closedPairingIds = [];
+    let closedCycleIds = [];
+    if (isFemaleSnake(snake)) {
+      const pairingResult = closePairingsForArchivedFemale(pairings, snake.id, reason, { isOpen: p => !isPairingCompleted(p), now });
+      const cycleResult = closeCyclesForArchivedFemale(breedingCycles, snake.id, cycleOutcomeForArchive(reason), { now });
+      closedPairingIds = pairingResult.closedIds;
+      closedCycleIds = cycleResult.closedIds;
+      if (closedPairingIds.length) setPairings(pairingResult.pairings);
+      if (closedCycleIds.length) setBreedingCycles(cycleResult.cycles);
+    } else if (isMaleSnake(snake)) {
+      const cycleResult = cancelPlannedPairingsForArchivedMale(breedingCycles, snake.id, { now });
+      if (cycleResult.changedIds.length) setBreedingCycles(cycleResult.cycles);
+    }
+    updateSpacesState(prev => ({
+      ...prev,
+      heatRacks: prev.heatRacks.map((rack) => {
+        const slots = Array.isArray(rack?.slots) ? rack.slots : [];
+        if (!slots.some(slot => slot?.snakeId === snake.id)) return rack;
+        return { ...rack, slots: slots.map(slot => (slot?.snakeId === snake.id ? { ...slot, snakeId: null } : slot)), updatedAt: now };
+      }),
+      terrariums: prev.terrariums.map((terrarium) => {
+        const ids = Array.isArray(terrarium?.occupantIds) ? terrarium.occupantIds : [];
+        if (!ids.includes(snake.id)) return terrarium;
+        return { ...terrarium, occupantIds: ids.filter(id => id !== snake.id), updatedAt: now };
+      }),
+    }));
+    const listing = marketplaceListingsByAnimal[snake.id];
+    if (listing && listing.status !== 'sold') {
+      syncSnakeToMarketplace({ ...snake, forSale: false, isForSale: false }, { published: false }).catch((err) => {
+        console.warn('Could not take the animal off the marketplace', err);
+      });
+    }
+    return { closedPairingIds, closedCycleIds };
+  }, [breedingCycles, marketplaceListingsByAnimal, pairings, setBreedingCycles, setPairings, syncSnakeToMarketplace, updateSpacesState]);
+
+  /**
+   * Delete a snake. One that nothing else points at is erased completely. One with family links
+   * (pairings, offspring, its own parents or clutch) leaves a small card behind: its data goes,
+   * its identity and links stay, and its pairings and clutches are never touched.
+   */
+  const performSnakeDeletion = useCallback((id, { reason = null } = {}) => {
     if (!id) return;
-    const deletedAt = nowIsoString();
+    const snake = snakes.find(s => s.id === id);
+    const links = snake ? familyLinksOf(snake, { animals: snakes, pairings, cycles: breedingCycles }) : null;
+    const now = nowIsoString();
+    if (snake && links?.hasLinks && !isDemoSnakeRecord(snake)) {
+      const stub = buildRemovalStub(snake, { reason, now });
+      if (!isRemovedAnimal(snake)) releaseFromCollection(snake, stub.removed.reason, now);
+      setSnakes(prev => prev.map(s => (s.id === id ? stub : s)));
+      if (editSnake && editSnake.id === id) closeSnakeEditor();
+      setArchiveRecordId(current => (current === id ? null : current));
+      return;
+    }
     setSyncTombstones(prev => ({
       ...prev,
-      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt } },
+      snakes: { ...prev.snakes, [id]: { id, appAnimalId: id, deletedAt: now } },
     }));
     setSnakes(prev => prev.filter(s => s.id !== id));
+    // Only reachable for a snake with no pairings (or a demo), so this removes demo pairings only.
     setPairings(prev => {
       const removed = prev.filter(p => p.maleId === id || p.femaleId === id);
       removed.forEach(p => {
         if (p.id) setSyncTombstones(t => ({
           ...t,
-          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt } },
+          pairings: { ...t.pairings, [p.id]: { id: p.id, appPairingId: p.id, deletedAt: now } },
         }));
       });
       return prev.filter(p => p.maleId !== id && p.femaleId !== id);
@@ -10921,17 +10882,139 @@ export default function BreedingPlannerApp() {
     if (editSnake && editSnake.id === id) {
       closeSnakeEditor();
     }
-  }, [closeSnakeEditor, editSnake]);
+  }, [breedingCycles, closeSnakeEditor, editSnake, pairings, releaseFromCollection, setPairings, setSnakes, snakes]);
 
-  const confirmDeleteSnake = useCallback(() => {
+  const confirmDeleteSnake = useCallback((reason = null) => {
     if (!pendingDeleteSnake) return;
-    performSnakeDeletion(pendingDeleteSnake.id);
+    performSnakeDeletion(pendingDeleteSnake.id, { reason });
     setPendingDeleteSnake(null);
   }, [performSnakeDeletion, pendingDeleteSnake]);
+
+  const pendingDeleteLinks = useMemo(() => (
+    pendingDeleteSnake ? familyLinksOf(pendingDeleteSnake, { animals: snakes, pairings, cycles: breedingCycles }) : null
+  ), [breedingCycles, pairings, pendingDeleteSnake, snakes]);
 
   const cancelDeleteSnake = useCallback(() => {
     setPendingDeleteSnake(null);
   }, []);
+
+  // ── Animal archive ──────────────────────────────────────────────────────────
+  const patchSnakeById = useCallback((id, patch) => {
+    setSnakes(prev => prev.map(snake => (snake.id === id ? { ...snake, ...patch } : snake)));
+  }, [setSnakes]);
+
+  const requestArchiveSnake = useCallback((snake) => {
+    if (!snake?.id) return;
+    setPendingDeleteSnake(null);
+    setArchiveDialog({ id: snake.id, mode: 'archive' });
+  }, []);
+
+  const archiveDialogSnake = archiveDialog ? (snakes.find(snake => snake.id === archiveDialog.id) || null) : null;
+
+  /** What archiving this female will close: her open pairings and breeding cards. */
+  const openBreedingForSnake = useCallback((snake) => {
+    if (!snake || !isFemaleSnake(snake)) return { pairings: 0, cycles: 0 };
+    const openPairings = pairings.filter(p => p?.femaleId === snake.id && !isPairingCompleted(p));
+    // A breeding card mapped from a legacy pairing (id "bc-legacy-<pairing id>") is the same
+    // breeding seen twice; count it once.
+    const mirrored = new Set(openPairings.map(p => `bc-legacy-${p.id}`));
+    return {
+      pairings: openPairings.length,
+      cycles: breedingCycles.filter(c => c && !c.deletedAt && c.femaleId === snake.id && c.status !== BREEDING_CYCLE_STATUS.CLOSED && !mirrored.has(c.id)).length,
+    };
+  }, [pairings, breedingCycles]);
+
+  const submitArchiveDialog = useCallback(async (input) => {
+    const snake = archiveDialogSnake;
+    if (!snake || !archiveDialog) return;
+    const now = nowIsoString();
+
+    if (archiveDialog.mode === 'edit') {
+      patchSnakeById(snake.id, buildExitDetailsPatch(snake, input, { now }));
+      setArchiveDialog(null);
+      return;
+    }
+
+    // Throws on an incomplete form before anything is written.
+    buildArchivePatch(snake, input, { now });
+    const { closedPairingIds, closedCycleIds } = releaseFromCollection(snake, input.reason, now);
+    patchSnakeById(snake.id, buildArchivePatch(snake, input, { now, closedPairingIds, closedCycleIds }));
+
+    if (editSnake && editSnake.id === snake.id) closeSnakeEditor();
+    setArchiveDialog(null);
+    setArchiveRecordId(snake.id);
+  }, [archiveDialog, archiveDialogSnake, closeSnakeEditor, editSnake, patchSnakeById, releaseFromCollection]);
+
+  const archiveRecordSnake = archiveRecordId ? (snakes.find(snake => snake.id === archiveRecordId) || null) : null;
+  const archiveRecordData = useMemo(() => {
+    if (!archiveRecordSnake || !isArchivedAnimal(archiveRecordSnake)) return null;
+    return buildArchiveRecordData({
+      animal: archiveRecordSnake,
+      animals: snakes,
+      pairings,
+      isPairingCompleted,
+      speciesName: getSpeciesById(resolveSpeciesId(archiveRecordSnake.species))?.name || '',
+    });
+  }, [archiveRecordSnake, snakes, pairings]);
+
+  const closeArchiveRecord = useCallback(() => setArchiveRecordId(null), []);
+
+  const handleArchiveAddNote = useCallback((noteText) => {
+    if (!archiveRecordSnake) return;
+    patchSnakeById(archiveRecordSnake.id, buildAddNotePatch(archiveRecordSnake, noteText));
+  }, [archiveRecordSnake, patchSnakeById]);
+
+  const handleArchiveEraseContact = useCallback(() => {
+    if (!archiveRecordSnake) return;
+    patchSnakeById(archiveRecordSnake.id, buildEraseContactPatch(archiveRecordSnake));
+  }, [archiveRecordSnake, patchSnakeById]);
+
+  const handleArchiveReturn = useCallback(({ date, note }) => {
+    if (!archiveRecordSnake) return;
+    if (addAnimalCap?.blocked) {
+      throw new Error(t('archive.record.returnBlocked', {
+        defaultValue: 'Your plan keeps {{limit}} animals and the collection is full. Make room or upgrade before bringing this snake back.',
+        limit: addAnimalCap.limit,
+      }));
+    }
+    patchSnakeById(archiveRecordSnake.id, buildReturnPatch(archiveRecordSnake, { date, note }));
+    setArchiveRecordId(null);
+    setAnimalView(isFemaleSnake(archiveRecordSnake) ? 'females' : 'males');
+  }, [addAnimalCap, archiveRecordSnake, t, patchSnakeById]);
+
+  // The confirmation opens over the record; Cancel leaves the keeper where they were, and a
+  // confirmed delete closes the record by itself (the animal it shows no longer exists).
+  const handleArchiveDelete = useCallback(() => {
+    if (!archiveRecordSnake) return;
+    setPendingDeleteSnake(archiveRecordSnake);
+  }, [archiveRecordSnake]);
+
+  const handleArchivePdf = useCallback(async () => {
+    if (!archiveRecordData) return;
+    const { downloadArchiveRecordPdf } = await import('./features/animals/archiveRecordPdf');
+    await downloadArchiveRecordPdf(archiveRecordData, archiveLabels(t), {
+      locale: i18n.language,
+      breederName: String(breederInfo?.businessName || breederInfo?.name || '').trim(),
+    });
+  }, [archiveRecordData, breederInfo, t]);
+
+  const openAnimalFromArchive = useCallback((id) => {
+    const target = snakes.find(snake => snake.id === id);
+    if (!target) return;
+    setArchiveRecordId(null);
+    setRemovedCardId(null);
+    openSnakeCard(target);
+  }, [openSnakeCard, snakes]);
+
+  const removedCardSnake = removedCardId ? (snakes.find(snake => snake.id === removedCardId) || null) : null;
+  const openPairingFromCard = useCallback((pairingId) => {
+    const pairing = pairings.find(p => p.id === pairingId);
+    if (!pairing) return;
+    setRemovedCardId(null);
+    setArchiveRecordId(null);
+    setTab('pairings');
+    setFocusedPairingId(pairing.id);
+  }, [pairings]);
 
   function findActivePairingForFemale(femaleId, ignorePairingId = null) {
     if (!femaleId) return null;
@@ -11393,99 +11476,7 @@ export default function BreedingPlannerApp() {
     };
   }
 
-    const openHatchWizardForPayload = useCallback((payload) => {
-      if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
-      const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
-      const existingHatchlingIndexes = new Set(
-        snakes
-          .filter(s => s && (s.pairingId === pairing.id || s.metadata?.pairingId === pairing.id))
-          .map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex))
-          .filter(Number.isFinite)
-      );
-      const requestedThrough = Number(payload.existingCount) + payload.count;
-      // hatchlingsGeneratedThrough is a persistent, synced high-water mark, so it still
-      // blocks re-generation after the hatchling records themselves were deleted or on a
-      // device/tab that hasn't locally seen them yet (unlike existingHatchlingIndexes, which
-      // only reflects snakes currently present in this session's state).
-      const alreadyGenerated = Number(pairing.hatch?.hatchlingsGeneratedThrough || 0) >= requestedThrough;
-      const alreadyRecorded = alreadyGenerated || Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
-        .some(index => existingHatchlingIndexes.has(index));
-      if (alreadyRecorded) {
-        showAppAlert(t('pairing.hatchlingsAlreadyRecorded', {
-          defaultValue: 'These hatchlings have already been recorded for this pairing. To record them again, choose "Eggs hatched", answer that you have logged hatch before, and delete the old hatchling records.',
-        }));
-        return;
-      }
-      const hatchedOn = payload.hatchedDate || localYMD(new Date());
-      const parsedDate = parseYmd(hatchedOn) || new Date();
-      const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
-      const sire = snakeById(snakes, pairing?.maleId);
-      const dam = snakeById(snakes, pairing?.femaleId);
-      const pairingName = `${dam?.name || 'Dam'} × ${sire?.name || 'Sire'}`;
-      const baseExistingRecords = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
-      const idsInUse = new Set(baseExistingRecords.map(record => record.id));
-      const recordsInUse = baseExistingRecords.map(record => ({ ...record }));
-      const configClone = breederInfo?.idGenerator ? { ...breederInfo.idGenerator } : null;
 
-      const entries = Array.from({ length: payload.count }, (_, idx) => {
-        const sequenceLabel = payload.existingCount + idx + 1;
-        const defaultName = `${pairingName} - ${sequenceLabel}`;
-        const generatedId = generateSnakeId(
-          defaultName,
-          year,
-          recordsInUse,
-          null,
-          {
-            idConfig: configClone,
-            sex: 'U',
-            morphs: [],
-            hets: [],
-            birthYear: year,
-          }
-        );
-        idsInUse.add(generatedId);
-        const seqValue = extractSequenceFromId(generatedId, configClone);
-        recordsInUse.push({ id: generatedId, idSequence: seqValue });
-        return {
-          id: generatedId,
-          autoId: true,
-          name: defaultName,
-          sex: 'U',
-          morph: '',
-          weight: '',
-          birthDate: hatchedOn,
-          idSequence: seqValue,
-        };
-      });
-
-      setHatchWizard({
-        pairingId: pairing.id,
-        pairing,
-        entries,
-        currentIndex: 0,
-        hatchedDate: hatchedOn,
-        total: payload.count,
-        existingCount: payload.existingCount,
-        previousHatch: payload.previousHatch || pairing.hatch,
-        context: {
-          pairingName,
-          sireName: sire?.name || '',
-          damName: dam?.name || '',
-          groupName: `Hatchlings ${year}`,
-          year,
-          idConfig: configClone,
-          existingIdsBase: baseExistingRecords.map(record => record.id),
-          existingRecordsBase: baseExistingRecords,
-        },
-      });
-    }, [snakes, breederInfo, showAppAlert, t]);
-
-    useEffect(() => {
-      const payload = pendingHatchWizardPayloadRef.current;
-      if (!payload) return;
-      pendingHatchWizardPayloadRef.current = null;
-      openHatchWizardForPayload(payload);
-    }, [pendingHatchWizardTick, openHatchWizardForPayload]);
 
   // ── Female breeding cards (SBR-01..SBR-11) ─────────────────────────────────
   // Animals as the breeding domain sees them: species id and whether the species lays eggs.
@@ -11541,13 +11532,14 @@ export default function BreedingPlannerApp() {
     if (!target && femaleId) {
       target = breedingCyclesForFemale(breedingCycles, femaleId).find(c => c.status !== BREEDING_CYCLE_STATUS.CLOSED)?.id || null;
     }
+    const cycle = target ? breedingCycles.find(c => c?.id === target) : null;
     setTab('pairings');
-    setPairingsView('cards');
+    setPairingsView(cycle?.status === BREEDING_CYCLE_STATUS.CLOSED ? 'completed' : 'active');
     setFocusedCycleId(target);
   }, [breedingCycles]);
   const requestBreedingDialog = useCallback((request) => {
     setTab('pairings');
-    setPairingsView('cards');
+    setPairingsView('active');
     setBreedingDialogRequest({ ...request, at: Date.now() });
   }, []);
 
@@ -11559,10 +11551,79 @@ export default function BreedingPlannerApp() {
     const tombstoned = new Set(Object.keys(syncTombstonesRef.current?.breedingCycles || {}));
     const { cycles: planned, report } = planLegacyMigration(pairings, breedingCycles);
     const fresh = planned.filter(cycle => !tombstoned.has(cycle.id));
-    if (!fresh.length) return;
-    console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
-    setBreedingCycles(prev => [...prev, ...fresh.filter(cycle => !prev.some(existing => existing?.id === cycle.id))]);
+    // Cards made earlier are brought up to date with anything recorded on their legacy pairing
+    // since (each pairing once per change; additive only).
+    const now = nowIsoString();
+    const caughtUp = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle?.legacy?.pairingIds?.length) return;
+      const next = catchUpCycleFromLegacy(cycle, pairings, { now });
+      if (next !== cycle) caughtUp.set(cycle.id, next);
+    });
+    if (!fresh.length && !caughtUp.size) return;
+    if (fresh.length) console.info(`[breeding] mapped ${fresh.length} legacy pairing record(s) into breeding cards`, report);
+    if (caughtUp.size) console.info(`[breeding] caught ${caughtUp.size} breeding card(s) up with their legacy pairing record`);
+    setBreedingCycles(prev => {
+      const updated = prev.map(cycle => caughtUp.get(cycle?.id) || cycle);
+      const added = fresh
+        .filter(cycle => !updated.some(existing => existing?.id === cycle.id))
+        .map(cycle => catchUpCycleFromLegacy(cycle, pairings, { now }));
+      return [...updated, ...added];
+    });
   }, [pairings, breedingCycles, setBreedingCycles]);
+
+  // Seasons. Switched on once: cycles already running keep the season they were running in.
+  // After that every automatic label follows the season rule (1 September unless configured,
+  // or the day "Start new season" was pressed). A label the keeper typed is never changed.
+  const seasonSettings = breedingSettings?.seasons;
+  useEffect(() => {
+    if (seasonSettings?.initializedAt) return;
+    if (!Array.isArray(breedingCycles) || !breedingCycles.some(cycle => cycle && !cycle.deletedAt)) return;
+    const { settings: initialized, changed } = initializeSeasonSettings(seasonSettings, breedingCycles, { now: nowIsoString() });
+    if (!changed) return;
+    setBreedingSettings(prev => normalizeBreedingSettings({ ...normalizeBreedingSettings(prev), seasons: initialized, updatedAt: nowIsoString() }));
+  }, [seasonSettings, breedingCycles]);
+  useEffect(() => {
+    if (!seasonSettings?.initializedAt) return;
+    const relabel = cyclesNeedingSeasonLabel(breedingCycles, seasonSettings);
+    if (!relabel.length) return;
+    const labels = new Map(relabel.map(entry => [entry.id, entry.label]));
+    const now = nowIsoString();
+    setBreedingCycles(prev => prev.map(cycle => (
+      labels.has(cycle?.id)
+        ? { ...cycle, seasonLabel: labels.get(cycle.id), seasonLabelSource: 'auto', updatedAt: now, metadata: { ...(cycle.metadata || {}), updatedAt: now } }
+        : cycle
+    )));
+  }, [seasonSettings, breedingCycles, setBreedingCycles]);
+  const currentBreedingSeason = useMemo(() => currentSeasonLabel(seasonSettings), [seasonSettings]);
+  const breedingSeasonSummaries = useMemo(() => summarizeSeasons(breedingCycles, seasonSettings), [breedingCycles, seasonSettings]);
+
+  // A hatched cycle completes once every hatchling is registered as an animal; it then moves to
+  // Completed pairing on its own.
+  useEffect(() => {
+    const now = nowIsoString();
+    const completed = new Map();
+    breedingCycles.forEach(cycle => {
+      if (!cycle || cycle.deletedAt || cycle.status === BREEDING_CYCLE_STATUS.CLOSED) return;
+      const next = completeCycleIfRegistered(cycle, { now });
+      if (next !== cycle) completed.set(cycle.id, next);
+    });
+    if (!completed.size) return;
+    setBreedingCycles(prev => prev.map(cycle => completed.get(cycle?.id) || cycle));
+  }, [breedingCycles, setBreedingCycles]);
+
+  // A clutch laid on a card gets its permanent incubator number, above every number in use.
+  useEffect(() => {
+    const assign = clutchNumbersToAssign(breedingCycles, pairings, { pairingsById });
+    if (!assign.length) return;
+    const numbers = new Map(assign.map(entry => [entry.id, entry.number]));
+    const now = nowIsoString();
+    setBreedingCycles(prev => prev.map(cycle => (
+      numbers.has(cycle?.id)
+        ? { ...cycle, clutch: { ...cycle.clutch, clutchNumber: numbers.get(cycle.id), eggBoxNumber: numbers.get(cycle.id) }, updatedAt: now, metadata: { ...(cycle.metadata || {}), updatedAt: now } }
+        : cycle
+    )));
+  }, [breedingCycles, pairings, pairingsById, setBreedingCycles]);
 
   // Pre-pairing scans join the female's card once it exists; their dates never move.
   useEffect(() => {
@@ -11605,38 +11666,112 @@ export default function BreedingPlannerApp() {
     setBreedingCycles(prev => prev.map(cycle => updates.get(cycle?.id) || cycle));
   }, [snakes, breedingCycles, setBreedingCycles]);
 
-  // The existing hatch wizard creates the hatchling animals; the card supplies the parents. With
+  // Log hatch creates the hatchlings straight away, as the old pairing records did: one animal per
+  // hatchling, automatic IDs, sex unknown, filed in that year's hatchlings group and linked to the
+  // card (which then completes on its own). The record is the one the hatch wizard writes. With
   // more than one participating male the sire is left empty, so parentage stays unresolved.
+  const hatchlingCreationRef = useRef(new Set());
   const createHatchlingsForCycle = useCallback((cycle) => {
-    const female = snakeById(snakes, cycle.femaleId);
+    if (!cycle?.id || hatchlingCreationRef.current.has(cycle.id)) return 0;
+    const dam = snakeById(snakes, cycle.femaleId);
     const participated = cycle.males.filter(m => m.state === BREEDING_MALE_STATE.PARTICIPATED);
     const soleMaleId = participated.length === 1 ? participated[0].maleId : null;
-    const male = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const sire = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const pairingRef = cycle.legacy?.pairingIds?.[0] || cycle.id;
     const linkedIds = new Set([cycle.id, ...(cycle.legacy?.pairingIds || [])]);
-    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId)).length;
+    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId));
     const total = Number(cycle.clutch?.hatchlingsRecorded || 0);
-    const count = total - existing;
-    if (count <= 0) {
-      showAppAlert(t('breeding.notice.hatchlingsUpToDate', { defaultValue: 'Hatchling records already exist for every recorded hatchling on this card ({{count}}). Raise the hatchling count first.', count: total }));
-      return;
-    }
-    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const count = total - existing.length;
+    if (count <= 0) return 0;
+    hatchlingCreationRef.current.add(cycle.id);
     const hatchedOn = cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate || localYMD(new Date());
-    openHatchWizardForPayload({
-      pairing: withPairingLifecycleDefaults({
-        id: cycle.legacy?.pairingIds?.[0] || cycle.id,
-        femaleId: cycle.femaleId,
-        maleId: soleMaleId,
-        label: `${female?.name || cycle.femaleId} × ${male?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' }))}`,
-        clutch: { recorded: !!layDate, date: layDate, eggsTotal: cycle.clutch.eggsTotal ?? '', fertileEggs: cycle.clutch.fertileEggs ?? '', slugs: cycle.clutch.slugs ?? '' },
-        hatch: { recorded: true, date: hatchedOn, hatchedCount: total },
-      }),
-      count,
-      hatchedDate: hatchedOn,
-      existingCount: existing,
-      previousHatch: {},
+    const year = Number(String(hatchedOn).slice(0, 4)) || new Date().getFullYear();
+    const groupName = `Hatchlings ${year}`;
+    const sireLabel = sire?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : 'Sire');
+    const pairingName = `${dam?.name || 'Dam'} × ${sireLabel}`;
+    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const clutchYear = (layDate || hatchedOn).slice(0, 4);
+    const clutchId = buildClutchId(dam?.name, sire?.name, clutchYear) || pairingRef;
+    const snapshot = (parent) => parent ? {
+      id: parent.id || null,
+      name: parent.name || parent.id || '',
+      sex: parent.sex || '',
+      morphs: Array.isArray(parent.morphs) ? [...parent.morphs] : [],
+      hets: Array.isArray(parent.hets) ? [...parent.hets] : [],
+      possibleHets: Array.isArray(parent.possibleHets) ? [...parent.possibleHets] : [],
+      genetics: getDisplayedSnakeGeneticsTokens(parent),
+    } : null;
+    const sireSnapshot = snapshot(sire);
+    const damSnapshot = snapshot(dam);
+    const species = resolveSpeciesId(dam?.species || sire?.species);
+    const idConfig = breederInfo?.idGenerator ? { ...breederInfo.idGenerator } : null;
+    const recordsInUse = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
+    const idsInUse = new Set(recordsInUse.map(r => r.id));
+    const indexesInUse = new Set(existing.map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex)).filter(Number.isFinite));
+    const created = [];
+    let hatchlingIndex = 0;
+    while (created.length < count) {
+      hatchlingIndex += 1;
+      if (indexesInUse.has(hatchlingIndex)) continue;
+      const name = `${pairingName} - ${hatchlingIndex}`;
+      let id = generateSnakeId(name, year, recordsInUse, null, { idConfig, sex: 'U', morphs: [], hets: [], birthYear: year });
+      if (!id || idsInUse.has(id)) {
+        let suffix = 2;
+        const baseId = id || `H-${year}-${hatchlingIndex}`;
+        while (idsInUse.has(`${baseId}-${suffix}`)) suffix += 1;
+        id = idsInUse.has(baseId) ? `${baseId}-${suffix}` : baseId;
+      }
+      const idSequence = extractSequenceFromId(id, idConfig);
+      idsInUse.add(id);
+      recordsInUse.push({ id, idSequence });
+      created.push({
+        id,
+        name,
+        sex: 'U',
+        species,
+        morphs: [],
+        hets: [],
+        weight: 0,
+        year,
+        birthDate: hatchedOn,
+        clutchId,
+        hatchlingIndex,
+        pairingId: pairingRef,
+        sireId: soleMaleId,
+        damId: cycle.femaleId || null,
+        sireName: sireSnapshot?.name || '',
+        damName: damSnapshot?.name || '',
+        sireGenetics: sireSnapshot?.genetics || [],
+        damGenetics: damSnapshot?.genetics || [],
+        parentGenetics: { sire: sireSnapshot, dam: damSnapshot },
+        metadata: { pairingId: pairingRef, cycleId: cycle.id, clutchId, hatchlingIndex, hatchDate: hatchedOn, parents: { sire: sireSnapshot, dam: damSnapshot } },
+        tags: ['hatchling'],
+        groups: normalizeSingleGroupValue(groupName),
+        // Born into the collection, not brought into it: hatchlings never start in quarantine.
+        status: 'Active',
+        imageUrl: undefined,
+        logs: cloneLogs(),
+        idSequence,
+        isDemo: false,
+      });
+    }
+    setSnakes(prev => {
+      const base = prev.filter(s => !s.isDemo);
+      const fresh = created.filter(c => !base.some(s => s.id === c.id));
+      return fresh.length ? [...base, ...fresh] : prev;
     });
-  }, [snakes, openHatchWizardForPayload, showAppAlert, t]);
+    setGroupsForSpecies(species, prev => (prev.includes(groupName) ? prev : [...prev, groupName]));
+    const highest = Math.max(...created.map(c => c.hatchlingIndex));
+    setPairings(prev => prev.map(p => {
+      if (p?.id !== pairingRef) return p;
+      const withDefaults = withPairingLifecycleDefaults({ ...p });
+      if (highest <= Number(withDefaults.hatch?.hatchlingsGeneratedThrough || 0)) return p;
+      return { ...withDefaults, hatch: { ...withDefaults.hatch, hatchlingsGeneratedThrough: highest } };
+    }));
+    showAppAlert(t('breeding.notice.hatchlingsAdded', { defaultValue: '{{count}} hatchlings added to {{group}}.', count: created.length, group: groupName }));
+    setTimeout(() => hatchlingCreationRef.current.delete(cycle.id), 2000);
+    return created.length;
+  }, [snakes, breederInfo, setSnakes, setGroupsForSpecies, setPairings, showAppAlert, t]);
 
   // Ultrasound stills and clips attached to an examination. Images are downscaled the way animal
   // photos are; anything over 8 MB is refused rather than silently dropped later by the sync.
@@ -12081,110 +12216,8 @@ export default function BreedingPlannerApp() {
     });
   }, [editSnakeDraft, snakes, editSnake, breederInfo]);
 
-  const handleUpdatePairing = useCallback(async (pairingId, updater) => {
-    let conflictInfo = null;
-    pendingHatchWizardPayloadRef.current = null;
-    setPairings(prev => {
-      const updated = prev.map(p => {
-        if (p.id !== pairingId) return p;
-        const current = withPairingLifecycleDefaults({ ...p });
-        const nextRaw = typeof updater === 'function' ? updater(current) : updater;
-        const merged = withPairingLifecycleDefaults({ ...current, ...(nextRaw || {}) });
-        merged.id = p.id;
 
-        if (merged?.clutch?.date && !(Number(merged.clutch.eggBoxNumber) > 0)) {
-          const nextNumber = prev.reduce((max, other) => Math.max(max, Number(other?.clutch?.eggBoxNumber) || 0), 0) + 1;
-          merged.clutch = { ...merged.clutch, clutchNumber: nextNumber, eggBoxNumber: nextNumber };
-        }
 
-        if (merged.femaleId) {
-          const blocking = prev.find(other => (
-            other &&
-            other.id !== pairingId &&
-            other.femaleId === merged.femaleId &&
-            !isPairingCompleted(other)
-          ));
-          if (blocking) {
-            conflictInfo = { femaleId: merged.femaleId, blockingPairing: blocking };
-            return p;
-          }
-        }
-
-        const previousCount = current?.hatch?.recorded ? Number(current.hatch.hatchedCount || 0) : 0;
-        const newCount = merged?.hatch?.recorded ? Number(merged.hatch.hatchedCount || 0) : 0;
-        const delta = merged?.hatch?.recorded ? Math.max(0, newCount - previousCount) : 0;
-        if (delta > 0) {
-          pendingHatchWizardPayloadRef.current = {
-            pairing: { ...current, ...merged },
-            count: delta,
-            hatchedDate: merged.hatch.date,
-            existingCount: previousCount,
-            previousHatch: { ...current.hatch },
-          };
-        }
-        return merged;
-      });
-      if (conflictInfo) {
-        return prev;
-      }
-      return autoAdjustAllPairingAppointments(updated);
-    });
-    if (conflictInfo) {
-      const femaleSnake = snakeById(snakes, conflictInfo.femaleId);
-      const femaleLabel = femaleSnake?.name || conflictInfo.femaleId || t('pairing.femaleFallback', { defaultValue: 'This female' });
-      const blockerLabel = conflictInfo.blockingPairing?.label || conflictInfo.blockingPairing?.id || t('pairing.existingPairing', { defaultValue: 'existing pairing' });
-      await showAppAlert(t('pairing.femaleAlreadyPaired', {
-        defaultValue: '{{female}} is already assigned to {{pairing}}. Change or delete that pairing before creating another.',
-        female: femaleLabel,
-        pairing: blockerLabel,
-      }));
-      setTab('pairings');
-      setFocusedPairingId(conflictInfo.blockingPairing?.id || null);
-      return;
-    }
-    setPendingHatchWizardTick(tick => tick + 1);
-  }, [setPairings, snakes, t, setTab, setFocusedPairingId, showAppAlert]);
-
-  // Animals that were generated by the hatch wizard for a given pairing. Deliberately keyed on
-  // the pairing link only (not the parent/name heuristics the pairing card uses for display), so
-  // a redo never deletes an animal the breeder attached to the clutch by hand.
-  const listGeneratedHatchlings = useCallback((pairingId) => {
-    if (!pairingId) return [];
-    return snakes.filter(s => s && (s.pairingId === pairingId || s?.metadata?.pairingId === pairingId));
-  }, [snakes]);
-
-  // Wipes a previously generated hatchling batch so the clutch can be logged again from scratch.
-  // Bumps hatch.hatchlingsResetCount so the anti-duplication high-water mark can't be restored by
-  // a later sync (see mergePairingRecord).
-  const handleResetPairingHatchlings = useCallback((pairingId) => {
-    if (!pairingId) return 0;
-    const doomed = listGeneratedHatchlings(pairingId);
-    const doomedIds = new Set(doomed.map(s => s.id).filter(Boolean));
-    if (doomedIds.size) {
-      const deletedAt = nowIsoString();
-      setSyncTombstones(prev => {
-        const nextSnakes = { ...prev.snakes };
-        doomedIds.forEach(id => { nextSnakes[id] = { id, appAnimalId: id, deletedAt }; });
-        return { ...prev, snakes: nextSnakes };
-      });
-      setSnakes(prev => prev.filter(s => !doomedIds.has(s.id)));
-    }
-    setPairings(prev => prev.map(p => {
-      if (p.id !== pairingId) return p;
-      const withDefaults = withPairingLifecycleDefaults({ ...p });
-      const freshHatch = pairingLifecycleDefaults().hatch;
-      return {
-        ...withDefaults,
-        hatch: {
-          ...freshHatch,
-          // The incubation schedule is a plan, not part of the hatch record being cleared.
-          scheduledDate: withDefaults.hatch?.scheduledDate || '',
-          hatchlingsResetCount: Number(withDefaults.hatch?.hatchlingsResetCount || 0) + 1,
-        },
-      };
-    }));
-    return doomedIds.size;
-  }, [listGeneratedHatchlings, setSnakes, setPairings, setSyncTombstones]);
 
   const handleGeneratePairingQrLabels = useCallback(async (targetPairings) => {
     if (!Array.isArray(targetPairings) || !targetPairings.length) {
@@ -12482,7 +12515,7 @@ export default function BreedingPlannerApp() {
             <span className="ms-auto text-xs text-neutral-600 tabular-nums">
               {t('species.scope.summary', {
                 defaultValue: '{{animals}} animals · {{genes}} genes',
-                animals: scopedSnakes.length,
+                animals: scopedCollection.length,
                 genes: getSpeciesById(speciesScope)?.traitCount || 0,
               })}
             </span>
@@ -12532,6 +12565,7 @@ export default function BreedingPlannerApp() {
                   { key: 'males', label: t("filters.males") },
                   { key: 'females', label: t("filters.females") },
                   { key: 'groups', label: t("filters.groups") },
+                  { key: 'archive', label: t("archive.tab", { defaultValue: "Archive" }), count: scopedArchive.length },
                 ].map(filter => (
                   <button
                     key={filter.key}
@@ -12544,10 +12578,13 @@ export default function BreedingPlannerApp() {
                     onClick={() => handleAnimalViewTabChange(filter.key)}
                   >
                     {filter.label}
+                    {typeof filter.count === 'number' && filter.count > 0 && (
+                      <span className="tabular-nums opacity-70 font-medium">{filter.count}</span>
+                    )}
                   </button>
                 ))}
               </div>
-              {animalView !== "groups" && (
+              {animalView !== "groups" && animalView !== "archive" && (
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Layout and sort are one control: all three decide how the same list is
                       drawn. They share a single pill with hairline dividers so the row reads as
@@ -12632,14 +12669,20 @@ export default function BreedingPlannerApp() {
                 {/* Adding animals comes first: it is what this row is mostly used for. The two
                     QR actions sit last, next to the scanner status they belong with. Feed prep
                     moved out to the header — it plans the whole collection, not this list. */}
-                <button
-                  onClick={startNewAnimalDraft}
-                  className={cx(toolbarControlClass, 'bp-toolbar-action')}
-                >
-                  + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
-                </button>
-                <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
-                <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                {/* Adding, importing and labelling act on the collection, so the Archive view
+                    leaves them out. Scanning stays: a scanned label opens an archived record too. */}
+                {animalView !== 'archive' && (
+                  <>
+                    <button
+                      onClick={startNewAnimalDraft}
+                      className={cx(toolbarControlClass, 'bp-toolbar-action')}
+                    >
+                      + {speciesScope ? t("actions.addAnimal") : t("actions.addAnimalAndSpecies", { defaultValue: "New animal & species" })}
+                    </button>
+                    <button onClick={() => setShowImportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.importAnimals")}</button>
+                    <button onClick={()=>setShowExportModal(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.exportQr")}</button>
+                  </>
+                )}
                 <button onClick={()=>setShowScanner(true)} className={cx(toolbarControlClass, 'bp-toolbar-action')}>{t("actions.scanQr")}</button>
                 {/* Last on the row, and smaller than the buttons: this reports scanner state,
                     it is not something to press. Its colour still tracks that state. */}
@@ -12673,7 +12716,7 @@ export default function BreedingPlannerApp() {
                 filterSnakes. Sitting directly under the toolbar it lines up with the controls
                 that filter alongside it, and it is absent from Groups view, which the query
                 does not filter. */}
-            {animalView !== "groups" && (
+            {animalView !== "groups" && animalView !== "archive" && (
               <div className="header-search-shell w-full">
                 <input
                   value={query}
@@ -12708,11 +12751,11 @@ export default function BreedingPlannerApp() {
               <GroupsSection
                 groups={groups}
                 setGroups={setGroups}
-                snakes={snakes}
+                snakes={collectionSnakes}
                 theme={theme}
                 onOpenSnake={openSnakeCard}
                 onDeleteGroup={(g)=>{
-                  const inUse = snakes.some(s => (s.groups||[]).includes(g));
+                  const inUse = collectionSnakes.some(s => (s.groups||[]).includes(g));
                   if (inUse) {
                     showAppAlert("Group in use by some snakes. Remove from those snakes first.");
                     return;
@@ -12721,6 +12764,8 @@ export default function BreedingPlannerApp() {
                   if (groupFilter === g) setGroupFilter("all");
                 }}
               />
+            ) : animalView === "archive" ? (
+              <ArchiveList animals={scopedArchive} locale={i18n.language} onOpen={(snake) => setArchiveRecordId(snake.id)} />
             ) : (
               <Card title={animalsCardTitle}>
                 <div className="mb-3">
@@ -12940,6 +12985,7 @@ export default function BreedingPlannerApp() {
                       onOpenFamilyTree={openFamilyTreeForSnake}
                       onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                       onDelete={requestDeleteSnake}
+                      onArchive={requestArchiveSnake}
                       pairings={pairings}
                       onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
                       sortBy={animalSortBy}
@@ -12963,6 +13009,7 @@ export default function BreedingPlannerApp() {
                           onOpenFamilyTree={openFamilyTreeForSnake}
                           onOrderGeneticTest={(sn) => setTestOrderSnake(sn)}
                           onDelete={requestDeleteSnake}
+                          onArchive={requestArchiveSnake}
                           pairings={pairings}
                           onOpenPairing={(pid)=>{ const p = pairings.find(x=>x.id===pid); if (p) { setTab('pairings'); setFocusedPairingId(p.id); } }}
                           lastFeedDefaults={lastFeedDefaults}
@@ -12986,7 +13033,7 @@ export default function BreedingPlannerApp() {
             rooms={rooms}
             heatRacks={heatRacks}
             terrariums={terrariums}
-            snakes={snakes}
+            snakes={collectionSnakes}
             theme={theme}
             showAppPrompt={showAppPrompt}
             showAppConfirm={showAppConfirm}
@@ -13028,103 +13075,58 @@ export default function BreedingPlannerApp() {
 
         {tab === "pairings" && !speciesGateActive && (
           <div className="flex flex-col gap-4">
+            <SeasonBar
+              summaries={breedingSeasonSummaries}
+              currentSeason={currentBreedingSeason}
+              onStartNewSeason={() => {
+                const outcome = breedingActions.startNewSeason();
+                if (outcome?.changed) showAppAlert(t('breeding.season.started', { defaultValue: 'Season {{season}} has started. Pairings from today on belong to it.', season: outcome.label }));
+              }}
+            />
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'cards'}
-                  onClick={() => {
-                    setPairingsView('cards');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                  }}
-                >
-                  {t('breeding.tabs.cards', { defaultValue: 'Breeding cards' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'follicles'}
-                  onClick={() => {
-                    setPairingsView('follicles');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                  }}
-                >
-                  {t('breeding.tabs.follicles', { defaultValue: 'Follicle tracking' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'dashboard'}
-                  onClick={() => {
-                    setPairingsView('dashboard');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t('pairing.dashboard', { defaultValue: 'Dashboard' })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'active'}
-                  onClick={() => {
-                    setPairingsView('active');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.activeProjects", { count: activePairingsCount })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'completed'}
-                  onClick={() => {
-                    setPairingsView('completed');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.completedProjects", { count: completedPairingsCount })}
-                </TabButton>
-                <TabButton
-                  theme={theme}
-                  active={pairingsView === 'incubator'}
-                  onClick={() => {
-                    setPairingsView('incubator');
-                    setFocusedPairingId(null);
-                    setPairingsReturnView(null);
-                    setCompletedYearFilter('All');
-                    setCompletedOutcomeFilter('all');
-                  }}
-                >
-                  {t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}
-                </TabButton>
+              <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={t('nav.pairings', { defaultValue: 'Breeding' })}>
+                {[
+                  ['dashboard', t('pairing.dashboard', { defaultValue: 'Dashboard' })],
+                  ['active', t('breeding.tabs.active', { defaultValue: 'Active pairing ({{count}})', count: activeCyclesCount })],
+                  ['incubator', t('breeding.tabs.incubator', { defaultValue: 'Incubator ({{count}})', count: incubatorSummary.clutches })],
+                  ['completed', t('breeding.tabs.completed', { defaultValue: 'Completed pairing ({{count}})', count: completedCyclesCount })],
+                ].map(([key, label]) => (
+                  <TabButton
+                    key={key}
+                    theme={theme}
+                    active={pairingsView === key}
+                    onClick={() => {
+                      setPairingsView(key);
+                      setFocusedPairingId(null);
+                      setFocusedCycleId(null);
+                    }}
+                  >
+                    {label}
+                  </TabButton>
+                ))}
               </div>
               <div className="flex flex-wrap items-center gap-2 ms-auto">
-                <div className="relative w-full sm:w-64">
-                  <input
-                    type="text"
-                    className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
-                    placeholder={t('pairing.searchPlaceholder', { defaultValue: 'Search pairings or snakes' })}
-                    value={pairingsSearchQuery}
-                    onChange={e => setPairingsSearchQuery(e.target.value)}
-                  />
-                  {pairingsSearchQuery && (
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
-                      onClick={() => setPairingsSearchQuery('')}
-                      aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
+                {pairingsView === 'active' || pairingsView === 'completed' ? (
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      className="w-full border rounded-xl px-3 py-2 text-sm pe-8"
+                      placeholder={t('breeding.searchPlaceholder', { defaultValue: 'Search females, males or a season' })}
+                      value={pairingsSearchQuery}
+                      onChange={e => setPairingsSearchQuery(e.target.value)}
+                    />
+                    {pairingsSearchQuery && (
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 end-2 text-neutral-500 text-lg leading-none"
+                        onClick={() => setPairingsSearchQuery('')}
+                        aria-label={t('pairing.clearSearch', { defaultValue: 'Clear pairing search' })}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setShowPairingQrModal(true)}
@@ -13134,62 +13136,14 @@ export default function BreedingPlannerApp() {
                 </button>
                 <button
                   type="button"
-                  onClick={openNewPairingModal}
+                  onClick={() => requestBreedingDialog({ kind: 'pairing', femaleId: null })}
                   className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))}
                 >
-                  {t("pairing.new")}
+                  {t('breeding.cards.recordPairing', { defaultValue: 'Record a pairing' })}
                 </button>
               </div>
             </div>
-            {pairingsView === 'completed' && completedYearOptions.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <TabButton
-                    theme={theme}
-                    active={completedYearFilter === 'All'}
-                    onClick={() => setCompletedYearFilter('All')}
-                  >
-                    {t("pairing.filters.allYears", { defaultValue: "All years" })}
-                  </TabButton>
-                  {completedYearOptions.map(year => (
-                    <TabButton
-                      key={year}
-                      theme={theme}
-                      active={completedYearFilter === year}
-                      onClick={() => setCompletedYearFilter(year)}
-                    >
-                      {year}
-                    </TabButton>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <TabButton
-                    theme={theme}
-                    active={completedOutcomeFilter === 'all'}
-                    onClick={() => setCompletedOutcomeFilter('all')}
-                  >
-                    {t("pairing.filters.allOutcomes", { defaultValue: "All outcomes" })}
-                  </TabButton>
-                  {[
-                    ['productive', t("pairing.filters.outcome.productive", { defaultValue: "Eggs or live birth" })],
-                    ['no_ovulation_observed', t("pairing.filters.outcome.noOvulationObserved", { defaultValue: "No ovulation observed" })],
-                    ['follicles_reabsorbed', t("pairing.filters.outcome.folliclesReabsorbed", { defaultValue: "Follicles reabsorbed" })],
-                    ['late_outcome', t("pairing.filters.outcome.lateOutcome", { defaultValue: "Late outcome" })],
-                    ['reopened', t("pairing.filters.outcome.reopened", { defaultValue: "Reopened" })],
-                  ].map(([key, label]) => (
-                    <TabButton
-                      key={key}
-                      theme={theme}
-                      active={completedOutcomeFilter === key}
-                      onClick={() => setCompletedOutcomeFilter(key)}
-                    >
-                      {label}
-                    </TabButton>
-                  ))}
-                </div>
-              </div>
-            )}
-            {pairingsView === 'cards' || pairingsView === 'follicles' ? (
+            {pairingsView === 'active' || pairingsView === 'completed' ? (
               <BreedingWorkspace
                 view={pairingsView}
                 cycles={breedingCycles}
@@ -13213,22 +13167,8 @@ export default function BreedingPlannerApp() {
                 scopedFemaleIds={speciesScope ? new Set(scopedSnakes.map(snake => snake.id)) : null}
                 dialogRequest={breedingDialogRequest}
                 onDialogRequestHandled={() => setBreedingDialogRequest(null)}
-              />
-            ) : pairingsView === 'dashboard' ? (
-              <BreedingDashboardSection
-                items={breedingDashboardItems}
-                initialUrgencyFilter={breedingUrgencyFocus}
-                theme={theme}
-                clutchNumberByPairingId={clutchNumberByPairingId}
-                clutchMetadataByPairingId={clutchMetadataByPairingId}
-                onOpenPairing={(pid) => {
-                  const p = pairings.find(x => x.id === pid);
-                  if (p) {
-                    setPairingsView(isPairingCompleted(p) ? 'completed' : 'active');
-                    setPairingsReturnView({ pairingId: p.id, view: 'dashboard' });
-                    setFocusedPairingId(p.id);
-                  }
-                }}
+                currentSeason={currentBreedingSeason}
+                seasonSummaries={breedingSeasonSummaries}
               />
             ) : pairingsView === 'incubator' ? (
               <Card title={t("pairing.incubatorTitle", { count: incubatorSummary.clutches })}>
@@ -13262,7 +13202,7 @@ export default function BreedingPlannerApp() {
                                 })
                                 : t("pairing.eggBox.title", { number: box.eggBoxNumber })}
                             </div>
-                            <div className="text-xs text-neutral-500">{box.year || t("pairing.eggBox.yearFallback")}</div>
+                            <div className="text-xs text-neutral-500">{box.seasonLabel ? t('breeding.season.heading', { defaultValue: 'Season {{season}}', season: box.seasonLabel }) : (box.year || t("pairing.eggBox.yearFallback"))}</div>
                           </div>
                           <div className="text-xs leading-snug text-neutral-700">
                             {t("pairing.eggBox.clutchLabel", { number: box.clutchNumber || box.number, pairing: box.pairingLabel })}
@@ -13299,6 +13239,15 @@ export default function BreedingPlannerApp() {
                           >
                             {t("pairing.incubator.viewEditBox", { defaultValue: "View / edit egg box" })}
                           </button>
+                          {box.cycleId ? (
+                            <button
+                              type="button"
+                              className="mt-1 w-fit px-2.5 py-1.5 rounded-xl border text-xs bg-white text-neutral-800"
+                              onClick={() => openBreedingCycle(box.cycleId)}
+                            >
+                              {t('breeding.incubator.openCard', { defaultValue: 'Open breeding card' })}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className={cx('mt-1 w-fit px-2.5 py-1.5 rounded-xl text-xs', primaryBtnClass(theme, true))}
@@ -13334,52 +13283,14 @@ export default function BreedingPlannerApp() {
                 )}
               </Card>
             ) : (
-            <PairingsSection
-              snakes={snakes}
-              pairings={filteredPairingsBySearch}
-              breederMales={males}
-              breederFemales={females}
-              onDelete={(pid)=>{
-                if (pid) {
-                  const deletedAt = nowIsoString();
-                  setSyncTombstones(prev => ({
-                    ...prev,
-                    pairings: { ...prev.pairings, [pid]: { id: pid, appPairingId: pid, deletedAt } },
-                  }));
-                }
-                setPairings(ps=>ps.filter(x=>x.id!==pid));
-                setFocusedPairingId(prev=>prev===pid?null:prev);
-              }}
-              onOpenSnake={openSnakeCard}
-              onUpdatePairing={handleUpdatePairing}
-              onExportPairingQr={handleGeneratePairingQrLabels}
-              onResetHatchlings={handleResetPairingHatchlings}
-              getGeneratedHatchlings={listGeneratedHatchlings}
-              showAppAlert={showAppAlert}
-              clutchNumberByPairingId={clutchNumberByPairingId}
-              clutchMetadataByPairingId={clutchMetadataByPairingId}
-              focusedPairingId={focusedPairingId}
-              onFocusPairing={setFocusedPairingId}
-              onCollapsePairing={(pid) => {
-                // The focus has to go with the collapse: while it is set, the effect that
-                // keeps a focused pairing visible would drag the view straight back here.
-                setFocusedPairingId(prev => (prev === pid ? null : prev));
-                setPairingsView(prev => resolveCollapseView(prev, pairingsReturnView, pid));
-                setPairingsReturnView(prev => (prev?.pairingId === pid ? null : prev));
-              }}
-              theme={theme}
-              title={pairingsView === 'completed'
-                ? `${t('pairing.completedProjects', { count: filteredCompletedCount })}${completedYearFilter !== 'All' ? ` - ${completedYearFilter}` : ''}`
-                : t('pairing.cardTitle', { count: activePairingsCount })}
-              emptyMessage={pairingsSearchQuery.trim()
-                ? t('pairing.searchEmpty', { defaultValue: 'No pairings match your search.' })
-                : (pairingsView === 'completed'
-                  ? (completedYearFilter === 'All'
-                    ? t('pairing.completedEmptyAll', { defaultValue: 'No completed pairings yet. Hatchlings will land here once the cycle is marked finished.' })
-                    : t('pairing.completedEmptyYear', { defaultValue: 'No completed pairings recorded for {{year}}.', year: completedYearFilter }))
-                  : t('pairing.emptyDefault'))}
-              variant="collapsed"
-            />
+              <BreedingDashboardSection
+                items={breedingDashboardItems}
+                initialUrgencyFilter={breedingUrgencyFocus}
+                theme={theme}
+                clutchNumberByPairingId={clutchNumberByPairingId}
+                clutchMetadataByPairingId={clutchMetadataByPairingId}
+                onOpenPairing={(id) => openBreedingCycle(id)}
+              />
             )}
           </div>
         )}
@@ -13423,7 +13334,7 @@ export default function BreedingPlannerApp() {
 
         {tab === "quarantine" && (
           <QuarantineSection
-            snakes={snakes}
+            snakes={collectionSnakes}
             onUpdateSnake={updateSnakeById}
             onOpenAnimal={openSnakeEditor}
             showAppPrompt={showAppPrompt}
@@ -14377,6 +14288,16 @@ export default function BreedingPlannerApp() {
                         {t("actions.orderGeneticTest", { defaultValue: "Order Genetic Test" })}
                       </button>
                       <div className="snake-editor-menu__sep" role="separator" />
+                      {!isDemoSnakeRecord(editSnake) && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="snake-editor-menu__item"
+                          onClick={() => { setEditMoreMenuOpen(false); requestArchiveSnake(editSnake); }}
+                        >
+                          {t("archive.action", { defaultValue: "Move to archive" })}
+                        </button>
+                      )}
                       <button
                         type="button"
                         role="menuitem"
@@ -15113,11 +15034,11 @@ export default function BreedingPlannerApp() {
           />
         );
       })()}
-  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={snakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
+  <ExportQrModal open={showExportModal} onClose={()=>setShowExportModal(false)} snakes={collectionSnakes} groups={groups} onGenerate={(list)=>exportQrToPdf(list, breederInfo)} theme={theme} showAppAlert={showAppAlert} />
       <FeedPrepModal
         open={showFeedPrepModal}
         onClose={() => setShowFeedPrepModal(false)}
-        snakes={snakes}
+        snakes={collectionSnakes}
         pairings={pairings}
         onEditSnake={(snake) => {
           setShowFeedPrepModal(false);
@@ -15158,11 +15079,53 @@ export default function BreedingPlannerApp() {
         />
       )}
       <ConfirmDeleteSnakeModal
+        key={pendingDeleteSnake?.id || 'none'}
         snake={pendingDeleteSnake}
+        links={pendingDeleteLinks}
         onCancel={cancelDeleteSnake}
         onConfirm={confirmDeleteSnake}
+        onArchiveInstead={requestArchiveSnake}
         theme={theme}
       />
+      {archiveDialogSnake && (
+        <ArchiveAnimalDialog
+          key={`${archiveDialog.id}-${archiveDialog.mode}`}
+          animal={archiveDialogSnake}
+          mode={archiveDialog.mode}
+          isFemale={isFemaleSnake(archiveDialogSnake)}
+          openBreeding={openBreedingForSnake(archiveDialogSnake)}
+          defaultCurrency={archiveDialogSnake.currency || 'EUR'}
+          onSubmit={submitArchiveDialog}
+          onCancel={() => setArchiveDialog(null)}
+        />
+      )}
+      {removedCardSnake && isRemovedAnimal(removedCardSnake) && (
+        <RemovedAnimalCard
+          animal={removedCardSnake}
+          animals={snakes}
+          pairings={pairings}
+          locale={i18n.language}
+          onClose={() => setRemovedCardId(null)}
+          onOpenAnimal={openAnimalFromArchive}
+          onOpenPairing={openPairingFromCard}
+        />
+      )}
+      {archiveRecordData && (
+        <ArchivedAnimalRecord
+          data={archiveRecordData}
+          locale={i18n.language}
+          onClose={closeArchiveRecord}
+          onEditExit={() => setArchiveDialog({ id: archiveRecordSnake.id, mode: 'edit' })}
+          onEraseContact={handleArchiveEraseContact}
+          onAddNote={handleArchiveAddNote}
+          onReturn={handleArchiveReturn}
+          onDelete={handleArchiveDelete}
+          onDownloadPdf={handleArchivePdf}
+          onOpenAnimal={openAnimalFromArchive}
+          showAppAlert={showAppAlert}
+          showAppConfirm={showAppConfirm}
+        />
+      )}
       <EggBoxModal
         box={eggBoxModal}
         onClose={() => setEggBoxModal(null)}
@@ -15700,24 +15663,84 @@ function useHardwareScannerListener({ enabled, onScan, minLength = 3, maxKeyInte
 }
 
 // small comps
-function ConfirmDeleteSnakeModal({ snake, onCancel, onConfirm }) {
+function ConfirmDeleteSnakeModal({ snake, links = null, onCancel, onConfirm, onArchiveInstead }) {
   const { t } = useTranslation();
+  // Opens over an archived record too, so it sits above it (z 10040) and takes the keyboard.
+  const dialogRef = useDialogFocus(onCancel, { active: Boolean(snake) });
+  const archivedReason = snake ? (departureOf(snake)?.reason || '') : '';
+  const [reason, setReason] = useState(archivedReason);
   if (!snake) return null;
   if (typeof document === 'undefined') return null;
+  const archived = isArchivedAnimal(snake);
+  const canArchive = !archived && !isDemoSnakeRecord(snake) && typeof onArchiveInstead === 'function';
+  // A snake other records point at (pairings, offspring, its own parents or clutch) leaves a
+  // small card behind instead of vanishing, so the keeper says why it left.
+  const keepsCard = Boolean(links?.hasLinks) && !isDemoSnakeRecord(snake);
+  const labels = archiveLabels(t);
+  const name = snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" });
   return createPortal((
-    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10020]" onClick={onCancel}>
-      <div className="relative z-[10021] bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name: snake.name || t("snakeEdit.thisSnake", { defaultValue: "this snake" }), defaultValue: "Delete {{name}}?" })}</div>
-        <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-          {t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
+    <div className="sk-scrim fixed inset-0 flex items-center justify-center p-4 z-[10040]" onClick={onCancel}>
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-delete-snake-title"
+        className="relative z-[10041] bg-white w-full max-w-md rounded-2xl shadow-2xl border p-5 max-h-[92vh] overflow-y-auto"
+        onClick={e=>e.stopPropagation()}
+      >
+        <div id="confirm-delete-snake-title" className="font-semibold text-lg">{t("snakeEdit.deleteSnakeTitle", { name, defaultValue: "Delete {{name}}?" })}</div>
+        {keepsCard ? (
+          <>
+            <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+              {t("archive.delete.keepsCard", {
+                defaultValue: "{{name}} is part of your breeding records ({{summary}}). Feeding, weights, notes and photos are erased, but a small card keeps the ID, name, main photo and family links, so pairings, clutches and pedigrees still show it.",
+                name,
+                summary: [
+                  links.pairings ? t("archive.delete.linkPairings", { defaultValue: "pairings: {{count}}", count: links.pairings }) : '',
+                  links.offspring ? t("archive.delete.linkOffspring", { defaultValue: "offspring: {{count}}", count: links.offspring }) : '',
+                  links.parents ? t("archive.delete.linkParents", { defaultValue: "parents on file" }) : '',
+                ].filter(Boolean).join(', ') || t("archive.delete.linkClutch", { defaultValue: "a clutch" }),
+              })}
+            </p>
+            <fieldset className="mt-3">
+              <legend className="text-xs font-medium mb-2">{t("archive.delete.whyLeft", { defaultValue: "Why did it leave?" })}</legend>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {ARCHIVE_REASONS.map(option => (
+                  <label key={option} className={`archive-reason-option flex items-center gap-2 rounded-xl border px-3 py-2 text-sm cursor-pointer ${reason === option ? 'archive-reason-option--selected' : ''}`}>
+                    <input type="radio" name="delete-reason" value={option} checked={reason === option} onChange={() => setReason(option)} />
+                    <span>{labels.reasons[option]}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+            {archived
+              ? t("archive.delete.archivedBody", { defaultValue: "This permanently removes the archived record, its pairings and its history. It cannot be undone." })
+              : t("snakeEdit.deleteSnakeBody", { defaultValue: "This removes the animal and detaches any pairings linked to it. Demo animals are only shown in a fresh planner and stay hidden after real animals have been added." })}
+          </p>
+        )}
+        {canArchive && (
+          <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+            {t("archive.delete.suggest", { defaultValue: "Sold, died or gave it away? Archive it instead: it leaves the collection and its record and breeding history are kept." })}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
+          {canArchive && (
+            <button className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" onClick={() => onArchiveInstead(snake)}>
+              {t("archive.delete.archiveInstead", { defaultValue: "Archive instead" })}
+            </button>
+          )}
           <button
             className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--danger"
-            onClick={onConfirm}
+            onClick={() => onConfirm(keepsCard ? reason : null)}
+            disabled={keepsCard && !reason}
           >
-            {t("common.delete", { defaultValue: "Delete" })}
+            {archived || keepsCard
+              ? t("archive.delete.confirmPermanent", { defaultValue: "Delete permanently" })
+              : t("common.delete", { defaultValue: "Delete" })}
           </button>
         </div>
       </div>
@@ -15842,10 +15865,6 @@ function Card({ title, children }) {
       <div className="p-4">{children}</div>
     </div>
   );
-}
-
-function Badge({ children }) {
-  return <span className="mt-chip border bg-neutral-50">{children}</span>;
 }
 
 function getStatusTone(status) {
@@ -18221,7 +18240,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
   ), document.body);
 }
 
-function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
+function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, onArchive, groups = [], setSnakes, pairings = [], onOpenPairing, lastFeedDefaults, setLastFeedDefaults, showAppAlert }) {
   const { t } = useTranslation();
   const hasEdit = typeof onEdit === "function";
   const hasQuick = typeof onQuickPair === "function";
@@ -18547,6 +18566,11 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
                   {hasFamilyTree && (
                     <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onOpenFamilyTree(s); }}>
                       🌳 {t("actions.openFamilyTree", { defaultValue: "Open family tree" })}
+                    </button>
+                  )}
+                  {typeof onArchive === 'function' && !isDemoSnakeRecord(s) && (
+                    <button className="bp-overflow-menu__item" onClick={() => { setOverflowMenuOpen(false); onArchive(s); }}>
+                      {t("archive.action", { defaultValue: "Move to archive" })}
                     </button>
                   )}
                   {hasDelete && (
@@ -19099,7 +19123,7 @@ function PairingsModal({ snake, pairings, onClose, onOpenPairing }) {
   );
 }
 
-function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
+function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTest, onDelete, onArchive, pairings = [], onOpenPairing, sortBy = '', sortDir = 'asc', onSortHeaderClick }) {
   const { t } = useTranslation();
   const [pairingsSnake, setPairingsSnake] = useState(null);
 
@@ -19288,6 +19312,9 @@ function SnakeListTable({ snakes = [], onEdit, onQuickPair, onOpenFamilyTree, on
                     >
                       {t('snakeEdit.pairingsLabel', { defaultValue: 'Pairings' })}{relatedPairings.length ? ` (${relatedPairings.length})` : ''}
                     </button>
+                    {typeof onArchive === 'function' && !isDemoSnakeRecord(snake) && (
+                      <button className="text-[11px] px-2 py-1 border rounded-lg" onClick={() => onArchive(snake)}>{t('archive.actionShort', { defaultValue: 'Archive' })}</button>
+                    )}
                     {typeof onDelete === 'function' && (
                       <button className="text-[11px] px-2 py-1 border rounded-lg text-rose-600" onClick={() => onDelete(snake)}>{t('actions.delete')}</button>
                     )}
@@ -24483,12 +24510,20 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                   ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
                   : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
               return (
-                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('breeding.dashboard.openCard', { defaultValue: 'Open the breeding card for {{name}}', name: item.label })}
+                  onClick={() => openPairing(item.id)}
+                  onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPairing(item.id); } }}
+                  className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5 cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                >
                   <div className="flex flex-col gap-2">
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-semibold text-neutral-900 text-sm leading-snug break-words">{item.label}</div>
-                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.cycleYear}</span>
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border bg-neutral-50 text-neutral-600">{item.seasonLabel || item.cycleYear}</span>
                       </div>
                       {(() => {
                         const dashClutchId = buildClutchId(item.femaleName, item.maleName, item.cycleYear);
@@ -24511,10 +24546,18 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-                        {item.countdownLabel}
-                      </span>
-                      {item.cycleDayLabel ? (
+                      {/* With a cycle clock the banner below carries the countdown and its colour; only
+                          the day count stays here, taken from the same clock so both agree. */}
+                      {item.clock ? null : (
+                        <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+                          {item.countdownLabel}
+                        </span>
+                      )}
+                      {item.clock ? (
+                        <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700 tabular-nums">
+                          {t('breeding.clock.dayShort', { defaultValue: 'Day {{day}} of {{total}}', day: item.clock.day, total: item.clock.totalDays })}
+                        </span>
+                      ) : item.cycleDayLabel ? (
                         <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700">
                           {item.cycleDayLabel}
                         </span>
@@ -24522,6 +24565,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                     </div>
                   </div>
 
+                  <CycleClock clock={item.clock} compact />
                   <div className="grid grid-cols-1 gap-2 text-xs">
                     <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
                       <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
@@ -24563,7 +24607,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
-                      onClick={() => openPairing(item.id)}
+                      onClick={e => { e.stopPropagation(); openPairing(item.id); }}
                     >
                       {item.actionLabel}
                     </button>
@@ -24580,1695 +24624,6 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
       </div>
     </Card>
   );
-}
-
-function PairingsSection({
-  snakes,
-  pairings,
-  breederMales = [],
-  breederFemales = [],
-  onDelete,
-  onOpenSnake,
-  onUpdatePairing,
-  onExportPairingQr,
-  onResetHatchlings,
-  getGeneratedHatchlings,
-  clutchNumberByPairingId,
-  clutchMetadataByPairingId,
-  theme = 'blue',
-  focusedPairingId = null,
-  onFocusPairing,
-  onCollapsePairing,
-  title,
-  emptyMessage = '{t("snakeEdit.noPairingsYet")} yet. Use "New pairing".',
-  variant = 'default',
-  showAppAlert,
-}) {
-  const handleDelete = typeof onDelete === 'function' ? onDelete : null;
-  const openSnake = typeof onOpenSnake === 'function' ? onOpenSnake : null;
-
-  const list = Array.isArray(pairings) ? pairings : [];
-  const heading = title || `Serpentora (${list.length})`;
-  const isCollapsedVariant = variant === 'collapsed';
-  const listContainerClass = isCollapsedVariant
-    ? 'flex flex-col gap-3'
-    : 'space-y-4';
-
-  return (
-    <Card title={heading}>
-      <div className={listContainerClass}>
-        {list.map((p, idx) => (
-          <PairingInlineCard
-            key={p.id}
-            pairing={p}
-            pairingNumber={clutchNumberByPairingId?.get(p.id) || idx + 1}
-            clutchMetadata={clutchMetadataByPairingId?.get?.(p.id) || null}
-            snakes={snakes}
-            breederMales={breederMales}
-            breederFemales={breederFemales}
-            onDelete={handleDelete}
-            onOpenSnake={openSnake}
-            onUpdatePairing={onUpdatePairing}
-            onExportPairingQr={onExportPairingQr}
-            onResetHatchlings={onResetHatchlings}
-            getGeneratedHatchlings={getGeneratedHatchlings}
-            theme={theme}
-            isFocused={focusedPairingId === p.id}
-            onFocus={onFocusPairing ? () => onFocusPairing(p.id) : undefined}
-            onCollapse={onCollapsePairing ? () => onCollapsePairing(p.id) : undefined}
-            variant={variant}
-            showAppAlert={showAppAlert}
-          />
-        ))}
-        {!list.length && (
-          <div className={cx('text-sm text-neutral-500', isCollapsedVariant && 'w-full')}>
-            {emptyMessage}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function ProjectCompletionPanel({
-  completion,
-  isWorkflowCompleted,
-  lateOutcomeRecorded,
-  finalKnownOutcome,
-  onComplete,
-  onReopen,
-}) {
-  const { t } = useTranslation();
-  const [reason, setReason] = useState('season_ended');
-  const [confidence, setConfidence] = useState('likely');
-  const [note, setNote] = useState('');
-
-  const requiresConfidence = needsOutcomeConfidence(reason);
-  const completedAtLabel = completion.completedAt ? formatDateTimeForDisplay(completion.completedAt) : '';
-  const finalOutcomeLabel = getCompletionReasonLabel(finalKnownOutcome);
-
-  return (
-    <div className="mt-3 rounded-xl border bg-neutral-50 p-3 text-sm">
-      {isWorkflowCompleted ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-xs font-semibold uppercase text-neutral-500">{t("pairing.completion.completed", { defaultValue: "Completed" })}</div>
-              <div className="font-medium text-neutral-900">{getCompletionReasonLabel(completion.completionReason)}</div>
-            </div>
-            <button type="button" className="px-3 py-1.5 rounded-xl border bg-white text-xs" onClick={onReopen}>
-              {t("pairing.completion.reopen", { defaultValue: "Reopen pairing" })}
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-neutral-700">
-            <div><span className="font-semibold">{t("pairing.completion.date", { defaultValue: "Date:" })}</span> {completedAtLabel || t("pairing.completion.unknown", { defaultValue: "Unknown" })}</div>
-            <div><span className="font-semibold">{t("pairing.completion.confidence", { defaultValue: "Confidence:" })}</span> {getOutcomeConfidenceLabel(completion.outcomeConfidence)}</div>
-            <div><span className="font-semibold">{t("pairing.completion.finalOutcome", { defaultValue: "Final outcome:" })}</span> {finalOutcomeLabel}</div>
-          </div>
-          {completion.completionNote ? (
-            <div className="text-xs text-neutral-700"><span className="font-semibold">{t("pairing.completion.note", { defaultValue: "Note:" })}</span> {completion.completionNote}</div>
-          ) : null}
-          {lateOutcomeRecorded ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {t("pairing.completion.lateOutcome", { defaultValue: "A reproductive event was recorded after completion. The original completion record is preserved." })}
-            </div>
-          ) : null}
-          {completion.reopenedAt ? (
-            <div className="text-xs text-neutral-600">{t("pairing.completion.previouslyReopened", { when: formatDateTimeForDisplay(completion.reopenedAt) || t("pairing.completion.afterCompletion", { defaultValue: "after completion" }), defaultValue: "Previously reopened {{when}}." })}</div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {completion.completedAt ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {t("pairing.completion.previouslyCompleted", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Previously completed as {{reason}}. Reopening preserved that history." })}
-            </div>
-          ) : null}
-          <div className="text-xs text-neutral-600">
-            {t("pairing.completion.help", { defaultValue: "Completing a pairing ends active monitoring. You can still add ovulation, egg-laying, clutch, hatch, medical, and other events later." })}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">{t("pairing.completion.reason", { defaultValue: "Completion reason" })}</span>
-              <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={reason} onChange={event => setReason(event.target.value)}>
-                {COMPLETION_REASON_GROUPS.map(group => (
-                  <optgroup key={group.key} label={group.label}>
-                    {group.options.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">{t("pairing.completion.outcomeConfidence", { defaultValue: "Outcome confidence" })}</span>
-              <select
-                className="border rounded-xl px-3 py-2 bg-white text-sm"
-                value={requiresConfidence ? confidence : 'confirmed'}
-                disabled={!requiresConfidence}
-                onChange={event => setConfidence(event.target.value)}
-              >
-                {OUTCOME_CONFIDENCE_OPTIONS.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">{t("pairing.completion.completionNote", { defaultValue: "Completion note" })}</span>
-            <textarea className="border rounded-xl px-3 py-2 bg-white text-sm" rows={2} value={note} onChange={event => setNote(event.target.value)} />
-          </label>
-          <button
-            type="button"
-            className="w-fit px-3 py-2 rounded-xl border bg-white text-xs font-medium"
-            onClick={() => onComplete({ reason, confidence: requiresConfidence ? confidence : 'confirmed', note })}
-          >
-            {t("pairing.completion.markCompleted", { defaultValue: "Mark completed" })}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const PAIRING_STAGE_LABELS = ['Paired', 'Locked', 'Ovulated', 'Pre-lay Shed', 'Clutch Laid', 'Incubating', 'Hatched'];
-
-function PairingStageTracker({ reached }) {
-  const { t } = useTranslation();
-  const lastReachedIdx = reached.reduce((acc, isReached, idx) => (isReached ? idx : acc), -1);
-  const activeIdx = lastReachedIdx === -1 ? 0 : lastReachedIdx;
-  // Display labels, index-aligned with PAIRING_STAGE_LABELS (which stays English: it is the React key).
-  const stageDisplayLabels = [
-    t("pairing.stageTracker.paired", { defaultValue: "Paired" }),
-    t("pairing.stageTracker.locked", { defaultValue: "Locked" }),
-    t("pairing.stageTracker.ovulated", { defaultValue: "Ovulated" }),
-    t("pairing.stageTracker.preLayShed", { defaultValue: "Pre-lay Shed" }),
-    t("pairing.stageTracker.clutchLaid", { defaultValue: "Clutch Laid" }),
-    t("pairing.stageTracker.incubating", { defaultValue: "Incubating" }),
-    t("pairing.stageTracker.hatched", { defaultValue: "Hatched" }),
-  ];
-  return (
-    <div className="flex items-center" role="list" aria-label={t("pairing.stageTracker.ariaLabel", { defaultValue: "Pairing stage progress" })}>
-      {PAIRING_STAGE_LABELS.map((label, i) => {
-        const done = i < activeIdx;
-        const active = i === activeIdx;
-        const dotColor = done || active ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)';
-        const lineBeforeColor = i === 0 ? 'transparent' : (i <= activeIdx ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)');
-        const lineAfterColor = i === PAIRING_STAGE_LABELS.length - 1 ? 'transparent' : (i < activeIdx ? 'var(--sk-primary, #0ea5e9)' : 'var(--sk-border, #e5e7eb)');
-        const textColor = active ? 'var(--sk-primary, #0ea5e9)' : (done ? 'var(--sk-text-muted, #6b7280)' : 'var(--sk-text-muted, #9ca3af)');
-        return (
-          <div key={label} role="listitem" className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-            <div className="w-full flex items-center">
-              <div className="flex-1 h-0.5" style={{ background: lineBeforeColor }} />
-              <div
-                className="w-3 h-3 rounded-full shrink-0"
-                style={{ background: dotColor, boxShadow: active ? '0 0 0 3px var(--sk-success-bg, #f0fdf4)' : 'none' }}
-                aria-current={active ? 'step' : undefined}
-              />
-              <div className="flex-1 h-0.5" style={{ background: lineAfterColor }} />
-            </div>
-            <div className="text-[10px] font-semibold text-center leading-tight px-0.5" style={{ color: textColor }}>{stageDisplayLabels[i] || label}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PairingInlineCard({
-  pairing,
-  pairingNumber,
-  clutchMetadata,
-  snakes,
-  breederMales = [],
-  breederFemales = [],
-  onDelete,
-  onOpenSnake,
-  onUpdatePairing,
-  onExportPairingQr,
-  onResetHatchlings,
-  getGeneratedHatchlings,
-  theme = 'blue',
-  isFocused = false,
-  onFocus,
-  onCollapse,
-  variant = 'default',
-  showAppAlert,
-}) {
-  const cardRef = useRef(null);
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(variant !== 'collapsed');
-  const [isEditingParticipants, setIsEditingParticipants] = useState(false);
-
-  useEffect(() => {
-    if (isFocused && cardRef.current) {
-      try {
-        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch (err) {
-        /* ignore scroll errors */
-      }
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (isFocused && typeof onFocus === 'function') {
-      onFocus();
-    }
-  }, [isFocused, onFocus]);
-
-  const collapsedVariant = variant === 'collapsed';
-
-  useEffect(() => {
-    if (!collapsedVariant) {
-      setIsExpanded(true);
-    } else {
-      setIsExpanded(false);
-    }
-  }, [collapsedVariant]);
-
-  useEffect(() => {
-    if (collapsedVariant && isFocused) {
-      setIsExpanded(true);
-    }
-  }, [collapsedVariant, isFocused]);
-
-  useEffect(() => {
-    if (!isExpanded && isEditingParticipants) {
-      setIsEditingParticipants(false);
-    }
-  }, [isExpanded, isEditingParticipants]);
-
-  const { t } = useTranslation();
-  const clutchTitleLabel = t('clutch.clutchTitle', { defaultValue: 'Clutch' });
-  const deleteLabel = t('clutch.delete', { defaultValue: 'Delete' });
-  const collapseLabel = t('clutch.collapse', { defaultValue: 'Collapse' });
-  const labelLabel = t('clutch.label', { defaultValue: 'Label' });
-  const startingDateLabel = t('clutch.startingDate', { defaultValue: 'Starting date' });
-  const appointmentsLabel = t('clutch.appointments', { defaultValue: 'Appointments' });
-  const appointmentsHelp = t('clutch.appointmentsHelp', { defaultValue: 'Manage pairing touchpoints' });
-  const generateMonthsLabel = t('clutch.generate5Months', { defaultValue: 'Generate 5 months' });
-  const addAppointmentLabel = t('clutch.addAppointment', { defaultValue: '+ Add appointment' });
-  const appointmentStatusLabel = t('clutch.appointmentStatus', { defaultValue: 'Appointment' });
-  const pairingDateLabel = t('clutch.pairingDate', { defaultValue: 'Date of Pairing' });
-  const lockLabel = t('clutch.lock', { defaultValue: 'Lock' });
-  const lockDateLabel = t('clutch.lockDate', { defaultValue: 'Date of Lock' });
-  const notesLabel = t('clutch.notes', { defaultValue: 'Notes' });
-  const removeLabel = t('clutch.remove', { defaultValue: 'Remove' });
-  const notesFieldLabel = t('clutch.notesField', { defaultValue: 'Notes' });
-  const geneticsCalculatorLabel = t('clutch.geneticsCalculator', { defaultValue: 'Genetics calculator' });
-  const showLabel = t('clutch.show', { defaultValue: 'Show' });
-  const hideLabel = t('common.hide', { defaultValue: 'Hide' });
-  const maleLabel = t('snake.sex.male', { defaultValue: 'Male' });
-  const femaleLabel = t('snake.sex.female', { defaultValue: 'Female' });
-  const editParticipantsLabel = t('pairing.editParticipants', { defaultValue: 'Edit pairing' });
-  const doneEditingParticipantsLabel = t('pairing.editParticipantsDone', { defaultValue: 'Done' });
-  const maleSelectPlaceholder = t('pairing.selectMalePlaceholder', { defaultValue: 'Choose a male' });
-  const femaleSelectPlaceholder = t('pairing.selectFemalePlaceholder', { defaultValue: 'Choose a female' });
-  const femaleRuleHelper = t('pairing.femaleUniqueRule', { defaultValue: 'Each female can only be in one active pairing. Update or remove the other pairing first.' });
-  const clutchCardTitleLabel = t('clutchCard.clutch', { defaultValue: clutchTitleLabel });
-  const clutchCardMaleLabel = t('clutchCard.male', { defaultValue: maleLabel });
-  const clutchCardFemaleLabel = t('clutchCard.female', { defaultValue: femaleLabel });
-  const clutchCardStartLabel = t('clutchCard.start', { defaultValue: 'Start' });
-  const clutchCardEndLabel = t('clutchCard.end', { defaultValue: 'End' });
-  const clutchCardViewDetailsLabel = t('clutchCard.viewDetails', { defaultValue: 'View details' });
-  const missingValueLabel = '\u2014';
-  const edit = useMemo(() => withPairingLifecycleDefaults(pairing || {}), [pairing]);
-  const completion = useMemo(() => normalizeCompletionMetadata(edit), [edit]);
-  const workflowStatus = completion.workflowStatus;
-  const isWorkflowCompleted = workflowStatus === 'completed';
-  const lateOutcomeRecorded = didLateOutcomeOccur(edit);
-  const finalKnownOutcome = getFinalKnownBiologicalOutcome(edit);
-  const femaleSnake = useMemo(() => snakeById(snakes, edit.femaleId), [snakes, edit.femaleId]);
-  const maleSnake = useMemo(() => snakeById(snakes, edit.maleId), [snakes, edit.maleId]);
-
-  const femaleName = femaleSnake?.name || edit.femaleId || 'Female';
-  const maleName = maleSnake?.name || edit.maleId || 'Male';
-  const defaultLabel = `${femaleName} \u00D7 ${maleName}`;
-  const femaleGeneticsTokens = useMemo(() => {
-    if (!femaleSnake) return [];
-    return combineMorphsAndHetsForDisplay(femaleSnake.morphs, femaleSnake.hets, femaleSnake.possibleHets);
-  }, [femaleSnake]);
-  const maleGeneticsTokens = useMemo(() => {
-    if (!maleSnake) return [];
-    return combineMorphsAndHetsForDisplay(maleSnake.morphs, maleSnake.hets, maleSnake.possibleHets);
-  }, [maleSnake]);
-  const femaleGeneticsLine = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
-  const maleGeneticsLine = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
-  const breederMaleOptions = useMemo(() => {
-    if (Array.isArray(breederMales) && breederMales.length) return breederMales;
-    return snakes.filter(isMaleSnake);
-  }, [breederMales, snakes]);
-  const breederFemaleOptions = useMemo(() => {
-    if (Array.isArray(breederFemales) && breederFemales.length) return breederFemales;
-    return snakes.filter(isFemaleSnake);
-  }, [breederFemales, snakes]);
-  const hasMaleOptions = breederMaleOptions.length > 0;
-  const hasFemaleOptions = breederFemaleOptions.length > 0;
-  const formatSnakeOptionLabel = useCallback((snake) => {
-    if (!snake) return '';
-    const name = typeof snake.name === 'string' ? snake.name.trim() : '';
-    const id = snake.id || '';
-    if (name && id) return `${name} (${id})`;
-    return name || id;
-  }, []);
-
-  const setEdit = useCallback((updater) => {
-    if (typeof onUpdatePairing !== 'function') return;
-    onUpdatePairing(pairing.id, updater);
-  }, [onUpdatePairing, pairing.id]);
-
-  useEffect(() => {
-    setEdit(prev => {
-      if (!prev) return prev;
-      const current = (prev.label || '').trim();
-      const nextLabel = defaultLabel;
-      if (!current && prev.label !== nextLabel) {
-        return { ...prev, label: nextLabel };
-      }
-      return prev;
-    });
-  }, [defaultLabel, setEdit]);
-
-  const cascadeAppointments = useCallback((appointments, anchorIndex = 0) => {
-    if (!Array.isArray(appointments) || !appointments.length) return appointments;
-    const index = Math.max(0, Math.min(anchorIndex, appointments.length - 1));
-    const anchor = appointments[index];
-    if (!anchor?.date) return appointments;
-    const anchorDate = parseYmd(anchor.date);
-    if (!anchorDate || Number.isNaN(anchorDate.getTime())) return appointments;
-    const result = [...appointments];
-    let cursor = new Date(anchorDate.getTime());
-    for (let idx = index + 1; idx < result.length; idx++) {
-      cursor = addMonthsClamped(cursor, 1);
-      result[idx] = { ...result[idx], date: localYMD(cursor) };
-    }
-    return result;
-  }, []);
-
-  const labelValue = edit.label || defaultLabel;
-  const geneticsOdds = useMemo(() => computePairingGenetics(maleSnake, femaleSnake), [maleSnake, femaleSnake]);
-  const hasGeneticsOdds = useMemo(() => {
-    if (!geneticsOdds) return false;
-    const perGene = Array.isArray(geneticsOdds.perGene) ? geneticsOdds.perGene : [];
-    const combined = Array.isArray(geneticsOdds.combined) ? geneticsOdds.combined : [];
-    return perGene.length > 0 || combined.length > 0;
-  }, [geneticsOdds]);
-
-  useEffect(() => {
-    if (!hasGeneticsOdds && showCalculator) {
-      setShowCalculator(false);
-    }
-  }, [hasGeneticsOdds, showCalculator]);
-
-  const hatchlings = useMemo(() => {
-    return snakes.filter(s => {
-      if (!s) return false;
-      const tags = Array.isArray(s.tags) ? s.tags : [];
-      const groups = Array.isArray(s.groups) ? s.groups : [];
-      const taggedHatchling = tags.includes('hatchling') || groups.some(g => /^hatchlings\b/i.test(g));
-      if (!taggedHatchling) return false;
-      const pairingMatch = s.pairingId === pairing.id || s?.metadata?.pairingId === pairing.id;
-      const parentMatch = (s.damId && s.damId === pairing.femaleId) && (s.sireId && s.sireId === pairing.maleId);
-      const nameMatch = typeof s.name === 'string' && labelValue && s.name.includes(labelValue);
-      return pairingMatch || parentMatch || nameMatch;
-    });
-  }, [snakes, pairing, labelValue]);
-
-  // Only the wizard-generated animals — this is what a hatch redo would delete, which is a
-  // narrower set than the hatchlings listed above (those also match on parents and name).
-  const generatedHatchlingCount = useMemo(() => (
-    typeof getGeneratedHatchlings === 'function' ? getGeneratedHatchlings(pairing.id).length : 0
-  ), [getGeneratedHatchlings, pairing.id]);
-
-  const handleResetHatchlingBatch = useCallback(() => (
-    typeof onResetHatchlings === 'function' ? onResetHatchlings(pairing.id) : 0
-  ), [onResetHatchlings, pairing.id]);
-
-  const lifecycle = useMemo(() => getBreedingCycleDerived(edit), [edit]);
-  const cycleYear = useMemo(() => computeBreedingCycleYear({
-    clutchDate: lifecycle.clutchDate,
-    preLayDate: lifecycle.preLayDate,
-    ovulationDate: lifecycle.ovulationDate,
-    hatchDate: lifecycle.hatchDate,
-    startDate: edit.startDate || ''
-  }), [lifecycle.clutchDate, lifecycle.preLayDate, lifecycle.ovulationDate, lifecycle.hatchDate, edit.startDate]);
-  const startDisplay = edit.startDate ? formatDateForDisplay(edit.startDate) : missingValueLabel;
-  const endSource = lifecycle.hatchDate || (edit?.hatch?.recorded ? edit?.hatch?.date : '') || lifecycle.clutchDate || '';
-  const endDisplay = endSource ? formatDateForDisplay(endSource) : missingValueLabel;
-  const eggBoxLabel = clutchMetadata?.eggBoxNumber
-    ? (clutchMetadata.eggBoxCount > 1
-      ? `Egg box #${clutchMetadata.eggBoxNumber} (${clutchMetadata.eggBoxCount} boxes)`
-      : `Egg box #${clutchMetadata.eggBoxNumber}`)
-    : '';
-
-  const handleGenerateAppointments = useCallback(() => {
-    setEdit(d => {
-      const existing = Array.isArray(d.appointments) ? d.appointments : [];
-      const firstWithPairingDate = existing.find(appt => normalizeDateInput(appt?.pairingDate || ''));
-      const generationStart = normalizeDateInput(firstWithPairingDate?.pairingDate || '') || d.startDate || localYMD(new Date());
-      const created = genMonthlyAppointments(generationStart, 5).map((appt, index) => {
-        const pairingDate = normalizeDateInput(existing[index]?.pairingDate || '');
-        return {
-          ...appt,
-          date: pairingDate || appt.date,
-        };
-      });
-      const next = { ...d, appointments: cascadeAppointments(created, 0) };
-      next.startDate = (next.appointments && next.appointments[0]) ? next.appointments[0].date : next.startDate;
-      return next;
-    });
-  }, [cascadeAppointments, setEdit]);
-
-  const handleAddAppointment = useCallback(() => {
-    setEdit(d => {
-      const existing = Array.isArray(d.appointments) ? d.appointments : [];
-      let defaultDate = null;
-      const latestCheckedPairing = [...existing]
-        .reverse()
-        .find(appt => !!appt?.appointmentDone && normalizeDateInput(appt?.pairingDate || ''));
-      if (latestCheckedPairing?.pairingDate) {
-        const pairingBase = parseYmd(latestCheckedPairing.pairingDate);
-        if (pairingBase && !Number.isNaN(pairingBase.getTime())) {
-          defaultDate = localYMD(addMonthsClamped(pairingBase, 1));
-        }
-      }
-      if (!defaultDate) {
-        defaultDate = d.startDate || localYMD(new Date());
-      }
-      const arr = [...existing, {
-        id: uid(),
-        date: defaultDate,
-        notes: '',
-        appointmentDone: false,
-        pairingDate: null,
-        lockObserved: false,
-        lockDate: null,
-        lockLoggedAt: null,
-      }];
-      return { ...d, appointments: arr, startDate: arr[0]?.date || d.startDate || null };
-    });
-  }, [setEdit]);
-
-  const handleCompleteProject = useCallback(async (input) => {
-    if (typeof onUpdatePairing !== 'function') return;
-    try {
-      const patch = buildCompletionPatch(edit, input);
-      onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
-    } catch (error) {
-      if (typeof showAppAlert === 'function') {
-        await showAppAlert(error?.message || 'Completion reason is required.');
-      }
-    }
-  }, [edit, onUpdatePairing, pairing.id, showAppAlert]);
-
-  const handleReopenProject = useCallback(() => {
-    if (typeof onUpdatePairing !== 'function') return;
-    const patch = buildReopenPatch(edit);
-    onUpdatePairing(pairing.id, prev => withPairingLifecycleDefaults({ ...prev, ...patch }));
-  }, [edit, onUpdatePairing, pairing.id]);
-
-  const handleOpenMale = useCallback(() => {
-    if (typeof onOpenSnake !== 'function' || !maleSnake) return;
-    onOpenSnake(maleSnake);
-  }, [onOpenSnake, maleSnake]);
-
-  const handleOpenFemale = useCallback(() => {
-    if (typeof onOpenSnake !== 'function' || !femaleSnake) return;
-    onOpenSnake(femaleSnake);
-  }, [onOpenSnake, femaleSnake]);
-
-  const handleChangeMale = useCallback((event) => {
-    const nextId = event?.target?.value;
-    if (!nextId) return;
-    setEdit(prev => {
-      if (prev.maleId === nextId) return prev;
-      return { ...prev, maleId: nextId };
-    });
-  }, [setEdit]);
-
-  const handleChangeFemale = useCallback((event) => {
-    const nextId = event?.target?.value;
-    if (!nextId) return;
-    setEdit(prev => {
-      if (prev.femaleId === nextId) return prev;
-      return { ...prev, femaleId: nextId };
-    });
-  }, [setEdit]);
-
-  const handleCreateClutchCard = useCallback(async () => {
-    const clutchDate = edit?.clutch?.date;
-    if (!clutchDate) {
-      if (typeof showAppAlert === 'function') {
-        await showAppAlert('Please add a clutch date before generating the clutch card.');
-      } else {
-        console.warn('Please add a clutch date before generating the clutch card.');
-      }
-      return;
-    }
-    const eggsValue = resolveEggCountForClutch(edit?.clutch?.eggsTotal, edit?.clutch?.fertileEggs);
-    try {
-      const maleGenetics = maleSnake ? (maleGeneticsTokens.length ? maleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
-      const femaleGenetics = femaleSnake ? (femaleGeneticsTokens.length ? femaleGeneticsTokens.join(', ') : 'Normal') : missingValueLabel;
-      await exportClutchCardToPdf({
-        clutchNumber: pairingNumber,
-        clutchDate,
-        femaleName,
-        femaleGenetics,
-        maleName,
-        maleGenetics,
-        eggsTotal: eggsValue,
-        fertileEggs: edit?.clutch?.fertileEggs,
-        eggBoxNumber: clutchMetadata?.eggBoxNumber,
-        eggBoxCount: clutchMetadata?.eggBoxCount,
-        label: labelValue,
-      });
-    } catch (err) {
-      console.error('Failed to generate clutch card', err);
-      if (typeof showAppAlert === 'function') {
-        await showAppAlert('Unable to generate clutch card PDF.');
-      } else {
-        console.warn('Unable to generate clutch card PDF.');
-      }
-    }
-  }, [edit, pairingNumber, clutchMetadata, femaleName, maleName, femaleGeneticsTokens, maleGeneticsTokens, labelValue, femaleSnake, maleSnake, showAppAlert]);
-
-  const cardClasses = cx(
-    'border rounded-xl shadow-sm bg-white focus:outline-none w-full p-3',
-    isFocused ? 'ring-2 ring-sky-400 ring-offset-1' : 'ring-0'
-  );
-
-  // A card that was opened from the dashboard hands the view back on collapse; the parent
-  // owns that decision, since it is the one that knows where the keeper came from.
-  const handleCollapse = useCallback(() => {
-    setIsExpanded(false);
-    if (typeof onCollapse === 'function') onCollapse();
-  }, [onCollapse]);
-
-  if (!isExpanded) {
-    const handleExpand = () => {
-      setIsExpanded(true);
-      if (typeof onFocus === 'function') onFocus();
-    };
-    const handleCollapsedKey = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleExpand();
-      }
-    };
-    return (
-      <div
-        ref={cardRef}
-        role="button"
-        tabIndex={0}
-        className={cx(cardClasses, 'text-start cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400')}
-        onClick={handleExpand}
-        onKeyDown={handleCollapsedKey}
-        aria-expanded={false}
-      >
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
-                {clutchCardTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}
-              </div>
-              {buildClutchId(femaleName, maleName, cycleYear) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-1.5 py-0.5 shrink-0 max-w-[180px]">
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
-                  <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
-                </span>
-              )}
-              {edit?.clutch?.allEggsLost && (
-                <span className="inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
-                  {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
-                </span>
-              )}
-            </div>
-            <div className="text-[11px] text-neutral-500 flex items-center gap-1 shrink-0">
-              {isWorkflowCompleted && (
-                <span className="inline-flex items-center rounded-full border bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  {t("pairing.completion.completed", { defaultValue: "Completed" })}
-                </span>
-              )}
-              <span className="font-semibold">{clutchCardViewDetailsLabel}</span>
-              <span aria-hidden="true">{'\u203A'}</span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-800">
-            <div className="flex items-center gap-2 min-w-[12rem]">
-              <SexBadge sex="M" label={clutchCardMaleLabel} />
-              {typeof onOpenSnake === 'function' && maleSnake ? (
-                <button
-                  type="button"
-                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                  onClick={handleOpenMale}
-                >
-                  {maleName}
-                </button>
-              ) : (
-                <span className="font-medium truncate">{maleName}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 min-w-[12rem]">
-              <SexBadge sex="F" label={clutchCardFemaleLabel} />
-              {typeof onOpenSnake === 'function' && femaleSnake ? (
-                <button
-                  type="button"
-                  className="truncate font-medium text-sm text-start text-sky-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                  onClick={handleOpenFemale}
-                >
-                  {femaleName}
-                </button>
-              ) : (
-                <span className="font-medium truncate">{femaleName}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 min-w-[10rem]">
-              <span className="text-[11px] uppercase text-neutral-500 font-semibold">{clutchCardStartLabel}</span>
-              <span className="font-medium">{startDisplay}</span>
-            </div>
-            <div className="flex items-center gap-2 min-w-[10rem]">
-              <span className="text-[11px] uppercase text-neutral-500 font-semibold">{clutchCardEndLabel}</span>
-              <span className="font-medium">{endDisplay}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={cardRef} className={cardClasses} tabIndex={-1}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-semibold leading-tight text-sm sm:text-base">
-            <div className="truncate">{clutchTitleLabel} #{pairingNumber}{eggBoxLabel ? ` - ${eggBoxLabel}` : ''} - {cycleYear || missingValueLabel}</div>
-          </div>
-          {buildClutchId(femaleName, maleName, cycleYear) && (
-            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 max-w-full">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 shrink-0">{t("pairing.incubator.clutchId", { defaultValue: "Clutch ID" })}</span>
-              <span className="text-[10px] font-mono font-semibold text-violet-700 truncate">{buildClutchId(femaleName, maleName, cycleYear)}</span>
-            </div>
-          )}
-          {edit?.clutch?.allEggsLost && (
-            <div className="mt-1.5 inline-flex items-center rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-              {t("pairing.clutchLost", { defaultValue: "Clutch lost" })}
-            </div>
-          )}
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div
-              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
-              style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
-            >
-              <div
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
-                style={{ background: 'var(--sk-surface-2, #f3f4f6)', color: 'var(--sk-text-muted, #6b7280)' }}
-              >
-                {maleName ? maleName.slice(0, 2).toUpperCase() : '—'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
-                  <SexBadge sex="M" label={maleLabel} showText={false} />
-                  <span>{t("snakeEdit.parentage.sire", { defaultValue: "Sire" })}</span>
-                </div>
-                <div className="truncate text-[13px] font-semibold text-neutral-800">
-                  {typeof onOpenSnake === 'function' && maleSnake ? (
-                    <button
-                      type="button"
-                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                      style={{ color: 'var(--sk-primary, #0284c7)' }}
-                      onClick={handleOpenMale}
-                    >
-                      {maleName}
-                    </button>
-                  ) : (
-                    <span className="truncate">{maleName}</span>
-                  )}
-                </div>
-                {maleGeneticsTokens.length ? (
-                  <GeneLine genes={maleGeneticsTokens} size="sm" className="mt-0.5" />
-                ) : (
-                  <div className="truncate text-[11px] text-neutral-500">{maleGeneticsLine}</div>
-                )}
-              </div>
-            </div>
-            <div
-              className="flex items-center gap-2 rounded-lg border p-2 min-w-0"
-              style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
-            >
-              <div
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-semibold"
-                style={{ background: 'var(--sk-surface-2, #f3f4f6)', color: 'var(--sk-text-muted, #6b7280)' }}
-              >
-                {femaleName ? femaleName.slice(0, 2).toUpperCase() : '—'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-neutral-500">
-                  <SexBadge sex="F" label={femaleLabel} showText={false} />
-                  <span>{t("snakeEdit.parentage.dam", { defaultValue: "Dam" })}</span>
-                </div>
-                <div className="truncate text-[13px] font-semibold text-neutral-800">
-                  {typeof onOpenSnake === 'function' && femaleSnake ? (
-                    <button
-                      type="button"
-                      className="truncate text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
-                      style={{ color: 'var(--sk-primary, #0284c7)' }}
-                      onClick={handleOpenFemale}
-                    >
-                      {femaleName}
-                    </button>
-                  ) : (
-                    <span className="truncate">{femaleName}</span>
-                  )}
-                </div>
-                {femaleGeneticsTokens.length ? (
-                  <GeneLine genes={femaleGeneticsTokens} size="sm" className="mt-0.5" />
-                ) : (
-                  <div className="truncate text-[11px] text-neutral-500">{femaleGeneticsLine}</div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-1 flex-wrap mt-1">
-            {(pairing.goals || []).slice(0, 4).map(g => <Badge key={g}>{g}</Badge>)}
-          </div>
-          {isWorkflowCompleted && (
-            <div className="mt-2 text-[11px] text-neutral-600">
-              {t("pairing.completion.completedWithReason", { reason: getCompletionReasonLabel(completion.completionReason), defaultValue: "Completed: {{reason}}" })}
-              {lateOutcomeRecorded ? t("pairing.completion.lateOutcomeSuffix", { defaultValue: " - late outcome recorded" }) : ''}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          {typeof onExportPairingQr === 'function' && (
-            <button
-              type="button"
-              className="text-xs px-2 py-1 border rounded-lg"
-              onClick={() => onExportPairingQr([pairing])}
-            >
-              {t('pairing.qrLabelButton', { defaultValue: 'QR label' })}
-            </button>
-          )}
-          {typeof onDelete === 'function' && (
-            <button className="text-xs px-2 py-1 border rounded-lg" onClick={() => onDelete(pairing.id)}>{deleteLabel}</button>
-          )}
-          <button
-            type="button"
-            className="text-xs px-2 py-1 border rounded-lg"
-            onClick={() => setIsEditingParticipants(prev => !prev)}
-            disabled={!hasMaleOptions || !hasFemaleOptions}
-          >
-            {isEditingParticipants ? doneEditingParticipantsLabel : editParticipantsLabel}
-          </button>
-          {isExpanded && (
-            <button
-              type="button"
-              className="text-xs px-2 py-1 border rounded-lg"
-              onClick={handleCollapse}
-            >
-              {collapseLabel}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <ProjectCompletionPanel
-        completion={completion}
-        isWorkflowCompleted={isWorkflowCompleted}
-        lateOutcomeRecorded={lateOutcomeRecorded}
-        finalKnownOutcome={finalKnownOutcome}
-        onComplete={handleCompleteProject}
-        onReopen={handleReopenProject}
-      />
-
-      <div
-        className="mt-3 border rounded-2xl p-3"
-        style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
-      >
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-2">{t("pairing.stageTracker.title", { defaultValue: "Stage" })}</div>
-        <PairingStageTracker
-          reached={[
-            (edit.appointments || []).some(ap => ap && ap.pairingObserved),
-            (edit.appointments || []).some(ap => ap && ap.lockObserved),
-            !!lifecycle.ovulationObserved,
-            !!lifecycle.preLayObserved,
-            !!lifecycle.clutchRecorded,
-            !!lifecycle.clutchRecorded,
-            !!lifecycle.hatchedRecorded,
-          ]}
-        />
-      </div>
-
-      {isEditingParticipants && (
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium">{maleLabel}</label>
-            <select
-              className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
-              value={edit.maleId || ''}
-              onChange={handleChangeMale}
-              disabled={!hasMaleOptions}
-            >
-              <option value="" disabled>{maleSelectPlaceholder}</option>
-              {breederMaleOptions.map(option => (
-                <option key={option.id} value={option.id}>
-                  {formatSnakeOptionLabel(option)}
-                </option>
-              ))}
-            </select>
-            {!hasMaleOptions && (
-              <div className="text-[11px] text-neutral-500">
-                {t('pairing.noMaleOptions', { defaultValue: 'Add breeder males to edit this pairing.' })}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium">{femaleLabel}</label>
-            <select
-              className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
-              value={edit.femaleId || ''}
-              onChange={handleChangeFemale}
-              disabled={!hasFemaleOptions}
-            >
-              <option value="" disabled>{femaleSelectPlaceholder}</option>
-              {breederFemaleOptions.map(option => (
-                <option key={option.id} value={option.id}>
-                  {formatSnakeOptionLabel(option)}
-                </option>
-              ))}
-            </select>
-            {!hasFemaleOptions && (
-              <div className="text-[11px] text-neutral-500">
-                {t('pairing.noFemaleOptions', { defaultValue: 'Add breeder females to edit this pairing.' })}
-              </div>
-            )}
-          </div>
-          <div className="sm:col-span-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            {femaleRuleHelper}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium">{labelLabel}</label>
-          <input
-            className="w-full border rounded-xl px-3 py-2 text-sm"
-            value={labelValue}
-            onChange={e => setEdit(d => ({ ...d, label: e.target.value }))}
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium">{startingDateLabel}</label>
-          <input
-            type="date"
-            className="w-full border rounded-xl px-3 py-2 text-sm"
-            value={edit.startDate || ''}
-            onChange={e => {
-              const nextStart = e.target.value || '';
-              setEdit(d => {
-                const normalizedStart = nextStart || null;
-                let nextAppointments = d.appointments;
-                if (normalizedStart && Array.isArray(d.appointments) && d.appointments.length) {
-                  const arr = [...d.appointments];
-                  arr[0] = { ...arr[0], date: normalizedStart };
-                  nextAppointments = cascadeAppointments(arr, 0);
-                }
-                return { ...d, startDate: normalizedStart, appointments: nextAppointments };
-              });
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-3 min-w-0">
-        <div className="flex flex-col gap-3 min-w-0">
-          <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{appointmentsLabel}</div>
-              <div className="text-[13px] text-neutral-500">{appointmentsHelp}</div>
-            </div>
-            <div className="flex gap-2">
-            <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleGenerateAppointments}>{generateMonthsLabel}</button>
-              <button className="text-xs px-2 py-1 border rounded-lg" onClick={handleAddAppointment}>{addAppointmentLabel}</button>
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col gap-2 min-w-0">
-            {(edit.appointments || []).map((ap, i) => (
-              <div key={ap.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start min-w-0">
-                <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)] gap-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4"
-                        checked={!!ap.appointmentDone}
-                        onChange={e => {
-                          const v = e.target.checked;
-                          setEdit(d => {
-                            const arr = [...(d.appointments || [])];
-                            const prevAppt = arr[i] || {};
-                            const nextPairingDate = prevAppt.pairingDate || (v ? localYMD(new Date()) : null);
-                            const normalizedPairingDate = normalizeDateInput(nextPairingDate);
-                            const baseDate = normalizedPairingDate || prevAppt.date || null;
-                            arr[i] = {
-                              ...prevAppt,
-                              appointmentDone: v,
-                              pairingObserved: v,
-                              pairingDate: nextPairingDate,
-                              pairingLoggedAt: nextPairingDate,
-                              date: baseDate,
-                            };
-                            const nextAppointments = baseDate ? cascadeAppointments(arr, i) : arr;
-                            return { ...d, appointments: nextAppointments, startDate: nextAppointments[0]?.date || d.startDate || null };
-                          });
-                        }}
-                      />
-                      {appointmentStatusLabel}
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4"
-                        checked={!!ap.lockObserved}
-                        onChange={e => {
-                          const v = e.target.checked;
-                          setEdit(d => {
-                            const arr = [...(d.appointments || [])];
-                            const prevAppt = arr[i] || {};
-                            const nextLockDate = prevAppt.lockDate || (v ? localYMD(new Date()) : null);
-                            arr[i] = {
-                              ...prevAppt,
-                              lockObserved: v,
-                              lockDate: nextLockDate,
-                              lockLoggedAt: nextLockDate,
-                            };
-                            return { ...d, appointments: arr };
-                          });
-                        }}
-                      />
-                      {lockLabel}
-                    </label>
-                  </div>
-                  <div className="flex flex-col gap-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs whitespace-nowrap">{pairingDateLabel}</span>
-                      <input
-                        type="date"
-                        className="border rounded-lg px-2 py-1 text-xs min-w-[138px]"
-                        value={ap.pairingDate || ''}
-                        onChange={e => {
-                          const value = e.target.value;
-                          const normalized = normalizeDateInput(value);
-                          setEdit(d => {
-                            const arr = [...(d.appointments || [])];
-                            const prevAppt = arr[i] || {};
-                            const baseDate = normalized || prevAppt.date || null;
-                            arr[i] = {
-                              ...prevAppt,
-                              pairingDate: normalized || null,
-                              pairingLoggedAt: normalized || null,
-                              appointmentDone: normalized ? true : !!prevAppt.appointmentDone,
-                              pairingObserved: normalized ? true : !!prevAppt.pairingObserved,
-                              date: baseDate,
-                            };
-                            const nextAppointments = baseDate ? cascadeAppointments(arr, i) : arr;
-                            return { ...d, appointments: nextAppointments, startDate: nextAppointments[0]?.date || d.startDate || null };
-                          });
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs whitespace-nowrap">{lockDateLabel}</span>
-                      <input
-                        type="date"
-                        className="border rounded-lg px-2 py-1 text-xs min-w-[130px]"
-                        value={ap.lockDate || ''}
-                        onChange={e => {
-                          const value = e.target.value;
-                          const normalized = normalizeDateInput(value);
-                          setEdit(d => {
-                            const arr = [...(d.appointments || [])];
-                            const prevAppt = arr[i] || {};
-                            arr[i] = {
-                              ...prevAppt,
-                              lockDate: normalized || null,
-                              lockLoggedAt: normalized || null,
-                              lockObserved: normalized ? true : !!prevAppt.lockObserved,
-                            };
-                            return { ...d, appointments: arr };
-                          });
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <input
-                    placeholder={notesLabel}
-                    className="border rounded-lg px-2 py-1 text-xs min-w-0 lg:col-span-2"
-                    value={ap.notes || ''}
-                    onChange={e => {
-                      const v = e.target.value;
-                      setEdit(d => {
-                        const arr = [...(d.appointments || [])];
-                        arr[i] = { ...arr[i], notes: v };
-                        return { ...d, appointments: arr };
-                      });
-                    }}
-                  />
-                </div>
-                <button
-                  className="text-[11px] px-2 py-1 border rounded-lg"
-                  onClick={() => {
-                    setEdit(d => {
-                      const arr = [...(d.appointments || [])];
-                      arr.splice(i, 1);
-                      return { ...d, appointments: arr, startDate: arr[0]?.date || d.startDate || null };
-                    });
-                  }}
-                >
-                  {removeLabel}
-                </button>
-              </div>
-            ))}
-            {!(edit.appointments || []).length && <div className="text-xs text-neutral-500">{t("pairing.noAppointments", { defaultValue: "No appointments yet." })}</div>}
-          </div>
-          </div>
-          <CycleTimersFrame lifecycle={lifecycle} theme={theme} />
-        </div>
-
-        <PairingLifecycleEditor
-          edit={edit}
-          setEdit={setEdit}
-          theme={theme}
-          onCreateClutchCard={handleCreateClutchCard}
-          lifecycle={lifecycle}
-          isWorkflowCompleted={isWorkflowCompleted}
-          onReopenProject={handleReopenProject}
-          hatchlingCount={generatedHatchlingCount}
-          onResetHatchlings={handleResetHatchlingBatch}
-          showAppAlert={showAppAlert}
-        />
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2">
-        <label className="text-xs font-medium">{notesFieldLabel}</label>
-        <textarea
-          rows={2}
-          className="w-full border rounded-xl px-3 py-2 text-sm"
-          value={edit.notes || ''}
-          onChange={e => setEdit(d => ({ ...d, notes: e.target.value }))}
-        />
-      </div>
-
-      {hatchlings.length > 0 && (
-        <div className="mt-4">
-          <div className="text-xs font-medium mb-1">{t("pairing.hatchlings", { defaultValue: "Hatchlings" })}</div>
-          <div className="flex flex-wrap gap-1">
-            {hatchlings.map(h => (
-              <button
-                key={h.id}
-                type="button"
-                className={cx(
-                  'px-2 py-0.5 text-xs rounded-full border bg-amber-50 text-amber-900',
-                  onOpenSnake ? 'hover:bg-amber-100 transition-colors' : 'cursor-default opacity-80'
-                )}
-                onClick={onOpenSnake ? () => onOpenSnake(h) : undefined}
-                title={h.name || h.id}
-              >
-                <bdi>{h.name || h.id}</bdi>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {hasGeneticsOdds && (
-        <div className="mt-4">
-          <div className="border rounded-xl bg-neutral-50">
-            <button
-              type="button"
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-neutral-700"
-              onClick={() => setShowCalculator(prev => !prev)}
-              aria-expanded={showCalculator}
-            >
-              <span>{geneticsCalculatorLabel}</span>
-              <span className="text-[11px] text-neutral-500">{showCalculator ? hideLabel : showLabel}</span>
-            </button>
-            {showCalculator && (
-              <div className="border-t px-3 pb-3">
-                <PairingGeneticsOdds male={maleSnake} female={femaleSnake} odds={geneticsOdds} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PairingGeneticsOdds({ male, female, odds: providedOdds }) {
-  const { t } = useTranslation();
-  const odds = useMemo(() => {
-    if (providedOdds) return providedOdds;
-    return computePairingGenetics(male, female);
-  }, [providedOdds, male, female]);
-  const perGene = odds?.perGene || [];
-  const combined = odds?.combined || [];
-  if (!perGene.length && !combined.length) return null;
-  return (
-    <div className="mt-3">
-      {perGene.length > 0 && (
-        <>
-          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.title", { defaultValue: "Genetics odds" })}</div>
-          <div className="flex flex-col gap-2">
-            {perGene.map(item => {
-              const visualOutcomes = item.outcomes.filter(out => !/^het\s/i.test(out.label));
-              const hetOutcomes = item.outcomes.filter(out => /^het\s/i.test(out.label));
-              return (
-                <div
-                  key={item.gene}
-                  className="rounded-lg border px-3 py-2.5"
-                  style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
-                >
-                  <div className="text-xs font-semibold text-neutral-700 mb-2">{item.gene}</div>
-                  <div className={cx('grid gap-3', hetOutcomes.length ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.visualOutcomes", { defaultValue: "Visual outcomes" })}</div>
-                      <div className="flex flex-col gap-1.5">
-                        {visualOutcomes.map(out => (
-                          <div key={`${item.gene}-v-${out.label}`}>
-                            <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-700 mb-0.5">
-                              <span className="truncate">{out.label}</span>
-                              <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
-                            </div>
-                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
-                              <div
-                                className="h-full rounded-full"
-                                style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--sk-primary, #0ea5e9)' }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {hetOutcomes.length > 0 && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wide text-neutral-400 mb-1">{t("pairing.odds.hetOutcomes", { defaultValue: "Het outcomes (carried, non-visual)" })}</div>
-                        <div className="flex flex-col gap-1.5">
-                          {hetOutcomes.map(out => (
-                            <div key={`${item.gene}-h-${out.label}`}>
-                              <div className="flex justify-between gap-2 text-[11px] font-medium text-neutral-500 mb-0.5">
-                                <span className="truncate">{out.label}</span>
-                                <span className="shrink-0">{formatProbabilityPercent(out.probability)}</span>
-                              </div>
-                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${Math.round(out.probability * 100)}%`, background: 'var(--sk-border-strong, #94a3b8)' }}
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {item.notes ? (
-                    <div className="mt-2 text-[10px] text-neutral-500">
-                      {item.notes}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-      {combined.length > 0 && (
-        <div className="mt-3">
-          <div className="text-xs font-medium mb-1.5">{t("pairing.odds.combined", { defaultValue: "Combined genetics odds" })}</div>
-          <div className="flex flex-col gap-1.5">
-            {combined.map(item => {
-              const breakdownItems = (item.breakdown || []).filter(detail => detail.label && detail.label !== 'Normal');
-              return (
-                <div
-                  key={item.key}
-                  className="rounded-lg border px-3 py-2 text-[11px] text-neutral-700"
-                  style={{ background: 'var(--sk-surface, #ffffff)', borderColor: 'var(--sk-border, #e5e7eb)' }}
-                >
-                  <div className="flex justify-between gap-2 mb-1">
-                    <span className="truncate">{item.label}</span>
-                    <span className="font-semibold text-neutral-900 shrink-0">{formatProbabilityPercent(item.probability)}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sk-surface-2, #f3f4f6)' }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.round(item.probability * 100)}%`, background: 'var(--sk-accent, #f59e0b)' }}
-                    />
-                  </div>
-                  {breakdownItems.length ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-neutral-500">
-                      {breakdownItems.map(detail => (
-                        <span key={`${item.key}-${detail.gene}`} className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 bg-neutral-50">
-                          <span className="font-semibold text-neutral-700">{detail.gene}</span>
-                          <span>{detail.label}</span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function computePairingGenetics(male, female) {
-  if (!male || !female) return { perGene: [], combined: [] };
-  const maleProfile = buildSnakeGeneProfile(male);
-  const femaleProfile = buildSnakeGeneProfile(female);
-  const keys = new Set([...maleProfile.keys(), ...femaleProfile.keys()]);
-  const results = [];
-
-  for (const key of keys) {
-    const maleEntry = maleProfile.get(key) || null;
-    const femaleEntry = femaleProfile.get(key) || null;
-    const displayName = maleEntry?.displayName || femaleEntry?.displayName || '';
-    if (!displayName || /^normal$/i.test(displayName)) continue;
-
-    const inheritance = resolveGeneInheritanceType(displayName, maleEntry, femaleEntry);
-    if (!inheritance) continue;
-
-    let calculation = null;
-    if (inheritance === 'Recessive') {
-      calculation = calcRecessiveOutcome(displayName, maleEntry, femaleEntry);
-    } else if (inheritance === 'Incomplete Dominant' || inheritance === 'Dominant') {
-      calculation = calcDominantOutcome(displayName, maleEntry, femaleEntry, inheritance);
-    } else {
-      continue;
-    }
-
-    if (!calculation || !calculation.outcomes || !calculation.outcomes.length) continue;
-
-    const hasMeaningfulOutcome = calculation.outcomes.some(out => out.label !== 'Normal' && out.probability > 0.0001);
-    if (!hasMeaningfulOutcome) continue;
-
-    const notesParts = [`Inheritance: ${inheritance}`];
-    if (calculation.sireDescriptor) notesParts.push(`Sire: ${calculation.sireDescriptor}`);
-    if (calculation.damDescriptor) notesParts.push(`Dam: ${calculation.damDescriptor}`);
-
-    results.push({
-      gene: displayName,
-      inheritance,
-      outcomes: calculation.outcomes,
-      notes: notesParts.join(' — ')
-    });
-  }
-
-  results.sort((a, b) => a.gene.localeCompare(b.gene));
-  const combined = buildCombinedOutcomes(results);
-  return { perGene: results, combined };
-}
-
-function buildCombinedOutcomes(perGeneResults, limit = 12, minProbability = 0.01) {
-  if (!Array.isArray(perGeneResults) || !perGeneResults.length) return [];
-
-  let combos = [{
-    probability: 1,
-    breakdown: [],
-    labelParts: [],
-    geneOutcomes: []
-  }];
-
-  perGeneResults.forEach(gene => {
-    const outcomes = Array.isArray(gene.outcomes) && gene.outcomes.length
-      ? gene.outcomes
-      : [{ label: 'Normal', probability: 1 }];
-
-    const nextMap = new Map();
-
-    combos.forEach(base => {
-      outcomes.forEach(outcome => {
-        const prob = base.probability * (outcome.probability || 0);
-        if (prob <= 0) return;
-        const breakdown = [...base.breakdown, { gene: gene.gene, label: outcome.label }];
-        const labelParts = outcome.label && outcome.label !== 'Normal'
-          ? [...base.labelParts, outcome.label]
-          : [...base.labelParts];
-        const geneOutcomes = [...base.geneOutcomes, `${gene.gene}:${outcome.label}`];
-        const key = geneOutcomes.join('|');
-        const existing = nextMap.get(key);
-        if (existing) {
-          existing.probability += prob;
-        } else {
-          nextMap.set(key, { probability: prob, breakdown, labelParts, geneOutcomes });
-        }
-      });
-    });
-
-    combos = Array.from(nextMap.values());
-    combos.sort((a, b) => b.probability - a.probability);
-    if (combos.length > 1024) {
-      combos = combos.slice(0, 1024);
-    }
-  });
-
-  combos.sort((a, b) => b.probability - a.probability);
-
-  const filtered = [];
-  combos.forEach(item => {
-    if (item.probability >= minProbability || filtered.length < limit) {
-      filtered.push(item);
-    }
-  });
-
-  return filtered.slice(0, limit).map(item => ({
-    key: item.geneOutcomes.join('|'),
-    label: item.labelParts.length ? item.labelParts.join(' + ') : 'Normal (all genes)',
-    probability: item.probability,
-    breakdown: item.breakdown
-  }));
-}
-
-function buildSnakeGeneProfile(snake) {
-  const profile = new Map();
-  if (!snake) return profile;
-
-  const ensureEntry = (key, displayName) => {
-    if (!profile.has(key)) {
-      profile.set(key, {
-        key,
-        displayName: displayName || '',
-        group: null,
-        visualCount: 0,
-        superVisual: false,
-        hetCount: 0,
-        possibleHetProbabilities: [],
-        morphTokens: [],
-        hetTokens: []
-      });
-    }
-    const entry = profile.get(key);
-    if (displayName) {
-      if (!entry.displayName || entry.displayName.length < displayName.length) {
-        entry.displayName = displayName;
-      }
-      if (!entry.group || entry.group === 'Other') {
-        const derivedGroup = getGeneDisplayGroup(displayName);
-        if (derivedGroup) entry.group = derivedGroup;
-      }
-    }
-    return entry;
-  };
-
-  (Array.isArray(snake.morphs) ? snake.morphs : []).forEach(token => {
-    const parsed = parseVisualMorphToken(token);
-    if (!parsed) return;
-    const key = normalizeGeneCandidate(parsed.gene);
-    if (!key) return;
-    const entry = ensureEntry(key, parsed.displayName);
-    entry.visualCount += 1;
-    entry.superVisual = entry.superVisual || !!parsed.isSuper;
-    entry.morphTokens.push(parsed.original);
-  });
-
-  (Array.isArray(snake.hets) ? snake.hets : []).forEach(token => {
-    const parsed = parseHetDescriptor(token);
-    if (!parsed) return;
-    const key = normalizeGeneCandidate(parsed.gene);
-    if (!key) return;
-    const entry = ensureEntry(key, parsed.displayName);
-    entry.hetTokens.push(parsed.original);
-    if (parsed.isCertain) {
-      entry.hetCount += 1;
-    } else {
-      entry.possibleHetProbabilities.push(Math.max(0, Math.min(1, parsed.probability)));
-    }
-    if (!entry.group || entry.group === 'Other') entry.group = 'Recessive';
-  });
-
-  return profile;
-}
-
-function parseVisualMorphToken(token) {
-  if (!token) return null;
-  const original = String(token).trim();
-  if (!original) return null;
-  let working = original;
-  let isSuper = false;
-
-  const superMatch = working.match(/^super[\s-]+(.+)$/i);
-  if (superMatch && superMatch[1]) {
-    isSuper = true;
-    working = superMatch[1].trim();
-  } else {
-    const camelSuper = working.match(/^Super([A-Z].*)$/);
-    if (camelSuper && camelSuper[1]) {
-      isSuper = true;
-      working = camelSuper[1].trim();
-    }
-  }
-
-  const displayName = working.replace(/\s+/g, ' ').trim();
-  if (!displayName) return null;
-
-  return {
-    gene: displayName,
-    displayName,
-    isSuper,
-    original
-  };
-}
-
-function parseHetDescriptor(token) {
-  if (!token) return null;
-  const original = String(token).trim();
-  if (!original) return null;
-  let working = original;
-  let probability = 1;
-  let explicitProbability = false;
-
-  const percentMatch = working.match(/^(\d{1,3})%\s*(.+)$/i);
-  if (percentMatch && percentMatch[2]) {
-    explicitProbability = true;
-    probability = Math.min(1, parseInt(percentMatch[1], 10) / 100);
-    working = percentMatch[2].trim();
-  }
-
-  if (/^possible\s+/i.test(working)) {
-    if (!explicitProbability) probability = Math.min(probability, 0.5);
-    working = working.replace(/^possible\s+/i, '').trim();
-  } else if (/^probable\s+/i.test(working)) {
-    if (!explicitProbability) probability = Math.min(probability, 0.66);
-    working = working.replace(/^probable\s+/i, '').trim();
-  } else if (/^maybe\s+/i.test(working)) {
-    if (!explicitProbability) probability = Math.min(probability, 0.33);
-    working = working.replace(/^maybe\s+/i, '').trim();
-  }
-
-  working = working.replace(/^het\s+/i, '').trim();
-  if (!working) return null;
-
-  const displayName = working;
-  const isCertain = probability >= 0.999;
-
-  return {
-    gene: working,
-    displayName,
-    probability,
-    isCertain,
-    original
-  };
-}
-
-function resolveGeneInheritanceType(displayName, maleEntry, femaleEntry) {
-  const candidates = [maleEntry?.group, femaleEntry?.group, getGeneDisplayGroup(displayName)].filter(Boolean);
-  const prioritized = candidates.find(type => type && type !== 'Other');
-  if (prioritized) return prioritized;
-  const fallback = inferGeneTypeFromEntry(maleEntry) || inferGeneTypeFromEntry(femaleEntry);
-  if (fallback) return fallback;
-  return candidates[0] || null;
-}
-
-function inferGeneTypeFromEntry(entry) {
-  if (!entry) return null;
-  if ((entry.hetCount || 0) > 0 || (entry.possibleHetProbabilities || []).some(p => p > 0)) return 'Recessive';
-  if (entry.superVisual) return 'Incomplete Dominant';
-  if ((entry.visualCount || 0) > 0) return 'Incomplete Dominant';
-  return null;
-}
-
-function getRecessiveParentStates(entry) {
-  if (!entry) {
-    return { descriptor: 'Normal', states: [{ genotype: 'NN', probability: 1 }] };
-  }
-  if ((entry.visualCount || 0) > 0) {
-    return { descriptor: 'Visual', states: [{ genotype: 'rr', probability: 1 }] };
-  }
-  if ((entry.hetCount || 0) > 0) {
-    return { descriptor: 'Het', states: [{ genotype: 'Nr', probability: 1 }] };
-  }
-  const possibles = (entry.possibleHetProbabilities || []).filter(p => p > 0);
-  if (possibles.length) {
-    const best = Math.max(...possibles);
-    const clamped = Math.max(0, Math.min(1, best));
-    if (clamped >= 0.999) {
-      return { descriptor: 'Het (proven)', states: [{ genotype: 'Nr', probability: 1 }] };
-    }
-    return {
-      descriptor: `${formatProbabilityPercent(clamped)} possible het`,
-      states: [
-        { genotype: 'Nr', probability: clamped },
-        { genotype: 'NN', probability: 1 - clamped }
-      ]
-    };
-  }
-  return { descriptor: 'Normal', states: [{ genotype: 'NN', probability: 1 }] };
-}
-
-function recessiveGametes(genotype) {
-  if (genotype === 'rr') return [{ allele: 'r', probability: 1 }];
-  if (genotype === 'Nr' || genotype === 'rN') {
-    return [
-      { allele: 'r', probability: 0.5 },
-      { allele: 'N', probability: 0.5 }
-    ];
-  }
-  return [{ allele: 'N', probability: 1 }];
-}
-
-function calcRecessiveOutcome(geneName, maleEntry, femaleEntry) {
-  const sire = getRecessiveParentStates(maleEntry);
-  const dam = getRecessiveParentStates(femaleEntry);
-  const outcomes = new Map();
-
-  sire.states.forEach(sireState => {
-    dam.states.forEach(damState => {
-      const pairingWeight = sireState.probability * damState.probability;
-      if (pairingWeight <= 0) return;
-      const sireGametes = recessiveGametes(sireState.genotype);
-      const damGametes = recessiveGametes(damState.genotype);
-      sireGametes.forEach(sGamete => {
-        damGametes.forEach(dGamete => {
-          const prob = pairingWeight * sGamete.probability * dGamete.probability;
-          if (prob <= 0) return;
-          const mutatedCount = (sGamete.allele === 'r' ? 1 : 0) + (dGamete.allele === 'r' ? 1 : 0);
-          const label = mutatedCount === 2 ? `Visual ${geneName}` : mutatedCount === 1 ? `Het ${geneName}` : 'Normal';
-          outcomes.set(label, (outcomes.get(label) || 0) + prob);
-        });
-      });
-    });
-  });
-
-  const outcomeList = Array.from(outcomes.entries())
-    .map(([label, probability]) => ({ label, probability }))
-    .filter(item => item.probability > 0.0001)
-    .sort((a, b) => b.probability - a.probability);
-
-  return {
-    outcomes: outcomeList,
-    sireDescriptor: sire.descriptor,
-    damDescriptor: dam.descriptor
-  };
-}
-
-function getDominantParentStates(entry, inheritance) {
-  if (!entry) {
-    return { descriptor: 'Normal', states: [{ copies: 0, probability: 1 }] };
-  }
-  if (entry.superVisual) {
-    const descriptor = inheritance === 'Incomplete Dominant' ? 'Super visual' : 'Homozygous visual';
-    return { descriptor, states: [{ copies: 2, probability: 1 }] };
-  }
-  if ((entry.visualCount || 0) > 0) {
-    return { descriptor: 'Visual', states: [{ copies: 1, probability: 1 }] };
-  }
-  if ((entry.hetCount || 0) > 0) {
-    return { descriptor: 'Carrier', states: [{ copies: 1, probability: 1 }] };
-  }
-  const possibles = (entry.possibleHetProbabilities || []).filter(p => p > 0);
-  if (possibles.length) {
-    const best = Math.max(...possibles);
-    const clamped = Math.max(0, Math.min(1, best));
-    if (clamped >= 0.999) {
-      return { descriptor: 'Visual (likely homozygous)', states: [{ copies: 1, probability: 1 }] };
-    }
-    return {
-      descriptor: `${formatProbabilityPercent(clamped)} possible carrier`,
-      states: [
-        { copies: 1, probability: clamped },
-        { copies: 0, probability: 1 - clamped }
-      ]
-    };
-  }
-  return { descriptor: 'Normal', states: [{ copies: 0, probability: 1 }] };
-}
-
-function dominantGametes(copyCount) {
-  if (copyCount >= 2) return [{ allele: 'A', probability: 1 }];
-  if (copyCount >= 1) {
-    return [
-      { allele: 'A', probability: 0.5 },
-      { allele: 'a', probability: 0.5 }
-    ];
-  }
-  return [{ allele: 'a', probability: 1 }];
-}
-
-function calcDominantOutcome(geneName, maleEntry, femaleEntry, inheritance) {
-  const sire = getDominantParentStates(maleEntry, inheritance);
-  const dam = getDominantParentStates(femaleEntry, inheritance);
-  const outcomes = new Map();
-
-  sire.states.forEach(sireState => {
-    dam.states.forEach(damState => {
-      const pairingWeight = sireState.probability * damState.probability;
-      if (pairingWeight <= 0) return;
-      const sireGametes = dominantGametes(sireState.copies);
-      const damGametes = dominantGametes(damState.copies);
-      sireGametes.forEach(sGamete => {
-        damGametes.forEach(dGamete => {
-          const prob = pairingWeight * sGamete.probability * dGamete.probability;
-          if (prob <= 0) return;
-          const mutatedCount = (sGamete.allele === 'A' ? 1 : 0) + (dGamete.allele === 'A' ? 1 : 0);
-          let label;
-          if (mutatedCount === 0) {
-            label = 'Normal';
-          } else if (mutatedCount === 2 && inheritance === 'Incomplete Dominant') {
-            label = `Super ${geneName}`;
-          } else {
-            label = geneName;
-          }
-          outcomes.set(label, (outcomes.get(label) || 0) + prob);
-        });
-      });
-    });
-  });
-
-  const outcomeList = Array.from(outcomes.entries())
-    .map(([label, probability]) => ({ label, probability }))
-    .filter(item => item.probability > 0.0001)
-    .sort((a, b) => b.probability - a.probability);
-
-  return {
-    outcomes: outcomeList,
-    sireDescriptor: sire.descriptor,
-    damDescriptor: dam.descriptor
-  };
-}
-
-function formatProbabilityPercent(value) {
-  if (!Number.isFinite(value) || value <= 0) return '0%';
-  if (value >= 0.9995) return '100%';
-  const percent = value * 100;
-  const rounded = Math.round(percent * 10) / 10;
-  if (Number.isInteger(rounded)) {
-    return `${rounded}%`;
-  }
-  return `${rounded.toFixed(1)}%`;
 }
 
 function getBreedingCycleDerived(edit = {}) {
@@ -26594,961 +24949,6 @@ function getFemaleBreedingCyclesByYear(femaleId, pairings = []) {
     });
 }
 
-function PairingLifecycleEditor({ edit, setEdit, theme = 'blue', onCreateClutchCard, lifecycle, isWorkflowCompleted = false, onReopenProject, hatchlingCount = 0, onResetHatchlings, showAppAlert }) {
-  const { t } = useTranslation();
-  const [activeDialog, setActiveDialog] = useState(null);
-  const [ovulationDraft, setOvulationDraft] = useState({ date: '', notes: '' });
-  const [preLayDraft, setPreLayDraft] = useState({ date: '', notes: '' });
-  const [clutchDraft, setClutchDraft] = useState({ fertileEggs: '', slugs: '' });
-  const [hatchedDraft, setHatchedDraft] = useState({ date: '', hatchedCount: '', notes: '' });
-
-  const breedingCycleLabel = t('clutch.breedingCycle', { defaultValue: 'BREEDING CYCLE' });
-  const breedingCycleHelper = t('clutch.trackShedsClutchesHatch', { defaultValue: 'Track sheds, clutches, and hatch' });
-  const ovulationLabel = t('clutch.ovulation', { defaultValue: 'OVULATION' });
-  const logOvulationLabel = t('clutch.logOvulation', { defaultValue: 'Log ovulation' });
-  const preLayLabel = t('clutch.preLayShed', { defaultValue: 'PRE-LAY SHED' });
-  const logPreLayLabel = t('clutch.logPreLayShed', { defaultValue: 'Log pre-lay shed' });
-  const clutchHatchLabel = t('clutch.clutchHatch', { defaultValue: 'CLUTCH & HATCH' });
-  const noEggLaidRecordedLabel = t('clutch.noEggLaidRecorded', { defaultValue: 'No egg laid recorded' });
-  const eggLayingDateLabel = t('clutch.eggLayingDate', { defaultValue: 'EGG LAYING DATE' });
-  const eggLayingPlaceholder = t('clutch.eggLayingDatePlaceholder', { defaultValue: 'dd / mm / yyyy' });
-  const fertileEggsLabel = t('clutch.fertileEggs', { defaultValue: 'NUMBER OF FERTILE EGGS' });
-  const slugsLabel = t('clutch.slugs', { defaultValue: 'NUMBER OF SLUGS' });
-  const noEggLaidYetLabel = t('clutch.noEggLaidYet', { defaultValue: 'No egg laid yet' });
-  const expectedOnLabel = t('clutch.expectedOn', { defaultValue: 'Expected on' });
-  const eggsLaidLabel = t('clutch.eggsLaid', { defaultValue: 'Eggs laid' });
-  const hatchedLabel = t('clutch.hatched', { defaultValue: 'HATCHED' });
-  const notYetLabel = t('clutch.notYet', { defaultValue: 'Not yet' });
-  const notesFieldLabel = t('clutch.notesField', { defaultValue: 'Notes' });
-  const missingValueLabel = '\u2014';
-
-  const derived = lifecycle || getBreedingCycleDerived(edit);
-  const {
-    ovulationObserved,
-    preLayObserved,
-    clutchRecorded,
-    hatchedRecorded,
-    ovulationDate,
-    preLayDate,
-    clutchDate,
-    preLayWindowTarget,
-    eggLayingTarget,
-    hatchTarget,
-    eggsTotalNumber,
-    fertileEggsNumber,
-    clutchFertileValue,
-    clutchSlugsValue,
-  } = derived;
-
-  const badEggsTotal = useMemo(
-    () => Object.values(edit?.clutch?.eggBoxBadEggs || {}).reduce((s, n) => s + (Number(n) || 0), 0),
-    [edit?.clutch?.eggBoxBadEggs]
-  );
-  const totalEggsDisplay = useMemo(() => {
-    const bad = badEggsTotal;
-    if (typeof eggsTotalNumber === 'number') return Math.max(0, eggsTotalNumber - bad);
-    const fertileCount = typeof fertileEggsNumber === 'number'
-      ? fertileEggsNumber
-      : (() => {
-          if (clutchFertileValue === '' || typeof clutchFertileValue === 'undefined') return null;
-          const parsed = Number(clutchFertileValue);
-          return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-        })();
-    const slugCount = (() => {
-      if (clutchSlugsValue === '' || typeof clutchSlugsValue === 'undefined') return null;
-      const parsed = Number(clutchSlugsValue);
-      return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-    })();
-    if (fertileCount === null && slugCount === null) return null;
-    return Math.max(0, Math.max(0, (fertileCount ?? 0)) + Math.max(0, (slugCount ?? 0)) - bad);
-  }, [eggsTotalNumber, fertileEggsNumber, clutchFertileValue, clutchSlugsValue, badEggsTotal]);
-
-  const totalEggsText = useMemo(() => {
-    return t('clutch.totalEggs', {
-      defaultValue: 'Total eggs laid: {{count}} (fertile + slugs)',
-      count: typeof totalEggsDisplay === 'number' ? String(totalEggsDisplay) : missingValueLabel,
-    });
-  }, [missingValueLabel, t, totalEggsDisplay]);
-
-  const hatchLimitForUi = typeof fertileEggsNumber === 'number'
-    ? fertileEggsNumber
-    : (typeof eggsTotalNumber === 'number' ? eggsTotalNumber : null);
-
-  const hatchLimitLabel = typeof fertileEggsNumber === 'number' ? fertileEggsLabel : eggsLaidLabel;
-
-  const canGenerateClutchCard = typeof onCreateClutchCard === 'function' && clutchRecorded && !!clutchDate;
-
-  const openOvulationDialog = useCallback(() => {
-    setOvulationDraft({
-      date: edit?.ovulation?.date || localYMD(new Date()),
-      notes: edit?.ovulation?.notes || '',
-    });
-    setActiveDialog('ovulation');
-  }, [edit?.ovulation?.date, edit?.ovulation?.notes]);
-
-  const openPreLayDialog = useCallback(() => {
-    setPreLayDraft({
-      date: edit?.preLayShed?.date || localYMD(new Date()),
-      notes: edit?.preLayShed?.notes || '',
-    });
-    setActiveDialog('preLay');
-  }, [edit?.preLayShed?.date, edit?.preLayShed?.notes]);
-
-  useEffect(() => {
-    if (activeDialog === 'clutch') {
-      setClutchDraft({
-        fertileEggs: clutchFertileValue === '' ? '' : clutchFertileValue,
-        slugs: clutchSlugsValue === '' ? '0' : clutchSlugsValue,
-      });
-    }
-  }, [activeDialog, clutchFertileValue, clutchSlugsValue]);
-
-  const toggleClutch = useCallback((checked) => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      if (checked) {
-        next.clutch.recorded = true;
-        next.clutch.date = next.clutch.date || localYMD(new Date());
-        if (!next.hatch.scheduledDate && next.clutch.date) {
-          next.hatch.scheduledDate = addDaysYmd(next.clutch.date, 60);
-        }
-      } else {
-        const defaults = pairingLifecycleDefaults();
-        next.clutch = { ...defaults.clutch };
-        next.hatch = { ...defaults.hatch };
-      }
-      return next;
-    });
-  }, [setEdit]);
-
-  const updateClutchField = useCallback((field, rawValue) => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      next.clutch.recorded = true;
-      if (field === 'date') {
-        const dateValue = rawValue || '';
-        next.clutch.date = dateValue;
-        if (!next.hatch.scheduledDate && dateValue) {
-          next.hatch.scheduledDate = addDaysYmd(dateValue, 60);
-        }
-      } else if (field === 'fertileEggs' || field === 'slugs') {
-        const inputValue = rawValue ?? '';
-        if (inputValue === '') {
-          next.clutch[field] = '';
-        } else {
-          const parsed = Number(inputValue);
-          next.clutch[field] = Number.isFinite(parsed) ? Math.max(0, parsed) : next.clutch[field];
-        }
-        const fertileValue = typeof next.clutch.fertileEggs === 'number' && Number.isFinite(next.clutch.fertileEggs)
-          ? Math.max(0, next.clutch.fertileEggs)
-          : null;
-        const slugValue = typeof next.clutch.slugs === 'number' && Number.isFinite(next.clutch.slugs)
-          ? Math.max(0, next.clutch.slugs)
-          : null;
-        if (fertileValue === null && slugValue === null) {
-          next.clutch.eggsTotal = '';
-        } else {
-          const total = Math.max(0, fertileValue ?? 0) + Math.max(0, slugValue ?? 0);
-          next.clutch.eggsTotal = total;
-        }
-      } else if (field === 'notes') {
-        next.clutch.notes = rawValue || '';
-      }
-      return next;
-    });
-  }, [setEdit]);
-
-  const clearHatched = useCallback(() => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      // Clearing the record does not delete the hatchlings it produced, so the anti-duplication
-      // marks have to survive. Deleting the batch is the hatch redo flow, which bumps them.
-      next.hatch = {
-        ...pairingLifecycleDefaults().hatch,
-        hatchlingsGeneratedThrough: Number(next.hatch?.hatchlingsGeneratedThrough || 0),
-        hatchlingsResetCount: Number(next.hatch?.hatchlingsResetCount || 0),
-      };
-      return next;
-    });
-  }, [setEdit]);
-
-  const openHatchedDialog = useCallback((options = {}) => {
-    // After a redo the pairing in `edit` may not have re-rendered yet, so a fresh open must not
-    // prefill from the record we just cleared.
-    const fresh = options?.fresh === true;
-    setHatchedDraft({
-      date: (!fresh && edit?.hatch?.date) || localYMD(new Date()),
-      hatchedCount: !fresh && edit?.hatch?.hatchedCount ? String(edit.hatch.hatchedCount) : '',
-      notes: (!fresh && edit?.hatch?.notes) || '',
-    });
-    setActiveDialog('hatched');
-  }, [edit?.hatch]);
-
-  // Every entry into hatch logging goes through this gate so a second hatch log for the same
-  // clutch is a deliberate choice instead of a silently ignored one.
-  const openHatchGate = useCallback(() => {
-    setActiveDialog('hatchGate');
-  }, []);
-
-  const handleHatchGateAnswer = useCallback((loggedBefore) => {
-    if (loggedBefore) {
-      setActiveDialog('hatchRedo');
-      return;
-    }
-    openHatchedDialog({ fresh: !edit?.hatch?.recorded });
-  }, [openHatchedDialog, edit?.hatch?.recorded]);
-
-  const handleConfirmHatchRedo = useCallback(async () => {
-    const deleted = typeof onResetHatchlings === 'function' ? onResetHatchlings() : 0;
-    setActiveDialog(null);
-    if (typeof showAppAlert === 'function' && deleted > 0) {
-      await showAppAlert(t('pairing.hatchlingsResetDone', {
-        count: deleted,
-        defaultValue: '{{count}} previous hatchling record(s) deleted. Log the hatch again and you will be asked for each hatchling.',
-      }));
-    }
-    openHatchedDialog({ fresh: true });
-  }, [onResetHatchlings, openHatchedDialog, showAppAlert, t]);
-
-  const saveClutchDraft = useCallback(() => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      let fertileValue = Number(clutchDraft.fertileEggs);
-      if (!Number.isFinite(fertileValue) || fertileValue < 0) fertileValue = 0;
-      let slugsValue = clutchDraft.slugs === '' ? 0 : Number(clutchDraft.slugs);
-      if (!Number.isFinite(slugsValue) || slugsValue < 0) slugsValue = 0;
-      next.clutch.recorded = true;
-      next.clutch.date = next.clutch.date || localYMD(new Date());
-      next.clutch.fertileEggs = fertileValue;
-      next.clutch.slugs = slugsValue;
-      next.clutch.eggsTotal = fertileValue + slugsValue;
-      if (!next.hatch.scheduledDate && next.clutch.date) {
-        next.hatch.scheduledDate = addDaysYmd(next.clutch.date, 60);
-      }
-      return next;
-    });
-    setActiveDialog(null);
-  }, [clutchDraft, setEdit, setActiveDialog]);
-
-
-  const saveOvulationDraft = useCallback(() => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      next.ovulation.observed = true;
-      next.ovulation.date = ovulationDraft.date || '';
-      next.ovulation.notes = ovulationDraft.notes || '';
-      if (next.ovulation.date) {
-        next.appointments = trimAppointmentsAfterOvulation(next.appointments || [], next.ovulation.date);
-      }
-      if (next.preLayShed.observed && next.preLayShed.date) {
-        const delta = diffInDays(next.ovulation.date, next.preLayShed.date);
-        next.preLayShed.intervalFromOvulation = Number.isFinite(delta) ? delta : null;
-      }
-      return next;
-    });
-    setActiveDialog(null);
-  }, [ovulationDraft, setEdit, setActiveDialog]);
-
-  const savePreLayDraft = useCallback(() => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      next.preLayShed.observed = true;
-      next.preLayShed.date = preLayDraft.date || '';
-      next.preLayShed.notes = preLayDraft.notes || '';
-      const delta = next.ovulation.observed && next.ovulation.date && preLayDraft.date
-        ? diffInDays(next.ovulation.date, preLayDraft.date)
-        : null;
-      next.preLayShed.intervalFromOvulation = Number.isFinite(delta) ? delta : null;
-      return next;
-    });
-    setActiveDialog(null);
-  }, [preLayDraft, setEdit, setActiveDialog]);
-
-  const clutchModalConfirmDisabled = useMemo(() => {
-    const eggsRaw = clutchDraft.fertileEggs;
-    if (eggsRaw === '') return true;
-    const eggsValue = Number(eggsRaw);
-    if (!Number.isFinite(eggsValue) || eggsValue < 0) return true;
-    if (clutchDraft.slugs === '') return false;
-    const slugsValue = Number(clutchDraft.slugs);
-    if (!Number.isFinite(slugsValue) || slugsValue < 0) return true;
-    return false;
-  }, [clutchDraft]);
-
-  const clutchDraftTotal = useMemo(() => {
-    const fertileRaw = clutchDraft.fertileEggs;
-    const slugRaw = clutchDraft.slugs;
-    const hasFertile = fertileRaw !== '' && Number.isFinite(Number(fertileRaw));
-    const hasSlugs = slugRaw !== '' && Number.isFinite(Number(slugRaw));
-    if (!hasFertile && !hasSlugs) return null;
-    const fertileCount = hasFertile ? Math.max(0, Number(fertileRaw)) : 0;
-    const slugCount = hasSlugs ? Math.max(0, Number(slugRaw)) : 0;
-    return fertileCount + slugCount;
-  }, [clutchDraft]);
-
-  const saveHatchedDraft = useCallback(() => {
-    setEdit(prev => {
-      const next = withPairingLifecycleDefaults({ ...prev });
-      let safeCount = hatchedDraft.hatchedCount === '' ? 0 : Number(hatchedDraft.hatchedCount);
-      if (!Number.isFinite(safeCount) || safeCount < 0) safeCount = 0;
-      const hatchLimit = typeof next.clutch.fertileEggs === 'number' && Number.isFinite(next.clutch.fertileEggs)
-        ? Math.max(0, next.clutch.fertileEggs)
-        : (typeof next.clutch.eggsTotal === 'number' && Number.isFinite(next.clutch.eggsTotal)
-          ? Math.max(0, next.clutch.eggsTotal)
-          : null);
-      if (typeof hatchLimit === 'number') {
-        safeCount = Math.min(safeCount, hatchLimit);
-      }
-      next.hatch = {
-        ...next.hatch,
-        recorded: true,
-        date: hatchedDraft.date,
-        hatchedCount: safeCount,
-        notes: hatchedDraft.notes || '',
-      };
-      return next;
-    });
-    setActiveDialog(null);
-
-    // The hatchling wizard only opens for hatchlings that are new to this pairing. Saying so
-    // beats the old behaviour, where re-saving the same count simply did nothing.
-    const previousCount = edit?.hatch?.recorded ? Number(edit.hatch.hatchedCount || 0) : 0;
-    const requestedCount = hatchedDraft.hatchedCount === '' ? 0 : Number(hatchedDraft.hatchedCount);
-    const noNewHatchlings = previousCount > 0
-      && Number.isFinite(requestedCount)
-      && requestedCount > 0
-      && requestedCount <= previousCount;
-    if (noNewHatchlings && typeof showAppAlert === 'function') {
-      showAppAlert(t('pairing.hatchNoNewHatchlings', {
-        count: previousCount,
-        defaultValue: 'Hatch details saved. No hatchling cards will open because {{count}} hatchling(s) are already recorded for this clutch. To record them again, choose "Eggs hatched" and answer that you have logged hatch before.',
-      }));
-    }
-  }, [hatchedDraft, setEdit, edit?.hatch, showAppAlert, t]);
-
-  const tileClass = "rounded-xl border border-neutral-200 bg-white p-2 flex flex-col gap-2 text-[11px] min-w-0 overflow-hidden";
-
-  return (
-    <>
-      <div className="border rounded-2xl bg-white shadow-sm p-3 flex flex-col gap-3 h-full max-h-[60vh] min-h-0 overflow-hidden">
-        {isWorkflowCompleted ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <div className="font-semibold">{t("clutch.completedNotice", { defaultValue: "This pairing is marked completed. You can still record this event." })}</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-2 py-1">
-                {t("clutch.keepCompletedAddEvent", { defaultValue: "Keep pairing completed and add event" })}
-              </span>
-              {typeof onReopenProject === 'function' ? (
-                <button type="button" className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium" onClick={onReopenProject}>
-                  {t("clutch.reopenAddEvent", { defaultValue: "Reopen pairing and add event" })}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{breedingCycleLabel}</div>
-          <div className="text-[12px] text-neutral-500">{breedingCycleHelper}</div>
-        </div>
-        <div className="flex flex-col gap-2.5 min-w-0 overflow-auto pe-1">
-          <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:items-stretch">
-            <div className={cx(tileClass, 'flex-1 lg:h-full')}>
-              <div className="flex-1 text-center space-y-1">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-neutral-500">{ovulationLabel}</div>
-                <div className="text-neutral-700 text-[13px]">
-                  {ovulationDate ? formatDateForDisplay(ovulationDate) : missingValueLabel}
-                </div>
-                {ovulationObserved && edit?.ovulation?.notes ? (
-                  <div className="text-[11px] text-neutral-500 leading-snug max-h-12 overflow-hidden mx-auto">
-                    {edit.ovulation.notes}
-                  </div>
-                ) : null}
-                {ovulationObserved && preLayWindowTarget && (
-                  <div className="text-[11px] text-neutral-500">{t("clutch.preLayWindow", { date: formatDateForDisplay(preLayWindowTarget), defaultValue: "Pre-lay window {{date}}" })}</div>
-                )}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openOvulationDialog}>
-                  {ovulationObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logOvulationLabel}
-                </button>
-                {ovulationObserved && (
-                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
-                    setEdit(prev => {
-                      const next = withPairingLifecycleDefaults({ ...prev });
-                      next.ovulation = { observed: false, date: '', notes: '' };
-                      next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
-                      return next;
-                    });
-                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
-                )}
-              </div>
-            </div>
-            <div className={cx(tileClass, 'flex-1 lg:h-full')}>
-              <div className="flex-1 text-center space-y-1">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-neutral-500">{preLayLabel}</div>
-                <div className="text-neutral-700 text-[13px]">
-                  {preLayDate ? formatDateForDisplay(preLayDate) : missingValueLabel}
-                </div>
-                {preLayObserved && Number.isFinite(edit?.preLayShed?.intervalFromOvulation) && (
-                  <div className="text-[11px] text-neutral-500">
-                    {t("clutch.daysAfterOvulation", { days: edit.preLayShed.intervalFromOvulation, defaultValue: "{{days}} days after ovulation" })}
-                  </div>
-                )}
-                {preLayObserved && edit?.preLayShed?.notes ? (
-                  <div className="text-[11px] text-neutral-500 leading-snug max-h-12 overflow-hidden mx-auto">
-                    {edit.preLayShed.notes}
-                  </div>
-                ) : null}
-                {preLayObserved && eggLayingTarget && (
-                  <div className="text-[11px] text-neutral-500">{t("clutch.eggWindow", { date: formatDateForDisplay(eggLayingTarget), defaultValue: "Egg window {{date}}" })}</div>
-                )}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={openPreLayDialog}>
-                  {preLayObserved ? t("clutch.editDetails", { defaultValue: "Edit details" }) : logPreLayLabel}
-                </button>
-                {preLayObserved && (
-                  <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>{
-                    setEdit(prev => {
-                      const next = withPairingLifecycleDefaults({ ...prev });
-                      next.preLayShed = { ...pairingLifecycleDefaults().preLayShed };
-                      return next;
-                    });
-                  }}>{t("pairing.clear", { defaultValue: "Clear" })}</button>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-center">
-            <div className={cx(tileClass, 'w-full lg:max-w-xl')}>
-              <div className="space-y-0.5">
-                <div className="font-semibold uppercase tracking-wide text-neutral-500">{clutchHatchLabel}</div>
-                <div className="text-neutral-700 text-[13px]">
-                  {clutchRecorded && clutchDate ? `${eggsLaidLabel} ${formatDateForDisplay(clutchDate)}` : noEggLaidRecordedLabel}
-                </div>
-              </div>
-
-              <div className="mt-3 w-full text-start space-y-3">
-                <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{eggLayingDateLabel}</label>
-                  <input
-                    type="date"
-                    className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
-                    value={clutchDate}
-                    onChange={e=>updateClutchField('date', e.target.value)}
-                    disabled={!clutchRecorded}
-                    placeholder={eggLayingPlaceholder}
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{fertileEggsLabel}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
-                      value={clutchFertileValue}
-                      onChange={e=>updateClutchField('fertileEggs', e.target.value)}
-                      disabled={!clutchRecorded}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{slugsLabel}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="mt-1 w-full border rounded-xl px-3 py-2 text-xs"
-                      value={clutchSlugsValue}
-                      onChange={e=>updateClutchField('slugs', e.target.value)}
-                      disabled={!clutchRecorded}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2 items-center text-xs text-neutral-600">
-                <div className="text-[11px] text-neutral-500">
-                  {clutchRecorded ? eggsLaidLabel : noEggLaidYetLabel}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-neutral-500">
-                  <span>{expectedOnLabel}</span>
-                  <span className="text-neutral-700 font-medium">
-                    {hatchTarget ? formatDateForDisplay(hatchTarget) : missingValueLabel}
-                  </span>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {!clutchRecorded && (
-                    <button className="text-[11px] px-2.5 py-1 border rounded-lg" onClick={()=>setActiveDialog('clutch')}>
-                      {eggsLaidLabel}
-                    </button>
-                  )}
-                  {clutchRecorded && (
-                    <>
-                      <button
-                        className="text-[11px] px-2.5 py-1 border rounded-lg"
-                        onClick={() => onCreateClutchCard?.()}
-                        disabled={!canGenerateClutchCard}
-                      >
-                        {t("clutch.createClutchCard", { defaultValue: "Create clutch card" })}
-                      </button>
-                      {!hatchedRecorded && (
-                        <button
-                          className="text-[11px] px-2.5 py-1 border rounded-lg"
-                          onClick={openHatchGate}
-                        >
-                          {t("clutch.eggsHatched", { defaultValue: "Eggs hatched" })}
-                        </button>
-                      )}
-                      <button
-                        className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
-                        onClick={() => toggleClutch(false)}
-                      >
-                        {t("clutch.clearEggRecord", { defaultValue: "Clear egg record" })}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 mt-2 flex items-start justify-between gap-3 w-full">
-                <div className="space-y-1 text-start">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">{hatchedLabel}</div>
-                  <div className="text-[13px] text-neutral-700">
-                    {hatchedRecorded && edit?.hatch?.date ? `${hatchedLabel} ${formatDateForDisplay(edit.hatch.date)}` : notYetLabel}
-                  </div>
-                  {hatchedRecorded && (
-                    <div className="text-[11px] text-neutral-500 space-y-1">
-                      <div>{t("clutch.hatchedCount", { hatched: edit?.hatch?.hatchedCount || 0, defaultValue: "Hatched count: {{hatched}}" })}</div>
-                      {edit?.hatch?.notes ? <div>{notesFieldLabel}: {edit.hatch.notes}</div> : null}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {hatchedRecorded && (
-                    <div className="flex flex-col items-end gap-2">
-                      <button
-                        className="text-[11px] px-2.5 py-1 border rounded-lg"
-                        onClick={openHatchGate}
-                      >
-                        {t("clutch.viewEditHatch", { defaultValue: "View / edit hatch" })}
-                      </button>
-                      <button
-                        className="text-[11px] px-2.5 py-1 border rounded-lg text-rose-600 border-rose-300"
-                        onClick={clearHatched}
-                      >
-                        {t("clutch.clearHatchRecord", { defaultValue: "Clear hatch record" })}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2 text-[11px] text-neutral-500">
-                {totalEggsText}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {activeDialog === 'ovulation' && (
-        <FloatingDialog
-          title={t("clutch.ovulationDetails", { defaultValue: "Ovulation details" })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          onConfirm={saveOvulationDraft}
-          disableConfirm={!ovulationDraft.date}
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium">{t("clutch.ovulationDate", { defaultValue: "Ovulation date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.date} onChange={e=>setOvulationDraft(d=>({...d, date:e.target.value}))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={ovulationDraft.notes} onChange={e=>setOvulationDraft(d=>({...d, notes:e.target.value}))} />
-            </div>
-          </div>
-        </FloatingDialog>
-      )}
-
-      {activeDialog === 'preLay' && (
-        <FloatingDialog
-          title={t("clutch.preLayShedDetails", { defaultValue: "Pre-Lay shed details" })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          onConfirm={savePreLayDraft}
-          disableConfirm={!preLayDraft.date}
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium">{t("clutch.preLayShedDate", { defaultValue: "Pre-Lay shed date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.date} onChange={e=>setPreLayDraft(d=>({...d, date:e.target.value}))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={preLayDraft.notes} onChange={e=>setPreLayDraft(d=>({...d, notes:e.target.value}))} />
-            </div>
-          </div>
-        </FloatingDialog>
-      )}
-
-      {activeDialog === 'clutch' && (
-        <FloatingDialog
-          title={t("clutch.logEggsLaid", { defaultValue: "Log eggs laid" })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          onConfirm={saveClutchDraft}
-          disableConfirm={clutchModalConfirmDisabled}
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium">{fertileEggsLabel}</label>
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full border rounded-xl px-3 py-2"
-                value={clutchDraft.fertileEggs}
-                onChange={e=>{
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setClutchDraft(d=>({ ...d, fertileEggs: '' }));
-                    return;
-                  }
-                  let parsed = Number(raw);
-                  if (!Number.isFinite(parsed)) return;
-                  if (parsed < 0) parsed = 0;
-                  setClutchDraft(d=>({ ...d, fertileEggs: String(parsed) }));
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium">{slugsLabel}</label>
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full border rounded-xl px-3 py-2"
-                value={clutchDraft.slugs}
-                onChange={e=>{
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setClutchDraft(d=>({ ...d, slugs: '' }));
-                    return;
-                  }
-                  let parsed = Number(raw);
-                  if (!Number.isFinite(parsed)) return;
-                  if (parsed < 0) parsed = 0;
-                  setClutchDraft(d=>({ ...d, slugs: String(parsed) }));
-                }}
-              />
-              <div className="mt-1 text-[11px] text-neutral-500">
-                {typeof clutchDraftTotal === 'number'
-                  ? t("clutch.totalEggsFormulaWithTotal", { total: clutchDraftTotal, defaultValue: "Total eggs laid will be saved as fertile eggs + slugs = {{total}}." })
-                  : t("clutch.totalEggsFormula", { defaultValue: "Total eggs laid will be saved as fertile eggs + slugs." })}
-              </div>
-            </div>
-          </div>
-        </FloatingDialog>
-      )}
-
-      {activeDialog === 'hatchGate' && (
-        <ChoiceDialog
-          title={t('pairing.hatchGateTitle', { defaultValue: 'Have you logged hatch before for this clutch?' })}
-          description={t('pairing.hatchGateDescription', {
-            defaultValue: 'Hatchling cards are only created for hatchlings that are new to this clutch, so a repeat hatch log needs the old records cleared first.',
-          })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          options={[
-            {
-              key: 'no',
-              tone: 'primary',
-              label: t('pairing.hatchGateNo', { defaultValue: 'No — this is the first hatch log' }),
-              hint: t('pairing.hatchGateNoHint', { defaultValue: 'Opens hatch logging, then one card per hatchling.' }),
-              onSelect: () => handleHatchGateAnswer(false),
-            },
-            {
-              key: 'yes',
-              label: t('pairing.hatchGateYes', { defaultValue: 'Yes — I have logged hatch before' }),
-              hint: hatchlingCount > 0
-                ? t('pairing.hatchGateYesHintCount', {
-                  count: hatchlingCount,
-                  defaultValue: '{{count}} hatchling record(s) already exist for this clutch.',
-                })
-                : t('pairing.hatchGateYesHintEmpty', { defaultValue: 'No hatchling records found on this device.' }),
-              onSelect: () => handleHatchGateAnswer(true),
-            },
-          ]}
-        />
-      )}
-
-      {activeDialog === 'hatchRedo' && (
-        <ChoiceDialog
-          title={t('pairing.hatchRedoTitle', { defaultValue: 'Delete the old hatchling records?' })}
-          description={hatchlingCount > 0
-            ? t('pairing.hatchRedoDescription', {
-              count: hatchlingCount,
-              defaultValue: 'This permanently deletes the {{count}} animal(s) created by the hatch wizard for this clutch, on every synced device, and clears the hatch record so you can log it again from scratch. Animals you linked to this clutch by hand are not touched.',
-            })
-            : t('pairing.hatchRedoDescriptionEmpty', {
-              defaultValue: 'No wizard-generated animals were found on this device. Continuing clears the hatch record so this clutch can be logged again.',
-            })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          options={[
-            {
-              key: 'reset',
-              tone: 'danger',
-              label: hatchlingCount > 0
-                ? t('pairing.hatchRedoConfirm', {
-                  count: hatchlingCount,
-                  defaultValue: 'Delete {{count}} hatchling record(s) and log again',
-                })
-                : t('pairing.hatchRedoConfirmEmpty', { defaultValue: 'Clear the hatch record and log again' }),
-              hint: t('pairing.hatchRedoConfirmHint', { defaultValue: 'Cannot be undone.' }),
-              onSelect: handleConfirmHatchRedo,
-            },
-            {
-              key: 'keep',
-              label: t('pairing.hatchRedoKeep', { defaultValue: 'Keep them — just edit the hatch details' }),
-              hint: t('pairing.hatchRedoKeepHint', { defaultValue: 'No new hatchling cards will open.' }),
-              onSelect: () => openHatchedDialog(),
-            },
-          ]}
-        />
-      )}
-
-      {activeDialog === 'hatched' && (
-        <FloatingDialog
-          title={t("clutch.hatchDetails", { defaultValue: "Hatch details" })}
-          theme={theme}
-          onClose={() => setActiveDialog(null)}
-          onConfirm={saveHatchedDraft}
-          disableConfirm={!hatchedDraft.date}
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium">{t("clutch.hatchDate", { defaultValue: "Hatch date" })}</label>
-              <input type="date" className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.date} onChange={e=>setHatchedDraft(d=>({...d, date:e.target.value}))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium">{t("clutch.numberHatched", { defaultValue: "Number hatched" })}</label>
-              <input
-                type="number"
-                min="0"
-                max={hatchLimitForUi ?? undefined}
-                className="mt-1 w-full border rounded-xl px-3 py-2"
-                value={hatchedDraft.hatchedCount}
-                onChange={e=>{
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setHatchedDraft(d=>({ ...d, hatchedCount: '' }));
-                    return;
-                  }
-                  let parsed = Number(raw);
-                  if (!Number.isFinite(parsed) || parsed < 0) parsed = 0;
-                  if (hatchLimitForUi !== null && parsed > hatchLimitForUi) parsed = hatchLimitForUi;
-                  setHatchedDraft(d=>({ ...d, hatchedCount: String(parsed) }));
-                }}
-              />
-              {hatchLimitForUi !== null && (
-                <div className="mt-1 text-[11px] text-neutral-500">{t("clutch.maxAllowed", { max: hatchLimitForUi, basis: hatchLimitLabel, defaultValue: "Maximum allowed: {{max}} ({{basis}})" })}</div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium">{notesFieldLabel}</label>
-              <textarea rows={3} className="mt-1 w-full border rounded-xl px-3 py-2" value={hatchedDraft.notes} onChange={e=>setHatchedDraft(d=>({...d, notes:e.target.value}))} />
-            </div>
-          </div>
-        </FloatingDialog>
-      )}
-    </>
-  );
-}
-
-function CycleTimersFrame({ lifecycle, theme = 'blue', className }) {
-  const { t } = useTranslation();
-  const timerQueue = lifecycle?.timerQueue || [];
-  const hasTimers = timerQueue.length > 0;
-  const [now, setNow] = useState(new Date());
-  const isCycleComplete = !!lifecycle?.hatchedRecorded;
-  const hatchDate = lifecycle?.hatchDate || '';
-  const hasLifecycleData = Boolean(
-    lifecycle && (
-      lifecycle.ovulationObserved ||
-      lifecycle.preLayObserved ||
-      lifecycle.clutchRecorded ||
-      lifecycle.hatchedRecorded ||
-      lifecycle.ovulationDate ||
-      lifecycle.preLayDate ||
-      lifecycle.clutchDate
-    )
-  );
-
-  useEffect(() => {
-    if (hasTimers || isCycleComplete) return undefined;
-    const id = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(id);
-  }, [hasTimers, isCycleComplete]);
-
-  if (!hasTimers && !hasLifecycleData) {
-    return null;
-  }
-
-  if (isCycleComplete) {
-    return (
-      <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
-            <div className="text-sm text-neutral-600">{t("clutch.timers.statusSubtitle", { defaultValue: "Breeding cycle status" })}</div>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div className="font-medium text-neutral-700">{t("clutch.timers.cycleOver", { defaultValue: "This breeding cycle is over." })}</div>
-          {hatchDate ? (
-            <div className="text-xs text-neutral-500">{t("clutch.timers.hatchedOn", { date: formatDateForDisplay(hatchDate), defaultValue: "Hatched on {{date}}" })}</div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cx("border rounded-2xl bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4", className)}>
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t("clutch.timers.title", { defaultValue: "Cycle timers" })}</div>
-          <div className="text-sm text-neutral-600">{t("clutch.timers.upcomingSubtitle", { defaultValue: "Upcoming breeding milestones" })}</div>
-        </div>
-        {hasTimers && (
-          <div className="text-xs text-neutral-500">{t("clutch.timers.activeCount", { active: timerQueue.length, defaultValue: "{{active}} active" })}</div>
-        )}
-      </div>
-      {hasTimers ? (
-        <div className="flex flex-col gap-3">
-          {timerQueue.map(timer => (
-            <CountdownBadge
-              key={timer.key}
-              label={timer.label}
-              targetDate={timer.targetDate}
-              totalDays={typeof timer.totalDays === 'number' ? timer.totalDays : null}
-              theme={theme}
-              size="lg"
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2 text-sm text-neutral-600">
-          <div>{t("clutch.timers.none", { defaultValue: "No active timers yet. Log ovulation, pre-lay, or clutch events to start tracking milestones." })}</div>
-          <div className="text-xs font-medium text-neutral-500">{t("clutch.timers.currentTime", { time: formatDateTimeForDisplay(now), defaultValue: "Current time: {{time}}" })}</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FloatingDialog({ title, onClose, onConfirm, children, theme = 'blue', confirmLabel, disableConfirm = false }) {
-  const { t } = useTranslation();
-  const resolvedConfirmLabel = confirmLabel ?? t("common.save", { defaultValue: "Save" });
-  return (
-    <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
-        </div>
-        <div className="space-y-3 max-h-[60vh] overflow-auto pe-1">
-          {children}
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t("common.cancel", { defaultValue: "Cancel" })}</button>
-          <button className={cx('px-3 py-2 rounded-xl text-sm', primaryBtnClass(theme, true))} onClick={onConfirm} disabled={disableConfirm}>{resolvedConfirmLabel}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChoiceDialog({ title, description, options = [], onClose, theme = 'blue' }) {
-  const { t } = useTranslation();
-  return (
-    <div className="sk-scrim fixed inset-0 flex items-center justify-center z-[70]" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border p-5" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold">{title}</div>
-          <button className="text-sm px-2 py-1" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
-        </div>
-        {description ? <div className="text-sm text-neutral-600">{description}</div> : null}
-        <div className="mt-4 flex flex-col gap-2">
-          {options.map((option, idx) => (
-            <button
-              key={option.key || idx}
-              className={cx(
-                'w-full text-start px-3 py-2 rounded-xl text-sm border',
-                option.tone === 'danger' && 'border-rose-300 text-rose-600',
-                option.tone === 'primary' && primaryBtnClass(theme, true),
-                !option.tone && 'hover:bg-neutral-50'
-              )}
-              onClick={option.onSelect}
-            >
-              <div className="font-medium">{option.label}</div>
-              {option.hint ? (
-                <div className={cx('text-[11px] mt-0.5', option.tone === 'primary' ? 'opacity-80' : 'text-neutral-500')}>
-                  {option.hint}
-                </div>
-              ) : null}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button className="px-3 py-2 rounded-xl text-sm border" onClick={onClose}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CountdownBadge({ label, targetDate, totalDays = null, theme = 'blue', size = 'sm' }) {
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (!targetDate) return undefined;
-    const id = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(id);
-  }, [targetDate]);
-
-  if (!targetDate) return null;
-
-  const target = parseYmd(targetDate);
-  if (!target) return null;
-
-  const diffMs = target.getTime() - now;
-  const overdue = diffMs < 0;
-  const remainingLabel = overdue ? `Overdue by ${formatDurationFromMs(-diffMs)}` : `Due in ${formatDurationFromMs(diffMs)}`;
-  const dayLabel = formatCycleTimerDayLabel(targetDate, totalDays, now);
-
-  let progressPercent = null;
-  if (totalDays && totalDays > 0) {
-    const totalMs = totalDays * 86400000;
-    const elapsed = totalMs - diffMs;
-    progressPercent = overdue ? 100 : Math.min(100, Math.max(0, (elapsed / totalMs) * 100));
-  }
-
-  const containerSizing = size === 'lg'
-    ? 'px-4 py-3 rounded-2xl gap-3 text-sm sm:text-base'
-    : 'px-3 py-1.5 rounded-full gap-2 text-xs';
-
-  return (
-    <div className={cx('countdown-badge flex flex-wrap items-center font-semibold w-full', containerSizing, overdue ? 'overdue' : 'upcoming')}>
-      {progressPercent !== null && <span className="countdown-progress" style={{ width: `${progressPercent}%` }} />}
-      <span className="break-words leading-tight">{label}</span>
-      {dayLabel ? <span className="break-words leading-tight">{dayLabel}</span> : null}
-      <span className="break-words leading-tight">{remainingLabel}</span>
-      <span className="break-words leading-tight">{formatDateForDisplay(targetDate)}</span>
-    </div>
-  );
-}
-
 function formatCycleTimerDayLabel(targetDate, totalDays, now = Date.now()) {
   if (!targetDate || !Number.isFinite(totalDays) || totalDays <= 0) return '';
   const target = parseYmd(targetDate);
@@ -27561,24 +24961,6 @@ function formatCycleTimerDayLabel(targetDate, totalDays, now = Date.now()) {
     ? Math.floor(totalDays + Math.abs(daysUntil))
     : Math.min(Math.floor(totalDays), Math.max(1, Math.floor(totalDays - daysUntil + 1)));
   return `Day ${dayNumber} of ${Math.floor(totalDays)}`;
-}
-
-function formatDurationFromMs(ms) {
-  const absMs = Math.max(0, Math.floor(ms));
-  const totalMinutes = Math.round(absMs / 60000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes - days * 60 * 24) / 60);
-  const minutes = totalMinutes - days * 60 * 24 - hours * 60;
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${Math.max(minutes, 0)}m`;
-}
-
-function trimAppointmentsAfterOvulation(appointments = [], ovulationDate) {
-  if (!ovulationDate || !Array.isArray(appointments) || !appointments.length) return appointments;
-  const priorCount = appointments.filter(ap => (ap.date || '') <= ovulationDate).length;
-  if (priorCount < 3) return appointments;
-  return appointments.filter(ap => (ap.date || '') <= ovulationDate);
 }
 
 function diffInDays(startYmd, endYmd) {
@@ -27678,7 +25060,7 @@ function ImportSection({ importText, setImportText, importPreview, setImportPrev
   const parsingLabel = t("ui.animals.import.parsing", { defaultValue: "Parsing..." });
   // Duplicates of animals already here are dropped on apply, so this can count a few too many;
   // erring that way never lets an import past the plan's cap.
-  const importCapResult = useAnimalCap(Array.isArray(existingAnimals) ? existingAnimals.length : 0, importCount);
+  const importCapResult = useAnimalCap(activeAnimals(existingAnimals).length, importCount);
   const canImport = importCount > 0 && Boolean(importSpecies) && !importCapResult?.blocked;
   const importButtonLabel = importCount
     ? t("ui.animals.import.importButtonWithCount", { count: importCount, defaultValue: "Import ({{count}})" })
@@ -29050,7 +26432,8 @@ function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams 
       };
       ['feeds', 'weights', 'sheds', 'cleanings', 'meds'].forEach(addLogs);
 
-      const feedDueEvent = getNextFeedCycleEvent(s);
+      // Past logs stay on the calendar as history; a snake that left the collection is never due.
+      const feedDueEvent = isOutOfCollection(s) ? null : getNextFeedCycleEvent(s);
       if (feedDueEvent) {
         const dt = new Date(`${feedDueEvent.date}T00:00:00`);
         if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === targetYear && dt.getMonth() === targetMonth) {
@@ -29061,7 +26444,7 @@ function CalendarSection({ snakes, pairings, breedingCycles = [], follicleExams 
 
     // Quarantine start/clear days, derived the same way everything else on this calendar is --
     // there is no stored event row anywhere in the app.
-    deriveQuarantineEvents(snakes).forEach(event => {
+    deriveQuarantineEvents(activeAnimals(snakes)).forEach(event => {
       const dt = new Date(`${event.date}T00:00:00`);
       if (Number.isNaN(dt.getTime())) return;
       if (dt.getFullYear() !== targetYear || dt.getMonth() !== targetMonth) return;

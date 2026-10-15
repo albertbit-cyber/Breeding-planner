@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { readSnapshot, reapplyConfirmation } from "./labGeneticsRules";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
+import { countedAnimalWhere, isArchivedAnimalStatus, isRemovedAnimalPayload } from "./animalArchive";
 import { ingestAllPairingsIntoReproductiveCycles } from "./reproductiveCycleService";
 import {
   screenBreedingRecords,
@@ -93,6 +94,10 @@ const completionReasons = new Set([
   "breeding_stopped",
   "unknown_outcome",
   "other",
+  // Written by the app when the female is moved to the animal archive.
+  "female_sold",
+  "female_died",
+  "female_left_collection",
 ]);
 
 const outcomeConfidences = new Set(["confirmed", "likely", "unknown"]);
@@ -246,6 +251,16 @@ const storedRecord = (row: { payload?: unknown; updatedAt?: unknown }): JsonReco
 };
 
 const mergeAnimalPayload = (existing: JsonRecord, incomingPayload: JsonRecord): JsonRecord => {
+  // A deleted snake kept as a lineage card wins whole. Merging it with the full copy would
+  // union the erased logs and photos straight back in. Two cards: the later one.
+  const existingRemoved = isRemovedAnimalPayload(existing);
+  const incomingRemoved = isRemovedAnimalPayload(incomingPayload);
+  if (existingRemoved || incomingRemoved) {
+    if (existingRemoved && incomingRemoved) {
+      return payloadUpdatedAtMs(incomingPayload) >= payloadUpdatedAtMs(existing) ? incomingPayload : existing;
+    }
+    return incomingRemoved ? incomingPayload : existing;
+  }
   const merged = mergeSyncRecord(existing, incomingPayload, { entryArrays: SYNC_ENTRY_ARRAYS.animal, mergeLogs: true });
 
   // A device that has not synced since the test still holds the animal's pre-test genetics, and
@@ -512,35 +527,109 @@ const createManyChunked = async (model: any, rows: JsonRecord[], chunkSize = 200
   }
 };
 
+const wasArchivedBefore = (existingAnimals: Map<string, ExistingRow>, appId: string): boolean => (
+  isArchivedAnimalStatus(asRecord(existingAnimals.get(appId)?.payload)?.status)
+);
+
+type ArchiveTransition = { rowId: string; appId: string; archived: boolean; payload: JsonRecord | null };
+
+/** Animals this save moves into the archive (archived: true) or back out of it (false). */
+const planArchiveTransitions = (animalUpdates: PlannedUpdate[], existingAnimals: Map<string, ExistingRow>): ArchiveTransition[] => (
+  animalUpdates
+    .filter((update) => !update.data.deletedAt && update.data.status !== undefined)
+    .map((update) => ({
+      rowId: update.id,
+      appId: update.appId,
+      archived: isArchivedAnimalStatus(update.data.status),
+      before: wasArchivedBefore(existingAnimals, update.appId),
+      payload: asRecord(update.data.payload),
+    }))
+    .filter((row) => row.archived !== row.before)
+    .map(({ before, ...row }) => row)
+);
+
+/**
+ * Keep the ownership history (shown on the pedigree passport) in step with the archive: leaving
+ * closes the keeper's period, returning opens a new one. A marketplace sale already did this
+ * itself, and its animal arrives here already "Sold", so it is not a transition and is skipped.
+ * The buyer's name is deliberately not copied here: it lives in the archive record, where the
+ * keeper can erase it, and nowhere else.
+ */
+const recordArchiveOwnership = async (ownerId: string, transitions: ArchiveTransition[]): Promise<void> => {
+  for (const transition of transitions) {
+    const archive = asRecord(transition.payload?.archive);
+    if (transition.archived) {
+      const leftAt = new Date(isoDateValue(archive?.date) || isoDateValue(asRecord(transition.payload?.removed)?.date) || new Date().toISOString());
+      const removed = asRecord(transition.payload?.removed);
+      const reason = (textValue(archive?.reason) || textValue(removed?.reason))?.replace(/_/g, " ") || "archived";
+      const history = await db.ownershipHistory.findMany({ where: { animalId: transition.rowId }, orderBy: { fromDate: "asc" } });
+      const open = history.find((row: any) => row.ownerId === ownerId && !row.toDate);
+      if (open) {
+        await db.ownershipHistory.update({ where: { id: open.id }, data: { toDate: leftAt } });
+      } else if (!history.some((row: any) => row.ownerId === ownerId)) {
+        const animal = await db.animal.findUnique({ where: { id: transition.rowId }, select: { createdAt: true } });
+        const fromDate = animal?.createdAt && animal.createdAt < leftAt ? animal.createdAt : leftAt;
+        await db.ownershipHistory.create({
+          data: { animalId: transition.rowId, ownerId, fromDate, toDate: leftAt, transferType: "owned", notes: `Left the collection: ${reason}.` },
+        });
+      }
+    } else {
+      const history = Array.isArray(transition.payload?.archiveHistory) ? (transition.payload?.archiveHistory as unknown[]) : [];
+      const lastReturn = asRecord(history[history.length - 1]);
+      const returnedAt = new Date(isoDateValue(lastReturn?.returnDate) || new Date().toISOString());
+      await db.ownershipHistory.create({
+        data: { animalId: transition.rowId, ownerId, fromDate: returnedAt, transferType: "owned", notes: "Returned to the collection." },
+      });
+    }
+  }
+};
+
 /**
  * The tier's animal cap, judged on what this save leaves in the cloud.
  *
  * The app uploads only changed records, so the request size says nothing about the
  * collection: comparing it to the limit let a keeper pass the cap in small steps, and
  * the usage check that sat beside it counted deleted rows and refused every save --
- * edits included -- once an account reached its limit exactly. Only new live animals
- * can push an account over, so a save without any always goes through: edits,
- * deletions and pairings are never held hostage to the cap.
+ * edits included -- once an account reached its limit exactly. Only animals entering the
+ * collection can push an account over -- new ones, and archived ones returning -- so a save
+ * without any always goes through: edits, deletions, archiving and pairings are never held
+ * hostage to the cap. Archived animals (sold, died, given away...) do not count at all.
  */
 const assertAnimalCapacity = async (
   tx: any,
   ownerId: string,
   access: any,
-  added: number,
+  animalCreates: JsonRecord[],
   animalUpdates: PlannedUpdate[],
+  existingAnimals: Map<string, ExistingRow>,
 ): Promise<void> => {
   const limit = access?.limit;
   if (limit === undefined || limit === null || !Number.isFinite(Number(limit))) return;
+  const wasArchived = (appId: string) => wasArchivedBefore(existingAnimals, appId);
+  const created = animalCreates.filter((row) => !row.deletedAt && !isArchivedAnimalStatus(row.status)).length;
+  // Entering the collection: a deleted row brought back live (its data clears deletedAt), or an
+  // archived animal returning. Either way only when the animal it now is counts.
+  const entering = animalUpdates.filter((update) => {
+    if (update.data.deletedAt) return false;
+    if (update.data.status === undefined || isArchivedAnimalStatus(update.data.status)) return false;
+    const resurrected = "deletedAt" in update.data && update.data.deletedAt === null;
+    return resurrected || wasArchived(update.appId);
+  }).length;
+  const added = created + entering;
   if (!added) return;
 
-  const deletedIds = animalUpdates.filter((update) => update.data.deletedAt).map((update) => update.appId);
-  const [liveNow, liveBeingDeleted] = await Promise.all([
-    tx.animal.count({ where: { ownerId, deletedAt: null } }),
-    deletedIds.length
-      ? tx.animal.count({ where: { ownerId, deletedAt: null, appAnimalId: { in: deletedIds } } })
+  // Room made in the same save: animals deleted, or moved to the archive. countedAnimalWhere only
+  // matches rows that count now, so a row already deleted or archived frees nothing twice.
+  const leavingIds = animalUpdates
+    .filter((update) => update.data.deletedAt || (isArchivedAnimalStatus(update.data.status) && !wasArchived(update.appId)))
+    .map((update) => update.appId);
+  const [liveNow, liveLeaving] = await Promise.all([
+    tx.animal.count({ where: countedAnimalWhere(ownerId) }),
+    leavingIds.length
+      ? tx.animal.count({ where: countedAnimalWhere(ownerId, { appAnimalId: { in: leavingIds } }) })
       : Promise.resolve(0),
   ]);
-  const liveAfter = liveNow - liveBeingDeleted + added;
+  const liveAfter = liveNow - liveLeaving + added;
   if (liveAfter <= Number(limit)) return;
 
   const tierName = access.tier || access.currentTier || "Your plan";
@@ -579,6 +668,8 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
   };
   let plannerStateWritten = false;
   let cycleChangesForReminders = false;
+  // Animals this save moves into or out of the archive, for the ownership history written after.
+  let archiveTransitions: ArchiveTransition[] = [];
 
   // One transaction for the whole save, reads included, holding the account's sync lock. Reading
   // the stored rows before the transaction (the old shape) let two devices saving at once merge
@@ -728,7 +819,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
 
     const animalCreates: JsonRecord[] = [];
     const animalUpdates: PlannedUpdate[] = [];
-    let animalsResurrected = 0;
     for (const [index, animal] of animals.entries()) {
       const appAnimalId = requireRecordId(animal, "animal", index);
       const existing = existingAnimals.get(appAnimalId) || null;
@@ -752,7 +842,6 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
         // sent, not merged with the dead row's payload.
         if (!shouldResurrect(animal, existing)) continue;
         animalUpdates.push({ id: existing.id, appId: appAnimalId, data: { ...animalColumns(animal), deletedAt: null } });
-        animalsResurrected += 1;
         continue;
       }
       const merged = mergeAnimalPayload(storedRecord(existing), animal);
@@ -764,9 +853,11 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
       tx,
       ownerId,
       animalAccess,
-      animalCreates.filter((row) => !row.deletedAt).length + animalsResurrected,
+      animalCreates,
       animalUpdates,
+      existingAnimals,
     );
+    archiveTransitions = planArchiveTransitions(animalUpdates, existingAnimals);
 
     // Row ids for every pairing the clutch loop may reference. Pairings created by this request
     // have no id until after the insert, so those are resolved in a single lookup below.
@@ -883,6 +974,13 @@ export const upsertBreederSnapshot = async (ownerId: string, input: BreederSnaps
     examUpdates.forEach((row) => touched.follicleExams.add(row.appId));
     cycleChangesForReminders = cycleCreates.length > 0 || cycleUpdates.length > 0;
   }, SNAPSHOT_TRANSACTION_OPTIONS);
+
+  if (archiveTransitions.length) {
+    // Best effort, after the save: a passport history problem must never cost the keeper a sync.
+    await recordArchiveOwnership(ownerId, archiveTransitions).catch((err) => {
+      console.error("[archive] ownership history update failed:", err);
+    });
+  }
 
   const savedSnapshot = await listBreederSnapshot(ownerId);
 

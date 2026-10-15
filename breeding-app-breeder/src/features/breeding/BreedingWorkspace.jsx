@@ -1,11 +1,13 @@
 /**
- * Hosts the breeding cards view and the follicle overview, owns the quick-entry dialogs and the
- * rack-walk ("save and next female") sequence, and translates dialog submissions into actions.
+ * Hosts Active pairing (the open breeding cards, with the follicle overview one switch away) and
+ * Completed pairing (closed cards by season), owns the quick-entry dialogs and the rack-walk
+ * ("save and next female") sequence, and translates dialog submissions into actions.
  * App.jsx gives it state and setters; the domain stays in ./domain.
  */
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BreedingCardsSection } from './components/BreedingCardsSection';
+import { CompletedCyclesSection } from './components/CompletedCyclesSection';
 import { FollicleOverviewSection } from './components/FollicleOverviewSection';
 import {
   BreedingDialog,
@@ -15,6 +17,7 @@ import {
   MilestoneDialog,
   ClutchDialog,
   HatchingDialog,
+  LogHatchDialog,
   CloseCycleDialog,
   PlannedPairingDialog,
   SireAssignmentDialog,
@@ -54,7 +57,7 @@ function EditSessionDialog({ cycle, session, snakesById, onSubmit, onClose }) {
 }
 
 export function BreedingWorkspace({
-  view = 'cards',
+  view = 'active',
   cycles,
   exams,
   settings,
@@ -76,9 +79,17 @@ export function BreedingWorkspace({
   scopedFemaleIds = null,
   dialogRequest = null,
   onDialogRequestHandled = null,
+  currentSeason = '',
+  seasonSummaries = [],
 }) {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState(null);
+  const [activeMode, setActiveMode] = useState('cards');
+  // Follicle exams belong to the breeding project: only females with an open card are offered.
+  const femalesWithOpenCard = React.useMemo(() => {
+    const open = new Set(cycles.filter((c) => c && !c.deletedAt && c.status !== 'closed').map((c) => c.femaleId));
+    return females.filter((f) => open.has(f.id));
+  }, [cycles, females]);
   const [batchIndex, setBatchIndex] = useState(0);
 
   const openDialog = useCallback((request) => {
@@ -137,6 +148,7 @@ export function BreedingWorkspace({
             males={males}
             defaultMaleId={dialog.defaultMaleId || femaleCycle?.males?.[femaleCycle.males.length - 1]?.maleId || null}
             seasonLabel={femaleCycle?.seasonLabel || ''}
+            newCardSeasonLabel={femaleCycle ? '' : currentSeason}
             batch={batchFor(dialog)}
             onClose={closeDialog}
             onSubmit={(input) => {
@@ -164,7 +176,7 @@ export function BreedingWorkspace({
         return (
           <FollicleExamDialog
             femaleId={exam?.femaleId || dialog.femaleId || null}
-            females={females}
+            females={exam ? females : femalesWithOpenCard}
             exam={exam}
             batch={batchFor(dialog)}
             onAttach={onAttachFiles}
@@ -201,6 +213,19 @@ export function BreedingWorkspace({
             onSubmit={(input) => (dialog.mode === 'complete' ? actions.completeHatching(cycle.id, input) : actions.recordHatching(cycle.id, input))}
           />
         ) : null;
+      case 'logHatch':
+        return cycle ? (
+          <LogHatchDialog
+            cycle={cycle}
+            onClose={closeDialog}
+            onSubmit={(input) => {
+              const updated = actions.completeHatching(cycle.id, input);
+              // The hatchlings become animals right away; that completes the cycle.
+              if (updated && updated.status !== 'closed' && (updated.clutch?.hatchlingsRecorded || 0) > 0) onCreateHatchlings?.(updated);
+              return updated;
+            }}
+          />
+        ) : null;
       case 'close':
         return cycle ? <CloseCycleDialog cycle={cycle} onClose={closeDialog} onSubmit={(input) => actions.closeCycle(cycle.id, input)} /> : null;
       case 'planned':
@@ -224,24 +249,56 @@ export function BreedingWorkspace({
 
   const shared = { cycles, exams, settings, snakesById, geneticsTokensFor, females, males, actions, openDialog, onOpenSnake, locationFor, searchQuery };
 
+  const modeButton = (key, label) => (
+    <button
+      type="button"
+      aria-pressed={activeMode === key}
+      className={`text-xs px-3 py-1.5 rounded-lg border ${activeMode === key ? 'font-semibold bg-white' : 'bg-transparent text-neutral-600 hover:bg-white'}`}
+      style={activeMode === key ? { borderColor: 'var(--sk-primary, #0284c7)', color: 'var(--sk-primary, #0284c7)' } : undefined}
+      onClick={() => setActiveMode(key)}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <>
-      {view === 'follicles' ? (
-        <FollicleOverviewSection
-          {...shared}
-          onSettingsChange={actions.updateSettings}
-          onOpenCycle={onFocusCycle}
-          speciesOptions={speciesOptions}
-        />
-      ) : (
-        <BreedingCardsSection
+      {view === 'completed' ? (
+        <CompletedCyclesSection
           {...shared}
           focusedCycleId={focusedCycleId}
           onFocusCycle={onFocusCycle}
           onCreateHatchlings={onCreateHatchlings}
           showAppAlert={showAppAlert}
           scopedFemaleIds={scopedFemaleIds}
+          seasonSummaries={seasonSummaries}
         />
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('breeding.active.modeLabel', { defaultValue: 'Show' })}>
+            {modeButton('cards', t('breeding.active.modeCards', { defaultValue: 'Breeding cards' }))}
+            {modeButton('follicles', t('breeding.active.modeFollicles', { defaultValue: 'Follicle overview' }))}
+          </div>
+          {activeMode === 'follicles' ? (
+            <FollicleOverviewSection
+              {...shared}
+              females={femalesWithOpenCard}
+              onSettingsChange={actions.updateSettings}
+              onOpenCycle={(cycleId) => { setActiveMode('cards'); onFocusCycle?.(cycleId); }}
+              speciesOptions={speciesOptions}
+            />
+          ) : (
+            <BreedingCardsSection
+              {...shared}
+              focusedCycleId={focusedCycleId}
+              onFocusCycle={onFocusCycle}
+              onCreateHatchlings={onCreateHatchlings}
+              showAppAlert={showAppAlert}
+              scopedFemaleIds={scopedFemaleIds}
+              currentSeason={currentSeason}
+            />
+          )}
+        </div>
       )}
       {renderDialog()}
     </>

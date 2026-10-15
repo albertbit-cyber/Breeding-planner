@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planLegacyMigration, legacyCounts, cycleCounts, explicitSeasonToken } from './legacyMigration';
+import { planLegacyMigration, legacyCounts, cycleCounts, explicitSeasonToken, catchUpCycleFromLegacy } from './legacyMigration';
 import { countObservedLocks, countSessions } from './cycleModel';
 
 const NOW = '2026-03-01T10:00:00.000Z';
@@ -107,5 +107,58 @@ describe('P. legacy migration', () => {
     expect(result.cycles[0].legacy.reviewReasons).toContain('no_actual_pairing_date');
     const demo = planLegacyMigration([{ ...noDates, isDemo: true }], [], { now: NOW });
     expect(demo.cycles).toHaveLength(0);
+  });
+});
+
+describe('catching a card up with its legacy pairing record', () => {
+  const pairing = {
+    id: 'p-cu',
+    femaleId: 'F-cu',
+    maleId: 'M-cu',
+    appointments: [{ id: 'a1', date: '2025-11-02', appointmentDone: true, lockObserved: true, lockDate: '2025-11-03' }],
+  };
+
+  it('adds what was recorded in the old screens after the card was made, once', () => {
+    const [card] = planLegacyMigration([pairing], [], { now: NOW }).cycles;
+    expect(card.events).toHaveLength(0);
+    const edited = {
+      ...pairing,
+      appointments: [...pairing.appointments, { id: 'a2', date: '2025-12-01', appointmentDone: true }],
+      ovulation: { observed: true, date: '2026-01-10' },
+      clutch: { recorded: true, date: '2026-03-01', eggsTotal: 7, fertileEggs: 7, eggBoxNotes: { 1: 'left shelf' } },
+    };
+    const caught = catchUpCycleFromLegacy(card, [edited], { now: NOW });
+    expect(caught.sessions.map((s) => s.id).sort()).toEqual(['a1-session', 'a2-session']);
+    expect(caught.events.map((e) => e.type).sort()).toEqual(['egg_laying', 'ovulation']);
+    expect(caught.clutch.eggsTotal).toBe(7);
+    expect(caught.status).toBe('active');
+    // Same facts again: nothing to do, so the very same object comes back.
+    expect(catchUpCycleFromLegacy(caught, [edited], { now: NOW })).toBe(caught);
+    // An egg box note is incubator bookkeeping, not a fact the card mirrors.
+    expect(catchUpCycleFromLegacy(caught, [{ ...edited, clutch: { ...edited.clutch, eggBoxNotes: { 1: 'moved' } } }], { now: NOW })).toBe(caught);
+  });
+
+  it('never overwrites what the card already holds', () => {
+    const [card] = planLegacyMigration([pairing], [], { now: NOW }).cycles;
+    const onCard = { ...card, clutch: { ...card.clutch, eggsTotal: 9 } };
+    const caught = catchUpCycleFromLegacy(onCard, [{ ...pairing, clutch: { recorded: true, date: '2026-03-01', eggsTotal: 7 } }], { now: NOW });
+    expect(caught.clutch.eggsTotal).toBe(9);
+  });
+
+  it('closes a card the old screens finished (hatched), unless it was reopened', () => {
+    const [card] = planLegacyMigration([pairing], [], { now: NOW }).cycles;
+    const hatched = { ...pairing, clutch: { recorded: true, date: '2026-03-01', eggsTotal: 6 }, hatch: { recorded: true, date: '2026-05-01', hatchedCount: 6 } };
+    const caught = catchUpCycleFromLegacy(card, [hatched], { now: NOW });
+    expect(caught.status).toBe('closed');
+    expect(caught.closure.outcome).toBe('hatching_complete');
+    expect(caught.closure.biologicalCompletionDate).toBe('2026-05-01');
+    const reopened = { ...card, reopenings: [{ reopenedAt: NOW }] };
+    expect(catchUpCycleFromLegacy(reopened, [hatched], { now: NOW }).status).toBe('active');
+  });
+
+  it('labels a bare legacy year by the season rule, not as a manual label', () => {
+    const [card] = planLegacyMigration([{ ...pairing, cycleYear: 2026, appointments: [{ id: 'a1', date: '2026-01-20', appointmentDone: true }] }], [], { now: NOW }).cycles;
+    expect(card.seasonLabel).toBe('2025–26');
+    expect(card.seasonLabelSource).toBe('auto');
   });
 });

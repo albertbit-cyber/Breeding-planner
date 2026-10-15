@@ -104,13 +104,23 @@ test("a fresh phone account imports a MorphMarket file in three clicks and pairs
 
   // Pair right away, from the phone's own navigation.
   await page.locator("nav").getByRole("button", { name: /^Breeding$/ }).click();
-  await page.getByRole("button", { name: "New pairing" }).click();
-  const pairingModal = page.locator("div.fixed", { hasText: "Create pairing" }).last();
-  await expect(pairingModal.getByText(/Breeders group, and/)).toHaveCount(0);
-  await pairingModal.getByText("Confusion Firefly Lesser Clown #2").click();
-  await pairingModal.getByText("Pastel Yellow Belly Female").click();
-  await pairingModal.getByRole("button", { name: "New pairing" }).click();
+  await page.getByRole("button", { name: "Record a pairing" }).first().click();
+  const pairingDialog = page.getByRole("dialog");
+  // The imported breeders are offered: pick them by name.
+  const pick = async (index: number, name: string) => {
+    const select = pairingDialog.locator("select").nth(index);
+    const value = await select.locator("option").evaluateAll(
+      (options, wanted) => (options as HTMLOptionElement[]).find((o) => o.textContent?.includes(wanted))?.value || "",
+      name,
+    );
+    expect(value, `${name} is offered`).not.toBe("");
+    await select.selectOption(value);
+  };
+  await pick(0, "Pastel Yellow Belly Female");
+  await pick(1, "Confusion Firefly Lesser Clown #2");
+  await pairingDialog.getByRole("button", { name: "Save session" }).click();
+  await expect(pairingDialog).toHaveCount(0);
 
-  // The count shows on the view tab and on the list heading; the tab is enough.
-  await expect(page.getByRole("button", { name: "Active pairings (1)" })).toBeVisible();
+  // The first pairing opened her breeding card under Active pairing.
+  await expect(page.getByRole("button", { name: /^Active pairing \(1\)/ })).toBeVisible();
 });

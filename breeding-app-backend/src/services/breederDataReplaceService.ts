@@ -45,6 +45,13 @@ const db = prisma as any;
 // The previous state of the account is kept for this many replaces, newest first.
 export const REPLACEMENT_HISTORY_LIMIT = 10;
 
+/**
+ * Newest first. The generation goes up by one with every replace and undo, so it is the true order;
+ * two entries written in the same millisecond (a replace undone straight away) tie on createdAt, and
+ * ordering by that alone could list them backwards or prune the newest instead of the oldest.
+ */
+const HISTORY_ORDER = [{ dataGeneration: "desc" as const }, { createdAt: "desc" as const }];
+
 const REPLACE_TRANSACTION_OPTIONS = {
   maxWait: 10_000,
   timeout: 120_000,
@@ -412,7 +419,7 @@ export const replaceBreederData = async (
 
     const stale = await tx.breederDataReplacement.findMany({
       where: { ownerId },
-      orderBy: { createdAt: "desc" },
+      orderBy: HISTORY_ORDER,
       skip: REPLACEMENT_HISTORY_LIMIT,
       select: { id: true },
     });
@@ -457,7 +464,7 @@ export const replaceBreederData = async (
 export const listBreederDataReplacements = async (ownerId: string) => {
   const rows = await db.breederDataReplacement.findMany({
     where: { ownerId },
-    orderBy: { createdAt: "desc" },
+    orderBy: HISTORY_ORDER,
     take: REPLACEMENT_HISTORY_LIMIT,
     select: { id: true, reason: true, dataGeneration: true, summary: true, createdAt: true },
   });
