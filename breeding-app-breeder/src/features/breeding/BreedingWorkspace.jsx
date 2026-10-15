@@ -22,7 +22,8 @@ import {
   SireAssignmentDialog,
 } from './components/BreedingDialogs';
 import { formatDate, animalName } from './components/format';
-import { toYmd } from './domain/dates';
+import { toYmd, todayYmd } from './domain/dates';
+import { upcomingPairings } from './domain/pairingPlan';
 
 function EditSessionDialog({ cycle, session, snakesById, onSubmit, onClose }) {
   const { t } = useTranslation();
@@ -194,8 +195,6 @@ export function BreedingWorkspace({
             onClose={closeDialog}
             onSubmit={(input) => {
               const result = actions.recordMilestone(cycle.id, input);
-              if (result.review?.cancelled?.length) showAppAlert?.(t('breeding.notice.ovulationCancelled', { defaultValue: 'Ovulation recorded: {{count}} automatic pairing reminder(s) were cancelled. Their record is kept.', count: result.review.cancelled.length }));
-              if (result.review?.toReview?.length) showAppAlert?.(t('breeding.notice.ovulationReview', { defaultValue: 'You have {{count}} planned pairing(s) you set yourself. Review them on the card now that ovulation is recorded.', count: result.review.toReview.length }));
               return result;
             }}
           />
@@ -291,8 +290,12 @@ export function BreedingWorkspace({
   );
 }
 
-/** Calendar entries derived from breeding cards and examinations, for CalendarSection. */
-export function buildBreedingCalendarEvents({ cycles = [], exams = [], year, month }) {
+/**
+ * Calendar entries derived from breeding cards and examinations, for CalendarSection. Ticked
+ * pairings and observed locks are records and always show. A planned pairing shows only while it
+ * is still ahead: once its date passes unticked it drops off instead of turning overdue.
+ */
+export function buildBreedingCalendarEvents({ cycles = [], exams = [], year, month, today = todayYmd() }) {
   const inMonth = (date) => {
     const ymd = toYmd(date);
     if (!ymd) return false;
@@ -307,11 +310,9 @@ export function buildBreedingCalendarEvents({ cycles = [], exams = [], year, mon
         if (lock.status === 'observed' && inMonth(lock.observationDate)) events.push({ date: lock.observationDate, type: 'breedingCard', kind: 'lock_observed', cycleId: cycle.id, femaleId: cycle.femaleId, maleId: session.maleId, certainty: 'recorded' });
       });
     });
-    if (cycle.status === 'active') {
-      cycle.plannedPairings.filter((p) => p.status === 'pending').forEach((planned) => {
-        if (inMonth(planned.date)) events.push({ date: planned.date, type: 'breedingCard', kind: 'planned_pairing', cycleId: cycle.id, femaleId: cycle.femaleId, maleId: planned.maleId, certainty: 'planned' });
-      });
-    }
+    upcomingPairings(cycle, { today }).forEach((row) => {
+      if (inMonth(row.plannedDate)) events.push({ date: row.plannedDate, type: 'breedingCard', kind: 'planned_pairing', cycleId: cycle.id, femaleId: cycle.femaleId, maleId: row.maleId, certainty: 'planned' });
+    });
     cycle.events.forEach((event) => {
       if (inMonth(event.date)) events.push({ date: event.date, type: 'breedingCard', kind: event.type, cycleId: cycle.id, femaleId: cycle.femaleId, certainty: event.certainty === 'suspected' ? 'suspected' : event.precision === 'estimated' ? 'estimated' : 'recorded' });
     });

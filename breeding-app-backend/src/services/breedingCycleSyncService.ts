@@ -243,6 +243,26 @@ const mergeSession = (older: JsonRecord, newer: JsonRecord): JsonRecord => {
   return { ...other, ...base, locks: unionById(other.locks, base.locks) };
 };
 
+/**
+ * Drop the ids the keeper removed from a card (sessions, locks, milestones, planned pairings).
+ * Without this the by-id union would bring a removed record back from the other copy. Mirrors
+ * dropRemoved in the breeder app's features/breeding/domain/cycleModel.js.
+ */
+const dropRemoved = (payload: JsonRecord, removedIds: string[]): JsonRecord => {
+  if (!removedIds.length) return payload;
+  const removed = new Set(removedIds);
+  const keep = (item: JsonRecord | null): item is JsonRecord => !!item && !removed.has(text(item.id) || "");
+  return {
+    ...payload,
+    sessions: asArray(payload.sessions).map(asRecord).filter(keep).map((session) => ({
+      ...session,
+      locks: asArray(session.locks).map(asRecord).filter(keep),
+    })),
+    plannedPairings: asArray(payload.plannedPairings).map(asRecord).filter(keep),
+    events: asArray(payload.events).map(asRecord).filter(keep),
+  };
+};
+
 /** Newer record wins scalars; nested arrays are unioned by id. Tombstones are handled by the caller. */
 export const mergeBreedingCyclePayload = (existingPayload: unknown, incoming: JsonRecord): JsonRecord => {
   const existing = asRecord(existingPayload);
@@ -250,7 +270,10 @@ export const mergeBreedingCyclePayload = (existingPayload: unknown, incoming: Js
   const incomingNewer = timestampMs(incoming) >= timestampMs(existing);
   const base = incomingNewer ? incoming : existing;
   const other = incomingNewer ? existing : incoming;
-  return {
+  const removedIds = Array.from(new Set(
+    [...asArray(other.removedIds), ...asArray(base.removedIds)].map(text).filter((id): id is string => !!id),
+  ));
+  return dropRemoved({
     ...other,
     ...base,
     males: unionById(other.males, base.males, "maleId"),
@@ -258,8 +281,9 @@ export const mergeBreedingCyclePayload = (existingPayload: unknown, incoming: Js
     plannedPairings: unionById(other.plannedPairings, base.plannedPairings),
     events: unionById(other.events, base.events),
     offspring: unionById(other.offspring, base.offspring, "animalId"),
+    ...(removedIds.length ? { removedIds } : {}),
     metadata: { ...(asRecord(other.metadata) || {}), ...(asRecord(base.metadata) || {}) },
-  };
+  }, removedIds);
 };
 
 export const mergeFollicleExamPayload = (existingPayload: unknown, incoming: JsonRecord): JsonRecord => {
@@ -384,7 +408,7 @@ export const syncPlannedPairingReminders = async (
           projectDisplayName: `Breeding card ${text(cycle.seasonLabel) || ""}`.trim(),
           reminderType: "pairing_follow_up",
           reminderDateDisplay: formatDateForTimezone(date as string, timezone),
-          explanation: `A pairing with ${maleName} is planned for this date. It was proposed one calendar month after an observed lock, or set by you. Open the breeding card to record the session, move the date, or skip it.`,
+          explanation: `A pairing with ${maleName} is planned for this date. Tick "Paired" on the breeding card when it happens. If it does not happen, there is nothing to do.`,
           actionUrl: `${env.publicAppUrl || "https://app.breedingplanner.com"}/#/?focusCycle=${encodeURIComponent(id)}`,
         },
         subject: `Breeding reminder: planned pairing for ${femaleName}`,
