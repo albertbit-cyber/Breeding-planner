@@ -3,11 +3,13 @@
 // tested on their own and so the entry shapes stay identical to the ones the desktop editor
 // writes (feeds, weights, sheds, cleanings in `snake.logs`).
 
+import { isOutOfCollection } from "../animals/archive.js";
+
 const text = (value) => String(value ?? "").trim();
 
-export const RETIRED_STATUSES = new Set(["deceased", "sold", "died", "dead"]);
-
-export const isRetired = (snake) => RETIRED_STATUSES.has(text(snake?.status).toLowerCase());
+// Archived (sold, died, given away) and removed snakes are not worked on in the field. The
+// archive module owns that rule, so the Field tab and the desktop lists cannot disagree.
+export const isRetired = (snake) => isOutOfCollection(snake);
 
 export const sexLetter = (snake) => {
   const raw = text(snake?.sex).toLowerCase();
@@ -77,7 +79,7 @@ export const searchSnakes = (snakes, query, limit = 30) => {
   if (!q) return [];
   const hits = [];
   for (const snake of Array.isArray(snakes) ? snakes : []) {
-    if (!snake || snake.isDemo) continue;
+    if (!snake || snake.isDemo || isRetired(snake)) continue;
     const blob = [snake.name, snake.id, geneticsText(snake), snake.species, ...list(snake.groups), ...list(snake.tags)]
       .map((v) => text(v).toLowerCase())
       .join(" ");

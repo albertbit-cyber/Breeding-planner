@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowCounterClockwise, CaretRight, ForkKnife, MagnifyingGlass, QrCode, X } from "@phosphor-icons/react";
-import { buildLocationIndex, dueFeeds, geneticsText, searchSnakes, sexLetter, snakeImage } from "./fieldLogic.js";
+import { buildLocationIndex, dueFeeds, geneticsText, isRetired, searchSnakes, sexLetter, snakeImage } from "./fieldLogic.js";
 import "./field.css";
 
 // The phone's home screen: scan, see what is due, get to an animal in one tap. Everything
@@ -68,9 +68,9 @@ export default function FieldScreen({
   const results = useMemo(() => searchSnakes(snakes, query), [snakes, query]);
   const recent = useMemo(() => {
     const byId = new Map((Array.isArray(snakes) ? snakes : []).map((s) => [String(s?.id || ""), s]));
-    return (Array.isArray(recentIds) ? recentIds : []).map((id) => byId.get(String(id))).filter(Boolean);
+    return (Array.isArray(recentIds) ? recentIds : []).map((id) => byId.get(String(id))).filter((s) => s && !isRetired(s));
   }, [snakes, recentIds]);
-  const liveCount = useMemo(() => (Array.isArray(snakes) ? snakes.filter((s) => s && !s.isDemo).length : 0), [snakes]);
+  const liveCount = useMemo(() => (Array.isArray(snakes) ? snakes.filter((s) => s && !s.isDemo && !isRetired(s)).length : 0), [snakes]);
 
   useEffect(() => {
     if (!notice) return undefined;
