@@ -8,7 +8,15 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
-**Latest breeder APK (2026-10-13 16:11, 0.1.96): `app-release-2026-10-13-cloud-replace.apk`**
+**Latest breeder APK (2026-10-15 16:22, 0.1.106): `app-release-2026-10-15-breeding-season-pairing-plan.apk`**
+SHA256 `6C3699043D7A5254E4D8A7658EA46E1A452BE56BB1DE68B74998466137DD2754`, package `com.serpentora.mobile`,
+versionCode 10106 / 0.1.106, release-signed (same certificate), staging backend. The 0.1.96 build below plus `main`
+(archive, breeding seasons, cycle clock and Log hatch) and the open PRs 22 (phone animal list), 24 (pairing plan rows)
+and 25 (lab results wording). The Android rebuild is PR 26 (`feature/android-rebuild`), not merged yet. PR 24 and 25
+backend parts reach staging only when they merge. Built from `build/apk-2026-10-15` @ `3a3b65f`. Browser-verified,
+not run on the phone. Full entry in `APK_CHANGELOG.md`.
+
+**Previous breeder APK (2026-10-13 16:11, 0.1.96): `app-release-2026-10-13-cloud-replace.apk`**
 SHA256 `08A453C43CF2BA98A0D0AE28205C8F3FF071C15DFEEEF5B1D3D6FF62497A746C`, package `com.serpentora.mobile`,
 versionCode 10096 / 0.1.96, release-signed (same certificate), staging backend. Everything in the 0.1.93 build below
 plus PR #18: signed in, restoring a backup previews the change and then replaces the cloud data, every device follows on
