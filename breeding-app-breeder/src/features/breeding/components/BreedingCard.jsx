@@ -9,7 +9,7 @@
  * hatchling outcome and the step that completes the cycle: registering the hatchlings.
  */
 import DepartureTag from '../../animals/DepartureTag.jsx';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   deriveStage,
@@ -24,6 +24,8 @@ import {
   registrationStatus,
 } from '../domain/cycleModel';
 import { isIncubating } from '../domain/pairingView';
+import { cycleClock } from '../domain/cycleClock';
+import { CycleClock } from './CycleClock';
 import { examsForCycle, latestMeasurement, latestChange } from '../domain/follicles';
 import { upcomingPairings } from '../domain/pairingPlan';
 import { evaluateReview, buildForecasts } from '../domain/reviewRules';
@@ -81,6 +83,14 @@ export function BreedingCard({
   const [expanded, setExpanded] = useState(defaultExpanded || isFocused);
   const [editingSeason, setEditingSeason] = useState(false);
   const [section, setSection] = useState('overview');
+  const rootRef = useRef(null);
+  // Opened from the dashboard, the incubator or a link: bring this card into view.
+  useEffect(() => {
+    if (!isFocused) return;
+    setExpanded(true);
+    const id = window.setTimeout(() => rootRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }), 50);
+    return () => window.clearTimeout(id);
+  }, [isFocused]);
   const [seasonDraft, setSeasonDraft] = useState(cycle.seasonLabel);
   const today = todayYmd();
 
@@ -103,6 +113,7 @@ export function BreedingCard({
   const overlays = useMemo(() => femaleCycles.filter((c) => c.id !== cycle.id).map((c) => ({ label: c.seasonLabel, cycle: c, exams: examsForCycle(exams, c) })), [femaleCycles, cycle.id, exams]);
   const latestAge = latest ? diffDays(latest.date, today) : null;
   const incubating = isIncubating(cycle);
+  const clock = cycleClock(cycle, today);
   const registration = registrationStatus(cycle);
   const awaitingRegistration = !isClosed && registration.hatched && registration.missing > 0;
   const sortedExams = useMemo(() => [...cycleExams].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [cycleExams]);
@@ -174,6 +185,7 @@ export function BreedingCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(true); } }}
       >
         {headerIdentity}
+        <CycleClock clock={clock} compact />
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
           <span>{t('breeding.card.sessionsCount', { defaultValue: '{{count}} sessions', count: countSessions(cycle) })}</span>
           <span>{t('breeding.card.locksCount', { defaultValue: '{{count}} observed locks', count: countObservedLocks(cycle) })}</span>
@@ -187,7 +199,7 @@ export function BreedingCard({
   }
 
   return (
-    <div className={`mt-card border rounded-xl p-3 w-full ${isFocused ? 'ring-2 ring-sky-400 ring-offset-1' : ''}`} tabIndex={-1} aria-label={t('breeding.card.ariaLabel', { defaultValue: 'Breeding card for {{name}}', name: animalName(female, cycle.femaleId) })}>
+    <div ref={rootRef} className={`mt-card border rounded-xl p-3 w-full scroll-mt-4 ${isFocused ? 'ring-2 ring-sky-400 ring-offset-1' : ''}`} tabIndex={-1} aria-label={t('breeding.card.ariaLabel', { defaultValue: 'Breeding card for {{name}}', name: animalName(female, cycle.femaleId) })}>
       <div className="flex items-start justify-between gap-3">
         {headerIdentity}
         <button type="button" className={`${smallBtn} shrink-0`} onClick={() => setExpanded(false)}>{t('common.collapse', { defaultValue: 'Collapse' })}</button>
@@ -210,6 +222,8 @@ export function BreedingCard({
           <Stat label={eventTypeLabel(t, 'live_birth')} value={milestoneDate('live_birth') ? formatDate(milestoneDate('live_birth')) : DASH} hint={cycle.clutch.liveBirths !== null ? `${cycle.clutch.liveBirths}` : null} />
         )}
       </div>
+
+      <CycleClock clock={clock} />
 
       {/* Review prompts and flags */}
       {(review.flags.length || flags.length || openReviewFlags.length || cycle.legacy?.reviewNeeded || isPaused) ? (
@@ -249,10 +263,9 @@ export function BreedingCard({
         <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
         {!isClosed ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'milestone', cycleId: cycle.id })}>{t('breeding.action.milestone', { defaultValue: '+ Milestone' })}</button> : null}
         {!isClosed && cycle.reproductionMode !== 'live_bearing' ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'clutch', cycleId: cycle.id })}>{t('breeding.action.eggsLaid', { defaultValue: 'Eggs laid' })}</button> : null}
-        {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'hatching', cycleId: cycle.id, mode: 'partial' })}>{t('breeding.action.hatching', { defaultValue: 'Hatching' })}</button> : null}
         {!isClosed && !isPaused ? <button type="button" className={smallBtn} onClick={() => { const reason = window.prompt(t('breeding.action.pauseReason', { defaultValue: 'Reason for pausing (optional)' }), ''); if (reason !== null) run(() => actions.pauseCycle(cycle.id, { reason })); }}>{t('breeding.action.pause', { defaultValue: 'Pause' })}</button> : null}
         {isPaused ? <button type="button" className={smallBtn} onClick={() => run(() => actions.resumeCycle(cycle.id))}>{t('breeding.action.resume', { defaultValue: 'Resume' })}</button> : null}
-        {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'hatching', cycleId: cycle.id, mode: 'complete' })}>{t('breeding.action.complete', { defaultValue: 'Hatching complete' })}</button> : null}
+        {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button type="button" className={incubating ? primaryBtn : smallBtn} onClick={() => openDialog({ kind: 'logHatch', cycleId: cycle.id })}>{t('breeding.action.logHatch', { defaultValue: 'Log hatch' })}</button> : null}
         {!isClosed ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'close', cycleId: cycle.id })}>{t('breeding.action.close', { defaultValue: 'Close card' })}</button> : null}
         {isClosed ? <button type="button" className={smallBtn} onClick={() => { const note = window.prompt(t('breeding.action.reopenNote', { defaultValue: 'Why is this card being reopened?' }), ''); if (note !== null) { const result = run(() => actions.reopenCycle(cycle.id, { note })); if (result?.correctionMode) showAppAlert?.(t('breeding.notice.reopenedPaused', { defaultValue: 'Reopened in correction mode (paused): this female already has a newer open card, so this one does not become active again. Correct the records, then close it.' })); } }}>{t('breeding.action.reopen', { defaultValue: 'Reopen' })}</button> : null}
       </div>
@@ -401,10 +414,12 @@ export function BreedingCard({
                   <li key={w.metric}>
                     <span className="font-semibold">{eventTypeLabel(t, w.target)}</span>: {formatDate(w.earliest)} – {formatDate(w.latest)}{w.typical ? ` (${t('breeding.forecast.typical', { defaultValue: 'typical' })} ${formatDate(w.typical)})` : ''}
                     <div className="text-neutral-500">
-                      {w.kind === 'forecast' ? t('breeding.forecast.fromFemale', { defaultValue: 'From {{n}} of her completed cycles; anchored on {{anchor}} {{date}}. Historical range, not a confidence interval.', n: w.sampleCount, anchor: eventTypeLabel(t, w.anchor), date: formatDate(w.anchorDate) }) : null}
+                      {w.minDays !== null && w.minDays !== undefined ? <span className="text-neutral-700">{t('breeding.forecast.inDays', { defaultValue: '{{min}}–{{max}} days after {{anchor}}', min: w.minDays, max: w.maxDays, anchor: eventTypeLabel(t, w.anchor).toLowerCase() })}{w.typicalDays !== null ? `, ${t('breeding.forecast.typicalDays', { defaultValue: 'typically {{days}}', days: w.typicalDays })}` : ''}. </span> : null}
+                      {w.kind === 'forecast' && w.source === 'female_history' ? t('breeding.forecast.fromFemale', { defaultValue: 'From {{n}} of her completed cycles; anchored on {{anchor}} {{date}}. Historical range, not a confidence interval.', n: w.sampleCount, anchor: eventTypeLabel(t, w.anchor), date: formatDate(w.anchorDate) }) : null}
                       {w.kind === 'descriptive' ? t('breeding.forecast.descriptive', { defaultValue: 'Descriptive only: {{n}} prior cycle(s), fewer than the {{min}} needed for a forecast. Anchored on {{anchor}} {{date}}.', n: w.sampleCount, min: forecasts.minCycles, anchor: eventTypeLabel(t, w.anchor), date: formatDate(w.anchorDate) }) : null}
                       {w.source === 'collection_history' ? t('breeding.forecast.fromCollection', { defaultValue: 'From {{n}} completed cycles of other females of this species in your collection; anchored on {{anchor}} {{date}}. Historical range.', n: w.sampleCount, anchor: eventTypeLabel(t, w.anchor), date: formatDate(w.anchorDate) }) : null}
                       {w.kind === 'reference' ? t('breeding.forecast.reference', { defaultValue: 'Species reference range (keeper literature), not this female\'s data. Anchored on {{anchor}} {{date}}.', anchor: eventTypeLabel(t, w.anchor), date: formatDate(w.anchorDate) }) : null}
+                      {w.ignoredCount ? ` ${t('breeding.forecast.ignored', { defaultValue: '{{count}} record(s) with an impossible interval were left out.', count: w.ignoredCount })}` : ''}
                       {w.overdue ? ` ${t('breeding.forecast.overdue', { defaultValue: 'The range has passed without a recorded event.' })}` : ''}
                     </div>
                   </li>

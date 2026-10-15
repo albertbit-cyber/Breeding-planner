@@ -170,6 +170,18 @@ export function summarizeCycle(cycle, exams = [], { usePreciseOnly = true } = {}
   };
 }
 
+/**
+ * Intervals a record can actually have, in days, for any egg-laying species the app knows.
+ * Wider than any one species' biology on purpose: they only drop entries that cannot be true,
+ * such as a clutch "hatching" on the day it was laid, which one mistyped legacy date produces.
+ */
+export const PLAUSIBLE_INTERVAL_DAYS = Object.freeze({
+  ovulationToPreLayShed: [5, 60],
+  preLayShedToLaying: [5, 90],
+  layingToFirstHatch: [20, 150],
+  layingToFinalHatch: [20, 160],
+});
+
 function statistic(values) {
   const list = values.filter((v) => typeof v === 'number' && Number.isFinite(v));
   if (!list.length) return { n: 0, median: null, min: null, max: null, label: 'none' };
@@ -191,7 +203,10 @@ export function femaleStatistics(cycles = [], exams = [], { excludeCycleId = nul
   const summaries = usable.map((c) => summarizeCycle(c, exams));
   const metrics = {};
   INTERVAL_METRICS.forEach((key) => {
-    metrics[key] = statistic(summaries.map((s) => (s.intervals[key].status === 'ok' ? s.intervals[key].value : null)));
+    const values = summaries.map((s) => (s.intervals[key].status === 'ok' ? s.intervals[key].value : null)).filter((v) => v !== null);
+    const bounds = PLAUSIBLE_INTERVAL_DAYS[key];
+    const kept = bounds ? values.filter((v) => v >= bounds[0] && v <= bounds[1]) : values;
+    metrics[key] = { ...statistic(kept), ignored: values.length - kept.length };
   });
   const laidSummaries = summaries.filter((s) => s.clutch.laid && !s.clutch.noClutch);
   COUNT_METRICS.forEach((key) => {
