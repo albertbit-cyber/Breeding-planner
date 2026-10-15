@@ -3939,6 +3939,11 @@
   display: none;
 }
 
+/* Desktop has the group checkboxes, so the one-tap group dropdown is phone-only. */
+.bp-group-select {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .bp-filter-sheet-trigger {
     display: flex;
@@ -3970,6 +3975,27 @@
   /* Hide the full GroupCheckboxes block on mobile */
   .bp-group-filters-desktop {
     display: none !important;
+  }
+  .bp-group-select {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 16rem;
+    padding: 8px 10px;
+    border: 1.5px solid var(--sk-border, #e5e7eb);
+    border-radius: 10px;
+    background-color: var(--sk-surface, #fff);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--sk-text-secondary, #374151);
+    text-overflow: ellipsis;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bp-group-select.has-filters {
+    border-color: var(--sk-series-4, #7c3aed);
+    color: var(--sk-series-4, #7c3aed);
+    background-color: var(--sk-surface-2, #f5f3ff);
   }
 }
 
@@ -4142,6 +4168,52 @@
   color: var(--sk-text-muted, #6b7280);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.bp-legend-popover-anchor {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.bp-legend-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 40px 12px 14px;
+  background: var(--sk-surface, #fff);
+  border: 1px solid var(--sk-border, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: var(--sk-shadow-2);
+}
+
+.bp-legend-popover__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--sk-text-muted, #6b7280);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bp-legend-popover__close:hover,
+.bp-legend-popover__close:focus-visible {
+  background: var(--sk-surface-2, #f3f4f6);
+  color: var(--sk-text-secondary, #374151);
 }
 
 /* ── Cards grid — single column on narrow phones ─────────────── */

@@ -1069,6 +1069,8 @@
   "filters.apply": "Zastosuj",
   "filters.filters": "Filtry",
   "filters.other": "Inne",
+  "filters.allGroups": "Wszystkie grupy",
+  "filters.severalGroups": "Kilka grup",
   "groups.noSnakes": "Brak węży w tej grupie.",
   "groups.tip": "Wskazówka: edytuj węża, aby przypisać lub zmienić jego grupę.",
   "groups.title": "Grupy",

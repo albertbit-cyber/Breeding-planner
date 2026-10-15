@@ -1067,6 +1067,8 @@
   "filters.apply": "Apply",
   "filters.filters": "Filters",
   "filters.other": "Other",
+  "filters.allGroups": "All groups",
+  "filters.severalGroups": "Several groups",
   "groups.noSnakes": "No snakes in this group.",
   "groups.tip": "Tip: Edit a snake to assign or change its group.",
   "groups.title": "Groups",
