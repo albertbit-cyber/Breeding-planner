@@ -3174,6 +3174,13 @@ function prepareAnimalForBackend(snake) {
   if (!snake || typeof snake !== 'object') return snake;
   const cleaned = sanitizeBackendMediaValue(snake);
   if (!cleaned || typeof cleaned !== 'object') return cleaned;
+  // A cover photo stored on the device is left out of the upload, but its edit stamp went up
+  // with it, so the server took the missing value for a deliberate removal and every device
+  // dropped the cover on its next sync. Without the stamp the server keeps what it had.
+  if (isEmbeddedMediaString(snake.imageUrl) && cleaned.fieldUpdatedAt && typeof cleaned.fieldUpdatedAt === 'object' && 'imageUrl' in cleaned.fieldUpdatedAt) {
+    const { imageUrl: _deviceOnlyStamp, ...fieldUpdatedAt } = cleaned.fieldUpdatedAt;
+    cleaned.fieldUpdatedAt = fieldUpdatedAt;
+  }
   if (!Array.isArray(cleaned.photos)) return cleaned;
   const photos = cleaned.photos.filter(photo => photo && typeof photo.url === 'string' && photo.url.trim());
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
@@ -3344,6 +3351,12 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (removedCopy) return sanitizeSnakeRecord(removedCopy);
   const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
   if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
+  // The cloud never holds a device-stored cover photo, so its missing cover is no removal. The
+  // cover stays while its photo is still on the animal (a photo deleted elsewhere takes it along).
+  if (merged.imageUrl === undefined && backendAnimal.imageUrl === undefined && isEmbeddedMediaString(localAnimal.imageUrl)
+    && Array.isArray(merged.photos) && merged.photos.some(photo => photo?.url === localAnimal.imageUrl)) {
+    merged.imageUrl = localAnimal.imageUrl;
+  }
   return sanitizeSnakeRecord(merged);
 }
 
@@ -7501,6 +7514,10 @@ export default function BreedingPlannerApp() {
   // The account's data generation this device last loaded, kept across restarts: a device that
   // was closed while the account was replaced must still notice on its next start.
   const dataGenerationRef = useRef(Number(loadStoredJson(STORAGE_KEYS.dataGeneration, 0)) || 0);
+  // The animals of a backup file this device just replaced the cloud with. The cloud copy has
+  // no photos, so loading the replace takes them from the file, not only from what the device
+  // held before the restore.
+  const restoredFileSnakesRef = useRef(null);
   // Filled in once the backup vault exists further down, so loading a replace can first keep
   // this device's own copy.
   const addBackupVaultEntryRef = useRef(null);
@@ -8005,7 +8022,10 @@ export default function BreedingPlannerApp() {
     remoteSnapshotRef.current = backendSnapshot;
     remoteCursorRef.current = fullSnapshot?.serverTime || null;
 
-    const shown = normalizeCloudSnapshotForDisplay({ ...backendSnapshot, snakes: keepLocalPhotos(backendSnapshot.snakes, local.snakes) }, local);
+    const fileSnakes = restoredFileSnakesRef.current || [];
+    restoredFileSnakesRef.current = null;
+    const withPhotos = keepLocalPhotos(keepLocalPhotos(backendSnapshot.snakes, fileSnakes), local.snakes);
+    const shown = normalizeCloudSnapshotForDisplay({ ...backendSnapshot, snakes: withPhotos }, local);
     setSyncedSnakes(shown.snakes);
     setSyncedPairings(shown.pairings);
     setSyncedBreedingCycles(shown.breedingCycles);
@@ -9007,6 +9027,7 @@ export default function BreedingPlannerApp() {
     if (!confirmed) return { mode: 'cancelled' };
 
     const result = await replaceBreederData(upload);
+    restoredFileSnakesRef.current = (Array.isArray(payload.snakes) ? payload.snakes : []).map(sanitizeSnakeRecord).filter(Boolean);
     // Breeding settings are this device's own and never synced; the file's apply here.
     if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
     // This device loads the replace like every other one: its next sync sees the new generation.
@@ -15166,6 +15187,8 @@ export {
   exportDatasetToCsv,
   formatCycleTimerDayLabel,
   mergeBreederSnapshots,
+  keepLocalPhotos,
+  prepareAnimalForBackend,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
