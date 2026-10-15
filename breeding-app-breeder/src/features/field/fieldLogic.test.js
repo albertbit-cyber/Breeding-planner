@@ -31,6 +31,12 @@ describe("field row helpers", () => {
     expect(isRetired(snake({ status: "Deceased" }))).toBe(true);
     expect(isRetired(snake())).toBe(false);
   });
+
+  it("follows the archive: an archive record or a removed stub retires the animal", () => {
+    expect(isRetired(snake({ archive: { reason: "given_away", date: "2026-10-01" } }))).toBe(true);
+    expect(isRetired(snake({ status: "Removed" }))).toBe(true);
+    expect(isRetired(snake({ status: "Quarantine" }))).toBe(false);
+  });
 });
 
 describe("dueFeeds", () => {
@@ -60,6 +66,11 @@ describe("searchSnakes", () => {
     expect(searchSnakes(rows, "26-").length).toBe(2);
     expect(searchSnakes(rows, "26-", 1).length).toBe(1);
     expect(searchSnakes(rows, "   ")).toEqual([]);
+  });
+
+  it("leaves archived animals out", () => {
+    const rows = [snake(), snake({ id: "26-F-9", name: "Athena II", archive: { reason: "sold", date: "2026-10-01" } })];
+    expect(searchSnakes(rows, "athena").map((s) => s.id)).toEqual(["26-F-1"]);
   });
 });
 
