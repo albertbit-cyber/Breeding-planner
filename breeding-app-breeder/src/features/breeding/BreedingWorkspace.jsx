@@ -17,6 +17,7 @@ import {
   MilestoneDialog,
   ClutchDialog,
   HatchingDialog,
+  LogHatchDialog,
   CloseCycleDialog,
   PlannedPairingDialog,
   SireAssignmentDialog,
@@ -210,6 +211,19 @@ export function BreedingWorkspace({
             mode={dialog.mode || 'partial'}
             onClose={closeDialog}
             onSubmit={(input) => (dialog.mode === 'complete' ? actions.completeHatching(cycle.id, input) : actions.recordHatching(cycle.id, input))}
+          />
+        ) : null;
+      case 'logHatch':
+        return cycle ? (
+          <LogHatchDialog
+            cycle={cycle}
+            onClose={closeDialog}
+            onSubmit={(input) => {
+              const updated = actions.completeHatching(cycle.id, input);
+              // The hatchlings become animals right away; that completes the cycle.
+              if (updated && updated.status !== 'closed' && (updated.clutch?.hatchlingsRecorded || 0) > 0) onCreateHatchlings?.(updated);
+              return updated;
+            }}
           />
         ) : null;
       case 'close':
