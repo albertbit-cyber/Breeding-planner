@@ -10,7 +10,7 @@ import { test, expect, type Page } from "@playwright/test";
  *  1. first actual pairing creates the card, in the season its date falls in
  *  2. multiple sires: second male, his session and lock  3. follicle exams on her Follicles tab
  *  4. ovulation, pre-lay shed, eggs laid: the clutch is in the incubator
- *  5. partial hatching, the final outcome, then registering the hatchlings completes the cycle
+ *  5. the cycle clock, then Log hatch: the hatchlings become animals and the cycle completes
  *  6. her next cycle in the next season, with embedded history
  *  7. correct a historical event on the reopened card and see the recalculation
  */
@@ -75,15 +75,6 @@ const expandCards = async (page: Page) => {
     if (!(await collapsed.isVisible().catch(() => false))) return;
     await collapsed.click();
   }
-};
-
-/** The hatch wizard registers each hatchling as an animal; the last step saves and closes. */
-const registerHatchlings = async (page: Page, count: number) => {
-  await card(page).getByRole("button", { name: "Register hatchlings" }).first().click();
-  for (let i = 0; i < count; i += 1) {
-    await page.getByRole("button", { name: i === count - 1 ? "Save hatchling" : "Save & next", exact: true }).click();
-  }
-  await dismissNotice(page);
 };
 
 test.describe("breeding cards end to end", () => {
@@ -174,22 +165,18 @@ test.describe("breeding cards end to end", () => {
     await openBreedingTab(page, /^Active pairing/);
     await expandCards(page);
 
-    // 5. Partial hatching keeps the card open; the final outcome is recorded; the cycle is only
-    // complete once every hatchling is registered as an animal.
-    await card(page).getByRole("button", { name: "Hatching", exact: true }).click();
-    await fillDate(page, /Hatch date/, "2026-08-01");
-    await dialog(page).getByLabel("Hatchlings so far").fill("2");
-    await dialog(page).getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog(page)).toHaveCount(0);
-    await expect(card(page).getByText("Active", { exact: true }).first()).toBeVisible();
-    await card(page).getByRole("button", { name: "Hatching complete" }).first().click();
-    await fillDate(page, /Final hatch date/, "2026-08-04");
-    await dialog(page).getByLabel("Hatchlings so far").fill("5");
-    await dialog(page).getByLabel(/Unhatched/).fill("0");
-    await dialog(page).getByRole("button", { name: "Hatching complete", exact: true }).click();
-    await expect(dialog(page)).toHaveCount(0);
-    await expect(card(page).getByText("Hatchlings to register: 5")).toBeVisible();
-    await registerHatchlings(page, 5);
+    // The cycle clock counts 60 days from laying; this scenario runs long after, so it is red.
+    await expect(card(page).getByText(/Watch for hatching: \d+ days past due \(expected 04\/08\/2026\)/).first()).toBeVisible();
+
+    // 5. Log hatch, once every hatchling is out: the hatchlings become animals in Hatchlings 2026
+    // and the cycle completes on its own.
+    await card(page).getByRole("button", { name: "Log hatch", exact: true }).click();
+    await fillDate(page, /Hatch date/, "2026-08-04");
+    await dialog(page).getByLabel("How many hatched").fill("5");
+    await dialog(page).getByLabel(/Did not hatch/).fill("0");
+    await dialog(page).getByRole("button", { name: "Log hatch", exact: true }).click();
+    await expect(page.getByText("5 hatchlings added to Hatchlings 2026.")).toBeVisible();
+    await dismissNotice(page);
 
     // The card is complete and lives under Completed pairing, in its own season.
     await openBreedingTab(page, /^Completed pairing \(1\)/);
@@ -231,9 +218,10 @@ test.describe("breeding cards end to end", () => {
     await dialog(page).getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog(page)).toHaveCount(0);
     await dismissNotice(page);
-    // Its hatchlings are already registered, so recording the outcome again completes it again.
-    await reopened.getByRole("button", { name: "Hatching complete" }).first().click();
-    await dialog(page).getByRole("button", { name: "Hatching complete", exact: true }).click();
+    // Its hatchlings are already registered, so logging the hatch again completes it again and
+    // creates no second set of hatchlings.
+    await reopened.getByRole("button", { name: "Log hatch", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Log hatch", exact: true }).click();
     await expect(dialog(page)).toHaveCount(0);
     await expect(card(page)).toHaveCount(1);
     await expandCards(page);

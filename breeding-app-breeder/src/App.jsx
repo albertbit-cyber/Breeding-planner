@@ -29,6 +29,8 @@ import { planLegacyMigration, catchUpCycleFromLegacy } from "./features/breeding
 import { initializeSeasonSettings, cyclesNeedingSeasonLabel, summarizeSeasons, currentSeasonLabel } from "./features/breeding/domain/season";
 import { cycleToPairingView, isIncubating as isCycleIncubating, clutchNumbersToAssign } from "./features/breeding/domain/pairingView";
 import { SeasonBar } from "./features/breeding/components/SeasonBar.jsx";
+import { CycleClock } from "./features/breeding/components/CycleClock.jsx";
+import { cycleClock } from "./features/breeding/domain/cycleClock";
 import { associateExamsWithCycle } from "./features/breeding/domain/follicles";
 import { linkOffspring as linkCycleOffspring, cyclesForFemale as breedingCyclesForFemale, CYCLE_STATUS as BREEDING_CYCLE_STATUS, MALE_STATE as BREEDING_MALE_STATE, closeCyclesForArchivedFemale, cancelPlannedPairingsForArchivedMale, completeIfRegistered as completeCycleIfRegistered, registrationStatus as cycleRegistrationStatus } from "./features/breeding/domain/cycleModel";
 import { normalizeBreedingSettings } from "./features/breeding/domain/reviewRules";
@@ -9470,10 +9472,13 @@ export default function BreedingPlannerApp() {
   }, [breedingCycleViews, scopedSnakes, speciesScope]);
   const breedingDashboardItems = useMemo(() => {
     const today = new Date();
+    const cyclesById = new Map((Array.isArray(breedingCycles) ? breedingCycles : []).map(cycle => [cycle?.id, cycle]));
     return scopedOpenCycleViews
       .map(view => {
-        const item = buildPairingDashboardItem(view, snakes, today);
-        if (!item) return null;
+        const base = buildPairingDashboardItem(view, snakes, today);
+        if (!base) return null;
+        // The same clock the breeding card shows, so both always agree.
+        const item = { ...base, clock: cycleClock(cyclesById.get(view.cycleId)) };
         // Hatched but not every hatchling is an animal yet: that registration is what is left.
         if (view.awaitingRegistration) {
           return { ...item, nextStage: `Register ${view.registration.missing} ${view.registration.missing === 1 ? 'hatchling' : 'hatchlings'}`, actionLabel: 'Register hatchlings', seasonLabel: view.seasonLabel || '' };
@@ -9495,7 +9500,7 @@ export default function BreedingPlannerApp() {
         if (aDays !== bDays) return aDays - bDays;
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
-  }, [scopedOpenCycleViews, snakes]);
+  }, [scopedOpenCycleViews, snakes, breedingCycles]);
 
   /**
    * The same urgency counts the Breeding dashboard shows, but for every species at
@@ -11341,92 +11346,6 @@ export default function BreedingPlannerApp() {
     };
   }
 
-    const openHatchWizardForPayload = useCallback((payload) => {
-      if (!payload || !payload.pairing || !payload.count || payload.count <= 0) return;
-      const pairing = withPairingLifecycleDefaults({ ...payload.pairing });
-      const existingHatchlingIndexes = new Set(
-        snakes
-          .filter(s => s && (s.pairingId === pairing.id || s.metadata?.pairingId === pairing.id))
-          .map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex))
-          .filter(Number.isFinite)
-      );
-      const requestedThrough = Number(payload.existingCount) + payload.count;
-      // hatchlingsGeneratedThrough is a persistent, synced high-water mark, so it still
-      // blocks re-generation after the hatchling records themselves were deleted or on a
-      // device/tab that hasn't locally seen them yet (unlike existingHatchlingIndexes, which
-      // only reflects snakes currently present in this session's state).
-      const alreadyGenerated = Number(pairing.hatch?.hatchlingsGeneratedThrough || 0) >= requestedThrough;
-      const alreadyRecorded = alreadyGenerated || Array.from({ length: payload.count }, (_, idx) => payload.existingCount + idx + 1)
-        .some(index => existingHatchlingIndexes.has(index));
-      if (alreadyRecorded) {
-        showAppAlert(t('pairing.hatchlingsAlreadyRecorded', {
-          defaultValue: 'These hatchlings have already been recorded for this pairing. To record them again, choose "Eggs hatched", answer that you have logged hatch before, and delete the old hatchling records.',
-        }));
-        return;
-      }
-      const hatchedOn = payload.hatchedDate || localYMD(new Date());
-      const parsedDate = parseYmd(hatchedOn) || new Date();
-      const year = Number.isFinite(parsedDate.getFullYear()) ? parsedDate.getFullYear() : new Date().getFullYear();
-      const sire = snakeById(snakes, pairing?.maleId);
-      const dam = snakeById(snakes, pairing?.femaleId);
-      const pairingName = `${dam?.name || 'Dam'} × ${sire?.name || 'Sire'}`;
-      const baseExistingRecords = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
-      const idsInUse = new Set(baseExistingRecords.map(record => record.id));
-      const recordsInUse = baseExistingRecords.map(record => ({ ...record }));
-      const configClone = breederInfo?.idGenerator ? { ...breederInfo.idGenerator } : null;
-
-      const entries = Array.from({ length: payload.count }, (_, idx) => {
-        const sequenceLabel = payload.existingCount + idx + 1;
-        const defaultName = `${pairingName} - ${sequenceLabel}`;
-        const generatedId = generateSnakeId(
-          defaultName,
-          year,
-          recordsInUse,
-          null,
-          {
-            idConfig: configClone,
-            sex: 'U',
-            morphs: [],
-            hets: [],
-            birthYear: year,
-          }
-        );
-        idsInUse.add(generatedId);
-        const seqValue = extractSequenceFromId(generatedId, configClone);
-        recordsInUse.push({ id: generatedId, idSequence: seqValue });
-        return {
-          id: generatedId,
-          autoId: true,
-          name: defaultName,
-          sex: 'U',
-          morph: '',
-          weight: '',
-          birthDate: hatchedOn,
-          idSequence: seqValue,
-        };
-      });
-
-      setHatchWizard({
-        pairingId: pairing.id,
-        pairing,
-        entries,
-        currentIndex: 0,
-        hatchedDate: hatchedOn,
-        total: payload.count,
-        existingCount: payload.existingCount,
-        previousHatch: payload.previousHatch || pairing.hatch,
-        context: {
-          pairingName,
-          sireName: sire?.name || '',
-          damName: dam?.name || '',
-          groupName: `Hatchlings ${year}`,
-          year,
-          idConfig: configClone,
-          existingIdsBase: baseExistingRecords.map(record => record.id),
-          existingRecordsBase: baseExistingRecords,
-        },
-      });
-    }, [snakes, breederInfo, showAppAlert, t]);
 
 
   // ── Female breeding cards (SBR-01..SBR-11) ─────────────────────────────────
@@ -11617,38 +11536,112 @@ export default function BreedingPlannerApp() {
     setBreedingCycles(prev => prev.map(cycle => updates.get(cycle?.id) || cycle));
   }, [snakes, breedingCycles, setBreedingCycles]);
 
-  // The existing hatch wizard creates the hatchling animals; the card supplies the parents. With
+  // Log hatch creates the hatchlings straight away, as the old pairing records did: one animal per
+  // hatchling, automatic IDs, sex unknown, filed in that year's hatchlings group and linked to the
+  // card (which then completes on its own). The record is the one the hatch wizard writes. With
   // more than one participating male the sire is left empty, so parentage stays unresolved.
+  const hatchlingCreationRef = useRef(new Set());
   const createHatchlingsForCycle = useCallback((cycle) => {
-    const female = snakeById(snakes, cycle.femaleId);
+    if (!cycle?.id || hatchlingCreationRef.current.has(cycle.id)) return 0;
+    const dam = snakeById(snakes, cycle.femaleId);
     const participated = cycle.males.filter(m => m.state === BREEDING_MALE_STATE.PARTICIPATED);
     const soleMaleId = participated.length === 1 ? participated[0].maleId : null;
-    const male = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const sire = soleMaleId ? snakeById(snakes, soleMaleId) : null;
+    const pairingRef = cycle.legacy?.pairingIds?.[0] || cycle.id;
     const linkedIds = new Set([cycle.id, ...(cycle.legacy?.pairingIds || [])]);
-    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId)).length;
+    const existing = snakes.filter(s => s && linkedIds.has(s.pairingId || s.metadata?.pairingId));
     const total = Number(cycle.clutch?.hatchlingsRecorded || 0);
-    const count = total - existing;
-    if (count <= 0) {
-      showAppAlert(t('breeding.notice.hatchlingsUpToDate', { defaultValue: 'Hatchling records already exist for every recorded hatchling on this card ({{count}}). Raise the hatchling count first.', count: total }));
-      return;
-    }
-    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const count = total - existing.length;
+    if (count <= 0) return 0;
+    hatchlingCreationRef.current.add(cycle.id);
     const hatchedOn = cycle.clutch.finalHatchDate || cycle.clutch.firstHatchDate || localYMD(new Date());
-    openHatchWizardForPayload({
-      pairing: withPairingLifecycleDefaults({
-        id: cycle.legacy?.pairingIds?.[0] || cycle.id,
-        femaleId: cycle.femaleId,
-        maleId: soleMaleId,
-        label: `${female?.name || cycle.femaleId} × ${male?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' }))}`,
-        clutch: { recorded: !!layDate, date: layDate, eggsTotal: cycle.clutch.eggsTotal ?? '', fertileEggs: cycle.clutch.fertileEggs ?? '', slugs: cycle.clutch.slugs ?? '' },
-        hatch: { recorded: true, date: hatchedOn, hatchedCount: total },
-      }),
-      count,
-      hatchedDate: hatchedOn,
-      existingCount: existing,
-      previousHatch: {},
+    const year = Number(String(hatchedOn).slice(0, 4)) || new Date().getFullYear();
+    const groupName = `Hatchlings ${year}`;
+    const sireLabel = sire?.name || (participated.length > 1 ? t('breeding.notice.multipleSiresLabel', { defaultValue: 'multiple sires' }) : 'Sire');
+    const pairingName = `${dam?.name || 'Dam'} × ${sireLabel}`;
+    const layDate = cycle.events.find(e => e.type === 'egg_laying' && e.certainty === 'recorded')?.date || '';
+    const clutchYear = (layDate || hatchedOn).slice(0, 4);
+    const clutchId = buildClutchId(dam?.name, sire?.name, clutchYear) || pairingRef;
+    const snapshot = (parent) => parent ? {
+      id: parent.id || null,
+      name: parent.name || parent.id || '',
+      sex: parent.sex || '',
+      morphs: Array.isArray(parent.morphs) ? [...parent.morphs] : [],
+      hets: Array.isArray(parent.hets) ? [...parent.hets] : [],
+      possibleHets: Array.isArray(parent.possibleHets) ? [...parent.possibleHets] : [],
+      genetics: getDisplayedSnakeGeneticsTokens(parent),
+    } : null;
+    const sireSnapshot = snapshot(sire);
+    const damSnapshot = snapshot(dam);
+    const species = resolveSpeciesId(dam?.species || sire?.species);
+    const idConfig = breederInfo?.idGenerator ? { ...breederInfo.idGenerator } : null;
+    const recordsInUse = snakes.map(s => ({ id: s.id, idSequence: s.idSequence }));
+    const idsInUse = new Set(recordsInUse.map(r => r.id));
+    const indexesInUse = new Set(existing.map(s => Number(s.hatchlingIndex ?? s.metadata?.hatchlingIndex)).filter(Number.isFinite));
+    const created = [];
+    let hatchlingIndex = 0;
+    while (created.length < count) {
+      hatchlingIndex += 1;
+      if (indexesInUse.has(hatchlingIndex)) continue;
+      const name = `${pairingName} - ${hatchlingIndex}`;
+      let id = generateSnakeId(name, year, recordsInUse, null, { idConfig, sex: 'U', morphs: [], hets: [], birthYear: year });
+      if (!id || idsInUse.has(id)) {
+        let suffix = 2;
+        const baseId = id || `H-${year}-${hatchlingIndex}`;
+        while (idsInUse.has(`${baseId}-${suffix}`)) suffix += 1;
+        id = idsInUse.has(baseId) ? `${baseId}-${suffix}` : baseId;
+      }
+      const idSequence = extractSequenceFromId(id, idConfig);
+      idsInUse.add(id);
+      recordsInUse.push({ id, idSequence });
+      created.push({
+        id,
+        name,
+        sex: 'U',
+        species,
+        morphs: [],
+        hets: [],
+        weight: 0,
+        year,
+        birthDate: hatchedOn,
+        clutchId,
+        hatchlingIndex,
+        pairingId: pairingRef,
+        sireId: soleMaleId,
+        damId: cycle.femaleId || null,
+        sireName: sireSnapshot?.name || '',
+        damName: damSnapshot?.name || '',
+        sireGenetics: sireSnapshot?.genetics || [],
+        damGenetics: damSnapshot?.genetics || [],
+        parentGenetics: { sire: sireSnapshot, dam: damSnapshot },
+        metadata: { pairingId: pairingRef, cycleId: cycle.id, clutchId, hatchlingIndex, hatchDate: hatchedOn, parents: { sire: sireSnapshot, dam: damSnapshot } },
+        tags: ['hatchling'],
+        groups: normalizeSingleGroupValue(groupName),
+        // Born into the collection, not brought into it: hatchlings never start in quarantine.
+        status: 'Active',
+        imageUrl: undefined,
+        logs: cloneLogs(),
+        idSequence,
+        isDemo: false,
+      });
+    }
+    setSnakes(prev => {
+      const base = prev.filter(s => !s.isDemo);
+      const fresh = created.filter(c => !base.some(s => s.id === c.id));
+      return fresh.length ? [...base, ...fresh] : prev;
     });
-  }, [snakes, openHatchWizardForPayload, showAppAlert, t]);
+    setGroupsForSpecies(species, prev => (prev.includes(groupName) ? prev : [...prev, groupName]));
+    const highest = Math.max(...created.map(c => c.hatchlingIndex));
+    setPairings(prev => prev.map(p => {
+      if (p?.id !== pairingRef) return p;
+      const withDefaults = withPairingLifecycleDefaults({ ...p });
+      if (highest <= Number(withDefaults.hatch?.hatchlingsGeneratedThrough || 0)) return p;
+      return { ...withDefaults, hatch: { ...withDefaults.hatch, hatchlingsGeneratedThrough: highest } };
+    }));
+    showAppAlert(t('breeding.notice.hatchlingsAdded', { defaultValue: '{{count}} hatchlings added to {{group}}.', count: created.length, group: groupName }));
+    setTimeout(() => hatchlingCreationRef.current.delete(cycle.id), 2000);
+    return created.length;
+  }, [snakes, breederInfo, setSnakes, setGroupsForSpecies, setPairings, showAppAlert, t]);
 
   // Ultrasound stills and clips attached to an examination. Images are downscaled the way animal
   // photos are; anything over 8 MB is refused rather than silently dropped later by the sync.
@@ -24287,7 +24280,15 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                   ? t('pairing.dashboard.eggsInBox', { count: eggsCount, defaultValue: '{{count}} eggs in box' })
                   : t('pairing.dashboard.eggsInBoxUnknown', { defaultValue: 'Egg count not set' }));
               return (
-                <div key={item.id} className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5">
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('breeding.dashboard.openCard', { defaultValue: 'Open the breeding card for {{name}}', name: item.label })}
+                  onClick={() => openPairing(item.id)}
+                  onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPairing(item.id); } }}
+                  className="border rounded-xl bg-white p-3 shadow-sm space-y-2.5 cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                >
                   <div className="flex flex-col gap-2">
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -24315,10 +24316,18 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
-                        {item.countdownLabel}
-                      </span>
-                      {item.cycleDayLabel ? (
+                      {/* With a cycle clock the banner below carries the countdown and its colour; only
+                          the day count stays here, taken from the same clock so both agree. */}
+                      {item.clock ? null : (
+                        <span className={cx('w-fit text-[11px] px-2 py-0.5 rounded-full border font-medium', urgencyClass)}>
+                          {item.countdownLabel}
+                        </span>
+                      )}
+                      {item.clock ? (
+                        <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700 tabular-nums">
+                          {t('breeding.clock.dayShort', { defaultValue: 'Day {{day}} of {{total}}', day: item.clock.day, total: item.clock.totalDays })}
+                        </span>
+                      ) : item.cycleDayLabel ? (
                         <span className="w-fit text-[11px] px-2 py-0.5 rounded-full border border-neutral-200 bg-neutral-50 font-medium text-neutral-700">
                           {item.cycleDayLabel}
                         </span>
@@ -24326,6 +24335,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                     </div>
                   </div>
 
+                  <CycleClock clock={item.clock} compact />
                   <div className="grid grid-cols-1 gap-2 text-xs">
                     <div className="rounded-lg bg-neutral-50 border px-2.5 py-2">
                       <div className="text-[10px] uppercase font-semibold tracking-wide text-neutral-500">
@@ -24367,7 +24377,7 @@ function BreedingDashboardSection({ items = [], theme = 'blue', onOpenPairing, c
                     <button
                       type="button"
                       className={cx('px-3 py-2 rounded-xl text-xs', primaryBtnClass(theme, true))}
-                      onClick={() => openPairing(item.id)}
+                      onClick={e => { e.stopPropagation(); openPairing(item.id); }}
                     >
                       {item.actionLabel}
                     </button>
