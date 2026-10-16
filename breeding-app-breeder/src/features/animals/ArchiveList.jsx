@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ARCHIVE_REASONS, getArchiveRecord } from './archive';
 import { archiveLabels, formatRecordDate, formatRecordPrice } from './archiveRecord';
 import { formatSexCode } from './animalTextList';
+import { help } from '../help/help';
 
 const text = (value) => (value === undefined || value === null ? '' : String(value).trim());
 
@@ -67,21 +68,22 @@ export default function ArchiveList({ animals = [], locale, onOpen }) {
     <div className="archive-list flex flex-col gap-3">
       <div className="archive-list__filters flex flex-wrap items-center gap-2">
         <div className="archive-list__reasons flex flex-wrap gap-1" role="group" aria-label={labels.reason}>
-          <button type="button" className={`archive-chip ${reason === 'all' ? 'archive-chip--selected' : ''}`} aria-pressed={reason === 'all'} onClick={() => setReason('all')}>
+          <button type="button" {...help('archive-filter-reason')} className={`archive-chip ${reason === 'all' ? 'archive-chip--selected' : ''}`} aria-pressed={reason === 'all'} onClick={() => setReason('all')}>
             {t('archive.list.allReasons', { defaultValue: 'All' })} <span className="archive-chip__count">{entries.length}</span>
           </button>
           {ARCHIVE_REASONS.filter(r => reasonCounts[r]).map(r => (
-            <button key={r} type="button" className={`archive-chip ${reason === r ? 'archive-chip--selected' : ''}`} aria-pressed={reason === r} onClick={() => setReason(r)}>
+            <button key={r} type="button" {...help('archive-filter-reason')} className={`archive-chip ${reason === r ? 'archive-chip--selected' : ''}`} aria-pressed={reason === r} onClick={() => setReason(r)}>
               {labels.reasons[r]} <span className="archive-chip__count">{reasonCounts[r]}</span>
             </button>
           ))}
         </div>
-        <select className="border rounded-xl px-3 py-2 bg-white text-sm" value={year} onChange={e => setYear(e.target.value)} aria-label={t('archive.list.year', { defaultValue: 'Year' })}>
+        <select {...help('archive-filter-year')} className="border rounded-xl px-3 py-2 bg-white text-sm" value={year} onChange={e => setYear(e.target.value)} aria-label={t('archive.list.year', { defaultValue: 'Year' })}>
           <option value="all">{t('archive.list.allYears', { defaultValue: 'All years' })}</option>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
           {entries.some(e => !e.record.date) && <option value="none">{labels.dateNotRecorded}</option>}
         </select>
         <input
+          {...help('archive-search')}
           type="search"
           className="border rounded-xl px-3 py-2 bg-white text-sm flex-1 min-w-[10rem]"
           value={query}
@@ -105,7 +107,7 @@ export default function ArchiveList({ animals = [], locale, onOpen }) {
             ].filter(Boolean).join(' · ');
             return (
               <li key={animal.id}>
-                <button type="button" className="archive-list__row w-full text-left" onClick={() => onOpen(animal)}>
+                <button type="button" {...help('archive-open')} className="archive-list__row w-full text-left" onClick={() => onOpen(animal)}>
                   {photo
                     ? <img src={photo} alt="" className="archive-list__thumb" loading="lazy" />
                     : <span className="archive-list__thumb archive-list__thumb--empty" aria-hidden="true">{formatSexCode(animal.sex)}</span>}

@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useFeatureAccess } from "./FeatureAccessContext.jsx";
+import { help } from "../help/help";
 
 /**
  * Says what a plan does not include before the keeper presses the button the
@@ -16,7 +17,7 @@ export function LockedFeatureNotice({ access, featureName, onUpgrade, compact = 
     ? `${access.currentUsage || 0} / ${access.limit}`
     : "";
   return (
-    <div className="locked-feature-notice rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="status">
+    <div {...help('account-locked-feature')} className="locked-feature-notice rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="status">
       <div className="font-semibold">
         {t("subscriptions.locked.notIncluded", {
           defaultValue: "{{feature}} is not included in {{plan}}",
@@ -33,6 +34,7 @@ export function LockedFeatureNotice({ access, featureName, onUpgrade, compact = 
       </div>
       {onUpgrade ? (
         <button
+          {...help('account-see-plans')}
           type="button"
           className={`mt-2 rounded-md border border-amber-300 bg-white px-2 py-1 font-medium ${compact ? "" : "text-sm"}`}
           onClick={onUpgrade}
@@ -50,7 +52,7 @@ export function UpgradeModal({ access, onClose }) {
   return (
     <div className="upgrade-modal-backdrop">
       <div className="upgrade-modal">
-        <button type="button" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
+        <button {...help('app-dialog-close')} type="button" onClick={onClose}>{t("common.close", { defaultValue: "Close" })}</button>
         <LockedFeatureNotice access={access} onUpgrade={() => { onClose?.(); openUpgrade(); }} />
       </div>
     </div>

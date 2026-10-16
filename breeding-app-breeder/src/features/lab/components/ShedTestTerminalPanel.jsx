@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { help } from "../../help/help";
 import { createLabApiClient } from "../api/client";
 import { useSharedBackend } from "../../../contexts/SharedBackendContext.jsx";
 import { ORDER_PAYMENT_STATUS_LABELS, ORDER_PAYMENT_STATUS_TONES } from "../../../types/labStatus";
@@ -409,7 +410,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
     <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <div {...help('lab-tests-screen')} className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
             {t("lab.terminal.title", { defaultValue: "Lab tests" })}
           </div>
           <div className="mt-1 text-[11px] text-neutral-500">
@@ -423,6 +424,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
             <button
               type="button"
               className="rounded-lg border px-2 py-1 text-[11px]"
+              {...help('lab-past-orders-toggle')}
               onClick={() => setShowHistory((prev) => !prev)}
             >
               {showHistory
@@ -430,7 +432,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                 : t("lab.terminal.showHistory", { defaultValue: "Show past orders" })}
             </button>
           ) : null}
-          <button type="button" className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => refreshData()}>
+          <button {...help('lab-refresh')} type="button" className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => refreshData()}>
             {t("common.refresh", { defaultValue: "Refresh" })}
           </button>
         </div>
@@ -465,7 +467,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
         <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              <div {...help('lab-sent-orders')} className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 {t("lab.terminal.trackingTitle", { defaultValue: "Sent orders" })}
               </div>
               <div className="mt-1 text-[11px] text-neutral-500">
@@ -507,13 +509,13 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                           {t("lab.orders.orderDate", { defaultValue: "Order Date" })}: {formatDate(order.submittedAt || order.createdAt)}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5" {...help('lab-order-status')}>
                         <StatusBadge label={statusLabel} tone={statusTone} />
                         <StatusBadge label={paymentLabel} tone={paymentTone} />
                       </div>
                     </div>
 
-                    <div className="mt-3 overflow-x-auto">
+                    <div className="mt-3 overflow-x-auto" {...help('lab-order-status')}>
                       <OrderProgressBar status={status} />
                     </div>
 
@@ -528,6 +530,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                               key={`${order.id}-${snakeId}`}
                               type="button"
                               className="rounded-md border border-neutral-300 bg-neutral-50 px-1.5 py-0.5 text-[11px] hover:bg-white"
+                              {...help('lab-order-animal')}
                               onClick={() => openSnakeById(snakeId)}
                             >
                               {snakeNameById.get(String(snakeId)) || snakeId}
@@ -561,7 +564,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     {status === "submitted" ? (
                       <div className="mt-3 border-t border-neutral-100 pt-2">
                         {cancelingOrderId === order.id ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5">
+                          <div {...help('lab-cancel-order')} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5">
                             <span className="text-[11px] text-rose-700">
                               {t("lab.terminal.cancelConfirm", {
                                 defaultValue: "Cancel this order and delete all its data? This cannot be undone.",
@@ -592,6 +595,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                           <button
                             type="button"
                             className="rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50"
+                            {...help('lab-cancel-order')}
                             onClick={() => setCancelingOrderId(order.id)}
                           >
                             {t("lab.terminal.cancelOrder", { defaultValue: "Cancel Order" })}
@@ -622,7 +626,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                 className={`rounded-lg border px-3 py-2 text-xs ${isActiveSnake ? "border-sky-300 bg-sky-50" : "border-neutral-200 bg-neutral-50"}`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <label className="inline-flex items-center gap-2 font-medium text-neutral-800">
+                  <label {...help('lab-queue-item')} className="inline-flex items-center gap-2 font-medium text-neutral-800">
                     <input
                       type="checkbox"
                       checked={Boolean(item.selected)}
@@ -634,6 +638,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     <button
                       type="button"
                       className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px]"
+                      {...help('lab-queue-open-snake')}
                       onClick={() => openRelatedSnake(item)}
                     >
                       {t("lab.terminal.openSnake", { defaultValue: "Open Related Snake" })}
@@ -641,6 +646,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     <button
                       type="button"
                       className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px]"
+                      {...help('lab-queue-edit-tests')}
                       onClick={() => beginEditTests(item)}
                     >
                       {t("lab.terminal.editTests", { defaultValue: "Edit Tests" })}
@@ -648,6 +654,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     <button
                       type="button"
                       className="rounded-md border border-rose-200 bg-white px-2 py-0.5 text-[11px] text-rose-700"
+                      {...help('lab-queue-remove')}
                       onClick={() => removeItem(item.id)}
                     >
                       {t("common.remove", { defaultValue: "Remove" })}
@@ -656,7 +663,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                 </div>
 
                 {testEditorItemId === item.id ? (
-                  <div className="mt-2 rounded-md border border-neutral-300 bg-white p-2">
+                  <div {...help('lab-queue-edit-tests')} className="mt-2 rounded-md border border-neutral-300 bg-white p-2">
                     <div className="mb-2 text-[11px] font-medium text-neutral-700">
                       {t("lab.terminal.editTestsHelp", { defaultValue: "Select tests for this snake." })}
                     </div>
@@ -709,7 +716,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                       ))}
                     </div>
                   </div>
-                  <label>
+                  <label {...help('lab-queue-priority')}>
                     <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">
                       {t("lab.orders.priority", { defaultValue: "Priority" })}
                     </span>
@@ -727,7 +734,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                     <div className="mb-1 text-[10px] uppercase tracking-wide text-neutral-500">
                       {t("lab.terminal.itemTotal", { defaultValue: "Item total" })}
                     </div>
-                    <div className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-medium">
+                    <div {...help('lab-queue-total')} className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-medium">
                       {formatMoney(quoteItem?.currency || quote.currency, quoteItem?.itemTotalCents || 0)}
                     </div>
                   </div>
@@ -739,7 +746,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
       ) : null}
 
       {queueUnavailable ? (
-        <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+        <div {...help('lab-direct-orders')} className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
           <div className="font-medium">
             {t("lab.terminal.sharedModeDirectOrdersTitle", { defaultValue: "Orders go straight to the lab" })}
           </div>
@@ -756,13 +763,14 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
               <div className="text-[11px] text-neutral-500">{t("lab.terminal.selectedItems", { defaultValue: "Selected items" })}</div>
               <div className="font-medium text-neutral-800">{(quote.items || []).length}</div>
             </div>
-            <div>
+            <div {...help('lab-queue-total')}>
               <div className="text-[11px] text-neutral-500">{t("lab.terminal.total", { defaultValue: "Order total" })}</div>
               <div className="font-semibold text-neutral-900">{formatMoney(quote.currency, quote.totalCents)}</div>
             </div>
             <button
               type="button"
               className="rounded-lg border bg-neutral-900 px-3 py-1.5 text-xs font-medium sk-on-accent disabled:opacity-60"
+              {...help('lab-submit-queue')}
               disabled={submitting || loadingQuote || !pricingConfig || !(quote.items || []).length}
               onClick={submitBatch}
             >
@@ -779,7 +787,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
 
       {showHistory && !queueUnavailable ? (
         <div className="mt-3 space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <div {...help('lab-batch-history')} className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
             {t("lab.terminal.batchHistory", { defaultValue: "Past orders" })}
           </div>
           {!batches.length ? (
@@ -806,6 +814,7 @@ export default function ShedTestTerminalPanel({ activeSnakeId, snakes = [], onBa
                   <button
                     type="button"
                     className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-[11px]"
+                    {...help('lab-download-batch')}
                     onClick={() => redownloadBatch(batch.id)}
                   >
                     {t("lab.terminal.downloadBatch", { defaultValue: "Download all labels again" })}

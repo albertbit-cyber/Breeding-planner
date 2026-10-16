@@ -42,6 +42,7 @@ import {
   formatYmd,
   makeLabeller,
 } from './labels';
+import { help } from '../help/help';
 import QuickCheckSheet from './QuickCheckSheet';
 import CheckGuidanceDialog, { GuidanceButton } from './CheckGuidanceDialog';
 
@@ -50,6 +51,28 @@ import CheckGuidanceDialog, { GuidanceButton } from './CheckGuidanceDialog';
 // here writes until the breeder saves.
 
 const TABS = ['record', 'checks', 'tests', 'history'];
+
+// Help topics for the controls drawn from a list, written as literals so the help scan sees them.
+const STATUS_HELP = {
+  [QUARANTINE_STATUS.NONE]: { helpId: 'quarantine-panel-status-none' },
+  [QUARANTINE_STATUS.IN]: { helpId: 'quarantine-panel-status-in' },
+  [QUARANTINE_STATUS.CLEARED]: { helpId: 'quarantine-panel-status-cleared' },
+};
+const TAB_HELP = {
+  record: { helpId: 'quarantine-panel-tab-record' },
+  checks: { helpId: 'quarantine-panel-tab-checks' },
+  tests: { helpId: 'quarantine-panel-tab-tests' },
+  history: { helpId: 'quarantine-panel-tab-history' },
+};
+const INTAKE_HELP = {
+  pass: { helpId: 'quarantine-panel-intake-ok' },
+  flag: { helpId: 'quarantine-panel-intake-flag' },
+};
+const RESULT_HELP = {
+  clear: { helpId: 'quarantine-panel-result-clear' },
+  positive: { helpId: 'quarantine-panel-result-positive' },
+  inconclusive: { helpId: 'quarantine-panel-result-inconclusive' },
+};
 
 function Field({ label, children, className = '' }) {
   return (
@@ -96,7 +119,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
   return (
     <div className="p-3 border rounded-xl bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="font-medium text-sm">{t('quarantine.title', { defaultValue: 'Quarantine' })}</div>
+        <div className="font-medium text-sm" {...help('quarantine-panel')}>{t('quarantine.title', { defaultValue: 'Quarantine' })}</div>
         {status === QUARANTINE_STATUS.IN && progress ? (
           <div className="text-xs text-neutral-500 tabular-nums">
             {t('quarantine.dayOfPlanned', { day: days, planned: progress.planned, defaultValue: 'Day {{day}} of {{planned}}' })}
@@ -113,6 +136,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
               key={option}
               type="button"
               aria-pressed={active}
+              {...help(STATUS_HELP[option].helpId)}
               className={`px-3 py-1.5 rounded-xl border text-xs font-medium ${
                 active ? 'border-sky-500 bg-sky-500 text-white' : 'bg-white text-neutral-600'
               }`}
@@ -138,6 +162,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 key={key}
                 type="button"
                 aria-pressed={tab === key}
+                {...help(TAB_HELP[key].helpId)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
                   tab === key ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-100'
                 }`}
@@ -159,6 +184,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label={t('quarantine.source', { defaultValue: 'Where it came from' })}>
                 <select
+                  {...help('quarantine-panel-source')}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm bg-white"
                   value={record.source || ''}
                   onChange={event => patch(current => updateQuarantineDetails(current, { source: event.target.value }))}
@@ -176,6 +202,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
               <Field label={t('quarantine.sourceName', { defaultValue: 'Who from' })}>
                 <input
                   type="text"
+                  {...help('quarantine-panel-source-name')}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                   value={record.sourceName}
                   placeholder={t('quarantine.sourceNamePlaceholder', { defaultValue: 'Breeder, shop or shipment' })}
@@ -190,6 +217,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
               <Field label={t('quarantine.startedAt', { defaultValue: 'Started' })}>
                 <input
                   type="date"
+                  {...help('quarantine-panel-started')}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                   value={getQuarantineStartDate(draft) || ''}
                   onChange={event => patch(current => updateQuarantineDetails(current, { startedAt: event.target.value || null }))}
@@ -200,6 +228,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 <input
                   type="number"
                   min="1"
+                  {...help('quarantine-panel-planned-days')}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                   value={getPlannedDays(draft) || ''}
                   placeholder={record.source ? String(getDefaultDaysForSource(record.source)) : '90'}
@@ -211,6 +240,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 <Field label={t('quarantine.clearedAt', { defaultValue: 'Cleared' })}>
                   <input
                     type="date"
+                    {...help('quarantine-panel-cleared-date')}
                     className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                     value={record.clearedAt || ''}
                     onChange={event => patch(current => updateQuarantineDetails(current, { clearedAt: event.target.value || null }))}
@@ -221,17 +251,19 @@ export default function QuarantinePanel({ draft, setDraft }) {
               <Field label={t('quarantine.intakeWeight', { defaultValue: 'Intake weight (g)' })}>
                 <input
                   type="number"
+                  {...help('quarantine-panel-intake-weight')}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                   value={record.intakeWeight || ''}
                   onChange={event => patch(current => updateQuarantineDetails(current, { intakeWeight: Number(event.target.value) || null }))}
                 />
               </Field>
 
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2" {...help('quarantine-panel-intake')}>
                 <SectionTitle
                   action={(
                     <button
                       type="button"
+                      {...help('quarantine-panel-what-to-check')}
                       className="rounded-xl border px-2.5 py-1 text-[11px] text-neutral-600"
                       onClick={() => setGuidanceKey('mites')}
                     >
@@ -256,6 +288,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                               key={option}
                               type="button"
                               aria-pressed={value === option}
+                              {...help(INTAKE_HELP[option].helpId)}
                               className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${
                                 value === option
                                   ? (option === 'pass'
@@ -281,6 +314,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
 
               <Field className="sm:col-span-2" label={t('quarantine.notes', { defaultValue: 'Notes' })}>
                 <textarea
+                  {...help('quarantine-panel-notes')}
                   rows={2}
                   className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm"
                   placeholder={t('quarantine.notesPlaceholder', { defaultValue: 'Source, observations, treatments…' })}
@@ -293,6 +327,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 <div className="sm:col-span-2 flex flex-wrap gap-1.5 border-t pt-3">
                   <button
                     type="button"
+                    {...help('quarantine-panel-restart-clock')}
                     className="rounded-xl border px-3 py-1.5 text-xs"
                     onClick={() => patch(current => restartQuarantineClock(current, { today: todayYmd(), reason: t('quarantine.restartedManually', { defaultValue: 'Restarted from the animal record' }) }))}
                   >
@@ -302,6 +337,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                     <button
                       key={extra}
                       type="button"
+                      {...help('quarantine-panel-extend')}
                       className="rounded-xl border px-3 py-1.5 text-xs"
                       onClick={() => patch(current => extendQuarantine(current, extra, { today: todayYmd() }))}
                     >
@@ -319,6 +355,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 action={(
                   <button
                     type="button"
+                    {...help('quarantine-panel-log-check')}
                     className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
                     onClick={() => setCheckSheetOpen(true)}
                   >
@@ -336,6 +373,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                       {check.weightGrams ? <span className="text-[11px] tabular-nums text-neutral-600">{check.weightGrams} g</span> : null}
                       <button
                         type="button"
+                        {...help('quarantine-panel-check-delete')}
                         className="text-[11px] text-neutral-400 hover:text-rose-600"
                         onClick={() => patch(current => removeQuarantineCheck(current, check.id))}
                       >
@@ -372,6 +410,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                   action={(
                     <button
                       type="button"
+                      {...help('quarantine-panel-add-test')}
                       className="rounded-xl border px-3 py-1.5 text-xs"
                       onClick={() => setTestDraft({ date: todayYmd(), kind: QUARANTINE_TESTS[0].name, lab: '', result: 'pending', notes: '' })}
                     >
@@ -385,31 +424,31 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 {testDraft ? (
                   <div className="rounded-xl border bg-neutral-50 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Field label={t('quarantine.date', { defaultValue: 'Date' })}>
-                      <input type="date" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={testDraft.date}
+                      <input type="date" {...help('quarantine-panel-test-date')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={testDraft.date}
                         onChange={event => setTestDraft(prev => ({ ...prev, date: event.target.value }))} />
                     </Field>
                     <Field label={t('quarantine.testKind', { defaultValue: 'Test' })}>
-                      <select className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm bg-white" value={testDraft.kind}
+                      <select {...help('quarantine-panel-test-kind')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm bg-white" value={testDraft.kind}
                         onChange={event => setTestDraft(prev => ({ ...prev, kind: event.target.value }))}>
                         {QUARANTINE_TESTS.map(test => <option key={test.key} value={test.name}>{test.name}</option>)}
                       </select>
                     </Field>
                     <Field label={t('quarantine.lab', { defaultValue: 'Vet or laboratory' })}>
-                      <input type="text" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={testDraft.lab}
+                      <input type="text" {...help('quarantine-panel-test-lab')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={testDraft.lab}
                         onChange={event => setTestDraft(prev => ({ ...prev, lab: event.target.value }))} />
                     </Field>
                     <Field label={t('quarantine.result', { defaultValue: 'Result' })}>
-                      <select className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm bg-white" value={testDraft.result}
+                      <select {...help('quarantine-panel-test-result')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm bg-white" value={testDraft.result}
                         onChange={event => setTestDraft(prev => ({ ...prev, result: event.target.value }))}>
                         {TEST_RESULTS.map(result => <option key={result} value={result}>{label(TEST_RESULT_LABELS, result)}</option>)}
                       </select>
                     </Field>
                     <div className="sm:col-span-2 flex gap-2">
-                      <button type="button" className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
+                      <button type="button" {...help('quarantine-panel-test-save')} className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
                         onClick={() => { patch(current => addQuarantineTest(current, testDraft)); setTestDraft(null); }}>
                         {t('common.save', { defaultValue: 'Save' })}
                       </button>
-                      <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={() => setTestDraft(null)}>
+                      <button type="button" {...help('quarantine-panel-test-cancel')} className="rounded-xl border px-3 py-1.5 text-xs" onClick={() => setTestDraft(null)}>
                         {t('common.cancel', { defaultValue: 'Cancel' })}
                       </button>
                     </div>
@@ -433,6 +472,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                           <button
                             key={result}
                             type="button"
+                            {...help(RESULT_HELP[result].helpId)}
                             className="rounded-lg border px-2 py-0.5 text-[10px] font-medium"
                             onClick={() => patch(current => setQuarantineTestResult(current, test.id, result, { today: todayYmd() }))}
                           >
@@ -442,6 +482,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                         : null}
                       <button
                         type="button"
+                        {...help('quarantine-panel-test-delete')}
                         className="ms-auto text-[11px] text-neutral-400 hover:text-rose-600"
                         onClick={() => patch(current => removeQuarantineTest(current, test.id))}
                       >
@@ -457,6 +498,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                   action={(
                     <button
                       type="button"
+                      {...help('quarantine-panel-add-treatment')}
                       className="rounded-xl border px-3 py-1.5 text-xs"
                       onClick={() => setTreatmentDraft({ date: todayYmd(), what: '', dose: '', reason: '' })}
                     >
@@ -470,27 +512,27 @@ export default function QuarantinePanel({ draft, setDraft }) {
                 {treatmentDraft ? (
                   <div className="rounded-xl border bg-neutral-50 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Field label={t('quarantine.date', { defaultValue: 'Date' })}>
-                      <input type="date" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.date}
+                      <input type="date" {...help('quarantine-panel-treatment-date')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.date}
                         onChange={event => setTreatmentDraft(prev => ({ ...prev, date: event.target.value }))} />
                     </Field>
                     <Field label={t('quarantine.treatmentWhat', { defaultValue: 'What was given' })}>
-                      <input type="text" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.what}
+                      <input type="text" {...help('quarantine-panel-treatment-what')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.what}
                         onChange={event => setTreatmentDraft(prev => ({ ...prev, what: event.target.value }))} />
                     </Field>
                     <Field label={t('quarantine.treatmentDose', { defaultValue: 'Dose' })}>
-                      <input type="text" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.dose}
+                      <input type="text" {...help('quarantine-panel-treatment-dose')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.dose}
                         onChange={event => setTreatmentDraft(prev => ({ ...prev, dose: event.target.value }))} />
                     </Field>
                     <Field label={t('quarantine.treatmentReason', { defaultValue: 'Reason' })}>
-                      <input type="text" className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.reason}
+                      <input type="text" {...help('quarantine-panel-treatment-reason')} className="mt-1 w-full border rounded-xl px-2 py-1.5 text-sm" value={treatmentDraft.reason}
                         onChange={event => setTreatmentDraft(prev => ({ ...prev, reason: event.target.value }))} />
                     </Field>
                     <div className="sm:col-span-2 flex flex-wrap gap-2 items-center">
-                      <button type="button" className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
+                      <button type="button" {...help('quarantine-panel-treatment-save')} className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white"
                         onClick={() => { patch(current => addQuarantineTreatment(current, treatmentDraft)); setTreatmentDraft(null); }}>
                         {t('common.save', { defaultValue: 'Save' })}
                       </button>
-                      <button type="button" className="rounded-xl border px-3 py-1.5 text-xs" onClick={() => setTreatmentDraft(null)}>
+                      <button type="button" {...help('quarantine-panel-treatment-cancel')} className="rounded-xl border px-3 py-1.5 text-xs" onClick={() => setTreatmentDraft(null)}>
                         {t('common.cancel', { defaultValue: 'Cancel' })}
                       </button>
                       <span className="text-[11px] text-neutral-500">
@@ -510,6 +552,7 @@ export default function QuarantinePanel({ draft, setDraft }) {
                     </div>
                     <button
                       type="button"
+                      {...help('quarantine-panel-treatment-delete')}
                       className="shrink-0 text-[11px] text-neutral-400 hover:text-rose-600"
                       onClick={() => patch(current => removeQuarantineTreatment(current, treatment.id))}
                     >

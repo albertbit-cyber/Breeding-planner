@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSpeciesById } from '../../genetics/speciesRegistry';
+import { help } from '../help/help';
 
 /**
  * Puts chosen animals into the Breeders group, which is where pairing and the Breeding
@@ -91,6 +92,7 @@ export default function BreedersGroupPicker({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
+          {...help('animals-breeders-select-all')}
           className="text-xs px-3 py-2 rounded-lg border bg-white disabled:opacity-50"
           aria-pressed={allMalesSelected}
           disabled={!males.length}
@@ -100,6 +102,7 @@ export default function BreedersGroupPicker({
         </button>
         <button
           type="button"
+          {...help('animals-breeders-select-all')}
           className="text-xs px-3 py-2 rounded-lg border bg-white disabled:opacity-50"
           aria-pressed={allFemalesSelected}
           disabled={!females.length}
@@ -113,7 +116,7 @@ export default function BreedersGroupPicker({
           const currentGroup = Array.isArray(animal.groups) ? animal.groups[0] : animal.groups;
           return (
             <li key={animal.id}>
-              <label className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
+              <label {...help('animals-breeders-pick')} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selected.has(animal.id)}
@@ -140,6 +143,7 @@ export default function BreedersGroupPicker({
       </ul>
       <button
         type="button"
+        {...help('animals-breeders-add')}
         className={`px-3 py-2 rounded-xl text-sm ${primaryButtonClass} disabled:opacity-50`}
         disabled={!selected.size}
         onClick={() => {
@@ -199,11 +203,12 @@ export function BreedersGroupGate({
 
   return (
     <div className="text-sm bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-3">
-      <p className="text-amber-900">{reason}</p>
+      <p {...help('animals-breeders-gate')} className="text-amber-900">{reason}</p>
       {!canChoose ? (
         typeof onAddAnimal === 'function' ? (
           <button
             type="button"
+            {...help('animals-breeders-add-animal')}
             className="text-sm px-3 py-2 rounded-xl border border-amber-300 bg-white text-amber-900 font-medium"
             onClick={onAddAnimal}
           >
@@ -224,6 +229,7 @@ export function BreedersGroupGate({
       ) : (
         <button
           type="button"
+          {...help('animals-breeders-choose')}
           className="text-sm px-3 py-2 rounded-xl border border-amber-300 bg-white text-amber-900 font-medium"
           onClick={() => setOpen(true)}
         >

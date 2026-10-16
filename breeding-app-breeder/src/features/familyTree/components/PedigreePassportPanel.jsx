@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../../help/help';
 
 const TABS = ['Overview', 'History', 'Health', 'Files'];
+
+// The help topic of each passport tab.
+const TAB_HELP = {
+  Overview: { helpId: 'tree-passport-overview' },
+  History: { helpId: 'tree-passport-history' },
+  Health: { helpId: 'tree-passport-health' },
+  Files: { helpId: 'tree-passport-files' },
+};
 
 const GeneticBadge = ({ label, tone = 'default' }) => {
   const colors = {
@@ -228,7 +237,7 @@ const PedigreePassportPanel = ({ snake, parents, offspring, clutches, ownershipH
   }
 
   return (
-    <div className="ft-right-panel flex flex-col overflow-hidden">
+    <div className="ft-right-panel flex flex-col overflow-hidden" {...help('tree-passport')}>
       {/* Panel header */}
       <div className="p-4 border-b border-violet-100 flex-shrink-0">
         <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">
@@ -246,11 +255,14 @@ const PedigreePassportPanel = ({ snake, parents, offspring, clutches, ownershipH
 
       {/* Tabs */}
       <div className="flex border-b border-violet-100 flex-shrink-0 overflow-x-auto">
-        {TABS.map(tabName => (
+        {TABS.map(tabName => {
+          const entry = TAB_HELP[tabName];
+          return (
           <button
             key={tabName}
             type="button"
             onClick={() => setTab(tabName)}
+            data-help={entry.helpId}
             className={[
               'px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex-shrink-0',
               tab === tabName
@@ -260,7 +272,8 @@ const PedigreePassportPanel = ({ snake, parents, offspring, clutches, ownershipH
           >
             {tabLabel(t, tabName)}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tab body */}

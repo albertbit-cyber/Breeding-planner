@@ -9,6 +9,7 @@ import { addDays } from '../domain/dates';
 import { WATCH_DAYS_BEFORE } from '../domain/cycleClock';
 import { formatDate } from './format';
 import { eventTypeLabel } from './labels';
+import { help } from '../../help/help';
 
 export const CLOCK_TONE = {
   upcoming: { box: 'border-neutral-200 bg-neutral-50 text-neutral-800', bar: 'bg-neutral-400' },
@@ -47,7 +48,7 @@ export function CycleClock({ clock, compact = false }) {
   const tone = CLOCK_TONE[clock.state] || CLOCK_TONE.upcoming;
   const headline = clockHeadline(t, clock);
   if (compact) {
-    return <div className={`mt-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${tone.box}`} role="status">{headline}</div>;
+    return <div {...help('card-cycle-clock')} className={`mt-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${tone.box}`} role="status">{headline}</div>;
   }
   const dayLabel = t('breeding.clock.day', {
     defaultValue: 'Day {{day}} of {{total}} since {{anchor}} on {{date}}',
@@ -57,7 +58,7 @@ export function CycleClock({ clock, compact = false }) {
     date: formatDate(clock.anchorDate),
   });
   return (
-    <div className={`mt-3 rounded-xl border px-3 py-2.5 ${tone.box}`} role="status" aria-label={t('breeding.clock.label', { defaultValue: 'Cycle clock' })}>
+    <div {...help('card-cycle-clock')} className={`mt-3 rounded-xl border px-3 py-2.5 ${tone.box}`} role="status" aria-label={t('breeding.clock.label', { defaultValue: 'Cycle clock' })}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="text-sm font-semibold">{headline}</div>
         <div className="text-xs tabular-nums opacity-80">{dayLabel}</div>

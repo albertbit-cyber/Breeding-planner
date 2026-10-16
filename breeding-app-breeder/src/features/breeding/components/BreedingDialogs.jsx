@@ -10,12 +10,14 @@ import { EXAM_METHODS, EXAM_RESULTS, MEASUREMENT_AXES } from '../domain/follicle
 import { addCalendarMonths, todayYmd } from '../domain/dates';
 import { animalLabel, formatDate } from './format';
 import { eventTypeLabel, closureOutcomeLabel, methodLabel, resultLabel, lockStatusLabel } from './labels';
+import { help } from '../../help/help';
+import { DialogHelpButton } from '../../help/ui/HelpButton';
 
 const inputClass = 'w-full border rounded-xl px-3 py-2 text-sm bg-white';
 const labelClass = 'text-xs font-medium';
 const hintClass = 'text-[11px] text-neutral-500';
 
-export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLabel, children, busy = false, error = null, secondaryAction = null, wide = false }) {
+export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLabel, children, busy = false, error = null, secondaryAction = null, wide = false, titleProps = null }) {
   const { t } = useTranslation();
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') onClose?.(); };
@@ -29,16 +31,20 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
       <div
         role="dialog"
         aria-modal="true"
+        data-dialog="breeding-entry"
         aria-labelledby="breeding-dialog-title"
         className={`bg-white w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-t-2xl sm:rounded-2xl shadow-xl border p-4 sm:p-5 max-h-[92vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <div id="breeding-dialog-title" className="font-semibold">{title}</div>
+            <div id="breeding-dialog-title" className="font-semibold" {...titleProps}>{title}</div>
             {subtitle ? <div className={hintClass}>{subtitle}</div> : null}
           </div>
-          <button type="button" className="text-sm px-2 py-1 shrink-0" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+          <div className="flex items-center gap-2 shrink-0">
+            <DialogHelpButton />
+            <button type="button" className="text-sm px-2 py-1" {...help('app-dialog-close')} onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</button>
+          </div>
         </div>
         <div className="space-y-3 overflow-auto pe-1 flex-1">{children}</div>
         {error ? (
@@ -49,9 +55,9 @@ export function BreedingDialog({ title, subtitle, onClose, onConfirm, confirmLab
         ) : null}
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {secondaryAction}
-          <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onClose} disabled={busy}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
+          <button type="button" className="px-3 py-2 rounded-xl text-sm border" {...help('app-dialog-cancel')} onClick={onClose} disabled={busy}>{t('common.cancel', { defaultValue: 'Cancel' })}</button>
           {onConfirm ? (
-            <button type="button" className="appearance-btn appearance-btn--filled px-3 py-2 rounded-xl text-sm" onClick={onConfirm} disabled={busy} aria-busy={busy}>
+            <button type="button" className="appearance-btn appearance-btn--filled px-3 py-2 rounded-xl text-sm" {...help('app-dialog-confirm')} onClick={onConfirm} disabled={busy} aria-busy={busy}>
               {busy ? t('breeding.dialog.saving', { defaultValue: 'Saving…' }) : (confirmLabel || t('common.save', { defaultValue: 'Save' }))}
             </button>
           ) : null}
@@ -145,6 +151,7 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
     <button
       type="button"
       className="px-3 py-2 rounded-xl text-sm border"
+      {...help('bfield-save-next')}
       disabled={busy || !batch.nextFemaleId}
       onClick={async () => {
         const result = await submit(payload(), { keepOpen: true });
@@ -161,6 +168,7 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
   return (
     <BreedingDialog
       title={t('breeding.quickPairing.title', { defaultValue: 'Record a pairing session' })}
+      titleProps={help('dlg-pairing')}
       subtitle={seasonLabel ? t('breeding.quickPairing.seasonInherited', { defaultValue: 'Season {{season}} (from the card)', season: seasonLabel }) : newCardSeasonLabel ? t('breeding.quickPairing.seasonNewCard', { defaultValue: 'Season {{season}} (a new card)', season: newCardSeasonLabel }) : null}
       onClose={onClose}
       onConfirm={() => submit(payload())}
@@ -169,20 +177,20 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
       error={error}
       secondaryAction={saveAndNext}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-female')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.female', { defaultValue: 'Female' })}</span>
         <AnimalSelect value={female} onChange={setFemale} options={females} placeholder={t('breeding.field.chooseFemale', { defaultValue: 'Choose a female' })} disabled={!!femaleId} />
       </label>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-male')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.male', { defaultValue: 'Male' })}</span>
         <AnimalSelect value={male} onChange={setMale} options={males} placeholder={t('breeding.field.chooseMale', { defaultValue: 'Choose a male' })} />
         <span className={hintClass}>{t('breeding.quickPairing.maleHint', { defaultValue: 'Changing the male here applies to this new session only. Earlier sessions keep their male.' })}</span>
       </label>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-pairing-date')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.pairingDate', { defaultValue: 'Pairing date (introduction)' })}</span>
         <input type="date" className={inputClass} value={introductionDate} max={today} onChange={(e) => setIntroductionDate(e.target.value)} />
       </label>
-      <fieldset className="flex flex-col gap-1">
+      <fieldset {...help('bfield-lock-observed')} className="flex flex-col gap-1">
         <legend className={labelClass}>{t('breeding.field.lockObserved', { defaultValue: 'Lock observed?' })}</legend>
         <div className="flex flex-wrap gap-2" role="radiogroup">
           {[LOCK_STATUS.OBSERVED, LOCK_STATUS.NOT_OBSERVED, LOCK_STATUS.UNKNOWN].map((status) => (
@@ -212,24 +220,24 @@ export function QuickPairingDialog({ femaleId, females = [], males = [], default
             : t('breeding.quickPairing.nextProposal', { defaultValue: 'An observed lock proposes the next pairing with this male on {{date}} (one calendar month later). You can move or skip it on the card.', date: formatDate(proposedNext) })}
         </div>
       ) : null}
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
-      <button type="button" className="text-xs underline text-start" onClick={() => setMore((v) => !v)} aria-expanded={more}>
+      <button {...help('bfield-more-details')} type="button" className="text-xs underline text-start" onClick={() => setMore((v) => !v)} aria-expanded={more}>
         {more ? t('breeding.dialog.fewerDetails', { defaultValue: 'Fewer details' }) : t('breeding.dialog.moreDetails', { defaultValue: 'More details' })}
       </button>
       {more ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-more-details')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.introductionTime', { defaultValue: 'Introduction time' })}</span>
             <input type="time" className={inputClass} value={introductionTime} onChange={(e) => setIntroductionTime(e.target.value)} />
           </label>
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-more-details')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.removalDate', { defaultValue: 'Removal date' })}</span>
             <input type="date" className={inputClass} value={removalDate} min={introductionDate} onChange={(e) => setRemovalDate(e.target.value)} />
           </label>
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-more-details')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.removalTime', { defaultValue: 'Removal time' })}</span>
             <input type="time" className={inputClass} value={removalTime} onChange={(e) => setRemovalTime(e.target.value)} />
           </label>
@@ -253,13 +261,14 @@ export function LockObservationDialog({ cycle, sessions = [], snakesById, defaul
   return (
     <BreedingDialog
       title={t('breeding.lockDialog.title', { defaultValue: 'Record a lock observation' })}
+      titleProps={help('dlg-lock')}
       subtitle={t('breeding.lockDialog.subtitle', { defaultValue: 'One dated record per sighting day. A second sighting on the same day updates the same record.' })}
       onClose={onClose}
       onConfirm={() => submit({ sessionId, status, observationDate: date, observationTime: time || null, notes })}
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-session')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.session', { defaultValue: 'Pairing session' })}</span>
         <select className={inputClass} value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
           {sessions.map((s) => (
@@ -268,7 +277,7 @@ export function LockObservationDialog({ cycle, sessions = [], snakesById, defaul
         </select>
         {!sessions.length ? <span className={hintClass}>{t('breeding.lockDialog.noSessions', { defaultValue: 'Record a pairing session first. A lock belongs to a session with a male.' })}</span> : null}
       </label>
-      <fieldset className="flex flex-col gap-1">
+      <fieldset {...help('bfield-lock-status')} className="flex flex-col gap-1">
         <legend className={labelClass}>{t('breeding.field.lockStatus', { defaultValue: 'Status' })}</legend>
         <div className="flex flex-wrap gap-2">
           {[LOCK_STATUS.OBSERVED, LOCK_STATUS.NOT_OBSERVED, LOCK_STATUS.UNKNOWN].map((value) => (
@@ -280,16 +289,16 @@ export function LockObservationDialog({ cycle, sessions = [], snakesById, defaul
         </div>
       </fieldset>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-observation-date')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.observationDate', { defaultValue: 'Observation date' })}</span>
           <input type="date" className={inputClass} value={date} min={session?.introductionDate || undefined} max={today} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-time')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.timeOptional', { defaultValue: 'Time (optional)' })}</span>
           <input type="time" className={inputClass} value={time} onChange={(e) => setTime(e.target.value)} />
         </label>
       </div>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
@@ -370,6 +379,7 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
     <button
       type="button"
       className="px-3 py-2 rounded-xl text-sm border"
+      {...help('bfield-save-next')}
       disabled={busy || !batch.nextFemaleId}
       onClick={async () => {
         const saved = await submit(payload(), { keepOpen: true });
@@ -387,6 +397,7 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
   return (
     <BreedingDialog
       title={exam ? t('breeding.examDialog.editTitle', { defaultValue: 'Edit follicle examination' }) : t('breeding.examDialog.title', { defaultValue: 'Record a follicle examination' })}
+      titleProps={help('dlg-exam')}
       onClose={onClose}
       onConfirm={() => submit(payload())}
       busy={busy}
@@ -395,25 +406,25 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
       wide
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 sm:col-span-2">
+        <label {...help('bfield-female')} className="flex flex-col gap-1 sm:col-span-2">
           <span className={labelClass}>{t('breeding.field.female', { defaultValue: 'Female' })}</span>
           <AnimalSelect value={female} onChange={setFemale} options={females} placeholder={t('breeding.field.chooseFemale', { defaultValue: 'Choose a female' })} disabled={!!femaleId || !!exam} />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-exam-date')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.examDate', { defaultValue: 'Examination date' })}</span>
           <input type="date" className={inputClass} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-time')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.timeOptional', { defaultValue: 'Time (optional)' })}</span>
           <input type="time" className={inputClass} value={time} onChange={(e) => setTime(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-method')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.method', { defaultValue: 'Method' })}</span>
           <select className={inputClass} value={method} onChange={(e) => setMethod(e.target.value)}>
             {EXAM_METHODS.map((m) => <option key={m} value={m}>{methodLabel(t, m)}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-result')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.result', { defaultValue: 'Result' })}</span>
           <select className={inputClass} value={result} onChange={(e) => setResult(e.target.value)}>
             {EXAM_RESULTS.map((r) => <option key={r} value={r}>{resultLabel(t, r)}</option>)}
@@ -428,12 +439,12 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
       ) : null}
       {canMeasure ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-largest')} className="flex flex-col gap-1">
             <span className={labelClass}>{isEstimate ? t('breeding.field.largestEstimate', { defaultValue: 'Largest diameter, estimate (mm)' }) : t('breeding.field.largestMeasured', { defaultValue: 'Largest measured diameter (mm)' })}</span>
             <input type="number" inputMode="decimal" min="0.1" step="0.1" className={inputClass} value={largest} onChange={(e) => setLargest(e.target.value)} placeholder={t('breeding.field.optional', { defaultValue: 'Optional' })} />
             {isEstimate ? <span className={hintClass}>{t('breeding.examDialog.palpationHint', { defaultValue: 'Palpation values are saved as estimates and kept apart from ultrasound measurements.' })}</span> : null}
           </label>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1" {...help('bfield-extra-measurements')}>
             <span className={labelClass}>{t('breeding.field.extraMeasurements', { defaultValue: 'Additional measurements' })}</span>
             {measurements.map((m, index) => (
               <div key={m.id} className="grid grid-cols-[1fr_1fr_auto] gap-1 items-center">
@@ -449,11 +460,11 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
         </div>
       ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-visible-count')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.visibleCount', { defaultValue: 'Visible follicle count' })}</span>
           <input type="number" inputMode="numeric" min="0" step="1" className={inputClass} value={visibleCount} onChange={(e) => setVisibleCount(e.target.value)} placeholder={t('breeding.field.optional', { defaultValue: 'Optional' })} />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-count-certainty')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.countCertainty', { defaultValue: 'Count certainty' })}</span>
           <select className={inputClass} value={countCertainty} onChange={(e) => setCountCertainty(e.target.value)}>
             <option value="unknown">{t('breeding.certainty.unknownCount', { defaultValue: 'Unknown' })}</option>
@@ -461,7 +472,7 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
             <option value="exact">{t('breeding.certainty.exact', { defaultValue: 'Exact' })}</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-coverage')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.coverage', { defaultValue: 'Examination coverage' })}</span>
           <select className={inputClass} value={coverage} onChange={(e) => setCoverage(e.target.value)}>
             <option value="complete">{t('breeding.coverage.complete', { defaultValue: 'Complete' })}</option>
@@ -469,16 +480,16 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
           </select>
         </label>
       </div>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-exam-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.examNotes', { defaultValue: 'Notes (appearance, behaviour, feeding, other observations)' })}</span>
         <textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-next-check')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.nextReview', { defaultValue: 'Next check date' })}</span>
           <input type="date" className={inputClass} value={nextReview} min={date} onChange={(e) => setNextReview(e.target.value)} />
         </label>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" {...help('bfield-attachments')}>
           <span className={labelClass}>{t('breeding.field.attachments', { defaultValue: 'Images / video (evidence for your review)' })}</span>
           {onAttach ? <input type="file" accept="image/*,video/*" multiple className="text-xs" onChange={handleFiles} /> : <span className={hintClass}>{t('breeding.examDialog.attachUnavailable', { defaultValue: 'Attachments are not available here.' })}</span>}
           {attachments.length ? (
@@ -493,14 +504,14 @@ export function FollicleExamDialog({ femaleId, females = [], exam = null, onSubm
           ) : null}
         </div>
       </div>
-      <button type="button" className="text-xs underline text-start" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
+      <button {...help('bfield-exam-advanced')} type="button" className="text-xs underline text-start" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
         {advanced ? t('breeding.dialog.fewerDetails', { defaultValue: 'Fewer details' }) : t('breeding.examDialog.advanced', { defaultValue: 'Operator, equipment, image quality' })}
       </button>
       {advanced ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <label className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.operator', { defaultValue: 'Operator' })}</span><input className={inputClass} value={operator} onChange={(e) => setOperator(e.target.value)} /></label>
-          <label className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.equipment', { defaultValue: 'Equipment' })}</span><input className={inputClass} value={equipment} onChange={(e) => setEquipment(e.target.value)} /></label>
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-exam-advanced')} className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.operator', { defaultValue: 'Operator' })}</span><input className={inputClass} value={operator} onChange={(e) => setOperator(e.target.value)} /></label>
+          <label {...help('bfield-exam-advanced')} className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.equipment', { defaultValue: 'Equipment' })}</span><input className={inputClass} value={equipment} onChange={(e) => setEquipment(e.target.value)} /></label>
+          <label {...help('bfield-exam-advanced')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.imageQuality', { defaultValue: 'Image quality' })}</span>
             <select className={inputClass} value={imageQuality} onChange={(e) => setImageQuality(e.target.value)}>
               <option value="">{DASH_OPTION}</option>
@@ -531,31 +542,32 @@ export function MilestoneDialog({ cycle, defaultType = 'ovulation', event = null
   return (
     <BreedingDialog
       title={event ? t('breeding.milestoneDialog.editTitle', { defaultValue: 'Correct a milestone' }) : t('breeding.milestoneDialog.title', { defaultValue: 'Record a milestone' })}
+      titleProps={help('dlg-milestone')}
       subtitle={t('breeding.milestoneDialog.subtitle', { defaultValue: 'A known later milestone can be entered without the earlier ones. Conflicting dates are flagged, never changed for you.' })}
       onClose={onClose}
       onConfirm={() => submit({ id: event?.id, type, date, precision, certainty, notes })}
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-milestone')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.milestone', { defaultValue: 'Milestone' })}</span>
         <select className={inputClass} value={type} onChange={(e) => setType(e.target.value)} disabled={!!event}>
           {allowed.map((value) => <option key={value} value={value}>{eventTypeLabel(t, value)}</option>)}
         </select>
       </label>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-date')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.date', { defaultValue: 'Date' })}</span>
         <input type="date" className={inputClass} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
       </label>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-certainty')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.certainty', { defaultValue: 'Observation' })}</span>
           <select className={inputClass} value={certainty} onChange={(e) => setCertainty(e.target.value)}>
             <option value="recorded">{t('breeding.certainty.recordedObservation', { defaultValue: 'Recorded (seen)' })}</option>
             <option value="suspected">{t('breeding.certainty.suspectedObservation', { defaultValue: 'Suspected (interpretation)' })}</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-precision')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.precision', { defaultValue: 'Date precision' })}</span>
           <select className={inputClass} value={precision} onChange={(e) => setPrecision(e.target.value)}>
             <option value="exact">{t('breeding.precision.exact', { defaultValue: 'Exact date' })}</option>
@@ -564,7 +576,7 @@ export function MilestoneDialog({ cycle, defaultType = 'ovulation', event = null
         </label>
       </div>
       <div className={hintClass}>{t('breeding.milestoneDialog.statsHint', { defaultValue: 'Suspected and estimated dates are shown on the card but left out of the female\'s default history statistics.' })}</div>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
@@ -586,6 +598,7 @@ export function ClutchDialog({ cycle, onSubmit, onClose }) {
   return (
     <BreedingDialog
       title={t('breeding.clutchDialog.title', { defaultValue: 'Record the clutch' })}
+      titleProps={help('dlg-clutch')}
       subtitle={t('breeding.clutchDialog.subtitle', { defaultValue: 'Eggs laid are not follicles and not hatchlings. Leave a count empty if you do not know it.' })}
       onClose={onClose}
       onConfirm={() => submit({ laidDate: laid ? undefined : laidDate, eggsTotal: count(eggsTotal), fertileEggs: count(fertile), slugs: count(slugs), notes })}
@@ -593,17 +606,17 @@ export function ClutchDialog({ cycle, onSubmit, onClose }) {
       error={error}
     >
       {!laid ? (
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-laying-date')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.layingDate', { defaultValue: 'Laying date' })}</span>
           <input type="date" className={inputClass} value={laidDate} max={todayYmd()} onChange={(e) => setLaidDate(e.target.value)} />
         </label>
       ) : <div className={hintClass}>{t('breeding.clutchDialog.laidOn', { defaultValue: 'Laid on {{date}} (correct the date from the milestones list).', date: formatDate(laid) })}</div>}
       <div className="grid grid-cols-3 gap-2">
-        <label className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.eggsTotal', { defaultValue: 'Total eggs' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={eggsTotal} onChange={(e) => setEggsTotal(e.target.value)} /></label>
-        <label className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.fertileEggs', { defaultValue: 'Fertile' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={fertile} onChange={(e) => setFertile(e.target.value)} /></label>
-        <label className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.slugs', { defaultValue: 'Slugs' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={slugs} onChange={(e) => setSlugs(e.target.value)} /></label>
+        <label {...help('bfield-eggs-total')} className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.eggsTotal', { defaultValue: 'Total eggs' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={eggsTotal} onChange={(e) => setEggsTotal(e.target.value)} /></label>
+        <label {...help('bfield-fertile')} className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.fertileEggs', { defaultValue: 'Fertile' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={fertile} onChange={(e) => setFertile(e.target.value)} /></label>
+        <label {...help('bfield-slugs')} className="flex flex-col gap-1"><span className={labelClass}>{t('breeding.field.slugs', { defaultValue: 'Slugs' })}</span><input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={slugs} onChange={(e) => setSlugs(e.target.value)} /></label>
       </div>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
@@ -667,6 +680,7 @@ export function LogHatchDialog({ cycle, onSubmit, onClose }) {
   return (
     <BreedingDialog
       title={t('breeding.logHatch.title', { defaultValue: 'Log hatch' })}
+      titleProps={help('dlg-log-hatch')}
       subtitle={t('breeding.logHatch.subtitle', { defaultValue: 'Log it once every hatchling is out of the egg. The hatchlings are added to Hatchlings {{year}} and the cycle moves to Completed pairing.', year })}
       onClose={onClose}
       onConfirm={() => {
@@ -680,16 +694,16 @@ export function LogHatchDialog({ cycle, onSubmit, onClose }) {
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-hatch-date')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.hatchDate', { defaultValue: 'Hatch date' })}</span>
         <input type="date" className={inputClass} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
       </label>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-hatched')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.logHatch.hatched', { defaultValue: 'How many hatched' })}</span>
           <input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={count} onChange={(e) => setCount(e.target.value)} autoFocus />
         </label>
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-not-hatched')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.logHatch.notHatched', { defaultValue: 'Did not hatch (optional)' })}</span>
           <input type="number" min="0" step="1" inputMode="numeric" className={inputClass} value={lost} onChange={(e) => setLost(e.target.value)} />
         </label>
@@ -709,6 +723,7 @@ export function CloseCycleDialog({ cycle, onSubmit, onClose }) {
   return (
     <BreedingDialog
       title={t('breeding.closeDialog.title', { defaultValue: 'Close this breeding card' })}
+      titleProps={help('dlg-close')}
       subtitle={t('breeding.closeDialog.subtitle', { defaultValue: 'Closing without hatchlings needs a documented reason. Everything recorded stays; the card can be reopened.' })}
       onClose={onClose}
       onConfirm={() => submit({ outcome, note, biologicalCompletionDate: biologicalDate || null })}
@@ -716,19 +731,19 @@ export function CloseCycleDialog({ cycle, onSubmit, onClose }) {
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-outcome')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.outcome', { defaultValue: 'Outcome' })}</span>
         <select className={inputClass} value={outcome} onChange={(e) => setOutcome(e.target.value)}>
           {outcomes.map((o) => <option key={o} value={o}>{closureOutcomeLabel(t, o)}</option>)}
         </select>
       </label>
       {outcome === 'live_birth_complete' ? (
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-final-birth')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.biologicalDate', { defaultValue: 'Date of the final birth' })}</span>
           <input type="date" className={inputClass} value={biologicalDate} onChange={(e) => setBiologicalDate(e.target.value)} />
         </label>
       ) : null}
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-close-note')} className="flex flex-col gap-1">
         <span className={labelClass}>{outcome === 'other' ? t('breeding.field.noteRequired', { defaultValue: 'Note (required)' }) : t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
@@ -745,22 +760,23 @@ export function PlannedPairingDialog({ cycle, males = [], planned = null, onSubm
   return (
     <BreedingDialog
       title={planned ? t('breeding.plannedDialog.rescheduleTitle', { defaultValue: 'Move the planned pairing' }) : t('breeding.plannedDialog.title', { defaultValue: 'Plan a pairing' })}
+      titleProps={help('dlg-planned')}
       subtitle={t('breeding.plannedDialog.subtitle', { defaultValue: 'A planned pairing is a reminder. It is not a session and never counts as a lock.' })}
       onClose={onClose}
       onConfirm={() => submit({ maleId, date, note })}
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-male')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.male', { defaultValue: 'Male' })}</span>
         <AnimalSelect value={maleId} onChange={setMaleId} options={males} placeholder={t('breeding.field.chooseMale', { defaultValue: 'Choose a male' })} disabled={!!planned} />
       </label>
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-date')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.date', { defaultValue: 'Date' })}</span>
         <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       {!planned ? (
-        <label className="flex flex-col gap-1">
+        <label {...help('bfield-notes')} className="flex flex-col gap-1">
           <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
           <textarea className={inputClass} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
@@ -781,19 +797,20 @@ export function SireAssignmentDialog({ cycle, offspring, snakesById, onSubmit, o
   return (
     <BreedingDialog
       title={t('breeding.sireDialog.title', { defaultValue: 'Sire of {{name}}', name: animalLabel(snakesById?.get?.(offspring?.animalId), offspring?.animalId) })}
+      titleProps={help('dlg-sire')}
       subtitle={t('breeding.sireDialog.subtitle', { defaultValue: 'Only the card\'s candidate males can be assigned. Leave the sire empty to keep parentage unresolved.' })}
       onClose={onClose}
       onConfirm={() => submit({ maleId: maleId || null, method, certainty, note })}
       busy={busy}
       error={error}
     >
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-sire')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.sire', { defaultValue: 'Sire' })}</span>
         <AnimalSelect value={maleId} onChange={setMaleId} options={candidates} placeholder={t('breeding.sireDialog.unresolved', { defaultValue: 'Unresolved (no sire assigned)' })} />
       </label>
       {maleId ? (
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-sire-basis')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.assignmentMethod', { defaultValue: 'Basis' })}</span>
             <select className={inputClass} value={method} onChange={(e) => setMethod(e.target.value)}>
               <option value="breeder_assigned">{t('breeding.sireMethod.breederAssigned', { defaultValue: 'Breeder\'s judgement' })}</option>
@@ -802,7 +819,7 @@ export function SireAssignmentDialog({ cycle, offspring, snakesById, onSubmit, o
               <option value="only_candidate">{t('breeding.sireMethod.onlyCandidate', { defaultValue: 'Only one male was paired' })}</option>
             </select>
           </label>
-          <label className="flex flex-col gap-1">
+          <label {...help('bfield-sire-certainty')} className="flex flex-col gap-1">
             <span className={labelClass}>{t('breeding.field.assignmentCertainty', { defaultValue: 'Certainty' })}</span>
             <select className={inputClass} value={certainty} onChange={(e) => setCertainty(e.target.value)}>
               <option value="reported">{t('breeding.sireCertainty.reported', { defaultValue: 'Reported' })}</option>
@@ -811,7 +828,7 @@ export function SireAssignmentDialog({ cycle, offspring, snakesById, onSubmit, o
           </label>
         </div>
       ) : null}
-      <label className="flex flex-col gap-1">
+      <label {...help('bfield-notes')} className="flex flex-col gap-1">
         <span className={labelClass}>{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span>
         <textarea className={inputClass} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>

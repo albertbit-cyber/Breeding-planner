@@ -5,6 +5,8 @@ import { departureOf } from './archive';
 import { archiveLabels, formatRecordDate } from './archiveRecord';
 import { formatSexCode } from './animalTextList';
 import useDialogFocus from './useDialogFocus';
+import { help } from '../help/help';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 
 const text = (value) => (value === undefined || value === null ? '' : String(value).trim());
 
@@ -65,9 +67,11 @@ export default function RemovedAnimalCard({ animal, animals = [], pairings = [],
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        data-dialog="removed-animal"
         aria-labelledby="removed-card-title"
       >
-        <header className="flex gap-4 p-5 border-b">
+        <header className="relative flex gap-4 p-5 pe-14 border-b">
+          <DialogHelpButton className="help-dialog-corner" />
           {photo ? (
             <img src={photo} alt="" className="archive-record__photo removed-card__photo" />
           ) : (
@@ -77,14 +81,14 @@ export default function RemovedAnimalCard({ animal, animals = [], pairings = [],
             <span className="removed-card__label">
               {t('archive.removed.label', { defaultValue: 'No longer in the collection' })}
             </span>
-            <h2 id="removed-card-title" className="mt-1 text-xl font-semibold leading-tight break-words">{animal.name || animal.id}</h2>
+            <h2 id="removed-card-title" className="mt-1 text-xl font-semibold leading-tight break-words" {...help('archive-removed-card')}>{animal.name || animal.id}</h2>
             <p className="text-sm text-neutral-600"><bdi>{animal.id}</bdi> · {formatSexCode(animal.sex)}</p>
             <p className="mt-1 text-sm">
               <span className={`archive-reason-badge archive-reason-badge--${departure?.reason || 'other'}`}>{reasonLabel}</span>
               {departure?.date && <span className="ms-2 text-xs text-neutral-500">{formatRecordDate(departure.date, locale)}</span>}
             </p>
           </div>
-          <button type="button" className="archive-record__close self-start text-sm" onClick={onClose} aria-label={t('common.close', { defaultValue: 'Close' })}>✕</button>
+          <button type="button" className="archive-record__close self-start text-sm" {...help('app-dialog-close')} onClick={onClose} aria-label={t('common.close', { defaultValue: 'Close' })}>✕</button>
         </header>
 
         <div className="px-5 py-4 flex flex-col gap-5">

@@ -2,6 +2,7 @@ import React from 'react';
 import SpeciesBreedingTable from './SpeciesBreedingTable';
 import { speciesCardStyle } from './speciesColor';
 import { useAppearance } from '../../contexts/AppearanceContext.jsx';
+import { help } from '../help/help';
 
 /**
  * Landing page: the species you actually keep, with the counts you would otherwise open a
@@ -54,12 +55,14 @@ export default function SpeciesDashboard({
           advanced option tucked inside a species: it sits beside adding one by hand. */}
       <div className="grid grid-cols-2 gap-3 max-w-3xl">
         <EntryCard
+          {...help('dashboard-add-animal')}
           symbol="+"
           title={t('actions.addAnimalAndSpecies', { defaultValue: 'New animal & species' })}
           hint={t('species.dashboard.addHint', { defaultValue: 'a new species appears here once you own one' })}
           onClick={() => onAddAnimal?.()}
         />
         <EntryCard
+          {...help('dashboard-import')}
           symbol={'↓'}
           title={t('species.dashboard.importCollection', { defaultValue: 'Import your collection' })}
           hint={t('species.dashboard.importHint', { defaultValue: 'MorphMarket export, CSV or spreadsheet' })}
@@ -73,7 +76,7 @@ export default function SpeciesDashboard({
   return (
     <div className="space-y-4">
       {isDemoCollection && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div {...help('dashboard-demo')} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[10px] font-bold tracking-wider uppercase text-amber-700 border border-amber-300 rounded px-1.5 py-0.5">
             {t('species.dashboard.demoBadge', { defaultValue: 'Demo' })}
           </span>
@@ -89,6 +92,7 @@ export default function SpeciesDashboard({
 
       <div className="header-search-shell w-full">
         <input
+          {...help('dashboard-search')}
           value={searchQuery}
           onChange={e => onSearchQueryChange?.(e.target.value)}
           placeholder={t('species.dashboard.searchPlaceholder', {
@@ -99,6 +103,7 @@ export default function SpeciesDashboard({
         {searchQuery ? (
           <button
             type="button"
+            {...help('dashboard-search-clear')}
             className="header-search-clear"
             onClick={() => onSearchQueryChange?.('')}
             aria-label={t('filters.clear', { defaultValue: 'Clear' })}
@@ -109,7 +114,7 @@ export default function SpeciesDashboard({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-neutral-600 tabular-nums">
+      <div {...help('dashboard-screen')} className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-neutral-600 tabular-nums">
         <span><strong className="text-neutral-900">{totals.animals}</strong> {t('species.dashboard.animals', { defaultValue: 'animals' })}</span>
         <span><strong className="text-neutral-900">{totals.species}</strong> {t('species.dashboard.species', { defaultValue: 'species' })}</span>
         <span><strong className="text-neutral-900">{totals.activePairings}</strong> {t('species.dashboard.activePairings', { defaultValue: 'active pairings' })}</span>
@@ -127,7 +132,7 @@ export default function SpeciesDashboard({
       ) : (
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <SectionHeading>{t('species.dashboard.speciesHeading', { defaultValue: 'Species' })}</SectionHeading>
+          <SectionHeading {...help('dashboard-species')}>{t('species.dashboard.speciesHeading', { defaultValue: 'Species' })}</SectionHeading>
           <div className={`grid gap-3 ${speciesGridClass(summaries.length)}`}>
             {summaries.map(summary => (
               <SpeciesCard
@@ -145,7 +150,7 @@ export default function SpeciesDashboard({
         </div>
 
         <div className="flex flex-col gap-3">
-          <SectionHeading>{t('species.dashboard.breedingHeading', { defaultValue: 'Breeding' })}</SectionHeading>
+          <SectionHeading {...help('dashboard-breeding')}>{t('species.dashboard.breedingHeading', { defaultValue: 'Breeding' })}</SectionHeading>
           <SpeciesBreedingTable rows={breeding} onOpenBreeding={onOpenBreeding} t={t} />
         </div>
       </div>
@@ -184,6 +189,7 @@ function SpeciesCard({ summary, mode, preset, onOpen, t }) {
   return (
     <button
       type="button"
+      {...help('dashboard-species-card')}
       onClick={onOpen}
       style={style}
       className="text-start bg-white border rounded-2xl overflow-hidden flex flex-col hover:border-neutral-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
@@ -301,10 +307,11 @@ const URGENCY_CLASS = {
   none: 'bg-neutral-100 text-neutral-600 border border-neutral-200',
 };
 
-function EntryCard({ symbol, title, hint, onClick }) {
+function EntryCard({ symbol, title, hint, onClick, ...rest }) {
   return (
     <button
       type="button"
+      {...rest}
       onClick={onClick}
       className="text-center border border-dashed rounded-2xl p-3 sm:p-4 min-h-[132px] flex flex-col items-center justify-center gap-1 text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
     >
@@ -315,9 +322,9 @@ function EntryCard({ symbol, title, hint, onClick }) {
   );
 }
 
-function SectionHeading({ children }) {
+function SectionHeading({ children, ...rest }) {
   return (
-    <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+    <h2 {...rest} className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
       {children}
     </h2>
   );
@@ -342,6 +349,7 @@ function SearchResults({ results, hiddenResultCount, onOpenAnimal, t }) {
         <button
           key={result.key}
           type="button"
+          {...help('dashboard-search-result')}
           onClick={() => onOpenAnimal?.(result.snake)}
           className="w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50 transition"
         >

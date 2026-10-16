@@ -23,6 +23,7 @@ import {
   SireAssignmentDialog,
 } from './components/BreedingDialogs';
 import { formatDate, animalName } from './components/format';
+import { help } from '../help/help';
 import { toYmd, todayYmd } from './domain/dates';
 import { upcomingPairings } from './domain/pairingPlan';
 
@@ -44,14 +45,14 @@ function EditSessionDialog({ cycle, session, snakesById, onSubmit, onClose }) {
     } catch (err) { setError(err?.message || String(err)); } finally { setBusy(false); }
   };
   return (
-    <BreedingDialog title={t('breeding.sessionDialog.title', { defaultValue: 'Correct a pairing session' })} subtitle={`${animalName(snakesById.get(session.maleId), session.maleId)} · ${cycle.seasonLabel}`} onClose={onClose} onConfirm={save} busy={busy} error={error}>
+    <BreedingDialog titleProps={help('dlg-edit-session')} title={t('breeding.sessionDialog.title', { defaultValue: 'Correct a pairing session' })} subtitle={`${animalName(snakesById.get(session.maleId), session.maleId)} · ${cycle.seasonLabel}`} onClose={onClose} onConfirm={save} busy={busy} error={error}>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1"><span className="text-xs font-medium">{t('breeding.field.pairingDate', { defaultValue: 'Pairing date (introduction)' })}</span><input type="date" className={inputClass} value={introductionDate} onChange={(e) => setIntroductionDate(e.target.value)} /></label>
-        <label className="flex flex-col gap-1"><span className="text-xs font-medium">{t('breeding.field.introductionTime', { defaultValue: 'Introduction time' })}</span><input type="time" className={inputClass} value={introductionTime} onChange={(e) => setIntroductionTime(e.target.value)} /></label>
-        <label className="flex flex-col gap-1"><span className="text-xs font-medium">{t('breeding.field.removalDate', { defaultValue: 'Removal date' })}</span><input type="date" className={inputClass} value={removalDate} onChange={(e) => setRemovalDate(e.target.value)} /></label>
-        <label className="flex flex-col gap-1"><span className="text-xs font-medium">{t('breeding.field.removalTime', { defaultValue: 'Removal time' })}</span><input type="time" className={inputClass} value={removalTime} onChange={(e) => setRemovalTime(e.target.value)} /></label>
+        <label className="flex flex-col gap-1" {...help('bfield-pairing-date')}><span className="text-xs font-medium">{t('breeding.field.pairingDate', { defaultValue: 'Pairing date (introduction)' })}</span><input type="date" className={inputClass} value={introductionDate} onChange={(e) => setIntroductionDate(e.target.value)} /></label>
+        <label className="flex flex-col gap-1" {...help('bfield-more-details')}><span className="text-xs font-medium">{t('breeding.field.introductionTime', { defaultValue: 'Introduction time' })}</span><input type="time" className={inputClass} value={introductionTime} onChange={(e) => setIntroductionTime(e.target.value)} /></label>
+        <label className="flex flex-col gap-1" {...help('bfield-more-details')}><span className="text-xs font-medium">{t('breeding.field.removalDate', { defaultValue: 'Removal date' })}</span><input type="date" className={inputClass} value={removalDate} onChange={(e) => setRemovalDate(e.target.value)} /></label>
+        <label className="flex flex-col gap-1" {...help('bfield-more-details')}><span className="text-xs font-medium">{t('breeding.field.removalTime', { defaultValue: 'Removal time' })}</span><input type="time" className={inputClass} value={removalTime} onChange={(e) => setRemovalTime(e.target.value)} /></label>
       </div>
-      <label className="flex flex-col gap-1"><span className="text-xs font-medium">{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span><textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
+      <label className="flex flex-col gap-1" {...help('bfield-notes')}><span className="text-xs font-medium">{t('breeding.field.notes', { defaultValue: 'Notes (optional)' })}</span><textarea className={inputClass} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
       <div className="text-[11px] text-neutral-500">{t('breeding.sessionDialog.hint', { defaultValue: 'Lock records on this session keep their own dates. Changing the male is not possible here: record a new session instead so history stays attributable.' })}</div>
     </BreedingDialog>
   );
@@ -252,6 +253,7 @@ export function BreedingWorkspace({
     <button
       type="button"
       aria-pressed={activeMode === key}
+      {...help('breeding-mode')}
       className={`text-xs px-3 py-1.5 rounded-lg border ${activeMode === key ? 'font-semibold bg-white' : 'bg-transparent text-neutral-600 hover:bg-white'}`}
       style={activeMode === key ? { borderColor: 'var(--sk-primary, #0284c7)', color: 'var(--sk-primary, #0284c7)' } : undefined}
       onClick={() => setActiveMode(key)}

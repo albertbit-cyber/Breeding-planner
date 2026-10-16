@@ -6,6 +6,7 @@ import { examsForFemale, latestMeasurement } from '../domain/follicles';
 import { FemaleStatistics } from './PreviousCycles';
 import { animalName, formatDate, formatMm, DASH, STATUS_CLASS } from './format';
 import { stageLabel, statusLabel } from './labels';
+import { help } from '../../help/help';
 
 const smallBtn = 'text-xs px-2.5 py-1.5 border rounded-lg bg-white hover:bg-neutral-50';
 
@@ -20,8 +21,8 @@ export function FemaleBreedingPanel({ snake, cycles = [], exams = [], snakesById
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="font-medium text-sm">{t('breeding.animalPanel.femaleTitle', { defaultValue: 'Breeding card' })}</div>
         <div className="flex gap-2">
-          {active ? <button type="button" className={smallBtn} onClick={() => onOpenCycle(active.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button> : <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'pairing', femaleId: snake.id })}>{t('breeding.overview.startCard', { defaultValue: 'Record first pairing' })}</button>}
-          <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: snake.id })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
+          {active ? <button {...help('overview-open-card')} type="button" className={smallBtn} onClick={() => onOpenCycle(active.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button> : <button type="button" {...help('overview-open-card')} className={smallBtn} onClick={() => openDialog({ kind: 'pairing', femaleId: snake.id })}>{t('breeding.overview.startCard', { defaultValue: 'Record first pairing' })}</button>}
+          <button {...help('card-add-exam')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: snake.id })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
         </div>
       </div>
       {active ? (
@@ -56,7 +57,7 @@ export function MaleBreedingPanel({ snake, cycles = [], snakesById, onOpenCycle 
               <span className="text-neutral-600">{t('breeding.history.maleCounts', { defaultValue: '{{sessions}} sessions, {{locks}} observed locks', sessions: history.sessionCount, locks: history.lockCount })}</span>
               <span className="text-neutral-600">{t('breeding.male.latestIntro', { defaultValue: 'Last introduced' })}: {history.latestIntroductionDate ? formatDate(history.latestIntroductionDate) : DASH}</span>
               {cycle.males.length > 1 ? <span className="text-neutral-500">{t('breeding.animalPanel.candidateOf', { defaultValue: 'one of {{count}} candidate sires', count: cycle.males.length })}</span> : null}
-              <button type="button" className="ms-auto underline" onClick={() => onOpenCycle(cycle.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button>
+              <button {...help('overview-open-card')} type="button" className="ms-auto underline" onClick={() => onOpenCycle(cycle.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button>
             </li>
           ))}
         </ul>

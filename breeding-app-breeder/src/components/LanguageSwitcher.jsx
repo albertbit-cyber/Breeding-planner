@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import "../i18n/index.js";
+import { help } from "../features/help/help";
 
 const languages = [
   { code: "en", label: "EN", name: "English", flag: "🇺🇸🇬🇧" },
@@ -28,6 +29,7 @@ export default function LanguageSwitcher() {
         const active = current === lng.code;
         return (
           <button
+            {...help('settings-language-option')}
             key={lng.code}
             type="button"
             onClick={() => i18n.changeLanguage(lng.code)}

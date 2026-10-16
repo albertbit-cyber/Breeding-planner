@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { buildTimeline } from '../domain/timeline';
 import { animalName, formatDate, formatMm, CERTAINTY_CLASS } from './format';
 import { timelineKindLabel, certaintyLabel, methodLabel, resultLabel, closureOutcomeLabel } from './labels';
+import { help } from '../../help/help';
 
 export function CycleTimeline({ cycle, exams = [], snakesById, onSelectExam = null, onSelectEvent = null, onSelectSession = null, onSelectPlanned = null, limit = null }) {
   const { t } = useTranslation();
@@ -41,7 +42,7 @@ export function CycleTimeline({ cycle, exams = [], snakesById, onSelectExam = nu
         return (
           <li key={entry.id} className={`text-xs ${entry.status === 'cancelled' || entry.status === 'skipped' ? 'opacity-60 line-through' : ''}`}>
             {handler ? (
-              <button type="button" className="w-full flex flex-wrap items-center gap-2 text-start rounded-lg px-2 py-1 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" onClick={handler}>{row}</button>
+              <button type="button" {...help('card-timeline')} className="w-full flex flex-wrap items-center gap-2 text-start rounded-lg px-2 py-1 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" onClick={handler}>{row}</button>
             ) : (
               <div className="flex flex-wrap items-center gap-2 px-2 py-1">{row}</div>
             )}

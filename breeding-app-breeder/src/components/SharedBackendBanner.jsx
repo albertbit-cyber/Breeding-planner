@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useSharedBackend } from "../contexts/SharedBackendContext.jsx";
+import { help } from "../features/help/help";
 
 const bannerTone = {
   checking: "border-sky-200 bg-sky-50 text-sky-800",
@@ -41,15 +42,15 @@ export default function SharedBackendBanner() {
   return (
     <div className={`border-b px-4 py-3 text-sm ${toneClass}`}>
       <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0" {...help("sync-backend-banner")}>
           <div className="font-semibold">{title}</div>
           <div className="text-xs opacity-90">{snapshot.message || "Shared backend status updated."}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={retry}>
+          <button type="button" {...help("sync-backend-retry")} className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={retry}>
             Retry
           </button>
-          <button type="button" className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={() => setShowDiagnostics((prev) => !prev)}>
+          <button type="button" {...help("sync-backend-diagnostics")} className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={() => setShowDiagnostics((prev) => !prev)}>
             {showDiagnostics ? "Hide Diagnostics" : "Diagnostics"}
           </button>
         </div>

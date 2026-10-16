@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { help } from "../help/help";
 
 /**
  * The visible half of a failed cloud save: a pill that stays until a save
@@ -12,6 +13,7 @@ export function NotSyncedPill({ failure, onOpen, className = "" }) {
   if (!failure) return null;
   return (
     <button
+      {...help('sync-not-synced')}
       type="button"
       onClick={onOpen}
       title={failure.reason}
@@ -50,6 +52,7 @@ export function NotSyncedToast({ failure }) {
   // otherwise make "fixed" relative to the header instead of the screen.
   return createPortal((
     <div
+      {...help('sync-not-synced-toast')}
       className="fixed rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm shadow-xl"
       // Inline so it sits clear of the phone's bottom navigation whatever the utility build holds.
       style={{
@@ -69,6 +72,7 @@ export function NotSyncedToast({ failure }) {
           <div className="mt-0.5 text-neutral-700">{failure.reason}</div>
         </div>
         <button
+          {...help('sync-toast-close')}
           type="button"
           className="shrink-0 rounded-md px-1.5 text-neutral-500"
           aria-label={t("common.close", { defaultValue: "Close" })}

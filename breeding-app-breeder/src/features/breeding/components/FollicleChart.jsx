@@ -11,6 +11,7 @@ import { buildFollicleSeries, relativeDay } from '../domain/follicles';
 import { diffDays, compareYmd } from '../domain/dates';
 import { formatDate, formatMm, DASH } from './format';
 import { methodLabel, resultLabel } from './labels';
+import { help } from '../../help/help';
 
 const WIDTH = 640;
 const HEIGHT = 240;
@@ -84,14 +85,14 @@ export function FollicleChart({ exams = [], cycle = null, overlays = [], onSelec
         <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{title || t('breeding.chart.title', { defaultValue: 'Follicle measurements' })}</div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {relative && overlays.length ? (
-            <label className="inline-flex items-center gap-1">
+            <label {...help('card-chart-overlay')} className="inline-flex items-center gap-1">
               <input type="checkbox" checked={showOverlays} onChange={(e) => setShowOverlays(e.target.checked)} />
               {t('breeding.chart.overlay', { defaultValue: 'Overlay previous cycles (day 0 = first pairing)' })}
             </label>
           ) : null}
           <div role="tablist" className="inline-flex rounded-lg border overflow-hidden">
-            <button type="button" role="tab" aria-selected={view === 'chart'} className={`px-2 py-1 ${view === 'chart' ? 'appearance-tab--active' : ''}`} onClick={() => setView('chart')}>{t('breeding.chart.chartView', { defaultValue: 'Chart' })}</button>
-            <button type="button" role="tab" aria-selected={view === 'table'} className={`px-2 py-1 ${view === 'table' ? 'appearance-tab--active' : ''}`} onClick={() => setView('table')}>{t('breeding.chart.tableView', { defaultValue: 'Table' })}</button>
+            <button {...help('card-chart-view')} type="button" role="tab" aria-selected={view === 'chart'} className={`px-2 py-1 ${view === 'chart' ? 'appearance-tab--active' : ''}`} onClick={() => setView('chart')}>{t('breeding.chart.chartView', { defaultValue: 'Chart' })}</button>
+            <button {...help('card-chart-view')} type="button" role="tab" aria-selected={view === 'table'} className={`px-2 py-1 ${view === 'table' ? 'appearance-tab--active' : ''}`} onClick={() => setView('table')}>{t('breeding.chart.tableView', { defaultValue: 'Table' })}</button>
           </div>
         </div>
       </div>
@@ -165,7 +166,7 @@ export function FollicleChart({ exams = [], cycle = null, overlays = [], onSelec
             <tbody>
               {tableRows.map((exam) => (
                 <tr key={exam.id} className="border-t">
-                  <td className="py-1 pe-2 whitespace-nowrap">{onSelectExam ? <button type="button" className="underline" onClick={() => onSelectExam(exam.id)}>{formatDate(exam.date)}</button> : formatDate(exam.date)}</td>
+                  <td className="py-1 pe-2 whitespace-nowrap">{onSelectExam ? <button {...help('card-exam-edit')} type="button" className="underline" onClick={() => onSelectExam(exam.id)}>{formatDate(exam.date)}</button> : formatDate(exam.date)}</td>
                   {relative ? <td className="py-1 pe-2">{relativeDay(exam, cycle)}</td> : null}
                   <td className="py-1 pe-2">{methodLabel(t, exam.method)}</td>
                   <td className="py-1 pe-2">{resultLabel(t, exam.result)}</td>

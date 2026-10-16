@@ -9,6 +9,7 @@ import { CYCLE_STATUS } from '../domain/cycleModel';
 import { BreedingCard } from './BreedingCard';
 import { groupBySeason, cycleMatchesSearch } from './BreedingCardsSection';
 import { formatDate } from './format';
+import { help } from '../../help/help';
 
 const OUTCOME_FILTERS = {
   productive: (c) => c.closure?.outcome === 'hatching_complete' || c.closure?.outcome === 'live_birth_complete',
@@ -19,11 +20,12 @@ const OUTCOME_FILTERS = {
   reopened: (c) => (c.reopenings || []).some((r) => r.reopenedAt),
 };
 
-function Chip({ active, onClick, children }) {
+function Chip({ active, onClick, children, ...rest }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      {...rest}
       aria-pressed={active}
       className={`text-xs px-2.5 py-1 rounded-full border ${active ? 'font-semibold' : 'bg-white text-neutral-600 hover:bg-neutral-50'}`}
       style={active ? { borderColor: 'var(--sk-primary, #0284c7)', color: 'var(--sk-primary, #0284c7)', background: 'var(--sk-primary-soft, #f0f9ff)' } : undefined}
@@ -66,12 +68,12 @@ export function CompletedCyclesSection({ cycles = [], exams = [], settings, snak
           <div className="text-xs text-neutral-500">{t('breeding.completed.subtitle', { defaultValue: 'Finished cycles, filed under the season they started in. Reopening one sends it back to Active pairing in that same season.' })}</div>
         </div>
         {seasons.length ? (
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('breeding.completed.seasonFilter', { defaultValue: 'Season' })}>
+          <div {...help('completed-filter-season')} className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('breeding.completed.seasonFilter', { defaultValue: 'Season' })}>
             <Chip active={season === 'all'} onClick={() => setSeasonFilter('all')}>{t('breeding.completed.allSeasons', { defaultValue: 'All seasons' })}</Chip>
             {seasons.map((label) => <Chip key={label || 'none'} active={season === label} onClick={() => setSeasonFilter(label)}>{label || '?'}</Chip>)}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('breeding.completed.outcomeFilter', { defaultValue: 'Outcome' })}>
+        <div {...help('completed-filter-outcome')} className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('breeding.completed.outcomeFilter', { defaultValue: 'Outcome' })}>
           <Chip active={outcomeFilter === 'all'} onClick={() => setOutcomeFilter('all')}>{t('breeding.completed.allOutcomes', { defaultValue: 'All outcomes' })}</Chip>
           {outcomeLabels.map(([key, label]) => <Chip key={key} active={outcomeFilter === key} onClick={() => setOutcomeFilter(key)}>{label}</Chip>)}
         </div>

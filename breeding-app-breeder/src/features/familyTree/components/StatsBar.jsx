@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../../help/help';
 
 const Stat = ({ icon, label, value }) => (
   <div className="flex items-center gap-2 px-4 py-2 border-e border-violet-100 last:border-0 flex-shrink-0">
@@ -47,7 +48,7 @@ const StatsBar = ({ stats }) => {
   const isOnline = networkStatus === 'online';
 
   return (
-    <div className="ft-stats-bar flex items-center overflow-x-auto">
+    <div className="ft-stats-bar flex items-center overflow-x-auto" {...help('tree-stats')}>
       <Stat icon="🐍" label={t('familyTree.stats.snakes', { defaultValue: 'Snakes' })} value={totalSnakes} />
       <Stat icon="🥚" label={t('familyTree.stats.clutches', { defaultValue: 'Clutches' })} value={totalClutches} />
       <Stat icon="👤" label={t('familyTree.stats.breeders', { defaultValue: 'Breeders' })} value={totalBreeders} />

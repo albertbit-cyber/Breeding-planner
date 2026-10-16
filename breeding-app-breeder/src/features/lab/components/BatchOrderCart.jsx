@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { help } from "../../help/help";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 import { createLabApiClient } from "../api/client";
 import { useSharedBackend } from "../../../contexts/SharedBackendContext.jsx";
@@ -123,7 +124,7 @@ export default function BatchOrderCart() {
   // ── Success banner ──────────────────────────────────────────────────────────
   if (createdOrder) {
     return renderFloating(
-      <div className="fixed bottom-4 end-4 z-[10030] w-80 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-xl">
+      <div {...help('lab-batch-submitted')} className="fixed bottom-4 end-4 z-[10030] w-80 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-xl">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="font-semibold text-emerald-800">
@@ -159,6 +160,7 @@ export default function BatchOrderCart() {
       <button
         type="button"
         className="fixed bottom-4 end-4 z-[10030] flex items-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5 shadow-xl text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+        {...help('lab-batch-cart')}
         onClick={() => setIsExpanded(true)}
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-bold sk-on-accent">
@@ -178,7 +180,7 @@ export default function BatchOrderCart() {
     <div className="fixed bottom-4 end-4 z-[10030] w-80 rounded-2xl border border-neutral-200 bg-white shadow-xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-        <div className="text-sm font-semibold text-neutral-800">
+        <div {...help('lab-batch-cart')} className="text-sm font-semibold text-neutral-800">
           {t("lab.batch.title", { defaultValue: "Batch Order" })}
           {" · "}
           {cartItems.length}{" "}
@@ -189,6 +191,7 @@ export default function BatchOrderCart() {
         <button
           type="button"
           className="text-lg leading-none text-neutral-400 hover:text-neutral-700"
+          {...help('lab-batch-cart')}
           onClick={() => setIsExpanded(false)}
           aria-label={t("actions.collapse", { defaultValue: "Collapse" })}
         >
@@ -213,6 +216,7 @@ export default function BatchOrderCart() {
             <button
               type="button"
               className="mt-0.5 shrink-0 text-[11px] text-rose-600 hover:text-rose-800"
+              {...help('lab-batch-remove')}
               onClick={() => removeFromCart(item.snakeId)}
             >
               {t("common.remove", { defaultValue: "Remove" })}
@@ -247,6 +251,7 @@ export default function BatchOrderCart() {
             <button
               type="button"
               className="mt-1 text-[11px] underline"
+              {...help('lab-batch-retry')}
               onClick={retry}
             >
               {t("common.retry", { defaultValue: "Retry" })}
@@ -281,6 +286,7 @@ export default function BatchOrderCart() {
           <button
             type="button"
             className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            {...help('lab-batch-clear')}
             onClick={clearCart}
             disabled={isSubmitting}
           >
@@ -289,6 +295,7 @@ export default function BatchOrderCart() {
           <button
             type="button"
             className="flex-1 rounded-xl border border-neutral-900 bg-neutral-900 px-3 py-2 text-sm font-medium sk-on-accent hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60"
+            {...help('lab-batch-submit')}
             onClick={handleSubmit}
             disabled={isSubmitting || !cartItems.length || !sharedFeaturesEnabled || !selectedLabId}
           >

@@ -1,4 +1,5 @@
 import React from 'react';
+import { help } from '../help/help';
 
 /**
  * Breeding attention across the whole collection, one line per species.
@@ -24,6 +25,7 @@ import React from 'react';
 const COLUMNS = [
   {
     key: 'overdue',
+    helpId: 'dashboard-breeding-overdue',
     urgency: 'overdue',
     labelKey: 'pairing.dashboard.overdue',
     label: 'Overdue',
@@ -31,6 +33,7 @@ const COLUMNS = [
   },
   {
     key: 'due',
+    helpId: 'dashboard-breeding-due',
     urgency: 'due',
     labelKey: 'pairing.dashboard.dueSoon',
     label: 'Due in 3 days',
@@ -38,6 +41,7 @@ const COLUMNS = [
   },
   {
     key: 'soon',
+    helpId: 'dashboard-breeding-soon',
     urgency: 'soon',
     labelKey: 'pairing.dashboard.nextWeek',
     label: 'Next 7 days',
@@ -45,6 +49,7 @@ const COLUMNS = [
   },
   {
     key: 'tracking',
+    helpId: 'dashboard-breeding-tracking',
     urgency: null,
     labelKey: 'pairing.dashboard.tracking',
     label: 'Tracking',
@@ -75,12 +80,12 @@ export default function SpeciesBreedingTable({
 
   return (
     <div className="rounded-2xl border bg-white overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 border-b bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+      <div {...help('dashboard-breeding')} className="flex items-center gap-2 px-4 py-2 border-b bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
         <span className="flex-1 min-w-0">
           {t('species.dashboard.breedingSpecies', { defaultValue: 'Species' })}
         </span>
-        {COLUMNS.map(column => (
-          <span key={column.key} className="w-16 sm:w-20 text-center leading-tight">
+        {COLUMNS.map(({ helpId, ...column }) => (
+          <span key={column.key} data-help={helpId} className="w-16 sm:w-20 text-center leading-tight">
             {t(column.labelKey, { defaultValue: column.label })}
           </span>
         ))}
@@ -91,6 +96,7 @@ export default function SpeciesBreedingTable({
         return (
           <div key={row.id} className="flex items-center gap-2 px-4 py-1.5 border-b last:border-b-0">
             <div
+              {...help('dashboard-breeding-species')}
               role="button"
               tabIndex={0}
               onClick={openAll}
@@ -100,7 +106,7 @@ export default function SpeciesBreedingTable({
               {row.name}
             </div>
 
-            {COLUMNS.map(column => {
+            {COLUMNS.map(({ helpId, ...column }) => {
               const value = row[column.key] || 0;
               const label = t(column.labelKey, { defaultValue: column.label });
 
@@ -108,7 +114,7 @@ export default function SpeciesBreedingTable({
               // is nothing behind it to open, so it is not a control at all.
               if (!value) {
                 return (
-                  <div key={column.key} className={`${CELL_BASE} ${ZERO_TONE}`} aria-label={`${row.name} - ${label}: 0`}>
+                  <div key={column.key} data-help={helpId} className={`${CELL_BASE} ${ZERO_TONE}`} aria-label={`${row.name} - ${label}: 0`}>
                     0
                   </div>
                 );
@@ -118,6 +124,7 @@ export default function SpeciesBreedingTable({
               return (
                 <div
                   key={column.key}
+                  data-help={helpId}
                   role="button"
                   tabIndex={0}
                   onClick={open}

@@ -7,9 +7,12 @@ import App from './AppEntry.jsx';
 import DeviceStorageUnavailable from './components/DeviceStorageUnavailable.jsx';
 import reportWebVitals from './reportWebVitals';
 import { initSentry } from './shared/sentry';
+import { installHelp } from './features/help/installHelp';
 import { initDeviceStore } from './platform/deviceStore.js';
 
 initSentry();
+// Help Mode's guard must be registered before anything else listens on window.
+installHelp();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
