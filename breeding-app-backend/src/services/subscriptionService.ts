@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
 import { countedAnimalWhere } from "./animalArchive";
-import { FEATURE_CATALOG, LIMIT_FEATURE_KEYS } from "./subscriptionCatalog";
+import { FEATURE_CATALOG, LIMIT_FEATURE_KEYS, PHOTOS_PER_ANIMAL_FEATURE } from "./subscriptionCatalog";
 
 const db = prisma as any;
 
@@ -299,10 +299,10 @@ const usageForFeature = async (userId: string, featureKey: string): Promise<numb
   // archived one (sold, died, given away) is a record the keeper chose to keep, not an animal
   // they hold. Counting either would keep an account at its cap after it made room.
   if (featureKey === "animals.create") return db.animal.count({ where: countedAnimalWhere(userId) });
-  // Stored photos, counted from the table rather than a monthly tally: storage is held, not spent.
-  if (featureKey === "animals.photos") {
-    return db.photo.count({ where: { ownerUserId: userId, status: { in: ["pending", "ready", "deleted"] } } });
-  }
+  // A limit per animal, not per account: the account as a whole has used none of it, so the gate
+  // answers "may this account store photos, and how many per animal". photoService counts the
+  // photos of the one animal an upload is for (countPhotosForAnimal).
+  if (featureKey === PHOTOS_PER_ANIMAL_FEATURE) return 0;
   if (featureKey === "spaces.racks") return 0;
   if (featureKey === "spaces.rooms") return 0;
   const { start, end } = monthlyPeriod();
@@ -422,7 +422,25 @@ export const getUserSubscriptionPanel = async (userId: string) => {
     if (override.enabled) enabledFeatures.add(override.featureKey);
     else disabledFeatures.add(override.featureKey);
   }
+  // The two limits a keeper meets every day, as the gate actually resolves them (an override wins
+  // over the tier), so the admin sees the number the account lives with and where it comes from.
+  const limits: Record<string, unknown> = {};
+  for (const featureKey of ["animals.create", PHOTOS_PER_ANIMAL_FEATURE]) {
+    const access: any = await canAccessFeature({ id: userId, role: "user" }, featureKey);
+    const activeOverride = access.source === "override"
+      ? overrides.find((entry: any) => entry.featureKey === featureKey && (!entry.expiresAt || new Date(entry.expiresAt) > new Date()))
+      : null;
+    limits[featureKey] = {
+      allowed: Boolean(access.allowed) || access.reason === "Usage limit reached",
+      limit: access.limit ?? null,
+      used: featureKey === PHOTOS_PER_ANIMAL_FEATURE ? null : access.currentUsage ?? null,
+      source: access.source || (access.currentTier ? "tier" : "none"),
+      tierName: access.tier || access.currentTier || "",
+      overrideExpiresAt: activeOverride?.expiresAt || null,
+    };
+  }
   return {
+    limits,
     user,
     subscription: subscription ? {
       id: subscription.id,

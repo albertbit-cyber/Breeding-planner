@@ -10,21 +10,26 @@ const feature = (
   featureGroup: string,
   featureKey: string,
   featureName: string,
-  defaultLimitType: string | null = null
+  defaultLimitType: string | null = null,
+  description = `${featureName} access`
 ): FeatureCatalogSeed => ({
   featureGroup,
   featureKey,
   featureName,
-  description: `${featureName} access`,
+  description,
   defaultLimitType,
 });
 
+/** The tier limit on how many photos one animal can hold (per animal, not per account). */
+export const PHOTOS_PER_ANIMAL_FEATURE = "animals.photos";
+
 export const FEATURE_CATALOG: FeatureCatalogSeed[] = [
   feature("Animal Management", "animals.view", "View animals"),
-  feature("Animal Management", "animals.create", "Add animals", "count"),
+  feature("Animal Management", "animals.create", "Animals in the collection", "count", "How many animals the account can keep. Archived animals do not count."),
   feature("Animal Management", "animals.edit", "Edit animals"),
   feature("Animal Management", "animals.delete", "Delete animals"),
-  feature("Animal Management", "animals.photos", "Animal photos", "count"),
+  // A per-animal limit, not an account total: the limit is how many photos one animal can hold.
+  feature("Animal Management", "animals.photos", "Photos per animal", "count", "How many photos each animal can have. Blank means no tier limit (the technical cap still applies)."),
   feature("Animal Management", "animals.documents", "Animal documents", "count"),
   feature("Animal Management", "animals.notes", "Animal notes"),
   feature("Animal Management", "animals.health_logs", "Animal health logs"),
