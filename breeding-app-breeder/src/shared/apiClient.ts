@@ -1637,6 +1637,7 @@ export const requestPhotoUploadUrl = async (payload: {
   width?: number;
   height?: number;
   thumb?: boolean;
+  addedAt?: string;
 }) =>
   request<PhotoUploadStart>("/photos/upload-url", { method: "POST", body: JSON.stringify(payload) });
 

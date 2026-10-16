@@ -133,7 +133,7 @@ describe('the upload queue', () => {
     const upload = vi.fn(async (dataUrl) => ({ id: dataUrl === INLINE_A ? 'idA' : 'idB', status: 'ready' }));
     const result = await runPhotoUploadQueue([animal('a1', INLINE_A), animal('a2', INLINE_A), animal('a3', INLINE_B)], { upload, cache, failures: new Map() });
     expect(upload).toHaveBeenCalledTimes(2);
-    expect(upload).toHaveBeenCalledWith(INLINE_A, { animalId: 'a1', kind: 'gallery' });
+    expect(upload).toHaveBeenCalledWith(INLINE_A, { animalId: 'a1', kind: 'gallery', addedAt: null });
     expect([...result.swaps.entries()]).toEqual([[INLINE_A, 'idA'], [INLINE_B, 'idB']]);
     expect(cache.get('idA')).toBe(INLINE_A);
     expect(result.remaining).toBe(0);
@@ -157,6 +157,35 @@ describe('the upload queue', () => {
     expect(upload).toHaveBeenCalledTimes(1);
     expect(result.stoppedBy).toBeTruthy();
     expect(result.swaps.size).toBe(0);
+  });
+
+  it('skips only the full animal when the photos-per-animal limit refuses one', async () => {
+    const INLINE_C = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAF';
+    const full = Object.assign(new Error('This animal already has 3 photos'), {
+      kind: 'forbidden',
+      details: { code: 'PHOTO_QUOTA', scope: 'animal', animalId: 'a1', limit: 3 },
+    });
+    const upload = vi.fn(async (dataUrl, { animalId }) => {
+      if (animalId === 'a1') throw full;
+      return { id: `id-${dataUrl.slice(-1)}`, status: 'ready' };
+    });
+    const twoPhotos = { id: 'a1', photos: [{ id: 'p1', url: INLINE_A, addedAt: '2026-11-02T09:00:00.000Z' }, { id: 'p2', url: INLINE_B }] };
+    const result = await runPhotoUploadQueue([twoPhotos, animal('a2', INLINE_C)], { upload, failures: new Map() });
+    // One refusal for a1 is enough; its second photo is not tried, and a2 still goes up.
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(upload).toHaveBeenCalledWith(INLINE_A, { animalId: 'a1', kind: 'gallery', addedAt: '2026-11-02T09:00:00.000Z' });
+    expect(result.stoppedBy).toBeNull();
+    expect(result.fullAnimals).toEqual(['a1']);
+    expect([...result.swaps.keys()]).toEqual([INLINE_C]);
+  });
+
+  it('still stops the run when the plan has no photos at all', async () => {
+    const upload = vi.fn(async () => {
+      throw Object.assign(new Error('Feature is not included'), { kind: 'forbidden', details: { code: 'PHOTO_QUOTA', scope: 'plan' } });
+    });
+    const result = await runPhotoUploadQueue([animal('a1', INLINE_A), animal('a2', INLINE_B)], { upload, failures: new Map() });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(result.stoppedBy).toBeTruthy();
   });
 
   it('gives up on a photo for the session after repeated failures of its own', async () => {

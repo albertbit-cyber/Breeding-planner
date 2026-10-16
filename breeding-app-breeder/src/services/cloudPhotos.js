@@ -118,6 +118,7 @@ export async function uploadInlinePhoto(dataUrl, options = {}) {
   const {
     animalId,
     kind = 'gallery',
+    addedAt = null,
     client = defaultClient,
     shrink = resizeImageBlob,
     thumbnail = makeThumbnail,
@@ -150,6 +151,9 @@ export async function uploadInlinePhoto(dataUrl, options = {}) {
   const started = await client.requestPhotoUploadUrl({
     animalId: animalId || undefined,
     kind,
+    // When the photo was added on the device. The backend lets photos from before the per-animal
+    // limits existed through, so a photo taken back then never stays on one device only.
+    addedAt: addedAt || undefined,
     mimeType: body.type,
     sizeBytes: body.size,
     checksum,
@@ -174,8 +178,12 @@ export async function uploadInlinePhoto(dataUrl, options = {}) {
 
 // --- The queue --------------------------------------------------------------------------------
 
-// Errors that will fail the same way for every other photo in this run.
-const stopsTheRun = (error) => ['unauthorized', 'forbidden', 'connection', 'config'].includes(error?.kind);
+/** The animal already holds as many photos as the plan keeps per animal (PHOTO_QUOTA, scope animal). */
+export const isAnimalPhotoLimit = (error) => error?.details?.code === 'PHOTO_QUOTA' && error?.details?.scope === 'animal';
+
+// Errors that will fail the same way for every other photo in this run. A full animal is not one
+// of them: it says nothing about the other animals' photos.
+const stopsTheRun = (error) => !isAnimalPhotoLimit(error) && ['unauthorized', 'forbidden', 'connection', 'config'].includes(error?.kind);
 
 /**
  * One pass over the photos still on the device. Sequential on purpose: each upload decodes and
@@ -193,18 +201,28 @@ export async function runPhotoUploadQueue(snakes, options = {}) {
   const { upload = uploadInlinePhoto, cache = null, limit = 20, shouldStop = () => false, failures = sessionFailures } = options;
   const pending = collectPendingPhotoUploads(snakes).filter((item) => (failures.get(item.dataUrl) || 0) < MAX_ATTEMPTS_PER_SESSION);
   const swaps = new Map();
+  // Animals the backend called full in this run: their other photos would be refused the same way.
+  const fullAnimals = new Set();
   let failed = 0;
   let stoppedBy = null;
   for (const item of pending.slice(0, limit)) {
     if (shouldStop()) break;
+    if (fullAnimals.has(item.snakeId)) continue;
     try {
-      const photo = await upload(item.dataUrl, { animalId: item.snakeId, kind: item.kind });
+      const photo = await upload(item.dataUrl, { animalId: item.snakeId, kind: item.kind, addedAt: item.addedAt });
       if (photo?.id && photo.status !== 'pending') {
         swaps.set(item.dataUrl, photo.id);
         cache?.set(photo.id, item.dataUrl);
       }
     } catch (error) {
       failed += 1;
+      if (isAnimalPhotoLimit(error)) {
+        // Over the plan's limit for this animal. The photo stays on this device (and in backups)
+        // and is offered again on later passes, so it goes up once the animal has room.
+        fullAnimals.add(item.snakeId);
+        failures.set(item.dataUrl, (failures.get(item.dataUrl) || 0) + 1);
+        continue;
+      }
       if (stopsTheRun(error)) {
         stoppedBy = error;
         break;
@@ -213,7 +231,7 @@ export async function runPhotoUploadQueue(snakes, options = {}) {
       console.warn('[photos] upload failed; the photo stays on this device and is tried again later', error?.message || error);
     }
   }
-  return { swaps, failed, pending: pending.length, remaining: Math.max(0, pending.length - swaps.size), stoppedBy };
+  return { swaps, failed, pending: pending.length, remaining: Math.max(0, pending.length - swaps.size), stoppedBy, fullAnimals: [...fullAnimals] };
 }
 
 // --- Showing stored photos --------------------------------------------------------------------

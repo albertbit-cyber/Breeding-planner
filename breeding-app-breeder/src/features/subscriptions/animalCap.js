@@ -1,7 +1,7 @@
 /**
  * The tier's animal cap, as the app states it before the keeper commits.
  *
- * Free keeps 20 animals. The app does not let a keeper add past their tier's cap
+ * Free keeps 10 animals. The app does not let a keeper add past their tier's cap
  * and says so before the confirm button, with the next tier that would hold more.
  * Nothing here decides which animals to drop: an import that would cross the cap
  * waits until the keeper skips rows or upgrades.

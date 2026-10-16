@@ -38,8 +38,8 @@ describe('the upload queue', () => {
       snake('demo', { isDemo: true, photos: [photo('p5', 'data:image/png;base64,iVBOR')] }),
     ];
     expect(collectPendingPhotoUploads(snakes)).toEqual([
-      { snakeId: 'a1', dataUrl: INLINE_A, kind: 'gallery' },
-      { snakeId: 'a3', dataUrl: INLINE_B, kind: 'cover' },
+      { snakeId: 'a1', dataUrl: INLINE_A, kind: 'gallery', addedAt: '2026-08-24T04:09:51.788Z' },
+      { snakeId: 'a3', dataUrl: INLINE_B, kind: 'cover', addedAt: null },
     ]);
   });
 

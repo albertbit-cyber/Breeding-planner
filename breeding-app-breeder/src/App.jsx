@@ -54,6 +54,8 @@ import BackendStatusDot from "./components/BackendStatusDot.jsx";
 import { useFeatureAccess } from "./features/subscriptions/FeatureAccessContext.jsx";
 import FeatureAccessGuard from "./features/subscriptions/FeatureAccessGuard.jsx";
 import AnimalCapNotice, { useAnimalCap } from "./features/subscriptions/AnimalCapNotice.jsx";
+import PhotoCapNotice, { usePhotoCap } from "./features/subscriptions/PhotoCapNotice.jsx";
+import { describePhotoCount } from "./features/subscriptions/photoCap";
 import { describeCloudSyncFailure } from "./features/sync/cloudSyncFailure";
 import { NotSyncedPill, NotSyncedToast } from "./features/sync/CloudSyncIndicator.jsx";
 import MissingAnimalsPanel from "./features/sync/MissingAnimalsPanel.jsx";
@@ -8589,6 +8591,8 @@ export default function BreedingPlannerApp() {
   const editCameraInputRef = useRef(null);
   const editUploadInputRef = useRef(null);
   const [editUploadingPhoto, setEditUploadingPhoto] = useState(false);
+  // The photo-limit notice from the last add on the open record (a selection that only partly fit).
+  const [editPhotoCapNotice, setEditPhotoCapNotice] = useState(null);
   const [editStatusTagInput, setEditStatusTagInput] = useState('');
   const [editStatusMenuOpen, setEditStatusMenuOpen] = useState(false);
   const editStatusMenuRef = useRef(null);
@@ -10537,6 +10541,12 @@ export default function BreedingPlannerApp() {
     Array.isArray(editSnakeDraft?.photos) ? editSnakeDraft.photos.length : 0
   ), [editSnakeDraft?.photos]);
 
+  // Photos per animal, by the account's plan (Free 3 ... Breeder 9; the technical cap otherwise).
+  // A lower limit never takes a photo away: an animal over it keeps them all and takes no more.
+  const checkPhotoCap = usePhotoCap();
+  const editPhotoCap = useMemo(() => checkPhotoCap(editPhotoCount, 0), [checkPhotoCap, editPhotoCount]);
+  useEffect(() => { setEditPhotoCapNotice(null); }, [editSnake?.id]);
+
   const handleEditPhotoSelection = useCallback(async (fileList, source) => {
     if (!editSnake?.id) return;
     const files = Array.isArray(fileList)
@@ -10544,9 +10554,16 @@ export default function BreedingPlannerApp() {
       : Array.from(fileList || []).filter(Boolean);
     if (!files.length) return;
 
+    // Only what fits under the plan's photos-per-animal limit is added, first ones first; the
+    // notice says how many did not fit. A full animal adds nothing and says why.
+    const capCheck = checkPhotoCap(editPhotoCount, files.length);
+    setEditPhotoCapNotice(capCheck.refused ? capCheck : null);
+    if (!capCheck.accepted) return;
+    const accepted = files.slice(0, capCheck.accepted);
+
     try {
       setEditUploadingPhoto(true);
-      const result = await handleAddSnakePhotos(editSnake.id, files, { source });
+      const result = await handleAddSnakePhotos(editSnake.id, accepted, { source });
       const newEntries = Array.isArray(result?.newEntries) ? result.newEntries : [];
       const combinedFromHandler = Array.isArray(result?.combined) ? result.combined : null;
       const imageUrlFromHandler = typeof result?.imageUrl === 'string' ? result.imageUrl : null;
@@ -10569,7 +10586,7 @@ export default function BreedingPlannerApp() {
     } finally {
       setEditUploadingPhoto(false);
     }
-  }, [editSnake?.id, handleAddSnakePhotos, showAppAlert, t]);
+  }, [checkPhotoCap, editPhotoCount, editSnake?.id, handleAddSnakePhotos, showAppAlert, t]);
 
   const handleEditCameraInputChange = useCallback(async (event) => {
     const files = event?.target?.files;
@@ -14538,10 +14555,10 @@ export default function BreedingPlannerApp() {
                   {getSpeciesById(resolveSpeciesId(editSnakeDraft.species))?.name || ''}
                 </div>
                 <div className="snake-editor-photo-actions">
-                  <button type="button" className="snake-editor-link" {...help('record-photo-take')} onClick={triggerEditCameraCapture} disabled={editUploadingPhoto || !editSnake?.id}>
+                  <button type="button" className="snake-editor-link" {...help('record-photo-take')} onClick={triggerEditCameraCapture} disabled={editUploadingPhoto || !editSnake?.id || editPhotoCap.full}>
                     {t("snakeEdit.image.take")}
                   </button>
-                  <button type="button" className="snake-editor-link" {...help('record-photo-upload')} onClick={triggerEditUploadPicker} disabled={editUploadingPhoto || !editSnake?.id}>
+                  <button type="button" className="snake-editor-link" {...help('record-photo-upload')} onClick={triggerEditUploadPicker} disabled={editUploadingPhoto || !editSnake?.id || editPhotoCap.full}>
                     {t("snakeEdit.image.upload")}
                   </button>
                   <button type="button" className="snake-editor-link" {...help('record-photo-view')} onClick={handleEditViewPictures} disabled={!editSnake?.id}>
@@ -14561,6 +14578,12 @@ export default function BreedingPlannerApp() {
                     </button>
                   ) : null}
                 </div>
+                {editPhotoCap.tierLimited || editPhotoCap.full ? (
+                  <div className="snake-editor-photo-count" {...help('account-photo-limit')}>
+                    {describePhotoCount(editPhotoCap, { t })}
+                  </div>
+                ) : null}
+                <PhotoCapNotice result={editPhotoCapNotice || editPhotoCap} className="mt-2" />
               </div>
               <div className="snake-editor-commands">
                 <div ref={editMoreMenuRef} className="relative">

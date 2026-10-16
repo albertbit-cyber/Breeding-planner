@@ -161,6 +161,7 @@ export const settings = {
   'account-signed-in-chip': topic('account', { see: ['account-sign-out', 'account-screen'] }),
   'account-sign-out': topic('account', { title: 'auth:actions.signOut', see: ['account-signed-in-chip', 'account-sign-out-device', 'saving'] }),
   'account-animal-limit': topic('account', { see: ['account-see-plans', 'account-plans'] }),
+  'account-photo-limit': topic('account', { see: ['account-see-plans', 'account-plans', 'record-photo-upload'] }),
   'account-locked-feature': topic('account', { see: ['account-see-plans', 'account-features'] }),
   'account-see-plans': topic('account', { title: 'common:subscriptions.cap.seePlans', see: ['account-plans', 'account-animal-limit'] }),
 } as const;

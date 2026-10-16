@@ -3204,6 +3204,12 @@
       "more": "Skip some rows of an import, or remove animals, to stay within the limit.",
       "words": "limit cap animals plan"
     },
+    "account-photo-limit": {
+      "title": "Photo limit",
+      "short": "Says how many photos each animal can have on your plan, and stops a photo that would go over it.",
+      "more": "Photos an animal already has are never removed. Remove one to add another, or move to a plan with more photos per animal.",
+      "words": "limit cap photos pictures plan"
+    },
     "account-locked-feature": {
       "title": "Not included in your plan",
       "short": "Says that your current plan does not include this feature, before you try it.",
