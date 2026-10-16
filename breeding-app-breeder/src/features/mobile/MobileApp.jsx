@@ -7,6 +7,7 @@ import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { estimateDataUrlBytes } from "../../utils/imageResize";
 import SuggestionsTab from "../suggestions/SuggestionsTab";
 import ShedTestTerminalPanel from "../lab/components/ShedTestTerminalPanel.jsx";
+import { activeAnimals } from "../animals/archive";
 import BreederOrderGeneticTestModal from "../lab/components/BreederOrderGeneticTestModal.jsx";
 import {
   clearAuthToken,
@@ -26,6 +27,8 @@ import {
   saveBreederSnapshot,
   syncMobileQueue,
 } from "../../shared/apiClient";
+import { selectRecordsToUpload } from "../../services/cloudSyncPayload";
+import { SYNC_ENTRY_ARRAYS, mergeSyncRecord, stampRecordChanges } from "../../services/syncMerge";
 
 // ג”€ג”€ג”€ Storage helpers ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const DEVICE_KEY    = "breedingPlannerMobileDeviceId";
@@ -284,122 +287,33 @@ const markRecordUpdated = (record, at = new Date().toISOString()) => {
   };
 };
 
-const mergeStringList = (...values) => {
-  const merged = [];
-  const seen = new Set();
-  values.flatMap((value) => (Array.isArray(value) ? value : [])).forEach((item) => {
-    const text = String(item || "").trim();
-    if (!text) return;
-    const key = text.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    merged.push(text);
-  });
-  return merged;
-};
-
-const entryIdentity = (entry, label, index) => {
-  if (!entry || typeof entry !== "object") return `${label}:blank:${index}`;
-  const explicit = [
-    entry.id,
-    entry.logId,
-    entry.uuid,
-    entry.createdAt && `${entry.createdAt}:${entry.actionType || label}`,
-    entry.addedAt && `${entry.addedAt}:${entry.source || label}`,
-  ].map((value) => String(value || "").trim()).find(Boolean);
-  if (explicit) return explicit;
-  return [
-    label,
-    entry.date || "",
-    entry.time || "",
-    entry.result || entry.outcome || "",
-    entry.feed || entry.food || entry.prey || "",
-    entry.size || entry.weight || entry.grams || "",
-    entry.notes || entry.note || "",
-  ].map((part) => String(part || "").trim()).join("|") || `${label}:${index}`;
-};
-
-const mergeEntryArrays = (localEntries, backendEntries, label) => {
-  const rows = [
-    ...(Array.isArray(backendEntries) ? backendEntries : []),
-    ...(Array.isArray(localEntries) ? localEntries : []),
-  ].filter((entry) => entry && typeof entry === "object");
-  const merged = new Map();
-  rows.forEach((entry, index) => {
-    const key = entryIdentity(entry, label, index);
-    const current = merged.get(key);
-    if (!current || recordTimestamp(entry) >= recordTimestamp(current)) {
-      merged.set(key, current ? { ...current, ...entry } : entry);
-    }
-  });
-  return Array.from(merged.values()).sort((a, b) => recordTimestamp(b) - recordTimestamp(a));
-};
-
-const mergeLogs = (localLogs, backendLogs) => {
-  const local = localLogs && typeof localLogs === "object" ? localLogs : {};
-  const backend = backendLogs && typeof backendLogs === "object" ? backendLogs : {};
-  const keys = Array.from(new Set([
-    "feeds",
-    "weights",
-    "sheds",
-    "cleanings",
-    "meds",
-    "water",
-    "notes",
-    "health",
-    ...Object.keys(local),
-    ...Object.keys(backend),
-  ]));
-  return keys.reduce((acc, key) => {
-    acc[key] = mergeEntryArrays(local[key], backend[key], key);
-    return acc;
-  }, {});
-};
+// The same merge the desktop app and the server use (services/syncMerge.js): field by field, the
+// later edit of each field winning, nested logs and photos merged entry by entry with deletions
+// kept. This copy used to union genetics, tags and groups, so a gene removed on the desktop came
+// back from the phone's cache on its next save.
+const ANIMAL_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.animal, mergeLogs: true };
+const PAIRING_MERGE = { entryArrays: SYNC_ENTRY_ARRAYS.pairing, mergeLogs: true };
 
 const mergeAnimalRecord = (localAnimal, backendAnimal) => {
   if (!localAnimal) return backendAnimal;
   if (!backendAnimal) return localAnimal;
   // A saved record replaces a demo with the same id whole; merged, it kept isDemo and was hidden.
   if (isDemoAnimal(localAnimal) && !isDemoAnimal(backendAnimal)) return backendAnimal;
-  const localTime = recordTimestamp(localAnimal);
-  const backendTime = recordTimestamp(backendAnimal);
-  const base = localTime >= backendTime ? localAnimal : backendAnimal;
-  const other = localTime >= backendTime ? backendAnimal : localAnimal;
-  return {
-    ...other,
-    ...base,
-    morphs: mergeStringList(other.morphs, base.morphs),
-    hets: mergeStringList(other.hets, base.hets),
-    possibleHets: mergeStringList(other.possibleHets, base.possibleHets),
-    tags: mergeStringList(other.tags, base.tags),
-    groups: mergeStringList(other.groups, base.groups),
-    photos: mergeEntryArrays(other.photos, base.photos, "photo"),
-    logs: mergeLogs(other.logs, base.logs),
-  };
+  return mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
 };
 
 const mergePairingRecord = (localPairing, backendPairing) => {
   if (!localPairing) return backendPairing;
   if (!backendPairing) return localPairing;
-  const localTime = recordTimestamp(localPairing);
-  const backendTime = recordTimestamp(backendPairing);
-  const base = localTime >= backendTime ? localPairing : backendPairing;
-  const other = localTime >= backendTime ? backendPairing : localPairing;
-  return {
-    ...other,
-    ...base,
-    goals: mergeStringList(other.goals, base.goals),
-    tags: mergeStringList(other.tags, base.tags),
-    locks: mergeEntryArrays(other.locks, base.locks, "locks"),
-    lockLogs: mergeEntryArrays(other.lockLogs, base.lockLogs, "lockLogs"),
-    appointments: mergeEntryArrays(other.appointments, base.appointments, "appointments"),
-    mobileOvulationLogs: mergeEntryArrays(other.mobileOvulationLogs, base.mobileOvulationLogs, "mobileOvulationLogs"),
-    mobilePreLayShedLogs: mergeEntryArrays(other.mobilePreLayShedLogs, base.mobilePreLayShedLogs, "mobilePreLayShedLogs"),
-    mobileClutchLogs: mergeEntryArrays(other.mobileClutchLogs, base.mobileClutchLogs, "mobileClutchLogs"),
-    mobileHatchLogs: mergeEntryArrays(other.mobileHatchLogs, base.mobileHatchLogs, "mobileHatchLogs"),
-    logs: mergeLogs(other.logs, base.logs),
-  };
+  return mergeSyncRecord(backendPairing, localPairing, PAIRING_MERGE);
 };
+
+// Stamps an edit against the copy it was made from, so only the fields the keeper changed carry
+// a new edit time. Stamping the whole record made every field of a stale cached copy "newer"
+// than the server's and put old values back.
+const stampMobileEdit = (updated, base, kind) => (base
+  ? stampRecordChanges(updated, base, kind === "pairing" ? PAIRING_MERGE : ANIMAL_MERGE)
+  : markRecordUpdated(updated));
 
 const mergeSnapshotList = (localItems, backendItems, fallbackPrefix, mergeRecord) => {
   const merged = new Map();
@@ -490,6 +404,8 @@ const normalizeMobileSnapshot = (snapshot = {}) => {
   return {
     animals: animals.filter((animal) => !isDemoAnimal(animal)),
     pairings: filterDemoPairings(snapshot?.pairings, demoIds),
+    // Breeding cards travel with the snapshot read-only here; the desktop app owns their edits.
+    breedingCycles: Array.isArray(snapshot?.breedingCycles) ? snapshot.breedingCycles.filter((c) => c && !c.deletedAt && !demoIds.has(c.femaleId)) : [],
     plannerState: extractMobilePlannerState(snapshot),
   };
 };
@@ -502,6 +418,7 @@ const mergeMobileSnapshot = (localSnapshot = {}, backendSnapshot = {}) => normal
     mergeAnimalRecord
   ),
   pairings: mergeSnapshotList(localSnapshot.pairings, backendSnapshot.pairings, "pairing", mergePairingRecord),
+  breedingCycles: backendSnapshot.breedingCycles || localSnapshot.breedingCycles || [],
   plannerState: backendSnapshot.plannerState || localSnapshot.plannerState,
 });
 
@@ -912,7 +829,7 @@ function AnimalEditForm({ animal, onSave, onCancel, busy }) {
     { key: "name",            label: t("mobile.edit.name", { defaultValue: "Name" }),                 type: "text" },
     { key: "sex",             label: t("mobile.edit.sex", { defaultValue: "Sex" }),                   type: "select", opts: ["", "Male", "Female", "Unknown"] },
     { key: "genetics",        label: t("mobile.edit.genetics", { defaultValue: "Genetics / Morph" }), type: "text" },
-    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Sold", "Deceased", "Quarantine"] },
+    { key: "status",          label: t("mobile.edit.status", { defaultValue: "Status" }),             type: "select", opts: ["", "Active", "For sale", "Quarantine"] },
     { key: "species",         label: t("mobile.edit.species", { defaultValue: "Species" }),           type: "text" },
     { key: "dob",             label: t("mobile.edit.dob", { defaultValue: "Date of birth" }),         type: "date" },
     { key: "weight",          label: t("mobile.edit.weight", { defaultValue: "Weight (g)" }),         type: "number" },
@@ -1294,7 +1211,7 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
     try {
       const arrKey  = KEY_MAP[stageKey];
       const updated = { ...pairing, [arrKey]: [...(pairing[arrKey] || []), entry] };
-      await onSavePairing(syncCompatFields(updated));
+      await onSavePairing(syncCompatFields(updated), pairing);
       setOpenStage(null);
     } finally {
       setSaving(false);
@@ -1392,7 +1309,32 @@ function PairingSection({ pairing, isFemale, partnerName, onSavePairing }) {
 }
 
 // ג”€ג”€ג”€ BREEDING PANEL ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
+function BreedingCardSummary({ cycle, animalMap }) {
+  const { t } = useTranslation();
+  const sessions = (cycle.sessions || []).filter((s) => s.introductionDate).length;
+  const locks = (cycle.sessions || []).reduce((n, s) => n + (s.locks || []).filter((l) => l.status === "observed" && l.observationDate).length, 0);
+  const pending = (cycle.plannedPairings || []).filter((p) => p.status === "pending" && p.date).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const males = (cycle.males || []).map((m) => animalMap.get(m.maleId)?.name || m.maleId).join(", ");
+  return (
+    <div className="mbl-bp-card">
+      <div className="mbl-bp-header">
+        <div>
+          <strong>{t("mobile.breedingCard.title", { season: cycle.seasonLabel || "", defaultValue: "Breeding card {{season}}" })}</strong>
+          <small className="mbl-bp-meta">{t("mobile.breedingCard.males", { males: males || "—", defaultValue: "Males: {{males}}" })}</small>
+        </div>
+        <span className={`mbl-bp-status mbl-bp-status--${cycle.status || "active"}`}>{cycle.status}</span>
+      </div>
+      <div className="mbl-cs-entry-detail">
+        <span>{t("mobile.breedingCard.sessions", { n: sessions, defaultValue: "{{n}} sessions" })}</span>
+        <span>{t("mobile.breedingCard.locks", { n: locks, defaultValue: "{{n}} observed locks" })}</span>
+        {pending ? <span>{t("mobile.breedingCard.nextPlanned", { date: fmtDate(pending.date), defaultValue: "Next planned pairing {{date}}" })}</span> : null}
+      </div>
+      <div className="mbl-cs-entry-notes">{t("mobile.breedingCard.editHint", { defaultValue: "Record sessions, locks and scans in the full app; this view is read-only." })}</div>
+    </div>
+  );
+}
+
+function BreedingPanel({ animal, pairings, allAnimals, onSavePairing, breedingCycles = [] }) {
   const animalId = animal?.id || animal?.appAnimalId;
   const related  = useMemo(
     () => (pairings || []).filter((p) => p.femaleId === animalId || p.maleId === animalId),
@@ -1404,12 +1346,18 @@ function BreedingPanel({ animal, pairings, allAnimals, onSavePairing }) {
   );
   const { t } = useTranslation();
 
-  if (!related.length) {
+  const cards = useMemo(
+    () => (breedingCycles || []).filter((c) => c && (c.femaleId === animalId || (c.males || []).some((m) => m.maleId === animalId))),
+    [breedingCycles, animalId]
+  );
+
+  if (!related.length && !cards.length) {
     return <p className="mbl-empty">{t("mobile.breeding.noPairingsForAnimal", { defaultValue: "No pairings found for this animal." })}</p>;
   }
 
   return (
     <div className="mbl-breeding-list">
+      {cards.map((cycle) => <BreedingCardSummary key={cycle.id} cycle={cycle} animalMap={animalMap} />)}
       {related.map((pairing) => {
         const isFemale    = pairing.femaleId === animalId;
         const partnerId   = isFemale ? pairing.maleId : pairing.femaleId;
@@ -1839,6 +1787,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const [recent, setRecent]       = useState(() => readJson(RECENT_KEY, []));
   const [localAnimals, setLocalAnimals] = useState(() => normalizeMobileSnapshot({ animals: readJson(ANIMALS_CACHE, []) }).animals);
   const [pairings, setPairings]   = useState([]);
+  const [breedingCycles, setBreedingCycles] = useState([]);
   const { t } = useTranslation();
 
   useEffect(() => { writeJson(RECENT_KEY, recent); }, [recent]);
@@ -1850,6 +1799,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         const normalizedSnapshot = normalizeMobileSnapshot(snap);
         setLocalAnimals(normalizedSnapshot.animals);
         setPairings(normalizedSnapshot.pairings);
+        setBreedingCycles(normalizedSnapshot.breedingCycles || []);
         writeJson(ANIMALS_CACHE, normalizedSnapshot.animals);
       })
       .catch(() => {});
@@ -1895,11 +1845,13 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   const handleManual = (e) => { e.preventDefault(); resolveAnimal(manual); setManual(""); };
 
   // ג”€ג”€ Shared snapshot helper ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-  const updateAnimalInSnapshot = useCallback(async (updated) => {
+  const updateAnimalInSnapshot = useCallback(async (updated, base = null) => {
     const snap = normalizeMobileSnapshot(await fetchBreederSnapshot());
-    const changed = markRecordUpdated(updated);
+    const changed = stampMobileEdit(updated, base, "animal");
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
-    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    // Only the edited animal goes up; re-sending the whole account on every photo was how a stale
+    // cache overwrote everything else.
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ animals: [changed] }));
     // saveBreederSnapshot strips embedded (data:) photos before the request body is built, so the
     // echoed response won't carry them back — reconcile with the pre-send local list to keep photos.
     const reconciledAnimals = mergeSnapshotList(list, savedSnapshot.animals, "animal", mergeAnimalRecord);
@@ -1910,11 +1862,11 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
   }, []);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-  const handleSavePairing = useCallback(async (updatedPairing) => {
+  const handleSavePairing = useCallback(async (updatedPairing, base = null) => {
     const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot());
-    const changed = markRecordUpdated(updatedPairing);
+    const changed = stampMobileEdit(updatedPairing, base, "pairing");
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
-    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ pairings: [changed] }));
     const reconciledPairings = mergeSnapshotList(pairs, savedSnapshot.pairings, "pairing", mergePairingRecord);
     setPairings(reconciledPairings.length || !pairs.length ? reconciledPairings : [...pairs]);
   }, []);
@@ -1945,7 +1897,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
         size: estimateDataUrlBytes(dataUrl),
       };
       const updated = { ...animal, photos: [...(animal.photos || []), newPhoto] };
-      await updateAnimalInSnapshot(updated);
+      await updateAnimalInSnapshot(updated, animal);
       pushToast(t("mobile.toast.photoSaved", { defaultValue: "Photo saved." }));
     } catch (err) {
       if (!String(err?.message || "").toLowerCase().includes("cancel")) {
@@ -1960,7 +1912,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     if (!animal) return;
     setPhotoBusy(true);
     try {
-      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
+      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl }, animal);
       pushToast(t("mobile.toast.iconUpdated", { defaultValue: "Icon updated." }));
     } catch {
       pushToast(t("mobile.toast.iconFailed", { defaultValue: "Could not update icon." }));
@@ -1977,7 +1929,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
       const nextIcon  = remaining.some((p) => p.url === animal.imageUrl)
         ? animal.imageUrl
         : (remaining.length ? remaining[remaining.length - 1].url : undefined);
-      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
+      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon }, animal);
       pushToast(t("mobile.toast.photoDeleted", { defaultValue: "Photo deleted." }));
     } catch {
       pushToast(t("mobile.toast.photoDeleteFailed", { defaultValue: "Could not delete photo." }));
@@ -1990,9 +1942,9 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
     setEditBusy(true);
     try {
       const snapshot = normalizeMobileSnapshot(await fetchBreederSnapshot());
-      const merged = markRecordUpdated({ ...animal, ...draft });
+      const merged = stampMobileEdit({ ...animal, ...draft }, animal, "animal");
       const animals = mergeSnapshotList([merged], snapshot.animals, "animal", mergeAnimalRecord);
-      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snapshot, animals }));
+      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ animals: [merged] }));
       const reconciledAnimals = mergeSnapshotList(animals, savedSnapshot.animals, "animal", mergeAnimalRecord);
       const mergedKey = recordIdentity(merged, "animal", 0);
       const savedAnimal = reconciledAnimals.find((record, index) => recordIdentity(record, "animal", index) === mergedKey) || merged;
@@ -2124,7 +2076,7 @@ function TerminalMode({ onSwitchMode, onSignOut, deviceId }) {
             <AnimalEditForm animal={animal} onSave={saveEdit} onCancel={() => { setScreen("scan"); setAnimal(null); }} busy={editBusy} />
           )}
           {cardTab === "breeding" && (
-            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} />
+            <BreedingPanel animal={animal} pairings={pairings} allAnimals={localAnimals} onSavePairing={handleSavePairing} breedingCycles={breedingCycles} />
           )}
         </div>
       )}
@@ -2268,7 +2220,12 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     }
     try {
       const merged = mergeMobileSnapshot({ animals, pairings, plannerState }, latest);
-      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot(merged));
+      // Only records this phone changed (newer than the server's copy) go up, not the account.
+      const remote = normalizeMobileSnapshot(latest);
+      const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({
+        animals: selectRecordsToUpload(merged.animals, remote.animals),
+        pairings: selectRecordsToUpload(merged.pairings, remote.pairings),
+      }));
       // saveBreederSnapshot strips embedded (data:) photos before sending, so the echoed response
       // won't carry them — reconcile with the pre-send local merge to keep photos in local storage.
       const reconciledAnimals = mergeSnapshotList(merged.animals, savedSnapshot.animals, "animal", mergeAnimalRecord);
@@ -2383,8 +2340,13 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   const runSync = async () => {
     if (!queue.length) return;
     try {
-      await syncMobileQueue({ deviceId, actions: queue });
-      setQueue([]);
+      const response = await syncMobileQueue({ deviceId, actions: queue });
+      // Keep what the server could not apply, so a failed log is retried instead of dropped.
+      const failedIds = new Set((Array.isArray(response?.results) ? response.results : [])
+        .filter((result) => result?.status === "failed")
+        .map((result) => result.id));
+      const sent = new Set(queue.map((item) => item.id));
+      setQueue((prev) => prev.filter((item) => failedIds.has(item.id) || !sent.has(item.id)));
       pushToast(t("mobile.toast.offlineSynced", { defaultValue: "Offline updates synced." }));
       await refresh();
     } catch (err) {
@@ -2410,11 +2372,13 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   };
 
   // ג”€ג”€ Photo helpers (Full mode) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-  const updateAnimalInSnapshot = useCallback(async (updated) => {
+  const updateAnimalInSnapshot = useCallback(async (updated, base = null) => {
     const snap = normalizeMobileSnapshot(await fetchBreederSnapshot());
-    const changed = markRecordUpdated(updated);
+    const changed = stampMobileEdit(updated, base, "animal");
     const list = mergeSnapshotList([changed], snap?.animals, "animal", mergeAnimalRecord);
-    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, animals: list }));
+    // Only the edited animal goes up; re-sending the whole account on every photo was how a stale
+    // cache overwrote everything else.
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ animals: [changed] }));
     // saveBreederSnapshot strips embedded (data:) photos before the request body is built, so the
     // echoed response won't carry them back — reconcile with the pre-send local list to keep photos.
     const reconciledAnimals = mergeSnapshotList(list, savedSnapshot.animals, "animal", mergeAnimalRecord);
@@ -2430,11 +2394,11 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
   }, [snapshotCacheKey, t]);
 
   // ג”€ג”€ Pairing save handler ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
-  const handleSavePairing = useCallback(async (updatedPairing) => {
+  const handleSavePairing = useCallback(async (updatedPairing, base = null) => {
     const snap  = normalizeMobileSnapshot(await fetchBreederSnapshot());
-    const changed = markRecordUpdated(updatedPairing);
+    const changed = stampMobileEdit(updatedPairing, base, "pairing");
     const pairs = mergeSnapshotList([changed], snap?.pairings, "pairing", mergePairingRecord);
-    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ ...snap, pairings: pairs }));
+    const savedSnapshot = normalizeMobileSnapshot(await saveBreederSnapshot({ pairings: [changed] }));
     const reconciledPairings = mergeSnapshotList(pairs, savedSnapshot.pairings, "pairing", mergePairingRecord);
     setPairings(reconciledPairings.length || !pairs.length ? reconciledPairings : [...pairs]);
     setPlannerState(savedSnapshot.plannerState);
@@ -2465,7 +2429,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
         type: `image/${result.format || "jpeg"}`,
         size: estimateDataUrlBytes(dataUrl),
       };
-      await updateAnimalInSnapshot({ ...animal, photos: [...(animal.photos || []), newPhoto] });
+      await updateAnimalInSnapshot({ ...animal, photos: [...(animal.photos || []), newPhoto] }, animal);
       pushToast(t("mobile.toast.photoSaved", { defaultValue: "Photo saved." }));
     } catch (err) {
       if (!String(err?.message || "").toLowerCase().includes("cancel")) {
@@ -2480,7 +2444,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     if (!animal) return;
     setPhotoBusy(true);
     try {
-      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl });
+      await updateAnimalInSnapshot({ ...animal, imageUrl: photoUrl }, animal);
       pushToast(t("mobile.toast.iconUpdated", { defaultValue: "Icon updated." }));
     } catch { pushToast(t("mobile.toast.iconFailed", { defaultValue: "Could not update icon." })); }
     finally { setPhotoBusy(false); }
@@ -2494,7 +2458,7 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       const nextIcon  = remaining.some((p) => p.url === animal.imageUrl)
         ? animal.imageUrl
         : (remaining.length ? remaining[remaining.length - 1].url : undefined);
-      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon });
+      await updateAnimalInSnapshot({ ...animal, photos: remaining, imageUrl: nextIcon }, animal);
       pushToast(t("mobile.toast.photoDeleted", { defaultValue: "Photo deleted." }));
     } catch { pushToast(t("mobile.toast.photoDeleteFailed", { defaultValue: "Could not delete photo." })); }
     finally { setPhotoBusy(false); }
@@ -2505,19 +2469,23 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
     [animals]
   );
 
+  // Archived snakes (sold, died, given away) stay in the synced data but out of the phone's lists;
+  // their record is read in the full app's Archive.
+  const collectionAnimals = useMemo(() => activeAnimals(animals), [animals]);
+
   const filteredAnimals = useMemo(() => {
-    let list = animals;
+    let list = collectionAnimals;
     if (sexFilter && sexFilter !== "groups") list = list.filter((a) => sexMatchesFilter(a, sexFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((a) => animalSearchBlob(a).includes(q));
     }
     return list;
-  }, [animals, search, sexFilter]);
+  }, [collectionAnimals, search, sexFilter]);
 
   const groupedAnimals = useMemo(() => {
     const map = new Map();
-    animals.forEach((a) => {
+    collectionAnimals.forEach((a) => {
       const gs = Array.isArray(a.groups) && a.groups.length ? a.groups : ["Ungrouped"];
       gs.forEach((g) => {
         if (!map.has(g)) map.set(g, []);
@@ -2529,15 +2497,15 @@ function FullMode({ onSwitchMode, onSignOut, deviceId, user }) {
       if (b === "Ungrouped") return -1;
       return a.localeCompare(b);
     });
-  }, [animals]);
+  }, [collectionAnimals]);
 
   const advisorMales = useMemo(
-    () => animals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "male" || s === "m"; }),
-    [animals]
+    () => collectionAnimals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "male" || s === "m"; }),
+    [collectionAnimals]
   );
   const advisorFemales = useMemo(
-    () => animals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "female" || s === "f"; }),
-    [animals]
+    () => collectionAnimals.filter((a) => { const s = String(a.sex || "").toLowerCase(); return s === "female" || s === "f"; }),
+    [collectionAnimals]
   );
 
   const taskGroups = useMemo(() => {

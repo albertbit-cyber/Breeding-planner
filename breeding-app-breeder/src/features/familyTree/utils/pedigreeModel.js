@@ -28,6 +28,7 @@
  * groups on that.
  */
 
+import { departureOf } from '../../animals/archive';
 import { normalizeSexValue } from '../../animals/animalSex';
 import { splitPairLabel, isBreederAnimal, normalizeAnimalName } from '../../animals/parentage';
 
@@ -99,6 +100,8 @@ export function toTreeAnimal(animal) {
     damId: animal.damId || null,
     isEgg: false,
     isBreeder: isBreederAnimal(animal),
+    // Sold, died, deleted...: the snake stays in the tree as a parent, labelled and faded.
+    departure: departureOf(animal),
   };
 }
 
@@ -111,6 +114,7 @@ function fromServerAnimal(animal) {
     genetics: Array.isArray(animal.genetics) ? animal.genetics : [],
     pairingId: animal.pairingId || null,
     hatchlingIndex: firstFinite(animal.hatchlingIndex),
+    departure: animal.departure || null,
     sireId: null,
     damId: null,
     isEgg: false,

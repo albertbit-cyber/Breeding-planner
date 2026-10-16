@@ -2,9 +2,12 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
+const { assertSeedAllowed } = require("./scripts/seedGuard.js");
+
 const prisma = new PrismaClient();
 
 async function main() {
+  assertSeedAllowed("seedAdminUser.ts");
   const email = "admin@breedingplanner.dev";
   const password = "admin1234";
   const passwordHash = await bcrypt.hash(password, 12);

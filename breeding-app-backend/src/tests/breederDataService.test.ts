@@ -13,6 +13,8 @@ const tx = {
   pairing: { createMany: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   clutch: { createMany: vi.fn(), update: vi.fn() },
   breederPlannerState: { create: vi.fn(), update: vi.fn() },
+  breedingCycle: { createMany: vi.fn(), update: vi.fn() },
+  follicleExamination: { createMany: vi.fn(), update: vi.fn() },
 };
 
 // A row as the bulk pre-load sees it: the app-side id is what keys the lookup, so a row without
@@ -24,15 +26,32 @@ const existingRow = (appIdField: string, appId: string, payload: unknown, update
   updatedAt: updatedAt ? new Date(updatedAt) : undefined,
 });
 
-vi.mock("../lib/prisma", () => ({
-  prisma: {
-    $transaction: vi.fn(async (callback) => callback(tx)),
+vi.mock("../lib/prisma", () => {
+  const client: any = {
     animal: { findMany: vi.fn(), count: vi.fn() },
     pairing: { findMany: vi.fn() },
     clutch: { findMany: vi.fn() },
     breederPlannerState: { findUnique: vi.fn() },
-  },
-}));
+    breedingCycle: { findMany: vi.fn() },
+    follicleExamination: { findMany: vi.fn() },
+  };
+  // The save reads and writes inside one transaction under the account lock, so the transaction
+  // client sees the reads scripted on `prisma` alongside the writes recorded on `tx`.
+  client.$transaction = vi.fn(async (callback: any) => {
+    const view: any = { $executeRaw: vi.fn(async () => 0) };
+    new Set([...Object.keys(client), ...Object.keys(tx)]).forEach((key) => {
+      if (key.startsWith("$")) return;
+      view[key] = { ...(client[key] || {}), ...((tx as any)[key] || {}) };
+    });
+    // tx.pairing.findMany scripts the lookup of pairings this request just inserted; the bulk
+    // pre-load of the owner's pairings still answers from `prisma`.
+    view.pairing.findMany = (args: any) => (args?.where?.appPairingId
+      ? tx.pairing.findMany(args)
+      : client.pairing.findMany(args));
+    return callback(view);
+  });
+  return { prisma: client };
+});
 
 // The tier lookup is its own service; these tests set the answer it gives.
 vi.mock("../services/subscriptionService", () => ({
@@ -42,6 +61,7 @@ vi.mock("../services/subscriptionService", () => ({
 import { prisma } from "../lib/prisma";
 import { canAccessFeature } from "../services/subscriptionService";
 import { listBreederSnapshot, upsertBreederSnapshot } from "../services/breederDataService";
+import { countedAnimalWhere } from "../services/animalArchive";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,6 +81,10 @@ beforeEach(() => {
   vi.mocked((prisma as any).pairing.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([]);
   vi.mocked((prisma as any).breederPlannerState.findUnique).mockResolvedValue(null);
+  vi.mocked((prisma as any).breedingCycle.findMany).mockResolvedValue([]);
+  vi.mocked((prisma as any).follicleExamination.findMany).mockResolvedValue([]);
+  tx.breedingCycle.createMany.mockResolvedValue({ count: 0 });
+  tx.follicleExamination.createMany.mockResolvedValue({ count: 0 });
   vi.mocked(canAccessFeature).mockResolvedValue({ allowed: true, featureKey: "animals.create", source: "unconfigured", tier: "Unconfigured" } as any);
 });
 
@@ -97,7 +121,7 @@ describe("the tier's animal cap", () => {
 
     await upsertBreederSnapshot("breeder-1", { animals: newAnimals(1) });
 
-    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: { ownerId: "breeder-1", deletedAt: null } });
+    expect((prisma as any).animal.count).toHaveBeenCalledWith({ where: countedAnimalWhere("breeder-1") });
     expect(tx.animal.createMany).toHaveBeenCalled();
   });
 
@@ -109,7 +133,9 @@ describe("the tier's animal cap", () => {
       statusCode: 403,
       message: "Free keeps 20 animals in the cloud. This save would bring it to 25, so it was not saved. Every animal is still on this device.",
     });
-    expect((prisma as any).$transaction).not.toHaveBeenCalled();
+    // The check runs inside the transaction, before any write, and its error rolls it back.
+    expect(tx.animal.createMany).not.toHaveBeenCalled();
+    expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
   it("refuses a first sync of 60 animals on Free instead of letting the request size decide", async () => {
@@ -131,8 +157,65 @@ describe("the tier's animal cap", () => {
     });
 
     expect((prisma as any).animal.count).toHaveBeenLastCalledWith({
-      where: { ownerId: "breeder-1", deletedAt: null, appAnimalId: { in: ["snake-1"] } },
+      where: countedAnimalWhere("breeder-1", { appAnimalId: { in: ["snake-1"] } }),
     });
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("does not count archived animals toward the cap", async () => {
+    const where = countedAnimalWhere("breeder-1") as any;
+    expect(where.deletedAt).toBeNull();
+    expect(where.OR).toContainEqual({ status: null });
+    const excluded = where.OR.find((clause: any) => clause.status?.notIn).status.notIn;
+    expect(excluded).toEqual(expect.arrayContaining(["Sold", "Deceased", "Archived", "sold"]));
+  });
+
+  it("lets an account at its cap archive an animal without a capacity check", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Breeder" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Sold", archive: { reason: "sold" }, updatedAt: "2026-02-01T00:00:00.000Z" }],
+    });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.update).toHaveBeenCalled();
+  });
+
+  it("does not count a new animal that arrives already archived", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+
+    await upsertBreederSnapshot("breeder-1", { animals: [{ id: "old-sale", status: "Sold" }] });
+
+    expect((prisma as any).animal.count).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+
+  it("counts an archived animal returning to the collection", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Sold" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValue(20);
+
+    await expect(upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Active", archive: null, updatedAt: "2026-02-01T00:00:00.000Z" }],
+    })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("makes room for a new animal when the same save archives one", async () => {
+    vi.mocked(canAccessFeature).mockResolvedValue(freeAt(20) as any);
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "snake-1", { id: "snake-1", status: "Breeder" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    vi.mocked((prisma as any).animal.count).mockResolvedValueOnce(20).mockResolvedValueOnce(1);
+
+    await upsertBreederSnapshot("breeder-1", {
+      animals: [{ id: "snake-1", status: "Deceased", updatedAt: "2026-02-01T00:00:00.000Z" }, ...newAnimals(1)],
+    });
+
     expect(tx.animal.createMany).toHaveBeenCalled();
   });
 
@@ -145,6 +228,43 @@ describe("the tier's animal cap", () => {
 
     expect((prisma as any).animal.count).not.toHaveBeenCalled();
     expect(tx.animal.createMany).toHaveBeenCalled();
+  });
+});
+
+describe("a deleted snake kept as a lineage card", () => {
+  const full = {
+    id: "M-1", name: "Clown male", status: "Breeder", morphs: ["Clown"],
+    logs: { feeds: [{ id: "f1", date: "2026-01-01" }] },
+    photos: [{ id: "p1", url: "a" }, { id: "p2", url: "b" }],
+  };
+  const card = {
+    id: "M-1", name: "Clown male", status: "Removed", morphs: ["Clown"],
+    logs: { feeds: [] }, photos: [{ id: "p1", url: "a" }],
+    removed: { reason: "died", date: "2026-10-13" },
+  };
+
+  it("replaces the full record whole, so the erased logs and photos stay erased", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...full, updatedAt: "2026-01-01T00:00:00.000Z" }, "2026-01-01T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...card, updatedAt: "2026-10-13T00:00:00.000Z" }] });
+    const written = tx.animal.update.mock.calls[0][0].data;
+    expect(written.status).toBe("Removed");
+    expect(written.payload.logs.feeds).toEqual([]);
+    expect(written.payload.photos).toHaveLength(1);
+  });
+
+  it("is not merged back together with a full copy from a device that had not synced", async () => {
+    vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
+      existingRow("appAnimalId", "M-1", { ...card, updatedAt: "2026-10-13T00:00:00.000Z" }, "2026-10-13T00:00:00.000Z"),
+    ]);
+    await upsertBreederSnapshot("breeder-1", { animals: [{ ...full, updatedAt: "2026-10-14T00:00:00.000Z" }] });
+    // The stored card wins whole, and a merge that changes nothing is not written at all
+    // (sameSyncContent), so the row keeps the card, untouched by the stale full copy.
+    expect(tx.animal.update).not.toHaveBeenCalled();
+    expect(tx.animal.createMany).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([expect.objectContaining({ appAnimalId: "M-1" })]),
+    }));
   });
 });
 
@@ -319,10 +439,10 @@ describe("breederDataService", () => {
       pairings: [],
     });
 
-    // The phone's payload is the later one and now owns the genetics outright, so without
-    // re-applying the decision the disproved guess would be back on the animal.
-    const written = tx.animal.update.mock.calls[0][0].data.payload;
-    expect(written.possibleHets).toEqual([]);
+    // The phone's payload is the later one, so without re-applying the decision the disproved
+    // guess would be back on the animal. Re-applied, nothing the phone sent differs from what is
+    // stored, so nothing is written at all.
+    expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
   it("still accepts genetics a laboratory never ruled on", async () => {
@@ -408,25 +528,25 @@ describe("breederDataService", () => {
     expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
-  // Equal timestamps mean neither save is demonstrably later, so nothing justifies discarding
-  // either side's work.
-  it("still unions genetics when both copies carry the same timestamp", async () => {
+  // A copy carrying exactly the stored time has no newer information: it is a device echoing
+  // back what it last read. Letting such a copy add to the list (the old tie-union) is how a gene
+  // deleted on one device came back from another that still held it.
+  it("keeps the stored genetics when a copy with the same timestamp disagrees", async () => {
     vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
       existingRow(
         "appAnimalId",
         "snake-1",
-        { id: "snake-1", morphs: ["Pastel", "Clown"], updatedAt: "2026-09-05T10:00:00.000Z" },
+        { id: "snake-1", morphs: ["Pastel"], updatedAt: "2026-09-05T10:00:00.000Z" },
         "2026-09-05T10:00:00.000Z"
       ),
     ]);
 
     await upsertBreederSnapshot("breeder-1", {
-      animals: [{ id: "snake-1", morphs: ["Pastel", "Enchi"], updatedAt: "2026-09-05T10:00:00.000Z" }],
+      animals: [{ id: "snake-1", morphs: ["Pastel", "Clown"], updatedAt: "2026-09-05T10:00:00.000Z" }],
       pairings: [],
     });
 
-    const written = tx.animal.update.mock.calls[0][0].data.payload;
-    expect(written.morphs).toEqual(["Pastel", "Clown", "Enchi"]);
+    expect(tx.animal.update).not.toHaveBeenCalled();
   });
 
   // A payload that never carried the field is not asserting an empty one. Only a side that
@@ -452,12 +572,14 @@ describe("breederDataService", () => {
 
   // Tags and groups deliberately keep the union: two devices adding a tag each should end up
   // with both, and unlike genetics they are not the record of what the animal is.
-  it("still unions tags and groups across devices", async () => {
+  // Tags and groups used to union, which made removing one impossible: the copy that still had it
+  // handed it back on the next sync. They now follow the later edit like every other field.
+  it("lets the later save own the tag and group lists, so a removed tag stays removed", async () => {
     vi.mocked((prisma as any).animal.findMany).mockResolvedValue([
       existingRow(
         "appAnimalId",
         "snake-1",
-        { id: "snake-1", tags: ["Holdback"], groups: ["Rack A"], updatedAt: "2026-09-04T10:00:00.000Z" },
+        { id: "snake-1", tags: ["Holdback", "Proven"], groups: ["Rack A"], updatedAt: "2026-09-04T10:00:00.000Z" },
         "2026-09-04T10:00:00.000Z"
       ),
     ]);
@@ -468,8 +590,8 @@ describe("breederDataService", () => {
     });
 
     const written = tx.animal.update.mock.calls[0][0].data.payload;
-    expect(written.tags).toEqual(["Holdback", "Proven"]);
-    expect(written.groups).toEqual(["Rack A", "Rack B"]);
+    expect(written.tags).toEqual(["Proven"]);
+    expect(written.groups).toEqual(["Rack B"]);
   });
 
   it("merges nested animal logs when the incoming animal is newer", async () => {
@@ -536,8 +658,9 @@ describe("breederDataService", () => {
       pairings: [],
     });
 
-    // Once for the pre-load, once for the snapshot returned to the caller — not 500 times.
-    expect((prisma as any).animal.findMany).toHaveBeenCalledTimes(2);
+    // Once for the pre-load, and twice for the snapshot returned to the caller (live rows, then
+    // the deleted ones it reports as tombstones) — not 500 times.
+    expect((prisma as any).animal.findMany).toHaveBeenCalledTimes(3);
     expect(tx.animal.createMany).not.toHaveBeenCalled();
     expect(tx.animal.update).not.toHaveBeenCalled();
   });
@@ -660,10 +783,14 @@ describe("breederDataService", () => {
     });
 
     await expect(listBreederSnapshot("breeder-1")).resolves.toEqual({
+      tombstones: { animals: {}, pairings: {}, clutches: {}, breedingCycles: {}, follicleExams: {} },
       animals: [],
       pairings: [],
       clutches: [],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: { groups: ["Breeders"], updatedAt: "2026-07-04T12:00:00.000Z" },
+      dataGeneration: 0,
       serverTime: expect.any(String),
     });
   });
@@ -674,10 +801,14 @@ describe("breederDataService", () => {
     vi.mocked((prisma as any).clutch.findMany).mockResolvedValue([{ payload: { id: "clutch-1" } }]);
 
     await expect(listBreederSnapshot("breeder-1")).resolves.toEqual({
+      tombstones: { animals: {}, pairings: {}, clutches: {}, breedingCycles: {}, follicleExams: {} },
       animals: [{ id: "snake-1" }],
       pairings: [{ id: "pairing-1" }],
       clutches: [{ id: "clutch-1" }],
+      breedingCycles: [],
+      follicleExams: [],
       plannerState: null,
+      dataGeneration: 0,
       serverTime: expect.any(String),
     });
   });

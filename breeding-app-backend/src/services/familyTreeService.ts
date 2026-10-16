@@ -19,6 +19,8 @@ export type FamilyTreeAnimal = {
   status: string | null;
   privacyLevel: string;
   photoUrl: string | null;
+  /** Why the animal left the collection (sold, died, deleted...), or null while it is kept. */
+  departure: { kind: "archived" | "removed"; reason: string; date: string | null } | null;
 };
 
 export type FamilyTreeRelationship = {
@@ -67,6 +69,36 @@ function extractPayloadGenetics(payload: unknown): string[] {
   return [...morphs, ...hets];
 }
 
+const ARCHIVE_REASONS = new Set(["sold", "died", "given_away", "traded", "lost", "other"]);
+
+/**
+ * Why an animal is no longer in the collection. A deleted row (or a deleted snake kept as a
+ * lineage card) is "removed"; a sold or dead one still on file is "archived". Pedigrees keep both:
+ * a dead sire is still the sire of his offspring.
+ */
+function departureOf(animal: any, payload: Record<string, unknown>): FamilyTreeAnimal["departure"] {
+  const removed = payload.removed && typeof payload.removed === "object" ? (payload.removed as Record<string, unknown>) : null;
+  const archive = payload.archive && typeof payload.archive === "object" ? (payload.archive as Record<string, unknown>) : null;
+  const status = String(animal.status ?? payload.status ?? "").trim().toLowerCase();
+  const reasonOf = (value: unknown) => (ARCHIVE_REASONS.has(String(value)) ? String(value) : "other");
+  const fromStatus = status === "sold" ? "sold" : status === "deceased" ? "died" : "other";
+  if (removed || animal.deletedAt || status === "removed") {
+    return {
+      kind: "removed",
+      reason: reasonOf(removed?.reason ?? archive?.reason ?? fromStatus),
+      date: (removed?.date as string) ?? (animal.deletedAt ? new Date(animal.deletedAt).toISOString().slice(0, 10) : null),
+    };
+  }
+  if (archive?.reason || status === "sold" || status === "deceased" || status === "archived") {
+    return {
+      kind: "archived",
+      reason: reasonOf(archive?.reason ?? fromStatus),
+      date: (archive?.date as string) ?? null,
+    };
+  }
+  return null;
+}
+
 function formatAnimal(animal: any): FamilyTreeAnimal {
   const payload  = (animal.payload as Record<string, unknown>) ?? {};
   const genetics = extractPayloadGenetics(payload);
@@ -92,6 +124,7 @@ function formatAnimal(animal: any): FamilyTreeAnimal {
     status:         animal.status ?? (payload.status as string) ?? null,
     privacyLevel:   animal.privacyLevel ?? "private",
     photoUrl:       (payload.photoUrl as string) ?? null,
+    departure:      departureOf(animal, payload),
   };
 }
 
@@ -128,8 +161,10 @@ function applyVisibility(animals: FamilyTreeAnimal[], requesterId: string): Fami
  * for use in the Family Tree animal picker.
  */
 export async function listMyAnimals(userId: string): Promise<FamilyTreeAnimal[]> {
+  // The picker lists animals to open a tree from. A fully deleted row is a sync tombstone, not
+  // an animal, so it is left out here; it still appears inside pedigrees as a parent or offspring.
   const animals = await prisma.animal.findMany({
-    where:   { ownerId: userId },
+    where:   { ownerId: userId, deletedAt: null },
     include: animalWithOwner,
     orderBy: { updatedAt: "desc" },
   });
@@ -158,13 +193,16 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
   if (!animal) throw new HttpError(404, "Animal not found");
 
   const selected = formatAnimal(animal);
+  // Relationships are keyed by the database id. The caller may have passed the app id, which
+  // matched no relationship at all and returned a pedigree with no parents or offspring.
+  const rowId = animal.id;
   if (!isVisible(selected, requesterId)) {
     throw new HttpError(403, "This animal is private");
   }
 
   // Gen -1: direct parents
   const parentRels = await (prisma as any).parentRelationship.findMany({
-    where:   { childId: animalId },
+    where:   { childId: rowId },
     include: { parent: { include: animalWithOwner } },
   });
 
@@ -179,13 +217,13 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
 
   // Gen +1: direct offspring
   const offspringRels = await (prisma as any).parentRelationship.findMany({
-    where:   { parentId: animalId },
+    where:   { parentId: rowId },
     include: { child: { include: animalWithOwner } },
   });
 
   // Ownership history for the selected animal
   const ownershipRaw = await (prisma as any).ownershipHistory.findMany({
-    where:   { animalId },
+    where:   { animalId: rowId },
     orderBy: { fromDate: "desc" },
   });
 
@@ -196,8 +234,8 @@ export async function getSnakePedigree(animalId: string, requesterId: string) {
       : { femaleAnimalAppId: animal.appAnimalId };
 
   const pairings = await (prisma as any).pairing.findMany({
-    where:   { ownerId: requesterId, ...pairingWhere },
-    include: { clutches: true },
+    where:   { ownerId: requesterId, deletedAt: null, ...pairingWhere },
+    include: { clutches: { where: { deletedAt: null } } },
   });
 
   const clutches = pairings.flatMap((p: any) =>

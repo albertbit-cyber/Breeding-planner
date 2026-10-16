@@ -9,6 +9,7 @@ import {
   type GeneticsSnapshot,
   type LabGeneticsDecision,
 } from "./labGeneticsRules";
+import { lockBreederAccount, stampServerEdit } from "./syncMerge";
 
 /**
  * Writing a confirmed laboratory result onto the breeder's animal.
@@ -126,13 +127,16 @@ export const applyConfirmedResultGenetics = async (
     }));
   }
 
+  // Under the breeder's sync lock: a device saving the same animal at this moment would
+  // otherwise merge against the pre-result copy and write the result away again.
+  await lockBreederAccount(tx, order.breederId);
   const animalRows = await tx.animal.findMany({
     where: {
       ownerId: order.breederId,
       appAnimalId: { in: [...decisionsByAnimal.keys()] },
       deletedAt: null,
     },
-    select: { id: true, appAnimalId: true, payload: true },
+    select: { id: true, appAnimalId: true, payload: true, updatedAt: true },
   });
 
   const rowsByAppId = new Map<string, any>(
@@ -182,14 +186,11 @@ export const applyConfirmedResultGenetics = async (
       continue;
     }
 
-    const nextPayload: Record<string, unknown> = {
+    let nextPayload: Record<string, unknown> = {
       ...payload,
       morphs: after.morphs,
       hets: after.hets,
       possibleHets: after.possibleHets,
-      // The sync accepts an incoming snapshot only when its payload timestamp is
-      // at least as new as the stored row's. Stamping it here is what stops a
-      // device that still holds the pre-test genetics from overwriting this.
       updatedAt: confirmedAt,
     };
     if (confirmation) {
@@ -197,6 +198,14 @@ export const applyConfirmedResultGenetics = async (
     } else {
       delete nextPayload.labGeneticsConfirmation;
     }
+    // Each field the result decides is stamped as an edit at the confirmation time, so the sync
+    // gives it to the lab over any device copy written before the result.
+    nextPayload = stampServerEdit(
+      nextPayload,
+      ["morphs", "hets", "possibleHets", "labGeneticsConfirmation"],
+      confirmedAt,
+      row.updatedAt,
+    );
 
     await tx.animal.update({ where: { id: row.id }, data: { payload: nextPayload as any } });
 

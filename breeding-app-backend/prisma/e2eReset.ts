@@ -2,6 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
+const { assertSeedAllowed } = require("../scripts/seedGuard.js");
+
 const prisma = new PrismaClient();
 
 const E2E_RESET_CONFIRM_VALUE = "local";
@@ -435,6 +437,17 @@ const resetBreederLabOrders = async (breederId: string) => {
   });
 };
 
+// What the browser specs create through the cloud sync: breeding cards, examinations, pairings
+// and clutches, and the multi-device spec's own animals. Left in place, the breeding-card spec
+// found the previous run's open card and could only pass on a fresh database.
+const resetBreederSyncedRecords = async (breederId: string) => {
+  await prisma.follicleExamination.deleteMany({ where: { ownerId: breederId } });
+  await prisma.breedingCycle.deleteMany({ where: { ownerId: breederId } });
+  await prisma.clutch.deleteMany({ where: { ownerId: breederId } });
+  await prisma.pairing.deleteMany({ where: { ownerId: breederId } });
+  await prisma.animal.deleteMany({ where: { ownerId: breederId, appAnimalId: { startsWith: "e2e-sync-" } } });
+};
+
 const ensureBreederAnimal = async (breederId: string) => {
   const animalData = {
     name: E2E_ANIMAL.name,
@@ -634,6 +647,7 @@ const resetMarketplace = async (sellerId: string, buyerId: string, labOrganizati
 };
 
 const main = async () => {
+  assertSeedAllowed("prisma/e2eReset.ts");
   const database = assertLocalDatabaseUrl();
 
   const [adminUser, breederUser, labUser, labBUser, buyerUser] = await Promise.all([
@@ -665,6 +679,7 @@ const main = async () => {
   await ensureLabOfferingsAndPricing(labOrganizationId);
   await ensureLabOfferingsAndPricing(labBOrganizationId, "b");
   await resetBreederLabOrders(breederUser.id);
+  await resetBreederSyncedRecords(breederUser.id);
   await ensureBreederAnimal(breederUser.id);
   const baselineOrder = await createBaselineOrder(breederUser.id, labOrganizationId);
   await resetMarketplace(breederUser.id, buyerUser.id, labOrganizationId);

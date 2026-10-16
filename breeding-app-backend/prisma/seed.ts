@@ -4,6 +4,8 @@ import { PrismaClient } from "@prisma/client";
 import { LAB_TEST_CATALOG_SEEDS } from "../../src/data/testCatalog";
 import { FEATURE_CATALOG } from "../src/services/subscriptionCatalog";
 
+const { assertSeedAllowed } = require("../scripts/seedGuard.js");
+
 const prisma = new PrismaClient();
 
 type UserRoleValue = "admin" | "lab" | "breeder" | "buyer" | "moderator" | "support";
@@ -76,6 +78,7 @@ async function ensureOrganizationFor(
 }
 
 async function main() {
+  assertSeedAllowed("prisma/seed.ts");
   const adminUser = await upsertUser("admin@breedingplanner.dev", "BreedingPlanner Admin", "admin", "admin1234");
   const labUser = await upsertUser("lab@proherper.dev", "Seed Lab User", "lab", "demo1234");
   const breederUser = await upsertUser("breeder@proherper.dev", "Seed Breeder", "breeder", "breeder1234");

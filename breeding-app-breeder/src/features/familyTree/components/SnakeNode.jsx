@@ -1,3 +1,4 @@
+import DepartureTag from '../../animals/DepartureTag.jsx';
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
@@ -59,6 +60,7 @@ const SnakeNode = ({ data }) => {
     <div
       className={[
         'rounded-xl border p-3 shadow-md transition-all select-none cursor-pointer',
+        snake.departure ? 'opacity-75' : '',
         ROLE_BORDER[role] || 'border-neutral-200',
         ROLE_BG[role]    || 'bg-white',
       ].join(' ')}
@@ -128,7 +130,9 @@ const SnakeNode = ({ data }) => {
         <div className="text-[10px] text-neutral-400 truncate flex-1">
           {snake.breederName || '—'}
         </div>
-        {snake.status && (
+        {snake.departure ? (
+          <DepartureTag departure={snake.departure} className="flex-shrink-0" />
+        ) : snake.status && (
           <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-tight flex-shrink-0 ${statusClass}`}>
             {snake.status}
           </span>
