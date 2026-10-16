@@ -1,6 +1,7 @@
 import type { ServiceActor } from "./testOrderService";
 import type { ShedSubmissionBatch } from "../../types/labShedTerminal";
 import type { TestOrder } from "../../types/lab";
+import { readStoredJson } from "../../platform/deviceStore.js";
 
 type PdfDoc = import("jspdf").jsPDF;
 
@@ -29,15 +30,8 @@ const bytesToBase64 = (buffer: ArrayBuffer): string => {
 };
 
 const loadBreederInfo = (): BreederInfo => {
-  if (typeof localStorage === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(BREEDER_INFO_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as BreederInfo;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = readStoredJson(BREEDER_INFO_STORAGE_KEY, null);
+  return parsed && typeof parsed === "object" ? (parsed as BreederInfo) : {};
 };
 
 const formatCurrency = (currency: string, amountCents: number): string => {

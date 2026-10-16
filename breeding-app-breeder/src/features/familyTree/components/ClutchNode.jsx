@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { useTranslation } from 'react-i18next';
+import { help } from '../../help/help';
 
 /**
  * The label on a clutch's branch. It carries the clutch ID the keeper knows it by, and a count
@@ -12,6 +13,7 @@ const ClutchNode = ({ data }) => {
 
   return (
     <div
+      {...help('tree-clutch-node')}
       className={[
         'rounded-lg border bg-white px-3 py-1.5 text-center shadow-sm transition-all',
         isSelected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-violet-200',

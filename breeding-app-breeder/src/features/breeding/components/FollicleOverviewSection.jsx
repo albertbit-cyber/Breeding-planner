@@ -13,6 +13,7 @@ import { compareYmd, diffDays, todayYmd } from '../domain/dates';
 import { BreedingSettingsPanel } from './BreedingSettingsPanel';
 import { animalName, formatDate, formatMm, DASH, STATUS_CLASS } from './format';
 import { stageLabel, statusLabel, methodLabel, resultLabel } from './labels';
+import { help } from '../../help/help';
 
 const smallBtn = 'text-xs px-2.5 py-1.5 border rounded-lg bg-white hover:bg-neutral-50';
 
@@ -123,7 +124,7 @@ export function FollicleOverviewSection({ cycles = [], exams = [], females = [],
   };
   const header = (key, label) => (
     <th className="text-start py-1.5 pe-2 whitespace-nowrap">
-      <button type="button" className="bg-transparent border-0 p-0 font-semibold uppercase tracking-wide text-[10px] text-neutral-500 underline-offset-2 hover:underline" onClick={() => toggleSort(key)} aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button {...help('overview-sort')} type="button" className="bg-transparent border-0 p-0 font-semibold uppercase tracking-wide text-[10px] text-neutral-500 underline-offset-2 hover:underline" onClick={() => toggleSort(key)} aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
         {label}{sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
       </button>
     </th>
@@ -140,16 +141,16 @@ export function FollicleOverviewSection({ cycles = [], exams = [], females = [],
             <div className="text-xs text-neutral-500">{t('breeding.overview.subtitle', { defaultValue: '{{count}} open cards and scanned females. Measurements show their age; an old value is not today\'s size.', count: rows.length })}</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="appearance-btn appearance-btn--filled text-xs px-3 py-1.5 rounded-lg" disabled={!batchFemaleIds.length} onClick={() => openDialog({ kind: 'exam', femaleId: batchFemaleIds[0], batchFemaleIds })}>{t('breeding.overview.batchScan', { defaultValue: 'Scan walk: save and next female' })}</button>
-            <button type="button" className={smallBtn} disabled={!batchFemaleIds.length} onClick={() => openDialog({ kind: 'pairing', femaleId: batchFemaleIds[0], batchFemaleIds })}>{t('breeding.overview.batchPairing', { defaultValue: 'Pairing walk: save and next female' })}</button>
+            <button {...help('overview-batch-scan')} type="button" className="appearance-btn appearance-btn--filled text-xs px-3 py-1.5 rounded-lg" disabled={!batchFemaleIds.length} onClick={() => openDialog({ kind: 'exam', femaleId: batchFemaleIds[0], batchFemaleIds })}>{t('breeding.overview.batchScan', { defaultValue: 'Scan walk: save and next female' })}</button>
+            <button {...help('overview-batch-pairing')} type="button" className={smallBtn} disabled={!batchFemaleIds.length} onClick={() => openDialog({ kind: 'pairing', femaleId: batchFemaleIds[0], batchFemaleIds })}>{t('breeding.overview.batchPairing', { defaultValue: 'Pairing walk: save and next female' })}</button>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          <select className="border rounded-lg px-2 py-1 bg-white" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} aria-label={t('breeding.overview.filterStage', { defaultValue: 'Filter by stage' })}>
+          <select {...help('overview-filter-stage')} className="border rounded-lg px-2 py-1 bg-white" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} aria-label={t('breeding.overview.filterStage', { defaultValue: 'Filter by stage' })}>
             <option value="all">{t('breeding.overview.allStages', { defaultValue: 'All stages' })}</option>
             {stages.map((s) => <option key={s} value={s}>{stageLabel(t, s)}</option>)}
           </select>
-          <select className="border rounded-lg px-2 py-1 bg-white" value={maleFilter} onChange={(e) => setMaleFilter(e.target.value)} aria-label={t('breeding.overview.filterMale', { defaultValue: 'Filter by male' })}>
+          <select {...help('overview-filter-male')} className="border rounded-lg px-2 py-1 bg-white" value={maleFilter} onChange={(e) => setMaleFilter(e.target.value)} aria-label={t('breeding.overview.filterMale', { defaultValue: 'Filter by male' })}>
             <option value="all">{t('breeding.overview.allMales', { defaultValue: 'All males' })}</option>
             {maleOptions.map((id) => <option key={id} value={id}>{animalName(snakesById.get(id), id)}</option>)}
           </select>
@@ -205,8 +206,8 @@ export function FollicleOverviewSection({ cycles = [], exams = [], females = [],
                     </td>
                     <td className="py-1.5 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        {row.cycle ? <button type="button" className={smallBtn} onClick={() => onOpenCycle(row.cycle.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button> : <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'pairing', femaleId: row.femaleId })}>{t('breeding.overview.startCard', { defaultValue: 'Record first pairing' })}</button>}
-                        <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: row.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
+                        {row.cycle ? <button {...help('overview-open-card')} type="button" className={smallBtn} onClick={() => onOpenCycle(row.cycle.id)}>{t('breeding.overview.openCard', { defaultValue: 'Open card' })}</button> : <button type="button" {...help('overview-open-card')} className={smallBtn} onClick={() => openDialog({ kind: 'pairing', femaleId: row.femaleId })}>{t('breeding.overview.startCard', { defaultValue: 'Record first pairing' })}</button>}
+                        <button {...help('card-add-exam')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: row.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
                       </div>
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchFemaleReproductiveProfile } from '../../shared/apiClient';
+import { help } from '../help/help';
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ function CycleRow({ cycle }) {
     <div className="rounded-xl border border-violet-100 bg-white overflow-hidden">
       <button
         type="button"
+        {...help('animals-repro-cycle')}
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-3 py-2.5 text-start hover:bg-violet-50/40 transition-colors"
       >
@@ -344,7 +346,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
   return (
     <div className="border border-violet-100 rounded-2xl overflow-hidden bg-white">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-violet-100 flex items-center justify-between bg-violet-50/40">
+      <div {...help('animals-repro')} className="px-4 py-3 border-b border-violet-100 flex items-center justify-between bg-violet-50/40">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">
             {t('reproIntel.title', { defaultValue: 'Reproductive Intelligence' })}
@@ -360,6 +362,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
         </div>
         <button
           type="button"
+          {...help('animals-repro-refresh')}
           onClick={load}
           className="text-[10px] text-violet-400 hover:text-violet-600 transition-colors px-2 py-1 rounded-lg hover:bg-violet-100"
         >
@@ -373,6 +376,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
           <button
             key={tabName}
             type="button"
+            {...help('animals-repro-tabs')}
             onClick={() => setTab(tabName)}
             className={[
               'px-3 py-2 text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors',
@@ -389,7 +393,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
       {/* Body */}
       <div className="p-4">
         {loading && (
-          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">{t('mobile.common.loadingEllipsis', { defaultValue: 'Loading…' })}</div>
+          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">{t('common.loading', { defaultValue: 'Loading...' })}</div>
         )}
         {!loading && error && (
           <div className="text-xs text-rose-500 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{error}</div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { useTranslation } from 'react-i18next';
+import { help } from '../../help/help';
 
 const PlaceholderNode = ({ data }) => {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ const PlaceholderNode = ({ data }) => {
   const sexColor = role === 'sire' ? 'text-sky-300' : role === 'dam' ? 'text-pink-300' : 'text-neutral-400';
 
   return (
-    <div className="rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/80 p-3 opacity-70 select-none">
+    <div className="rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/80 p-3 opacity-70 select-none" {...help('tree-unknown-parent')}>
       <Handle
         id="t-top"
         type="target"

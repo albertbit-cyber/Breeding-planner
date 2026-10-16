@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { isIncubating } from '../domain/pairingView';
 import { nextSeasonLabel } from '../domain/season';
 import { formatDate } from './format';
+import { help } from '../../help/help';
 
 export function SeasonBar({ summaries = [], currentSeason = '', onStartNewSeason, confirm = (message) => window.confirm(message) }) {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export function SeasonBar({ summaries = [], currentSeason = '', onStartNewSeason
   };
 
   return (
-    <div className="mt-card border px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+    <div className="mt-card border px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" {...help('breeding-season-bar')}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.season.current', { defaultValue: 'Current season' })}</span>
         <span className="text-sm font-semibold tabular-nums">{current.label || '?'}</span>
@@ -52,7 +53,7 @@ export function SeasonBar({ summaries = [], currentSeason = '', onStartNewSeason
         <div className="text-neutral-500">{t('breeding.season.lastEnded', { defaultValue: 'Season {{season}} ended {{date}}', season: lastEnded.label, date: formatDate(lastEnded.endedOn) || '?' })}</div>
       ) : null}
       {onStartNewSeason && next ? (
-        <button type="button" className="ms-auto text-xs px-3 py-1.5 border rounded-lg bg-white hover:bg-neutral-50" onClick={start} title={t('breeding.season.startHint', { defaultValue: 'A new season starts on 1 September by default. Use this if your season starts on a different day.' })}>
+        <button {...help('season-start-new')} type="button" className="ms-auto text-xs px-3 py-1.5 border rounded-lg bg-white hover:bg-neutral-50" onClick={start} title={t('breeding.season.startHint', { defaultValue: 'A new season starts on 1 September by default. Use this if your season starts on a different day.' })}>
           {t('breeding.season.startNew', { defaultValue: 'Start new season' })}
         </button>
       ) : null}

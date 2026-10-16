@@ -3527,9 +3527,15 @@
   .bp-mobile-bottom-nav {
     display: flex !important;
   }
+  /* Scroll to top floats above the bottom bar; at bottom-6 it sat on the More item
+     and swallowed every tap on it once the page had scrolled. */
+  .bp-scroll-top {
+    /* Above the bottom bar and above the animals "+" (bottom 76px, 56px tall). */
+    bottom: calc(144px + env(safe-area-inset-bottom, 0px)) !important;
+  }
   /* Body gets bottom padding so content isn't hidden under nav */
   .bp-app-body {
-    padding-bottom: 80px !important;
+    padding-bottom: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) !important;
     padding-inline-start: 12px !important;
     padding-inline-end: 12px !important;
     padding-top: 12px !important;
@@ -3537,7 +3543,7 @@
   /* Compact top-level body padding */
   .max-w-7xl.mx-auto.p-5 {
     padding: 12px !important;
-    padding-bottom: 84px !important;
+    padding-bottom: calc(84px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) !important;
   }
 }
 
@@ -3561,7 +3567,9 @@
   border-bottom: 1px solid var(--sk-border, #e5e7eb);
   flex-direction: column;
   gap: 0;
-  padding: 0;
+  /* The Android shell draws under the status bar; Capacitor publishes the inset as a CSS
+     variable, browsers as env(). Off the phone both resolve to 0. */
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) 0 0;
 }
 
 .bp-header-mobile__top {
@@ -3626,7 +3634,7 @@
   z-index: 200;
   background: var(--sk-surface, #fff);
   border-top: 1px solid var(--sk-border, #e5e7eb);
-  padding: 4px 0 env(safe-area-inset-bottom, 4px);
+  padding: 4px 0 calc(4px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   box-shadow: var(--sk-shadow-2);
 }
 
@@ -3661,7 +3669,10 @@
 }
 
 .bp-mobile-bottom-nav__icon {
-  font-size: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
   line-height: 1;
 }
 
@@ -3760,11 +3771,34 @@
 }
 
 .bp-more-menu__row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   flex: none;
-  text-align: center;
-  font-size: 1.1rem;
   color: var(--sk-series-4, #3c1b73);
+}
+
+.bp-more-menu__row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.bp-more-menu__row-badge {
+  flex: none;
+  min-width: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--sk-warning-bg, #fef3c7);
+  color: var(--sk-warning-text, #92400e);
+  font-size: 0.7rem;
+  text-align: center;
+  line-height: 1.4rem;
+}
+
+.bp-more-menu__row.is-active {
+  color: var(--sk-series-4, #7c3aed);
+  background: var(--sk-surface-2, #f3f4f6);
 }
 
 /* ── Snake card mobile improvements ──────────────────────────── */
@@ -3877,12 +3911,22 @@
 .bp-fab {
   display: none;
 }
+/* The + glyph fills its button, so a tour step pointing at it rings the whole button. */
+.bp-fab__glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  pointer-events: none;
+}
 
 @media (max-width: 768px) {
   .bp-fab {
     display: flex;
     position: fixed;
-    bottom: 76px;
+    bottom: calc(76px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     right: 16px;
     z-index: 190;
     align-items: center;
@@ -3904,10 +3948,20 @@
     transform: scale(0.93);
     box-shadow: var(--sk-shadow-1);
   }
+  /* Scroll-to-top stacks above the FAB, centred on it, instead of covering the bottom nav's More. */
+  .bp-scroll-top {
+    bottom: calc(144px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    inset-inline-end: 20px !important;
+  }
 }
 
 /* ── Mobile filter sheet ─────────────────────────────────────── */
 .bp-filter-sheet-trigger {
+  display: none;
+}
+
+/* Desktop has the group checkboxes, so the one-tap group dropdown is phone-only. */
+.bp-group-select {
   display: none;
 }
 
@@ -3942,6 +3996,27 @@
   /* Hide the full GroupCheckboxes block on mobile */
   .bp-group-filters-desktop {
     display: none !important;
+  }
+  .bp-group-select {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 16rem;
+    padding: 8px 10px;
+    border: 1.5px solid var(--sk-border, #e5e7eb);
+    border-radius: 10px;
+    background-color: var(--sk-surface, #fff);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--sk-text-secondary, #374151);
+    text-overflow: ellipsis;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bp-group-select.has-filters {
+    border-color: var(--sk-series-4, #7c3aed);
+    color: var(--sk-series-4, #7c3aed);
+    background-color: var(--sk-surface-2, #f5f3ff);
   }
 }
 
@@ -4114,6 +4189,52 @@
   color: var(--sk-text-muted, #6b7280);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.bp-legend-popover-anchor {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.bp-legend-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 40px 12px 14px;
+  background: var(--sk-surface, #fff);
+  border: 1px solid var(--sk-border, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: var(--sk-shadow-2);
+}
+
+.bp-legend-popover__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--sk-text-muted, #6b7280);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bp-legend-popover__close:hover,
+.bp-legend-popover__close:focus-visible {
+  background: var(--sk-surface-2, #f3f4f6);
+  color: var(--sk-text-secondary, #374151);
 }
 
 /* ── Cards grid — single column on narrow phones ─────────────── */

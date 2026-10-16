@@ -12,6 +12,7 @@ import { isIncubating } from '../domain/pairingView';
 import { BreedingCard } from './BreedingCard';
 import { animalName } from './format';
 import { flagLabel } from './labels';
+import { help } from '../../help/help';
 
 export function groupBySeason(cycles = []) {
   const groups = new Map();
@@ -69,8 +70,8 @@ export function BreedingCardsSection({ cycles = [], exams = [], settings, snakes
             <div className="text-xs text-neutral-500">{t('breeding.active.subtitle', { defaultValue: 'One breeding card per female for her whole cycle: pairings, locks, follicles, eggs and hatchlings. A card moves to Completed pairing once its hatchlings are registered.' })}</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="appearance-btn appearance-btn--filled text-xs px-3 py-1.5 rounded-lg" onClick={() => openDialog({ kind: 'pairing', femaleId: null })}>{t('breeding.cards.recordPairing', { defaultValue: 'Record a pairing' })}</button>
-            <button type="button" className="text-xs px-3 py-1.5 border rounded-lg bg-white" onClick={() => openDialog({ kind: 'exam', femaleId: null })} disabled={!open.length}>{t('breeding.cards.recordScan', { defaultValue: 'Record a follicle exam' })}</button>
+            <button {...help('pairing-new')} type="button" className="appearance-btn appearance-btn--filled text-xs px-3 py-1.5 rounded-lg" onClick={() => openDialog({ kind: 'pairing', femaleId: null })}>{t('breeding.cards.recordPairing', { defaultValue: 'Record a pairing' })}</button>
+            <button {...help('breeding-record-exam')} type="button" className="text-xs px-3 py-1.5 border rounded-lg bg-white" onClick={() => openDialog({ kind: 'exam', femaleId: null })} disabled={!open.length}>{t('breeding.cards.recordScan', { defaultValue: 'Record a follicle exam' })}</button>
           </div>
         </div>
         {flags.length ? (

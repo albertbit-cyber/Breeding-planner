@@ -6,6 +6,7 @@ import {
   expect,
   installBreederAuthInPage,
   loginBreederViaApi,
+  readDeviceKey,
 } from "./helpers.js";
 
 /**
@@ -33,16 +34,13 @@ const getSnapshot = async (request: any, token: string) => {
   return response.json();
 };
 
-const storedAnimal = (page: any, id: string) => page.evaluate(
-  ({ key, id }: { key: string; id: string }) => {
-    try {
-      return (JSON.parse(localStorage.getItem(key) || "[]") as any[]).find((animal) => animal?.id === id) || null;
-    } catch {
-      return null;
-    }
-  },
-  { key: SNAKES_KEY, id },
-);
+const storedAnimal = async (page: any, id: string) => {
+  try {
+    return (JSON.parse((await readDeviceKey(page, SNAKES_KEY)) || "[]") as any[]).find((animal) => animal?.id === id) || null;
+  } catch {
+    return null;
+  }
+};
 
 const openDevice = async (browser: any, auth: any, storageState?: any) => {
   const context = await browser.newContext({ baseURL: breederFrontendUrl, ...(storageState ? { storageState } : {}) });

@@ -1,12 +1,33 @@
 # Help system plan: breeding-app-breeder
 
-Status: **0/7, waiting for approval.** Spec: [docs/handoff/help-system.md](handoff/help-system.md)
+Status: **built, 7/7 (2026-10-07)** on `feature/help-system`. Section 13 records the outcome. Spec: [docs/handoff/help-system.md](handoff/help-system.md)
 (repo copy of the "Serpentora Help System Handoff" doc). This file is the resumable record: later
 sessions read this file and the handoff copy, not the original doc.
 
 Scope: the breeder web app (`src/App.jsx`, `src/features/*`), at desktop and at 390px. Out of scope:
 the Android UI (`features/mobile/MobileApp.jsx`), and the lab, marketplace, admin and public apps.
 Section 12 covers how each of those could reuse this work later.
+
+### Approved 2026-10-07, with these changes
+
+The plan below was written on 2026-10-05. Four things landed before the build started; they override
+the text they contradict.
+
+1. **P3.2 ("One word for one thing") landed** (`69dcd73`). Topics use today's labels: "Breeding",
+   "Lab tests", "Status", "For sale", "Import animals", "Active pairings". Section 9 is history.
+2. **The phone-nav gap in 8.8 is fixed** (`5470aed`): the bottom bar has Dashboard, and a
+   species-scoped tab with no species open shows a SpeciesGate ("Open a species first") instead of
+   bouncing. No phone-nav change is part of this work; the essentials tour passes through the gate.
+3. **Certificate lookup exists** (`def666c`): `breeding-app-public` has `/verify` and an
+   unauthenticated backend route. Help may say a certificate carries a code that can be looked up on
+   the public `/verify` page; it must not present this as live for buyers or as campaign copy.
+4. **Billing exists in test mode** (`3ed0e32`): My Account can open Stripe checkout and the billing
+   portal, which answer "Plans are not purchasable yet." without keys. Help may say Change plan opens
+   a checkout page; it never says a plan can be bought or paid for today. Change plan stays explained
+   only.
+
+Line numbers in sections 1 and 2 predate these commits (App.jsx is now 27,623 lines); they are
+re-checked while building, not rewritten here.
 
 ## 0. Decisions at a glance
 
@@ -295,7 +316,7 @@ That is 13 tours in all, counting essentials.
 7. **"A new user: no data yet."** A Serpentora account is never empty; it starts with the demo
    collection. **Resolution:** "no data yet" means `isDemoCollection`. The invitation shows then,
    after 900ms, when no dialog is open, no tour is running and the keeper has not been invited.
-8. **Phone nav gaps (existing bugs).** The phone bottom nav has no Dashboard, and its Animals and
+8. **Phone nav gaps (fixed by `5470aed`, kept for history).** The phone bottom nav has no Dashboard, and its Animals and
    Breeding items bounce back to the dashboard when no species is open. The essentials tour at 390px
    would stick on those.
    - **Proposed, needs your yes:** in step 7, make the phone Animals and Breeding items open the
@@ -350,7 +371,9 @@ That is 13 tours in all, counting essentials.
 
 ## 9. Topics P3.2 ("One word for one thing") will rename
 
-P3.2 has not landed (`t-one-word` still fails). The topics use today's labels, and these are the ones
+*History: P3.2 landed in `69dcd73` before the build started; topics use the new labels.*
+
+At planning time P3.2 had not landed (`t-one-word` still failed). The topics use today's labels, and these are the ones
 whose titles or wording P3.2 will change:
 
 | Today | Topics affected |
@@ -415,3 +438,36 @@ plus the touched Playwright specs. Each step is one commit, "Help system N/7: <n
   consumer does not justify a shared API.
 - **Public site.** No Help Mode. Its only plausible reuse is the read-only manual and search as a
   public "How it works" page, filtered to topics that pass the honesty test.
+
+## 13. Outcome (2026-10-07)
+
+- 732 topics in 17 sections; 884 help ids in the source; every app window (39) is a dialog with its
+  own ?. 14 tours: essentials (18 steps, 6 parts), 12 area tours and "Using help".
+- English only, in `locales/en/help.json`; `check-app-locales.cjs` treats breeder `help` as an
+  English-only namespace until P2.9 translates it.
+- Changes from this plan made while building:
+  - The feed step of the essentials tour moved into the record (+ Add in Feeds, then Save
+    changes): a card's quick-add only opens from a tile that already has an entry.
+  - A tour step can name controls the panel must keep clear of (`avoid`) and can leave the page
+    unscrolled (`noScroll`); placePanel caps the panel to the free band on small phones.
+  - One "Take a short tour" link row above each screen, plus links inside the record and Feed
+    Prep windows, instead of one per screen header.
+- Reported by the coverage pass and NOT fixed here (each topic describes what the code does):
+  - Deleting an animal deletes its pairings, while the confirm says "detaches".
+  - The record's Open family tree discards unsaved edits; photos, publish, add status and new
+    group act at once and Cancel does not undo them.
+  - No confirm, no undo: status "−" (strips a status from every animal), pairing Delete, Generate
+    5 months, Clear egg/hatch record, appointment Remove, rack and terrarium Delete, quarantine
+    Remove record, lab queue Remove and Clear All, alias Delete, Restore and Import legacy JSON,
+    ID wizard / appearance / label resets.
+  - A restore is not a true replace while signed in: the next sync merges it with the account.
+  - Advisor Accept does nothing; Run Advisor's web search provider is inert in the browser build.
+  - Saving a hatchling deletes the whole demo collection.
+  - The QR preview window can never be opened; the phone status-filter chip's x does nothing; both
+    search clear buttons are labelled "Clear filters"; Breeder info Save saves nothing extra.
+  - Calendar: one male's appointments are shifted at least 3 days apart and exported shifted;
+    Upcoming misses next month; the Google connection is lost on reload.
+  - Spaces: tub numbers run left to right while the form hint says top-right downward; an
+    animal can sit in a rack and a terrarium at once; two RoomModal labels use the wrong keys.
+  - Generic CSV without headers reads unknown sex as Female.
+  - Visible app strings with em dashes (hatch window, quarantine editor help, source options).

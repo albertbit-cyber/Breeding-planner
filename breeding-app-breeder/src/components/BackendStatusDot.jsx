@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useSharedBackend } from "../contexts/SharedBackendContext.jsx";
+import { help } from "../features/help/help";
 
 // The quiet production stand-in for SharedBackendBanner, which only renders in
 // dev builds: a dot and a plain sentence, no diagnostics.
@@ -27,7 +28,7 @@ export default function BackendStatusDot({ failure = null }) {
   const [key, fallback] = LABELS[state];
 
   return (
-    <div className="mb-4 space-y-1 text-xs" role="status">
+    <div {...help('sync-connection-status')} className="mb-4 space-y-1 text-xs" role="status">
       <div className="flex items-center gap-2 text-neutral-500">
         <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[state]}`} aria-hidden="true" />
         <span>{t(key, { defaultValue: fallback })}</span>

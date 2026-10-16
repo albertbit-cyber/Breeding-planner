@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from "reactflow";
 import { useTranslation } from "react-i18next";
+import { DialogHelpButton } from "../../features/help/ui/HelpButton";
+import { help } from "../../features/help/help";
 import "reactflow/dist/style.css";
 
 const NODE_WIDTH = 260;
@@ -323,7 +325,7 @@ const FlowchartBody = ({ plan, getDisplayNameForAnimal }) => {
         ))}
       </div>
 
-      <div className="h-[560px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+      <div className="h-[560px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50" {...help("advisor-plan-chart")}>
         <ReactFlow
           nodes={layoutNodes}
           edges={flowEdges}
@@ -370,7 +372,7 @@ const BreedingPlanFlowchartCard = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" data-dialog="breeding-plan" {...help("advisor-plan-dialog")} aria-label={suggestionLabel || t("breedingPlan.eyebrow", { defaultValue: "Breeding Plan" })} className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4">
           <div className="min-w-[280px] flex-1">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{t("breedingPlan.eyebrow", { defaultValue: "Breeding Plan" })}</div>
@@ -394,6 +396,7 @@ const BreedingPlanFlowchartCard = ({
                 max={100}
                 step={1}
                 value={thresholdPercent}
+                {...help("advisor-plan-threshold")}
                 onChange={(event) => onThresholdChange?.(event.target.value)}
                 className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-900 focus:border-sky-400 focus:outline-none"
               />
@@ -406,6 +409,7 @@ const BreedingPlanFlowchartCard = ({
                 max={8}
                 step={1}
                 value={generationLimit}
+                {...help("advisor-plan-generations")}
                 onChange={(event) => onGenerationLimitChange?.(event.target.value)}
                 className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-900 focus:border-sky-400 focus:outline-none"
               />
@@ -413,11 +417,13 @@ const BreedingPlanFlowchartCard = ({
             <button
               type="button"
               onClick={onRefresh}
+              {...help("advisor-plan-update")}
               disabled={loading}
               className="inline-flex items-center justify-center rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("breedingPlan.updatePlan", { defaultValue: "Update Plan" })}
             </button>
+            <DialogHelpButton />
             <button
               type="button"
               onClick={onClose}

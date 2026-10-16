@@ -9,6 +9,7 @@ import { summarizeCycle, femaleStatistics, compareWithHistory, INTERVAL_METRICS,
 import { todayYmd } from '../domain/dates';
 import { animalName, formatDate, formatDays, formatMm, DASH, STATUS_CLASS } from './format';
 import { metricLabel, statusLabel, closureOutcomeLabel } from './labels';
+import { help } from '../../help/help';
 
 function Interval({ value }) {
   const { t } = useTranslation();
@@ -145,7 +146,7 @@ export function PreviousCycles({ cycles = [], exams = [], currentCycle, snakesBy
   const previous = useMemo(() => cycles.filter((c) => c && c.id !== currentCycle?.id && !c.deletedAt), [cycles, currentCycle]);
   const summaries = useMemo(() => previous.map((c) => summarizeCycle(c, exams)), [previous, exams]);
   return (
-    <details className="rounded-xl border bg-white">
+    <details {...help('card-previous')} className="rounded-xl border bg-white">
       <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700 flex items-center justify-between">
         <span>{t('breeding.previous.title', { defaultValue: 'Previous breeding cycles ({{count}})', count: previous.length })}</span>
         <span className="text-[11px] text-neutral-500">{t('breeding.previous.hint', { defaultValue: 'Most recent first' })}</span>
@@ -165,7 +166,7 @@ export function PreviousCycles({ cycles = [], exams = [], currentCycle, snakesBy
                       <span className="text-neutral-600">{formatDate(summary.startDate) || DASH}{summary.biologicalCompletionDate ? ` → ${formatDate(summary.biologicalCompletionDate)}` : ''}</span>
                       <span className="text-neutral-600">{summary.closure ? closureOutcomeLabel(t, summary.closure.outcome) : t('breeding.previous.open', { defaultValue: 'Still open' })}</span>
                       <span className="text-neutral-600">{t('breeding.history.sessionsShort', { defaultValue: '{{count}} sessions', count: summary.sessionCount })} · {t('breeding.history.locksShort', { defaultValue: '{{count}} locks', count: summary.lockCount })}</span>
-                      {onOpenCycle ? <button type="button" className="ms-auto underline" onClick={(e) => { e.preventDefault(); onOpenCycle(cycle.id); }}>{t('breeding.previous.openCard', { defaultValue: 'Open card' })}</button> : null}
+                      {onOpenCycle ? <button {...help('card-previous-open')} type="button" className="ms-auto underline" onClick={(e) => { e.preventDefault(); onOpenCycle(cycle.id); }}>{t('breeding.previous.openCard', { defaultValue: 'Open card' })}</button> : null}
                     </summary>
                     <div className="px-2 pb-2"><CycleSummaryDetails summary={summary} snakesById={snakesById} /></div>
                   </details>

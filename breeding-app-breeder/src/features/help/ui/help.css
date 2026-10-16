@@ -1,0 +1,524 @@
+/* Help system chrome. Skin roles only (--sk-*): a hex literal here is a bug, because
+   help has to look right under every one of the eighteen skins, dark ones included.
+   Help is chrome, so it stays cool and quiet: surface, border, one interactive colour.
+
+   Layers sit above the app's highest overlay (z 10070) so help is visible over any
+   open window. None of them dims or blocks the app except the menu and manual, which
+   are ordinary windows. */
+
+:root {
+  --help-z-pill: 10100;
+  --help-z-popover: 10120;
+  --help-z-window: 10130;
+  --help-z-tour: 10110;
+}
+
+/* ── The ? buttons ──────────────────────────────────────────────────────── */
+
+.help-qbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--sk-radius, 12px);
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text-secondary);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.help-qbtn:hover { color: var(--sk-primary); border-color: var(--sk-border-strong); }
+.help-qbtn:focus-visible { outline: 3px solid var(--sk-focus); outline-offset: 2px; }
+.help-qbtn[data-active] {
+  background: var(--sk-primary);
+  border-color: transparent;
+  color: var(--sk-text-on-accent);
+}
+.help-qbtn--dialog { width: 32px; height: 32px; font-size: 14px; }
+
+/* Desktop header: the ? sits in the brand row's free corner. */
+.help-header-slot {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 20px;
+}
+
+@media (max-width: 768px) {
+  /* Touch targets: 44px, the visible box stays compact. */
+  .help-qbtn { width: 44px; height: 44px; }
+  .help-qbtn--dialog { width: 40px; height: 40px; }
+}
+
+/* ── Help Mode on the page ──────────────────────────────────────────────── */
+
+body.help-mode [data-help],
+body.help-mode button,
+body.help-mode a[href],
+body.help-mode input,
+body.help-mode select,
+body.help-mode textarea,
+body.help-mode label,
+body.help-mode summary,
+body.help-mode [role="button"] {
+  cursor: help !important;
+}
+body.help-mode [data-help]:hover,
+body.help-mode [data-help]:focus-visible {
+  outline: 2px dashed var(--sk-focus);
+  outline-offset: 2px;
+}
+body.help-mode [data-help-ui],
+body.help-mode [data-help-ui] * { cursor: auto !important; }
+body.help-mode [data-help-ui] button,
+body.help-mode [data-help-ui] a[href] { cursor: pointer !important; }
+body.help-mode [data-help-ui] [data-help]:hover { outline: none; }
+
+/* ── Status pill ────────────────────────────────────────────────────────── */
+
+.help-pill {
+  position: fixed;
+  z-index: var(--help-z-pill);
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  box-shadow: var(--sk-shadow-3);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.help-pill__label { font-weight: 600; color: var(--sk-text); white-space: nowrap; }
+.help-pill__text { color: var(--sk-text-secondary); }
+.help-pill__exit {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+@media (max-width: 768px) {
+  /* Above the bottom nav, and the sentence drops to keep one tidy row. */
+  .help-pill { bottom: 84px; padding-inline-start: 14px; }
+  .help-pill__text { display: none; }
+  .help-pill__exit { min-height: 40px; }
+}
+
+/* ── Popover ────────────────────────────────────────────────────────────── */
+
+.help-popover {
+  position: fixed;
+  z-index: var(--help-z-popover);
+  width: min(340px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: var(--sk-radius, 12px);
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  box-shadow: var(--sk-shadow-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.help-popover__title { font-size: 15px; font-weight: 600; line-height: 1.35; margin: 0 0 4px; }
+.help-popover__short { color: var(--sk-text-secondary); margin: 0; }
+.help-popover__more { margin: 10px 0 0; color: var(--sk-text-secondary); }
+.help-popover__h { margin: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--sk-text); }
+.help-popover__tips { margin: 0; padding-inline-start: 18px; color: var(--sk-text-secondary); }
+.help-popover__tips li + li { margin-top: 2px; }
+.help-popover__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.help-btn:focus-visible,
+.help-chip:focus-visible,
+.help-link:focus-visible,
+.help-pill__exit:focus-visible {
+  outline: 3px solid var(--sk-focus);
+  outline-offset: 2px;
+}
+@media (max-width: 768px) {
+  .help-btn { min-height: 44px; }
+}
+
+.help-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.help-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface-2);
+  color: var(--sk-link, var(--sk-primary));
+  font-size: 12px;
+  cursor: pointer;
+}
+.help-chip:hover { border-color: var(--sk-border-strong); }
+
+.help-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--sk-link, var(--sk-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* ── Windows: Help menu and manual ──────────────────────────────────────── */
+
+.help-window-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--help-z-window);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.help-window {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  box-shadow: var(--sk-shadow-3);
+}
+.help-window--menu { max-width: 420px; padding: 20px; }
+.help-window--manual { max-width: 760px; height: min(680px, calc(100vh - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.help-window__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-window__title { margin: 0; font-size: 18px; font-weight: 600; }
+.help-window__close { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+
+.help-menu__primary { width: 100%; margin-top: 16px; min-height: 44px; font-size: 14px; }
+.help-menu__hint { margin: 6px 0 0; font-size: 12px; color: var(--sk-text-muted); }
+.help-menu__row { width: 100%; margin-top: 12px; min-height: 40px; justify-content: flex-start; }
+.help-menu__section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--sk-border); }
+.help-menu__h { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.help-menu__note { margin: 16px 0 0; font-size: 12px; color: var(--sk-text-muted); }
+
+@media (max-width: 640px) {
+  /* A phone gets the window as a sheet from the bottom edge: reachable by thumb. */
+  .help-window-scrim { align-items: flex-end; padding: 0; }
+  .help-window { border-radius: 16px 16px 0 0; max-height: 92vh; }
+  .help-window--manual { height: 92vh; }
+}
+
+/* ── Manual ─────────────────────────────────────────────────────────────── */
+
+.help-manual__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--sk-border);
+}
+.help-manual__body { flex: 1; overflow: auto; padding: 16px 20px 24px; }
+.help-manual__section + .help-manual__section { margin-top: 20px; }
+.help-manual__section-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sk-text);
+}
+.help-manual__list { margin: 0; padding: 0; list-style: none; }
+.help-manual__list li { padding: 5px 0; font-size: 13px; line-height: 1.5; }
+.help-manual__list .help-link { font-weight: 500; text-align: start; }
+.help-manual__desc { display: block; color: var(--sk-text-muted); }
+.help-manual__eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sk-text-muted);
+}
+.help-manual__topic-title { margin: 0 0 8px; font-size: 20px; font-weight: 600; line-height: 1.3; outline: none; }
+.help-manual__short { margin: 0; font-size: 15px; line-height: 1.6; color: var(--sk-text); }
+.help-manual__more { margin: 12px 0 0; font-size: 14px; line-height: 1.65; color: var(--sk-text-secondary); max-width: 65ch; }
+.help-manual__h { margin: 18px 0 6px; font-size: 13px; font-weight: 600; }
+.help-manual__tips { margin: 0; padding-inline-start: 20px; font-size: 14px; line-height: 1.6; color: var(--sk-text-secondary); }
+.help-manual__all { margin: 22px 0 0; font-size: 13px; }
+
+/* A window whose top-right corner is free carries its ? there. */
+.help-dialog-corner {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+}
+
+/* A sheet with no header gets a slim one, so its ? has a home that covers nothing. */
+.help-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sk-text-secondary);
+}
+.help-popover__note {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sk-surface-2);
+  color: var(--sk-text-secondary);
+  font-size: 12px;
+}
+
+/* The control a popover explains stays marked while it is open, so the two read as a pair. */
+body.help-mode [data-help-active] {
+  outline: 2px solid var(--sk-focus) !important;
+  outline-offset: 3px;
+}
+.help-pill__status { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.help-manual__head-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.help-manual__search { padding: 12px 20px; border-bottom: 1px solid var(--sk-border); }
+.help-manual__input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--sk-radius, 8px);
+  border: 1.5px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  font-size: 14px;
+}
+.help-manual__input::placeholder { color: var(--sk-text-muted); }
+.help-manual__input:focus { outline: none; border-color: var(--sk-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sk-focus) 35%, transparent); }
+.help-manual__count { margin: 0 0 8px; font-size: 12px; color: var(--sk-text-muted); }
+.help-manual__empty { margin: 8px 0 0; font-size: 14px; color: var(--sk-text-secondary); }
+.help-manual__list--compact li { padding: 3px 0; }
+.help-manual__minor { margin-top: 6px; font-size: 13px; }
+.help-manual__minor > summary { cursor: pointer; color: var(--sk-text-secondary); padding: 4px 0; }
+.help-manual__minor > summary:focus-visible { outline: 3px solid var(--sk-focus); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .help-manual__head, .help-manual__search, .help-manual__body { padding-inline: 16px; }
+  .help-manual__input { min-height: 44px; font-size: 16px; }
+}
+/* The app's reset strips list markers; tips are a real list. */
+.help-popover__tips, .help-manual__tips { list-style: disc; }
+
+/* ── Guided tour ────────────────────────────────────────────────────────── */
+
+.help-tour-ring {
+  position: fixed;
+  z-index: var(--help-z-tour);
+  border-radius: 12px;
+  border: 2px solid var(--sk-focus);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sk-focus) 25%, transparent);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .help-tour-ring { animation: help-tour-pulse 1.8s ease-in-out infinite; }
+}
+@keyframes help-tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sk-focus) 25%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--sk-focus) 8%, transparent); }
+}
+
+.help-tour-panel {
+  position: fixed;
+  z-index: var(--help-z-tour);
+  width: min(360px, calc(100vw - 24px));
+  overflow: auto;
+  padding: 14px 16px 12px;
+  border-radius: var(--sk-radius, 12px);
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  box-shadow: var(--sk-shadow-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.help-tour-panel__top { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
+.help-tour-panel__part {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sk-text-muted);
+}
+.help-tour-panel__count { color: var(--sk-text-muted); white-space: nowrap; }
+.help-tour-panel__progress { margin: 8px 0 10px; height: 3px; border-radius: 999px; background: var(--sk-surface-3); overflow: hidden; }
+.help-tour-panel__progress > span { display: block; height: 100%; background: var(--sk-primary); }
+.help-tour-panel__title { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 1.35; outline: none; }
+.help-tour-panel__title:focus-visible { outline: 3px solid var(--sk-focus); outline-offset: 2px; border-radius: 4px; }
+.help-tour-panel__text { margin: 0; color: var(--sk-text-secondary); }
+.help-tour-panel__done { margin: 8px 0 0; font-weight: 600; color: var(--sk-success-text); }
+.help-tour-panel__missing {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sk-warning-bg);
+  color: var(--sk-warning-text);
+}
+.help-tour-panel__offer { margin-top: 10px; }
+.help-tour-panel__note { margin: 4px 0 0; font-size: 12px; color: var(--sk-text-muted); }
+.help-tour-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.help-tour-panel__exit { margin-inline-start: auto; }
+
+.help-tour-list { margin: 0; padding: 0; list-style: none; }
+.help-tour-list__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.help-tour-list__item + .help-tour-list__item { border-top: 1px solid var(--sk-border); }
+.help-tour-list__text { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.help-tour-list__title { font-size: 13px; font-weight: 600; }
+.help-tour-list__done { font-size: 11px; font-weight: 600; color: var(--sk-success-text); }
+.help-tour-list__desc { flex-basis: 100%; font-size: 12px; color: var(--sk-text-muted); }
+
+/* ── Onboarding ─────────────────────────────────────────────────────────── */
+
+.help-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: var(--sk-radius, 12px);
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  box-shadow: var(--sk-shadow-1);
+}
+.help-invite__text { min-width: 0; flex: 1 1 280px; }
+.help-invite__title { margin: 0; font-size: 15px; font-weight: 600; color: var(--sk-text); }
+.help-invite__line { margin: 4px 0 0; font-size: 13px; color: var(--sk-text-secondary); }
+.help-invite__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.help-hint-anchor { position: relative; display: inline-flex; }
+.help-hint {
+  position: absolute;
+  top: calc(100% + 10px);
+  inset-inline-end: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sk-border);
+  background: var(--sk-surface);
+  color: var(--sk-text-secondary);
+  box-shadow: var(--sk-shadow-2);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: start;
+}
+.help-hint::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  inset-inline-end: 14px;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  background: var(--sk-surface);
+  border-top: 1px solid var(--sk-border);
+  border-left: 1px solid var(--sk-border);
+}
+.help-hint__text { display: block; }
+.help-hint__dismiss { margin-top: 6px; font-size: 12px; }
+
+.help-tour-link-row { display: flex; justify-content: flex-end; margin: -4px 0 8px; }
+.help-tour-link { font-size: 12px; color: var(--sk-text-muted); }
+.help-tour-link:hover { color: var(--sk-link, var(--sk-primary)); }
+@media (max-width: 768px) {
+  .help-tour-link-row { margin: 0 0 6px; }
+  .help-tour-link { min-height: 32px; }
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────────
+   Entrances only, all under 300ms, strong ease-out; nothing animates on the way out.
+   The popover is seen many times in one Help Mode session, so it is the shortest and
+   grows from the side that faces its control. Step changes in a tour stay instant: the
+   panel moves every step and motion there would only lag. Reduced motion keeps the
+   fades and drops every movement and the ring's pulse. */
+
+:root {
+  --help-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --help-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.help-popover {
+  transition: opacity 140ms var(--help-ease-out), transform 140ms var(--help-ease-out);
+  transform-origin: top center;
+}
+.help-popover[data-side="above"] { transform-origin: bottom center; }
+@starting-style {
+  .help-popover { opacity: 0; transform: scale(0.97); }
+}
+
+.help-window {
+  transition: opacity 180ms var(--help-ease-out), transform 180ms var(--help-ease-out);
+}
+@starting-style {
+  .help-window { opacity: 0; transform: scale(0.97); }
+}
+.help-window-scrim { transition: opacity 180ms ease; }
+@starting-style {
+  .help-window-scrim { opacity: 0; }
+}
+@media (max-width: 640px) {
+  .help-window { transition: transform 240ms var(--help-ease-drawer), opacity 120ms ease; }
+  @starting-style {
+    .help-window { opacity: 1; transform: translateY(100%); }
+  }
+}
+
+.help-pill { transition: opacity 180ms var(--help-ease-out), transform 180ms var(--help-ease-out); }
+@starting-style {
+  .help-pill { opacity: 0; transform: translateX(-50%) translateY(8px); }
+}
+
+.help-tour-panel { transition: opacity 200ms var(--help-ease-out), translate 200ms var(--help-ease-out); }
+@starting-style {
+  .help-tour-panel { opacity: 0; translate: 0 4px; }
+}
+
+.help-invite { transition: opacity 260ms var(--help-ease-out), transform 260ms var(--help-ease-out); }
+@starting-style {
+  .help-invite { opacity: 0; transform: translateY(6px); }
+}
+.help-hint { transition: opacity 200ms var(--help-ease-out); }
+@starting-style {
+  .help-hint { opacity: 0; }
+}
+
+.help-btn, .help-qbtn, .help-chip, .help-pill__exit {
+  transition: transform 120ms var(--help-ease-out), background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.help-btn:active, .help-qbtn:active, .help-chip:active, .help-pill__exit:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .help-popover, .help-window, .help-pill, .help-tour-panel, .help-invite { transition-property: opacity; }
+  @starting-style {
+    .help-popover, .help-window { transform: none; }
+    .help-pill { transform: translateX(-50%); }
+    .help-tour-panel { translate: none; }
+    .help-invite { transform: none; }
+  }
+  .help-btn:active, .help-qbtn:active, .help-chip:active, .help-pill__exit:active { transform: none; }
+}

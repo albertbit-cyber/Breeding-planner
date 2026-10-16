@@ -10,6 +10,7 @@
  */
 import { addCalendarMonths, compareYmd, nowIso, todayYmd, toYmd } from './dates';
 import { CYCLE_STATUS, LOCK_STATUS, normalizePlannedPairing, recordedEventDate, findEvent, EVENT_CERTAINTY } from './cycleModel';
+import { upcomingPairings } from './pairingPlan';
 
 const text = (value) => (value === null || value === undefined ? '' : String(value).trim());
 
@@ -133,33 +134,30 @@ function resolvePlanned(cycle, plannedId, status, resolution, now) {
 }
 
 /**
- * Ovulation recorded: automatic pairing proposals are no longer appropriate. Pending automatic
- * entries are cancelled with the reason kept; manual ones are left for the keeper to review.
+ * Ovulation recorded: the pairing plan is over. Every pending planned pairing is cancelled with
+ * the reason kept, so nothing is left asking to be paired. `toReview` stays for callers and is
+ * always empty.
  */
 export function reviewPlannedAfterOvulation(cycle, { now = nowIso() } = {}) {
   if (!recordedEventDate(cycle, 'ovulation') && !findEvent(cycle, 'ovulation', { certainty: EVENT_CERTAINTY.SUSPECTED })) return { cycle, cancelled: [], toReview: [] };
   const cancelled = [];
-  const toReview = [];
   const plannedPairings = cycle.plannedPairings.map((p) => {
     if (p.status !== 'pending') return p;
-    if (p.origin === 'auto_after_lock') {
-      cancelled.push(p.id);
-      return { ...p, status: 'cancelled', resolution: { kind: 'ovulation_recorded', at: now }, updatedAt: now };
-    }
-    toReview.push(p.id);
-    return p;
+    cancelled.push(p.id);
+    return { ...p, status: 'cancelled', resolution: { kind: 'ovulation_recorded', at: now }, updatedAt: now };
   });
-  return { cycle: cancelled.length ? touch({ ...cycle, plannedPairings }, now) : cycle, cancelled, toReview };
+  return { cycle: cancelled.length ? touch({ ...cycle, plannedPairings }, now) : cycle, cancelled, toReview: [] };
 }
 
-/** Planned pairings and scan reviews that are due on or before `today`, for the overview and calendar. */
+/**
+ * Upcoming pairings and scan reviews, for the overview. A pairing date that passed unticked is
+ * not listed and never "overdue": a missed pairing asks nothing of the keeper.
+ */
 export function dueFollowUps(cycle, exams = [], { today = todayYmd() } = {}) {
   const items = [];
-  if (cycle?.status === CYCLE_STATUS.ACTIVE) {
-    pendingPlannedPairings(cycle).forEach((p) => {
-      items.push({ kind: 'planned_pairing', date: p.date, maleId: p.maleId, plannedId: p.id, overdue: compareYmd(p.date, today) < 0, cycleId: cycle.id });
-    });
-  }
+  upcomingPairings(cycle, { today }).forEach((row) => {
+    items.push({ kind: 'planned_pairing', date: row.plannedDate, maleId: row.maleId, plannedId: row.plannedId, overdue: false, cycleId: cycle.id });
+  });
   (exams || [])
     .filter((e) => e.nextReviewDate && !e.deletedAt && (!cycle || !e.cycleId || e.cycleId === cycle.id))
     .sort((a, b) => compareYmd(b.date, a.date))

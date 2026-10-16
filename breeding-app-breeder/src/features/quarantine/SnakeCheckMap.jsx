@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import { CHECK_GUIDANCE, getChecksForView, getPreferredView } from './checkGuidance';
 import snakeBodyArt from './snakeArt.svg';
 import snakeHeadArt from './snakeHeadArt.svg';
@@ -44,7 +45,7 @@ export default function SnakeCheckMap({ selectedKey, onSelect, compact = false }
   ];
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" {...help('quarantine-guide-map')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
           {view === 'head'

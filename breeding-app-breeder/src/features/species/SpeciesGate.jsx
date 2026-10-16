@@ -1,6 +1,7 @@
 import React from 'react';
 import { speciesCardStyle } from './speciesColor';
 import { useAppearance } from '../../contexts/AppearanceContext.jsx';
+import { help } from '../help/help';
 
 /**
  * Shown in place of a species-scoped tab (Animals, Breeding, Advisor, Family Tree) when no
@@ -27,7 +28,7 @@ export default function SpeciesGate({
 
   return (
     <section className="bp-species-gate flex flex-col gap-3 max-w-md" aria-labelledby="bp-species-gate-message">
-      <p id="bp-species-gate-message" className="text-sm text-neutral-700">
+      <p {...help('species-gate')} id="bp-species-gate-message" className="text-sm text-neutral-700">
         {t('species.gate.message', { defaultValue: 'Open a species first; everything here lives inside one.' })}
       </p>
 
@@ -37,6 +38,7 @@ export default function SpeciesGate({
             <li key={summary.id}>
               <button
                 type="button"
+                {...help('species-gate')}
                 onClick={() => onOpenSpecies?.(summary.id)}
                 style={speciesCardStyle(summary.id, { mode, preset })}
                 className="w-full min-h-[48px] text-start bg-white border rounded-xl px-3 py-2 flex items-center gap-3 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-400 transition"
@@ -61,6 +63,7 @@ export default function SpeciesGate({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
+            {...help('dashboard-add-animal')}
             onClick={() => onAddAnimal?.()}
             className="min-h-[48px] border border-dashed rounded-xl px-3 py-2 text-sm font-medium text-neutral-600 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
           >
@@ -68,6 +71,7 @@ export default function SpeciesGate({
           </button>
           <button
             type="button"
+            {...help('dashboard-import')}
             onClick={() => onImportCollection?.()}
             className="min-h-[48px] border border-dashed rounded-xl px-3 py-2 text-sm font-medium text-neutral-600 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
           >

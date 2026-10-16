@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { help } from "../../help/help";
+import { DialogHelpButton } from "../../help/ui/HelpButton";
 import { createLabApiClient } from "../api/client";
 import { useBatchOrder } from "../contexts/BatchOrderContext";
 import LabPicker from "./LabPicker.jsx";
@@ -180,13 +182,17 @@ export default function BreederOrderGeneticTestModal({
       onClick={closeAndReset}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        data-dialog="order-genetic-test"
+        aria-label={t("lab.orders.addToBatchTitle", { defaultValue: "Add to Batch Order" })}
         className="relative z-[10021] w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
         style={{ zIndex: 10021 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-5 py-4">
-          <div>
+          <div {...help('lab-order-window')}>
             <div className="text-lg font-semibold">
               {t("lab.orders.addToBatchTitle", { defaultValue: "Add to Batch Order" })}
             </div>
@@ -197,13 +203,17 @@ export default function BreederOrderGeneticTestModal({
               })}
             </div>
           </div>
-          <button
-            type="button"
-            className="rounded-xl border px-3 py-1.5 text-sm"
-            onClick={closeAndReset}
-          >
-            {t("common.close", { defaultValue: "Close" })}
-          </button>
+          <div className="flex items-center gap-2">
+            <DialogHelpButton />
+            <button
+              {...help('lab-window-close')}
+              type="button"
+              className="rounded-xl border px-3 py-1.5 text-sm"
+              onClick={closeAndReset}
+            >
+              {t("common.close", { defaultValue: "Close" })}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 px-5 py-4">
@@ -245,6 +255,7 @@ export default function BreederOrderGeneticTestModal({
                 <button
                   type="button"
                   className="shrink-0 rounded-xl border px-3 py-1.5 text-xs"
+                  {...help('lab-change-lab')}
                   onClick={() => setChangingLab((prev) => !prev)}
                 >
                   {changingLab
@@ -254,7 +265,7 @@ export default function BreederOrderGeneticTestModal({
               </div>
             ) : null}
             {!selectedLabId || changingLab ? (
-              <div className={selectedLabId ? "mt-3" : ""}>
+              <div className={selectedLabId ? "mt-3" : ""} {...help('lab-choose-lab')}>
                 <LabPicker
                   speciesId={speciesId}
                   speciesName={speciesLabel}
@@ -266,7 +277,7 @@ export default function BreederOrderGeneticTestModal({
 
           {/* Test selection */}
           <div className={selectedLabId ? "" : "pointer-events-none opacity-40"}>
-            <div className="mb-2 text-xs text-neutral-600">
+            <div {...help('lab-test-list')} className="mb-2 text-xs text-neutral-600">
               {t("lab.orders.requestedGeneTests", { defaultValue: "Requested Gene Tests" })}
               {selectedLab?.labName ? (
                 <span className="ms-1 text-neutral-400">
@@ -275,7 +286,7 @@ export default function BreederOrderGeneticTestModal({
               ) : null}
             </div>
             {suggestedHetTests.length ? (
-              <div className="mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
+              <div {...help('lab-suggested-tests')} className="mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
                 <div className="text-sm font-medium text-sky-950">
                   {t("lab.orders.suggestedHetTests", {
                     defaultValue: "Suggested het tests",
@@ -318,7 +329,7 @@ export default function BreederOrderGeneticTestModal({
                 </div>
               </div>
             ) : null}
-            <div className="grid max-h-52 grid-cols-1 gap-2 overflow-auto rounded-2xl border border-neutral-200 bg-white p-3 sm:grid-cols-2">
+            <div {...help('lab-test-list')} className="grid max-h-52 grid-cols-1 gap-2 overflow-auto rounded-2xl border border-neutral-200 bg-white p-3 sm:grid-cols-2">
               {isLoadingCatalog ? (
                 <div className="col-span-2 py-2 text-center text-xs text-neutral-500">
                   {t("lab.orders.loadingTests", { defaultValue: "Loading tests…" })}
@@ -367,6 +378,7 @@ export default function BreederOrderGeneticTestModal({
           {/* Actions */}
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button
+              {...help('lab-order-cancel')}
               type="button"
               className="rounded-xl border px-4 py-2 text-sm"
               onClick={closeAndReset}
@@ -378,6 +390,7 @@ export default function BreederOrderGeneticTestModal({
               type="button"
               className="rounded-xl border px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!selectedLabId || !selectedTests.length || isLoadingCatalog || !!catalogError || saving || saved}
+              {...help('lab-save-for-later')}
               onClick={handleSaveForLater}
             >
               {saved
@@ -393,6 +406,7 @@ export default function BreederOrderGeneticTestModal({
               // turnaround all come from it, so there is nothing to add to a
               // batch until one is chosen.
               disabled={!selectedLabId || !selectedTests.length || isLoadingCatalog || !!catalogError || added}
+              {...help('lab-add-to-batch')}
               onClick={handleAddToBatch}
             >
               {alreadyInCart && !added

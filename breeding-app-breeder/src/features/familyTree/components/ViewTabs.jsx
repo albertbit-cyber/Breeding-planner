@@ -5,11 +5,11 @@ import { useTranslation } from 'react-i18next';
  * The five ways of looking at one pedigree. Each maps to a layout in `utils/layouts`.
  */
 export const VIEW_TABS = [
-  { id: 'tree', label: 'Tree', icon: '🌳', hint: 'Ancestors, clutch-mates and offspring around the selected animal' },
-  { id: 'horizontal', label: 'Horizontal', icon: '↔', hint: 'A printed-style pedigree chart, read left to right' },
-  { id: 'lineage', label: 'Lineage', icon: '↕', hint: 'Ancestors and descendants together, scrolling both ways' },
-  { id: 'clutch', label: 'Clutch', icon: '🥚', hint: 'Each clutch whole — parents, hatchlings and eggs still in' },
-  { id: 'universe', label: 'Universe', icon: '🌐', hint: 'The entire collection as one connected graph' },
+  { id: 'tree', helpId: 'tree-view-tree', label: 'Tree', icon: '🌳', hint: 'Ancestors, clutch-mates and offspring around the selected animal' },
+  { id: 'horizontal', helpId: 'tree-view-horizontal', label: 'Horizontal', icon: '↔', hint: 'A printed-style pedigree chart, read left to right' },
+  { id: 'lineage', helpId: 'tree-view-lineage', label: 'Lineage', icon: '↕', hint: 'Ancestors and descendants together, scrolling both ways' },
+  { id: 'clutch', helpId: 'tree-view-clutch', label: 'Clutch', icon: '🥚', hint: 'Each clutch whole — parents, hatchlings and eggs still in' },
+  { id: 'universe', helpId: 'tree-view-universe', label: 'Universe', icon: '🌐', hint: 'The entire collection as one connected graph' },
 ];
 
 /** The translated label and hint of one view tab, falling back to the English in VIEW_TABS. */
@@ -57,6 +57,7 @@ const ViewTabs = ({ activeTab, onTabChange }) => {
           role="tab"
           aria-selected={active}
           onClick={() => onTabChange(tab.id)}
+          data-help={tab.helpId}
           title={text.hint}
           className={[
             'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0',

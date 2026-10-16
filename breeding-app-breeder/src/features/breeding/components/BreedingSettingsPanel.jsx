@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { normalizeBreedingSettings } from '../domain/reviewRules';
 import { animalLabel } from './format';
+import { help } from '../../help/help';
 
 const inputClass = 'border rounded-lg px-2 py-1 text-xs w-24 bg-white';
 
@@ -11,10 +12,10 @@ function RuleFields({ rule = {}, onChange, allowPause = true }) {
   const set = (key, value) => onChange({ ...rule, [key]: value === '' ? null : value });
   return (
     <div className="flex flex-wrap items-end gap-2 text-xs">
-      <label className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.rangeMin', { defaultValue: 'Review range from (mm)' })}</span><input type="number" min="1" step="0.5" className={inputClass} value={rule.reviewRangeMinMm ?? ''} onChange={(e) => set('reviewRangeMinMm', e.target.value)} /></label>
-      <label className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.rangeMax', { defaultValue: 'to (mm)' })}</span><input type="number" min="1" step="0.5" className={inputClass} value={rule.reviewRangeMaxMm ?? ''} onChange={(e) => set('reviewRangeMaxMm', e.target.value)} /></label>
-      <label className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.scanDays', { defaultValue: 'Scan reminder every (days)' })}</span><input type="number" min="1" step="1" className={inputClass} value={rule.scanReminderDays ?? ''} onChange={(e) => set('scanReminderDays', e.target.value)} /></label>
-      {allowPause ? <label className="inline-flex items-center gap-1 pb-1"><input type="checkbox" checked={!!rule.pauseAutomaticReminders} onChange={(e) => set('pauseAutomaticReminders', e.target.checked)} />{t('breeding.settings.pause', { defaultValue: 'Pause scan reminders' })}</label> : null}
+      <label {...help('settings-review-range')} className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.rangeMin', { defaultValue: 'Review range from (mm)' })}</span><input type="number" min="1" step="0.5" className={inputClass} value={rule.reviewRangeMinMm ?? ''} onChange={(e) => set('reviewRangeMinMm', e.target.value)} /></label>
+      <label {...help('settings-review-range')} className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.rangeMax', { defaultValue: 'to (mm)' })}</span><input type="number" min="1" step="0.5" className={inputClass} value={rule.reviewRangeMaxMm ?? ''} onChange={(e) => set('reviewRangeMaxMm', e.target.value)} /></label>
+      <label {...help('settings-scan-days')} className="flex flex-col gap-0.5"><span className="text-[10px] text-neutral-500">{t('breeding.settings.scanDays', { defaultValue: 'Scan reminder every (days)' })}</span><input type="number" min="1" step="1" className={inputClass} value={rule.scanReminderDays ?? ''} onChange={(e) => set('scanReminderDays', e.target.value)} /></label>
+      {allowPause ? <label className="inline-flex items-center gap-1 pb-1"><input {...help('settings-pause-reminders')} type="checkbox" checked={!!rule.pauseAutomaticReminders} onChange={(e) => set('pauseAutomaticReminders', e.target.checked)} />{t('breeding.settings.pause', { defaultValue: 'Pause scan reminders' })}</label> : null}
     </div>
   );
 }
@@ -26,7 +27,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
   const update = (fn) => onChange((prev) => fn(normalizeBreedingSettings(prev)));
   return (
     <details className="rounded-xl border bg-white">
-      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700">{t('breeding.settings.titleWithSeason', { defaultValue: 'Breeding settings (season start, follicle ranges, scan reminders, forecast threshold)' })}</summary>
+      <summary {...help('breeding-settings')} className="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700">{t('breeding.settings.titleWithSeason', { defaultValue: 'Breeding settings (season start, follicle ranges, scan reminders, forecast threshold)' })}</summary>
       <div className="px-3 pb-3 space-y-3 text-xs">
         <p className="text-neutral-600">{t('breeding.settings.intro', { defaultValue: 'Nothing here is preset. A range you enter turns into a review prompt when a measured ultrasound diameter falls inside it; it is never an automatic decision to pair. Ball python settings stay separate from other species.' })}</p>
         <div className="space-y-2">
@@ -40,7 +41,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
         </div>
         <div className="space-y-2">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.settings.byFemale', { defaultValue: 'Individual override' })}</div>
-          <select className="border rounded-lg px-2 py-1 text-xs bg-white" value={femaleId} onChange={(e) => setFemaleId(e.target.value)} aria-label={t('breeding.field.female', { defaultValue: 'Female' })}>
+          <select {...help('settings-female-override')} className="border rounded-lg px-2 py-1 text-xs bg-white" value={femaleId} onChange={(e) => setFemaleId(e.target.value)} aria-label={t('breeding.field.female', { defaultValue: 'Female' })}>
             <option value="">{t('breeding.field.chooseFemale', { defaultValue: 'Choose a female' })}</option>
             {females.map((f) => <option key={f.id} value={f.id}>{animalLabel(f)}</option>)}
           </select>
@@ -51,7 +52,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
           <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.settings.seasonTitle', { defaultValue: 'Breeding season' })}</div>
           <div className="flex flex-wrap items-center gap-2">
             <span>{t('breeding.settings.seasonStart', { defaultValue: 'A new season starts on' })}</span>
-            <input
+            <input {...help('settings-season-start')}
               type="number"
               min="1"
               max="31"
@@ -61,7 +62,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
               value={normalized.seasons.startDay}
               onChange={(e) => update((prev) => ({ ...prev, seasons: { ...prev.seasons, startDay: Number(e.target.value) || 1 } }))}
             />
-            <select
+            <select {...help('settings-season-start')}
               className="border rounded-lg px-2 py-1 text-xs bg-white"
               aria-label={t('breeding.settings.seasonStartMonth', { defaultValue: 'Month' })}
               value={normalized.seasons.startMonth}
@@ -74,7 +75,7 @@ export function BreedingSettingsPanel({ settings, onChange, speciesOptions = [],
           </div>
           <p className="text-neutral-500">{t('breeding.settings.seasonHint', { defaultValue: 'A cycle belongs to the season its first pairing falls in. "Start new season" on the Breeding page starts the next season early or late for one year without changing this date.' })}</p>
         </div>
-        <label className="flex flex-wrap items-center gap-2">
+        <label className="flex flex-wrap items-center gap-2" {...help('settings-min-cycles')}>
           <span>{t('breeding.settings.minCycles', { defaultValue: 'Call a history window a forecast from this many completed cycles' })}</span>
           <input type="number" min="1" step="1" className={inputClass} value={normalized.minCyclesForForecast} onChange={(e) => update((prev) => ({ ...prev, minCyclesForForecast: Number(e.target.value) || 3 }))} />
         </label>

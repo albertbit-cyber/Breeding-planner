@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import {
   findFreeQuarantineSlot,
   findQuarantineRoom,
@@ -31,7 +32,7 @@ export default function HousingPanel({ snakes = [], spaces = {}, onMoveToQuarant
     <div className={`rounded-2xl border p-3 shadow-sm ${conflicts.length ? 'border-rose-200 bg-rose-50' : 'border-neutral-200 bg-white'}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className={`text-sm font-semibold ${conflicts.length ? 'text-rose-900' : 'text-neutral-900'}`}>
+          <h3 {...help('quarantine-housing')} className={`text-sm font-semibold ${conflicts.length ? 'text-rose-900' : 'text-neutral-900'}`}>
             {t('quarantine.housing.title', { defaultValue: 'Where they are housed' })}
           </h3>
           <p className={`mt-0.5 text-[11px] ${conflicts.length ? 'text-rose-800' : 'text-neutral-500'}`}>
@@ -48,7 +49,7 @@ export default function HousingPanel({ snakes = [], spaces = {}, onMoveToQuarant
           </p>
         </div>
         {room ? (
-          <button type="button" className="rounded-xl border bg-white px-3 py-1.5 text-xs" onClick={onOpenSpaces}>
+          <button {...help('quarantine-housing-open-spaces')} type="button" className="rounded-xl border bg-white px-3 py-1.5 text-xs" onClick={onOpenSpaces}>
             {t('quarantine.housing.openSpaces', { defaultValue: 'Open Spaces' })}
           </button>
         ) : null}
@@ -71,6 +72,7 @@ export default function HousingPanel({ snakes = [], spaces = {}, onMoveToQuarant
                 <button
                   type="button"
                   className="shrink-0 rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                  {...help('quarantine-housing-move')}
                   onClick={() => onMoveToQuarantine?.(snake, freeSlot)}
                 >
                   {t('quarantine.housing.move', { slot: freeSlot.slotLabel, defaultValue: 'Move to {{slot}}' })}

@@ -2,8 +2,9 @@
  * One female's breeding card.
  *
  * Layout (top to bottom): identity and status; compact counts and milestone dates; review
- * prompts; fast actions; then three tabs. Overview holds the males with their history, planned
- * follow-ups, forecasts, the timeline and previous cycles. Follicles is this female's own
+ * prompts; fast actions; then three tabs. Overview opens with the pairing plan and milestones
+ * (PairingPlanPanel), then the males with their history, forecasts, the timeline and previous
+ * cycles. Follicles is this female's own
  * follicle record: chart, trend and every examination. Clutch and hatchlings holds the egg and
  * hatchling outcome and the step that completes the cycle: registering the hatchlings.
  */
@@ -26,15 +27,17 @@ import { isIncubating } from '../domain/pairingView';
 import { cycleClock } from '../domain/cycleClock';
 import { CycleClock } from './CycleClock';
 import { examsForCycle, latestMeasurement, latestChange } from '../domain/follicles';
-import { pendingPlannedPairings } from '../domain/followUps';
+import { upcomingPairings } from '../domain/pairingPlan';
 import { evaluateReview, buildForecasts } from '../domain/reviewRules';
 import { cyclesForFemale } from '../domain/cycleModel';
 import { diffDays, todayYmd } from '../domain/dates';
 import { FollicleChart } from './FollicleChart';
 import { CycleTimeline } from './CycleTimeline';
 import { PreviousCycles } from './PreviousCycles';
+import { PairingPlanPanel } from './PairingPlanPanel';
 import { animalName, formatDate, formatDateTime, formatMm, DASH, STATUS_CLASS } from './format';
 import { stageLabel, statusLabel, eventTypeLabel, lockStatusLabel, closureOutcomeLabel, flagLabel, legacyReasonLabel, certaintyLabel, methodLabel, resultLabel } from './labels';
+import { help } from '../../help/help';
 
 const smallBtn = 'text-xs px-2.5 py-1.5 border rounded-lg bg-white hover:bg-neutral-50 disabled:opacity-50';
 const primaryBtn = 'appearance-btn appearance-btn--filled text-xs px-2.5 py-1.5 rounded-lg';
@@ -101,7 +104,7 @@ export function BreedingCard({
   const review = useMemo(() => evaluateReview(cycle, cycleExams, settings, { today }), [cycle, cycleExams, settings, today]);
   const forecasts = useMemo(() => buildForecasts({ cycle, cycles: femaleCycles, exams, collectionCycles: cycles, settings, today }), [cycle, femaleCycles, exams, cycles, settings, today]);
   const flags = useMemo(() => [...chronologyFlags(cycle), ...duplicateFlags(cycle)], [cycle]);
-  const pending = useMemo(() => pendingPlannedPairings(cycle), [cycle]);
+  const upcoming = useMemo(() => upcomingPairings(cycle, { today }), [cycle, today]);
   const participated = cycle.males.filter((m) => m.state === MALE_STATE.PARTICIPATED);
   const openReviewFlags = (cycle.reviewFlags || []).filter((f) => !f.resolvedAt);
   const isClosed = cycle.status === CYCLE_STATUS.CLOSED;
@@ -138,16 +141,16 @@ export function BreedingCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {onOpenSnake && female ? (
-            <button type="button" className="font-semibold text-sm text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded" style={{ color: 'var(--sk-primary, #0284c7)' }} onClick={() => onOpenSnake(female)}>{animalName(female, cycle.femaleId)}</button>
+            <button {...help('card-female')} type="button" className="font-semibold text-sm text-start hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded" style={{ color: 'var(--sk-primary, #0284c7)' }} onClick={() => onOpenSnake(female)}>{animalName(female, cycle.femaleId)}</button>
           ) : <span className="font-semibold text-sm">{animalName(female, cycle.femaleId)}</span>}
           <span className="text-[11px] text-neutral-500 font-mono"><bdi>{cycle.femaleId}</bdi></span>
           {editingSeason ? (
             <span className="inline-flex items-center gap-1">
-              <input className="border rounded-lg px-2 py-0.5 text-xs w-24" value={seasonDraft} onChange={(e) => setSeasonDraft(e.target.value)} aria-label={t('breeding.card.seasonLabel', { defaultValue: 'Season label' })} onKeyDown={(e) => { if (e.key === 'Enter') saveSeason(); if (e.key === 'Escape') setEditingSeason(false); }} autoFocus />
-              <button type="button" className={smallBtn} onClick={saveSeason}>{t('common.save', { defaultValue: 'Save' })}</button>
+              <input {...help('card-season')} className="border rounded-lg px-2 py-0.5 text-xs w-24" value={seasonDraft} onChange={(e) => setSeasonDraft(e.target.value)} aria-label={t('breeding.card.seasonLabel', { defaultValue: 'Season label' })} onKeyDown={(e) => { if (e.key === 'Enter') saveSeason(); if (e.key === 'Escape') setEditingSeason(false); }} autoFocus />
+              <button {...help('card-season')} type="button" className={smallBtn} onClick={saveSeason}>{t('common.save', { defaultValue: 'Save' })}</button>
             </span>
           ) : (
-            <button type="button" className="inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold bg-neutral-50 hover:bg-neutral-100" title={t('breeding.card.editSeason', { defaultValue: 'Edit season label' })} onClick={() => { setSeasonDraft(cycle.seasonLabel); setEditingSeason(true); }}>
+            <button {...help('card-season')} type="button" className="inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold bg-neutral-50 hover:bg-neutral-100" title={t('breeding.card.editSeason', { defaultValue: 'Edit season label' })} onClick={() => { setSeasonDraft(cycle.seasonLabel); setEditingSeason(true); }}>
               {t('breeding.card.season', { defaultValue: 'Season {{season}}', season: cycle.seasonLabel || DASH })}
             </button>
           )}
@@ -173,7 +176,7 @@ export function BreedingCard({
 
   if (!expanded) {
     return (
-      <div
+      <div {...help('pairing-card')}
         role="button"
         tabIndex={0}
         aria-expanded={false}
@@ -188,7 +191,7 @@ export function BreedingCard({
           <span>{t('breeding.card.sessionsCount', { defaultValue: '{{count}} sessions', count: countSessions(cycle) })}</span>
           <span>{t('breeding.card.locksCount', { defaultValue: '{{count}} observed locks', count: countObservedLocks(cycle) })}</span>
           <span>{t('breeding.card.malesCount', { defaultValue: '{{count}} males', count: cycle.males.length })}</span>
-          {pending[0] ? <span>{t('breeding.card.nextPlanned', { defaultValue: 'Next planned pairing {{date}}', date: formatDate(pending[0].date) })}</span> : null}
+          {upcoming[0] ? <span>{t('breeding.card.nextPlanned', { defaultValue: 'Next planned pairing {{date}}', date: formatDate(upcoming[0].plannedDate) })}</span> : null}
           {(openReviewFlags.length || flags.length || cycle.legacy?.reviewNeeded) ? <span className="text-amber-700">{t('breeding.card.needsReview', { defaultValue: 'Needs review' })}</span> : null}
           <span className="ms-auto font-semibold">{t('breeding.card.viewDetails', { defaultValue: 'View details ›' })}</span>
         </div>
@@ -200,7 +203,7 @@ export function BreedingCard({
     <div ref={rootRef} className={`mt-card border rounded-xl p-3 w-full scroll-mt-4 ${isFocused ? 'ring-2 ring-sky-400 ring-offset-1' : ''}`} tabIndex={-1} aria-label={t('breeding.card.ariaLabel', { defaultValue: 'Breeding card for {{name}}', name: animalName(female, cycle.femaleId) })}>
       <div className="flex items-start justify-between gap-3">
         {headerIdentity}
-        <button type="button" className={`${smallBtn} shrink-0`} onClick={() => setExpanded(false)}>{t('common.collapse', { defaultValue: 'Collapse' })}</button>
+        <button {...help('pairing-collapse')} type="button" className={`${smallBtn} shrink-0`} onClick={() => setExpanded(false)}>{t('common.collapse', { defaultValue: 'Collapse' })}</button>
       </div>
 
       {/* Compact counts and milestone dates */}
@@ -238,14 +241,14 @@ export function BreedingCard({
           {openReviewFlags.map((flag) => (
             <div key={flag.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
               <span>{flagLabel(t, flag.kind)}{Array.isArray(flag.animalIds) && flag.animalIds.length ? `: ${flag.animalIds.join(', ')}` : ''}</span>
-              <button type="button" className={smallBtn} onClick={() => run(() => actions.resolveReviewFlag(cycle.id, flag.id))}>{t('breeding.card.markReviewed', { defaultValue: 'Mark reviewed' })}</button>
+              <button {...help('card-mark-reviewed')} type="button" className={smallBtn} onClick={() => run(() => actions.resolveReviewFlag(cycle.id, flag.id))}>{t('breeding.card.markReviewed', { defaultValue: 'Mark reviewed' })}</button>
             </div>
           ))}
           {cycle.legacy?.reviewNeeded ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{t('breeding.legacy.title', { defaultValue: 'Migrated from pairing record(s) {{ids}}; please review', ids: (cycle.legacy.pairingIds || []).join(', ') })}</span>
-                <button type="button" className={smallBtn} onClick={() => run(() => actions.resolveReviewFlag(cycle.id, 'legacy'))}>{t('breeding.card.markReviewed', { defaultValue: 'Mark reviewed' })}</button>
+                <button {...help('card-mark-reviewed')} type="button" className={smallBtn} onClick={() => run(() => actions.resolveReviewFlag(cycle.id, 'legacy'))}>{t('breeding.card.markReviewed', { defaultValue: 'Mark reviewed' })}</button>
               </div>
               <ul className="list-disc ps-4 mt-1">{(cycle.legacy.reviewReasons || []).map((r) => <li key={r}>{legacyReasonLabel(t, r)}</li>)}</ul>
               {cycle.legacy.aggregateLocks ? <div className="mt-1">{t('breeding.legacy.aggregateCount', { defaultValue: 'Legacy lock count without dates: {{count}}. Shown here only; it is not part of the observed-lock total.', count: cycle.legacy.aggregateLocks.count })}</div> : null}
@@ -256,17 +259,16 @@ export function BreedingCard({
 
       {/* Fast actions */}
       <div className="mt-3 flex flex-wrap gap-2">
-        {!isClosed ? <button type="button" className={primaryBtn} onClick={() => openDialog({ kind: 'pairing', cycleId: cycle.id, femaleId: cycle.femaleId, defaultMaleId: cycle.males[cycle.males.length - 1]?.maleId || null })}>{t('breeding.action.pairing', { defaultValue: '+ Pairing' })}</button> : null}
-        {!isClosed && cycle.sessions.length ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'lock', cycleId: cycle.id })}>{t('breeding.action.lock', { defaultValue: '+ Observed lock' })}</button> : null}
-        <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
-        {!isClosed ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'milestone', cycleId: cycle.id })}>{t('breeding.action.milestone', { defaultValue: '+ Milestone' })}</button> : null}
-        {!isClosed && cycle.reproductionMode !== 'live_bearing' ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'clutch', cycleId: cycle.id })}>{t('breeding.action.eggsLaid', { defaultValue: 'Eggs laid' })}</button> : null}
-        {!isClosed ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'planned', cycleId: cycle.id })}>{t('breeding.action.plan', { defaultValue: 'Plan pairing' })}</button> : null}
-        {!isClosed && !isPaused ? <button type="button" className={smallBtn} onClick={() => { const reason = window.prompt(t('breeding.action.pauseReason', { defaultValue: 'Reason for pausing (optional)' }), ''); if (reason !== null) run(() => actions.pauseCycle(cycle.id, { reason })); }}>{t('breeding.action.pause', { defaultValue: 'Pause' })}</button> : null}
-        {isPaused ? <button type="button" className={smallBtn} onClick={() => run(() => actions.resumeCycle(cycle.id))}>{t('breeding.action.resume', { defaultValue: 'Resume' })}</button> : null}
-        {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button type="button" className={incubating ? primaryBtn : smallBtn} onClick={() => openDialog({ kind: 'logHatch', cycleId: cycle.id })}>{t('breeding.action.logHatch', { defaultValue: 'Log hatch' })}</button> : null}
-        {!isClosed ? <button type="button" className={smallBtn} onClick={() => openDialog({ kind: 'close', cycleId: cycle.id })}>{t('breeding.action.close', { defaultValue: 'Close card' })}</button> : null}
-        {isClosed ? <button type="button" className={smallBtn} onClick={() => { const note = window.prompt(t('breeding.action.reopenNote', { defaultValue: 'Why is this card being reopened?' }), ''); if (note !== null) { const result = run(() => actions.reopenCycle(cycle.id, { note })); if (result?.correctionMode) showAppAlert?.(t('breeding.notice.reopenedPaused', { defaultValue: 'Reopened in correction mode (paused): this female already has a newer open card, so this one does not become active again. Correct the records, then close it.' })); } }}>{t('breeding.action.reopen', { defaultValue: 'Reopen' })}</button> : null}
+        {!isClosed ? <button {...help('card-add-pairing')} type="button" className={primaryBtn} onClick={() => openDialog({ kind: 'pairing', cycleId: cycle.id, femaleId: cycle.femaleId, defaultMaleId: cycle.males[cycle.males.length - 1]?.maleId || null })}>{t('breeding.action.pairing', { defaultValue: '+ Pairing' })}</button> : null}
+        {!isClosed && cycle.sessions.length ? <button {...help('card-add-lock')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'lock', cycleId: cycle.id })}>{t('breeding.action.lock', { defaultValue: '+ Observed lock' })}</button> : null}
+        <button {...help('card-add-exam')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
+        {!isClosed ? <button {...help('card-add-milestone')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'milestone', cycleId: cycle.id })}>{t('breeding.action.milestone', { defaultValue: '+ Milestone' })}</button> : null}
+        {!isClosed && cycle.reproductionMode !== 'live_bearing' ? <button {...help('card-eggs-laid')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'clutch', cycleId: cycle.id })}>{t('breeding.action.eggsLaid', { defaultValue: 'Eggs laid' })}</button> : null}
+        {!isClosed && !isPaused ? <button {...help('card-pause')} type="button" className={smallBtn} onClick={() => { const reason = window.prompt(t('breeding.action.pauseReason', { defaultValue: 'Reason for pausing (optional)' }), ''); if (reason !== null) run(() => actions.pauseCycle(cycle.id, { reason })); }}>{t('breeding.action.pause', { defaultValue: 'Pause' })}</button> : null}
+        {isPaused ? <button {...help('card-resume')} type="button" className={smallBtn} onClick={() => run(() => actions.resumeCycle(cycle.id))}>{t('breeding.action.resume', { defaultValue: 'Resume' })}</button> : null}
+        {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button {...help('card-log-hatch')} type="button" className={incubating ? primaryBtn : smallBtn} onClick={() => openDialog({ kind: 'logHatch', cycleId: cycle.id })}>{t('breeding.action.logHatch', { defaultValue: 'Log hatch' })}</button> : null}
+        {!isClosed ? <button {...help('card-close')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'close', cycleId: cycle.id })}>{t('breeding.action.close', { defaultValue: 'Close card' })}</button> : null}
+        {isClosed ? <button {...help('pairing-reopen')} type="button" className={smallBtn} onClick={() => { const note = window.prompt(t('breeding.action.reopenNote', { defaultValue: 'Why is this card being reopened?' }), ''); if (note !== null) { const result = run(() => actions.reopenCycle(cycle.id, { note })); if (result?.correctionMode) showAppAlert?.(t('breeding.notice.reopenedPaused', { defaultValue: 'Reopened in correction mode (paused): this female already has a newer open card, so this one does not become active again. Correct the records, then close it.' })); } }}>{t('breeding.action.reopen', { defaultValue: 'Reopen' })}</button> : null}
       </div>
 
       {/* Closure */}
@@ -284,7 +286,7 @@ export function BreedingCard({
       {awaitingRegistration ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
           <span>{t('breeding.card.registerNotice', { defaultValue: 'Hatched: {{expected}} hatchlings, {{registered}} registered. The cycle moves to Completed pairing once every hatchling is registered as an animal.', expected: registration.expected, registered: registration.registered })}</span>
-          {onCreateHatchlings ? <button type="button" className={primaryBtn} onClick={() => onCreateHatchlings(cycle)}>{t('breeding.card.registerAction', { defaultValue: 'Register hatchlings' })}</button> : null}
+          {onCreateHatchlings ? <button {...help('card-register-hatchlings')} type="button" className={primaryBtn} onClick={() => onCreateHatchlings(cycle)}>{t('breeding.card.registerAction', { defaultValue: 'Register hatchlings' })}</button> : null}
         </div>
       ) : null}
 
@@ -295,7 +297,7 @@ export function BreedingCard({
           ['follicles', t('breeding.card.tabFollicles', { defaultValue: 'Follicles ({{count}})', count: cycleExams.length })],
           ['clutch', cycle.reproductionMode === 'live_bearing' ? t('breeding.card.tabOffspring', { defaultValue: 'Offspring' }) : t('breeding.card.tabClutch', { defaultValue: 'Clutch and hatchlings' })],
         ].map(([key, label]) => (
-          <button
+          <button {...help('card-tabs')}
             key={key}
             type="button"
             role="tab"
@@ -311,11 +313,13 @@ export function BreedingCard({
 
       {section === 'overview' ? (
         <>
+        <PairingPlanPanel cycle={cycle} snakesById={snakesById} actions={actions} run={run} isClosed={isClosed} />
+
         {/* Males */}
         <div className="mt-3 rounded-xl border bg-white p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.card.males', { defaultValue: 'Males (candidate sires)' })}</div>
-            <label className="inline-flex items-center gap-2 text-xs">
+            <div {...help('card-males')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.card.males', { defaultValue: 'Males (candidate sires)' })}</div>
+            <label className="inline-flex items-center gap-2 text-xs" {...help('card-multiple-sires')}>
               <input
                 type="checkbox"
                 checked={cycle.multipleSires}
@@ -335,7 +339,7 @@ export function BreedingCard({
               const history = maleHistory(cycle, male.maleId);
               return (
                 <li key={male.maleId}>
-                  <details className="rounded-lg border bg-neutral-50">
+                  <details {...help('card-male-row')} className="rounded-lg border bg-neutral-50">
                     <summary className="cursor-pointer px-2 py-1.5 text-xs flex flex-wrap items-center gap-2">
                       {onOpenSnake && snake ? <button type="button" className="font-semibold hover:underline" style={{ color: 'var(--sk-primary, #0284c7)' }} onClick={(e) => { e.preventDefault(); onOpenSnake(snake); }}>{animalName(snake, male.maleId)}</button> : <span className="font-semibold">{animalName(snake, male.maleId)}</span>}
                       <span className="font-mono text-[10px] text-neutral-500"><bdi>{male.maleId}</bdi></span>
@@ -362,11 +366,11 @@ export function BreedingCard({
                                           <span>{formatDate(lock.observationDate)}{lock.observationTime ? ` ${lock.observationTime}` : ''}</span>
                                           {lock.notes ? <span className="text-neutral-500">· {lock.notes}</span> : null}
                                           {!isClosed ? (
-                                            <select className="border rounded px-1 py-0.5 text-[10px]" value={lock.status} aria-label={t('breeding.field.lockStatus', { defaultValue: 'Status' })} onChange={(e) => run(() => actions.setLockStatus(cycle.id, session.id, lock.id, e.target.value))}>
+                                            <select {...help('card-lock-status')} className="border rounded px-1 py-0.5 text-[10px]" value={lock.status} aria-label={t('breeding.field.lockStatus', { defaultValue: 'Status' })} onChange={(e) => run(() => actions.setLockStatus(cycle.id, session.id, lock.id, e.target.value))}>
                                               {['observed', 'not_observed', 'unknown'].map((s) => <option key={s} value={s}>{lockStatusLabel(t, s)}</option>)}
                                             </select>
                                           ) : null}
-                                          {!isClosed ? <button type="button" className="underline text-[10px]" onClick={() => run(() => actions.removeLock(cycle.id, session.id, lock.id))}>{t('common.remove', { defaultValue: 'Remove' })}</button> : null}
+                                          {!isClosed ? <button {...help('card-lock-remove')} type="button" className="underline text-[10px]" onClick={() => run(() => actions.removeLock(cycle.id, session.id, lock.id))}>{t('common.remove', { defaultValue: 'Remove' })}</button> : null}
                                         </li>
                                       ))}
                                     </ul>
@@ -374,16 +378,16 @@ export function BreedingCard({
                                 </td>
                                 <td className="py-1 pe-2 text-neutral-600">{session.notes || DASH}</td>
                                 <td className="py-1 whitespace-nowrap">
-                                  {!isClosed ? <button type="button" className="underline text-[10px] me-2" onClick={() => openDialog({ kind: 'lock', cycleId: cycle.id, sessionId: session.id })}>{t('breeding.session.addLock', { defaultValue: '+ Lock' })}</button> : null}
-                                  {!isClosed ? <button type="button" className="underline text-[10px] me-2" onClick={() => openDialog({ kind: 'editSession', cycleId: cycle.id, sessionId: session.id })}>{t('common.edit', { defaultValue: 'Edit' })}</button> : null}
-                                  {!isClosed ? <button type="button" className="underline text-[10px]" onClick={() => { if (window.confirm(t('breeding.session.removeConfirm', { defaultValue: 'Remove this pairing session and its lock records?' }))) run(() => actions.removeSession(cycle.id, session.id)); }}>{t('common.remove', { defaultValue: 'Remove' })}</button> : null}
+                                  {!isClosed ? <button {...help('card-session-add-lock')} type="button" className="underline text-[10px] me-2" onClick={() => openDialog({ kind: 'lock', cycleId: cycle.id, sessionId: session.id })}>{t('breeding.session.addLock', { defaultValue: '+ Lock' })}</button> : null}
+                                  {!isClosed ? <button {...help('card-session-edit')} type="button" className="underline text-[10px] me-2" onClick={() => openDialog({ kind: 'editSession', cycleId: cycle.id, sessionId: session.id })}>{t('common.edit', { defaultValue: 'Edit' })}</button> : null}
+                                  {!isClosed ? <button {...help('card-session-remove')} type="button" className="underline text-[10px]" onClick={() => { if (window.confirm(t('breeding.session.removeConfirm', { defaultValue: 'Remove this pairing session and its lock records?' }))) run(() => actions.removeSession(cycle.id, session.id)); }}>{t('common.remove', { defaultValue: 'Remove' })}</button> : null}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       ) : <div className="text-neutral-500">{t('breeding.male.noSessions', { defaultValue: 'No actual pairing session yet.' })}</div>}
-                      {male.state === MALE_STATE.PLANNED && !isClosed ? <button type="button" className={`${smallBtn} mt-1`} onClick={() => run(() => actions.removeMale(cycle.id, male.maleId))}>{t('breeding.male.removePlanned', { defaultValue: 'Remove planned male' })}</button> : null}
+                      {male.state === MALE_STATE.PLANNED && !isClosed ? <button {...help('card-male-remove-planned')} type="button" className={`${smallBtn} mt-1`} onClick={() => run(() => actions.removeMale(cycle.id, male.maleId))}>{t('breeding.male.removePlanned', { defaultValue: 'Remove planned male' })}</button> : null}
                     </div>
                   </details>
                 </li>
@@ -392,7 +396,7 @@ export function BreedingCard({
           </ul>
           {!isClosed ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <select className="border rounded-lg px-2 py-1 text-xs bg-white" defaultValue="" onChange={(e) => { if (e.target.value) { run(() => actions.addMale(cycle.id, e.target.value)); e.target.value = ''; } }} aria-label={t('breeding.card.addMale', { defaultValue: 'Add candidate male' })} disabled={!cycle.multipleSires && cycle.males.length >= 1}>
+              <select {...help('card-add-male')} className="border rounded-lg px-2 py-1 text-xs bg-white" defaultValue="" onChange={(e) => { if (e.target.value) { run(() => actions.addMale(cycle.id, e.target.value)); e.target.value = ''; } }} aria-label={t('breeding.card.addMale', { defaultValue: 'Add candidate male' })} disabled={!cycle.multipleSires && cycle.males.length >= 1}>
                 <option value="">{t('breeding.card.addMale', { defaultValue: 'Add candidate male' })}</option>
                 {males.filter((m) => !cycle.males.some((x) => x.maleId === m.id)).map((m) => <option key={m.id} value={m.id}>{animalName(m)} ({m.id})</option>)}
               </select>
@@ -401,32 +405,10 @@ export function BreedingCard({
           ) : null}
         </div>
 
-        {/* Planned follow-ups and forecasts */}
-        <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Forecasts */}
+        <div className="mt-3">
           <div className="rounded-xl border bg-white p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.plannedTitle', { defaultValue: 'Planned pairings (reminders)' })}</div>
-            {pending.length ? (
-              <ul className="space-y-1 text-xs">
-                {pending.map((planned) => (
-                  <li key={planned.id} className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold tabular-nums">{formatDate(planned.date)}</span>
-                    <span>{animalName(snakesById?.get?.(planned.maleId), planned.maleId)}</span>
-                    <span className="text-neutral-500">{planned.origin === 'auto_after_lock' ? t('breeding.planned.auto', { defaultValue: 'proposed one calendar month after an observed lock' }) : t('breeding.planned.manual', { defaultValue: 'set by you' })}{planned.manuallyAdjusted && planned.origin === 'auto_after_lock' ? ` · ${t('breeding.planned.adjusted', { defaultValue: 'date adjusted' })}` : ''}</span>
-                    {planned.date < today ? <span className="text-amber-700">{t('breeding.planned.overdue', { defaultValue: 'overdue' })}</span> : null}
-                    <span className="ms-auto flex gap-1">
-                      <button type="button" className="underline" onClick={() => openDialog({ kind: 'pairing', cycleId: cycle.id, femaleId: cycle.femaleId, defaultMaleId: planned.maleId, defaultDate: planned.date })}>{t('breeding.planned.record', { defaultValue: 'Record session' })}</button>
-                      <button type="button" className="underline" onClick={() => openDialog({ kind: 'reschedule', cycleId: cycle.id, plannedId: planned.id })}>{t('breeding.planned.reschedule', { defaultValue: 'Move' })}</button>
-                      <button type="button" className="underline" onClick={() => run(() => actions.skipPlanned(cycle.id, planned.id))}>{t('breeding.planned.skip', { defaultValue: 'Skip' })}</button>
-                      <button type="button" className="underline" onClick={() => run(() => actions.cancelPlanned(cycle.id, planned.id))}>{t('breeding.planned.cancel', { defaultValue: 'Cancel' })}</button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : <div className="text-xs text-neutral-500">{isClosed || isPaused ? t('breeding.planned.noneClosed', { defaultValue: 'No reminders while the card is paused or closed.' }) : milestoneDate('ovulation') ? t('breeding.planned.noneOvulated', { defaultValue: 'Ovulation recorded: no further pairing proposals.' }) : t('breeding.planned.none', { defaultValue: 'None pending. An observed lock proposes the next pairing one calendar month later.' })}</div>}
-            <div className="mt-1 text-[11px] text-neutral-500">{t('breeding.planned.channels', { defaultValue: 'Reminders appear in the Calendar and, when enabled in your notification settings, by email. There are no other channels.' })}</div>
-          </div>
-          <div className="rounded-xl border bg-white p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.forecastTitle', { defaultValue: 'Expected windows (history-based)' })}</div>
+            <div {...help('card-forecast')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.forecastTitle', { defaultValue: 'Expected windows (history-based)' })}</div>
             {forecasts.windows?.length ? (
               <ul className="space-y-1 text-xs">
                 {forecasts.windows.map((w) => (
@@ -449,7 +431,7 @@ export function BreedingCard({
         </div>
 
         <div className="mt-3 rounded-xl border bg-white p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.timeline', { defaultValue: 'Timeline' })}</div>
+          <div {...help('card-timeline')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.timeline', { defaultValue: 'Timeline' })}</div>
           <CycleTimeline
             cycle={cycle}
             exams={exams}
@@ -473,11 +455,11 @@ export function BreedingCard({
             <div className="text-xs text-neutral-600 min-w-0">
               {change?.comparable ? <div className="text-xs text-neutral-700">{t('breeding.card.trend', { defaultValue: 'Follicle trend: {{sign}}{{delta}} mm over {{days}} days ({{rate}} mm/day), comparable ultrasound records only.', sign: change.deltaMm > 0 ? '+' : '', delta: change.deltaMm, days: change.days, rate: change.ratePerDay })}</div> : latest ? <div className="text-xs text-neutral-500">{t('breeding.card.singleScan', { defaultValue: 'One measurement only; a trend needs two comparable scans.' })}</div> : null}
             </div>
-            <button type="button" className={primaryBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
+            <button {...help('card-add-exam')} type="button" className={primaryBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
           </div>
           {cycleExams.length ? <FollicleChart exams={cycleExams} cycle={cycle} overlays={overlays} onSelectExam={(examId) => openDialog({ kind: 'exam', examId, femaleId: cycle.femaleId })} /> : null}
           <div className="rounded-xl border bg-white p-3 overflow-x-auto">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.examsTitle', { defaultValue: 'Follicle examinations' })}</div>
+            <div {...help('card-exams')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.examsTitle', { defaultValue: 'Follicle examinations' })}</div>
             {sortedExams.length ? (
               <table className="w-full text-xs">
                 <thead>
@@ -500,7 +482,7 @@ export function BreedingCard({
                       <td className="py-1 pe-2 whitespace-nowrap tabular-nums">{exam.largestDiameterMm !== null ? formatMm(exam.largestDiameterMm, { estimate: exam.largestIsEstimate }) : DASH}</td>
                       <td className="py-1 pe-2 tabular-nums">{exam.visibleCount ?? DASH}</td>
                       <td className="py-1 pe-2 text-neutral-600">{exam.notes || DASH}</td>
-                      <td className="py-1 whitespace-nowrap"><button type="button" className="underline text-[10px]" onClick={() => openDialog({ kind: 'exam', examId: exam.id, femaleId: cycle.femaleId })}>{t('common.edit', { defaultValue: 'Edit' })}</button></td>
+                      <td className="py-1 whitespace-nowrap"><button {...help('card-exam-edit')} type="button" className="underline text-[10px]" onClick={() => openDialog({ kind: 'exam', examId: exam.id, femaleId: cycle.femaleId })}>{t('common.edit', { defaultValue: 'Edit' })}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -516,8 +498,8 @@ export function BreedingCard({
         {cycle.reproductionMode !== 'live_bearing' || cycle.offspring.length ? (
           <div className="mt-3 rounded-xl border bg-white p-3 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.card.outcomeTitle', { defaultValue: 'Clutch and hatchlings' })}</div>
-              {onCreateHatchlings && !isClosed && cycle.clutch.hatchlingsRecorded ? <button type="button" className={smallBtn} onClick={() => onCreateHatchlings(cycle)}>{t('breeding.card.createHatchlings', { defaultValue: 'Create hatchling records' })}</button> : null}
+              <div {...help('card-clutch')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('breeding.card.outcomeTitle', { defaultValue: 'Clutch and hatchlings' })}</div>
+              {onCreateHatchlings && !isClosed && cycle.clutch.hatchlingsRecorded ? <button {...help('card-register-hatchlings')} type="button" className={smallBtn} onClick={() => onCreateHatchlings(cycle)}>{t('breeding.card.createHatchlings', { defaultValue: 'Create hatchling records' })}</button> : null}
             </div>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               <span>{t('breeding.metric.eggsTotal', { defaultValue: 'Eggs laid' })}: <strong>{cycle.clutch.eggsTotal ?? DASH}</strong></span>
@@ -539,7 +521,7 @@ export function BreedingCard({
                       <span className="text-neutral-600">
                         {t('breeding.offspring.sire', { defaultValue: 'Sire' })}: {item.sireAssignment?.maleId ? `${animalName(sire, item.sireAssignment.maleId)} (${item.sireAssignment.method.replace(/_/g, ' ')}, ${item.sireAssignment.certainty})` : t('breeding.offspring.unresolved', { defaultValue: 'unresolved' })}
                       </span>
-                      <button type="button" className="underline" onClick={() => openDialog({ kind: 'sire', cycleId: cycle.id, animalId: item.animalId })}>{t('breeding.offspring.assign', { defaultValue: 'Assign / correct' })}</button>
+                      <button {...help('card-offspring-assign')} type="button" className="underline" onClick={() => openDialog({ kind: 'sire', cycleId: cycle.id, animalId: item.animalId })}>{t('breeding.offspring.assign', { defaultValue: 'Assign / correct' })}</button>
                     </li>
                   );
                 })}

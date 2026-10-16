@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { help } from '../help/help';
 import {
   DIAGNOSTIC_LABS,
   QUARANTINE_TESTS,
@@ -31,6 +32,7 @@ function TestRow({ test, expanded, onToggle }) {
     <div className="border-t border-neutral-100 first:border-t-0">
       <button
         type="button"
+        {...help('quarantine-reference-test')}
         className="w-full text-start px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-neutral-50"
         aria-expanded={expanded}
         onClick={onToggle}
@@ -158,7 +160,7 @@ export default function DiagnosticsReference() {
     <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">
+          <h3 {...help('quarantine-reference')} className="text-sm font-semibold">
             {t('quarantine.diag.title', { defaultValue: 'What to check, tests & laboratories' })}
           </h3>
           <p className="text-[11px] text-neutral-500 mt-0.5 max-w-prose">
@@ -176,6 +178,7 @@ export default function DiagnosticsReference() {
             <button
               key={tab.key}
               type="button"
+              {...help('quarantine-reference-tabs')}
               aria-pressed={view === tab.key}
               className={`rounded-xl border px-3 py-1.5 text-xs font-medium ${
                 view === tab.key ? 'border-sky-500 bg-sky-500 text-white' : 'bg-white text-neutral-600'
@@ -223,6 +226,7 @@ export default function DiagnosticsReference() {
             <div key={lab.key} className="px-3 py-3 border-t border-neutral-100 first:border-t-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <a
+                  {...help('quarantine-reference-lab')}
                   href={lab.url}
                   target="_blank"
                   rel="noreferrer noopener"

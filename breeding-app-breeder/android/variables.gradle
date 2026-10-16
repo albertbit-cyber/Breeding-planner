@@ -1,4 +1,12 @@
+import groovy.json.JsonSlurper
+
+def packageJson = new JsonSlurper().parse(file("../package.json"))
+def versionParts = (packageJson.version as String).tokenize('.').collect { it.toInteger() }
+while (versionParts.size() < 3) { versionParts << 0 }
+
 ext {
+    appVersionName = packageJson.version as String
+    appVersionCode = versionParts[0] * 1000000 + versionParts[1] * 10000 + versionParts[2]
     minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36

@@ -3,6 +3,8 @@ import useDialogFocus from './useDialogFocus';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { archiveLabels, exitDetailRows, formatRecordDate, formatArchiveRecordText } from './archiveRecord';
+import { help } from '../help/help';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 
 const FEEDS_SHOWN = 12;
 
@@ -151,9 +153,11 @@ export default function ArchivedAnimalRecord({
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        data-dialog="archived-record"
         aria-labelledby="archive-record-title"
       >
-        <header className="archive-record__header flex gap-4 p-5 border-b">
+        <header className="archive-record__header relative flex gap-4 p-5 pe-14 border-b">
+          <DialogHelpButton className="help-dialog-corner" />
           {a.photo ? (
             <img src={a.photo} alt="" className="archive-record__photo" />
           ) : (
@@ -164,7 +168,7 @@ export default function ArchivedAnimalRecord({
               <span className={`archive-reason-badge archive-reason-badge--${exit.reason}`}>{reasonLabel}</span>
               <span className="text-xs text-neutral-500">{exit.date ? d(exit.date) : labels.dateNotRecorded}</span>
             </div>
-            <h2 id="archive-record-title" className="mt-1 text-xl font-semibold leading-tight break-words">{a.name || a.id}</h2>
+            <h2 id="archive-record-title" className="mt-1 text-xl font-semibold leading-tight break-words" {...help('archive-record')}>{a.name || a.id}</h2>
             <p className="text-sm text-neutral-600">
               {[a.name && a.id ? a.id : '', `${a.sexCode} ${labels.sex[a.sex] || ''}`.trim(), a.species].filter(Boolean).join(' · ')}
             </p>
@@ -177,16 +181,16 @@ export default function ArchivedAnimalRecord({
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
-          <button type="button" className="archive-record__close self-start text-sm px-2 py-1" onClick={onClose} aria-label={t('common.close', { defaultValue: 'Close' })}>
+          <button type="button" className="archive-record__close self-start text-sm px-2 py-1" {...help('app-dialog-close')} onClick={onClose} aria-label={t('common.close', { defaultValue: 'Close' })}>
             ✕
           </button>
         </header>
 
         <div className="archive-record__actions flex flex-wrap gap-2 px-5 py-3 border-b">
-          <button type="button" className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" onClick={handlePdf} disabled={pdfBusy}>
+          <button type="button" className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" {...help('archive-pdf')} onClick={handlePdf} disabled={pdfBusy}>
             {pdfBusy ? t('archive.record.pdfBusy', { defaultValue: 'Preparing PDF…' }) : t('archive.record.downloadPdf', { defaultValue: 'Download PDF' })}
           </button>
-          <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={handleCopy}>
+          <button type="button" className="px-3 py-2 rounded-xl text-sm border" {...help('archive-copy')} onClick={handleCopy}>
             {t('archive.record.copyText', { defaultValue: 'Copy as text' })}
           </button>
           <span className="text-sm text-neutral-600 self-center" role="status" aria-live="polite">{feedback}</span>
@@ -196,7 +200,7 @@ export default function ArchivedAnimalRecord({
           <Section
             title={labels.exit}
             action={(
-              <button type="button" className="archive-record__link text-sm" onClick={onEditExit}>
+              <button type="button" className="archive-record__link text-sm" {...help('archive-edit-details')} onClick={onEditExit}>
                 {t('archive.record.editDetails', { defaultValue: 'Correct details' })}
               </button>
             )}
@@ -218,7 +222,7 @@ export default function ArchivedAnimalRecord({
               <p className="mt-2 text-xs text-neutral-500">{fill(labels.contactErased, { date: d(exit.erasedContactAt) })}</p>
             )}
             {hasContact && (
-              <button type="button" className="archive-record__link archive-record__link--small mt-1" onClick={handleErase}>
+              <button type="button" className="archive-record__link archive-record__link--small mt-1" {...help('archive-erase-contact')} onClick={handleErase}>
                 {t('archive.record.eraseContact', { defaultValue: 'Erase buyer contact' })}
               </button>
             )}
@@ -245,7 +249,7 @@ export default function ArchivedAnimalRecord({
                 placeholder={t('archive.record.notePlaceholder', { defaultValue: 'Add a dated note: a necropsy result, news from the buyer…' })}
                 aria-label={t('archive.record.addNote', { defaultValue: 'Add note' })}
               />
-              <button type="button" className="px-3 py-2 rounded-xl text-sm border self-start sm:self-end" onClick={handleAddNote} disabled={!noteDraft.trim()}>
+              <button type="button" className="px-3 py-2 rounded-xl text-sm border self-start sm:self-end" {...help('archive-add-note')} onClick={handleAddNote} disabled={!noteDraft.trim()}>
                 {t('archive.record.addNote', { defaultValue: 'Add note' })}
               </button>
             </div>
@@ -359,13 +363,13 @@ export default function ArchivedAnimalRecord({
           <Section title={t('archive.record.manage', { defaultValue: 'Manage' })}>
             {!returning ? (
               <div className="flex flex-col items-start gap-4">
-                <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={() => setReturning(true)}>
+                <button type="button" className="px-3 py-2 rounded-xl text-sm border" {...help('archive-return')} onClick={() => setReturning(true)}>
                   {t('archive.record.returnAction', { defaultValue: 'Returned to the collection…' })}
                 </button>
                 {/* Permanent deletion is the rarest and least reversible action here, so it is
                     the quietest: a danger-coloured text button, set apart, not a filled one. */}
                 <div className="archive-record__danger-zone">
-                  <button type="button" className="archive-record__delete" onClick={onDelete}>
+                  <button type="button" className="archive-record__delete" {...help('archive-delete')} onClick={onDelete}>
                     {t('archive.record.deleteAction', { defaultValue: 'Delete permanently' })}
                   </button>
                 </div>

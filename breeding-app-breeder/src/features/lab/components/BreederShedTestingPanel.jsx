@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
+import { help } from "../../help/help";
+import { DialogHelpButton } from "../../help/ui/HelpButton";
 import { createLabApiClient, formatLabConfirmedMarker, formatLabFindingLabel, formatLabTestNumber } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
 import OrderProgressBar from "./OrderProgressBar";
@@ -176,7 +178,7 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
   const firstSample = printData.sampleLabels?.[0] || null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 p-4 print:static print:bg-white print:p-0">
+    <div data-dialog-layer="label-preview" className="fixed inset-0 z-50 bg-black/50 p-4 print:static print:bg-white print:p-0">
       {/*
         Print CSS rules injected into the document while the modal is open.
 
@@ -249,10 +251,10 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
         }
       `}</style>
 
-      <div className="mx-auto max-h-[92vh] max-w-5xl overflow-auto rounded-xl bg-white p-4 shadow-xl print:contents">
+      <div role="dialog" aria-modal="true" data-dialog="label-preview" aria-label={t("lab.orders.printPreviewTitle", { defaultValue: "Label print preview" })} className="mx-auto max-h-[92vh] max-w-5xl overflow-auto rounded-xl bg-white p-4 shadow-xl print:contents">
         {/* ── Header ── */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
-          <div>
+          <div {...help('lab-label-preview')}>
             <div className="text-sm font-semibold text-neutral-900">
               {t("lab.orders.printPreviewTitle", { defaultValue: "Label print preview" })}
             </div>
@@ -261,19 +263,20 @@ const LabelPrintPreviewModal = ({ printData, qrDataUrls, error, isPrinting, onCl
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={onClose}>
+            <DialogHelpButton />
+            <button {...help('lab-window-close')} type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={onClose}>
               {t("modal.close", { defaultValue: "Close" })}
             </button>
             {/* Clicking Print calls window.print() (browser) or webContents.print({ silent: false }) (Electron).
                 The OS print dialog opens — no printer is pre-selected and silent mode is never used. */}
-            <button type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm sk-on-accent disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
+            <button {...help('lab-label-print')} type="button" className="rounded-lg bg-sky-600 px-3 py-2 text-sm sk-on-accent disabled:opacity-60" onClick={onPrint} disabled={isPrinting}>
               {isPrinting ? t("lab.orders.openingPrintDialog", { defaultValue: "Opening..." }) : t("actions.print", { defaultValue: "Print" })}
             </button>
           </div>
         </div>
 
         {/* ── Label size selector (preference saved to localStorage) ── */}
-        <div className="mb-4 print:hidden">
+        <div className="mb-4 print:hidden" {...help('lab-label-size')}>
           <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
             {t("lab.orders.labelSize", { defaultValue: "Label size" })}
           </div>
@@ -544,7 +547,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
     <>
     <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <div {...help('lab-animal-orders')} className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t("lab.orders.snakePanel.title", { defaultValue: "Shed Testing Orders" })}
         </div>
         <div className="flex items-center gap-1.5">
@@ -610,7 +613,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-neutral-800"><bdi>{order.orderNumber || order.id}</bdi></div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" {...help('lab-order-status')}>
                     <StatusBadge label={statusLabel} tone={statusTone} />
                     <StatusBadge label={paymentLabel} tone={paymentTone} />
                   </div>
@@ -639,7 +642,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                   </div>
                 ) : null}
 
-                <div className="mt-3">
+                <div className="mt-3" {...help('lab-order-status')}>
                   <OrderProgressBar status={order.status} />
                 </div>
 
@@ -672,6 +675,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                     <button
                       type="button"
                       className="rounded-lg border px-2 py-1 text-[11px]"
+                      {...help('lab-order-details')}
                       onClick={() => openDetails(order.id)}
                     >
                       {isOpen
@@ -682,6 +686,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                       type="button"
                       className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700 disabled:opacity-60"
                       disabled={labelActionState.loading}
+                      {...help('lab-preview-labels')}
                       onClick={() => previewOrderLabels(order.id)}
                     >
                       {labelActionState.loading
@@ -692,6 +697,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                       type="button"
                       className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
                       disabled={labelActionState.loading}
+                      {...help('lab-print-labels')}
                       onClick={() => openLabelPrintPreview(order.id)}
                     >
                       {labelActionState.loading
@@ -702,6 +708,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                       type="button"
                       className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-[11px] font-medium text-neutral-700 disabled:opacity-60"
                       disabled={labelActionState.loading}
+                      {...help('lab-download-labels')}
                       onClick={() => downloadOrderLabels(order.id)}
                     >
                       {t("lab.orders.downloadLabelsPdf", { defaultValue: "Download Labels PDF" })}
@@ -711,6 +718,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                         type="button"
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
                         disabled={certificateActionState.loading}
+                        {...help('lab-certificate-download')}
                         onClick={() => openCertificate(order.id, "download")}
                       >
                         {certificateActionState.loading
@@ -770,6 +778,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                                 type="button"
                                 className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700 disabled:opacity-60"
                                 disabled={certificateActionState.loading}
+                                {...help('lab-certificate-view')}
                                 onClick={() => openCertificate(order.id, "view")}
                               >
                                 {t("lab.orders.details.viewCertificate", { defaultValue: "View Certificate" })}
@@ -778,6 +787,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                                 type="button"
                                 className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-[11px] font-medium text-neutral-700 disabled:opacity-60"
                                 disabled={certificateActionState.loading}
+                                {...help('lab-certificate-download')}
                                 onClick={() => openCertificate(order.id, "download")}
                               >
                                 {t("lab.orders.details.downloadCertificate", { defaultValue: "Download PDF" })}

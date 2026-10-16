@@ -1,6 +1,7 @@
 import DepartureTag from '../../animals/DepartureTag.jsx';
 import React from 'react';
 import { Handle, Position } from 'reactflow';
+import { help } from '../../help/help';
 
 const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
 const SEX_COLOR = { male: 'sk-sex-male', female: 'sk-sex-female', unknown: 'sk-sex-unknown' };
@@ -58,6 +59,7 @@ const SnakeNode = ({ data }) => {
 
   return (
     <div
+      {...help('tree-node')}
       className={[
         'rounded-xl border p-3 shadow-md transition-all select-none cursor-pointer',
         snake.departure ? 'opacity-75' : '',

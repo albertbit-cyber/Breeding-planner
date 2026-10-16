@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ARCHIVE_REASONS, EXIT_FIELDS_BY_REASON, getArchiveRecord } from './archive';
 import { archiveLabels } from './archiveRecord';
+import { help } from '../help/help';
+import { DialogHelpButton } from '../help/ui/HelpButton';
 
 const todayYmd = () => {
   const now = new Date();
@@ -94,9 +96,11 @@ export default function ArchiveAnimalDialog({
         aria-labelledby="archive-dialog-title"
         role="dialog"
         aria-modal="true"
+        data-dialog="archive-animal"
       >
-        <div className="p-5 pb-3">
-          <h2 id="archive-dialog-title" className="font-semibold text-lg">
+        <div className="p-5 pb-3 relative">
+          <DialogHelpButton className="help-dialog-corner" />
+          <h2 id="archive-dialog-title" className="font-semibold text-lg pe-12" {...help('archive-dialog')}>
             {mode === 'edit'
               ? t('archive.dialog.editTitle', { defaultValue: 'Exit details for {{name}}', name })
               : t('archive.dialog.title', { defaultValue: 'Move {{name}} to the archive', name })}
@@ -117,7 +121,7 @@ export default function ArchiveAnimalDialog({
                   key={reason}
                   className={`archive-reason-option flex items-center gap-2 rounded-xl border px-3 py-2 text-sm cursor-pointer ${form.reason === reason ? 'archive-reason-option--selected' : ''}`}
                 >
-                  <input type="radio" name="archive-reason" value={reason} checked={form.reason === reason} onChange={set('reason')} />
+                  <input type="radio" name="archive-reason" {...help('archive-reason')} value={reason} checked={form.reason === reason} onChange={set('reason')} />
                   <span>{labels.reasons[reason]}</span>
                 </label>
               ))}
@@ -233,10 +237,10 @@ export default function ArchiveAnimalDialog({
         </div>
 
         <div className="sticky bottom-0 bg-white border-t px-5 py-3 flex justify-end gap-2">
-          <button type="button" className="px-3 py-2 rounded-xl text-sm border" onClick={onCancel}>
+          <button type="button" className="px-3 py-2 rounded-xl text-sm border" {...help('app-dialog-cancel')} onClick={onCancel}>
             {t('common.cancel', { defaultValue: 'Cancel' })}
           </button>
-          <button type="submit" className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" disabled={busy || !form.reason}>
+          <button type="submit" className="px-3 py-2 rounded-xl text-sm appearance-btn appearance-btn--filled" {...help('archive-confirm')} disabled={busy || !form.reason}>
             {busy
               ? t('archive.dialog.saving', { defaultValue: 'Saving…' })
               : mode === 'edit'
