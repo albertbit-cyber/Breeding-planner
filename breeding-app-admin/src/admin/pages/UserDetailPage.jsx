@@ -259,6 +259,24 @@ function SubscriptionPanel({ user, onUpdated }) {
   );
 }
 
+/**
+ * One of the account's limits as the feature gate resolves it: the number, how much of it is used
+ * (animals only; photos are counted per animal) and where it comes from, an override winning over
+ * the tier. "12 of 50 · Hobby tier", "10 · override until 31 Dec 2026", "unlimited · Enterprise tier".
+ */
+function describeAccountLimit(entry, unit) {
+  if (!entry) return "-";
+  if (entry.source === "unconfigured") return "no tiers configured (not limited)";
+  if (entry.source === "admin") return "not limited (admin)";
+  const from = entry.source === "override"
+    ? `override${entry.overrideExpiresAt ? ` until ${formatDate(entry.overrideExpiresAt)}` : ""}`
+    : `${entry.tierName || "no"} tier`;
+  if (!entry.allowed) return `no ${unit} · ${from}`;
+  const limit = entry.limit === null || entry.limit === undefined ? "unlimited" : String(entry.limit);
+  const amount = entry.used === null || entry.used === undefined ? limit : `${entry.used} of ${limit}`;
+  return `${amount} · ${from}`;
+}
+
 /* ── User Tier Subscription Panel ──────────────────────────────────────────── */
 function UserTierSubscriptionPanel({ userId }) {
   const toast = useToast();
@@ -333,6 +351,8 @@ function UserTierSubscriptionPanel({ userId }) {
             <dt>Payment</dt><dd>{panel?.subscription?.paymentStatus || "-"}</dd>
             <dt>Trial ends</dt><dd>{formatDate(panel?.subscription?.trialEndsAt)}</dd>
             <dt>Renewal</dt><dd>{formatDate(panel?.subscription?.renewsAt)}</dd>
+            <dt>Animals</dt><dd>{describeAccountLimit(panel?.limits?.["animals.create"], "animals")}</dd>
+            <dt>Photos per animal</dt><dd>{describeAccountLimit(panel?.limits?.["animals.photos"], "photos")}</dd>
           </dl>
           <div className="admin-action-grid" style={{ marginTop: 12 }}>
             <label>Change tier<select value={form.tierId} onChange={(e) => setForm((p) => ({ ...p, tierId: e.target.value }))}><option value="">Select tier</option>{tiers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
