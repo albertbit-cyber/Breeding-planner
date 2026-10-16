@@ -36,11 +36,11 @@ export function collectPendingPhotoUploads(snakes = []) {
     const photos = Array.isArray(snake.photos) ? snake.photos : [];
     photos.forEach((photo) => {
       if (!isInlinePhoto(photo?.url) || byUrl.has(photo.url)) return;
-      byUrl.set(photo.url, { snakeId: String(snake.id || ''), dataUrl: photo.url, kind: 'gallery' });
+      byUrl.set(photo.url, { snakeId: String(snake.id || ''), dataUrl: photo.url, kind: 'gallery', addedAt: photo.addedAt || null });
     });
     // A cover that is not one of the gallery photos (older records) still deserves its upload.
     if (isInlinePhoto(snake.imageUrl) && !byUrl.has(snake.imageUrl)) {
-      byUrl.set(snake.imageUrl, { snakeId: String(snake.id || ''), dataUrl: snake.imageUrl, kind: 'cover' });
+      byUrl.set(snake.imageUrl, { snakeId: String(snake.id || ''), dataUrl: snake.imageUrl, kind: 'cover', addedAt: null });
     }
   });
   return [...byUrl.values()];

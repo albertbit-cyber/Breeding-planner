@@ -5,7 +5,8 @@ const PLANS = [
   {
     id: 'free', name: 'Free', topColor: '#a09888',
     freeLabel: true,
-    stack: '20 animals',
+    stack: '10 animals',
+    photos: '3 photos per animal',
     desc: 'For a small collection, at no cost.',
     cta: 'Join the waitlist',
     ctaStyle: { border: '1px solid var(--border)', color: 'var(--dark)', background: 'transparent' },
@@ -13,7 +14,8 @@ const PLANS = [
   {
     id: 'hobby', name: 'Hobby', topColor: '#9b65d6',
     monthly: 5,
-    stack: '100 animals',
+    stack: '50 animals',
+    photos: '5 photos per animal',
     desc: 'For the growing hobbyist.',
     cta: 'Join the waitlist',
     ctaStyle: { border: '1px solid var(--border)', color: 'var(--dark)', background: 'transparent' },
@@ -21,7 +23,8 @@ const PLANS = [
   {
     id: 'hobby-plus', name: 'Hobby Plus', topColor: '#d86060',
     monthly: 10,
-    stack: '250 animals',
+    stack: '100 animals',
+    photos: '7 photos per animal',
     desc: 'More room for a serious collection.',
     cta: 'Join the waitlist',
     ctaStyle: { border: '1px solid var(--border)', color: 'var(--dark)', background: 'transparent' },
@@ -29,7 +32,8 @@ const PLANS = [
   {
     id: 'breeder', name: 'Breeder', topColor: '#c8a840', featured: true,
     monthly: 20,
-    stack: '500 animals',
+    stack: '250 animals',
+    photos: '9 photos per animal',
     desc: 'For dedicated breeders.',
     cta: 'Join the waitlist',
     ctaStyle: { background: 'var(--gold)', color: 'var(--dark)', border: 'none', fontWeight: 600 },
@@ -37,8 +41,9 @@ const PLANS = [
   {
     id: 'professional', name: 'Professional', topColor: '#7a7265',
     contactUs: true,
-    stack: 'Unlimited',
-    desc: 'No limits. Full team access.',
+    stack: '500 animals',
+    photos: 'No photo limit',
+    desc: 'For the largest collections. Full team access.',
     cta: 'Get in touch',
     ctaStyle: { background: 'var(--dark)', color: '#fff', border: 'none', fontWeight: 500 },
   },
@@ -86,7 +91,7 @@ function PlanCard({ plan }) {
           <i className="ti ti-stack" style={{ fontSize: 16, color: 'var(--gold-dk)', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{plan.stack}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>stack limit</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>stack limit{plan.photos ? ' · ' + plan.photos : ''}</div>
           </div>
         </div>
 
@@ -126,7 +131,7 @@ export default function PricingPage() {
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div className="section-label">Pricing</div>
           <h1 className="section-title">Planned founding-member pricing</h1>
-          <p className="section-sub">Every plan is planned to include every feature; only your stack size differs.</p>
+          <p className="section-sub">Every plan is planned to include every feature; only your stack size and photos per animal differ.</p>
         </div>
 
         <div className="alert" role="note" style={{ background: '#fff', border: '1px solid var(--border)', color: 'var(--dark)', maxWidth: 640, margin: '0 auto 1.75rem', lineHeight: 1.6 }}>
@@ -173,7 +178,7 @@ export default function PricingPage() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 14, color: 'var(--muted)', marginTop: '1.5rem' }}>
-          Need a lab portal or enterprise plan?{' '}
+          Need a lab portal, or an enterprise plan with no animal or photo limit?{' '}
           <a href="mailto:info@serpentora.com" style={{ color: 'var(--gold-dk)', fontWeight: 500 }}>Contact us</a>
         </p>
       </div>

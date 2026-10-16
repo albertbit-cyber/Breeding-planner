@@ -176,6 +176,81 @@ describe("upload", () => {
     }
   });
 
+  describe("photos per animal", () => {
+    const FREE = { allowed: true, featureKey: "animals.photos", source: "tier", tier: "Free", currentUsage: 0, limit: 3 };
+    const checksum = (n: number) => n.toString(16).padStart(64, "0");
+    const AFTER_LIMITS = "2026-11-01T10:00:00.000Z";
+
+    afterEach(() => {
+      delete process.env.PHOTO_MAX_PER_ANIMAL;
+      delete process.env.PHOTO_LIMITS_FROM;
+    });
+
+    it("stops a fourth photo on one animal under a three-per-animal tier, and says why", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      for (let n = 1; n <= 3; n += 1) await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS });
+      await expect(createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(4), addedAt: AFTER_LIMITS }))).rejects.toMatchObject({
+        statusCode: 403,
+        details: { code: "PHOTO_QUOTA", scope: "animal", animalId: "26-F-186", currentUsage: 3, limit: 3, tier: "Free" },
+      });
+    });
+
+    it("counts each animal on its own", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      for (let n = 1; n <= 3; n += 1) await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS });
+      const other: any = await createPhotoUploadUrl(OWNER, uploadRequest({ animalId: "26-M-001", checksum: checksum(9), addedAt: AFTER_LIMITS }));
+      expect(other.alreadyUploaded).toBe(false);
+    });
+
+    it("frees a place as soon as a photo is removed", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      const stored = [];
+      for (let n = 1; n <= 3; n += 1) stored.push(await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS }));
+      await deletePhoto(OWNER, stored[0].id);
+      const next: any = await createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(4), addedAt: AFTER_LIMITS }));
+      expect(next.alreadyUploaded).toBe(false);
+    });
+
+    it("still hands back a photo it already holds, full or not", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      const stored = [];
+      for (let n = 1; n <= 3; n += 1) stored.push(await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS }));
+      const again: any = await createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(2), addedAt: AFTER_LIMITS }));
+      expect(again).toMatchObject({ alreadyUploaded: true, photo: { id: stored[1].id } });
+    });
+
+    it("does not count a listing's own photos or scanned papers against the animal", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      for (let n = 1; n <= 3; n += 1) await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS });
+      const paper: any = await createPhotoUploadUrl(OWNER, uploadRequest({ kind: "document", checksum: checksum(7), addedAt: AFTER_LIMITS }));
+      expect(paper.alreadyUploaded).toBe(false);
+    });
+
+    it("lets a photo taken before the limits came in reach storage, so it never stays on one device", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue(FREE as any);
+      for (let n = 1; n <= 3; n += 1) await storePhoto(OWNER, { checksum: checksum(n), addedAt: AFTER_LIMITS });
+      const older: any = await createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(5), addedAt: "2026-09-01T08:00:00.000Z" }));
+      expect(older.alreadyUploaded).toBe(false);
+      // A photo with no date is treated as new.
+      await expect(createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(6) }))).rejects.toMatchObject({ details: { scope: "animal" } });
+    });
+
+    it("holds even the older photos and the unlimited tiers to the technical cap", async () => {
+      process.env.PHOTO_MAX_PER_ANIMAL = "2";
+      vi.mocked(canAccessFeature).mockResolvedValue({ ...FREE, tier: "Enterprise", limit: null } as any);
+      await storePhoto(OWNER, { checksum: checksum(1), addedAt: AFTER_LIMITS });
+      await storePhoto(OWNER, { checksum: checksum(2), addedAt: "2026-09-01T08:00:00.000Z" });
+      await expect(createPhotoUploadUrl(OWNER, uploadRequest({ checksum: checksum(3), addedAt: "2026-09-01T08:00:00.000Z" }))).rejects.toMatchObject({
+        details: { code: "PHOTO_QUOTA", scope: "animal", limit: 2 },
+      });
+    });
+
+    it("refuses a tier without photos (a lab) for every animal", async () => {
+      vi.mocked(canAccessFeature).mockResolvedValue({ allowed: false, featureKey: "animals.photos", reason: "Feature is not included in the current tier" } as any);
+      await expect(createPhotoUploadUrl(OWNER, uploadRequest())).rejects.toMatchObject({ details: { code: "PHOTO_QUOTA", scope: "plan" } });
+    });
+  });
+
   it("complete marks the photo ready after checking the bytes", async () => {
     const photo = await storePhoto();
     expect(photo.status).toBe("ready");

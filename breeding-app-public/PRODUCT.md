@@ -17,7 +17,7 @@ first.
 **Secondary: the established breeder.** 200–500+ animals, breeding commercially, selling regularly.
 They need pairing planning, verified genetics, and sales in one system rather than three. The page
 does not lead with them, but it must prove enough depth that they can see the product would hold their
-collection — the Breeder tier (500 animals) and Professional tier (unlimited, team access) exist for
+collection — the Breeder tier (250 animals) and Professional tier (500 animals, team access) exist for
 them.
 
 **Third-party operators: laboratories.** A separate lab portal exists for testing vendors who receive

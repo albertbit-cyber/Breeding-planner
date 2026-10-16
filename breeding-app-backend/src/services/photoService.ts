@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import type { AuthenticatedUser } from "../types/auth";
 import { HttpError } from "../utils/errors";
 import { canAccessFeature } from "./subscriptionService";
+import { PHOTOS_PER_ANIMAL_FEATURE } from "./subscriptionCatalog";
 import {
   SIGNED_READ_TTL_SECONDS,
   animalPhotoKey,
@@ -129,26 +130,79 @@ const uploadTargets = async (photo: any) => {
 };
 
 /**
- * The per-tier quota goes through the same feature gate as every other limit ("animals.photos" is
- * a count feature in the catalogue, counted below from this table). PHOTO_MAX_PER_USER is a hard
- * ceiling on top, so an unconfigured tier catalogue cannot mean unlimited storage.
+ * Photos are limited per animal: the tier's "animals.photos" value is how many photos one animal
+ * may hold (Free 3, Hobby 5, ...), blank meaning no tier limit. On top of that:
+ *
+ * - PHOTO_MAX_PER_ANIMAL is the technical cap for every tier, "unlimited" included, because the
+ *   app carries an animal's photos in its record, its backups and its PDFs.
+ * - PHOTO_MAX_PER_USER is a hard ceiling for the whole account, so an unconfigured tier catalogue
+ *   cannot mean unlimited storage.
+ *
+ * Photos taken before the per-animal limits came in (PHOTO_LIMITS_FROM) are exempt from the tier
+ * limit, though not from the technical cap. Every photo still on a device goes through this upload
+ * once, and refusing an older one would leave it on that device only, which is how 72 photos were
+ * lost on 13 Oct. A lower limit never takes a photo away; it only stops new ones.
  */
-const assertQuota = async (actor: AuthenticatedUser) => {
-  const access = await canAccessFeature(actor, "animals.photos");
+const DEFAULT_MAX_PHOTOS_PER_ANIMAL = 60;
+const DEFAULT_PHOTO_LIMITS_FROM = "2026-10-17T00:00:00.000Z";
+
+// What counts against an animal's limit: pictures of the animal. A listing's own photos and
+// scanned papers are not pictures of it, and a removed photo frees its place at once.
+const KINDS_COUNTED_PER_ANIMAL = ["cover", "gallery", "hatchling"];
+
+export const maxPhotosPerAnimal = () => positiveIntEnv("PHOTO_MAX_PER_ANIMAL", DEFAULT_MAX_PHOTOS_PER_ANIMAL);
+
+export const photoLimitsFrom = (): Date => {
+  const parsed = new Date(process.env.PHOTO_LIMITS_FROM || DEFAULT_PHOTO_LIMITS_FROM);
+  return Number.isNaN(parsed.getTime()) ? new Date(DEFAULT_PHOTO_LIMITS_FROM) : parsed;
+};
+
+/** Taken before the limits came in, by the date the device recorded when the photo was added. */
+const takenBeforeLimits = (addedAt: unknown): boolean => {
+  if (!addedAt) return false;
+  const parsed = new Date(String(addedAt));
+  return !Number.isNaN(parsed.getTime()) && parsed < photoLimitsFrom();
+};
+
+export const countPhotosForAnimal = (ownerUserId: string, animalAppId: string): Promise<number> =>
+  db.photo.count({
+    where: { ownerUserId, animalAppId, kind: { in: KINDS_COUNTED_PER_ANIMAL }, status: { in: ["pending", "ready"] } },
+  });
+
+const assertQuota = async (actor: AuthenticatedUser, input: { animalAppId: string | null; kind: string; addedAt: unknown }) => {
+  const access: any = await canAccessFeature(actor, PHOTOS_PER_ANIMAL_FEATURE);
   if (!access.allowed) {
-    throw new HttpError(403, (access as any).reason || "Photo storage is not included in your plan.", {
+    throw new HttpError(403, access.reason || "Photos are not included in your plan.", {
       code: "PHOTO_QUOTA",
-      currentUsage: (access as any).currentUsage,
-      limit: (access as any).limit,
+      scope: "plan",
+      requiredTier: access.requiredTier,
     });
   }
+
+  if (input.animalAppId && KINDS_COUNTED_PER_ANIMAL.includes(input.kind)) {
+    const tierLimit = access.limit === null || access.limit === undefined ? null : Number(access.limit);
+    const exempt = takenBeforeLimits(input.addedAt);
+    const limit = tierLimit === null || exempt ? maxPhotosPerAnimal() : Math.min(tierLimit, maxPhotosPerAnimal());
+    const onAnimal = await countPhotosForAnimal(actor.id, input.animalAppId);
+    if (onAnimal >= limit) {
+      throw new HttpError(403, `This animal already has ${onAnimal} photos, and ${access.tier || "your plan"} keeps ${limit} per animal.`, {
+        code: "PHOTO_QUOTA",
+        scope: "animal",
+        animalId: input.animalAppId,
+        currentUsage: onAnimal,
+        limit,
+        tier: access.tier || "",
+      });
+    }
+  }
+
   const used = await countStoredPhotos(actor.id);
   if (used >= maxPhotosPerUser()) {
-    throw new HttpError(403, "Photo storage limit reached.", { code: "PHOTO_QUOTA", currentUsage: used, limit: maxPhotosPerUser() });
+    throw new HttpError(403, "Photo storage limit reached.", { code: "PHOTO_QUOTA", scope: "account", currentUsage: used, limit: maxPhotosPerUser() });
   }
 };
 
-/** What counts against an account's photo quota: everything not yet purged. */
+/** What counts against the account's hard ceiling: everything not yet purged. */
 export const countStoredPhotos = (ownerUserId: string): Promise<number> =>
   db.photo.count({ where: { ownerUserId, status: { in: ["pending", "ready", "deleted"] } } });
 
@@ -183,7 +237,7 @@ export const createPhotoUploadUrl = async (actor: AuthenticatedUser, payload: Re
   const existing = await db.photo.findFirst({ where: { ownerUserId: actor.id, checksum } });
   if (existing) return answerForExisting(existing);
 
-  await assertQuota(actor);
+  await assertQuota(actor, { animalAppId, kind, addedAt: payload.addedAt });
 
   const id = newObjectId();
   let photo;

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { checkFeatureAccess, fetchPublicSubscriptionTiers } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { ANIMAL_CAP_FEATURE } from "./animalCap";
+import { PHOTO_CAP_FEATURE } from "./photoCap";
 
 /**
  * The account's feature access, fetched once after sign-in and kept.
@@ -12,7 +13,7 @@ import { ANIMAL_CAP_FEATURE } from "./animalCap";
  * A feature that could not be checked is left unknown, never treated as denied:
  * the app works on this device either way, and the backend still enforces.
  */
-export const GATED_FEATURES = [ANIMAL_CAP_FEATURE, "marketplace.create_listing"];
+export const GATED_FEATURES = [ANIMAL_CAP_FEATURE, PHOTO_CAP_FEATURE, "marketplace.create_listing"];
 
 const STORAGE_KEY = "serpentora.featureAccess.v1";
 

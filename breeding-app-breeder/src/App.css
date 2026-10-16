@@ -1863,6 +1863,13 @@
   gap: 0.25rem 1rem;
   margin-top: 0.5rem;
 }
+/* "3 of 5 photos": the plan's photos-per-animal limit, beside the controls it governs. */
+.snake-editor-photo-count {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--sk-text-muted, #737373);
+}
 
 /* Text buttons: the photo controls and the ID action. Quiet by design; they are
    secondary to the fields around them. */

@@ -41,7 +41,7 @@ user-media (private bucket)
 
 | Call | Does |
 | --- | --- |
-| `POST /upload-url` | `{ animalId, kind, mimeType, sizeBytes, checksum }`. Same checksum already stored for this owner: returns it (`alreadyUploaded: true`, a soft-deleted one is restored). Otherwise creates a `pending` row and returns signed upload URLs for the photo and its thumbnail. Quota: tier feature `animals.photos` plus the hard cap `PHOTO_MAX_PER_USER`. |
+| `POST /upload-url` | `{ animalId, kind, mimeType, sizeBytes, checksum, addedAt? }`. Same checksum already stored for this owner: returns it (`alreadyUploaded: true`, a soft-deleted one is restored). Otherwise creates a `pending` row and returns signed upload URLs for the photo and its thumbnail. Quota: tier feature `animals.photos` as photos per animal (cover, gallery and hatchling photos of that `animalId`, removed ones not counted; refused with `PHOTO_QUOTA`, `scope: "animal"`), the per-animal cap `PHOTO_MAX_PER_ANIMAL`, and the account cap `PHOTO_MAX_PER_USER`. A photo whose `addedAt` is before `PHOTO_LIMITS_FROM` skips the tier limit. |
 | `PUT <signed upload URL>` | The client sends the bytes straight to Supabase. |
 | `POST /:id/complete` | Checks the object exists, its size, and its magic bytes (JPEG, PNG, WebP, HEIC). Anything else is deleted. Marks `ready`. |
 | `GET /:id/url`, `POST /urls` | Signed read URLs (photo + thumbnail), one or up to 100 at a time. Owner or admin. |
@@ -104,16 +104,20 @@ refuses to start uploads into a bucket that does not exist, but it will boot.
    - `STORAGE_DRIVER=supabase` (explicit, so missing keys fail loudly instead of
      falling back to local disk)
    - optional: `SUPABASE_MEDIA_BUCKET` (default `user-media`), `PHOTO_MAX_BYTES`
-     (default 10 MB), `PHOTO_MAX_PER_USER` (default 20000)
+     (default 10 MB), `PHOTO_MAX_PER_USER` (default 20000), `PHOTO_MAX_PER_ANIMAL`
+     (default 60), `PHOTO_LIMITS_FROM` (default 2026-10-17, see tier-limits.md)
 5. **Deploy the branch to staging.** `start:migrate` applies migration
    `20261016120000_photos` (one new table, additive, nothing else touched).
    Check the boot log for exactly one line:
    `[storage] driver=supabase bucket=user-media project=<ref>.supabase.co`.
    `[storage] MISCONFIGURED: ...` means step 4 is incomplete.
-6. **Check the tier gate.** Uploads go through feature `animals.photos`
-   (a count feature). If the tier catalogue is seeded, make sure the free tier
-   has `animals.photos` enabled with a sensible limit (or none), or every upload
-   is refused with `PHOTO_QUOTA` and photos simply stay on devices.
+6. **Check the tier gate.** Uploads go through feature `animals.photos`, which
+   is a limit **per animal** (Free 3, Hobby 5, Hobby Plus 7, Breeder 9,
+   Professional Breeder and Enterprise no tier limit; technical cap
+   `PHOTO_MAX_PER_ANIMAL`, default 60). Set the numbers with
+   `npm run tiers:limits` (see [tier-limits.md](tier-limits.md)). A tier with
+   `animals.photos` off is refused with `PHOTO_QUOTA` (scope `plan`) and its
+   photos simply stay on devices.
 7. **Smoke test on staging**: sign in on the web app, take a photo, wait for a
    sync, reload on a second browser: the photo shows there. Supabase → Storage
    should show `users/<id>/animals/...`.

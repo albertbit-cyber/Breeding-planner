@@ -668,7 +668,10 @@
 .admin-form-grid textarea,
 .admin-panel input:not([type="checkbox"]):not([type="radio"]),
 .admin-panel select,
-.admin-panel textarea {
+.admin-panel textarea,
+.admin-modal-body input:not([type="checkbox"]):not([type="radio"]),
+.admin-modal-body select,
+.admin-modal-body textarea {
   border: 1px solid var(--a-border-strong) !important;
   border-radius: var(--a-radius) !important;
   padding: 8px 10px !important;
@@ -687,7 +690,10 @@
 .admin-form-grid textarea:focus,
 .admin-panel input:focus:not([type="checkbox"]):not([type="radio"]),
 .admin-panel select:focus,
-.admin-panel textarea:focus {
+.admin-panel textarea:focus,
+.admin-modal-body input:focus:not([type="checkbox"]):not([type="radio"]),
+.admin-modal-body select:focus,
+.admin-modal-body textarea:focus {
   border-color: var(--a-accent) !important;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
 }
@@ -1538,6 +1544,44 @@
 .admin-limit-input:focus {
   border-color: var(--a-accent) !important;
   box-shadow: 0 0 0 2px rgba(99,102,241,0.12) !important;
+}
+
+.admin-limit-input:disabled { opacity: 0.5; }
+
+/* Animals and photos (tier editor): the two limits a keeper meets daily, side by side. */
+.admin-tier-limits {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-tier-limit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  background: var(--a-surface-2);
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.admin-tier-limit__hint {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--a-text-2);
+}
+
+.admin-tier-limits__summary {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--a-text);
+}
+
+.admin-tier-limits__note {
+  margin: 0;
+  font-size: 12px;
 }
 
 /* Moderators see the console in full and change nothing in it. Stated once at
