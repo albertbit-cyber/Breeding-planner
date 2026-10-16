@@ -10,6 +10,7 @@ import type { TestOrderStatus } from "../../types/labStatus";
 import { applyConfirmedResultGeneticsUpdate, type GeneticsUpdateEngineResult } from "./geneticsUpdateEngine";
 import { issueCertificateForCompletedOrder } from "./certificateService";
 import { emitShedWorkflowEvent } from "./workflowEvents";
+import { readStoredJson } from "../../platform/deviceStore.js";
 import type { ServiceActor } from "./testOrderService";
 
 export type { GeneticsUpdateEngineResult };
@@ -84,9 +85,8 @@ const loadCurrentAnimalGenetics = async (animalId: string): Promise<GeneticsSnap
 
   if (typeof localStorage !== "undefined") {
     try {
-      const raw = localStorage.getItem("breedingPlannerSnakes");
-      const parsed = raw ? JSON.parse(raw) : [];
-      const snakes = Array.isArray(parsed) ? parsed : [];
+      const parsed = readStoredJson("breedingPlannerSnakes", []);
+      const snakes: Array<{ id?: unknown }> = Array.isArray(parsed) ? parsed : [];
       const snake = snakes.find((entry) => String(entry?.id ?? "") === animalId) as SnakeRecord | undefined;
       if (!snake) return null;
       return {

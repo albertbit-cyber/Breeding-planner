@@ -389,7 +389,7 @@ export function ReproductiveIntelligencePanel({ snake }) {
       {/* Body */}
       <div className="p-4">
         {loading && (
-          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">{t('mobile.common.loadingEllipsis', { defaultValue: 'Loading…' })}</div>
+          <div className="flex items-center justify-center py-8 text-sm text-neutral-400">{t('common.loading', { defaultValue: 'Loading...' })}</div>
         )}
         {!loading && error && (
           <div className="text-xs text-rose-500 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{error}</div>
