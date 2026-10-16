@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
 import { help } from "../../help/help";
 import { DialogHelpButton } from "../../help/ui/HelpButton";
-import { createLabApiClient, formatLabOutcomeLabel, formatLabTestNumber } from "../api/client";
+import { createLabApiClient, formatLabConfirmedMarker, formatLabFindingLabel, formatLabTestNumber } from "../api/client";
 import { useAutoRefetch } from "../hooks/useAutoRefetch";
 import OrderProgressBar from "./OrderProgressBar";
 import SharedBackendGuard from "../../../components/SharedBackendGuard.jsx";
@@ -57,9 +57,11 @@ const geneticsSnapshotToList = (snapshot) => {
     .filter(Boolean);
 };
 
+// "Clown: het Clown, Fire: Super Fire, Pinstripe: Not present" — the test
+// name, then the genotype the laboratory found, never a laboratory word.
 const formatFindingSummary = (findings = []) =>
   (Array.isArray(findings) ? findings : [])
-    .map((entry) => `${entry.marker}: ${formatLabOutcomeLabel(entry.outcome)}`)
+    .map((entry) => `${entry.marker}: ${formatLabFindingLabel(entry)}`)
     .join(", ");
 
 const base64ToBlob = (base64, mimeType) => {
@@ -841,7 +843,7 @@ export default function BreederShedTestingPanel({ snake, refreshToken }) {
                         {outcome?.labConfirmedMarkers?.length ? (
                           <div>
                             <span className="font-semibold text-emerald-700">{t("lab.orders.details.labConfirmedMarkers", { defaultValue: "Lab-confirmed markers" })}:</span>{" "}
-                            {outcome.labConfirmedMarkers.map((entry) => `${entry.marker} (${formatLabOutcomeLabel(entry.outcome)})`).join(", ")}
+                            {outcome.labConfirmedMarkers.map((entry) => formatLabConfirmedMarker(entry)).join(", ")}
                           </div>
                         ) : null}
                         {outcome?.geneticsUpdate?.applied ? (

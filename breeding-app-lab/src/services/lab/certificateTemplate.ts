@@ -205,10 +205,17 @@ export const formatCertificateOutcomeLabel = (value: unknown): string => {
   return normalized || "-";
 };
 
-const formatCertificateGeneCall = (geneName: string, outcome: unknown): string => {
+/**
+ * The call printed on the certificate. A finding stores the genotype label the
+ * laboratory recorded ("het Clown", "Super Fire", "Negative"); the outcome
+ * words only serve findings from before that existed.
+ */
+const formatCertificateGeneCall = (geneName: string, outcome: unknown, storedLabel?: unknown): string => {
+  const stored = String(storedLabel || "").trim();
+  if (stored) return stored;
   const canonicalGene = normalizeGeneLabel(geneName) || geneName || "Ordered Test";
   const normalizedOutcome = String(outcome || "").trim();
-  if (normalizedOutcome === "carrierDetected") return `Het ${canonicalGene}`;
+  if (normalizedOutcome === "carrierDetected") return `het ${canonicalGene}`;
   if (normalizedOutcome === "positive") return canonicalGene;
   if (normalizedOutcome === "negative" || normalizedOutcome === "notDetected") return "Negative";
   return formatCertificateOutcomeLabel(normalizedOutcome);
@@ -265,7 +272,7 @@ const toCertificateRows = (
     const rowTestNumber = `${testNumber}${subLabel}`;
     const rowTestCode = `${testCode}${subLabel}`;
     const geneName = normalizeGeneLabel(firstNonEmpty(finding.sourceOrderedName, finding.marker, "Ordered Test")) || "Ordered Test";
-    const outcomeLabel = formatCertificateGeneCall(geneName, finding.outcome);
+    const outcomeLabel = formatCertificateGeneCall(geneName, finding.outcome, (finding as any).label);
     return {
       test: geneName,
       phenotype: geneName,

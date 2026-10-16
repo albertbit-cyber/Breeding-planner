@@ -56,10 +56,16 @@ const UNMATCHABLE_CODE = "-";
 
 const text = (value: unknown): string => String(value ?? "").replace(/\s+/g, " ").trim();
 
-/** Same wording the certificate PDF uses, so the page and the paper agree. */
-const geneCall = (gene: string, outcome: unknown): string => {
+/**
+ * Same wording the certificate PDF uses, so the page and the paper agree. A
+ * finding stores the genotype label ("het Clown", "Super Fire", "Negative");
+ * the outcome words are only for findings recorded before it existed.
+ */
+const geneCall = (gene: string, outcome: unknown, label?: unknown): string => {
+  const stored = text(label);
+  if (stored) return stored;
   const normalized = text(outcome);
-  if (normalized === "carrierDetected") return `Het ${gene}`;
+  if (normalized === "carrierDetected") return `het ${gene}`;
   if (normalized === "positive") return gene;
   if (normalized === "negative" || normalized === "notDetected") return "Negative";
   if (normalized === "inconclusive") return "Inconclusive";
@@ -85,7 +91,7 @@ export const summarizeTests = (snapshot: any, resultId: string | null, animalApp
     return findings
       .map((finding) => {
         const gene = text(finding?.sourceOrderedName) || text(finding?.marker);
-        return gene ? { test: gene, result: geneCall(gene, finding?.outcome) } : null;
+        return gene ? { test: gene, result: geneCall(gene, finding?.outcome, finding?.label) } : null;
       })
       .filter((line): line is CertifiedTestLine => Boolean(line));
   }

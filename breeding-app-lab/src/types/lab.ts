@@ -120,11 +120,20 @@ export type TestOutcome =
   | "negative"
   | "inconclusive"
   | "carrierDetected"
-  | "notDetected";
+  | "notDetected"
+  /** A value that decides nothing about genetics, such as a sex test. */
+  | "reported";
 
 export interface ResultFinding {
   marker: string;
   outcome: TestOutcome;
+  /** The answer the laboratory picked (see labResultEntry.ts). */
+  resultStatus?: string;
+  /** What the breeder reads: the genotype itself ("het Clown", "Super Fire", "Negative"). */
+  label?: string;
+  /** The token written onto the animal for a decisive outcome. */
+  genotype?: string;
+  inheritance?: string;
   orderedTestKey?: string;
   sourceOrderedName?: string;
   catalogTestId?: string;

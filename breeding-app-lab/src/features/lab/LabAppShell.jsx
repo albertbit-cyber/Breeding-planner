@@ -150,7 +150,12 @@ const parseRoute = (path) => {
     return { route: "/lab/sample-intake", presetToken: params.get("token") || undefined };
   }
   if (normalized === "/lab/result-entry") {
-    return { route: "/lab/result-entry", presetOrderId: params.get("orderId") || undefined };
+    return {
+      route: "/lab/result-entry",
+      presetOrderId: params.get("orderId") || undefined,
+      // The scanned tube belongs to one snake; the sheet opens on that one.
+      presetAnimalId: params.get("animalId") || undefined,
+    };
   }
   if (normalized === "/lab/completed-tests") return { route: "/lab/completed-tests" };
   if (normalized === "/lab/archive") return { route: "/lab/archive" };
@@ -210,7 +215,7 @@ const pageForRoute = (parsedRoute, role, t) => {
     case "/lab/sample-intake":
       return <SampleIntakePage presetToken={parsedRoute.presetToken} />;
     case "/lab/result-entry":
-      return <ResultEntryPage presetOrderId={parsedRoute.presetOrderId} />;
+      return <ResultEntryPage presetOrderId={parsedRoute.presetOrderId} presetAnimalId={parsedRoute.presetAnimalId} />;
     case "/lab/completed-tests":
       return <CompletedTestsPage />;
     case "/lab/archive":
@@ -401,6 +406,19 @@ export default function LabAppShell() {
   // size — the sidebar itself is desktop-only (`lg:block`).
   const navButtons = (onNavigate) => (
     <>
+      {/* The bench action first, on every screen size: a desktop with a USB
+          barcode scanner needs it as much as a phone with a camera does. */}
+      <button
+        type="button"
+        onClick={() => {
+          setMobileNavOpen(false);
+          setScanOpen(true);
+        }}
+        className="mb-1 flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-900 bg-neutral-900 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+      >
+        <span aria-hidden="true">📷</span>
+        {t("lab.shell.tab.scan", { defaultValue: "Scan" })}
+      </button>
       {isDevEnv && (
         <button
           type="button"
@@ -497,7 +515,7 @@ export default function LabAppShell() {
               isBottomTabActive("/lab/dashboard") ? "text-neutral-900" : "text-neutral-500"
             }`}
           >
-            <span className="text-lg leading-none">🏠</span>
+            <span className="text-lg leading-none" aria-hidden="true">🏠</span>
             {t("lab.shell.nav.dashboard", { defaultValue: "Dashboard" })}
           </button>
           <button
@@ -507,7 +525,7 @@ export default function LabAppShell() {
               isBottomTabActive("/lab/incoming-orders") ? "text-neutral-900" : "text-neutral-500"
             }`}
           >
-            <span className="text-lg leading-none">📋</span>
+            <span className="text-lg leading-none" aria-hidden="true">📋</span>
             {t("lab.shell.tab.orders", { defaultValue: "Orders" })}
           </button>
           <button
@@ -515,7 +533,7 @@ export default function LabAppShell() {
             onClick={() => setScanOpen(true)}
             className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-neutral-900"
           >
-            <span className="-mt-4 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg text-white shadow-lg">
+            <span className="-mt-4 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg text-white shadow-lg" aria-hidden="true">
               📷
             </span>
             {t("lab.shell.tab.scan", { defaultValue: "Scan" })}
@@ -527,7 +545,7 @@ export default function LabAppShell() {
               isBottomTabActive("/lab/result-entry") ? "text-neutral-900" : "text-neutral-500"
             }`}
           >
-            <span className="text-lg leading-none">🧪</span>
+            <span className="text-lg leading-none" aria-hidden="true">🧪</span>
             {t("lab.shell.tab.results", { defaultValue: "Results" })}
           </button>
           <button
@@ -538,7 +556,7 @@ export default function LabAppShell() {
               mobileNavOpen ? "text-neutral-900" : "text-neutral-500"
             }`}
           >
-            <span className="text-lg leading-none">⋯</span>
+            <span className="text-lg leading-none" aria-hidden="true">⋯</span>
             {t("lab.shell.tab.more", { defaultValue: "More" })}
           </button>
         </div>

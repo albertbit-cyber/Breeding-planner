@@ -100,7 +100,7 @@ describe("GET /api/public/certificates/verify/:code", () => {
       certificateNumber: "PH-GC-20260105-000001",
       labName: "Helix Genetics",
       species: "Ball Pythons",
-      testsSummary: [{ test: "Albino", result: "Het Albino" }],
+      testsSummary: [{ test: "Albino", result: "het Albino" }],
       issuedAt: "2026-01-05T10:30:00.000Z",
     });
   });
