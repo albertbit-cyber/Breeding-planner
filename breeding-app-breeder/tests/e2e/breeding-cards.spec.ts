@@ -98,9 +98,11 @@ test.describe("breeding cards end to end", () => {
     await dismissNotice(page);
 
     await expect(card(page)).toHaveCount(1);
+    await expandCards(page);
     // A first pairing on 1 March belongs to the season that started the previous 1 September.
     await expect(card(page).getByText("Season 2025–26").first()).toBeVisible();
-    await expect(card(page).getByText(/None pending. An observed lock proposes the next pairing/)).toBeVisible();
+    // The pairing plan lists the pairing as a ticked row; nothing is pending or overdue.
+    await expect(card(page).getByRole("region", { name: "Pairing plan and milestones" }).getByRole("checkbox", { name: "Pairing 1: Paired" })).toBeChecked();
     await expect(card(page).getByText("First pairing").locator("..").getByText("01/03/2026")).toBeVisible();
 
     // 2. Multiple sires: a second male, his session and lock on the SAME card.
@@ -149,7 +151,7 @@ test.describe("breeding cards end to end", () => {
       await dismissNotice(page);
     };
     await milestone("Ovulation", "2026-04-20");
-    await expect(card(page).getByText(/Ovulation recorded: no further pairing proposals/)).toBeVisible();
+    await expect(card(page).getByText(/Ovulation recorded: no further pairing rows/)).toBeVisible();
     await milestone("Pre-lay shed", "2026-05-08");
     await card(page).getByRole("button", { name: "Eggs laid", exact: true }).click();
     await fillDate(page, /Laying date/, "2026-06-05");
