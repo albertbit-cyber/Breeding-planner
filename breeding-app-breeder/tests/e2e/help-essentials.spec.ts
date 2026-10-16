@@ -157,7 +157,7 @@ test("with Help Mode on, pressing controls on each screen changes no stored data
 
   const go = async (helpId: string) => {
     await helpMode(false);
-    if (["nav-advisor", "nav-quarantine", "nav-family-tree", "nav-spaces", "nav-lab-tests"].includes(helpId)) {
+    if (["nav-advisor", "nav-quarantine", "nav-family-tree", "nav-spaces", "nav-lab-tests", "nav-calendar", "nav-setup"].includes(helpId)) {
       await page.locator('[data-help="nav-more"]:visible').click();
     }
     await page.locator(`[data-help="${helpId}"]:visible`).first().click();
