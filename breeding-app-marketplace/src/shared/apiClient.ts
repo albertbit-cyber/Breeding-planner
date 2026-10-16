@@ -755,6 +755,28 @@ export const uploadMarketplaceMedia = async (payload: Record<string, unknown>) =
     { method: "POST", body: JSON.stringify(payload) }
   );
 
+/**
+ * The seller's photos in cloud storage: the same per-breeder folder the breeder app fills. Listed
+ * so a listing can take one of them without the bytes being uploaded a second time.
+ */
+export const fetchMyStoredPhotos = async () =>
+  request<{ photos: Array<{ id: string; animalId: string | null; mimeType: string; hasThumb: boolean; createdAt: string }> }>(
+    "/photos"
+  );
+
+export const fetchStoredPhotoUrls = async (ids: string[]) =>
+  request<{ photos: Array<{ id: string; url: string; thumbUrl: string; expiresAt: string }> }>("/photos/urls", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+
+/** One stored photo onto a listing, copied on the server into the seller's marketplace folder. */
+export const uploadMarketplaceMediaFromPhoto = async (payload: { photoId: string; listingId?: string }) =>
+  request<{ media: { id: string; publicUrl: string; mimeType: string; sizeBytes: number } }>(
+    "/marketplace/uploads/from-photo",
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+
 export const fetchMarketplaceReviewableSales = async () =>
   request<{ sales: unknown[] }>("/marketplace/reviews/pending");
 

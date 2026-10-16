@@ -397,7 +397,13 @@
     "full": "You can attach up to {{max}} photos.",
     "type": "{{name}} is not a JPEG, PNG or WebP image.",
     "size": "{{name}} is larger than 8 MB.",
-    "failed": "That upload failed."
+    "failed": "That upload failed.",
+    "fromAnimals": "Use a photo of your animals",
+    "fromAnimalsTitle": "Your animal photos",
+    "fromAnimalsLoading": "Loading your photos…",
+    "fromAnimalsEmpty": "No photos in your cloud storage yet. Photos taken in the breeder app appear here once they have synced.",
+    "fromAnimalsPick": "Add this photo",
+    "fromAnimalsClose": "Close"
   },
   "dashboard": {
     "noStoreName": "Your listings",

@@ -413,7 +413,13 @@
     "full": "Możesz dołączyć do {{max}} zdjęć.",
     "type": "{{name}} nie jest obrazem JPEG, PNG ani WebP.",
     "size": "{{name}} przekracza 8 MB.",
-    "failed": "To wysłanie się nie powiodło."
+    "failed": "To wysłanie się nie powiodło.",
+    "fromAnimals": "Użyj zdjęcia swoich zwierząt",
+    "fromAnimalsTitle": "Zdjęcia twoich zwierząt",
+    "fromAnimalsLoading": "Wczytywanie zdjęć…",
+    "fromAnimalsEmpty": "W twojej chmurze nie ma jeszcze zdjęć. Zdjęcia z aplikacji hodowcy pojawią się tutaj po synchronizacji.",
+    "fromAnimalsPick": "Dodaj to zdjęcie",
+    "fromAnimalsClose": "Zamknij"
   },
   "dashboard": {
     "noStoreName": "Twoje ogłoszenia",

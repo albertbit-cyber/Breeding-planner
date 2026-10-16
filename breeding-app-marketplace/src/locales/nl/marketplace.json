@@ -397,7 +397,13 @@
     "full": "Je kunt tot {{max}} foto's toevoegen.",
     "type": "{{name}} is geen JPEG-, PNG- of WebP-afbeelding.",
     "size": "{{name}} is groter dan 8 MB.",
-    "failed": "Die upload is mislukt."
+    "failed": "Die upload is mislukt.",
+    "fromAnimals": "Een foto van je dieren gebruiken",
+    "fromAnimalsTitle": "Foto's van je dieren",
+    "fromAnimalsLoading": "Je foto's worden geladen…",
+    "fromAnimalsEmpty": "Nog geen foto's in je cloudopslag. Foto's uit de fokkersapp verschijnen hier zodra ze gesynchroniseerd zijn.",
+    "fromAnimalsPick": "Deze foto toevoegen",
+    "fromAnimalsClose": "Sluiten"
   },
   "dashboard": {
     "noStoreName": "Jouw advertenties",

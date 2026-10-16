@@ -405,7 +405,13 @@
     "full": "אפשר לצרף עד {{max}} תמונות.",
     "type": "{{name}} אינה תמונת JPEG, PNG או WebP.",
     "size": "{{name}} גדולה מ־8 מ״ב.",
-    "failed": "ההעלאה נכשלה."
+    "failed": "ההעלאה נכשלה.",
+    "fromAnimals": "שימוש בתמונה של בעלי החיים שלכם",
+    "fromAnimalsTitle": "תמונות בעלי החיים שלכם",
+    "fromAnimalsLoading": "טוען את התמונות שלכם…",
+    "fromAnimalsEmpty": "עדיין אין תמונות באחסון הענן שלכם. תמונות שצולמו באפליקציית המגדלים יופיעו כאן לאחר הסנכרון.",
+    "fromAnimalsPick": "הוספת תמונה זו",
+    "fromAnimalsClose": "סגירה"
   },
   "dashboard": {
     "noStoreName": "המודעות שלך",

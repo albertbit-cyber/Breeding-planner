@@ -1110,6 +1110,30 @@ button.mk-gene { cursor: pointer; }
 }
 .mk-photos__drop.is-over { border-color: var(--mk-sky); background: var(--mk-sky-wash); color: var(--mk-sky-text); }
 
+/* Picking one of the seller's stored animal photos: the same tiles, as buttons. */
+.mk-photos__picker {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--mk-rule);
+  border-radius: var(--mk-r);
+  background: var(--mk-surface-2);
+}
+.mk-photos__picker-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 13px; }
+.mk-photos__pick {
+  width: 118px;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid var(--mk-rule);
+  border-radius: var(--mk-r);
+  overflow: hidden;
+  background: var(--mk-surface);
+  cursor: pointer;
+}
+.mk-photos__pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mk-photos__pick:hover,
+.mk-photos__pick:focus-visible { border-color: var(--mk-sky); }
+.mk-photos__pick[disabled] { opacity: 0.5; cursor: progress; }
+
 /* ── Stars ──────────────────────────────────────────────────────────────── */
 
 .mk-stars { display: inline-flex; align-items: center; gap: 7px; }

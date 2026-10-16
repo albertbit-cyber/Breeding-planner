@@ -397,7 +397,13 @@
     "full": "Du kannst bis zu {{max}} Fotos anhängen.",
     "type": "{{name}} ist kein JPEG-, PNG- oder WebP-Bild.",
     "size": "{{name}} ist größer als 8 MB.",
-    "failed": "Der Upload ist fehlgeschlagen."
+    "failed": "Der Upload ist fehlgeschlagen.",
+    "fromAnimals": "Foto deiner Tiere verwenden",
+    "fromAnimalsTitle": "Fotos deiner Tiere",
+    "fromAnimalsLoading": "Deine Fotos werden geladen…",
+    "fromAnimalsEmpty": "Noch keine Fotos in deinem Cloud-Speicher. Fotos aus der Züchter-App erscheinen hier, sobald sie synchronisiert sind.",
+    "fromAnimalsPick": "Dieses Foto hinzufügen",
+    "fromAnimalsClose": "Schließen"
   },
   "dashboard": {
     "noStoreName": "Deine Inserate",
