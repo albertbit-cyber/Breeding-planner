@@ -395,6 +395,32 @@
   color: var(--a-text);
 }
 
+/* Back, Save and Cancel in one row at the top of an editor. */
+.admin-editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.admin-editor-bar .admin-back { margin-bottom: 0; white-space: nowrap; }
+@media (max-width: 480px) {
+  .admin-editor-bar { gap: 6px; }
+  .admin-editor-bar .admin-back { padding: 6px 8px; }
+}
+
+.admin-back--primary {
+  background: var(--a-accent);
+  border-color: var(--a-accent);
+  color: #fff;
+}
+.admin-back--primary:hover:not(:disabled) {
+  background: var(--a-accent-dark);
+  border-color: var(--a-accent-dark);
+  color: #fff;
+}
+.admin-back--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* ── Dashboard stat cards ─────────────────────────────────────────────────── */
 .admin-card-grid {
   display: grid;
