@@ -1073,6 +1073,8 @@
   "filters.apply": "החל",
   "filters.filters": "מסננים",
   "filters.other": "אחר",
+  "filters.allGroups": "כל הקבוצות",
+  "filters.severalGroups": "מספר קבוצות",
   "lab.batch.addedConfirm": "נוסף לאצווה. פתח את עגלת האצווה (בפינה הימנית התחתונה) כדי לבדוק ולשלוח.",
   "lab.batch.addToBatch": "הוסף לאצווה",
   "lab.batch.alreadyStagedNote": "הנחש הזה כבר נמצא באצווה. שמירה תעדכן את בחירת הבדיקות שלו.",

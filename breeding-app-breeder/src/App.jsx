@@ -10101,15 +10101,7 @@ export default function BreedingPlannerApp() {
       <div className="bp-genetics-legend">
         <GeneLegend />
       </div>
-      <button type="button" className="bp-genetics-legend-toggle" onClick={() => {
-        const panel = document.getElementById('bp-legend-tooltip');
-        if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
-      }}>
-        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
-      </button>
-      <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: 'var(--sk-surface)', border: '1px solid var(--sk-border)', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--sk-shadow-2)'}}>
-        <GeneLegend />
-      </div>
+      <GeneLegendPopover />
     </div>
   );
 
@@ -12874,6 +12866,26 @@ export default function BreedingPlannerApp() {
                           ⚙ {t("filters.filters", { defaultValue: "Filters" })}
                           {mobileFilterCount > 0 && <span className="bp-filter-badge">{mobileFilterCount}</span>}
                         </button>
+                        {groups.length > 0 && (() => {
+                          // One-tap group choice. It writes the same showGroups the sheet and the
+                          // desktop checkboxes use, so all three always agree.
+                          const chosen = showGroups || [];
+                          const value = chosen.length === 0 ? '' : chosen.length === 1 ? chosen[0] : '__several';
+                          return (
+                            <select
+                              className={cx('bp-group-select', chosen.length > 0 ? 'has-filters' : '')}
+                              aria-label={t("filters.groups", { defaultValue: "Groups" })}
+                              value={value}
+                              onChange={(e) => setShowGroups(e.target.value ? [e.target.value] : [])}
+                            >
+                              <option value="">{t("filters.allGroups", { defaultValue: "All groups" })}</option>
+                              {chosen.length > 1 && (
+                                <option value="__several" disabled>{t("filters.severalGroups", { defaultValue: "Several groups" })}</option>
+                              )}
+                              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                          );
+                        })()}
                       </div>
                       {mobileFilterCount > 0 && (
                         <div className="bp-active-filters mb-2">
@@ -27958,6 +27970,58 @@ function GeneLegend({ className }) {
           <span className="text-neutral-600 whitespace-nowrap">{legendLabels[item.key] || item.label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Phone-width stand-in for the inline legend, which CSS hides below 768px. It closes from its
+// own X, from a tap anywhere outside it, and from Escape, so it can never cover the list for good.
+function GeneLegendPopover() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="bp-legend-popover-anchor">
+      <button
+        type="button"
+        className="bp-genetics-legend-toggle"
+        aria-expanded={open}
+        aria-controls="bp-legend-popover"
+        onClick={() => setOpen(prev => !prev)}
+      >
+        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
+      </button>
+      {open && (
+        <div id="bp-legend-popover" className="bp-legend-popover" role="dialog" aria-label={t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}>
+          <button
+            type="button"
+            className="bp-legend-popover__close"
+            aria-label={t("common.close", { defaultValue: "Close" })}
+            title={t("common.close", { defaultValue: "Close" })}
+            onClick={() => setOpen(false)}
+          >
+            ✕
+          </button>
+          <GeneLegend />
+        </div>
+      )}
     </div>
   );
 }
