@@ -195,9 +195,27 @@ const checks = {
         : pass('the phone-width toolbar is no longer display:none');
     } catch { return unknown('App.css not readable'); }
   },
-  'f-mobile-parity': () => grep('useTranslation', ['breeding-app-breeder/src/features/mobile']).length > 0
-    ? pass('MobileApp uses i18n (spot-check register/add/pair on a device too)')
-    : fail('features/mobile has no useTranslation; the Android app is still hardcoded English'),
+  'f-mobile-parity': () => {
+    // Since PR 26 the Android shell mounts the same App as the web (features/mobile is gone),
+    // so parity holds when no separate mobile app exists and AppEntry renders the translated App.
+    const src = 'breeding-app-breeder/src';
+    if (existsSync(path.join(root, src, 'features/mobile'))) {
+      return grep('useTranslation', [`${src}/features/mobile`]).length > 0
+        ? pass('MobileApp uses i18n (spot-check register/add/pair on a device too)')
+        : fail('features/mobile has no useTranslation; the Android app is still hardcoded English');
+    }
+    try {
+      const entry = readFileSync(path.join(root, src, 'AppEntry.jsx'), 'utf8');
+      const app = readFileSync(path.join(root, src, 'App.jsx'), 'utf8');
+      const problems = [];
+      if (/MobileApp/.test(entry)) problems.push('AppEntry still mounts a separate MobileApp');
+      if (!/from "\.\/App\.jsx"/.test(entry)) problems.push('AppEntry does not render App.jsx');
+      if (!app.includes('useTranslation')) problems.push('App.jsx has no useTranslation');
+      return problems.length === 0
+        ? pass('Android runs the same translated App as the web (spot-check register/add/pair on a device too)')
+        : fail(problems.join('; '));
+    } catch { return unknown('AppEntry.jsx or App.jsx not readable'); }
+  },
   'f-help-system': () => {
     const src = 'breeding-app-breeder/src';
     const missing = [];
