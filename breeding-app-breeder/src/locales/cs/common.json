@@ -1069,6 +1069,8 @@
   "filters.apply": "Použít",
   "filters.filters": "Filtry",
   "filters.other": "Jiné",
+  "filters.allGroups": "Všechny skupiny",
+  "filters.severalGroups": "Několik skupin",
   "groups.noSnakes": "V této skupině nejsou žádní hadi.",
   "groups.tip": "Tip: Skupinu přiřadíte nebo změníte v úpravě hada.",
   "groups.title": "Skupiny",
