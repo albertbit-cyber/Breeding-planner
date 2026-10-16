@@ -1,177 +1,66 @@
-# Breeding Planner Mobile Android Build
+# Serpentora Android build and install
 
-Breeding Planner Mobile is packaged as a Capacitor Android app around the mobile PWA route at `#/mobile`.
+The Android app is the breeder app itself, `breeding-app-breeder/`, packaged with Capacitor.
+Since 12 October 2026 it runs the same `BreedingPlannerApp` as the browser and Electron; the
+old separate mobile app (`src/features/mobile/MobileApp.jsx`) is gone. Device differences live
+in `src/platform/` (file save via share sheet, hardware back, haptics, status bar, splash).
 
-## App Identity
+## App identity
 
-- App name: `Breeding Planner Mobile`
-- Android package: `com.breedingplanner.mobile`
-- Min SDK: `24`
-- Target SDK: `36`
-- Output directory copied by scripts: `dist/android`
+- Launcher name: `Serpentora`
+- Package: `com.serpentora.mobile`
+- `versionCode` and `versionName` derive from `breeding-app-breeder/package.json` at build time
+  (`android/variables.gradle`): `0.1.84` → versionName `0.1.84`, versionCode `10084`. The
+  pre-commit hook bumps the package version, so every commit can ship as an upgrade.
+- Min SDK 24, target and compile SDK 36. Capacitor 8 publishes safe-area insets as
+  `--safe-area-inset-*` CSS variables; the header, bottom nav and body padding use them.
 
-## Environments
+## Build
 
-The Android build uses Vite environment files:
-
-- Development: `.env.android-development`
-- Staging: `.env.android-staging`
-- Production: `.env.android-production`
-
-Production must use HTTPS:
-
-```powershell
-$env:VITE_API_URL='https://api.breedingplanner.dev/api'
-```
-
-For Android emulator development, the default API URL is:
-
-```text
-http://10.0.2.2:4000/api
-```
-
-## One-Time Dependency Setup
-
-Install Capacitor dependencies from the repo root:
+From inside `breeding-app-breeder/`, in PowerShell:
 
 ```powershell
-npm install
+$env:JAVA_HOME = "D:\Git Clone\Breeding-planner\.tools\jdk21\jdk-21.0.11+10"
+$env:ANDROID_HOME = "D:\Git Clone\Breeding-planner\.tools\android-sdk"
+powershell -ExecutionPolicy Bypass -File scripts\android-build.ps1 -Environment staging -Artifact apk -BuildType release
 ```
 
-If Capacitor packages are missing, install:
+- `JAVA_HOME` must point at the repo's JDK 21. The script only falls back to `.tools` when the
+  variable is unset, and a machine-wide 32-bit Java 8 breaks Gradle with an object-heap error.
+- `-Environment staging` bakes `.env.android-staging` in. Every live Serpentora site reads the
+  staging backend and that is where real data lives; production is empty. Build staging unless
+  told otherwise.
+- The script runs the web build, `npx cap sync android`, then Gradle. A full release build
+  takes about ten minutes on the reference machine (R8). Use `-SkipWebBuild -SkipCapSync` to
+  rerun only Gradle.
+- Release signing needs `android/key.properties` and `android/app/breedingplanner.keystore`,
+  both ignored by git. In a worktree, copy them from the main checkout first.
+- Output: `dist/android/app-release.apk`. Copy it into `apk-backups/` with the
+  `app-release-YYYY-MM-DD-short-change-name.apk` name and log it in
+  `apk-backups/APK_CHANGELOG.md` with its SHA256 before handing it over.
+
+## Install
 
 ```powershell
-npm install @capacitor/core @capacitor/android @capacitor/app @capacitor/camera @capacitor/filesystem @capacitor/haptics @capacitor/keyboard @capacitor/network @capacitor/preferences @capacitor/push-notifications @capacitor/splash-screen @capacitor/status-bar
-npm install -D @capacitor/cli
+adb install -r apk-backups\app-release-<date>-<name>.apk
 ```
 
-## Debug APK
+Builds under `com.serpentora.mobile` upgrade each other as long as the versionCode rises.
+Builds from before 12 October 2026 used `com.breedingplanner.mobile` and install side by side;
+uninstall "Breeding Planner Mobile" once the new one works.
 
-```powershell
-npm run android:debug
-```
+## What the phone does differently
 
-Output:
+- Backups: Settings → Backups → "Download backup" writes the `.bpbackup` file to the app cache
+  and opens the share sheet (Files, Drive, mail). Restore uses the normal file picker.
+- Field tab: scan a tag, search, feeds due, recent animals, quick logs with Undo.
+- Hardware back closes the top-most sheet or modal, then returns to Field, then backgrounds
+  the app.
+- Photos use the existing camera-capable file input; no separate photo pipeline.
 
-```text
-dist/android/app-debug.apk
-```
+## Not done yet
 
-Install on a connected device:
-
-```powershell
-npm run android:install:debug
-```
-
-## Release Signing
-
-Generate a keystore:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/generate-android-keystore.ps1
-```
-
-For a local non-interactive release signing setup, generate the keystore and ignored `android/key.properties` file:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/generate-android-keystore.ps1 -NonInteractive -WriteProperties
-```
-
-Back up both `android/app/breedingplanner.keystore` and `android/key.properties`. They are intentionally ignored by git.
-
-Set signing variables before release builds:
-
-```powershell
-$env:BREEDING_PLANNER_KEYSTORE_FILE='D:\Git Clone\Breeding-planner\android\app\breedingplanner.keystore'
-$env:BREEDING_PLANNER_KEYSTORE_PASSWORD='your-store-password'
-$env:BREEDING_PLANNER_KEY_ALIAS='bpkey'
-$env:BREEDING_PLANNER_KEY_PASSWORD='your-key-password'
-```
-
-Do not commit the keystore or passwords.
-
-## Release APK
-
-```powershell
-npm run android:release:apk
-```
-
-Output:
-
-```text
-dist/android/app-release.apk
-```
-
-Direct installation:
-
-```powershell
-adb install -r dist/android/app-release.apk
-```
-
-Or transfer the APK to a phone, enable `Install unknown apps`, and open the APK.
-
-Release builds are signed when `android/key.properties` or the signing environment variables are present. R8 shrinking is opt-in because it can be memory-heavy on local machines:
-
-```powershell
-cd android
-.\gradlew assembleRelease -PenableReleaseOptimization
-```
-
-## Play Store AAB
-
-```powershell
-npm run android:release:aab
-```
-
-Output:
-
-```text
-dist/android/app-release.aab
-```
-
-Upload the AAB to Google Play Console. Use the internal testing track first, invite testers by email, then promote after validation.
-
-## All Release Artifacts
-
-```powershell
-npm run android:release:all
-```
-
-This builds both:
-
-- `dist/android/app-release.apk`
-- `dist/android/app-release.aab`
-
-## Permissions
-
-Configured Android permissions:
-
-- Camera: QR scanning
-- Internet and network state: backend access and sync
-- Photos/storage: animal photos/documents
-- Notifications: future push alerts
-
-## Mobile App Behavior
-
-The app supports:
-
-- Login with JWT-backed shared backend authentication
-- QR scan to animal profile
-- Fast feed, weight, shed, note, clean, and water logging
-- Offline local queue and later sync
-- Tier-based access checks with locked feature notices
-- Rack mode, tasks, communication confirmations, lab and sales surfaces
-
-## Verification Checklist
-
-Before publishing:
-
-- Build debug APK and install on a real Android device.
-- Login against the target backend.
-- Scan a QR and confirm the correct animal opens.
-- Log feed, weight, shed, clean, water, and note.
-- Turn off internet, log an action, reconnect, and sync.
-- Confirm locked tier features show upgrade messages.
-- Build signed release APK.
-- Build signed release AAB.
-- Upload AAB to Play Console internal testing.
+- Push notifications: the plugin and permission are present, no Firebase project exists.
+- Cloud upload of animal photos: photos sync like on desktop (stripped from the cloud
+  snapshot, kept locally and in backups).
+- The orphaned root `android/` project is untouched and should not be used.

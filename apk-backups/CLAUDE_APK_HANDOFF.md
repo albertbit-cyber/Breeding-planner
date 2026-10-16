@@ -8,6 +8,33 @@ Both agents must use this same folder for APK handoff work so APK files, hashes,
 
 ## Current Status
 
+**Latest breeder APK (2026-10-13 16:11, 0.1.96): `app-release-2026-10-13-cloud-replace.apk`**
+SHA256 `08A453C43CF2BA98A0D0AE28205C8F3FF071C15DFEEEF5B1D3D6FF62497A746C`, package `com.serpentora.mobile`,
+versionCode 10096 / 0.1.96, release-signed (same certificate), staging backend. Everything in the 0.1.93 build below
+plus PR #18: signed in, restoring a backup previews the change and then replaces the cloud data, every device follows on
+its next sync, and Settings > Backups lists replaces with Undo. Needs the PR #18 backend on staging for the signed-in
+restore. Built from `build/apk-cloud-replace` @ `5e5a5ab`. Browser-verified, not run on the phone. Full entry in
+`APK_CHANGELOG.md`.
+
+**Previous breeder APK (2026-10-13, 0.1.93): `app-release-2026-10-13-device-storage-indexeddb.apk`**
+SHA256 `C5F3B222D748A1B50703D8E457BBD463924D08BFF896CB2F6A340F66B28B0033`, package `com.serpentora.mobile`,
+versionCode 10093 / 0.1.93, release-signed (same certificate, installs over the previous one and keeps its data), staging
+backend. Fixes "Local storage is full" when opening a backup on the phone: the collection moves from localStorage (~5 MB
+WebView cap) to IndexedDB on first launch, photos are stored once in their own table, restore is all-or-nothing with
+"Undo last restore", Settings > Backups shows storage use. Built from `feature/device-storage` @ `acc877e`, which has
+`main` merged in (so it carries `feature/mobile-rebuild` and the multi-device sync fix). Browser-verified, not run on the
+phone. Full entry in `APK_CHANGELOG.md`.
+
+**Previous breeder APK (2026-10-13): `app-release-2026-10-13-duplicate-log-collapse.apk`**
+SHA256 `A17DCF8248F770376BD5CB98D1A583FFE462F831CF8A7A7BD3497206333C4FAD`, package `com.serpentora.mobile`,
+versionCode 10089 / 0.1.89, release-signed, staging backend. Supersedes `app-release-2026-10-13-backup-picker-fix.apk`
+(0.1.88): the phone now collapses duplicated log entries instead of re-uploading them, after the staging
+database was cleaned of 224k copies the same day. Also carries the 0.1.88 fix: the phone's
+file picker no longer greys out a transferred `.bpbackup`. First build in which the phone runs the real
+Serpentora app instead of the separate mobile app (deleted). Backups save through the share sheet; new Field
+tab for scan and quick logs. Built from `feature/mobile-rebuild`, not yet merged. Not run on a device. Build
+guide: `docs/mobile/android-build-and-install.md`. Everything below this paragraph predates the rebuild.
+
 **IMPORTANT — two separate Android projects (discovered 2026-07-27):** this repo contains two divergent Capacitor Android projects that both use appId `com.breedingplanner.mobile`: the repo-root `android/` (legacy, still named "Breeding Planner Mobile", last touched 2026-07-03, built via `npm run android:release:apk` at repo root) and `breeding-app-breeder/android/` (the actively developed one — matches the real "Serpentora" branding and icons). Because they share an appId, whichever one you build+install last silently replaces the other on-device. Every APK in the inventory below except the 2026-07-27 entry was built from the **root** project. Root's `scripts/android-build.ps1` was never repointed at `breeding-app-breeder/` (known issue, see apk-workflow reference memory) — building `breeding-app-breeder` for real requires running `npm run build` + `npx cap sync android` + `gradlew assembleDebug`/`assembleRelease` directly inside `breeding-app-breeder/` (its copy of `scripts/android-build.ps1` is present but NOT wired up — it still calls nonexistent `build:android:dev/staging/prod` npm scripts and will fail). This should be fixed properly (either repoint root's pipeline at `breeding-app-breeder`, or retire root's `android/` project entirely) rather than worked around indefinitely.
 
 Most recent **breeder** app build overall, and the first one built from the correct (`breeding-app-breeder/`) project:

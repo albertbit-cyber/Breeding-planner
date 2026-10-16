@@ -2,8 +2,9 @@
  * One female's breeding card.
  *
  * Layout (top to bottom): identity and status; compact counts and milestone dates; review
- * prompts; fast actions; then three tabs. Overview holds the males with their history, planned
- * follow-ups, forecasts, the timeline and previous cycles. Follicles is this female's own
+ * prompts; fast actions; then three tabs. Overview opens with the pairing plan and milestones
+ * (PairingPlanPanel), then the males with their history, forecasts, the timeline and previous
+ * cycles. Follicles is this female's own
  * follicle record: chart, trend and every examination. Clutch and hatchlings holds the egg and
  * hatchling outcome and the step that completes the cycle: registering the hatchlings.
  */
@@ -26,13 +27,14 @@ import { isIncubating } from '../domain/pairingView';
 import { cycleClock } from '../domain/cycleClock';
 import { CycleClock } from './CycleClock';
 import { examsForCycle, latestMeasurement, latestChange } from '../domain/follicles';
-import { pendingPlannedPairings } from '../domain/followUps';
+import { upcomingPairings } from '../domain/pairingPlan';
 import { evaluateReview, buildForecasts } from '../domain/reviewRules';
 import { cyclesForFemale } from '../domain/cycleModel';
 import { diffDays, todayYmd } from '../domain/dates';
 import { FollicleChart } from './FollicleChart';
 import { CycleTimeline } from './CycleTimeline';
 import { PreviousCycles } from './PreviousCycles';
+import { PairingPlanPanel } from './PairingPlanPanel';
 import { animalName, formatDate, formatDateTime, formatMm, DASH, STATUS_CLASS } from './format';
 import { stageLabel, statusLabel, eventTypeLabel, lockStatusLabel, closureOutcomeLabel, flagLabel, legacyReasonLabel, certaintyLabel, methodLabel, resultLabel } from './labels';
 import { help } from '../../help/help';
@@ -102,7 +104,7 @@ export function BreedingCard({
   const review = useMemo(() => evaluateReview(cycle, cycleExams, settings, { today }), [cycle, cycleExams, settings, today]);
   const forecasts = useMemo(() => buildForecasts({ cycle, cycles: femaleCycles, exams, collectionCycles: cycles, settings, today }), [cycle, femaleCycles, exams, cycles, settings, today]);
   const flags = useMemo(() => [...chronologyFlags(cycle), ...duplicateFlags(cycle)], [cycle]);
-  const pending = useMemo(() => pendingPlannedPairings(cycle), [cycle]);
+  const upcoming = useMemo(() => upcomingPairings(cycle, { today }), [cycle, today]);
   const participated = cycle.males.filter((m) => m.state === MALE_STATE.PARTICIPATED);
   const openReviewFlags = (cycle.reviewFlags || []).filter((f) => !f.resolvedAt);
   const isClosed = cycle.status === CYCLE_STATUS.CLOSED;
@@ -189,7 +191,7 @@ export function BreedingCard({
           <span>{t('breeding.card.sessionsCount', { defaultValue: '{{count}} sessions', count: countSessions(cycle) })}</span>
           <span>{t('breeding.card.locksCount', { defaultValue: '{{count}} observed locks', count: countObservedLocks(cycle) })}</span>
           <span>{t('breeding.card.malesCount', { defaultValue: '{{count}} males', count: cycle.males.length })}</span>
-          {pending[0] ? <span>{t('breeding.card.nextPlanned', { defaultValue: 'Next planned pairing {{date}}', date: formatDate(pending[0].date) })}</span> : null}
+          {upcoming[0] ? <span>{t('breeding.card.nextPlanned', { defaultValue: 'Next planned pairing {{date}}', date: formatDate(upcoming[0].plannedDate) })}</span> : null}
           {(openReviewFlags.length || flags.length || cycle.legacy?.reviewNeeded) ? <span className="text-amber-700">{t('breeding.card.needsReview', { defaultValue: 'Needs review' })}</span> : null}
           <span className="ms-auto font-semibold">{t('breeding.card.viewDetails', { defaultValue: 'View details ›' })}</span>
         </div>
@@ -262,7 +264,6 @@ export function BreedingCard({
         <button {...help('card-add-exam')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'exam', femaleId: cycle.femaleId })}>{t('breeding.action.exam', { defaultValue: '+ Follicle exam' })}</button>
         {!isClosed ? <button {...help('card-add-milestone')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'milestone', cycleId: cycle.id })}>{t('breeding.action.milestone', { defaultValue: '+ Milestone' })}</button> : null}
         {!isClosed && cycle.reproductionMode !== 'live_bearing' ? <button {...help('card-eggs-laid')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'clutch', cycleId: cycle.id })}>{t('breeding.action.eggsLaid', { defaultValue: 'Eggs laid' })}</button> : null}
-        {!isClosed ? <button {...help('card-plan-pairing')} type="button" className={smallBtn} onClick={() => openDialog({ kind: 'planned', cycleId: cycle.id })}>{t('breeding.action.plan', { defaultValue: 'Plan pairing' })}</button> : null}
         {!isClosed && !isPaused ? <button {...help('card-pause')} type="button" className={smallBtn} onClick={() => { const reason = window.prompt(t('breeding.action.pauseReason', { defaultValue: 'Reason for pausing (optional)' }), ''); if (reason !== null) run(() => actions.pauseCycle(cycle.id, { reason })); }}>{t('breeding.action.pause', { defaultValue: 'Pause' })}</button> : null}
         {isPaused ? <button {...help('card-resume')} type="button" className={smallBtn} onClick={() => run(() => actions.resumeCycle(cycle.id))}>{t('breeding.action.resume', { defaultValue: 'Resume' })}</button> : null}
         {!isClosed && cycle.reproductionMode !== 'live_bearing' && (milestoneDate('egg_laying') || cycle.clutch.eggsTotal !== null) ? <button {...help('card-log-hatch')} type="button" className={incubating ? primaryBtn : smallBtn} onClick={() => openDialog({ kind: 'logHatch', cycleId: cycle.id })}>{t('breeding.action.logHatch', { defaultValue: 'Log hatch' })}</button> : null}
@@ -312,6 +313,8 @@ export function BreedingCard({
 
       {section === 'overview' ? (
         <>
+        <PairingPlanPanel cycle={cycle} snakesById={snakesById} actions={actions} run={run} isClosed={isClosed} />
+
         {/* Males */}
         <div className="mt-3 rounded-xl border bg-white p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -402,30 +405,8 @@ export function BreedingCard({
           ) : null}
         </div>
 
-        {/* Planned follow-ups and forecasts */}
-        <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <div className="rounded-xl border bg-white p-3">
-            <div {...help('card-planned')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.plannedTitle', { defaultValue: 'Planned pairings (reminders)' })}</div>
-            {pending.length ? (
-              <ul className="space-y-1 text-xs">
-                {pending.map((planned) => (
-                  <li key={planned.id} className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold tabular-nums">{formatDate(planned.date)}</span>
-                    <span>{animalName(snakesById?.get?.(planned.maleId), planned.maleId)}</span>
-                    <span className="text-neutral-500">{planned.origin === 'auto_after_lock' ? t('breeding.planned.auto', { defaultValue: 'proposed one calendar month after an observed lock' }) : t('breeding.planned.manual', { defaultValue: 'set by you' })}{planned.manuallyAdjusted && planned.origin === 'auto_after_lock' ? ` · ${t('breeding.planned.adjusted', { defaultValue: 'date adjusted' })}` : ''}</span>
-                    {planned.date < today ? <span className="text-amber-700">{t('breeding.planned.overdue', { defaultValue: 'overdue' })}</span> : null}
-                    <span className="ms-auto flex gap-1">
-                      <button {...help('card-planned-record')} type="button" className="underline" onClick={() => openDialog({ kind: 'pairing', cycleId: cycle.id, femaleId: cycle.femaleId, defaultMaleId: planned.maleId, defaultDate: planned.date })}>{t('breeding.planned.record', { defaultValue: 'Record session' })}</button>
-                      <button {...help('card-planned-move')} type="button" className="underline" onClick={() => openDialog({ kind: 'reschedule', cycleId: cycle.id, plannedId: planned.id })}>{t('breeding.planned.reschedule', { defaultValue: 'Move' })}</button>
-                      <button {...help('card-planned-skip')} type="button" className="underline" onClick={() => run(() => actions.skipPlanned(cycle.id, planned.id))}>{t('breeding.planned.skip', { defaultValue: 'Skip' })}</button>
-                      <button {...help('card-planned-cancel')} type="button" className="underline" onClick={() => run(() => actions.cancelPlanned(cycle.id, planned.id))}>{t('breeding.planned.cancel', { defaultValue: 'Cancel' })}</button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : <div className="text-xs text-neutral-500">{isClosed || isPaused ? t('breeding.planned.noneClosed', { defaultValue: 'No reminders while the card is paused or closed.' }) : milestoneDate('ovulation') ? t('breeding.planned.noneOvulated', { defaultValue: 'Ovulation recorded: no further pairing proposals.' }) : t('breeding.planned.none', { defaultValue: 'None pending. An observed lock proposes the next pairing one calendar month later.' })}</div>}
-            <div className="mt-1 text-[11px] text-neutral-500">{t('breeding.planned.channels', { defaultValue: 'Reminders appear in the Calendar and, when enabled in your notification settings, by email. There are no other channels.' })}</div>
-          </div>
+        {/* Forecasts */}
+        <div className="mt-3">
           <div className="rounded-xl border bg-white p-3">
             <div {...help('card-forecast')} className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 mb-1">{t('breeding.card.forecastTitle', { defaultValue: 'Expected windows (history-based)' })}</div>
             {forecasts.windows?.length ? (

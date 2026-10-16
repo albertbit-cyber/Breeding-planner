@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { authHeaders, backendUrl, breederFrontendUrl, expect, installBreederAuthInPage } from "./helpers.js";
+import { authHeaders, backendUrl, breederFrontendUrl, expect, installBreederAuthInPage, readDeviceKey } from "./helpers.js";
 
 /**
  * A backup file replaces the cloud, and every device follows: the keeper restores a file on one
@@ -41,18 +41,18 @@ const cloudAnimals = async (request: any, token: string) => {
   return { ids: (body.animals as any[]).map((animal) => animal.id).sort(), body };
 };
 
-const storedIds = (page: any) => page.evaluate((key: string) => {
+const storedIds = async (page: any) => {
   try {
-    return (JSON.parse(localStorage.getItem(key) || "[]") as any[])
+    return (JSON.parse((await readDeviceKey(page, SNAKES_KEY)) || "[]") as any[])
       .filter((animal) => animal && !animal.isDemo)
       .map((animal) => animal.id)
       .sort();
   } catch {
     return [];
   }
-}, SNAKES_KEY);
+};
 
-const storedValue = (page: any, key: string) => page.evaluate((storageKey: string) => localStorage.getItem(storageKey), key);
+const storedValue = (page: any, key: string) => readDeviceKey(page, key);
 
 const openDevice = async (browser: any, auth: any) => {
   // An empty storage state: the project's default one signs in as the shared seed breeder.

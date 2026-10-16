@@ -286,3 +286,35 @@ export const openOrderGeneticTest = async (page) => {
   await editorMoreActions(page).click();
   await page.getByRole("menuitem", { name: /Order Genetic Test/i }).click();
 };
+
+// Since the collection moved to IndexedDB (src/platform/deviceStore.js), the animals, pairings
+// and breeding records live in the "serpentora-device" database, while small preferences stay in
+// localStorage. Reads a key from wherever the app keeps it, as the raw stored string.
+export const readDeviceKey = (page, key) => page.evaluate(async (storageKey) => {
+  const fromIndexedDb = await new Promise((resolve) => {
+    try {
+      const open = indexedDB.open("serpentora-device");
+      open.onerror = () => resolve(null);
+      // The app has not created its database yet; do not create it from the test.
+      open.onupgradeneeded = () => {
+        open.transaction.abort();
+        resolve(null);
+      };
+      open.onsuccess = () => {
+        const db = open.result;
+        if (!db.objectStoreNames.contains("kv")) {
+          db.close();
+          resolve(null);
+          return;
+        }
+        const request = db.transaction("kv", "readonly").objectStore("kv").get(storageKey);
+        request.onsuccess = () => { db.close(); resolve(request.result ?? null); };
+        request.onerror = () => { db.close(); resolve(null); };
+      };
+    } catch {
+      resolve(null);
+    }
+  });
+  if (fromIndexedDb !== null) return typeof fromIndexedDb === "string" ? fromIndexedDb : JSON.stringify(fromIndexedDb);
+  return localStorage.getItem(storageKey);
+}, key);

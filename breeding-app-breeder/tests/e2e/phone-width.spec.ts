@@ -49,13 +49,13 @@ const expectExplains = async (page: Page, where: string) => {
 };
 
 test("every phone destination renders or explains, and nothing scrolls sideways", async ({ page }) => {
-  // One walk through eleven destinations on a dev server; the default 45s is sized for one page.
+  // One walk through twelve destinations on a dev server; the default 45s is sized for one page.
   test.setTimeout(150_000);
   await page.goto("/#/breeder");
   await expect(bottomBar(page)).toBeVisible();
 
-  // Dashboard is in the bottom bar and is where a fresh visit lands.
-  await expect(bottomBar(page).getByRole("button", { name: "Dashboard", exact: true })).toHaveAttribute("aria-current", "page");
+  // Home (the dashboard) is in the bottom bar and is where a fresh visit lands.
+  await expect(bottomBar(page).getByRole("button", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "Species" })).toBeVisible();
   await expectNoHorizontalScroll(page, "dashboard");
 
@@ -70,14 +70,18 @@ test("every phone destination renders or explains, and nothing scrolls sideways"
   await tapMore(page, "Family Tree");
   await expectExplains(page, "Family Tree");
 
+  // The Field tab works without a species: scan, search and feeds due across the collection.
+  await tapBottom(page, "Field");
+  await expect(gate(page), "Field shows the species gate").toHaveCount(0);
+  await expect(page.getByPlaceholder("Name, ID or morph")).toBeVisible();
+  await expectNoHorizontalScroll(page, "field");
+
   // Global destinations render.
-  await tapBottom(page, "Calendar");
-  await expectRenders(page, "Calendar");
-  for (const name of ["Quarantine", "Spaces", "Lab tests"]) {
+  for (const name of ["Calendar", "Quarantine", "Spaces", "Lab tests"]) {
     await tapMore(page, name);
     await expectRenders(page, name);
   }
-  await tapBottom(page, "Settings");
+  await tapMore(page, "Settings");
   await expectRenders(page, "Settings");
   await expectNoHorizontalScroll(page, "settings");
 
@@ -105,8 +109,8 @@ test("every phone destination renders or explains, and nothing scrolls sideways"
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("button", { name: "Import from MorphMarket" })).toHaveCount(0);
 
-  // Dashboard from inside a species leaves it, as the desktop tab does.
-  await tapBottom(page, "Dashboard");
+  // Home from inside a species leaves it, as the desktop tab does.
+  await tapBottom(page, "Home");
   await expect(page.getByRole("heading", { name: "Species" })).toBeVisible();
   await tapBottom(page, "Animals");
   await expectExplains(page, "Animals after leaving a species");

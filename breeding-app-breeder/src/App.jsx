@@ -253,6 +253,39 @@ import {
 } from "./features/labels/presets";
 import defaultMorphAliasesJson from "./config/morphAliases.json";
 import {
+  BACKUP_FILE_DOT_EXTENSION,
+  BACKUP_FILE_MIME,
+  assertBackupFileSelectable,
+  assertRestorableBackup,
+  buildBackupFilename,
+  describeBackupPayload,
+  fileSafeName,
+  isoToFileTimestamp,
+  saveBackupFile,
+} from "./features/backup/backupFile.js";
+import { haptic, isNativeShell, onBackButton } from "./platform/index.js";
+import { DEVICE_STORE_DB_NAME, STORAGE_FULL_EVENT, getDeviceStore } from "./platform/deviceStore.js";
+import { reattachCurrentPhotos, stripInlinePhotos } from "./services/backupPhotos.js";
+import DeviceStorageSummary from "./components/DeviceStorageSummary.jsx";
+import FieldScreen from "./features/field/FieldScreen.jsx";
+import QuickLogSheet from "./features/field/QuickLogSheet.jsx";
+import { appendLog as appendLogToSnake, pushRecent as pushRecentAnimal, removeLog as removeLogFromSnake } from "./features/field/fieldLogic.js";
+import {
+  Brain as BrainIcon,
+  CalendarBlank as CalendarIcon,
+  Cards as AnimalsIcon,
+  DotsThreeOutline as MoreIcon,
+  Flask as LabIcon,
+  ForkKnife as FeedPrepIcon,
+  GearSix as SettingsIcon,
+  HeartStraight as BreedingIcon,
+  House as HomeIcon,
+  QrCode as FieldIcon,
+  ShieldCheck as QuarantineIcon,
+  TreeStructure as FamilyTreeIcon,
+  Warehouse as SpacesIcon,
+} from "@phosphor-icons/react";
+import {
   LOGO_PRESET,
   PHOTO_PRESET,
   mapWithConcurrency,
@@ -1219,6 +1252,8 @@ const STORAGE_KEYS = {
   backupSettings: 'breedingPlannerBackupSettings',
   backupSnapshot: 'breedingPlannerBackupSnapshot',
   backupVault: 'breedingPlannerBackupVault',
+  // The collection as it was just before the last restore, so the restore can be undone.
+  preRestoreSnapshot: 'breedingPlannerPreRestoreSnapshot',
   // The cloud data generation this device last loaded (see adoptReplacedCloudData).
   dataGeneration: 'breedingPlannerDataGeneration',
   spaces: 'breedingPlannerSpaces',
@@ -1292,12 +1327,11 @@ function compareAnimalsBySort(a, b, sortBy, sortDir) {
 }
 const DEFAULT_FAVICON_HREF = `${process.env.PUBLIC_URL || ''}/app-icons/icon_512x512.png`;
 const BACKUP_FREQUENCIES = ['off', 'nightly', 'weekly', 'monthly'];
-const DEFAULT_BACKUP_LIMIT = 20;
+// Vault copies leave photos out, but the phone still keeps fewer: the backup file saved through
+// the share sheet is the real backup there, and the vault is only a set of undo points.
+const DEFAULT_BACKUP_LIMIT = isNativeShell ? 5 : 20;
 const VAULT_LIMIT_OPTIONS = [5, 10, 20, 50, 100, 200, 'unlimited'];
-const BACKUP_FILE_EXTENSION = 'bpbackup';
-const BACKUP_FILE_DOT_EXTENSION = `.${BACKUP_FILE_EXTENSION}`;
-const BACKUP_FILE_MIME = 'application/x-breeding-planner-backup+json';
-const buildBackupFilename = (basename, timestamp) => `${basename}-${timestamp}${BACKUP_FILE_DOT_EXTENSION}`;
+// The backup file format and the save path live in features/backup; see backupFile.js.
 const DEFAULT_LAST_FEED_DEFAULTS = {
   feed: 'Mouse',
   size: 'pinky',
@@ -2766,7 +2800,7 @@ const ID_TEMPLATE_TOKENS = [
 function loadStoredJson(key, fallback) {
   if (typeof window === 'undefined') return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = getDeviceStore().getItem(key);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return parsed ?? fallback;
@@ -2776,12 +2810,20 @@ function loadStoredJson(key, fallback) {
   }
 }
 
+// The device store keeps the collection in IndexedDB behind an in-memory cache, so this stays
+// synchronous. A write that cannot reach the device raises STORAGE_FULL_EVENT from the store,
+// which the app turns into one alert.
 function saveStoredJson(key, value) {
   if (typeof window === 'undefined') return;
+  let text;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    text = JSON.stringify(value);
   } catch (err) {
-    console.warn(`Failed to persist ${key} to storage`, err);
+    console.warn(`Failed to serialise ${key} for storage`, err);
+    return;
+  }
+  if (!getDeviceStore().setItem(key, text)) {
+    console.warn(`Failed to persist ${key} to storage`);
   }
 }
 
@@ -3162,6 +3204,13 @@ function prepareAnimalForBackend(snake) {
   if (!snake || typeof snake !== 'object') return snake;
   const cleaned = sanitizeBackendMediaValue(snake);
   if (!cleaned || typeof cleaned !== 'object') return cleaned;
+  // A cover photo stored on the device is left out of the upload, but its edit stamp went up
+  // with it, so the server took the missing value for a deliberate removal and every device
+  // dropped the cover on its next sync. Without the stamp the server keeps what it had.
+  if (isEmbeddedMediaString(snake.imageUrl) && cleaned.fieldUpdatedAt && typeof cleaned.fieldUpdatedAt === 'object' && 'imageUrl' in cleaned.fieldUpdatedAt) {
+    const { imageUrl: _deviceOnlyStamp, ...fieldUpdatedAt } = cleaned.fieldUpdatedAt;
+    cleaned.fieldUpdatedAt = fieldUpdatedAt;
+  }
   if (!Array.isArray(cleaned.photos)) return cleaned;
   const photos = cleaned.photos.filter(photo => photo && typeof photo.url === 'string' && photo.url.trim());
   return photos.length === cleaned.photos.length ? cleaned : { ...cleaned, photos };
@@ -3192,6 +3241,9 @@ function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombs
   }
   return payload;
 }
+
+// Tabs that live behind the phone's More sheet rather than on the bar itself.
+const MOBILE_MORE_TABS = ['calendar', 'spaces', 'quarantine', 'advisor', 'familyTree', 'shedTerminal', 'setup'];
 
 function getSyncRecordKey(record, fallbackPrefix, index) {
   const candidates = [
@@ -3329,6 +3381,12 @@ function mergeAnimalRecord(localAnimal, backendAnimal) {
   if (removedCopy) return sanitizeSnakeRecord(removedCopy);
   const merged = mergeSyncRecord(backendAnimal, localAnimal, ANIMAL_MERGE);
   if (Array.isArray(merged.photos)) merged.photos = merged.photos.slice(0, MAX_PHOTOS_PER_SNAKE);
+  // The cloud never holds a device-stored cover photo, so its missing cover is no removal. The
+  // cover stays while its photo is still on the animal (a photo deleted elsewhere takes it along).
+  if (merged.imageUrl === undefined && backendAnimal.imageUrl === undefined && isEmbeddedMediaString(localAnimal.imageUrl)
+    && Array.isArray(merged.photos) && merged.photos.some(photo => photo?.url === localAnimal.imageUrl)) {
+    merged.imageUrl = localAnimal.imageUrl;
+  }
   return sanitizeSnakeRecord(merged);
 }
 
@@ -6958,7 +7016,7 @@ export default function BreedingPlannerApp() {
 
   const [syncTombstones, setSyncTombstones] = useState(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem('bpSyncTombstones') || '{"snakes":{},"pairings":{}}');
+      const parsed = loadStoredJson('bpSyncTombstones', { snakes: {}, pairings: {} });
       return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {}, ...parsed };
     } catch { return { snakes: {}, pairings: {}, breedingCycles: {}, follicleExams: {} }; }
   });
@@ -6966,11 +7024,19 @@ export default function BreedingPlannerApp() {
   useEffect(() => {
     syncTombstonesRef.current = syncTombstones;
     setRetiredSnakeIds(Object.keys(syncTombstones?.snakes || {}));
-    try { localStorage.setItem('bpSyncTombstones', JSON.stringify(syncTombstones)); } catch {}
+    saveStoredJson('bpSyncTombstones', syncTombstones);
   }, [syncTombstones]);
   // The dashboard is the landing page; a species workspace is entered from it. A null scope
   // means "no species chosen", which is only valid on the dashboard and the global tabs.
-  const [tab, setTab] = useState('dashboard');
+  // The phone starts on Field (scan, due feeds, recent animals); the desktop on the dashboard.
+  const [tab, setTab] = useState(isNativeShell ? 'field' : 'dashboard');
+  // Animals opened on this device, newest first. Device-local on purpose: it is a shortcut
+  // list for the keeper holding this phone, not collection data.
+  const [recentAnimalIds, setRecentAnimalIds] = useState(() => {
+    const stored = loadStoredJson('serpentoraRecentAnimals', []);
+    return Array.isArray(stored) ? stored.map(String) : [];
+  });
+  useEffect(() => { saveStoredJson('serpentoraRecentAnimals', recentAnimalIds); }, [recentAnimalIds]);
   const [speciesScope, setSpeciesScope] = useState(null);
 
   // Animals recorded before species tracking carry no species and resolve to ball python on
@@ -7373,6 +7439,11 @@ export default function BreedingPlannerApp() {
   const [backupSettings, setBackupSettings] = useState(() => normalizeBackupSettings(loadStoredJson(STORAGE_KEYS.backupSettings, null)));
   const [autoBackupSnapshot, setAutoBackupSnapshot] = useState(() => normalizeBackupSnapshot(loadStoredJson(STORAGE_KEYS.backupSnapshot, null)));
   const [backupVault, setBackupVault] = useState(() => normalizeBackupVault(loadStoredJson(STORAGE_KEYS.backupVault, [])));
+  // Only the summary lives in state; the full copy stays in the device store until it is used.
+  const [preRestoreInfo, setPreRestoreInfo] = useState(() => {
+    const stored = loadStoredJson(STORAGE_KEYS.preRestoreSnapshot, null);
+    return stored?.payload ? { savedAt: stored.savedAt || null, animals: Number(stored.animals) || 0 } : null;
+  });
   const [lastFeedDefaults, setLastFeedDefaults] = useState(() => {
     const stored = loadStoredJson(STORAGE_KEYS.lastFeedDefaults, DEFAULT_LAST_FEED_DEFAULTS) || DEFAULT_LAST_FEED_DEFAULTS;
     return { ...DEFAULT_LAST_FEED_DEFAULTS, ...stored };
@@ -7484,6 +7555,10 @@ export default function BreedingPlannerApp() {
   // The account's data generation this device last loaded, kept across restarts: a device that
   // was closed while the account was replaced must still notice on its next start.
   const dataGenerationRef = useRef(Number(loadStoredJson(STORAGE_KEYS.dataGeneration, 0)) || 0);
+  // The animals of a backup file this device just replaced the cloud with. The cloud copy has
+  // no photos, so loading the replace takes them from the file, not only from what the device
+  // held before the restore.
+  const restoredFileSnakesRef = useRef(null);
   // Filled in once the backup vault exists further down, so loading a replace can first keep
   // this device's own copy.
   const addBackupVaultEntryRef = useRef(null);
@@ -8045,7 +8120,10 @@ export default function BreedingPlannerApp() {
     remoteSnapshotRef.current = backendSnapshot;
     remoteCursorRef.current = fullSnapshot?.serverTime || null;
 
-    const shown = normalizeCloudSnapshotForDisplay({ ...backendSnapshot, snakes: keepLocalPhotos(backendSnapshot.snakes, local.snakes) }, local);
+    const fileSnakes = restoredFileSnakesRef.current || [];
+    restoredFileSnakesRef.current = null;
+    const withPhotos = keepLocalPhotos(keepLocalPhotos(backendSnapshot.snakes, fileSnakes), local.snakes);
+    const shown = normalizeCloudSnapshotForDisplay({ ...backendSnapshot, snakes: withPhotos }, local);
     setSyncedSnakes(shown.snakes);
     setSyncedPairings(shown.pairings);
     setSyncedBreedingCycles(shown.breedingCycles);
@@ -8905,13 +8983,7 @@ export default function BreedingPlannerApp() {
 
   useEffect(() => {
     if (!autoBackupSnapshot) {
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.removeItem(STORAGE_KEYS.backupSnapshot);
-        } catch (err) {
-          console.warn('Failed to clear backup snapshot', err);
-        }
-      }
+      getDeviceStore().removeItem(STORAGE_KEYS.backupSnapshot);
       return;
     }
     saveStoredJson(STORAGE_KEYS.backupSnapshot, autoBackupSnapshot);
@@ -8944,6 +9016,8 @@ export default function BreedingPlannerApp() {
     follicleExams,
     breedingSettings,
     groups,
+    // `groups` is only the open species' list; a restore needs all of them.
+    groupsBySpecies,
     morphAliases: normalizeMorphAliasDatabase(morphAliases),
     geneAliases: mergeGeneAliasRows(geneAliases),
     leucisticType: lastLeucisticType === 'blackEye' ? 'blackEye' : 'bel',
@@ -8954,17 +9028,19 @@ export default function BreedingPlannerApp() {
     heatRacks,
     terrariums,
     spaces: buildLegacySpacesSnapshot(rooms, heatRacks, terrariums),
-  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
+  }), [snakes, pairings, breedingCycles, follicleExams, breedingSettings, groups, groupsBySpecies, morphAliases, geneAliases, lastLeucisticType, breederInfo, theme, lastFeedDefaults, rooms, heatRacks, terrariums]);
 
-  // Restore on this device only: used when the app is not signed in to the cloud.
-  const restoreBackupOnThisDevice = useCallback((payload) => {
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Backup file is invalid.');
-    }
+  // Restoring on this device (signed out, or undoing a local restore) replaces the collection, so it must either keep the whole backup or change
+  // nothing. The restored data and a copy of the current collection (for undo) are written to
+  // the device in one transaction first; only once that succeeds does the app show them.
+  // Before this, the screen showed the backup while the device kept whatever fitted.
+  const restoreBackupOnThisDevice = useCallback(async (payload, { undo = false } = {}) => {
+    assertRestorableBackup(payload);
 
-    const incomingSnakes = Array.isArray(payload.snakes)
+    let incomingSnakes = Array.isArray(payload.snakes)
       ? payload.snakes.map(sanitizeSnakeRecord).filter(Boolean)
       : [];
+    if (payload.photosOmitted) incomingSnakes = reattachCurrentPhotos(incomingSnakes, snakes);
     const incomingPairings = Array.isArray(payload.pairings)
       ? payload.pairings.map(sanitizePairingRecord).filter(Boolean)
       : [];
@@ -8973,37 +9049,53 @@ export default function BreedingPlannerApp() {
       throw new Error('Backup file does not contain any animals or pairings.');
     }
 
-    // Written before anything changes on screen. A restore that did not fit in this device's
-    // storage (a phone keeps a few MB) used to show the data until the app closed and then lose
-    // all of it; now it is refused while the old data is still intact.
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const previous = {};
-      const written = [[STORAGE_KEYS.snakes, incomingSnakes], [STORAGE_KEYS.pairings, incomingPairings]];
+    const incomingCycles = Array.isArray(payload.breedingCycles)
+      ? payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean)
+      : null;
+    const incomingExams = Array.isArray(payload.follicleExams)
+      ? payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean)
+      : null;
+    const incomingGroupsBySpecies = migrateFlatGroups(payload.groups, payload.groupsBySpecies);
+
+    // Electron keeps the collection in its own file through the bridge.
+    const bridge = typeof window !== 'undefined' ? window.electronAPI : null;
+    if (!bridge?.saveData) {
+      const store = getDeviceStore();
+      const entries = {
+        [STORAGE_KEYS.snakes]: JSON.stringify(incomingSnakes),
+        [STORAGE_KEYS.pairings]: JSON.stringify(incomingPairings),
+        [STORAGE_KEYS.groupsBySpecies]: JSON.stringify(incomingGroupsBySpecies),
+        [STORAGE_KEYS.groups]: JSON.stringify(flattenGroupsBySpecies(incomingGroupsBySpecies)),
+      };
+      if (incomingCycles) entries[STORAGE_KEYS.breedingCycles] = JSON.stringify(incomingCycles);
+      if (incomingExams) entries[STORAGE_KEYS.follicleExams] = JSON.stringify(incomingExams);
+      // The undo copy doubles what a restore writes; only IndexedDB has room for that.
+      let undoInfo = null;
+      if (!undo && store.status().mode === 'idb') {
+        const current = createBackupPayload();
+        undoInfo = { savedAt: new Date().toISOString(), animals: Array.isArray(current.snakes) ? current.snakes.length : 0 };
+        entries[STORAGE_KEYS.preRestoreSnapshot] = JSON.stringify({ ...undoInfo, payload: current });
+      }
       try {
-        written.forEach(([key, value]) => {
-          previous[key] = window.localStorage.getItem(key);
-          window.localStorage.setItem(key, JSON.stringify(value));
-        });
+        await store.commit(entries);
       } catch (err) {
-        Object.entries(previous).forEach(([key, value]) => {
-          try {
-            if (value === null) window.localStorage.removeItem(key);
-            else window.localStorage.setItem(key, value);
-          } catch {}
-        });
-        console.warn('Backup does not fit in local storage', err);
-        throw new Error(t('cloudReplace.tooLargeForDevice', {
-          defaultValue: 'This backup is too large to keep on this device, so nothing was restored. Sign in and restore it again: it then goes to the cloud, and this device loads it from there.',
-        }));
+        console.error('Restore could not be written to the device', err);
+        throw new Error(t('storage.restoreNotSaved', { defaultValue: 'This backup could not be saved on this device, so nothing was changed. Your current data is as it was.' }));
+      }
+      if (undo) {
+        store.removeItem(STORAGE_KEYS.preRestoreSnapshot);
+        setPreRestoreInfo(null);
+      } else if (undoInfo) {
+        setPreRestoreInfo(undoInfo);
       }
     }
 
     setSnakes(incomingSnakes);
     setPairings(incomingPairings);
-    if (Array.isArray(payload.breedingCycles)) setBreedingCycles(payload.breedingCycles.map(sanitizeBreedingCycleRecord).filter(Boolean));
-    if (Array.isArray(payload.follicleExams)) setFollicleExams(payload.follicleExams.map(sanitizeFollicleExamRecord).filter(Boolean));
+    if (incomingCycles) setBreedingCycles(incomingCycles);
+    if (incomingExams) setFollicleExams(incomingExams);
     if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
-    setGroupsBySpecies(migrateFlatGroups(payload.groups, payload.groupsBySpecies));
+    setGroupsBySpecies(incomingGroupsBySpecies);
 
     if (Array.isArray(payload.morphAliases)) {
       const normalizedAliases = normalizeMorphAliasDatabase(payload.morphAliases);
@@ -9036,7 +9128,17 @@ export default function BreedingPlannerApp() {
         : normalizeSpacesDataset(payload.spaces || []);
       setSpacesState(normalizedSpaces);
     }
-  }, [setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState, t]);
+  }, [snakes, createBackupPayload, t, setSnakes, setPairings, setGroups, setMorphAliases, setGeneAliases, setLastLeucisticType, setBreederInfo, setLastFeedDefaults, setSpacesState]);
+
+  // Puts the collection back as it was before the last restore.
+  const handleUndoRestore = useCallback(async () => {
+    const snapshot = loadStoredJson(STORAGE_KEYS.preRestoreSnapshot, null);
+    if (!snapshot?.payload) {
+      setPreRestoreInfo(null);
+      throw new Error(t('setup.backup.undoMissing', { defaultValue: 'There is no earlier collection to go back to.' }));
+    }
+    await restoreBackupOnThisDevice(snapshot.payload, { undo: true });
+  }, [restoreBackupOnThisDevice, t]);
 
   // Signed in, a restore replaces the cloud: the file becomes the whole account and every device
   // signed in to it switches over on its next sync. The keeper first sees what that changes.
@@ -9065,6 +9167,7 @@ export default function BreedingPlannerApp() {
     if (!confirmed) return { mode: 'cancelled' };
 
     const result = await replaceBreederData(upload);
+    restoredFileSnakesRef.current = (Array.isArray(payload.snakes) ? payload.snakes : []).map(sanitizeSnakeRecord).filter(Boolean);
     // Breeding settings are this device's own and never synced; the file's apply here.
     if (payload.breedingSettings && typeof payload.breedingSettings === 'object') setBreedingSettings(normalizeBreedingSettings(payload.breedingSettings));
     // This device loads the replace like every other one: its next sync sees the new generation.
@@ -9073,8 +9176,10 @@ export default function BreedingPlannerApp() {
   }, [plannerSyncState, runCloudBreederSync, showAppConfirm, t]);
 
   const handleRestoreBackup = useCallback(async (payload) => {
+    // A file from a newer app version is refused before either path touches anything.
+    assertRestorableBackup(payload);
     if (sharedBreederDataReady) return replaceCloudFromBackup(payload);
-    restoreBackupOnThisDevice(payload);
+    await restoreBackupOnThisDevice(payload);
     return { mode: 'local' };
   }, [replaceCloudFromBackup, restoreBackupOnThisDevice, sharedBreederDataReady]);
 
@@ -9097,7 +9202,7 @@ export default function BreedingPlannerApp() {
       createdAt: savedAt,
       updatedAt: savedAt,
       source,
-      payload,
+      payload: stripInlinePhotos(payload),
     });
     if (!entry) return null;
     const { maxVaultEntries: limit } = normalizeBackupSettings(backupSettings);
@@ -9147,7 +9252,7 @@ export default function BreedingPlannerApp() {
       return;
     }
     const savedAt = new Date().toISOString();
-    setAutoBackupSnapshot({ savedAt, payload: snapshotPayload });
+    setAutoBackupSnapshot({ savedAt, payload: stripInlinePhotos(snapshotPayload) });
     setBackupSettings(prev => normalizeBackupSettings({ ...(prev || {}), lastRun: savedAt }));
     addBackupVaultEntry(snapshotPayload, {
       source: 'auto',
@@ -9219,6 +9324,14 @@ export default function BreedingPlannerApp() {
       }
     }
 
+    // The collection's own database stays open for the writes the reset itself makes below,
+    // so it is emptied rather than deleted with the others.
+    try {
+      await getDeviceStore().clearAll();
+    } catch (error) {
+      console.warn('Failed to clear the device store during reset', error);
+    }
+
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.clear();
@@ -9236,7 +9349,7 @@ export default function BreedingPlannerApp() {
           await Promise.all(
             (Array.isArray(databases) ? databases : [])
               .map((db) => db?.name)
-              .filter(Boolean)
+              .filter((name) => name && name !== DEVICE_STORE_DB_NAME)
               .map((dbName) => new Promise((resolve) => {
                 const request = window.indexedDB.deleteDatabase(dbName);
                 request.onsuccess = () => resolve(true);
@@ -10149,15 +10262,7 @@ export default function BreedingPlannerApp() {
       <div {...help('animals-gene-colors')} className="bp-genetics-legend">
         <GeneLegend />
       </div>
-      <button type="button" {...help('animals-gene-colors')} className="bp-genetics-legend-toggle" onClick={() => {
-        const panel = document.getElementById('bp-legend-tooltip');
-        if (panel) { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
-      }}>
-        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
-      </button>
-      <div id="bp-legend-tooltip" style={{display: 'none', position: 'absolute', zIndex: 500, background: 'var(--sk-surface)', border: '1px solid var(--sk-border)', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--sk-shadow-2)'}}>
-        <GeneLegend />
-      </div>
+      <GeneLegendPopover />
     </div>
   );
 
@@ -10538,7 +10643,45 @@ export default function BreedingPlannerApp() {
     setTab('animals');
     setAnimalView(isArchivedAnimal(snake) ? 'archive' : (isFemaleSnake(snake) ? 'females' : 'males'));
     openSnakeEditor(snake);
+    setRecentAnimalIds(prev => pushRecentAnimal(prev, snake.id));
   }, [animalView, tab, speciesScope, openSnakeEditor]);
+
+  // Quick logs from the Field tab write straight into the store, like the desktop's quick-add,
+  // and the normal sync carries them. `fieldNotice` is the one-line confirmation with Undo.
+  const [quickLogTarget, setQuickLogTarget] = useState(null); // { snakeId, type }
+  const [fieldNotice, setFieldNotice] = useState(null);
+  const quickLogSnake = useMemo(
+    () => (quickLogTarget ? snakes.find(x => x.id === quickLogTarget.snakeId) || null : null),
+    [quickLogTarget, snakes]
+  );
+  const openQuickLog = useCallback((snake, type = 'feed') => {
+    if (!snake?.id) return;
+    setQuickLogTarget({ snakeId: snake.id, type });
+  }, []);
+  const closeQuickLog = useCallback(() => setQuickLogTarget(null), []);
+  const saveQuickLog = useCallback((type, key, entry) => {
+    const snakeId = quickLogTarget?.snakeId;
+    if (!snakeId) return;
+    setSnakes(prev => prev.map(x => (x.id === snakeId ? appendLogToSnake(x, key, entry) : x)));
+    if (key === 'feeds' && typeof setLastFeedDefaults === 'function') {
+      setLastFeedDefaults(prev => ({ ...prev, feed: entry.feed, size: entry.size, refused: false }));
+    }
+    const target = snakes.find(x => x.id === snakeId);
+    const name = target?.name || snakeId;
+    const message = type === 'feed'
+      ? (entry.refused
+        ? t('field.saved.refused', { name, defaultValue: '{{name}} refused.' })
+        : t('field.saved.fed', { name, defaultValue: '{{name}} fed.' }))
+      : type === 'weight' ? t('field.saved.weight', { name, grams: entry.grams, defaultValue: '{{name}}: {{grams}} g.' })
+      : type === 'shed' ? t('field.saved.shed', { name, defaultValue: 'Shed logged for {{name}}.' })
+      : t('field.saved.clean', { name, defaultValue: '{{name}} cleaned.' });
+    setFieldNotice({
+      message,
+      onUndo: () => setSnakes(prev => prev.map(x => (x.id === snakeId ? removeLogFromSnake(x, key, entry.id) : x))),
+    });
+    haptic('success');
+    setQuickLogTarget(null);
+  }, [quickLogTarget, snakes, setSnakes, setLastFeedDefaults, t]);
 
   const editDraftSpeciesId = editSnakeDraft ? resolveSpeciesId(editSnakeDraft.species) : '';
 
@@ -12264,6 +12407,64 @@ export default function BreedingPlannerApp() {
     }
   }, [pairings, snakes, showAppAlert]);
 
+  // Hardware back on the phone. Closes whatever is on top first, then returns to the
+  // dashboard, and only from there lets Android send the app to the background.
+  const backStateRef = useRef({});
+  backStateRef.current = {
+    mobileMoreOpen, animalActionSheetOpen, filterSheetOpen, showScanner, editSnake, showExportModal,
+    showImportModal, showAddModal, showFeedPrepModal, showPairingModal, showPairingQrModal, qrFor, tab,
+    quickLogTarget,
+  };
+  useEffect(() => onBackButton(() => {
+    const st = backStateRef.current;
+    if (st.quickLogTarget) { setQuickLogTarget(null); return true; }
+    if (st.mobileMoreOpen) { setMobileMoreOpen(false); return true; }
+    if (st.animalActionSheetOpen) { setAnimalActionSheetOpen(false); return true; }
+    if (st.filterSheetOpen) { setFilterSheetOpen(false); return true; }
+    if (st.showScanner) { setShowScanner(false); return true; }
+    if (st.qrFor) { setQrFor(null); return true; }
+    if (st.showExportModal) { setShowExportModal(false); return true; }
+    if (st.showImportModal) { setShowImportModal(false); return true; }
+    if (st.showPairingQrModal) { setShowPairingQrModal(false); return true; }
+    if (st.showPairingModal) { setShowPairingModal(false); return true; }
+    if (st.showFeedPrepModal) { setShowFeedPrepModal(false); return true; }
+    if (st.showAddModal) { setShowAddModal(false); return true; }
+    if (st.editSnake) { closeSnakeEditor(); return true; }
+    if (typeof document !== 'undefined') {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (dialog) {
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        return true;
+      }
+    }
+    const home = isNativeShell ? 'field' : 'dashboard';
+    if (st.tab !== home) {
+      if (home === 'field') setTab('field'); else leaveSpeciesWorkspace();
+      return true;
+    }
+    return false;
+  }), [closeSnakeEditor, leaveSpeciesWorkspace]);
+
+  // The storage layer cannot show UI; it raises an event when the local store is full.
+  const storageFullWarnedRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    // The store keeps retrying, so a later successful write clears the condition by itself;
+    // warning once per session is enough.
+    const onFull = (event) => {
+      if (storageFullWarnedRef.current) return;
+      storageFullWarnedRef.current = true;
+      const detail = event?.detail || {};
+      showAppAlert(detail.quota && detail.limited
+        ? t('storage.limitReached', { defaultValue: 'Your latest change could not be saved because this app has reached the storage limit this browser allows it. Save a backup from Settings, then compress stored photos or remove old vault entries.' })
+        : detail.quota
+        ? t('storage.full', { defaultValue: 'Your latest change could not be saved because this device is out of space. It stays open in the app for now, but it will be lost if the app is closed. Save a backup from Settings, then free up space on the device.' })
+        : t('storage.writeFailed', { defaultValue: 'Your latest change could not be saved on this device yet. The app will keep trying. Until it succeeds, save a backup from Settings before closing the app.' }));
+    };
+    window.addEventListener(STORAGE_FULL_EVENT, onFull);
+    return () => window.removeEventListener(STORAGE_FULL_EVENT, onFull);
+  }, [showAppAlert, t]);
+
   return (
     <div
       className="app-root mt-shell w-full min-h-screen"
@@ -12352,30 +12553,36 @@ export default function BreedingPlannerApp() {
       <nav className="bp-mobile-bottom-nav">
         <div className="bp-mobile-bottom-nav__items" {...tour('main-nav')}>
           {[
-            { key: 'dashboard', icon: '🏡', label: t("nav.dashboard", { defaultValue: "Dashboard" }), helpId: 'nav-dashboard' },
-            { key: 'animals', icon: '🐍', label: t("nav.animals", { defaultValue: "Animals" }), helpId: 'nav-animals' },
-            { key: 'pairings', icon: '💞', label: t("nav.pairings", { defaultValue: "Breeding" }), helpId: 'nav-pairings' },
-            { key: 'calendar', icon: '📅', label: t("nav.calendar", { defaultValue: "Calendar" }), helpId: 'nav-calendar' },
-            { key: 'setup', icon: '⚙️', label: t("nav.setup", { defaultValue: "Settings" }), helpId: 'nav-setup' },
-            { key: '__more', icon: '☰', label: t("nav.more", { defaultValue: "More" }), helpId: 'nav-more' },
-          ].map(({ key, icon, label, helpId }) => (
-            <button
-              key={key}
-              data-help={helpId}
-              type="button"
-              aria-current={tab === key ? 'page' : undefined}
-              className={cx('bp-mobile-bottom-nav__item', (tab === key || (key === '__more' && ['advisor','quarantine','familyTree','spaces','shedTerminal'].includes(tab))) ? 'is-active' : '')}
-              onClick={() => {
-                if (key === '__more') { setMobileMoreOpen(prev => !prev); }
-                // Dashboard closes any open species, exactly like the desktop tab does.
-                else if (key === 'dashboard') { leaveSpeciesWorkspace(); setMobileMoreOpen(false); }
-                else { setTab(key); setMobileMoreOpen(false); }
-              }}
-            >
-              <span className="bp-mobile-bottom-nav__icon" aria-hidden="true">{icon}</span>
-              <span className="bp-mobile-bottom-nav__label">{label}</span>
-            </button>
-          ))}
+            { key: 'field', Icon: FieldIcon, label: t("nav.field", { defaultValue: "Field" }) },
+            { key: 'dashboard', Icon: HomeIcon, label: t("nav.home", { defaultValue: "Home" }), helpId: 'nav-dashboard' },
+            { key: 'animals', Icon: AnimalsIcon, label: t("nav.animals", { defaultValue: "Animals" }), helpId: 'nav-animals' },
+            { key: 'pairings', Icon: BreedingIcon, label: t("nav.pairings", { defaultValue: "Breeding" }), helpId: 'nav-pairings' },
+            { key: '__more', Icon: MoreIcon, label: t("nav.more", { defaultValue: "More" }), helpId: 'nav-more' },
+          ].map(({ key, Icon, label, helpId }) => {
+            const active = key === '__more'
+              ? (mobileMoreOpen || MOBILE_MORE_TABS.includes(tab))
+              : tab === key;
+            return (
+              <button
+                key={key}
+                data-help={helpId}
+                type="button"
+                aria-current={active && key !== '__more' ? 'page' : undefined}
+                aria-expanded={key === '__more' ? mobileMoreOpen : undefined}
+                className={cx('bp-mobile-bottom-nav__item', active ? 'is-active' : '')}
+                onClick={() => {
+                  if (key === '__more') { setMobileMoreOpen(prev => !prev); return; }
+                  setMobileMoreOpen(false);
+                  // Home closes any open species, exactly like the desktop tab does.
+                  if (key === 'dashboard') { leaveSpeciesWorkspace(); return; }
+                  setTab(key);
+                }}
+              >
+                <span className="bp-mobile-bottom-nav__icon" aria-hidden="true"><Icon size={22} weight={active ? 'fill' : 'regular'} /></span>
+                <span className="bp-mobile-bottom-nav__label">{label}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
@@ -12383,23 +12590,32 @@ export default function BreedingPlannerApp() {
       {mobileMoreOpen && (
         <div className="bp-more-menu">
           <div className="bp-more-menu__backdrop" onClick={() => setMobileMoreOpen(false)} />
-          <div className="bp-more-menu__panel">
+          <div className="bp-more-menu__panel bp-more-menu__panel--list" role="dialog" aria-modal="true" aria-label={t("nav.more", { defaultValue: "More" })}>
             {[
-              { key: 'advisor', icon: '🧠', label: t("nav.advisor", { defaultValue: "Breeding Advisor" }), helpId: 'nav-advisor' },
-              { key: 'quarantine', icon: '🛡️', label: t("nav.quarantine", { defaultValue: "Quarantine" }), helpId: 'nav-quarantine' },
-              { key: 'familyTree', icon: '🌳', label: t("nav.familyTree", { defaultValue: "Family Tree" }), helpId: 'nav-family-tree' },
-              { key: 'spaces', icon: '🏠', label: t("nav.spaces", { defaultValue: "Spaces" }), helpId: 'nav-spaces' },
-              { key: 'shedTerminal', icon: '🔬', label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }), helpId: 'nav-lab-tests' },
-            ].map(({ key, icon, label, helpId }) => (
+              { key: 'calendar', Icon: CalendarIcon, label: t("nav.calendar", { defaultValue: "Calendar" }), helpId: 'nav-calendar' },
+              { key: 'spaces', Icon: SpacesIcon, label: t("nav.spaces", { defaultValue: "Spaces" }), helpId: 'nav-spaces' },
+              { key: 'quarantine', Icon: QuarantineIcon, label: t("nav.quarantine", { defaultValue: "Quarantine" }), badge: quarantineCount || 0, helpId: 'nav-quarantine' },
+              { key: '__feedPrep', Icon: FeedPrepIcon, label: t("nav.feedPrep", { defaultValue: "Feed Prep" }), helpId: 'nav-feed-prep' },
+              { key: 'advisor', Icon: BrainIcon, label: t("nav.advisor", { defaultValue: "Breeding Advisor" }), helpId: 'nav-advisor' },
+              { key: 'familyTree', Icon: FamilyTreeIcon, label: t("nav.familyTree", { defaultValue: "Family Tree" }), helpId: 'nav-family-tree' },
+              { key: 'shedTerminal', Icon: LabIcon, label: t("nav.shedTerminalShort", { defaultValue: "Lab tests" }), helpId: 'nav-lab-tests' },
+              { key: 'setup', Icon: SettingsIcon, label: t("nav.setup", { defaultValue: "Settings" }), helpId: 'nav-setup' },
+            ].map(({ key, Icon, label, badge, helpId }) => (
               <button
                 key={key}
                 data-help={helpId}
                 type="button"
-                className="bp-more-menu__btn"
-                onClick={() => { setTab(key); setMobileMoreOpen(false); }}
+                className={cx('bp-more-menu__row', tab === key ? 'is-active' : '')}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => {
+                  setMobileMoreOpen(false);
+                  if (key === '__feedPrep') { setShowFeedPrepModal(true); return; }
+                  setTab(key);
+                }}
               >
-                <span className="bp-more-menu__btn-icon" aria-hidden="true">{icon}</span>
-                {label}
+                <span className="bp-more-menu__row-icon" aria-hidden="true"><Icon size={22} weight={tab === key ? 'fill' : 'regular'} /></span>
+                <span className="bp-more-menu__row-label">{label}</span>
+                {badge ? <span className="bp-more-menu__row-badge">{badge}</span> : null}
               </button>
             ))}
           </div>
@@ -12446,8 +12662,9 @@ export default function BreedingPlannerApp() {
       )}
 
       {/* Species scope bar. Persistent on purpose: without it a keeper can add a crested
-          gecko while looking at ball pythons and never understand where it went. */}
-      {speciesScope && (
+          gecko while looking at ball pythons and never understand where it went. Field is
+          the one cross-species screen, so it stays off there. */}
+      {speciesScope && tab !== 'field' && (
         <div className="border-b bg-[#f4f1f8]">
           <div className="max-w-7xl mx-auto px-5 py-2 flex flex-wrap items-center gap-3">
             <button
@@ -12846,6 +13063,26 @@ export default function BreedingPlannerApp() {
                           ⚙ {t("filters.filters", { defaultValue: "Filters" })}
                           {mobileFilterCount > 0 && <span className="bp-filter-badge">{mobileFilterCount}</span>}
                         </button>
+                        {groups.length > 0 && (() => {
+                          // One-tap group choice. It writes the same showGroups the sheet and the
+                          // desktop checkboxes use, so all three always agree.
+                          const chosen = showGroups || [];
+                          const value = chosen.length === 0 ? '' : chosen.length === 1 ? chosen[0] : '__several';
+                          return (
+                            <select
+                              className={cx('bp-group-select', chosen.length > 0 ? 'has-filters' : '')}
+                              aria-label={t("filters.groups", { defaultValue: "Groups" })}
+                              value={value}
+                              onChange={(e) => setShowGroups(e.target.value ? [e.target.value] : [])}
+                            >
+                              <option value="">{t("filters.allGroups", { defaultValue: "All groups" })}</option>
+                              {chosen.length > 1 && (
+                                <option value="__several" disabled>{t("filters.severalGroups", { defaultValue: "Several groups" })}</option>
+                              )}
+                              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                          );
+                        })()}
                       </div>
                       {mobileFilterCount > 0 && (
                         <div className="bp-active-filters mb-2">
@@ -13282,6 +13519,20 @@ export default function BreedingPlannerApp() {
           </div>
         )}
 
+        {tab === "field" && (
+          <FieldScreen
+            snakes={snakes}
+            spaces={spacesState}
+            recentIds={recentAnimalIds}
+            getNextFeedCycleEvent={getNextFeedCycleEvent}
+            onScan={() => setShowScanner(true)}
+            onOpenSnake={openSnakeCard}
+            onQuickLog={openQuickLog}
+            notice={fieldNotice}
+            onDismissNotice={() => setFieldNotice(null)}
+          />
+        )}
+
         {tab === "calendar" && (
           <CalendarSection
             snakes={snakes}
@@ -13336,6 +13587,8 @@ export default function BreedingPlannerApp() {
             onSaved={() => setTab('animals')}
             createBackupPayload={createBackupPayload}
             onRestoreBackup={handleRestoreBackup}
+            onUndoRestore={handleUndoRestore}
+            preRestoreInfo={preRestoreInfo}
             cloudReplaceAvailable={sharedBreederDataReady}
             onFetchCloudReplacements={fetchBreederDataReplacements}
             onUndoCloudReplace={undoCloudReplace}
@@ -15116,6 +15369,17 @@ export default function BreedingPlannerApp() {
               showAppAlert={showAppAlert}
             />
           )}
+      {quickLogSnake && (
+        <QuickLogSheet
+          snake={quickLogSnake}
+          type={quickLogTarget?.type || 'feed'}
+          onSave={saveQuickLog}
+          onClose={closeQuickLog}
+          lastFeedDefaults={lastFeedDefaults}
+          feedTypeOptions={FEEDER_TYPE_OPTIONS}
+          feedSizeOptionsByType={FEEDER_SIZE_OPTIONS_BY_TYPE}
+        />
+      )}
       <ConfirmDeleteSnakeModal
         key={pendingDeleteSnake?.id || 'none'}
         snake={pendingDeleteSnake}
@@ -15204,6 +15468,8 @@ export {
   exportDatasetToCsv,
   formatCycleTimerDayLabel,
   mergeBreederSnapshots,
+  keepLocalPhotos,
+  prepareAnimalForBackend,
 };
 
     function QrScannerModal({ onClose, onFound, inline = false, elementId = 'qr-scan-root', showAppAlert }) {
@@ -19522,6 +19788,8 @@ function BreederSection({
   onSaved,
   createBackupPayload,
   onRestoreBackup,
+  onUndoRestore,
+  preRestoreInfo = null,
   cloudReplaceAvailable = false,
   onFetchCloudReplacements,
   onUndoCloudReplace,
@@ -20503,7 +20771,7 @@ function BreederSection({
     }
   }, [onCompressStoredPhotos, photoCompressionRunning, photoCompressionWork, showAppConfirm, t]);
 
-  const handleManualBackupDownload = useCallback(() => {
+  const handleManualBackupDownload = useCallback(async () => {
     if (typeof createBackupPayload !== 'function') {
       setBackupFeedback({
         type: 'error',
@@ -20515,25 +20783,14 @@ function BreederSection({
     }
     try {
       const payload = createBackupPayload();
-      const serialized = JSON.stringify(payload, null, 2);
       const iso = new Date().toISOString();
-      const timestamp = iso.replace(/[:.]/g, '-');
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
-      const filename = buildBackupFilename('breeding-planner-backup', timestamp);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename('serpentora-backup', isoToFileTimestamp(iso));
+      const result = await saveBackupFile(payload, { filename, title: 'Serpentora backup' });
+      if (result?.cancelled) return;
+      const counts = describeBackupPayload(payload);
       setBackupFeedback({
         type: 'success',
-        message: `Backup downloaded (${Array.isArray(payload.snakes) ? payload.snakes.length : 0} snakes, ${Array.isArray(payload.pairings) ? payload.pairings.length : 0} pairings).`,
+        message: `Backup saved (${counts.snakes} snakes, ${counts.pairings} pairings).`,
         context: 'manual',
         timestamp: iso,
       });
@@ -20594,7 +20851,7 @@ function BreederSection({
     }
   }, [createBackupPayload, onCreateVaultEntry, showAppPrompt, t]);
 
-  const handleAutoBackupDownload = useCallback(() => {
+  const handleAutoBackupDownload = useCallback(async () => {
     if (!autoBackupSnapshot || !autoBackupSnapshot.payload) {
       setBackupFeedback({
         type: 'error',
@@ -20605,26 +20862,14 @@ function BreederSection({
       return;
     }
     try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
       const payload = autoBackupSnapshot.payload;
-      const serialized = JSON.stringify(payload, null, 2);
       const sourceIso = autoBackupSnapshot.savedAt || new Date().toISOString();
-      const timestamp = sourceIso.replace(/[:.]/g, '-');
-      const filename = buildBackupFilename('breeding-planner-auto-backup', timestamp);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename('serpentora-auto-backup', isoToFileTimestamp(sourceIso));
+      const result = await saveBackupFile(payload, { filename, title: 'Serpentora automatic backup' });
+      if (result?.cancelled) return;
       setBackupFeedback({
         type: 'success',
-        message: 'Latest automatic backup downloaded.',
+        message: 'Latest automatic backup saved.',
         context: 'auto-download',
         timestamp: new Date().toISOString(),
       });
@@ -21531,7 +21776,7 @@ function BreederSection({
     }
   }, [onSyncCloudDatabase]);
 
-  const handleDownloadVaultEntry = useCallback((entryId) => {
+  const handleDownloadVaultEntry = useCallback(async (entryId) => {
     const entry = vaultEntries.find(item => item.id === entryId);
     if (!entry) {
       setBackupFeedback({
@@ -21543,25 +21788,12 @@ function BreederSection({
       return;
     }
     try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('Downloads are not supported in this environment.');
-      }
-      const serialized = JSON.stringify(entry.payload, null, 2);
-      const fileSafeName = entry.name.replace(/[\\/:*?"<>|]+/g, '-');
-      const filenameBase = fileSafeName || 'breeding-planner-backup';
-      const filename = buildBackupFilename(filenameBase, entry.id);
-      const blob = new Blob([serialized], { type: BACKUP_FILE_MIME });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const filename = buildBackupFilename(fileSafeName(entry.name), entry.id);
+      const result = await saveBackupFile(entry.payload, { filename, title: entry.name });
+      if (result?.cancelled) return;
       setBackupFeedback({
         type: 'success',
-        message: `Downloaded "${entry.name}".`,
+        message: `Saved "${entry.name}".`,
         context: 'vault-download',
         timestamp: new Date().toISOString(),
       });
@@ -21657,33 +21889,41 @@ function BreederSection({
     });
   }, [onDeleteVaultEntry, showAppConfirm, t, vaultEntries]);
 
+  const handleUndoRestoreClick = useCallback(async () => {
+    if (typeof onUndoRestore !== 'function') return;
+    const confirmed = typeof showAppConfirm === 'function'
+      ? await showAppConfirm(
+        t('setup.backup.undoConfirm', { defaultValue: 'Put your collection back as it was before the last restore? The restored data will be replaced.' }),
+        {
+          confirmLabel: t('setup.backup.undoRestore', { defaultValue: 'Undo last restore' }),
+          cancelLabel: t('common.cancel', { defaultValue: 'Cancel' }),
+        },
+      )
+      : true;
+    if (!confirmed) return;
+    try {
+      await onUndoRestore();
+      setRestoreFeedback({
+        type: 'success',
+        message: t('setup.backup.undoDone', { defaultValue: 'Your collection is back as it was before the restore.' }),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(err);
+      setRestoreFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to undo the restore.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [onUndoRestore, showAppConfirm, t]);
+
   const handleRestoreFileSelected = useCallback(async (event) => {
     const file = event?.target?.files?.[0];
     if (!file) return;
     try {
       const allowLegacyJson = event?.target?.dataset?.allowLegacyJson === 'true';
-      const name = typeof file.name === 'string' ? file.name : '';
-      const lowerName = name.toLowerCase();
-      const isNativeBackup = !!name && lowerName.endsWith(BACKUP_FILE_DOT_EXTENSION);
-      const isLegacyJson = !!name && lowerName.endsWith('.json');
-
-      if (!isNativeBackup) {
-        if (!allowLegacyJson || !isLegacyJson) {
-          throw new Error(`Select a ${BACKUP_FILE_DOT_EXTENSION} backup${allowLegacyJson ? ' or legacy .json file' : ''}.`);
-        }
-      }
-
-      if (file.type) {
-        const normalizedType = file.type.toLowerCase();
-        const allowedNativeTypes = [BACKUP_FILE_MIME, 'application/octet-stream'];
-        const allowedLegacyTypes = ['application/json', 'text/json', 'application/octet-stream'];
-        if (isNativeBackup && !allowedNativeTypes.includes(normalizedType)) {
-          throw new Error('Unsupported backup file type.');
-        }
-        if (!isNativeBackup && allowLegacyJson && isLegacyJson && !allowedLegacyTypes.includes(normalizedType)) {
-          throw new Error('Unsupported legacy backup file type.');
-        }
-      }
+      assertBackupFileSelectable(file, { allowLegacyJson, lenient: isNativeShell });
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (typeof onRestoreBackup !== 'function') {
@@ -23132,7 +23372,9 @@ function BreederSection({
 
       {setupTab === 'backup' && (
         <div className="border-t pt-4 space-y-6" {...help('backup-screen')}>
-          <div className="space-y-3">
+          <DeviceStorageSummary snakes={snakes} refreshKey={`${vaultEntries.length}:${preRestoreInfo?.savedAt || ''}:${lastPhotoCompression?.completedAt || ''}`} />
+
+          <div className="space-y-3 border-t pt-4">
             <div>
               <div className="font-semibold text-sm">{t("setup.backup.compressTitle", { defaultValue: "Compress stored photos" })}</div>
               <div className="text-xs text-neutral-500 mt-1">
@@ -23361,6 +23603,9 @@ function BreederSection({
               </select>
             </div>
             <div className="text-[11px] text-neutral-500">{vaultLimitDescription}</div>
+            <div className="text-[11px] text-neutral-500">
+              {t('setup.backup.vaultNoPhotos', { defaultValue: 'Vault copies are kept on this device without photos, to save space. Restoring one keeps the photos your animals have now. For a complete copy with photos, save a backup file.' })}
+            </div>
             <div className="text-xs text-neutral-500">
               {vaultEntries.length ? t("setup.backup.vaultCount", { count: vaultEntries.length, defaultValue_one: "{{count}} backup saved.", defaultValue_other: "{{count}} backups saved." }) : t("setup.backup.vaultEmpty", { defaultValue: "No backups saved yet." })}
             </div>
@@ -23452,14 +23697,17 @@ function BreederSection({
               <input
                 ref={restoreInputRef}
                 type="file"
-                accept={`${BACKUP_FILE_MIME},${BACKUP_FILE_DOT_EXTENSION}`}
+                // Android's picker filters by MIME type and knows neither the backup MIME nor the
+                // .bpbackup extension, so a transferred backup shows up greyed out. On the phone the
+                // picker shows every file and the name and contents are checked after picking.
+                accept={isNativeShell ? '*/*' : `${BACKUP_FILE_MIME},${BACKUP_FILE_DOT_EXTENSION}`}
                 className="hidden"
                 onChange={handleRestoreFileSelected}
               />
               <input
                 ref={legacyRestoreInputRef}
                 type="file"
-                accept="application/json,.json"
+                accept={isNativeShell ? '*/*' : 'application/json,.json'}
                 data-allow-legacy-json="true"
                 className="hidden"
                 onChange={handleRestoreFileSelected}
@@ -23490,6 +23738,23 @@ function BreederSection({
               <div className={cx('text-xs', restoreFeedback.type === 'success' ? 'text-emerald-600' : 'text-red-600')}>
                 {restoreFeedback.message}
                 {restoreFeedback.timestamp ? ` — ${formatDateTimeForDisplay(restoreFeedback.timestamp)}` : ''}
+              </div>
+            )}
+            {preRestoreInfo && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg border text-sm"
+                  onClick={handleUndoRestoreClick}
+                >
+                  {t('setup.backup.undoRestore', { defaultValue: 'Undo last restore' })}
+                </button>
+                <span className="text-xs text-neutral-500">
+                  {t('setup.backup.undoHelp', {
+                    date: preRestoreInfo.savedAt ? formatDateTimeForDisplay(preRestoreInfo.savedAt) : '',
+                    defaultValue: 'Goes back to your collection as it was on {{date}}, before the restore.',
+                  })}
+                </span>
               </div>
             )}
             <div className="text-[11px] text-neutral-500">
@@ -28168,6 +28433,59 @@ function GeneLegend({ className }) {
           <span className="text-neutral-600 whitespace-nowrap">{legendLabels[item.key] || item.label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Phone-width stand-in for the inline legend, which CSS hides below 768px. It closes from its
+// own X, from a tap anywhere outside it, and from Escape, so it can never cover the list for good.
+function GeneLegendPopover() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="bp-legend-popover-anchor">
+      <button
+        type="button"
+        {...help('animals-gene-colors')}
+        className="bp-genetics-legend-toggle"
+        aria-expanded={open}
+        aria-controls="bp-legend-popover"
+        onClick={() => setOpen(prev => !prev)}
+      >
+        {t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}
+      </button>
+      {open && (
+        <div id="bp-legend-popover" className="bp-legend-popover" role="dialog" aria-label={t("animals.geneColorsToggle", { defaultValue: "? Gene colors" })}>
+          <button
+            type="button"
+            className="bp-legend-popover__close"
+            aria-label={t("common.close", { defaultValue: "Close" })}
+            title={t("common.close", { defaultValue: "Close" })}
+            onClick={() => setOpen(false)}
+          >
+            ✕
+          </button>
+          <GeneLegend />
+        </div>
+      )}
     </div>
   );
 }
