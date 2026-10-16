@@ -141,10 +141,14 @@ const checks = {
     ? pass('corsMarketplace.test.ts exists')
     : fail('no corsMarketplace.test.ts; the marketplace origin is likely still missing from CORS'),
   'f-mp-publish': () => {
+    // The account data export must still cover the frozen legacy table until it is
+    // dropped (no earlier than 2027-01-05, see listingRoutes.ts), so that one read
+    // is not a product read.
+    const exportReader = 'breeding-app-backend/src/services/accountDataExportService.ts';
     const hits = grep('/api/listings', ['breeding-app-marketplace/src', 'breeding-app-breeder/src'])
-      .concat(grep('prisma.listing.', ['breeding-app-backend/src']));
+      .concat(grep('prisma.listing.', ['breeding-app-backend/src']).filter((f) => f !== exportReader));
     return hits.length === 0
-      ? pass('nothing reads the legacy Listing store, frontend or backend')
+      ? pass('nothing reads the legacy Listing store, frontend or backend (the account data export aside)')
       : fail(`legacy Listing store still read by ${hits.slice(0, 2).join(', ')}${hits.length > 2 ? ` (+${hits.length - 2})` : ''}`);
   },
   'f-mp-buyer': () => existsSync(path.join(root, 'breeding-app-marketplace/tests/e2e/buyer-journey.spec.ts'))
