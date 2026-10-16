@@ -3132,5 +3132,8 @@
   "breeding.logHatch.subtitle": "Log it once every hatchling is out of the egg. The hatchlings are added to Hatchlings {{year}} and the cycle moves to Completed pairing.",
   "breeding.logHatch.title": "Log hatch",
   "breeding.notice.hatchlingsAdded": "{{count}} hatchlings added to {{group}}.",
-  "breeding.clock.dayShort": "Day {{day}} of {{total}}"
+  "breeding.clock.dayShort": "Day {{day}} of {{total}}",
+  "accountMenu.button": "Account: {{name}}",
+  "accountMenu.language": "Language",
+  "accountMenu.settings": "Account settings"
 }

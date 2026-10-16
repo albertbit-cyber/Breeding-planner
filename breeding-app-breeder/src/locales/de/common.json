@@ -2325,7 +2325,7 @@
   "quarantine.next.checkSoon": "Nächste Kontrolle in {{count}} Tagen",
   "quarantine.next.fecalDue": "Kotprobe fällig",
   "quarantine.next.fecalSoon": "Kotprobe fällig in {{count}} Tagen",
-  "quarantine.result.clear": "Leeren",
+  "quarantine.result.clear": "Negativ",
   "quarantine.result.inconclusive": "Nicht eindeutig",
   "quarantine.result.pending": "Ergebnis ausstehend",
   "quarantine.result.positive": "Positiv",
@@ -3134,5 +3134,8 @@
   "breeding.logHatch.subtitle": "Erfasse ihn, sobald alle Schlüpflinge aus dem Ei sind. Die Schlüpflinge kommen in Hatchlings {{year}}, und der Zyklus wechselt zu Abgeschlossene Verpaarungen.",
   "breeding.logHatch.title": "Schlupf erfassen",
   "breeding.notice.hatchlingsAdded": "{{count}} Schlüpflinge zu {{group}} hinzugefügt.",
-  "breeding.clock.dayShort": "Tag {{day}} von {{total}}"
+  "breeding.clock.dayShort": "Tag {{day}} von {{total}}",
+  "accountMenu.button": "Konto: {{name}}",
+  "accountMenu.language": "Sprache",
+  "accountMenu.settings": "Kontoeinstellungen"
 }

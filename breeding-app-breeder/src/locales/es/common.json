@@ -2325,7 +2325,7 @@
   "quarantine.next.checkSoon": "Próxima revisión en {{count}} días",
   "quarantine.next.fecalDue": "Toca la muestra de heces",
   "quarantine.next.fecalSoon": "Análisis de heces en {{count}} días",
-  "quarantine.result.clear": "Limpiar",
+  "quarantine.result.clear": "Negativo",
   "quarantine.result.inconclusive": "No concluyente",
   "quarantine.result.pending": "Resultado pendiente",
   "quarantine.result.positive": "Positivo",
@@ -3134,5 +3134,8 @@
   "breeding.logHatch.subtitle": "Regístrala cuando todas las crías hayan salido del huevo. Las crías se añaden a Hatchlings {{year}} y el ciclo pasa a Apareamientos completados.",
   "breeding.logHatch.title": "Registrar eclosión",
   "breeding.notice.hatchlingsAdded": "{{count}} crías añadidas a {{group}}.",
-  "breeding.clock.dayShort": "Día {{day}} de {{total}}"
+  "breeding.clock.dayShort": "Día {{day}} de {{total}}",
+  "accountMenu.button": "Cuenta: {{name}}",
+  "accountMenu.language": "Idioma",
+  "accountMenu.settings": "Ajustes de la cuenta"
 }

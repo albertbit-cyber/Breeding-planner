@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import "../i18n/index.js";
 import { help } from "../features/help/help";
 
-const languages = [
+export const languages = [
   { code: "en", label: "EN", name: "English", flag: "🇺🇸🇬🇧" },
   { code: "es", label: "ES", name: "Español", flag: "🇪🇸" },
   { code: "fr", label: "FR", name: "Français", flag: "🇫🇷" },

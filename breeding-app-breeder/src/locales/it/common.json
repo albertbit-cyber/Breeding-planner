@@ -2323,7 +2323,7 @@
   "quarantine.next.checkSoon": "Prossimo controllo tra {{count}} giorni",
   "quarantine.next.fecalDue": "Campione di feci da fare",
   "quarantine.next.fecalSoon": "Esame delle feci tra {{count}} giorni",
-  "quarantine.result.clear": "Pulisci",
+  "quarantine.result.clear": "Negativo",
   "quarantine.result.inconclusive": "Non conclusivo",
   "quarantine.result.pending": "Risultato in attesa",
   "quarantine.result.positive": "Positivo",
@@ -3132,5 +3132,8 @@
   "breeding.logHatch.subtitle": "Registrala quando tutti i piccoli sono usciti dall'uovo. I piccoli vengono aggiunti a Hatchlings {{year}} e il ciclo passa in Accoppiamenti completati.",
   "breeding.logHatch.title": "Registra la schiusa",
   "breeding.notice.hatchlingsAdded": "{{count}} piccoli aggiunti a {{group}}.",
-  "breeding.clock.dayShort": "Giorno {{day}} di {{total}}"
+  "breeding.clock.dayShort": "Giorno {{day}} di {{total}}",
+  "accountMenu.button": "Account: {{name}}",
+  "accountMenu.language": "Lingua",
+  "accountMenu.settings": "Impostazioni account"
 }

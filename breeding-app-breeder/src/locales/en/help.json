@@ -2784,7 +2784,7 @@
     },
     "settings-language": {
       "short": "Chooses the language of Serpentora's screens.",
-      "more": "Help texts are in English for now. Names you type yourself, such as animal names, are not translated.",
+      "more": "Help, the manual and the guided tours change language too. Names you type yourself, such as animal names, are not translated.",
       "words": "language translation locale"
     },
     "settings-language-option": {
@@ -3188,10 +3188,10 @@
       "short": "Cancels the scheduled deletion, so your account and records stay.",
       "words": "cancel deletion keep restore account"
     },
-    "account-signed-in-chip": {
-      "title": "Signed in as",
-      "short": "Shows the name of the account you are signed in with.",
-      "words": "signed in user account"
+    "account-menu": {
+      "title": "Account menu",
+      "short": "The round button with your initials. It shows who is signed in and lets you switch language, open your account settings or sign out.",
+      "words": "account signed in user profile initials language sign out logout"
     },
     "account-sign-out": {
       "short": "Signs you out and returns to the sign-in screen.",
@@ -4447,7 +4447,7 @@
         },
         "language": {
           "title": "Language",
-          "text": "Choose the language of the app. Help texts are in English for now.",
+          "text": "Choose the language of the app. Help and the guided tours follow it.",
           "missing": "Language is a tab at the top of Settings."
         },
         "exports": {

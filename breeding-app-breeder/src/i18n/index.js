@@ -8,7 +8,6 @@ import enAnimals from "../locales/en/animals.json";
 import enAdvisor from "../locales/en/advisor.json";
 import enAuth from "../locales/en/auth.json";
 import enElectron from "../locales/en/electron.json";
-// Help text is English-only until it is translated; other languages fall back to it.
 import enHelp from "../locales/en/help.json";
 
 import esCommon from "../locales/es/common.json";
@@ -16,54 +15,63 @@ import esAnimals from "../locales/es/animals.json";
 import esAdvisor from "../locales/es/advisor.json";
 import esAuth from "../locales/es/auth.json";
 import esElectron from "../locales/es/electron.json";
+import esHelp from "../locales/es/help.json";
 
 import frCommon from "../locales/fr/common.json";
 import frAnimals from "../locales/fr/animals.json";
 import frAdvisor from "../locales/fr/advisor.json";
 import frAuth from "../locales/fr/auth.json";
 import frElectron from "../locales/fr/electron.json";
+import frHelp from "../locales/fr/help.json";
 
 import itCommon from "../locales/it/common.json";
 import itAnimals from "../locales/it/animals.json";
 import itAdvisor from "../locales/it/advisor.json";
 import itAuth from "../locales/it/auth.json";
 import itElectron from "../locales/it/electron.json";
+import itHelp from "../locales/it/help.json";
 
 import deCommon from "../locales/de/common.json";
 import deAnimals from "../locales/de/animals.json";
 import deAdvisor from "../locales/de/advisor.json";
 import deAuth from "../locales/de/auth.json";
 import deElectron from "../locales/de/electron.json";
+import deHelp from "../locales/de/help.json";
 
 import nlCommon from "../locales/nl/common.json";
 import nlAnimals from "../locales/nl/animals.json";
 import nlAdvisor from "../locales/nl/advisor.json";
 import nlAuth from "../locales/nl/auth.json";
 import nlElectron from "../locales/nl/electron.json";
+import nlHelp from "../locales/nl/help.json";
 
 import plCommon from "../locales/pl/common.json";
 import plAnimals from "../locales/pl/animals.json";
 import plAdvisor from "../locales/pl/advisor.json";
 import plAuth from "../locales/pl/auth.json";
 import plElectron from "../locales/pl/electron.json";
+import plHelp from "../locales/pl/help.json";
 
 import ptCommon from "../locales/pt/common.json";
 import ptAnimals from "../locales/pt/animals.json";
 import ptAdvisor from "../locales/pt/advisor.json";
 import ptAuth from "../locales/pt/auth.json";
 import ptElectron from "../locales/pt/electron.json";
+import ptHelp from "../locales/pt/help.json";
 
 import csCommon from "../locales/cs/common.json";
 import csAnimals from "../locales/cs/animals.json";
 import csAdvisor from "../locales/cs/advisor.json";
 import csAuth from "../locales/cs/auth.json";
 import csElectron from "../locales/cs/electron.json";
+import csHelp from "../locales/cs/help.json";
 
 import heCommon from "../locales/he/common.json";
 import heAnimals from "../locales/he/animals.json";
 import heAdvisor from "../locales/he/advisor.json";
 import heAuth from "../locales/he/auth.json";
 import heElectron from "../locales/he/electron.json";
+import heHelp from "../locales/he/help.json";
 
 const resources = {
   en: {
@@ -80,6 +88,7 @@ const resources = {
     advisor: esAdvisor,
     auth: esAuth,
     electron: esElectron,
+    help: esHelp,
   },
   fr: {
     common: frCommon,
@@ -87,6 +96,7 @@ const resources = {
     advisor: frAdvisor,
     auth: frAuth,
     electron: frElectron,
+    help: frHelp,
   },
   it: {
     common: itCommon,
@@ -94,6 +104,7 @@ const resources = {
     advisor: itAdvisor,
     auth: itAuth,
     electron: itElectron,
+    help: itHelp,
   },
   de: {
     common: deCommon,
@@ -101,6 +112,7 @@ const resources = {
     advisor: deAdvisor,
     auth: deAuth,
     electron: deElectron,
+    help: deHelp,
   },
   nl: {
     common: nlCommon,
@@ -108,6 +120,7 @@ const resources = {
     advisor: nlAdvisor,
     auth: nlAuth,
     electron: nlElectron,
+    help: nlHelp,
   },
   pl: {
     common: plCommon,
@@ -115,6 +128,7 @@ const resources = {
     advisor: plAdvisor,
     auth: plAuth,
     electron: plElectron,
+    help: plHelp,
   },
   pt: {
     common: ptCommon,
@@ -122,6 +136,7 @@ const resources = {
     advisor: ptAdvisor,
     auth: ptAuth,
     electron: ptElectron,
+    help: ptHelp,
   },
   cs: {
     common: csCommon,
@@ -129,6 +144,7 @@ const resources = {
     advisor: csAdvisor,
     auth: csAuth,
     electron: csElectron,
+    help: csHelp,
   },
   he: {
     common: heCommon,
@@ -136,6 +152,7 @@ const resources = {
     advisor: heAdvisor,
     auth: heAuth,
     electron: heElectron,
+    help: heHelp,
   },
 };
 

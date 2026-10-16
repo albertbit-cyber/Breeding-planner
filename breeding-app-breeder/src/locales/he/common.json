@@ -2335,7 +2335,7 @@
   "quarantine.next.checkSoon": "הבדיקה הבאה בעוד {{count}} ימים",
   "quarantine.next.fecalDue": "הגיע מועד בדיקת הצואה",
   "quarantine.next.fecalSoon": "בדיקת צואה בעוד {{count}} ימים",
-  "quarantine.result.clear": "נקה",
+  "quarantine.result.clear": "שלילי",
   "quarantine.result.inconclusive": "לא חד-משמעי",
   "quarantine.result.pending": "ממתין לתוצאה",
   "quarantine.result.positive": "חיובי",
@@ -3149,5 +3149,8 @@
   "breeding.logHatch.subtitle": "רשמו לאחר שכל הצאצאים יצאו מהביצה. הצאצאים נוספים ל-Hatchlings {{year}} והמחזור עובר לזיווגים שהושלמו.",
   "breeding.logHatch.title": "רישום בקיעה",
   "breeding.notice.hatchlingsAdded": "{{count}} צאצאים נוספו ל-{{group}}.",
-  "breeding.clock.dayShort": "יום {{day}} מתוך {{total}}"
+  "breeding.clock.dayShort": "יום {{day}} מתוך {{total}}",
+  "accountMenu.button": "חשבון: {{name}}",
+  "accountMenu.language": "שפה",
+  "accountMenu.settings": "הגדרות חשבון"
 }

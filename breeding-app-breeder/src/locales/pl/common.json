@@ -2345,7 +2345,7 @@
   "quarantine.next.checkSoon": "Następna kontrola za {{count}} dni",
   "quarantine.next.fecalDue": "Czas na badanie kału",
   "quarantine.next.fecalSoon": "Badanie kału za {{count}} dni",
-  "quarantine.result.clear": "Wyczyść",
+  "quarantine.result.clear": "Negatywny",
   "quarantine.result.inconclusive": "Niejednoznaczny",
   "quarantine.result.pending": "Czeka na wynik",
   "quarantine.result.positive": "Pozytywny",
@@ -3164,5 +3164,8 @@
   "breeding.logHatch.subtitle": "Zapisz, gdy wszystkie młode wyjdą z jaj. Młode trafią do Hatchlings {{year}}, a cykl przejdzie do Zakończonych par.",
   "breeding.logHatch.title": "Zapisz wyklucie",
   "breeding.notice.hatchlingsAdded": "Dodano młode do {{group}}: {{count}}.",
-  "breeding.clock.dayShort": "Dzień {{day}} z {{total}}"
+  "breeding.clock.dayShort": "Dzień {{day}} z {{total}}",
+  "accountMenu.button": "Konto: {{name}}",
+  "accountMenu.language": "Język",
+  "accountMenu.settings": "Ustawienia konta"
 }

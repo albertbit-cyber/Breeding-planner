@@ -14,7 +14,7 @@ import {
 } from "../../shared/apiClient";
 import { useSharedBackend } from "../../contexts/SharedBackendContext.jsx";
 import { canRoleUsePortal, normalizeRole, portalRejectionMessage } from "./portalAccess";
-import { help } from "../help/help";
+import { AccountContext } from "./accountContext";
 
 /**
  * The account-lifecycle emails link back to plain paths (e.g. `${appUrl}/verify-email?token=...`),
@@ -905,19 +905,11 @@ export default function AuthGate({ children }) {
     </div>
   );
 
-  const signedInChip = authState.isAuthenticated ? (
-    <div className="auth-floating-chip" {...help('account-signed-in-chip')}>
-      <span>
-        {t("auth:status.signedInAs", { defaultValue: "Signed in as" })}{" "}
-        {authState.profile?.displayName ||
-          authState.profile?.fullName ||
-          t("auth:status.defaultName", { defaultValue: "Keeper" })}
-      </span>
-      <button type="button" onClick={handleLogout} {...help('account-sign-out')}>
-        {t("auth:actions.signOut", { defaultValue: "Sign out" })}
-      </button>
-    </div>
-  ) : null;
+  // Who is signed in, for the account menu in the app's top bar (features/auth/AccountMenu).
+  const account = useMemo(
+    () => (authState.isAuthenticated ? { profile: authState.profile || null, signOut: handleLogout } : null),
+    [authState.isAuthenticated, authState.profile, handleLogout],
+  );
 
   const maskEmailForDisplay = (email) => {
     const [local, domain] = String(email || "").split("@");
@@ -1118,8 +1110,9 @@ export default function AuthGate({ children }) {
   return (
     <div className="auth-shell">
       <div className={`auth-shell__app ${overlayActive ? "is-blurred" : ""}`}>
-        {authState.isAuthenticated && signedInChip}
-        {!overlayActive ? children : null}
+        <AccountContext.Provider value={account}>
+          {!overlayActive ? children : null}
+        </AccountContext.Provider>
       </div>
       {overlayActive && (
         <div className="auth-overlay">

@@ -2325,7 +2325,7 @@
   "quarantine.next.checkSoon": "Volgende controle over {{count}} dagen",
   "quarantine.next.fecalDue": "Ontlastingsmonster nodig",
   "quarantine.next.fecalSoon": "Ontlastingsonderzoek over {{count}} dagen",
-  "quarantine.result.clear": "Wissen",
+  "quarantine.result.clear": "Negatief",
   "quarantine.result.inconclusive": "Niet eenduidig",
   "quarantine.result.pending": "Wacht op resultaat",
   "quarantine.result.positive": "Positief",
@@ -3134,5 +3134,8 @@
   "breeding.logHatch.subtitle": "Leg het vast zodra alle jongen uit het ei zijn. De jongen komen in Hatchlings {{year}} en de cyclus gaat naar Afgeronde koppelingen.",
   "breeding.logHatch.title": "Uitkomen vastleggen",
   "breeding.notice.hatchlingsAdded": "{{count}} jongen toegevoegd aan {{group}}.",
-  "breeding.clock.dayShort": "Dag {{day}} van {{total}}"
+  "breeding.clock.dayShort": "Dag {{day}} van {{total}}",
+  "accountMenu.button": "Account: {{name}}",
+  "accountMenu.language": "Taal",
+  "accountMenu.settings": "Accountinstellingen"
 }
