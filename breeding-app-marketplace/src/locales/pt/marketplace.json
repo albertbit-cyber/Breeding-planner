@@ -397,7 +397,13 @@
     "full": "Pode juntar até {{max}} fotografias.",
     "type": "{{name}} não é uma imagem JPEG, PNG ou WebP.",
     "size": "{{name}} ultrapassa os 8 MB.",
-    "failed": "Esse envio falhou."
+    "failed": "Esse envio falhou.",
+    "fromAnimals": "Usar uma fotografia dos seus animais",
+    "fromAnimalsTitle": "Fotografias dos seus animais",
+    "fromAnimalsLoading": "A carregar as suas fotografias…",
+    "fromAnimalsEmpty": "Ainda não há fotografias no seu armazenamento na nuvem. As fotografias tiradas na app de criador aparecem aqui depois de sincronizadas.",
+    "fromAnimalsPick": "Adicionar esta fotografia",
+    "fromAnimalsClose": "Fechar"
   },
   "dashboard": {
     "noStoreName": "Os seus anúncios",

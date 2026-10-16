@@ -4,6 +4,7 @@ import { HttpError } from "../utils/errors";
 import { env } from "../config/env";
 import { recordSecurityEvent } from "./securityEventService";
 import { revokeRefreshSessionsForUser } from "./refreshTokenSessionService";
+import { getUploadStorage, userFolder } from "./uploadStorageService";
 import { enqueueEmail } from "../email/queueService";
 import {
   ACCOUNT_DELETION_SCHEDULED_TEMPLATE_KEY,
@@ -267,6 +268,17 @@ export const hardDeleteUser = async (userId: string): Promise<void> => {
       }
     }
   });
+
+  // The rows went with the cascade; the bytes are in object storage, under the
+  // user's own folder. Best effort and after the commit: a storage outage must
+  // not undo an erasure, and a leftover folder can be removed by hand from the
+  // log line below.
+  try {
+    const removed = await getUploadStorage().deletePrefix(userFolder(userId));
+    if (removed) console.info("[account-deletion] removed stored files", { userId, removed });
+  } catch (error) {
+    console.error("[account-deletion] stored files NOT removed", { userId, folder: userFolder(userId), error: (error as Error).message });
+  }
 
   // Deliberately after the transaction and without an actor id — the actor no
   // longer exists, and recording it inside would be rolled back on failure.

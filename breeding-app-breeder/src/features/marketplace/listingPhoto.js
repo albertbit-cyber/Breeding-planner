@@ -16,6 +16,8 @@
  * that needs a browser -- resizing through a canvas -- is isolated at the end.
  */
 
+import { isPhotoRef, photoIdFromRef } from '../../services/photoRefs.js';
+
 /** The upload endpoint rejects anything over 5 MB decoded. Leave headroom. */
 export const MAX_UPLOAD_BYTES = 4.5 * 1024 * 1024;
 const MAX_EDGE = 1600;
@@ -64,6 +66,15 @@ export function photoFingerprint(value) {
 export function planPhotoUpload(snake) {
   const cover = resolveCoverPhoto(snake);
   if (!cover) return { action: 'none' };
+
+  // In the keeper's cloud storage: the server copies it onto the listing, nothing is uploaded.
+  // The reference itself is the fingerprint, since it names exactly one stored photo.
+  if (isPhotoRef(cover)) {
+    if (snake?.marketplaceImageUrl && snake?.marketplaceImageFingerprint === cover) {
+      return { action: 'reuse', imageUrl: snake.marketplaceImageUrl, fingerprint: cover };
+    }
+    return { action: 'photo', photoId: photoIdFromRef(cover), fingerprint: cover };
+  }
 
   // Already somewhere the marketplace can reach: hand the address over as it is.
   if (!isDataUri(cover)) return { action: 'link', imageUrl: cover };

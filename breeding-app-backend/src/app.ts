@@ -30,7 +30,9 @@ import { partnerRoutes } from "./routes/partnerRoutes";
 import { publicRoutes } from "./routes/publicRoutes";
 import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { billingRoutes, billingWebhookRoutes } from "./routes/billingRoutes";
+import { photoRoutes } from "./routes/photoRoutes";
 import { errorHandler } from "./middleware/errorHandler";
+import { resolveStorageDriver } from "./services/uploadStorageService";
 
 const app = express();
 
@@ -65,13 +67,22 @@ if (env.nodeEnv === "production" && !process.env.LAB_PORTAL_URL) {
   );
 }
 
-// Marketplace listing photos are written by LocalUploadStorage to
+const resolvedStorageDriver = (): string => {
+  try {
+    return resolveStorageDriver();
+  } catch {
+    // Misconfigured: the [storage] boot line says why, and the first upload fails loudly.
+    return "misconfigured";
+  }
+};
+
+// With the local storage driver, photos and listing images are written to
 // UPLOAD_STORAGE_DIR, which defaults to a path inside the working directory.
 // On a container host that directory lives and dies with the container, so the
-// upload succeeds, the MarketplaceMedia row persists, and the file is gone at
-// the next deploy — leaving listings with broken images and no error anywhere.
-// Point this at a mounted volume, or swap uploadStorage for object storage.
-if (env.nodeEnv === "production" && !process.env.UPLOAD_STORAGE_DIR) {
+// upload succeeds, the row persists, and the file is gone at the next deploy —
+// leaving broken images and no error anywhere. Production should run the
+// Supabase driver (docs/runbooks/photo-storage.md); this warns when it does not.
+if (env.nodeEnv === "production" && resolvedStorageDriver() === "local" && !process.env.UPLOAD_STORAGE_DIR) {
   console.warn(
     "[server] UPLOAD_STORAGE_DIR is not set; marketplace listing photos are being written to the container filesystem and will be lost on the next deploy."
   );
@@ -150,6 +161,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
+app.use("/api/photos", photoRoutes);
 app.use("/api/mobile", mobileRoutes);
 // Ahead of adminRoutes on purpose: these are the endpoints a read-only
 // moderator may write to, and the router below refuses moderator writes

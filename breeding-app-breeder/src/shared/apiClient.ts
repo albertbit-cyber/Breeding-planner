@@ -1575,3 +1575,108 @@ export const putCycleManual = async (
     method: "PUT",
     body: JSON.stringify(payload),
   });
+
+// --- Cloud photo storage --------------------------------------------------------------------
+// Photos live in the keeper's own folder of the backend's object storage; records hold
+// `photo:{id}` (services/photoRefs.js). The bytes go straight to storage through a signed URL, so
+// the JSON API only ever carries the reference. See services/cloudPhotos.js for the flow.
+
+export type CloudPhoto = {
+  id: string;
+  ref: string;
+  animalId: string | null;
+  kind: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  checksum: string;
+  status: "pending" | "ready" | "deleted";
+  hasThumb: boolean;
+};
+
+export type PhotoUploadTarget = {
+  method: "PUT";
+  url: string;
+  headers: Record<string, string>;
+  // True for the local storage driver (development): the URL is this backend's and needs the
+  // session. A Supabase signed URL carries its own permission and must not get the token.
+  viaBackend: boolean;
+};
+
+export type PhotoUploadStart = {
+  photo: CloudPhoto;
+  alreadyUploaded: boolean;
+  upload?: PhotoUploadTarget;
+  thumbUpload?: PhotoUploadTarget | null;
+};
+
+export type CloudPhotoUrls = {
+  id: string;
+  status: "ready" | "deleted";
+  mimeType: string;
+  url: string;
+  thumbUrl: string;
+  expiresAt: string;
+};
+
+/** A path the backend returned (`/api/...`) as a URL a browser can load. */
+export const resolveBackendUrl = (url: string): string => {
+  const value = String(url || "");
+  if (!value.startsWith("/api/")) return value;
+  const config = getSharedApiConfig();
+  return config.ok && config.baseUrl ? `${config.baseUrl}${value.slice(4)}` : value;
+};
+
+export const requestPhotoUploadUrl = async (payload: {
+  animalId?: string;
+  kind?: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+  width?: number;
+  height?: number;
+  thumb?: boolean;
+}) =>
+  request<PhotoUploadStart>("/photos/upload-url", { method: "POST", body: JSON.stringify(payload) });
+
+export const putPhotoBytes = async (target: PhotoUploadTarget, body: Blob) => {
+  if (target.viaBackend) {
+    return request<{ ok: boolean }>(target.url.replace(/^\/api(?=\/)/, ""), {
+      method: "PUT",
+      body,
+      headers: target.headers,
+      timeoutMs: 120000,
+    });
+  }
+  const response = await fetch(target.url, { method: target.method || "PUT", body, headers: target.headers });
+  if (!response.ok) {
+    throw new SharedApiError(`Photo upload failed (${response.status}).`, response.status >= 500 ? "server" : "validation", response.status);
+  }
+  return { ok: true };
+};
+
+export const completeCloudPhoto = async (id: string, payload: { width?: number; height?: number } = {}) =>
+  request<{ photo: CloudPhoto }>(`/photos/${encodeURIComponent(id)}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchCloudPhotoUrls = async (ids: string[]) =>
+  request<{ photos: CloudPhotoUrls[] }>("/photos/urls", { method: "POST", body: JSON.stringify({ ids }) });
+
+export const listCloudPhotos = async (animalId?: string) =>
+  request<{ photos: CloudPhoto[] }>(animalId ? `/photos?animalId=${encodeURIComponent(animalId)}` : "/photos");
+
+export const deleteCloudPhoto = async (id: string) =>
+  request<{ photo: CloudPhoto }>(`/photos/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const restoreCloudPhoto = async (id: string) =>
+  request<{ photo: CloudPhoto }>(`/photos/${encodeURIComponent(id)}/restore`, { method: "POST", body: JSON.stringify({}) });
+
+/** One of the keeper's stored photos onto a listing, copied on the server instead of uploaded again. */
+export const uploadMarketplaceMediaFromPhoto = async (payload: { photoId: string; listingId?: string }) =>
+  request<{ media: { id: string; publicUrl: string; mimeType: string } }>(
+    "/marketplace/uploads/from-photo",
+    { method: "POST", body: JSON.stringify(payload) },
+  );

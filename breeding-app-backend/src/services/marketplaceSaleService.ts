@@ -180,11 +180,15 @@ const logsOf = (payload: JsonRecord) => {
   return out;
 };
 
-/** Photo URLs only; embedded data URIs are the seller device's cache, not the record. */
+/**
+ * Photo URLs only; embedded data URIs are the seller device's cache, not the record. A `photo:`
+ * reference is the seller's stored photo, readable by its owner alone, so it would be a broken
+ * picture on the buyer's card; it stays behind too until photos can be handed over with the sale.
+ */
 const photosOf = (payload: JsonRecord): JsonRecord[] =>
   asArray(payload.photos)
     .map((photo) => (typeof photo === "string" ? { url: photo } : asRecord(photo)))
-    .filter((photo) => typeof photo.url === "string" && photo.url && !photo.url.startsWith("data:"))
+    .filter((photo) => typeof photo.url === "string" && photo.url && !photo.url.startsWith("data:") && !photo.url.startsWith("photo:"))
     .slice(-MAX_PHOTOS)
     .map((photo) => ({ id: photo.id, url: photo.url, takenAt: photo.takenAt, caption: photo.caption }));
 

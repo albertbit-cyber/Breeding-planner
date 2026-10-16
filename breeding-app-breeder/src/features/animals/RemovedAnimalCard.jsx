@@ -6,6 +6,7 @@ import { archiveLabels, formatRecordDate } from './archiveRecord';
 import { formatSexCode } from './animalTextList';
 import useDialogFocus from './useDialogFocus';
 import { help } from '../help/help';
+import PhotoImg from '../../components/PhotoImg.jsx';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 
 const text = (value) => (value === undefined || value === null ? '' : String(value).trim());
@@ -73,7 +74,7 @@ export default function RemovedAnimalCard({ animal, animals = [], pairings = [],
         <header className="relative flex gap-4 p-5 pe-14 border-b">
           <DialogHelpButton className="help-dialog-corner" />
           {photo ? (
-            <img src={photo} alt="" className="archive-record__photo removed-card__photo" />
+            <PhotoImg src={photo} alt="" className="archive-record__photo removed-card__photo" />
           ) : (
             <div className="archive-record__photo archive-record__photo--empty removed-card__photo" aria-hidden="true">{formatSexCode(animal.sex)}</div>
           )}

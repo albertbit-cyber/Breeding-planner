@@ -2,6 +2,7 @@ import DepartureTag from '../../animals/DepartureTag.jsx';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { help } from '../../help/help';
+import PhotoImg from '../../../components/PhotoImg.jsx';
 
 // Handles both local ('M'/'F') and pedigree ('male'/'female') formats
 const normSex = (s) => {
@@ -40,7 +41,7 @@ const AvatarPlaceholder = ({ snake }) => {
 
   if (snake?.photoUrl) {
     return (
-      <img
+      <PhotoImg
         src={snake.photoUrl}
         alt={snake.name}
         className="w-full h-full object-cover rounded-2xl"

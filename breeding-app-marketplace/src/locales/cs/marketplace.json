@@ -405,7 +405,13 @@
     "full": "Můžete připojit až {{max}} fotografií.",
     "type": "{{name}} není obrázek JPEG, PNG ani WebP.",
     "size": "{{name}} přesahuje 8 MB.",
-    "failed": "Nahrání se nezdařilo."
+    "failed": "Nahrání se nezdařilo.",
+    "fromAnimals": "Použít fotografii vašich zvířat",
+    "fromAnimalsTitle": "Fotografie vašich zvířat",
+    "fromAnimalsLoading": "Načítání fotografií…",
+    "fromAnimalsEmpty": "V cloudovém úložišti zatím nejsou žádné fotografie. Fotografie z chovatelské aplikace se zde objeví po synchronizaci.",
+    "fromAnimalsPick": "Přidat tuto fotografii",
+    "fromAnimalsClose": "Zavřít"
   },
   "dashboard": {
     "noStoreName": "Vaše inzeráty",

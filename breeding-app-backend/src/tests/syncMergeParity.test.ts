@@ -40,6 +40,15 @@ const makeRecord = (random: () => number) => {
     };
   }
   if (random() < 0.5) record.photos = [{ url: "https://cdn/p1.jpg", addedAt: TIMES[0] }];
+  // Photos in cloud storage: an entry whose url is a `photo:` reference, sometimes the same entry
+  // id as an inline copy on the other side (a device that has not migrated it yet).
+  if (random() < 0.5) {
+    record.photos = [
+      ...(record.photos || []),
+      { id: "ph1", url: pick(["photo:abc123", "data:image/jpeg;base64,/9j/AAAA"]), addedAt: TIMES[1], ...(random() < 0.5 ? { photoId: "abc123" } : {}) },
+    ];
+    if (random() < 0.5) record.imageUrl = pick(["photo:abc123", "photo:def456"]);
+  }
   return record;
 };
 
@@ -54,6 +63,25 @@ describe("device and server merge identically", () => {
         server.mergeSyncRecord(existing, incoming, options),
       );
     }
+  });
+
+  it("carries photo references through untouched on both sides", () => {
+    const options = { entryArrays: ["photos"], mergeLogs: true };
+    const stored = { id: "ph1", url: "photo:abc123", photoId: "abc123", addedAt: TIMES[0] };
+    const existing = { id: "a1", updatedAt: TIMES[0], photos: [] };
+    const incoming = {
+      id: "a1",
+      updatedAt: TIMES[1],
+      imageUrl: "photo:abc123",
+      fieldUpdatedAt: { "*": TIMES[0], imageUrl: TIMES[1] },
+      photos: [stored],
+    };
+    const fromClient = client.mergeSyncRecord(existing, incoming, options);
+    const fromServer = server.mergeSyncRecord(existing, incoming, options);
+    expect(fromServer).toEqual(fromClient);
+    expect(fromServer.imageUrl).toBe("photo:abc123");
+    expect(fromServer.photos).toEqual([stored]);
+    expect(fromServer.removedEntries).toBeUndefined();
   });
 
   it("derives the same entry identities and hashes", () => {

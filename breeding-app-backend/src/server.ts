@@ -27,6 +27,7 @@ import { app } from "./app";
 import { startEmailWorker, stopEmailWorker } from "./email/worker";
 import { startAccountPurgeWorker, stopAccountPurgeWorker } from "./services/accountPurgeWorker";
 import { describeBillingConfig } from "./services/billingService";
+import { describeStorageConfig } from "./services/uploadStorageService";
 
 /*
 Setup steps for true multi-computer shared data:
@@ -45,6 +46,7 @@ Setup steps for true multi-computer shared data:
 const server = app.listen(env.port, "0.0.0.0", () => {
   console.log(`[server] API running on port ${env.port}`);
   console.log(describeBillingConfig());
+  console.log(describeStorageConfig());
   startEmailWorker();
   startAccountPurgeWorker();
 });

@@ -397,7 +397,13 @@
     "full": "Puoi allegare fino a {{max}} foto.",
     "type": "{{name}} non è un'immagine JPEG, PNG o WebP.",
     "size": "{{name}} supera gli 8 MB.",
-    "failed": "Il caricamento non è riuscito."
+    "failed": "Il caricamento non è riuscito.",
+    "fromAnimals": "Usa una foto dei tuoi animali",
+    "fromAnimalsTitle": "Foto dei tuoi animali",
+    "fromAnimalsLoading": "Caricamento delle foto…",
+    "fromAnimalsEmpty": "Ancora nessuna foto nel tuo archivio cloud. Le foto scattate nell'app per allevatori compaiono qui dopo la sincronizzazione.",
+    "fromAnimalsPick": "Aggiungi questa foto",
+    "fromAnimalsClose": "Chiudi"
   },
   "dashboard": {
     "noStoreName": "I tuoi annunci",

@@ -4,6 +4,7 @@ import { ARCHIVE_REASONS, getArchiveRecord } from './archive';
 import { archiveLabels, formatRecordDate, formatRecordPrice } from './archiveRecord';
 import { formatSexCode } from './animalTextList';
 import { help } from '../help/help';
+import PhotoImg from '../../components/PhotoImg.jsx';
 
 const text = (value) => (value === undefined || value === null ? '' : String(value).trim());
 
@@ -109,7 +110,7 @@ export default function ArchiveList({ animals = [], locale, onOpen }) {
               <li key={animal.id}>
                 <button type="button" {...help('archive-open')} className="archive-list__row w-full text-left" onClick={() => onOpen(animal)}>
                   {photo
-                    ? <img src={photo} alt="" className="archive-list__thumb" loading="lazy" />
+                    ? <PhotoImg src={photo} variant="thumb" alt="" className="archive-list__thumb" loading="lazy" />
                     : <span className="archive-list__thumb archive-list__thumb--empty" aria-hidden="true">{formatSexCode(animal.sex)}</span>}
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium truncate">{animal.name || animal.id}</span>

@@ -155,6 +155,7 @@ model User {
   breedingCycles                 BreedingCycle[]
   follicleExaminations           FollicleExamination[]
   marketplaceMedia               MarketplaceMedia[]         @relation("MarketplaceMediaOwner")
+  photos                         Photo[]                    @relation("PhotoOwner")
   marketplaceMessageReports      MarketplaceMessageReport[] @relation("MarketplaceMessageReportReporter")
   marketplaceBlocks              MarketplaceUserBlock[]     @relation("MarketplaceUserBlockBlocker")
   marketplaceBlockedBy           MarketplaceUserBlock[]     @relation("MarketplaceUserBlockBlocked")
@@ -2034,4 +2035,36 @@ model BreederDataReplacement {
 
   @@index([ownerId, createdAt])
   @@map("breeder_data_replacements")
+}
+
+/// One stored photo: the bytes live in object storage (see uploadStorageService.ts), this row is
+/// the reference. Animal records point at it as `photo:{id}`; the record never holds the bytes.
+model Photo {
+  id          String    @id @default(cuid())
+  ownerUserId String    @map("owner_user_id")
+  owner       User      @relation("PhotoOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// The breeder app's own animal id (Animal.appAnimalId), not a foreign key: a photo can be taken
+  /// before its animal has ever synced. Null for photos not taken for an animal.
+  animalAppId String?   @map("animal_app_id")
+  /// cover | gallery | hatchling | document | marketplace
+  kind        String    @default("gallery")
+  /// users/{userId}/animals/{animalId}/{photoId}.{ext}
+  storageKey  String    @unique @map("storage_key") @db.Text
+  thumbKey    String?   @map("thumb_key") @db.Text
+  mimeType    String    @map("mime_type")
+  sizeBytes   Int       @map("size_bytes")
+  width       Int?
+  height      Int?
+  /// sha256 of the bytes, hex. The same picture uploaded twice by one owner is one row.
+  checksum    String
+  /// pending (upload URL issued) | ready (bytes verified) | deleted (soft, purged after 30 days)
+  status      String    @default("pending")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([ownerUserId, checksum])
+  @@index([ownerUserId, animalAppId])
+  @@index([status, deletedAt])
+  @@map("photos")
 }

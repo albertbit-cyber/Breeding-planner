@@ -397,7 +397,13 @@
     "full": "Puedes adjuntar hasta {{max}} fotos.",
     "type": "{{name}} no es una imagen JPEG, PNG o WebP.",
     "size": "{{name}} supera los 8 MB.",
-    "failed": "Esa subida ha fallado."
+    "failed": "Esa subida ha fallado.",
+    "fromAnimals": "Usar una foto de tus animales",
+    "fromAnimalsTitle": "Fotos de tus animales",
+    "fromAnimalsLoading": "Cargando tus fotos…",
+    "fromAnimalsEmpty": "Aún no hay fotos en tu almacenamiento en la nube. Las fotos tomadas en la app de criador aparecen aquí cuando se sincronizan.",
+    "fromAnimalsPick": "Añadir esta foto",
+    "fromAnimalsClose": "Cerrar"
   },
   "dashboard": {
     "noStoreName": "Tus anuncios",

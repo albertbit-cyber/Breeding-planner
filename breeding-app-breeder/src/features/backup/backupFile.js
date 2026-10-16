@@ -4,6 +4,8 @@
 // in Electron and opens the share sheet on the phone. App.jsx used to carry three copies of an
 // anchor-download routine for the three places a backup can be saved from.
 import { saveFile } from "../../platform/index.js";
+import { getPhotoResolver } from "../../services/cloudPhotos.js";
+import { inlinePhotoRefsForBackup } from "../../services/photoRefs.js";
 
 export const BACKUP_FILE_EXTENSION = "bpbackup";
 export const BACKUP_FILE_DOT_EXTENSION = `.${BACKUP_FILE_EXTENSION}`;
@@ -22,13 +24,19 @@ export const isoToFileTimestamp = (iso) => String(iso || new Date().toISOString(
 export const serializeBackup = (payload) => JSON.stringify(payload, null, 2);
 
 // saveBackupFile(payload, { filename, title }) -> { method, name, cancelled? }
-export const saveBackupFile = async (payload, { filename, title } = {}) => {
+//
+// A backup file has to stand on its own without the cloud, so photos the records hold only as
+// `photo:` references are written into it as their bytes (services/photoRefs.js). A photo whose
+// bytes cannot be had right now (offline, never shown on this device) stays a reference.
+export const saveBackupFile = async (payload, { filename, title, resolvePhoto } = {}) => {
   if (!payload || typeof payload !== "object") throw new Error("Nothing to back up.");
   const name = filename || buildBackupFilename("serpentora-backup", isoToFileTimestamp(payload.generatedAt));
+  const resolver = resolvePhoto || ((id) => getPhotoResolver().resolveDataUrl(id));
+  const complete = await inlinePhotoRefsForBackup(payload, resolver);
   return saveFile({
     name,
     mime: BACKUP_FILE_MIME,
-    data: serializeBackup(payload),
+    data: serializeBackup(complete),
     title: title || name,
   });
 };

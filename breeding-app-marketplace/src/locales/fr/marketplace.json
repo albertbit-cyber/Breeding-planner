@@ -397,7 +397,13 @@
     "full": "Vous pouvez joindre jusqu'à {{max}} photos.",
     "type": "{{name}} n'est pas une image JPEG, PNG ou WebP.",
     "size": "{{name}} dépasse 8 Mo.",
-    "failed": "L'envoi a échoué."
+    "failed": "L'envoi a échoué.",
+    "fromAnimals": "Utiliser une photo de vos animaux",
+    "fromAnimalsTitle": "Photos de vos animaux",
+    "fromAnimalsLoading": "Chargement de vos photos…",
+    "fromAnimalsEmpty": "Aucune photo dans votre stockage cloud pour l'instant. Les photos prises dans l'application éleveur apparaissent ici une fois synchronisées.",
+    "fromAnimalsPick": "Ajouter cette photo",
+    "fromAnimalsClose": "Fermer"
   },
   "dashboard": {
     "noStoreName": "Vos annonces",
