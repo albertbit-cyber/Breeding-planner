@@ -30,6 +30,7 @@ import {
 } from "../services/marketplaceService";
 import {
   blockMarketplaceUser,
+  createMarketplaceMediaFromPhoto,
   createMarketplaceMediaUpload,
   listMyMarketplaceBlocks,
   listMyMarketplaceMedia,
@@ -99,6 +100,11 @@ export const addMessage = async (req: Request, res: Response): Promise<void> => 
 export const uploadMedia = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   res.status(201).json(await createMarketplaceMediaUpload(req.user, req.body || {}));
+};
+
+export const uploadMediaFromPhoto = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(201).json(await createMarketplaceMediaFromPhoto(req.user, req.body || {}));
 };
 
 export const myMedia = async (req: Request, res: Response): Promise<void> => {
@@ -175,7 +181,17 @@ export const reviewableSales = async (req: Request, res: Response): Promise<void
 };
 
 export const mediaObject = async (req: Request, res: Response): Promise<void> => {
-  const { buffer, mimeType } = await readMarketplaceMediaObject(req.params.id, req.user || null);
+  const { buffer, redirectUrl, mimeType } = await readMarketplaceMediaObject(req.params.id, req.user || null);
+  // Listing images are embedded by the marketplace site, which is another origin; helmet's default
+  // same-origin resource policy would block every one of them.
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  if (redirectUrl) {
+    // The signed URL lives ten minutes, so the redirect may be cached for less than that.
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.redirect(302, redirectUrl);
+    return;
+  }
+  if (!buffer) throw new HttpError(404, "Marketplace media not found.");
   res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=86400, immutable");
   res.setHeader("Content-Length", String(buffer.length));

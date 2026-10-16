@@ -74,6 +74,28 @@ export const marketplaceUploadLimiter = rateLimit({
   message: { message: "Too many marketplace uploads, please try again later." },
 });
 
+// Animal photo uploads. Far looser than marketplace uploads: the first sync after this shipped
+// moves every photo a keeper has ever taken (upload URL, bytes, complete: two calls here each),
+// and a collection of a few hundred animals has photos in the thousands.
+export const photoUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 4000,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many photo uploads, please try again later." },
+});
+
+// Signed read URLs. A gallery asks in batches, but a busy collection still asks often.
+export const photoReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3000,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many photo requests, please try again later." },
+});
+
 // Public certificate lookups. A buyer checks one or two certificates; a scanner
 // checks thousands. Codes are 96 bits, so this is about load and noise rather
 // than about making a guess feasible.

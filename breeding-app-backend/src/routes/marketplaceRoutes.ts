@@ -35,6 +35,7 @@ import {
   storeReviews,
   unblockUser,
   uploadMedia,
+  uploadMediaFromPhoto,
 } from "../controllers/marketplaceController";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { optionalAuth, requireAuth } from "../middleware/auth";
@@ -73,6 +74,8 @@ marketplaceRoutes.post("/conversations/:id/messages", marketplaceMessageLimiter,
 marketplaceRoutes.post("/messages/:id/report", marketplaceMessageLimiter, requireAuth, asyncHandler(reportMessage));
 
 marketplaceRoutes.post("/uploads", marketplaceUploadLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(uploadMedia));
+// A stored animal photo onto a listing, copied server-side instead of uploaded again.
+marketplaceRoutes.post("/uploads/from-photo", marketplaceUploadLimiter, requireAuth, requireRole("admin", "breeder"), asyncHandler(uploadMediaFromPhoto));
 marketplaceRoutes.get("/uploads/me", requireAuth, requireRole("admin", "breeder"), asyncHandler(myMedia));
 // Photos on a published listing have to render for signed-out visitors, so this
 // one is optionally authenticated -- the service decides what is public.

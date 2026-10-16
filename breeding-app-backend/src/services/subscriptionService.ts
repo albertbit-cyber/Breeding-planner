@@ -299,6 +299,10 @@ const usageForFeature = async (userId: string, featureKey: string): Promise<numb
   // archived one (sold, died, given away) is a record the keeper chose to keep, not an animal
   // they hold. Counting either would keep an account at its cap after it made room.
   if (featureKey === "animals.create") return db.animal.count({ where: countedAnimalWhere(userId) });
+  // Stored photos, counted from the table rather than a monthly tally: storage is held, not spent.
+  if (featureKey === "animals.photos") {
+    return db.photo.count({ where: { ownerUserId: userId, status: { in: ["pending", "ready", "deleted"] } } });
+  }
   if (featureKey === "spaces.racks") return 0;
   if (featureKey === "spaces.rooms") return 0;
   const { start, end } = monthlyPeriod();

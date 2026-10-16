@@ -12,7 +12,8 @@ vi.mock("../lib/prisma", () => ({
   },
 }));
 
-vi.mock("../services/uploadStorageService", () => ({
+vi.mock("../services/uploadStorageService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/uploadStorageService")>()),
   uploadStorage: { putObject: vi.fn() },
 }));
 
@@ -73,9 +74,10 @@ describe("marketplaceRuntimeService", () => {
       },
     });
 
+    // Into the seller's own folder of the bucket, named by the media row's id.
     expect(uploadStorage.putObject).toHaveBeenCalledWith(expect.objectContaining({
-      ownerUserId: "breeder-1",
-      originalName: "upload.png",
+      key: expect.stringMatching(/^users\/breeder-1\/marketplace\/[a-f0-9]{32}\.png$/),
+      contentType: "image/png",
     }));
     expect((prisma as any).marketplaceMedia.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({

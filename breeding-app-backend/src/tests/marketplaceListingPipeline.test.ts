@@ -17,8 +17,13 @@ vi.mock("../services/marketplaceRecordService", () => ({
   buildListingRecords: vi.fn().mockResolvedValue(new Map()),
   findUnpublishedEvidence: vi.fn().mockResolvedValue([]),
 }));
-vi.mock("../services/uploadStorageService", () => ({
-  uploadStorage: { getObject: vi.fn().mockResolvedValue(Buffer.from("jpeg-bytes")) },
+vi.mock("../services/uploadStorageService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/uploadStorageService")>()),
+  // The local driver: no signed URL, so the bytes are served by this backend.
+  uploadStorage: {
+    getObject: vi.fn().mockResolvedValue(Buffer.from("jpeg-bytes")),
+    createSignedReadUrl: vi.fn().mockResolvedValue(null),
+  },
 }));
 
 import { prisma } from "../lib/prisma";

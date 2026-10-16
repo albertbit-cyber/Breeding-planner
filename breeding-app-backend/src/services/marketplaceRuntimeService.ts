@@ -4,7 +4,13 @@ import type { AuthenticatedUser } from "../types/auth";
 import { HttpError } from "../utils/errors";
 import { assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 import { recordSecurityEvent } from "./securityEventService";
-import { uploadStorage } from "./uploadStorageService";
+import {
+  SIGNED_READ_TTL_SECONDS,
+  extensionForMime,
+  marketplaceMediaKey,
+  newObjectId,
+  uploadStorage,
+} from "./uploadStorageService";
 import { validateMarketplaceUpload } from "./uploadValidationService";
 
 const db = prisma as any;
@@ -81,9 +87,16 @@ export const createMarketplaceMediaUpload = async (actor: AuthenticatedUser, pay
   }
 
   const originalName = text(payload.originalName || payload.fileName || payload.name, 240) || "marketplace-upload";
-  const stored = await uploadStorage.putObject({ ownerUserId: actor.id, buffer, originalName });
+  // Listing photos live in the seller's own folder of the bucket, beside their animal photos.
+  const mediaId = newObjectId();
+  const stored = await uploadStorage.putObject({
+    key: marketplaceMediaKey(actor.id, mediaId, extensionForMime(validation.mimeType)),
+    buffer,
+    contentType: validation.mimeType,
+  });
   const media = await db.marketplaceMedia.create({
     data: {
+      id: mediaId,
       ownerUserId: actor.id,
       listingId,
       storageKey: stored.storageKey,
@@ -116,7 +129,7 @@ export const createMarketplaceMediaUpload = async (actor: AuthenticatedUser, pay
 export const readMarketplaceMediaObject = async (
   mediaId: string,
   actor: AuthenticatedUser | null
-): Promise<{ buffer: Buffer; mimeType: string }> => {
+): Promise<{ buffer?: Buffer; redirectUrl?: string; mimeType: string }> => {
   const media = await db.marketplaceMedia.findUnique({
     where: { id: mediaId },
     include: { listing: { select: { status: true, archivedAt: true } } },
@@ -132,9 +145,74 @@ export const readMarketplaceMediaObject = async (
     throw new HttpError(404, "Marketplace media not found.");
   }
 
+  const mimeType = media.mimeType || "application/octet-stream";
+  // Object storage that can sign a URL serves the bytes itself; this backend only decides who may
+  // see them. The visibility rule above is unchanged, it just guards a redirect now.
+  const redirectUrl = await uploadStorage.createSignedReadUrl(media.storageKey, SIGNED_READ_TTL_SECONDS).catch(() => null);
+  if (redirectUrl) return { redirectUrl, mimeType };
+
   const buffer = await uploadStorage.getObject(media.storageKey).catch(() => null);
   if (!buffer) throw new HttpError(404, "Marketplace media not found.");
-  return { buffer, mimeType: media.mimeType || "application/octet-stream" };
+  return { buffer, mimeType };
+};
+
+/**
+ * Puts one of the seller's stored animal photos on a listing without uploading it again. The
+ * object is copied into the seller's marketplace folder rather than shared: a listing photo then
+ * outlives the animal photo being deleted, and its public visibility never leaks back onto the
+ * private animal photo.
+ */
+export const createMarketplaceMediaFromPhoto = async (actor: AuthenticatedUser, payload: Record<string, unknown>) => {
+  assertMarketplaceSeller(actor);
+
+  const listingId = text(payload.listingId, 160);
+  if (listingId) {
+    const listing = await db.marketplaceListing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new HttpError(404, "Marketplace listing not found.");
+    assertOwnerOrAdmin(actor, listing.sellerUserId, "You cannot upload media to this listing.");
+  }
+
+  const photoId = String(payload.photoId || "").replace(/^photo:/, "").trim();
+  if (!photoId) throw new HttpError(400, "photoId is required.");
+  const photo = await db.photo.findUnique({ where: { id: photoId } });
+  if (!photo || photo.ownerUserId !== actor.id || photo.status !== "ready") {
+    throw new HttpError(404, "Photo not found.");
+  }
+
+  // The same photo already copied for this seller (and this listing, when one is named) is reused.
+  const existing = await db.marketplaceMedia.findFirst({
+    where: { ownerUserId: actor.id, checksum: photo.checksum, status: "ready", ...(listingId ? { listingId } : {}) },
+  });
+  if (existing) return { media: toMarketplaceMediaDto(existing) };
+
+  const mediaId = newObjectId();
+  const storageKey = marketplaceMediaKey(actor.id, mediaId, extensionForMime(photo.mimeType));
+  await uploadStorage.copyObject(photo.storageKey, storageKey);
+  const media = await db.marketplaceMedia.create({
+    data: {
+      id: mediaId,
+      ownerUserId: actor.id,
+      listingId,
+      storageKey,
+      originalName: `${photo.animalAppId || "photo"}.${extensionForMime(photo.mimeType)}`,
+      mimeType: photo.mimeType,
+      sizeBytes: photo.sizeBytes,
+      checksum: photo.checksum,
+      status: "ready",
+      // Its format was checked by magic bytes when the photo was completed.
+      scanStatus: "passed",
+      publicUrl: null,
+    },
+  });
+
+  await recordSecurityEvent({
+    type: "marketplace_upload_created",
+    actorUserId: actor.id,
+    outcome: "success",
+    metadata: { mediaId: media.id, listingId, sizeBytes: photo.sizeBytes, mimeType: photo.mimeType, fromPhotoId: photo.id },
+  });
+
+  return { media: toMarketplaceMediaDto(media) };
 };
 
 export const listMyMarketplaceMedia = async (actor: AuthenticatedUser) => {
