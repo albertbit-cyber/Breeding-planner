@@ -82,17 +82,16 @@ describe('F. follow-up proposals', () => {
     expect(pendingPlannedPairings(applied.cycle)).toHaveLength(0);
   });
 
-  it('paused and closed cycles and recorded ovulation suppress new proposals; ovulation cancels pending automatic ones', () => {
+  it('paused and closed cycles and recorded ovulation suppress new proposals; ovulation ends every pending plan', () => {
     const state = withLock();
     const scheduled = scheduleFollowUpForLock(state.cycle, { sessionId: 's1', lock: state.lock, today: TODAY, now: NOW });
     const manual = addManualPlannedPairing(scheduled.cycle, { maleId: 'M1', date: '2026-04-20' }, { now: NOW }).cycle;
     const ovulated = recordEvent(manual, { type: 'ovulation', date: '2026-03-20' }, { now: NOW });
     const review = reviewPlannedAfterOvulation(ovulated, { now: NOW });
-    expect(review.cancelled).toHaveLength(1);
-    expect(review.toReview).toHaveLength(1);
-    const cancelled = review.cycle.plannedPairings.find((p) => p.origin === 'auto_after_lock');
-    expect(cancelled.status).toBe('cancelled');
-    expect(cancelled.resolution.kind).toBe('ovulation_recorded');
+    // Nothing is left for the keeper to review: the manual entry is cancelled too, record kept.
+    expect(review.cancelled).toHaveLength(2);
+    expect(review.toReview).toHaveLength(0);
+    expect(review.cycle.plannedPairings.every((p) => p.status === 'cancelled' && p.resolution.kind === 'ovulation_recorded')).toBe(true);
     expect(proposeNextPairing(review.cycle, { sessionId: 's1', lock: state.lock, today: TODAY }).reason).toBe('ovulation_recorded');
 
     const paused = pauseCycle(state.cycle, {}, { now: NOW });

@@ -186,8 +186,29 @@ export function normalizeOffspring(raw = {}) {
   };
 }
 
+/**
+ * Ids of sessions, locks, milestones and planned pairings the keeper removed from a card. Sync
+ * unions nested lists by id, so without this a removed record comes back from the other copy
+ * on the next merge. Both merges (here and on the server) union this list and drop its ids.
+ */
+export function normalizeRemovedIds(value) {
+  return Array.from(new Set(asArray(value).map(text).filter(Boolean)));
+}
+
+export function dropRemoved(cycle) {
+  const removed = new Set(normalizeRemovedIds(cycle?.removedIds));
+  if (!removed.size) return cycle;
+  const keep = (item) => item && !removed.has(item.id);
+  return {
+    ...cycle,
+    sessions: asArray(cycle.sessions).filter(keep).map((s) => ({ ...s, locks: asArray(s.locks).filter(keep) })),
+    plannedPairings: asArray(cycle.plannedPairings).filter(keep),
+    events: asArray(cycle.events).filter(keep),
+  };
+}
+
 export function normalizeCycle(raw = {}) {
-  const cycle = asObject(raw) || {};
+  const cycle = dropRemoved(asObject(raw) || {});
   const status = Object.values(CYCLE_STATUS).includes(cycle.status) ? cycle.status : CYCLE_STATUS.ACTIVE;
   const sessions = asArray(cycle.sessions).map(normalizeSession);
   const startDate = toYmd(cycle.startDate) || deriveStartDate(sessions);
@@ -230,6 +251,7 @@ export function normalizeCycle(raw = {}) {
     clutch: normalizeClutch(cycle.clutch),
     offspring: asArray(cycle.offspring).map(normalizeOffspring).filter((o) => o.animalId),
     legacy: asObject(cycle.legacy) || null,
+    removedIds: normalizeRemovedIds(cycle.removedIds),
     reviewFlags: asArray(cycle.reviewFlags).filter(Boolean),
     createdAt: text(cycle.createdAt) || null,
     updatedAt: text(cycle.updatedAt) || null,
@@ -438,7 +460,23 @@ export function removeLock(cycle, sessionId, lockId, { now = nowIso() } = {}) {
     updatedAt: now,
     locks: s.locks.filter((l) => l.id !== lockId),
   }));
+  return touch({ ...cycle, sessions, removedIds: withRemoved(cycle, [lockId]) }, now);
+}
+
+/** Move a lock record to another day. Its status and count are unchanged. */
+export function setLockDate(cycle, sessionId, lockId, date, { now = nowIso() } = {}) {
+  const day = toYmd(date);
+  if (!day) throw new Error('A lock observation needs a date.');
+  const sessions = cycle.sessions.map((s) => (s.id !== sessionId ? s : {
+    ...s,
+    updatedAt: now,
+    locks: s.locks.map((l) => (l.id !== lockId ? l : { ...l, observationDate: day })),
+  }));
   return touch({ ...cycle, sessions }, now);
+}
+
+function withRemoved(cycle, ids) {
+  return normalizeRemovedIds([...asArray(cycle.removedIds), ...ids]);
 }
 
 /**
@@ -557,10 +595,12 @@ export function updateSession(cycle, sessionId, patch, { now = nowIso() } = {}) 
 }
 
 export function removeSession(cycle, sessionId, { now = nowIso() } = {}) {
+  const removed = cycle.sessions.find((s) => s.id === sessionId);
   const sessions = cycle.sessions.filter((s) => s.id !== sessionId);
   const participated = new Set(sessions.map((s) => s.maleId));
   const males = cycle.males.map((m) => (participated.has(m.maleId) ? m : { ...m, state: MALE_STATE.PLANNED }));
-  return touch(reconcileMales({ ...cycle, sessions, males }), now);
+  const removedIds = removed ? withRemoved(cycle, [removed.id, ...removed.locks.map((l) => l.id)]) : cycle.removedIds;
+  return touch(reconcileMales({ ...cycle, sessions, males, removedIds }), now);
 }
 
 export function addCandidateMale(cycle, maleId, { now = nowIso(), notes = '' } = {}) {
@@ -627,7 +667,7 @@ export function recordEvent(cycle, input, { now = nowIso() } = {}) {
 }
 
 export function removeEvent(cycle, eventId, { now = nowIso() } = {}) {
-  return touch({ ...cycle, events: cycle.events.filter((e) => e.id !== eventId) }, now);
+  return touch({ ...cycle, events: cycle.events.filter((e) => e.id !== eventId), removedIds: withRemoved(cycle, [eventId]) }, now);
 }
 
 export function updateClutch(cycle, patch, { now = nowIso() } = {}) {
