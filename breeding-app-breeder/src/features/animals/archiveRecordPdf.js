@@ -8,6 +8,8 @@
 import { CATALOG_COLORS } from './catalogLayout';
 import { exitDetailRows, formatRecordDate, archiveRecordFileName } from './archiveRecord';
 import { applyPdfUnicodeFont, setPdfFont } from '../../utils/pdfFonts';
+import { getPhotoResolver } from '../../services/cloudPhotos';
+import { isPhotoRef, photoIdFromRef } from '../../services/photoRefs';
 
 const MARGIN = 18;
 const LINE = 5.2;
@@ -17,6 +19,8 @@ const fill = (template, values) => template.replace(/\{\{(\w+)\}\}/g, (_, name) 
 async function loadImageDataUrl(url) {
   if (!url) return null;
   if (url.startsWith('data:image/')) return url;
+  // A photo in cloud storage: this device's copy, or the bytes behind a signed URL.
+  if (isPhotoRef(url)) return getPhotoResolver().resolveDataUrl(photoIdFromRef(url)).catch(() => null);
   try {
     const response = await fetch(url, { mode: 'cors' });
     if (!response.ok) return null;

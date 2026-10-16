@@ -1,4 +1,6 @@
 import { applyPdfUnicodeFont, setPdfFont } from "../pdfFonts";
+import { getPhotoResolver } from "../../services/cloudPhotos";
+import { isPhotoRef, photoIdFromRef } from "../../services/photoRefs";
 import type { LabCertificateTemplateData, RenderedCertificateArtifact } from "../../types/labCertificate";
 
 export interface CertificatePdfRenderOptions {
@@ -162,8 +164,13 @@ const loadImageElement = (url: string): Promise<HTMLImageElement> =>
   });
 
 const prepareSquareImageDataUrl = async (url: string): Promise<string | null> => {
-  const normalized = String(url || "").trim();
+  let normalized = String(url || "").trim();
   if (!normalized || typeof document === "undefined") return null;
+  // A photo in cloud storage is drawn from its bytes, which also keeps the canvas untainted.
+  if (isPhotoRef(normalized)) {
+    normalized = (await getPhotoResolver().resolveDataUrl(photoIdFromRef(normalized)).catch(() => null)) || "";
+    if (!normalized) return null;
+  }
 
   try {
     const image = await loadImageElement(normalized);

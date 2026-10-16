@@ -2,6 +2,7 @@ import DepartureTag from '../../animals/DepartureTag.jsx';
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { help } from '../../help/help';
+import PhotoImg from '../../../components/PhotoImg.jsx';
 
 const SEX_ICON  = { male: '♂', female: '♀', unknown: '?' };
 const SEX_COLOR = { male: 'sk-sex-male', female: 'sk-sex-female', unknown: 'sk-sex-unknown' };
@@ -84,8 +85,9 @@ const SnakeNode = ({ data }) => {
           style={{ background: AVATAR_GRADIENT[role] || AVATAR_GRADIENT.ancestor, color: 'var(--sk-text-on-accent)' }}
         >
           {snake.photoUrl ? (
-            <img
+            <PhotoImg
               src={snake.photoUrl}
+              variant="thumb"
               alt={snake.name}
               className="w-full h-full rounded-full object-cover"
             />

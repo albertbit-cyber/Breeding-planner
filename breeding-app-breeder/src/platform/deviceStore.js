@@ -60,6 +60,9 @@ export const MANAGED_KEYS = Object.freeze([
   "breedingPlannerPreRestoreSnapshot",
   "bpSyncTombstones",
   "serpentoraRecentAnimals",
+  // This device's copies of photos it moved to cloud storage (services/cloudPhotos.js), so a
+  // photo taken here still shows offline once its record holds only a `photo:` reference.
+  "serpentoraPhotoCache",
 ]);
 const managedSet = new Set(MANAGED_KEYS);
 export const isManagedKey = (key) => managedSet.has(key);

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowCounterClockwise, CaretRight, ForkKnife, MagnifyingGlass, QrCode, X } from "@phosphor-icons/react";
 import { buildLocationIndex, dueFeeds, geneticsText, isRetired, searchSnakes, sexLetter, snakeImage } from "./fieldLogic.js";
+import PhotoImg from "../../components/PhotoImg.jsx";
 import "./field.css";
 
 // The phone's home screen: scan, see what is due, get to an animal in one tap. Everything
@@ -16,7 +17,7 @@ function AnimalRow({ snake, location, meta, onOpen, onLog, logLabel }) {
     <li className="fld-row">
       <button type="button" className="fld-row__main" onClick={() => onOpen(snake)}>
         <span className="fld-row__avatar" aria-hidden="true">
-          {image ? <img src={image} alt="" /> : <span>{String(snake.name || snake.id || "?").slice(0, 1)}</span>}
+          {image ? <PhotoImg src={image} variant="thumb" alt="" /> : <span>{String(snake.name || snake.id || "?").slice(0, 1)}</span>}
         </span>
         <span className="fld-row__text">
           <span className="fld-row__title">

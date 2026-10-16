@@ -78,6 +78,8 @@ import {
   fetchSellerDashboard,
   updateMarketplaceListing,
   uploadMarketplaceMedia,
+  uploadMarketplaceMediaFromPhoto,
+  deleteCloudPhoto,
   fetchMySubscription,
   fetchPublicSubscriptionTiers,
   getCurrentUser,
@@ -266,6 +268,15 @@ import {
 import { haptic, isNativeShell, onBackButton } from "./platform/index.js";
 import { DEVICE_STORE_DB_NAME, STORAGE_FULL_EVENT, getDeviceStore } from "./platform/deviceStore.js";
 import { reattachCurrentPhotos, stripInlinePhotos } from "./services/backupPhotos.js";
+import {
+  applyPhotoSwaps,
+  collectPendingPhotoUploads,
+  collectPhotoRefIds,
+  isPhotoRef,
+  photoIdFromRef,
+} from "./services/photoRefs.js";
+import { getLocalPhotoCache, getPhotoResolver, runPhotoUploadQueue } from "./services/cloudPhotos.js";
+import PhotoImg, { PhotoLink } from "./components/PhotoImg.jsx";
 import DeviceStorageSummary from "./components/DeviceStorageSummary.jsx";
 import FieldScreen from "./features/field/FieldScreen.jsx";
 import QuickLogSheet from "./features/field/QuickLogSheet.jsx";
@@ -2900,7 +2911,12 @@ function normalizePhotoEntry(raw) {
   const sizeValue = Number(raw.size);
   const size = Number.isFinite(sizeValue) && sizeValue >= 0 ? sizeValue : null;
   const note = typeof raw.note === 'string' ? raw.note : '';
-  return { id, url, name, addedAt, source, type, size, note };
+  const entry = { id, url, name, addedAt, source, type, size, note };
+  // The stored photo behind a `photo:` url, kept beside an inline copy too (a backup file), so the
+  // record always says which stored photo it is.
+  const photoId = typeof raw.photoId === 'string' && raw.photoId.trim() ? raw.photoId.trim() : photoIdFromRef(url);
+  if (photoId) entry.photoId = photoId;
+  return entry;
 }
 
 function normalizeSnakePhotos(rawList) {
@@ -8335,6 +8351,42 @@ export default function BreedingPlannerApp() {
     return run;
   }, [performCloudBreederSync, sharedBackendSnapshot?.authStatus, sharedBackendSnapshot?.message, sharedBreederDataReady]);
 
+  // Photos to cloud storage (services/cloudPhotos.js). Photos on this device are sent to the
+  // keeper's folder after each successful sync, while signed in and online, a batch at a time.
+  // Each batch swaps the uploaded photos to `photo:` references; that edit is what the next sync
+  // carries to every other device. The first pass after this shipped is the one-time migration of
+  // every photo already on the device. A photo that fails stays inline and shows as before.
+  const photoQueueRunningRef = useRef(false);
+  const snakesForPhotoQueueRef = useRef(snakes);
+  snakesForPhotoQueueRef.current = snakes;
+  useEffect(() => {
+    if (!sharedBreederDataReady || cloudSyncStatus?.state !== 'success') return;
+    if (photoQueueRunningRef.current) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const current = snakesForPhotoQueueRef.current;
+    const cache = getLocalPhotoCache();
+    // Copies of photos no record points at any more (deleted, or replaced by a restore) go.
+    cache.prune(collectPhotoRefIds(current));
+    if (!collectPendingPhotoUploads(current).length) return;
+    photoQueueRunningRef.current = true;
+    (async () => {
+      try {
+        const result = await runPhotoUploadQueue(current, { cache });
+        if (result.swaps.size) setSnakes(prev => applyPhotoSwaps(prev, result.swaps));
+        if (result.stoppedBy) console.warn('[photos] upload paused until the next sync:', result.stoppedBy?.message || result.stoppedBy);
+      } catch (err) {
+        console.warn('[photos] upload pass failed; photos stay on this device', err);
+      } finally {
+        photoQueueRunningRef.current = false;
+      }
+    })();
+  }, [sharedBreederDataReady, cloudSyncStatus?.state, cloudSyncStatus?.lastSyncedAt, setSnakes]);
+
+  // Signed out: forget every signed photo URL, so the next account never sees this one's links.
+  useEffect(() => {
+    if (!sharedBreederDataReady) getPhotoResolver().clear();
+  }, [sharedBreederDataReady]);
+
   // A laboratory submitting a result now writes the animal's genetics on the
   // backend, so the way to see it here is to pull, not to recompute it locally.
   // Recomputing was how the same finding could land twice under two different
@@ -10407,6 +10459,20 @@ export default function BreedingPlannerApp() {
 
   const handleRemoveSnakePhoto = useCallback((snakeId, photoId) => {
     if (!snakeId || !photoId) return;
+    // A photo in cloud storage is soft-deleted there too (purged after 30 days), unless another
+    // card still shows the same stored photo. The purge checks again before deleting anything.
+    const before = snakesForPhotoQueueRef.current || [];
+    const removedRef = normalizeSnakePhotos(before.find(s => s?.id === snakeId)?.photos)
+      .find(photo => photo.id === photoId)?.url;
+    const storedId = photoIdFromRef(removedRef);
+    if (storedId) {
+      const elsewhere = before.some(s => {
+        if (!s) return false;
+        const photos = normalizeSnakePhotos(s.photos).filter(photo => !(s.id === snakeId && photo.id === photoId));
+        return photos.some(photo => photo.url === removedRef) || (s.id !== snakeId && s.imageUrl === removedRef);
+      });
+      if (!elsewhere) deleteCloudPhoto(storedId).catch(() => {});
+    }
     let updatedSnake = null;
     setSnakes(prev => prev.map(s => {
       if (!s || s.id !== snakeId) return s;
@@ -10739,12 +10805,18 @@ export default function BreedingPlannerApp() {
         return { images: [{ imageUrl: plan.imageUrl, isPrimary: true, sortOrder: 0 }], mediaIds: [], record: null };
       }
 
-      const parts = splitDataUri(await shrinkToFit(plan.dataUri));
-      if (!parts) return none;
-      const uploaded = await uploadMarketplaceMedia({
-        dataBase64: parts.dataBase64,
-        originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
-      });
+      let uploaded;
+      if (plan.action === 'photo') {
+        // Already in cloud storage: copied onto the listing on the server, no bytes from here.
+        uploaded = await uploadMarketplaceMediaFromPhoto({ photoId: plan.photoId });
+      } else {
+        const parts = splitDataUri(await shrinkToFit(plan.dataUri));
+        if (!parts) return none;
+        uploaded = await uploadMarketplaceMedia({
+          dataBase64: parts.dataBase64,
+          originalName: `${snake.id || 'animal'}.${extensionFor(parts.mimeType)}`,
+        });
+      }
       const imageUrl = uploaded?.media?.publicUrl || '';
       const mediaId = uploaded?.media?.id || '';
       if (!imageUrl || !mediaId) return none;
@@ -13667,7 +13739,7 @@ export default function BreedingPlannerApp() {
                     return (
                       <div key={photo.id} className="border border-neutral-200 rounded-xl overflow-hidden bg-neutral-50 flex flex-col">
                         <div className="relative bg-neutral-100">
-                          <img
+                          <PhotoImg
                             src={photo.url}
                             alt={photo.name || t("photoGallery.photoAlt", { name: photoGallerySnake.name || t("photoGallery.snakeFallback", { defaultValue: "Snake" }), defaultValue: "{{name}} photo" })}
                             className="w-full h-full object-cover"
@@ -13689,8 +13761,8 @@ export default function BreedingPlannerApp() {
                             <div className="text-xs text-neutral-500">{t("photoGallery.addedAt", { date: addedLabel, defaultValue: "Added {{date}}" })}</div>
                           )}
                           <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
-                            <a
-                              href={photo.url}
+                            <PhotoLink
+                              src={photo.url}
                               download={fileName}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -13698,7 +13770,7 @@ export default function BreedingPlannerApp() {
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100"
                             >
                               {t("actions.open", { defaultValue: "Open" })}
-                            </a>
+                            </PhotoLink>
                             <button
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-neutral-100 disabled:opacity-60"
                               onClick={() => handleSetSnakeCoverPhoto(photoGallerySnake.id, photo.id)}
@@ -14427,7 +14499,7 @@ export default function BreedingPlannerApp() {
                   const headerPhotos = normalizeSnakePhotos(editSnakeDraft.photos);
                   const headerUrl = editSnakeDraft.imageUrl || (headerPhotos.length ? headerPhotos[headerPhotos.length - 1]?.url : '');
                   return headerUrl ? (
-                    <img src={headerUrl} alt={editSnakeDraft.name || ''} />
+                    <PhotoImg src={headerUrl} alt={editSnakeDraft.name || ''} />
                   ) : (
                     <div className="snake-editor-photo__empty">{t("snakeEdit.image.none")}</div>
                   );
@@ -17421,7 +17493,11 @@ async function generateSnakeCatalogPDF(animals = [], options = {}) {
     doc.setFillColor(C.paper[0], C.paper[1], C.paper[2]);
     doc.rect(0, 0, pageW, pageH, 'F');
 
-    const primaryImage = resolvePrimaryAnimalImage(animal);
+    let primaryImage = resolvePrimaryAnimalImage(animal);
+    // A photo in cloud storage is fetched as bytes: jsPDF embeds data, not links.
+    if (isPhotoRef(primaryImage)) {
+      primaryImage = await getPhotoResolver().resolveDataUrl(photoIdFromRef(primaryImage)).catch(() => null) || '';
+    }
     let imageDrawn = false;
     if (primaryImage) {
       try {
@@ -18827,8 +18903,9 @@ function SnakeCard({ s, onEdit, onQuickPair, onOpenFamilyTree, onOrderGeneticTes
         <div className="flex-shrink-0">
           {coverPhotoUrl ? (
             <div className="w-12 h-12 rounded-full overflow-hidden border ring-1 ring-white/60 shadow-sm">
-              <img
+              <PhotoImg
                 src={coverPhotoUrl}
+                variant="thumb"
                 alt={s?.name ? `${s.name} photo` : 'Snake photo'}
                 className="w-full h-full object-cover object-center"
                 onError={(e)=>{e.currentTarget.style.display='none';}}

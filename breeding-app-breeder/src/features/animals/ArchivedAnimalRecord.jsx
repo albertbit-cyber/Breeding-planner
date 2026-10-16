@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { archiveLabels, exitDetailRows, formatRecordDate, formatArchiveRecordText } from './archiveRecord';
 import { help } from '../help/help';
+import PhotoImg from '../../components/PhotoImg.jsx';
 import { DialogHelpButton } from '../help/ui/HelpButton';
 
 const FEEDS_SHOWN = 12;
@@ -159,7 +160,7 @@ export default function ArchivedAnimalRecord({
         <header className="archive-record__header relative flex gap-4 p-5 pe-14 border-b">
           <DialogHelpButton className="help-dialog-corner" />
           {a.photo ? (
-            <img src={a.photo} alt="" className="archive-record__photo" />
+            <PhotoImg src={a.photo} alt="" className="archive-record__photo" />
           ) : (
             <div className="archive-record__photo archive-record__photo--empty" aria-hidden="true">{a.sexCode}</div>
           )}
