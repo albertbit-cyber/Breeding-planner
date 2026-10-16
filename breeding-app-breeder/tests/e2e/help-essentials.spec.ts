@@ -167,9 +167,23 @@ test("with Help Mode on, pressing controls on each screen changes no stored data
     }
   };
 
+  // The app writes on its own after a screen opens (a sync pull, season set-up). Take the
+  // snapshot once that has settled, so only a write caused by a press is caught.
+  const settledStorage = async () => {
+    await page.waitForLoadState("networkidle").catch(() => {});
+    let last = await storage();
+    for (let stable = 0; stable < 3;) {
+      await page.waitForTimeout(500);
+      const now = await storage();
+      stable = now === last ? stable + 1 : 0;
+      last = now;
+    }
+    return last;
+  };
+
   const pressAround = async (screen: string) => {
     await helpMode(true);
-    const before = await storage();
+    const before = await settledStorage();
     watching = true;
     const controls = page.locator("[data-help]:visible:not([data-help-ui]):not([data-help-ui] *)");
     const count = Math.min(await controls.count(), 18);
@@ -181,7 +195,14 @@ test("with Help Mode on, pressing controls on each screen changes no stored data
       await page.keyboard.press("Escape");
     }
     watching = false;
-    expect(await storage(), `${screen}: stored data changed in Help Mode`).toBe(before);
+    // Name the keys that changed, with their old and new values, so a failure says what moved.
+    const after = await storage();
+    const was = new Map<string, string>(JSON.parse(before));
+    const changed = (JSON.parse(after) as Array<[string, string]>)
+      .filter(([key, value]) => was.get(key) !== value)
+      .map(([key, value]) => `${key}\n  before: ${String(was.get(key)).slice(0, 600)}\n  after:  ${String(value).slice(0, 600)}`);
+    for (const key of was.keys()) if (!after.includes(JSON.stringify(key))) changed.push(`${key} removed`);
+    expect(changed, `${screen}: stored data changed in Help Mode`).toEqual([]);
     expect(writes, `${screen}: Help Mode wrote to the server`).toEqual([]);
   };
 
