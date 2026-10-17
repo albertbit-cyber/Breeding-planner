@@ -4218,7 +4218,8 @@ function withParentsDetectedFromName(draft, animals) {
   return Object.keys(patch).length ? { ...draft, ...patch } : draft;
 }
 
-const FEEDER_TYPE_OPTIONS = ['Rat', 'Multimammate', 'Mouse'];
+// Alphabetical, the same order the defrost report lists food types in.
+const FEEDER_TYPE_OPTIONS = ['Mouse', 'Multimammate', 'Rat'];
 const FEEDER_SIZE_OPTIONS_BY_TYPE = {
   Rat: ['5-10g','10-20g','20-30g','30-50g','50-70g','70-90g','90-110g','120-150g','150-170g','170-200g','200-250g','250-300g','301-350g','350-400g'],
   Mouse: ['1-3g','3-4g','5-7g','7-10g','10-16g','16-24g','25-30g','30-35g','35-40g','40-50g'],
@@ -4358,6 +4359,18 @@ function formatFeederClass(profile) {
   if (Number.isFinite(grams) && grams > 0) return `${grams} g`;
   return '';
 }
+
+// Size classes are ranges like '5-10g', so a text sort puts '10-20g' ahead of '5-10g'. The
+// lower bound is the real order; anything without a leading number (an old free-text size)
+// goes after the numbered ones.
+function feederSizeSortValue(sizeClass) {
+  const grams = parseFloat(String(sizeClass || '').trim().replace(',', '.'));
+  return Number.isFinite(grams) ? grams : Number.POSITIVE_INFINITY;
+}
+
+// A group named for hatchlings is what the group feed setter is for; breeder groups mix males
+// and females on different sizes, so they go to the bottom of the list rather than the top.
+const HATCHLING_GROUP_PATTERN = /hatch|bab(y|ies)|juv|neonat|schl(ü|ue|u)pf|jungtier|nakomeling|nouveau-n|cr(í|i)as?\b|filhote|m(ł|l)od|ml(á|a)d|גוזל|בקיע/i;
 
 /**
  * Example gene text for the Quick Add placeholder, per species. Only a hint for the handful
@@ -15487,6 +15500,14 @@ export default function BreedingPlannerApp() {
           setShowFeedPrepModal(false);
           openSnakeCard(snake);
         }}
+        onApplyGroupFeed={(ids, feed) => {
+          const targets = new Set(ids);
+          setSnakes(prev => prev.map(s => (
+            s && targets.has(s.id)
+              ? { ...s, feederProfile: normalizeFeederProfileForSave({ ...getSnakeFeederProfile(s), ...feed }) }
+              : s
+          )));
+        }}
         theme={theme}
       />
       <ExportPairingQrModal
@@ -18495,10 +18516,15 @@ async function exportClutchCardToPdf(details = {}) {
   doc.save(`${fileSafe}.pdf`);
 }
 
-function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake, theme = 'blue' }) {
+function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake, onApplyGroupFeed, theme = 'blue' }) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupFeedType, setGroupFeedType] = useState('');
+  const [groupSizeClass, setGroupSizeClass] = useState('');
+  const [groupAppliedCount, setGroupAppliedCount] = useState(null);
+  const wasOpenRef = useRef(false);
 
   const snakeRows = useMemo(() => {
     return (Array.isArray(snakes) ? snakes : [])
@@ -18523,11 +18549,47 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [pairings, snakes, t]);
 
+  // Hatchling groups first, so the usual target is one tap away; the rest follow by name.
+  const groupOptions = useMemo(() => {
+    const counts = new Map();
+    snakeRows.forEach((row) => {
+      const memberships = Array.isArray(row.snake.groups) ? row.snake.groups : [];
+      new Set(memberships.map(g => String(g || '').trim()).filter(Boolean))
+        .forEach(name => counts.set(name, (counts.get(name) || 0) + 1));
+    });
+    return Array.from(counts, ([name, count]) => ({ name, count, hatchling: HATCHLING_GROUP_PATTERN.test(name) }))
+      .sort((a, b) => (a.hatchling === b.hatchling ? a.name.localeCompare(b.name) : a.hatchling ? -1 : 1));
+  }, [snakeRows]);
+
+  // Only on opening. Saving a group's food changes `snakes`, and resetting here on every change
+  // would throw away the ticks the keeper has just made.
   useEffect(() => {
-    if (!open) return;
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (!open || wasOpen) return;
     setSelectedIds(snakeRows.filter(row => !row.excluded).map(row => row.id).filter(Boolean));
     setCopied(false);
-  }, [open, snakeRows]);
+    setGroupName(groupOptions.find(option => option.hatchling)?.name || '');
+    setGroupFeedType('');
+    setGroupSizeClass('');
+    setGroupAppliedCount(null);
+  }, [open, snakeRows, groupOptions]);
+
+  const groupMemberRows = useMemo(
+    () => (groupName ? snakeRows.filter(row => Array.isArray(row.snake.groups) && row.snake.groups.some(g => String(g || '').trim() === groupName)) : []),
+    [groupName, snakeRows]
+  );
+  const groupChangingCount = groupMemberRows.filter(row => (
+    row.profile.feedType && (row.profile.feedType !== groupFeedType || row.profile.sizeClass !== groupSizeClass)
+  )).length;
+  const groupSizeOptions = FEEDER_SIZE_OPTIONS_BY_TYPE[groupFeedType] || [];
+  const canApplyGroupFeed = Boolean(groupMemberRows.length && groupFeedType && groupSizeClass && typeof onApplyGroupFeed === 'function');
+
+  const applyGroupFeed = () => {
+    if (!canApplyGroupFeed) return;
+    onApplyGroupFeed(groupMemberRows.map(row => row.id), { feedType: groupFeedType, sizeClass: groupSizeClass });
+    setGroupAppliedCount(groupMemberRows.length);
+  };
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedRows = useMemo(
@@ -18556,8 +18618,13 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
     });
     return Array.from(map.values()).sort((a, b) => {
       const byFeed = a.feedType.localeCompare(b.feedType);
-      const bySize = byFeed || a.sizeClass.localeCompare(b.sizeClass);
-      return bySize || a.weightText.localeCompare(b.weightText);
+      if (byFeed) return byFeed;
+      const sizeA = feederSizeSortValue(a.sizeClass || a.weightText);
+      const sizeB = feederSizeSortValue(b.sizeClass || b.weightText);
+      if (sizeA !== sizeB) return sizeA < sizeB ? -1 : 1;
+      const bySizeText = a.sizeClass.localeCompare(b.sizeClass);
+      if (bySizeText) return bySizeText;
+      return (parseFloat(a.weightText) || 0) - (parseFloat(b.weightText) || 0);
     });
   }, [readyRows]);
 
@@ -18636,6 +18703,82 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
             </div>
           </div>
 
+          {groupOptions.length ? (
+            <section className="rounded-xl border overflow-hidden" data-feed-prep="group">
+              <div className="px-4 py-3 border-b bg-neutral-50">
+                <h3 {...help('feed-prep-group')} className="font-semibold text-neutral-900">{t('feedPrep.groupTitle', { defaultValue: 'Set food for a group' })}</h3>
+                <p className="text-xs text-neutral-500">{t('feedPrep.groupHint', { defaultValue: 'Gives every animal in a hatchling group the same food type and size. Quantity, interval, weight and notes stay as they are.' })}</p>
+              </div>
+              <div className="p-4 flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600 min-w-[12rem] flex-1 sm:flex-none">
+                  {t('feedPrep.group', { defaultValue: 'Group' })}
+                  <select
+                    className="border rounded-xl px-3 py-2 text-sm bg-white text-neutral-900"
+                    value={groupName}
+                    onChange={(event) => { setGroupName(event.target.value); setGroupAppliedCount(null); }}
+                  >
+                    <option value="">{t('feedPrep.chooseGroup', { defaultValue: 'Choose a group' })}</option>
+                    {groupOptions.map(option => (
+                      <option key={option.name} value={option.name}>{`${option.name} (${option.count})`}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600 min-w-[9rem] flex-1 sm:flex-none">
+                  {t('feedPrep.foodType', { defaultValue: 'Food type' })}
+                  <select
+                    className="border rounded-xl px-3 py-2 text-sm bg-white text-neutral-900"
+                    value={groupFeedType}
+                    onChange={(event) => {
+                      const nextType = event.target.value;
+                      setGroupFeedType(nextType);
+                      // A size from another food's list would save a size that food is not sold in.
+                      if (!(FEEDER_SIZE_OPTIONS_BY_TYPE[nextType] || []).includes(groupSizeClass)) setGroupSizeClass('');
+                      setGroupAppliedCount(null);
+                    }}
+                  >
+                    <option value="">{t('feedPrep.notSet', { defaultValue: 'Not set' })}</option>
+                    {FEEDER_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600 min-w-[9rem] flex-1 sm:flex-none">
+                  {t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}
+                  <select
+                    className="border rounded-xl px-3 py-2 text-sm bg-white text-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-400"
+                    value={groupSizeClass}
+                    disabled={!groupFeedType}
+                    onChange={(event) => { setGroupSizeClass(event.target.value); setGroupAppliedCount(null); }}
+                  >
+                    <option value="">{t('feedPrep.notSet', { defaultValue: 'Not set' })}</option>
+                    {groupSizeOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <button
+                  {...help('feed-prep-group-apply')}
+                  type="button"
+                  className={cx('px-4 py-2 rounded-xl text-sm w-full sm:w-auto', primaryBtnClass(theme, canApplyGroupFeed))}
+                  onClick={applyGroupFeed}
+                  disabled={!canApplyGroupFeed}
+                >
+                  {t('feedPrep.applyToGroup', { defaultValue: 'Apply to group' })}
+                </button>
+              </div>
+              {groupName ? (
+                <div className="px-4 pb-3 -mt-1 text-xs text-neutral-600 flex flex-wrap gap-x-4 gap-y-1" aria-live="polite">
+                  {groupAppliedCount !== null ? (
+                    <span className="text-emerald-700 font-medium">{t('feedPrep.groupApplied', { n: groupAppliedCount, defaultValue: 'Saved. Animals updated: {{n}}' })}</span>
+                  ) : (
+                    <>
+                      <span>{t('feedPrep.groupMembers', { n: groupMemberRows.length, defaultValue: 'Animals in group: {{n}}' })}</span>
+                      {groupFeedType && groupSizeClass && groupChangingCount ? (
+                        <span className="text-amber-700">{t('feedPrep.groupOverwrites', { n: groupChangingCount, defaultValue: 'Already on another food, will be changed: {{n}}' })}</span>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] gap-5">
             <section className="rounded-xl border overflow-hidden">
               <div className="px-4 py-3 border-b bg-neutral-50">
@@ -18649,7 +18792,7 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                       <tr>
                         <th className="text-start px-4 py-2">{t('feedPrep.foodType', { defaultValue: 'Food type' })}</th>
                         <th className="text-start px-4 py-2">{t('feedPrep.sizeClass', { defaultValue: 'Size / weight class' })}</th>
-                        <th className="text-start px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
+                        <th className="hidden sm:table-cell text-start px-4 py-2">{t('feedPrep.weightGrams', { defaultValue: 'Weight (g)' })}</th>
                         <th className="text-end px-4 py-2">{t('feedPrep.defrost', { defaultValue: 'Defrost' })}</th>
                       </tr>
                     </thead>
@@ -18657,8 +18800,12 @@ function FeedPrepModal({ open, onClose, snakes = [], pairings = [], onEditSnake,
                       {reportRows.map(row => (
                         <tr key={`${row.feedType}-${row.sizeClass}-${row.weightText}`} className="border-b last:border-0">
                           <td className="px-4 py-3 font-medium">{row.feedType}</td>
-                          <td className="px-4 py-3">{row.sizeClass || '-'}</td>
-                          <td className="px-4 py-3">{row.weightText || '-'}</td>
+                          {/* On a phone the weight folds under the size, so the count stays on screen. */}
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.sizeClass || '-'}
+                            {row.weightText ? <span className="block sm:hidden text-xs text-neutral-500">{row.weightText}</span> : null}
+                          </td>
+                          <td className="hidden sm:table-cell px-4 py-3">{row.weightText || '-'}</td>
                           <td className="px-4 py-3 text-end font-semibold">{row.quantity}</td>
                         </tr>
                       ))}

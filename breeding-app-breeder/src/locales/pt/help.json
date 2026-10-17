@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Lista o que tirar do congelador, agrupado por tipo de alimento, tamanho ou classe de peso e peso, com a quantidade de cada.",
-      "more": "Só contam aqui os animais marcados com perfil de alimentação completo.",
+      "more": "Só contam aqui os animais marcados com perfil de alimentação completo. Os tipos de alimento vão de A a Z e, em cada um, o tamanho mais pequeno vem primeiro.",
       "words": "descongelar relatorio relatório lista"
+    },
+    "feed-prep-group": {
+      "short": "Dá a todos os animais de um grupo o mesmo tipo de alimento e tamanho de uma só vez, para não ter de configurar uma ninhada de filhotes ficha a ficha.",
+      "more": "Os grupos de filhotes aparecem primeiro. Só mudam o tipo de alimento e o tamanho: cada animal mantém a sua quantidade, intervalo, peso e notas. Os animais que já têm outro alimento também são alterados, e a linha por baixo da barra diz quantos.",
+      "tips": [
+        "Os grupos de reprodutores costumam misturar machos e fêmeas com tamanhos diferentes, por isso configure-os em cada ficha."
+      ],
+      "words": "grupo em massa filhotes ninhada todos de uma vez alimento tamanho"
+    },
+    "feed-prep-group-apply": {
+      "short": "Guarda o tipo de alimento e o tamanho escolhidos em cada animal do grupo.",
+      "more": "Fica cinzento até escolher um grupo, um tipo de alimento e um tamanho. As fêmeas excluídas por ovulação também são atualizadas; continuam fora dos totais de hoje.",
+      "words": "aplicar guardar grupo"
     },
     "feed-prep-selection": {
       "short": "Lista todos os animais com a respetiva presa, para marcares os que vais alimentar.",

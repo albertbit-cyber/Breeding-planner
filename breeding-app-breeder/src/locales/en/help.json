@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Lists what to take out of the freezer, grouped by food type, size or weight class, and weight, with how many of each.",
-      "more": "Only ticked animals with a complete feeder profile count here.",
+      "more": "Only ticked animals with a complete feeder profile count here. Food types run A to Z, and within each the smallest size comes first.",
       "words": "defrost report thaw list"
+    },
+    "feed-prep-group": {
+      "short": "Gives every animal in one group the same food type and size in a single step, so a clutch of hatchlings does not have to be set one card at a time.",
+      "more": "Hatchling groups are listed first. Only the food type and size change: each animal keeps its own quantity, interval, weight and notes. Animals already on another food are changed too, and the line under the bar says how many.",
+      "tips": [
+        "Breeder groups usually mix males and females on different sizes, so set those on each card instead."
+      ],
+      "words": "group bulk hatchlings clutch all at once food size"
+    },
+    "feed-prep-group-apply": {
+      "short": "Saves the chosen food type and size to every animal in the group.",
+      "more": "It stays grey until a group, a food type and a size are chosen. Females left out for ovulation are updated too; they still stay out of today's totals.",
+      "words": "apply save group"
     },
     "feed-prep-selection": {
       "short": "Lists every animal with its feeder, so you can tick the ones to feed.",

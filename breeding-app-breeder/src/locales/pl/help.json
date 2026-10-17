@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Wypisuje, co wyjąć z zamrażarki, pogrupowane według typu pokarmu, rozmiaru lub klasy wagowej i wagi, z liczbą sztuk.",
-      "more": "Liczą się tu tylko zaznaczone zwierzęta z pełnym profilem karmienia.",
+      "more": "Liczą się tu tylko zaznaczone zwierzęta z pełnym profilem karmienia. Typy pokarmu idą od A do Z, a w każdym najpierw najmniejszy rozmiar.",
       "words": "raport rozmrazania rozmrażania rozmroz rozmróź lista"
+    },
+    "feed-prep-group": {
+      "short": "Nadaje wszystkim zwierzętom z grupy ten sam typ pokarmu i rozmiar za jednym razem, więc miotu młodych nie trzeba ustawiać karta po karcie.",
+      "more": "Grupy młodych są na górze listy. Zmienia się tylko typ pokarmu i rozmiar: każde zwierzę zachowuje swoją ilość, odstęp, wagę i notatki. Zwierzęta na innym pokarmie też zostaną zmienione, a wiersz pod paskiem mówi, ile ich jest.",
+      "tips": [
+        "Grupy hodowlane zwykle mieszają samce i samice na różnych rozmiarach, więc lepiej ustawić je na każdej karcie."
+      ],
+      "words": "grupa zbiorczo młode mlode miot wszystkie naraz pokarm rozmiar"
+    },
+    "feed-prep-group-apply": {
+      "short": "Zapisuje wybrany typ pokarmu i rozmiar u każdego zwierzęcia w grupie.",
+      "more": "Jest szary, dopóki nie wybierzesz grupy, typu pokarmu i rozmiaru. Samice wykluczone z powodu owulacji też są aktualizowane; nadal nie wchodzą do dzisiejszych sum.",
+      "words": "zastosuj zapisz grupa"
     },
     "feed-prep-selection": {
       "short": "Wyświetla każde zwierzę z jego karmą, abyś mógł zaznaczyć te do nakarmienia.",

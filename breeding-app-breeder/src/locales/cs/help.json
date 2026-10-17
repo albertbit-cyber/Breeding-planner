@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Vypíše, co vytáhnout z mrazáku, seskupené podle typu krmiva, velikostní nebo hmotnostní třídy a hmotnosti, s počtem kusů.",
-      "more": "Počítají se zde jen zaškrtnutá zvířata s úplným krmným profilem.",
+      "more": "Počítají se zde jen zaškrtnutá zvířata s úplným krmným profilem. Typy krmiva jdou od A do Z a u každého je nejmenší velikost první.",
       "words": "rozmrazit přehled rozmrazování seznam prehled rozmrazovani"
+    },
+    "feed-prep-group": {
+      "short": "Dá všem zvířatům ve skupině najednou stejný typ krmiva a velikost, takže snůšku mláďat nemusíte nastavovat kartu po kartě.",
+      "more": "Skupiny mláďat jsou v seznamu nahoře. Mění se jen typ krmiva a velikost: každé zvíře si ponechá množství, interval, hmotnost a poznámky. Zvířata na jiném krmivu se změní také a řádek pod lištou ukáže kolik.",
+      "tips": [
+        "Chovné skupiny obvykle mísí samce a samice na různých velikostech, ty raději nastavte na každé kartě."
+      ],
+      "words": "skupina hromadně mláďata mladata snůška vše najednou krmivo velikost"
+    },
+    "feed-prep-group-apply": {
+      "short": "Uloží zvolený typ krmiva a velikost u každého zvířete ve skupině.",
+      "more": "Je šedé, dokud nevyberete skupinu, typ krmiva a velikost. Samice vynechané kvůli ovulaci se také upraví; v dnešních součtech dál nejsou.",
+      "words": "použít uložit skupina"
     },
     "feed-prep-selection": {
       "short": "Vypíše všechna zvířata s jejich krmivem, abyste zaškrtli ta ke krmení.",

@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Liste ce qu'il faut sortir du congélateur, groupé par type de proie, taille ou classe de poids, et poids, avec la quantité de chaque.",
-      "more": "Seuls les animaux cochés avec un profil d'alimentation complet comptent ici.",
+      "more": "Seuls les animaux cochés avec un profil d'alimentation complet comptent ici. Les types de proie vont de A à Z et, pour chacun, la plus petite taille vient en premier.",
       "words": "rapport décongélation liste"
+    },
+    "feed-prep-group": {
+      "short": "Donne à tous les animaux d'un groupe le même type de proie et la même taille en une seule fois, pour ne pas régler une ponte de nouveau-nés fiche par fiche.",
+      "more": "Les groupes de nouveau-nés sont listés en premier. Seuls le type de proie et la taille changent : chaque animal garde sa quantité, son intervalle, son poids et ses notes. Les animaux déjà sur une autre proie sont aussi modifiés, et la ligne sous la barre indique combien.",
+      "tips": [
+        "Les groupes de reproducteurs mélangent souvent mâles et femelles sur des tailles différentes : réglez-les plutôt fiche par fiche."
+      ],
+      "words": "groupe en masse nouveau-nés ponte tous à la fois proie taille"
+    },
+    "feed-prep-group-apply": {
+      "short": "Enregistre le type de proie et la taille choisis sur chaque animal du groupe.",
+      "more": "Grisé tant qu'un groupe, un type de proie et une taille ne sont pas choisis. Les femelles exclues pour ovulation sont aussi mises à jour ; elles restent hors des totaux du jour.",
+      "words": "appliquer enregistrer groupe"
     },
     "feed-prep-selection": {
       "short": "Liste chaque animal avec sa proie, pour cocher ceux à nourrir.",

@@ -56,6 +56,8 @@ export const logistics = {
   'feed-prep-close': topic('feed-prep', { title: 'common:common.close', see: ['feed-prep-window'], minor: true }),
   'feed-prep-totals': topic('feed-prep', { see: ['feed-prep-report', 'feed-prep-animal'] }),
   'feed-prep-report': topic('feed-prep', { title: 'common:feedPrep.reportTitle', see: ['feed-prep-copy', 'feed-prep-totals'] }),
+  'feed-prep-group': topic('feed-prep', { title: 'common:feedPrep.groupTitle', see: ['feed-prep-group-apply', 'feed-prep-report'] }),
+  'feed-prep-group-apply': topic('feed-prep', { title: 'common:feedPrep.applyToGroup', see: ['feed-prep-group'] }),
   'feed-prep-selection': topic('feed-prep', { title: 'common:feedPrep.snakeSelection', see: ['feed-prep-animal', 'feed-prep-edit'] }),
   'feed-prep-animal': topic('feed-prep', { see: ['feed-prep-selection', 'feed-prep-edit', 'feed-prep-totals'] }),
   'feed-prep-edit': topic('feed-prep', { title: 'common:feedPrep.editSnake', see: ['feed-prep-animal'] }),

@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Listet, was du aus dem Gefrierschrank nehmen musst, gruppiert nach Futtertyp, Größe oder Gewichtsklasse und Gewicht, mit der jeweiligen Anzahl.",
-      "more": "Hier zählen nur angehakte Tiere mit vollständigem Futterprofil.",
+      "more": "Hier zählen nur angehakte Tiere mit vollständigem Futterprofil. Futtertypen stehen von A bis Z, innerhalb jedes Typs kommt die kleinste Größe zuerst.",
       "words": "auftaubericht auftauen liste"
+    },
+    "feed-prep-group": {
+      "short": "Gibt allen Tieren einer Gruppe in einem Schritt denselben Futtertyp und dieselbe Größe, damit ein Gelege Schlüpflinge nicht Karte für Karte eingestellt werden muss.",
+      "more": "Schlüpflingsgruppen stehen oben in der Liste. Nur Futtertyp und Größe ändern sich: Jedes Tier behält Menge, Intervall, Gewicht und Notizen. Tiere mit anderem Futter werden ebenfalls geändert; die Zeile unter der Leiste zeigt, wie viele.",
+      "tips": [
+        "Zuchtgruppen mischen meist Männchen und Weibchen mit unterschiedlichen Größen, also diese besser auf jeder Karte einstellen."
+      ],
+      "words": "gruppe sammel schlüpflinge gelege alle auf einmal futter größe"
+    },
+    "feed-prep-group-apply": {
+      "short": "Speichert den gewählten Futtertyp und die Größe bei jedem Tier der Gruppe.",
+      "more": "Grau, bis Gruppe, Futtertyp und Größe gewählt sind. Wegen Ovulation ausgeschlossene Weibchen werden auch aktualisiert, bleiben aber aus den heutigen Summen heraus.",
+      "words": "übernehmen speichern gruppe"
     },
     "feed-prep-selection": {
       "short": "Listet jedes Tier mit seinem Futtertier, damit du die zu fütternden anhaken kannst.",
