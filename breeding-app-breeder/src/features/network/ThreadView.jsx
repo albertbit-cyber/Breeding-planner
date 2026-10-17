@@ -43,12 +43,16 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
       if (!quiet) setError('');
       const newest = res?.messages?.[res.messages.length - 1]?.id || null;
       if (newest && newest !== lastIdRef.current) {
+        const firstLoad = lastIdRef.current === null;
         lastIdRef.current = newest;
         networkApi.markRead(threadId).then(() => onChanged?.()).catch(() => {});
-        requestAnimationFrame(() => {
-          const el = listRef.current;
-          if (el) el.scrollTop = el.scrollHeight;
-        });
+        // A project opens on its panel; a conversation opens on its newest message, and follows new ones.
+        if (!(firstLoad && res?.thread?.projectId)) {
+          requestAnimationFrame(() => {
+            const el = listRef.current;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        }
       }
     } catch (err) {
       if (!quiet) setError(errorText(err, t('network.thread.loadFailed', { defaultValue: 'The conversation could not be loaded.' })));
@@ -193,11 +197,11 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
       ) : null}
       {isIgnored ? <div className="bn-request" role="status"><p>{t('network.thread.ignoredBanner', { defaultValue: 'You ignored this conversation. Nothing from it notifies you.' })}</p></div> : null}
 
-      {thread?.projectId ? (
-        <ProjectPanel projectId={thread.projectId} animals={animals} onChanged={refresh} onCollectionChanged={onCollectionChanged} refreshKey={refreshKey} />
-      ) : null}
-
-      <div className="bn-messages" ref={listRef} aria-live="polite">
+      <div className="bn-messages" ref={listRef}>
+        {/* In the scroll, so a long project never squeezes the conversation or gets cut off. */}
+        {thread?.projectId ? (
+          <ProjectPanel projectId={thread.projectId} animals={animals} onChanged={refresh} onCollectionChanged={onCollectionChanged} refreshKey={refreshKey} />
+        ) : null}
         {!data && !error ? <div className="bn-empty">{t('network.loading', { defaultValue: 'Loading…' })}</div> : null}
         {(data?.messages || []).map((message) => {
           if (message.kind === 'system' || !message.sender) {

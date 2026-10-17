@@ -3229,7 +3229,7 @@
   "network.record.loanStatus": "Loan",
   "network.record.loanUntil": "Until {{date}}. It belongs to {{owner}}.",
   "network.record.partner": "Partner record",
-  "network.record.partnerText": "{{owner}}'s male for the joint project \"{{project}}\". Read-only: it stays theirs, and moves to your archive when the project ends.",
+  "network.record.partnerText": "Belongs to {{owner}}: their male for the joint project \"{{project}}\". Read-only here, and it moves to your archive when the project ends.",
   "network.record.project": "Joint project",
   "network.record.reason": "Reason",
   "network.record.receivedFrom": "Received from",

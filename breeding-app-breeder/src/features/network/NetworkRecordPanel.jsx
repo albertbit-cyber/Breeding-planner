@@ -63,7 +63,7 @@ export default function NetworkRecordPanel({ snake, onOpenNetwork }) {
     rows.push([
       t('network.record.partner', { defaultValue: 'Partner record' }),
       t('network.record.partnerText', {
-        defaultValue: '{{owner}}\'s male for the joint project "{{project}}". Read-only: it stays theirs, and moves to your archive when the project ends.',
+        defaultValue: 'Belongs to {{owner}}: their male for the joint project "{{project}}". Read-only here, and it moves to your archive when the project ends.',
         owner: who(snake.partnerRecord.ownerHandle, snake.partnerRecord.ownerName),
         project: snake.partnerRecord.projectTitle || '',
       }),

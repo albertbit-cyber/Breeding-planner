@@ -722,7 +722,7 @@ export const offerShares = async (actor: AuthenticatedUser, projectId: string, i
   if (taken.length) throw new HttpError(409, `Already offered: ${taken.map((row: any) => row.senderAppAnimalId).join(", ")}.`);
   const maleOwner = await loadPerson(project.maleOwnerId);
   const note = cleanText(input.note, 500);
-  const reason = `${project.title}: ${maleOwner?.displayName || "the partner"}'s share of the clutch.${note ? ` ${note}` : ""}`;
+  const reason = `${project.title}: share of the clutch for ${maleOwner?.displayName || "the partner"}.${note ? ` ${note}` : ""}`;
   for (const appAnimalId of ids) {
     await createTransfer(actor, { appAnimalId, reason }, { kind: "split", projectId: project.id, threadId: project.threadId, receiverId: project.maleOwnerId });
   }
