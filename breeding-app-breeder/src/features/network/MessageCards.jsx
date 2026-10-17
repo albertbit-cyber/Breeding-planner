@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { ArrowSquareOutIcon, StorefrontIcon } from '@phosphor-icons/react';
 import { networkApi, errorText } from './networkApi.js';
 import { isPermanentKind, shortDate } from './networkFormat.js';
-import { AnimalMini, ErrorNote, StatusChip } from './NetworkBits.jsx';
+import { AnimalMini, ErrorNote, StatusChip, useConfirm } from './NetworkBits.jsx';
 
 /** What a transfer offer looks like in the conversation, with the answer buttons for whoever answers. */
 export function TransferCard({ transfer, meId, onChanged, onCollectionChanged, onOpenAnimal }) {
   const { t, i18n } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [confirmElement, ask] = useConfirm();
   if (!transfer) return null;
   const incoming = transfer.receiverUserId === meId;
   const kindLabel = {
@@ -81,22 +82,41 @@ export function TransferCard({ transfer, meId, onChanged, onCollectionChanged, o
             type="button"
             className="bn-btn bn-btn--quiet bn-btn--sm"
             disabled={busy}
-            onClick={() => {
-              const note = window.prompt(t('network.transfer.returnPrompt', { defaultValue: 'End the loan. Anything to note on the record? (optional)' }), '');
-              if (note === null) return;
-              act(() => networkApi.returnLoan(transfer.id, note), true);
+            onClick={async () => {
+              const answer = await ask({
+                title: t('network.transfer.endLoanTitle', { defaultValue: 'End the loan of {{animal}}?', animal: transfer.animal?.name || '' }),
+                body: t('network.transfer.endLoanBody', { defaultValue: "The borrowed copy moves to the borrower's archive. The owner's record gets its old status back, plus the weights, feeds, sheds and medications logged during the loan." }),
+                confirmLabel: t('network.transfer.endLoan', { defaultValue: 'End loan' }),
+                note: true,
+                noteLabel: t('network.transfer.returnNote', { defaultValue: 'Note on the record (optional)' }),
+              });
+              if (!answer.ok) return;
+              act(() => networkApi.returnLoan(transfer.id, answer.note), true);
             }}
           >
             {t('network.transfer.endLoan', { defaultValue: 'End loan' })}
           </button>
         </div>
       ) : null}
-      {transfer.status === 'accepted' && onOpenAnimal && transfer.animal?.appAnimalId && !incoming ? (
-        <button type="button" className="bn-linkbtn" style={{ alignSelf: 'flex-start', fontSize: '0.8rem' }} onClick={() => onOpenAnimal(transfer.animal.appAnimalId)}>
-          {t('network.transfer.openMine', { defaultValue: 'Open my record' })}
+      {transfer.status === 'accepted' && incoming ? (
+        <div className="bn-success" role="status">
+          {transfer.kind === 'loan'
+            ? t('network.transfer.receivedLoan', { defaultValue: '{{animal}} is in your collection as borrowed, until the loan ends.', animal: transfer.animal?.name || '' })
+            : t('network.transfer.received', { defaultValue: '{{animal}} is in your collection, with its record.', animal: transfer.animal?.name || '' })}
+        </div>
+      ) : null}
+      {transfer.status === 'accepted' && onOpenAnimal && (incoming ? transfer.receiverAppAnimalId : transfer.animal?.appAnimalId) ? (
+        <button
+          type="button"
+          className="bn-btn bn-btn--quiet bn-btn--sm"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => onOpenAnimal(incoming ? transfer.receiverAppAnimalId : transfer.animal.appAnimalId)}
+        >
+          {t('network.transfer.openRecord', { defaultValue: 'Open record' })}
         </button>
       ) : null}
       <ErrorNote error={error} />
+      {confirmElement}
     </div>
   );
 }

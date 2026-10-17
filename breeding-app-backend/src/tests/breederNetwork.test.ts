@@ -241,6 +241,10 @@ describe("transfers", () => {
     const accepted = await as(BOB).post(`/api/network/transfers/${transferId}/respond`, { action: "accept" });
     expect(accepted.status).toBe(200);
     expect(accepted.body.transfer.status).toBe("accepted");
+    // The receiver can open their copy straight from the card, and the system line is translatable.
+    expect(accepted.body.transfer.receiverAppAnimalId).toBe("26-M-1");
+    const systemLine = rows("networkMessage").find((m) => m.kind === "system");
+    expect(systemLine.attachment.event).toMatchObject({ type: "transfer_accepted", animal: "Apollo", who: "Bob Brown" });
 
     const copy = animalOf(BOB, "26-M-1");
     expect(copy.status).toBe("Active");

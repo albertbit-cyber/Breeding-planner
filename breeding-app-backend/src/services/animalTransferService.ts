@@ -487,7 +487,7 @@ const acceptTransfer = async (actor: AuthenticatedUser, transfer: any) => {
 
     const updated = await tx.animalTransfer.update({
       where: { id: transfer.id },
-      data: { status: "accepted", receiverAnimalId: created.id, respondedAt: now },
+      data: { status: "accepted", receiverAnimalId: created.id, receiverAppAnimalId: created.appAnimalId, respondedAt: now },
     });
     if (transfer.threadId) {
       await appendMessage(tx, {
@@ -498,7 +498,10 @@ const acceptTransfer = async (actor: AuthenticatedUser, transfer: any) => {
           kind === "loan"
             ? `${receiver.displayName} accepted the loan of ${receiverPayload.name}. It is On loan in both collections until the loan ends.`
             : `${receiver.displayName} accepted ${receiverPayload.name}. It is now in their collection, and in ${sender.displayName}'s archive.`,
-        attachment: { transferId: transfer.id },
+        attachment: {
+          transferId: transfer.id,
+          event: { type: kind === "loan" ? "loan_accepted" : "transfer_accepted", who: receiver.displayName, animal: receiverPayload.name, sender: sender.displayName },
+        },
       });
     }
     return { updated, created };
@@ -542,7 +545,10 @@ export const respondToTransfer = async (actor: AuthenticatedUser, transferId: st
           senderUserId: null,
           kind: "system",
           body: `${who?.displayName || "They"} ${status} the transfer of ${transfer.snapshot?.name || "the animal"}.`,
-          attachment: { transferId: transfer.id },
+          attachment: {
+            transferId: transfer.id,
+            event: { type: `transfer_${status}`, who: who?.displayName || "", animal: transfer.snapshot?.name || "" },
+          },
         });
       }
       return row;
@@ -668,7 +674,10 @@ export const returnLoan = async (actor: AuthenticatedUser, transferId: string, i
         senderUserId: null,
         kind: "system",
         body: `${who.displayName} ended the loan of ${transfer.snapshot?.name || "the animal"}. It is back with ${owner.displayName}.${note ? ` ${note}` : ""}`,
-        attachment: { transferId: transfer.id },
+        attachment: {
+          transferId: transfer.id,
+          event: { type: "loan_ended", who: who.displayName, animal: transfer.snapshot?.name || "", owner: owner.displayName, note: note || "" },
+        },
       });
     }
     return row;

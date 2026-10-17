@@ -13641,8 +13641,14 @@ export default function BreedingPlannerApp() {
           <NetworkCenter
             animals={snakes}
             onCollectionChanged={() => { performCloudBreederSync({ silent: true }); refreshNetworkSummary(); }}
-            onOpenAnimal={(animalId) => {
-              const target = snakes.find(snake => snake && snake.id === animalId);
+            onOpenAnimal={async (animalId) => {
+              const find = (list) => (Array.isArray(list) ? list : []).find(snake => snake && snake.id === animalId);
+              let target = find(snakes);
+              // A just-received animal reaches this device with the next pull; fetch it first.
+              if (!target) {
+                await performCloudBreederSync({ silent: true });
+                target = find(latestPlannerSnapshotRef.current?.snakes);
+              }
               if (target) openSnakeEditor(target);
             }}
             intent={networkIntent}

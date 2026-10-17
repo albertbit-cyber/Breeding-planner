@@ -79,7 +79,7 @@
   background: var(--sk-surface-2);
 }
 
-.bn-tab[aria-selected='true'] {
+.bn-tab[aria-pressed='true'] {
   background: var(--sk-primary-quiet);
   color: var(--sk-primary-quiet-text);
 }
@@ -693,11 +693,11 @@
 
 .bn-choice {
   border: 1px solid var(--sk-border-strong);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--sk-surface);
   color: var(--sk-text);
-  padding: 0.5rem 0.6rem;
-  text-align: start;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -880,7 +880,96 @@
   overflow-wrap: anywhere;
 }
 
+/* Visible only to screen readers: announces a message that arrives while a thread is open. */
+.bn-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.bn-success {
+  background: var(--sk-success-bg);
+  border: 1px solid var(--sk-success-border);
+  color: var(--sk-success-text);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.83rem;
+}
+
+.bn-warning {
+  background: var(--sk-warning-bg);
+  border: 1px solid var(--sk-warning-border);
+  color: var(--sk-warning-text);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* The next thing this breeder can do in a project. */
+.bn-next {
+  background: var(--sk-primary-quiet);
+  color: var(--sk-primary-quiet-text);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.bn-outcome {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--sk-text-secondary);
+}
+
+.bn-outcome strong {
+  font-size: 1.35rem;
+  color: var(--sk-text);
+  margin-inline-end: 0.3rem;
+}
+
+.bn-btn--danger-solid {
+  background: var(--sk-danger-text);
+  color: var(--sk-surface);
+}
+
+.bn-hatchling__pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.bn-hatchling__pick input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--sk-primary);
+}
+
 @media (max-width: 767px) {
+  /* Thumb-size targets. */
+  .bn-btn,
+  .bn-btn--sm,
+  .bn-tab,
+  .bn-choice {
+    min-height: 2.75rem;
+  }
+
+  .bn-btn--icon {
+    min-width: 2.75rem;
+  }
+
   .bn-shell {
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;

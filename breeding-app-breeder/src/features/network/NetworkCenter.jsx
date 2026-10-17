@@ -4,7 +4,7 @@ import { ArrowsLeftRightIcon, ChatsCircleIcon, EggIcon, PencilSimpleIcon, PlusIc
 import { hasStoredAuthSession } from '../../shared/apiClient';
 import { errorCode, errorText, networkApi } from './networkApi.js';
 import { animalCardOf, personName, shortTime } from './networkFormat.js';
-import { Avatar, ErrorNote, NetworkDialog, PersonPicker, StatusChip } from './NetworkBits.jsx';
+import { Avatar, ErrorNote, Handle, NetworkDialog, PersonPicker, StatusChip, eventText } from './NetworkBits.jsx';
 import { TransferCard } from './MessageCards.jsx';
 import HandleSetup from './HandleSetup.jsx';
 import ThreadView from './ThreadView.jsx';
@@ -138,7 +138,7 @@ export default function NetworkCenter({ animals, onCollectionChanged, onOpenAnim
       <aside className="bn-panel bn-sidebar" aria-label={t('network.title', { defaultValue: 'Messages' })}>
         <div className="bn-sidebar__head">
           <div className="bn-me">
-            <span>{t('network.youAre', { defaultValue: 'You are' })} <strong>@{me.handle}</strong></span>
+            <span>{t('network.youAre', { defaultValue: 'You are' })} <strong><Handle handle={me.handle} /></strong></span>
             <button type="button" className="bn-btn bn-btn--ghost bn-btn--icon" onClick={() => setEditingHandle(true)} aria-label={t('network.handle.changeTitle', { defaultValue: 'Change your handle' })}>
               <PencilSimpleIcon size={14} />
             </button>
@@ -155,9 +155,9 @@ export default function NetworkCenter({ animals, onCollectionChanged, onOpenAnim
             </button>
           </div>
         </div>
-        <div className="bn-tabs" role="tablist">
+        <div className="bn-tabs" role="group" aria-label={t('network.title', { defaultValue: 'Messages' })}>
           {tabs.map((item) => (
-            <button key={item.key} type="button" role="tab" className="bn-tab" aria-selected={tab === item.key} onClick={() => { setTab(item.key); setShowIgnored(false); }}>
+            <button key={item.key} type="button" className="bn-tab" aria-pressed={tab === item.key} onClick={() => { setTab(item.key); setShowIgnored(false); }}>
               {item.label}
               {item.count ? <span className="bn-count">{item.count}</span> : null}
             </button>
@@ -205,7 +205,7 @@ export default function NetworkCenter({ animals, onCollectionChanged, onOpenAnim
           />
         ) : (
           <div className="bn-empty" style={{ paddingTop: '4rem' }}>
-            <ChatsCircleIcon size={40} aria-hidden="true" style={{ color: 'var(--sk-text-subtle)' }} />
+            <ChatsCircleIcon size={40} aria-hidden="true" style={{ color: 'var(--sk-text-subtle)', display: 'block', margin: '0 auto 0.75rem' }} />
             <strong>{t('network.pickThread', { defaultValue: 'Pick a conversation' })}</strong>
             {t('network.pickThreadHint', { defaultValue: 'Send snake cards and marketplace links, hand animals over with their whole record, or breed together in a joint project.' })}
           </div>
@@ -263,12 +263,13 @@ function ThreadList({ threads, activeThread, onOpen, empty, footer, locale }) {
                   </span>
                   <span className="bn-row__sub" style={{ display: 'block' }}>
                     {thread.lastMessage?.mine ? `${t('network.you', { defaultValue: 'You' })}: ` : ''}
-                    {thread.lastMessage?.body || ''}
+                    {eventText(thread.lastMessage?.event, t, thread.lastMessage?.body || '')}
                   </span>
                 </span>
                 <span className="bn-row__meta">
                   <span>{shortTime(thread.lastMessageAt, locale)}</span>
                   {thread.unread ? <span className="bn-count">{thread.unread}</span> : null}
+                  {!thread.unread && thread.project ? <StatusChip status={thread.project.status} /> : null}
                 </span>
               </button>
             </li>
@@ -298,7 +299,7 @@ function ProjectList({ projects, activeThread, onOpen }) {
               <span className="bn-row__title" style={{ display: 'block' }}>{project.title}</span>
               <span className="bn-row__sub" style={{ display: 'block' }}>
                 {[project.male?.name, project.female?.name].filter(Boolean).join(' × ')}
-                {project.other ? ` · @${project.other.handle}` : ''}
+                {project.other ? <> · <Handle handle={project.other.handle} /></> : null}
               </span>
             </span>
             <span className="bn-row__meta">
@@ -329,9 +330,11 @@ function TransferList({ transfers, me, onOpen, onChanged, onCollectionChanged, o
           <li key={transfer.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             <div className="bn-me">
               <span>
-                {transfer.direction === 'incoming'
-                  ? t('network.transfer.from', { defaultValue: 'From @{{handle}}', handle: other?.handle })
-                  : t('network.transfer.toWho', { defaultValue: 'To @{{handle}}', handle: other?.handle })}
+                <bdi>
+                  {transfer.direction === 'incoming'
+                    ? t('network.transfer.from', { defaultValue: 'From @{{handle}}', handle: other?.handle })
+                    : t('network.transfer.toWho', { defaultValue: 'To @{{handle}}', handle: other?.handle })}
+                </bdi>
               </span>
               {transfer.threadId ? (
                 <button type="button" className="bn-linkbtn" style={{ fontSize: '0.78rem' }} onClick={() => onOpen(transfer.threadId)}>

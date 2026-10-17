@@ -2145,30 +2145,31 @@ model NetworkMessage {
 /// hatchling from a joint project's clutch, permanent).
 /// status: pending | accepted | declined | cancelled | returned
 model AnimalTransfer {
-  id                String    @id @default(cuid())
-  senderUserId      String    @map("sender_user_id")
-  sender            User      @relation("AnimalTransferSender", fields: [senderUserId], references: [id], onDelete: Cascade)
-  receiverUserId    String    @map("receiver_user_id")
-  receiver          User      @relation("AnimalTransferReceiver", fields: [receiverUserId], references: [id], onDelete: Cascade)
+  id                  String    @id @default(cuid())
+  senderUserId        String    @map("sender_user_id")
+  sender              User      @relation("AnimalTransferSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  receiverUserId      String    @map("receiver_user_id")
+  receiver            User      @relation("AnimalTransferReceiver", fields: [receiverUserId], references: [id], onDelete: Cascade)
   /// Animal.id of the sender's row, and its app id at the time of sending.
-  senderAnimalId    String    @map("sender_animal_id")
-  senderAppAnimalId String    @map("sender_app_animal_id")
-  /// Animal.id of the receiver's copy once accepted.
-  receiverAnimalId  String?   @map("receiver_animal_id")
-  kind              String
+  senderAnimalId      String    @map("sender_animal_id")
+  senderAppAnimalId   String    @map("sender_app_animal_id")
+  /// Animal.id of the receiver's copy once accepted, and its app id in their collection.
+  receiverAnimalId    String?   @map("receiver_animal_id")
+  receiverAppAnimalId String?   @map("receiver_app_animal_id")
+  kind                String
   /// Why the animal is changing hands. Shown on both animals' cards.
-  reason            String    @db.Text
-  status            String    @default("pending")
-  loanUntil         DateTime? @map("loan_until")
-  threadId          String?   @map("thread_id")
-  messageId         String?   @map("message_id")
-  projectId         String?   @map("project_id")
+  reason              String    @db.Text
+  status              String    @default("pending")
+  loanUntil           DateTime? @map("loan_until")
+  threadId            String?   @map("thread_id")
+  messageId           String?   @map("message_id")
+  projectId           String?   @map("project_id")
   /// The animal card as the sender offered it.
-  snapshot          Json
-  respondedAt       DateTime? @map("responded_at")
-  returnedAt        DateTime? @map("returned_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  snapshot            Json
+  respondedAt         DateTime? @map("responded_at")
+  returnedAt          DateTime? @map("returned_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@index([senderUserId, status])
   @@index([receiverUserId, status])

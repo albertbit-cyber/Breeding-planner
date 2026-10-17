@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CaretDownIcon, CaretUpIcon, EggIcon } from '@phosphor-icons/react';
 import { networkApi, errorText } from './networkApi.js';
 import { SPLIT_METHODS, describeSplit, partnerShareCount, personName, projectAnimals, shortDate } from './networkFormat.js';
-import { AnimalMini, AnimalSelect, ErrorNote, StatusChip } from './NetworkBits.jsx';
+import { AnimalMini, AnimalSelect, ErrorNote, Handle, StatusChip, useConfirm } from './NetworkBits.jsx';
 
 /**
  * A joint project, pinned above its conversation: who brings what, where the female's cycle
@@ -14,9 +14,11 @@ import { AnimalMini, AnimalSelect, ErrorNote, StatusChip } from './NetworkBits.j
 export default function ProjectPanel({ projectId, animals, onChanged, onCollectionChanged, refreshKey }) {
   const { t, i18n } = useTranslation();
   const [project, setProject] = useState(null);
-  const [open, setOpen] = useState(true);
+  // A finished project starts folded: its outcome is history, the conversation is what is live.
+  const [open, setOpen] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [confirmElement, ask] = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -29,6 +31,7 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
+  /** Runs an action; resolves true when it worked, so a form only clears what was really sent. */
   const run = async (fn, { pull = false } = {}) => {
     setBusy(true);
     setError('');
@@ -38,8 +41,10 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
       else await load();
       onChanged?.();
       if (pull) onCollectionChanged?.();
+      return true;
     } catch (err) {
       setError(errorText(err, t('network.actionFailed', { defaultValue: 'That did not work. Try again.' })));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -52,17 +57,59 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
   const maleOwner = personName(project.male?.owner) || t('network.project.maleOwner', { defaultValue: 'Male owner' });
   const keeper = personName(project.keeper) || t('network.project.keeper', { defaultValue: 'Keeper' });
   const role = project.viewerRole;
+  const isOpen = open === null ? project.status !== 'completed' && project.status !== 'cancelled' && project.status !== 'declined' : open;
+  const sent = (project.hatchlings || []).filter((h) => h.share);
+  const kept = (project.hatchlings || []).filter((h) => !h.share);
+  const nextStep = nextStepFor(project, role, t);
+
+  const confirmClose = async () => {
+    const answer = await ask({
+      title: t('network.project.completeTitle', { defaultValue: 'Close {{title}}?', title: project.title }),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {!project.splitTerms ? (
+            <div className="bn-warning">{t('network.project.noSplitWarning', { defaultValue: 'No split was agreed. Closing records the project without one.' })}</div>
+          ) : null}
+          <ul className="bn-outcome">
+            <li><strong>{kept.length}</strong> {t('network.project.outcomeKept', { defaultValue: 'stay with {{who}}', who: keeper })}</li>
+            <li><strong>{sent.length}</strong> {t('network.project.outcomeSent', { defaultValue: 'sent to {{who}}', who: maleOwner })}</li>
+          </ul>
+          <p className="bn-note" style={{ fontSize: '0.86rem' }}>
+            {t('network.project.completeConfirm', { defaultValue: 'Close the project? Hatchlings not sent stay with the keeper, and every hatchling gets both parents and both breeders written on its record.' })}
+          </p>
+        </div>
+      ),
+      confirmLabel: t('network.project.complete', { defaultValue: 'Close project' }),
+    });
+    if (answer.ok) run(() => networkApi.completeProject(project.id), { pull: true });
+  };
+
+  const confirmCancel = async () => {
+    const answer = await ask({
+      title: t('network.project.cancelTitle', { defaultValue: 'Cancel {{title}}?', title: project.title }),
+      body: t('network.project.cancelConfirm', { defaultValue: 'Cancel the project? The partner record moves to the keeper\'s archive.' }),
+      confirmLabel: t('network.project.cancel', { defaultValue: 'Cancel project' }),
+      danger: true,
+    });
+    if (answer.ok) run(() => networkApi.cancelProject(project.id), { pull: true });
+  };
 
   return (
     <section className="bn-project" aria-label={project.title}>
-      <button type="button" className="bn-project__head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      <button type="button" className="bn-project__head" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>
         <EggIcon size={18} aria-hidden="true" />
         <span className="bn-project__title">{project.title}</span>
         <StatusChip status={project.status} />
-        {open ? <CaretUpIcon size={16} aria-hidden="true" /> : <CaretDownIcon size={16} aria-hidden="true" />}
+        {isOpen ? <CaretUpIcon size={16} aria-hidden="true" /> : <CaretDownIcon size={16} aria-hidden="true" />}
       </button>
-      {open ? (
+      {!isOpen && project.status === 'completed' ? (
+        <p className="bn-note" style={{ padding: '0 0.85rem 0.75rem' }}>
+          {t('network.project.outcomeLine', { defaultValue: 'Closed. {{kept}} stayed with {{keeper}}, {{sent}} went to {{male}}.', kept: kept.length, sent: sent.length, keeper, male: maleOwner })}
+        </p>
+      ) : null}
+      {isOpen ? (
         <div className="bn-project__body">
+          {nextStep ? <div className="bn-next" role="status">{nextStep}</div> : null}
           <div className="bn-pair">
             <Side
               role={t('network.project.sire', { defaultValue: 'Sire' })}
@@ -98,11 +145,7 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
                 type="button"
                 className="bn-btn bn-btn--quiet bn-btn--sm"
                 disabled={busy}
-                onClick={() => {
-                  if (window.confirm(t('network.project.completeConfirm', { defaultValue: 'Close the project? Hatchlings not sent stay with the keeper, and every hatchling gets both parents and both breeders written on its record.' }))) {
-                    run(() => networkApi.completeProject(project.id), { pull: true });
-                  }
-                }}
+                onClick={confirmClose}
               >
                 {t('network.project.complete', { defaultValue: 'Close project' })}
               </button>
@@ -111,11 +154,7 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
                   type="button"
                   className="bn-btn bn-btn--danger bn-btn--sm"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(t('network.project.cancelConfirm', { defaultValue: 'Cancel the project? The partner record moves to the keeper\'s archive.' }))) {
-                      run(() => networkApi.cancelProject(project.id), { pull: true });
-                    }
-                  }}
+                  onClick={confirmCancel}
                 >
                   {t('network.project.cancel', { defaultValue: 'Cancel project' })}
                 </button>
@@ -125,8 +164,34 @@ export default function ProjectPanel({ projectId, animals, onChanged, onCollecti
           <ErrorNote error={error} />
         </div>
       ) : null}
+      {confirmElement}
     </section>
   );
+}
+
+/** The one thing this breeder can do next, said plainly at the top of the panel. */
+function nextStepFor(project, role, t) {
+  const otherHandle = role === 'keeper' ? project.male?.owner?.handle : project.keeper?.handle || project.proposedBy?.handle;
+  if (project.status === 'proposed') {
+    return role === 'invited'
+      ? t('network.next.join', { defaultValue: 'Choose your animal below to join, or decline.' })
+      : t('network.next.waitJoin', { defaultValue: 'Waiting for @{{handle}} to answer the invitation.', handle: project.invited?.handle || '' });
+  }
+  if (project.status !== 'active') return null;
+  const open = (project.proposals || []).find((p) => p.status === 'open');
+  if (open && !open.mine) return t('network.next.answerSplit', { defaultValue: 'Answer the split @{{handle}} proposed.', handle: otherHandle || '' });
+  if (open && open.mine) return t('network.next.waitSplit', { defaultValue: 'Waiting for @{{handle}} to answer your split proposal.', handle: otherHandle || '' });
+  if (!project.splitTerms) return t('network.next.proposeSplit', { defaultValue: 'Agree how the clutch is split: propose terms below.' });
+  if (!project.progress) {
+    return role === 'keeper'
+      ? t('network.next.keeperCard', { defaultValue: 'Put the partner male on her breeding card to start the cycle.' })
+      : t('network.next.waitCard', { defaultValue: 'Waiting for @{{handle}} to start the breeding card.', handle: otherHandle || '' });
+  }
+  const unsent = (project.hatchlings || []).filter((h) => !h.share).length;
+  if (role === 'keeper' && unsent && project.hatchlings.length) return t('network.next.sendShares', { defaultValue: 'Send the partner their hatchlings, then close the project.' });
+  const pending = (project.hatchlings || []).some((h) => h.share?.status === 'pending');
+  if (pending && role !== 'keeper') return t('network.next.acceptShares', { defaultValue: 'Hatchlings are waiting for you under Transfers.' });
+  return null;
 }
 
 function Side({ role, owner, animal, waiting }) {
@@ -134,7 +199,7 @@ function Side({ role, owner, animal, waiting }) {
     <div className="bn-side">
       <div className="bn-side__role">
         <span>{role}</span>
-        {owner ? <span style={{ textTransform: 'none', letterSpacing: 0 }}>@{owner.handle}</span> : null}
+        {owner ? <span style={{ textTransform: 'none', letterSpacing: 0 }}><Handle handle={owner.handle} /></span> : null}
       </div>
       {animal ? <AnimalMini animal={animal} /> : <p className="bn-note">{waiting}</p>}
     </div>
@@ -231,7 +296,11 @@ function Split({ project, maleOwner, keeper, busy, run }) {
           {shareCount != null ? ` ${t('network.split.forThisClutch', { defaultValue: 'For this clutch: {{n}} to {{male}}.', n: shareCount, male: maleOwner })}` : ''}
         </p>
       ) : (
-        <p className="bn-note">{t('network.split.none', { defaultValue: 'No split agreed yet. Talk it over below, then one of you proposes terms and the other accepts.' })}</p>
+        <p className="bn-note">
+          {project.status === 'completed'
+            ? t('network.split.noneClosed', { defaultValue: 'Closed without an agreed split.' })
+            : t('network.split.none', { defaultValue: 'No split agreed yet. Talk it over below, then one of you proposes terms and the other accepts.' })}
+        </p>
       )}
       {openProposal ? (
         <div className="bn-card" style={{ marginBlockStart: '0.5rem' }}>
@@ -258,8 +327,7 @@ function Split({ project, maleOwner, keeper, busy, run }) {
           busy={busy}
           onCancel={() => setEditing(false)}
           onSubmit={async (terms) => {
-            await run(() => networkApi.proposeSplit(project.id, terms));
-            setEditing(false);
+            if (await run(() => networkApi.proposeSplit(project.id, terms))) setEditing(false);
           }}
         />
       ) : null}
@@ -343,7 +411,9 @@ function Hatchlings({ project, role, maleOwner, busy, run }) {
           return (
             <li key={h.appAnimalId} className="bn-hatchling">
               {canSend && free ? (
-                <input type="checkbox" checked={picked.has(h.appAnimalId)} onChange={() => toggle(h.appAnimalId)} aria-label={t('network.project.pickHatchling', { defaultValue: 'Send {{name}} to {{who}}', name: h.name, who: maleOwner })} />
+                <label className="bn-hatchling__pick">
+                  <input type="checkbox" checked={picked.has(h.appAnimalId)} onChange={() => toggle(h.appAnimalId)} aria-label={t('network.project.pickHatchling', { defaultValue: 'Send {{name}} to {{who}}', name: h.name, who: maleOwner })} />
+                </label>
               ) : null}
               <span><bdi>{h.appAnimalId}</bdi>{h.name && h.name !== h.appAnimalId ? ` · ${h.name}` : ''}{h.sex ? ` · ${h.sex}` : ''}</span>
               {share ? (
@@ -365,11 +435,12 @@ function Hatchlings({ project, role, maleOwner, busy, run }) {
             className="bn-btn bn-btn--primary bn-btn--sm"
             disabled={!picked.size || busy}
             onClick={async () => {
-              await run(() => networkApi.offerShares(project.id, Array.from(picked)), { pull: false });
-              setPicked(new Set());
+              if (await run(() => networkApi.offerShares(project.id, Array.from(picked)), { pull: false })) setPicked(new Set());
             }}
           >
-            {t('network.project.sendShares', { defaultValue: 'Send to {{who}} ({{n}})', n: picked.size, who: maleOwner })}
+            {picked.size
+              ? t('network.project.sendShares', { defaultValue: 'Send to {{who}} ({{n}})', n: picked.size, who: maleOwner })
+              : t('network.project.sendPick', { defaultValue: 'Pick hatchlings to send' })}
           </button>
           <p className="bn-note" style={{ flex: '1 1 12rem' }}>
             {t('network.project.sendHint', { defaultValue: 'Each one is a transfer they accept. Sent hatchlings move to your archive and arrive with both parents named.' })}

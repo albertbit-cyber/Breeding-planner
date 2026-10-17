@@ -404,7 +404,7 @@ export const respondToProject = async (
   if (action === "decline") {
     const updated = await db.$transaction(async (tx: any) => {
       const row = await tx.jointProject.update({ where: { id: project.id }, data: { status: "declined" } });
-      await appendMessage(tx, { threadId: project.threadId, senderUserId: null, kind: "system", body: `${me.displayName} declined the project.`, attachment: { projectId: project.id } });
+      await appendMessage(tx, { threadId: project.threadId, senderUserId: null, kind: "system", body: `${me.displayName} declined the project.`, attachment: { projectId: project.id, event: { type: "project_declined", who: me.displayName } } });
       return row;
     });
     await createNotification({
@@ -459,7 +459,16 @@ export const respondToProject = async (
         `Project started. ${keeper.displayName} keeps ${femaleName} through her cycle and incubates the eggs. ` +
         `A partner record of ${maleRow.name || asRecord(maleRow.payload).name || "the male"} (from ${personLabel(maleOwner)}) is now in ${keeper.displayName}'s collection: ` +
         `put him on her breeding card and both of you can follow the cycle here. Agree the split of the clutch below.`,
-      attachment: { projectId: project.id },
+      attachment: {
+        projectId: project.id,
+        event: {
+          type: "project_started",
+          keeper: keeper.displayName,
+          female: femaleName || "",
+          male: maleRow.name || asRecord(maleRow.payload).name || "",
+          maleOwner: personLabel(maleOwner),
+        },
+      },
     });
     return activated;
   });
@@ -529,7 +538,7 @@ export const cancelProject = async (actor: AuthenticatedUser, projectId: string)
     await tx.animalTransfer.updateMany({ where: { projectId: project.id, status: "pending" }, data: { status: "cancelled", respondedAt: now } });
     await archivePartnerRecord(tx, project, `Joint project "${project.title}" was cancelled.`, now);
     const row = await tx.jointProject.update({ where: { id: project.id }, data: { status: "cancelled", completedAt: now } });
-    await appendMessage(tx, { threadId: project.threadId, senderUserId: null, kind: "system", body: `${me?.displayName || "They"} cancelled the project.`, attachment: { projectId: project.id } });
+    await appendMessage(tx, { threadId: project.threadId, senderUserId: null, kind: "system", body: `${me?.displayName || "They"} cancelled the project.`, attachment: { projectId: project.id, event: { type: "project_cancelled", who: me?.displayName || "" } } });
     return row;
   });
   await createNotification({
@@ -619,7 +628,7 @@ export const completeProject = async (actor: AuthenticatedUser, projectId: strin
       senderUserId: null,
       kind: "system",
       body: `${me?.displayName || "They"} closed the project. ${kept.length} hatchling${kept.length === 1 ? "" : "s"} stay${kept.length === 1 ? "s" : ""} with the keeper, ${givenIds.size} went to the partner. Every hatchling now names both parents and both breeders.`,
-      attachment: { projectId: project.id },
+      attachment: { projectId: project.id, event: { type: "project_closed", who: me?.displayName || "", kept: kept.length, given: givenIds.size } },
     });
     return row;
   });
@@ -687,7 +696,7 @@ export const respondToSplit = async (actor: AuthenticatedUser, proposalId: strin
       senderUserId: null,
       kind: "system",
       body: action === "accept" ? `${me?.displayName || "They"} accepted the split. It is now the agreed split of this project.` : `${me?.displayName || "They"} turned the proposed split down.`,
-      attachment: { proposalId: proposal.id, projectId: project.id },
+      attachment: { proposalId: proposal.id, projectId: project.id, event: { type: action === "accept" ? "split_accepted" : "split_rejected", who: me?.displayName || "" } },
     });
   });
   await createNotification({

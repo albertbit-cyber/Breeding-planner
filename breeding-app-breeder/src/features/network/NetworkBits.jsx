@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ImageIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react';
@@ -59,14 +59,39 @@ export function NetworkDialog({ title, onClose, children, footer = null, labelle
   const generated = useId();
   const titleId = labelledBy || `bn-dialog-${generated}`;
   const panelRef = useRef(null);
+  // Held in a ref: parents pass a new arrow on every render, and re-running the effect on each
+  // one would pull focus back to the first field while the keeper is typing.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const previous = document.activeElement;
+    const focusable = () => Array.from(
+      panelRef.current?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [],
+    );
     const first = panelRef.current?.querySelector('input, select, textarea, button:not([data-close])');
     first?.focus?.();
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose?.();
+        closeRef.current?.();
+        return;
+      }
+      // Keep Tab inside the dialog: the page behind it is inert while it is open.
+      if (event.key === 'Tab') {
+        const items = focusable();
+        if (!items.length) return;
+        const firstItem = items[0];
+        const lastItem = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === firstItem) {
+          event.preventDefault();
+          lastItem.focus();
+        } else if (!event.shiftKey && document.activeElement === lastItem) {
+          event.preventDefault();
+          firstItem.focus();
+        } else if (!panelRef.current?.contains(document.activeElement)) {
+          event.preventDefault();
+          firstItem.focus();
+        }
       }
     };
     document.addEventListener('keydown', onKey);
@@ -74,7 +99,7 @@ export function NetworkDialog({ title, onClose, children, footer = null, labelle
       document.removeEventListener('keydown', onKey);
       previous?.focus?.();
     };
-  }, [onClose]);
+  }, []);
   return createPortal(
     <div className="bn-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="bn-dialog__scrim sk-scrim" onClick={onClose} />
@@ -129,7 +154,7 @@ export function PersonPicker({ value, onPick, label }) {
           <Avatar person={value} />
           <div>
             <div style={{ fontWeight: 600 }}>{personName(value)}</div>
-            <div className="bn-thread__handle">@{value.handle}</div>
+            <div className="bn-thread__handle"><Handle handle={value.handle} /></div>
           </div>
           <button type="button" className="bn-btn bn-btn--ghost bn-btn--sm" onClick={() => onPick(null)}>
             {t('network.people.change', { defaultValue: 'Change' })}
@@ -168,7 +193,7 @@ export function PersonPicker({ value, onPick, label }) {
                 <Avatar person={person} />
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: 'block', fontWeight: 600 }}>{personName(person)}</span>
-                  <span className="bn-thread__handle">@{person.handle}</span>
+                  <span className="bn-thread__handle"><Handle handle={person.handle} /></span>
                 </span>
               </button>
             </li>
@@ -206,4 +231,87 @@ export function AnimalSelect({ animals, value, onChange, label, hint, emptyText 
 export function ErrorNote({ error }) {
   if (!error) return null;
   return <div className="bn-error" role="alert">{error}</div>;
+}
+
+/** "@handle", isolated so it reads the right way round inside right-to-left text. */
+export function Handle({ handle }) {
+  if (!handle) return null;
+  return <bdi>@{handle}</bdi>;
+}
+
+/**
+ * The in-app replacement for window.confirm / window.prompt: translatable, skinned, and able to
+ * lay out what is about to happen. `ask` resolves to { ok, note }.
+ */
+export function useConfirm() {
+  const [request, setRequest] = useState(null);
+  const ask = useCallback((options) => new Promise((resolve) => setRequest({ ...options, resolve })), []);
+  const finish = (ok, note = '') => {
+    request?.resolve({ ok, note });
+    setRequest(null);
+  };
+  const element = request ? <ConfirmDialog {...request} onCancel={() => finish(false)} onConfirm={(note) => finish(true, note)} /> : null;
+  return [element, ask];
+}
+
+function ConfirmDialog({ title, body, confirmLabel, danger = false, note = false, noteLabel, notePlaceholder, onCancel, onConfirm }) {
+  const { t } = useTranslation();
+  const noteId = useId();
+  const [text, setText] = useState('');
+  return (
+    <NetworkDialog
+      title={title}
+      onClose={onCancel}
+      footer={(
+        <>
+          <button type="button" className="bn-btn bn-btn--ghost" onClick={onCancel}>{t('network.cancel', { defaultValue: 'Cancel' })}</button>
+          <button type="button" className={`bn-btn ${danger ? 'bn-btn--danger-solid' : 'bn-btn--primary'}`} onClick={() => onConfirm(text.trim())}>
+            {confirmLabel || t('network.confirm', { defaultValue: 'Confirm' })}
+          </button>
+        </>
+      )}
+    >
+      {typeof body === 'string' ? <p className="bn-note" style={{ fontSize: '0.88rem' }}>{body}</p> : body}
+      {note ? (
+        <div className="bn-field">
+          <label htmlFor={noteId}>{noteLabel}</label>
+          <textarea id={noteId} className="bn-input" rows={3} maxLength={1000} value={text} onChange={(event) => setText(event.target.value)} placeholder={notePlaceholder || ''} />
+        </div>
+      ) : null}
+    </NetworkDialog>
+  );
+}
+
+/**
+ * A system line in the reader's language. The server sends the English sentence plus a structured
+ * event; the event is translated here, and the sentence is the fallback for anything unknown.
+ */
+export function eventText(event, t, fallback = '') {
+  if (!event || typeof event !== 'object' || !event.type) return fallback;
+  switch (event.type) {
+    case 'transfer_accepted':
+      return t('network.event.transferAccepted', { defaultValue: '{{who}} accepted {{animal}}. It is now in their collection, and in {{sender}}\'s archive.', who: event.who, animal: event.animal, sender: event.sender });
+    case 'loan_accepted':
+      return t('network.event.loanAccepted', { defaultValue: '{{who}} accepted the loan of {{animal}}. It is On loan in both collections until the loan ends.', who: event.who, animal: event.animal });
+    case 'transfer_declined':
+      return t('network.event.transferDeclined', { defaultValue: '{{who}} declined the transfer of {{animal}}.', who: event.who, animal: event.animal });
+    case 'transfer_cancelled':
+      return t('network.event.transferCancelled', { defaultValue: '{{who}} cancelled the transfer of {{animal}}.', who: event.who, animal: event.animal });
+    case 'loan_ended':
+      return t('network.event.loanEnded', { defaultValue: '{{who}} ended the loan of {{animal}}. It is back with {{owner}}.', who: event.who, animal: event.animal, owner: event.owner }) + (event.note ? ` ${event.note}` : '');
+    case 'project_declined':
+      return t('network.event.projectDeclined', { defaultValue: '{{who}} declined the project.', who: event.who });
+    case 'project_started':
+      return t('network.event.projectStarted', { defaultValue: 'Project started. {{keeper}} keeps {{female}} through her cycle and incubates the eggs. A partner record of {{male}} from {{maleOwner}} is now in {{keeper}}\'s collection: put him on her breeding card and both of you can follow the cycle here. Agree the split of the clutch below.', keeper: event.keeper, female: event.female, male: event.male, maleOwner: event.maleOwner });
+    case 'project_cancelled':
+      return t('network.event.projectCancelled', { defaultValue: '{{who}} cancelled the project.', who: event.who });
+    case 'project_closed':
+      return t('network.event.projectClosed', { defaultValue: '{{who}} closed the project. Kept by the keeper: {{kept}}. Sent to the partner: {{given}}. Every hatchling now names both parents and both breeders.', who: event.who, kept: event.kept, given: event.given });
+    case 'split_accepted':
+      return t('network.event.splitAccepted', { defaultValue: '{{who}} accepted the split. It is now the agreed split of this project.', who: event.who });
+    case 'split_rejected':
+      return t('network.event.splitRejected', { defaultValue: '{{who}} turned the proposed split down.', who: event.who });
+    default:
+      return fallback;
+  }
 }

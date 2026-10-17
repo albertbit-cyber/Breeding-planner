@@ -12,11 +12,29 @@ import {
 } from '@phosphor-icons/react';
 import { errorCode, errorText, marketplaceListingUrl, networkApi } from './networkApi.js';
 import { animalCardOf, personName, shortTime, transferableAnimals } from './networkFormat.js';
-import { AnimalSelect, Avatar, ErrorNote, NetworkDialog, StatusChip } from './NetworkBits.jsx';
+import { AnimalSelect, Avatar, ErrorNote, Handle, NetworkDialog, StatusChip, eventText, useConfirm } from './NetworkBits.jsx';
 import { AnimalShareCard, ListingCard, TransferCard } from './MessageCards.jsx';
 import ProjectPanel from './ProjectPanel.jsx';
 
 const POLL_MS = 10_000;
+
+/** Closes a small popover on Escape or a click outside it. */
+function useDismiss(ref, open, close) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') close(); };
+    const onDown = (event) => { if (ref.current && !ref.current.contains(event.target)) close(); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown);
+    };
+  }, [ref, open, close]);
+}
+
+/** Enter sends on a keyboard; on a touch keyboard Enter is a new line and the button sends. */
+const enterSends = () => typeof window === 'undefined' || !window.matchMedia || !window.matchMedia('(pointer: coarse)').matches;
 
 /**
  * One conversation. Polls while it is open (there is no push channel yet), marks itself read,
@@ -32,8 +50,15 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
   const [menuOpen, setMenuOpen] = useState(false);
   const [picker, setPicker] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [notice, setNotice] = useState('');
+  const [announce, setAnnounce] = useState('');
+  const [confirmElement, ask] = useConfirm();
   const listRef = useRef(null);
   const lastIdRef = useRef(null);
+  const moreRef = useRef(null);
+  const attachRef = useRef(null);
+  useDismiss(moreRef, menuOpen, useCallback(() => setMenuOpen(false), []));
+  useDismiss(attachRef, attachOpen, useCallback(() => setAttachOpen(false), []));
   const ownIds = useMemo(() => new Set((animals || []).map((a) => a.id)), [animals]);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -44,6 +69,11 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
       const newest = res?.messages?.[res.messages.length - 1]?.id || null;
       if (newest && newest !== lastIdRef.current) {
         const firstLoad = lastIdRef.current === null;
+        // Tell a screen reader about a message that arrived while the thread was open.
+        const latest = res.messages[res.messages.length - 1];
+        if (!firstLoad && latest && !latest.mine && latest.sender) {
+          setAnnounce(t('network.thread.newFrom', { defaultValue: 'New message from {{name}}', name: personName(latest.sender) }));
+        }
         lastIdRef.current = newest;
         networkApi.markRead(threadId).then(() => onChanged?.()).catch(() => {});
         // A project opens on its panel; a conversation opens on its newest message, and follows new ones.
@@ -114,7 +144,13 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
   const block = async () => {
     const other = data?.thread?.other;
     if (!other) return;
-    if (!window.confirm(t('network.thread.blockConfirm', { defaultValue: 'Block {{name}}? They can no longer message you, send you animals or invite you to projects, here or on the marketplace.', name: personName(other) }))) return;
+    const answer = await ask({
+      title: t('network.thread.blockTitle', { defaultValue: 'Block {{name}}?', name: personName(other) }),
+      body: t('network.thread.blockConfirm', { defaultValue: 'Block {{name}}? They can no longer message you, send you animals or invite you to projects, here or on the marketplace.', name: personName(other) }),
+      confirmLabel: t('network.thread.block', { defaultValue: 'Block' }),
+      danger: true,
+    });
+    if (!answer.ok) return;
     try {
       await networkApi.block(other.id);
       onChanged?.();
@@ -136,11 +172,17 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
   };
 
   const report = async (message) => {
-    const note = window.prompt(t('network.thread.reportPrompt', { defaultValue: 'Report this message to the Serpentora team. What is wrong with it?' }), '');
-    if (note === null) return;
+    const answer = await ask({
+      title: t('network.thread.reportTitle', { defaultValue: 'Report this message' }),
+      body: t('network.thread.reportPrompt', { defaultValue: 'Report this message to the Serpentora team. What is wrong with it?' }),
+      confirmLabel: t('network.thread.reportSend', { defaultValue: 'Send report' }),
+      note: true,
+      noteLabel: t('network.thread.reportNote', { defaultValue: 'What is wrong (optional)' }),
+    });
+    if (!answer.ok) return;
     try {
-      await networkApi.report(message.id, 'user_report', note);
-      window.alert(t('network.thread.reported', { defaultValue: 'Thank you. The team will look at it.' }));
+      await networkApi.report(message.id, 'user_report', answer.note);
+      setNotice(t('network.thread.reported', { defaultValue: 'Thank you. The team will look at it.' }));
     } catch (err) {
       setError(errorText(err, t('network.actionFailed', { defaultValue: 'That did not work. Try again.' })));
     }
@@ -162,23 +204,23 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
         {other ? <Avatar person={other} /> : null}
         <div className="bn-thread__who">
           <div className="bn-thread__name">{other ? personName(other) : '…'}</div>
-          {other?.handle ? <div className="bn-thread__handle">@{other.handle}</div> : null}
+          {other?.handle ? <div className="bn-thread__handle"><Handle handle={other.handle} /></div> : null}
         </div>
-        <div className="bn-attach">
-          <button type="button" className="bn-btn bn-btn--ghost bn-btn--icon" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label={t('network.thread.more', { defaultValue: 'More' })}>
+        <div className="bn-attach" ref={moreRef}>
+          <button type="button" className="bn-btn bn-btn--ghost bn-btn--icon" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-label={t('network.thread.more', { defaultValue: 'More' })}>
             <DotsThreeIcon size={18} />
           </button>
           {menuOpen ? (
-            <div className="bn-menu" role="menu" style={{ insetBlockEnd: 'auto', insetBlockStart: 'calc(100% + 0.4rem)', insetInlineStart: 'auto', insetInlineEnd: 0 }}>
+            <div className="bn-menu" style={{ insetBlockEnd: 'auto', insetBlockStart: 'calc(100% + 0.4rem)', insetInlineStart: 'auto', insetInlineEnd: 0 }}>
               {thread?.status !== 'ignored' ? (
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setStatus('ignored'); }}>{t('network.thread.ignore', { defaultValue: 'Ignore conversation' })}</button>
+                <button type="button" onClick={() => { setMenuOpen(false); setStatus('ignored'); }}>{t('network.thread.ignore', { defaultValue: 'Ignore conversation' })}</button>
               ) : (
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setStatus('accepted'); }}>{t('network.thread.restore', { defaultValue: 'Move back to inbox' })}</button>
+                <button type="button" onClick={() => { setMenuOpen(false); setStatus('accepted'); }}>{t('network.thread.restore', { defaultValue: 'Move back to inbox' })}</button>
               )}
               {blocked === 'by_me' ? (
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); unblock(); }}>{t('network.thread.unblock', { defaultValue: 'Unblock' })}</button>
+                <button type="button" onClick={() => { setMenuOpen(false); unblock(); }}>{t('network.thread.unblock', { defaultValue: 'Unblock' })}</button>
               ) : (
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); block(); }}>{t('network.thread.block', { defaultValue: 'Block' })}</button>
+                <button type="button" onClick={() => { setMenuOpen(false); block(); }}>{t('network.thread.block', { defaultValue: 'Block' })}</button>
               )}
             </div>
           ) : null}
@@ -205,7 +247,7 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
         {!data && !error ? <div className="bn-empty">{t('network.loading', { defaultValue: 'Loading…' })}</div> : null}
         {(data?.messages || []).map((message) => {
           if (message.kind === 'system' || !message.sender) {
-            return <div key={message.id} className="bn-system">{message.body}</div>;
+            return <div key={message.id} className="bn-system">{eventText(message.attachment?.event, t, message.body)}</div>;
           }
           const a = message.attachment || {};
           let content;
@@ -250,7 +292,14 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
               <div className="bn-msg__time">
                 <span>{shortTime(message.createdAt, i18n.language)}</span>
                 {!message.mine ? (
-                  <button type="button" className="bn-linkbtn" onClick={() => report(message)}>{t('network.thread.report', { defaultValue: 'Report' })}</button>
+                  <button
+                    type="button"
+                    className="bn-linkbtn"
+                    onClick={() => report(message)}
+                    aria-label={t('network.thread.reportFrom', { defaultValue: 'Report message from {{name}}', name: personName(message.sender) })}
+                  >
+                    {t('network.thread.report', { defaultValue: 'Report' })}
+                  </button>
                 ) : null}
               </div>
             </div>
@@ -260,24 +309,27 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
       </div>
 
       <ErrorNote error={error} />
+      {notice ? <div className="bn-success" role="status" style={{ margin: '0 1rem 0.5rem' }}>{notice}</div> : null}
+      <div className="bn-sr-only" aria-live="polite">{announce}</div>
+      {confirmElement}
       {blocked === 'by_them' ? (
         <div className="bn-system" style={{ padding: '0.75rem' }}>{t('network.thread.notAccepting', { defaultValue: 'This breeder is not accepting messages from you.' })}</div>
       ) : blocked === 'by_me' ? (
         <div className="bn-system" style={{ padding: '0.75rem' }}>{t('network.thread.youBlocked', { defaultValue: 'You blocked this breeder. Unblock them to write again.' })}</div>
       ) : (
         <form className="bn-composer" onSubmit={submitText}>
-          <div className="bn-attach">
-            <button type="button" className="bn-btn bn-btn--ghost bn-btn--icon" onClick={() => setAttachOpen((v) => !v)} aria-haspopup="menu" aria-expanded={attachOpen} aria-label={t('network.thread.attach', { defaultValue: 'Attach' })}>
+          <div className="bn-attach" ref={attachRef}>
+            <button type="button" className="bn-btn bn-btn--ghost bn-btn--icon" onClick={() => setAttachOpen((v) => !v)} aria-expanded={attachOpen} aria-label={t('network.thread.attach', { defaultValue: 'Attach' })}>
               <PaperclipIcon size={18} />
             </button>
             {attachOpen ? (
-              <div className="bn-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setAttachOpen(false); setPicker('animal'); }}><ImageIcon size={16} aria-hidden="true" />{t('network.thread.shareSnake', { defaultValue: 'Snake card' })}</button>
-                <button type="button" role="menuitem" onClick={() => { setAttachOpen(false); setPicker('listing'); }}><StorefrontIcon size={16} aria-hidden="true" />{t('network.thread.shareListing', { defaultValue: 'Marketplace link' })}</button>
+              <div className="bn-menu">
+                <button type="button" onClick={() => { setAttachOpen(false); setPicker('animal'); }}><ImageIcon size={16} aria-hidden="true" />{t('network.thread.shareSnake', { defaultValue: 'Snake card' })}</button>
+                <button type="button" onClick={() => { setAttachOpen(false); setPicker('listing'); }}><StorefrontIcon size={16} aria-hidden="true" />{t('network.thread.shareListing', { defaultValue: 'Marketplace link' })}</button>
                 {thread?.kind === 'direct' ? (
                   <>
-                    <button type="button" role="menuitem" onClick={() => { setAttachOpen(false); onStartTransfer?.(other); }}><ArrowsLeftRightIcon size={16} aria-hidden="true" />{t('network.thread.transfer', { defaultValue: 'Transfer an animal' })}</button>
-                    <button type="button" role="menuitem" onClick={() => { setAttachOpen(false); onStartProject?.(other); }}><EggIcon size={16} aria-hidden="true" />{t('network.thread.project', { defaultValue: 'Start a joint project' })}</button>
+                    <button type="button" onClick={() => { setAttachOpen(false); onStartTransfer?.(other); }}><ArrowsLeftRightIcon size={16} aria-hidden="true" />{t('network.thread.transfer', { defaultValue: 'Transfer an animal' })}</button>
+                    <button type="button" onClick={() => { setAttachOpen(false); onStartProject?.(other); }}><EggIcon size={16} aria-hidden="true" />{t('network.thread.project', { defaultValue: 'Start a joint project' })}</button>
                   </>
                 ) : null}
               </div>
@@ -290,7 +342,7 @@ export default function ThreadView({ threadId, me, animals, onBack, onChanged, o
             maxLength={4000}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) submitText(event);
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && enterSends()) submitText(event);
             }}
             placeholder={t('network.thread.placeholder', { defaultValue: 'Write a message' })}
             aria-label={t('network.thread.placeholder', { defaultValue: 'Write a message' })}

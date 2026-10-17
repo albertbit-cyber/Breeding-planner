@@ -54,6 +54,7 @@ CREATE TABLE "animal_transfers" (
     "sender_animal_id" TEXT NOT NULL,
     "sender_app_animal_id" TEXT NOT NULL,
     "receiver_animal_id" TEXT,
+    "receiver_app_animal_id" TEXT,
     "kind" TEXT NOT NULL,
     "reason" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',

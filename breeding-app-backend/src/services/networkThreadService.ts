@@ -347,6 +347,7 @@ export const toTransferSummary = (row: any) =>
         loanUntil: row.loanUntil,
         projectId: row.projectId || null,
         animal: row.snapshot || null,
+        receiverAppAnimalId: row.receiverAppAnimalId || null,
         createdAt: row.createdAt,
         respondedAt: row.respondedAt,
         returnedAt: row.returnedAt,
@@ -437,6 +438,7 @@ export const listThreads = async (actor: AuthenticatedUser, boxRaw: unknown) => 
       lastMessage: {
         kind: last.kind,
         body: String(last.body || "").slice(0, 160),
+        event: asRecord(last.attachment).event || null,
         createdAt: last.createdAt,
         mine: last.senderUserId === actor.id,
       },
