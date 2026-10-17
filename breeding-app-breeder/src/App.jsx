@@ -129,6 +129,7 @@ import SpeciesDashboard from "./features/species/SpeciesDashboard";
 import SpeciesGate from "./features/species/SpeciesGate";
 import HelpRoot from "./features/help/ui/HelpRoot";
 import { HelpButton, DialogHelpButton } from "./features/help/ui/HelpButton";
+import AccountMenu from "./features/auth/AccountMenu.jsx";
 import { ScreenTourLink, TourInvitation, TourLink } from "./features/help/ui/Onboarding";
 import { isHelpModeOn } from "./features/help/helpStore";
 import { help, tour } from "./features/help/help";
@@ -12572,7 +12573,8 @@ export default function BreedingPlannerApp() {
       {/* Desktop header — hidden on mobile via CSS */}
       <div className="bp-header-desktop px-5 py-4 border-b bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto relative">
-          <div className="help-header-slot"><HelpButton /></div>
+          {/* Account and ? share one row, so neither can be painted over the other in any language. */}
+          <div className="help-header-slot"><AccountMenu onOpenSettings={() => openSetupTab('account')} /><HelpButton /></div>
           {/* Brand sits on its own centred row above the tabs. Side by side, the nav row was
               forced onto one line by lg:flex-nowrap while every label carries white-space:nowrap,
               so the row overflowed its box and painted over the logo and breeder name. Stacked,
@@ -12644,6 +12646,7 @@ export default function BreedingPlannerApp() {
             )}
           </div>
           <NotSyncedPill failure={cloudSyncFailure} onOpen={() => openSetupTab('backup')} className="shrink-0" />
+          <AccountMenu onOpenSettings={() => openSetupTab('account')} />
           <HelpButton />
         </div>
       </div>

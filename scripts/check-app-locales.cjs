@@ -125,10 +125,10 @@ const addKeysToFile = (filePath, entries) => {
   return conflicts;
 };
 
-// Namespaces an app ships in English only, by decision, until they are translated. The
-// source is still checked against en/<ns>.json; the other languages are not compared.
-// breeder `help`: the in-app help system's text (2026-10-07); P2.9 translates it.
-const ENGLISH_ONLY_NAMESPACES = {
+// Namespaces one app loads on top of the shared settings.json list (which lab shares
+// too). They are checked like the rest: source against en, every language against en.
+// breeder `help`: the in-app help system's text, translated into all ten languages 2026-10-16.
+const APP_NAMESPACES = {
   "breeding-app-breeder": ["help"],
 };
 
@@ -151,9 +151,8 @@ for (const app of apps) {
   const baseLanguage = settings.fallbackLng || "en";
   const defaultNs = settings.defaultNamespace || "common";
   const basePath = (ns) => path.join(localesDir, baseLanguage, `${ns}.json`);
-  const englishOnly = (ENGLISH_ONLY_NAMESPACES[app] || []).filter((ns) => fs.existsSync(basePath(ns)));
-  // Everything the app loads: translated namespaces plus the English-only ones.
-  const loaded = [...namespaces, ...englishOnly];
+  // Everything the app loads: the shared namespaces plus its own.
+  const loaded = [...namespaces, ...(APP_NAMESPACES[app] || [])];
   const loadBase = () => {
     const flatByNs = {};
     for (const ns of loaded) {
@@ -236,7 +235,7 @@ for (const app of apps) {
 
   // ---- 2. en -> other languages ----
   let enKeyCount = 0;
-  for (const namespace of namespaces) {
+  for (const namespace of loaded) {
     if (!fs.existsSync(basePath(namespace))) {
       failures.push(`${app}: missing base locale ${baseLanguage}/${namespace}.json`);
       continue;

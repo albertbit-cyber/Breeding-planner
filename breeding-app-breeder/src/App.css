@@ -1429,34 +1429,6 @@
   padding: 0;
 }
 
-.auth-floating-chip {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  background: var(--sk-surface-2);
-  color: var(--sk-text);
-  padding: 0.6rem 1rem;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  z-index: 1500;
-}
-
-/* The chip used to be a dark 85%-alpha slab, so a 15% white pill with white
-   text read fine. The chip now follows --sk-surface-2, which made that pairing
-   white-on-near-white (measured 1.04:1 on the light skins). Both halves now
-   come from the same ramp. */
-.auth-floating-chip button {
-  background: var(--sk-surface-3);
-  border: 1px solid var(--sk-border);
-  color: var(--sk-text);
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
 .auth-overlay .auth-card {
   max-height: calc(100vh - 4rem);
   overflow-y: auto;
@@ -3515,13 +3487,6 @@
    BREEDER APP — MOBILE RESPONSIVE OVERRIDES
    Applied on screens ≤ 768px (phone portrait + small tablets)
    ================================================================ */
-
-/* ── Auth floating chip ───────────────────────────────────────── */
-@media (max-width: 768px) {
-  .auth-floating-chip {
-    display: none; /* hidden on mobile — sign-out lives in Settings */
-  }
-}
 
 /* ── Desktop header: hide on mobile ──────────────────────────── */
 @media (max-width: 768px) {

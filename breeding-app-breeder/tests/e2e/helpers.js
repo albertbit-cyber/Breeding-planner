@@ -102,7 +102,9 @@ export const installBreederAuthInPage = async (page, auth) => {
 export const openAuthenticatedBreeder = async (page, hashPath = "/breeder") => {
   await page.goto(`/#${hashPath}`);
   await expect(page.getByText("Serpentora").first()).toBeVisible();
-  await expect(page.getByText(/signed in as/i)).toBeVisible();
+  // The account menu button (initials, labelled "Account: <name>") replaced the
+  // "Signed in as" pill; it only renders once a session is in place.
+  await expect(page.getByRole("button", { name: /^account:/i })).toBeVisible();
 };
 
 export const collectConsoleErrors = (page) => {
