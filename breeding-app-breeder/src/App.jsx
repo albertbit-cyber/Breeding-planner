@@ -155,6 +155,7 @@ import {
   sexOrUnknown,
 } from "./features/animals/animalSex";
 import { retagIdForSex } from "./features/animals/animalIdSex";
+import { renameAnimalInCycles, renameAnimalInExams, renameTombstone } from "./features/animals/animalRename";
 import { buildQuickAddGeneticsSource } from "./features/animals/quickAddGenetics";
 import { resolveCatalogParent } from "./features/animals/catalogParentLabel";
 import { parseCsvToRows, detectHeaderKey } from "./utils/csvRows";
@@ -14799,6 +14800,17 @@ export default function BreedingPlannerApp() {
                           // leave the tub and the terrarium pointing at an animal that no longer
                           // exists -- the record survives, but it vanishes off the rack.
                           if (newId !== oldId) {
+                            // The old ID is deleted for sync like any delete. Without this the
+                            // server kept it, and the next sync handed it back: the unsexed
+                            // 26-U-242 reappeared beside the 26-M-242 it had become.
+                            if (String(oldId || '').trim()) {
+                              setSyncTombstones(prev => ({
+                                ...prev,
+                                snakes: { ...prev.snakes, [oldId]: renameTombstone(oldId, { now: nowIsoString() }) },
+                              }));
+                            }
+                            setBreedingCycles(prev => renameAnimalInCycles(prev, oldId, newId));
+                            setFollicleExams(prev => renameAnimalInExams(prev, oldId, newId));
                             updateSpacesState(prev => ({
                               ...prev,
                               heatRacks: prev.heatRacks.map(rack => {
