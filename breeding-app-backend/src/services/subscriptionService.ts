@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/errors";
 import type { AuthenticatedUser } from "../types/auth";
 import { countedAnimalWhere } from "./animalArchive";
-import { FEATURE_CATALOG, LIMIT_FEATURE_KEYS, PHOTOS_PER_ANIMAL_FEATURE } from "./subscriptionCatalog";
+import { FEATURE_CATALOG, LIMIT_FEATURE_KEYS, PHOTOS_PER_ANIMAL_FEATURE, featureAudience } from "./subscriptionCatalog";
 
 const db = prisma as any;
 
@@ -78,6 +78,9 @@ const normalizeFeature = (feature: any) => ({
   description: feature.description || "",
   defaultLimitType: feature.defaultLimitType || null,
   sortOrder: feature.sortOrder || 0,
+  audience: featureAudience(feature.featureKey),
+  addonAvailable: Boolean(feature.addonAvailable),
+  addonMonthlyPrice: feature.addonMonthlyPrice === null || feature.addonMonthlyPrice === undefined ? null : Number(feature.addonMonthlyPrice),
 });
 
 const logAdminAction = async (input: {
@@ -127,6 +130,57 @@ export const listFeatureCatalog = async () => {
   await ensureFeatureCatalog();
   const features = await db.featureCatalog.findMany({ orderBy: [{ featureGroup: "asc" }, { sortOrder: "asc" }] });
   return { features: features.map(normalizeFeature) };
+};
+
+/**
+ * "Build My Own": the price of one feature on its own. Setting a price does not sell anything yet;
+ * until checkout handles add-ons an admin grants a bought add-on as a user feature override.
+ */
+export const updateFeatureAddon = async (actor: AuthenticatedUser, featureKey: string, payload: Record<string, unknown>) => {
+  await ensureFeatureCatalog();
+  const before = await db.featureCatalog.findUnique({ where: { featureKey } });
+  if (!before) throw new HttpError(404, "Feature not found.");
+  if (featureAudience(featureKey) !== "tier") throw new HttpError(400, "Only customer features can be sold as add-ons.");
+  const price = payload.addonMonthlyPrice === "" || payload.addonMonthlyPrice === null || payload.addonMonthlyPrice === undefined
+    ? null
+    : money(payload.addonMonthlyPrice);
+  const updated = await db.featureCatalog.update({
+    where: { featureKey },
+    data: {
+      addonAvailable: payload.addonAvailable === undefined ? before.addonAvailable : Boolean(payload.addonAvailable),
+      addonMonthlyPrice: payload.addonMonthlyPrice === undefined ? before.addonMonthlyPrice : price,
+    },
+  });
+  await logAdminAction({
+    adminUserId: actor.id,
+    action: "feature_addon_updated",
+    beforeJson: normalizeFeature(before),
+    afterJson: normalizeFeature(updated),
+    reason: "feature_addon_updated",
+  });
+  return { feature: normalizeFeature(updated) };
+};
+
+/** The public "Build My Own" price list: features on sale as add-ons, with a price set. */
+export const listPublicAddons = async () => {
+  const features = await db.featureCatalog.findMany({
+    where: { addonAvailable: true, addonMonthlyPrice: { not: null } },
+    orderBy: [{ featureGroup: "asc" }, { sortOrder: "asc" }],
+  });
+  return {
+    addons: features
+      .filter((feature: any) => featureAudience(feature.featureKey) === "tier")
+      .map((feature: any) => {
+        const dto = normalizeFeature(feature);
+        return {
+          featureKey: dto.featureKey,
+          featureName: dto.featureName,
+          featureGroup: dto.featureGroup,
+          description: dto.description,
+          monthlyPrice: dto.addonMonthlyPrice,
+        };
+      }),
+  };
 };
 
 const tierDataFromPayload = (payload: Record<string, unknown>) => ({

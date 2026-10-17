@@ -282,11 +282,15 @@ import { getLocalPhotoCache, getPhotoResolver, runPhotoUploadQueue } from "./ser
 import PhotoImg, { PhotoLink } from "./components/PhotoImg.jsx";
 import DeviceStorageSummary from "./components/DeviceStorageSummary.jsx";
 import FieldScreen from "./features/field/FieldScreen.jsx";
+import NetworkCenter from "./features/network/NetworkCenter.jsx";
+import NetworkRecordPanel from "./features/network/NetworkRecordPanel.jsx";
+import useNetworkSummary from "./features/network/useNetworkSummary.js";
 import QuickLogSheet from "./features/field/QuickLogSheet.jsx";
 import { appendLog as appendLogToSnake, pushRecent as pushRecentAnimal, removeLog as removeLogFromSnake } from "./features/field/fieldLogic.js";
 import {
   Brain as BrainIcon,
   CalendarBlank as CalendarIcon,
+  ChatsCircle as MessagesIcon,
   Cards as AnimalsIcon,
   DotsThreeOutline as MoreIcon,
   Flask as LabIcon,
@@ -3262,7 +3266,7 @@ function prepareSnapshotForBackend(animals, pairings, plannerState = null, tombs
 }
 
 // Tabs that live behind the phone's More sheet rather than on the bar itself.
-const MOBILE_MORE_TABS = ['calendar', 'spaces', 'quarantine', 'advisor', 'familyTree', 'shedTerminal', 'setup'];
+const MOBILE_MORE_TABS = ['network', 'calendar', 'spaces', 'quarantine', 'advisor', 'familyTree', 'shedTerminal', 'setup'];
 
 function getSyncRecordKey(record, fallbackPrefix, index) {
   const candidates = [
@@ -7057,6 +7061,9 @@ export default function BreedingPlannerApp() {
   });
   useEffect(() => { saveStoredJson('serpentoraRecentAnimals', recentAnimalIds); }, [recentAnimalIds]);
   const [speciesScope, setSpeciesScope] = useState(null);
+  // Breeder network (features/network): the Messages badge, and what another screen asked it to open.
+  const { badge: networkBadge, refresh: refreshNetworkSummary } = useNetworkSummary(true);
+  const [networkIntent, setNetworkIntent] = useState(null);
 
   // Animals recorded before species tracking carry no species and resolve to ball python on
   // read. That guess is right for most keepers and wrong for some, so it is confirmed once
@@ -12610,6 +12617,10 @@ export default function BreedingPlannerApp() {
               </TabButton>
               <TabButton theme={theme} active={tab==="calendar"} onClick={()=>setTab("calendar")} className="header-nav-button" {...help('nav-calendar')}>{t("nav.calendar", { defaultValue: "Calendar" })}</TabButton>
               <TabButton theme={theme} active={tab==="shedTerminal"} onClick={()=>setTab("shedTerminal")} className="header-nav-button" {...help('nav-lab-tests')}>{t("nav.shedTerminal", { defaultValue: "Lab tests" })}</TabButton>
+              <TabButton theme={theme} active={tab==="network"} onClick={()=>setTab("network")} className="header-nav-button" {...help('nav-messages')}>
+                {t("nav.messages", { defaultValue: "Messages" })}
+                {networkBadge ? <span className="ms-1 rounded-full bg-sky-100 px-1.5 text-[10px] font-semibold text-sky-800">{networkBadge}</span> : null}
+              </TabButton>
               <TabButton theme={theme} active={tab==="setup"} onClick={()=>setTab("setup")} className="header-nav-button" {...help('nav-setup')}>{t("nav.setup", { defaultValue: "Settings" })}</TabButton>
             </div>
             {/* Search lives in the Animals section now: it only ever filtered animals, so sitting
@@ -12670,7 +12681,10 @@ export default function BreedingPlannerApp() {
                   setTab(key);
                 }}
               >
-                <span className="bp-mobile-bottom-nav__icon" aria-hidden="true"><Icon size={22} weight={active ? 'fill' : 'regular'} /></span>
+                <span className="bp-mobile-bottom-nav__icon" aria-hidden="true" style={{ position: 'relative' }}>
+                  <Icon size={22} weight={active ? 'fill' : 'regular'} />
+                  {key === '__more' && networkBadge ? <span className="bp-more-menu__row-badge" style={{ position: 'absolute', top: -6, insetInlineEnd: -10, fontSize: 10, minWidth: 16, padding: '0 4px' }}>{networkBadge}</span> : null}
+                </span>
                 <span className="bp-mobile-bottom-nav__label">{label}</span>
               </button>
             );
@@ -12684,6 +12698,7 @@ export default function BreedingPlannerApp() {
           <div className="bp-more-menu__backdrop" onClick={() => setMobileMoreOpen(false)} />
           <div className="bp-more-menu__panel bp-more-menu__panel--list" role="dialog" aria-modal="true" aria-label={t("nav.more", { defaultValue: "More" })}>
             {[
+              { key: 'network', Icon: MessagesIcon, label: t("nav.messages", { defaultValue: "Messages" }), badge: networkBadge || 0, helpId: 'nav-messages' },
               { key: 'calendar', Icon: CalendarIcon, label: t("nav.calendar", { defaultValue: "Calendar" }), helpId: 'nav-calendar' },
               { key: 'spaces', Icon: SpacesIcon, label: t("nav.spaces", { defaultValue: "Spaces" }), helpId: 'nav-spaces' },
               { key: 'quarantine', Icon: QuarantineIcon, label: t("nav.quarantine", { defaultValue: "Quarantine" }), badge: quarantineCount || 0, helpId: 'nav-quarantine' },
@@ -13625,6 +13640,25 @@ export default function BreedingPlannerApp() {
           />
         )}
 
+        {tab === "network" && (
+          <NetworkCenter
+            animals={snakes}
+            onCollectionChanged={() => { performCloudBreederSync({ silent: true }); refreshNetworkSummary(); }}
+            onOpenAnimal={async (animalId) => {
+              const find = (list) => (Array.isArray(list) ? list : []).find(snake => snake && snake.id === animalId);
+              let target = find(snakes);
+              // A just-received animal reaches this device with the next pull; fetch it first.
+              if (!target) {
+                await performCloudBreederSync({ silent: true });
+                target = find(latestPlannerSnapshotRef.current?.snakes);
+              }
+              if (target) openSnakeEditor(target);
+            }}
+            intent={networkIntent}
+            onIntentHandled={() => setNetworkIntent(null)}
+            onSummaryChanged={refreshNetworkSummary}
+          />
+        )}
         {tab === "calendar" && (
           <CalendarSection
             snakes={snakes}
@@ -15290,6 +15324,15 @@ export default function BreedingPlannerApp() {
                 />
                 {/* Bought on Serpentora Market: the seller, the claims with their sources, the certificates. */}
                 <AcquisitionRecordPanel snake={editSnake} />
+                {/* Handed over, lent, or bred in a joint project with another breeder; and the actions that start here. */}
+                <NetworkRecordPanel
+                  snake={editSnake}
+                  onOpenNetwork={(intent) => {
+                    closeSnakeEditor();
+                    setNetworkIntent({ ...intent, nonce: Date.now() });
+                    setTab('network');
+                  }}
+                />
                 </div>
               </SnakeEditorSection>
               <SnakeEditorSection

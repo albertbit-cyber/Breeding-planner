@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TIER_LIMIT_PLAN, describeTarget, planTierLimitChanges, type TierRow } from "../services/tierLimitPlan";
 
 /**
- * The animal and photo limits per tier (owner's numbers, 16 Oct 2026) and the dry-run/apply plan
+ * The animal and photo limits per tier (owner's numbers, 16 Oct 2026; Hobby Keeper 25 from 17 Oct) and the dry-run/apply plan
  * the live-database script is built on.
  */
 
@@ -16,12 +16,11 @@ describe("the plan", () => {
     ]));
     expect(table).toEqual({
       free: ["10", "3"],
-      hobby: ["50", "5"],
+      hobby: ["25", "5"],
       hobby_plus: ["100", "7"],
       breeder: ["250", "9"],
       professional_breeder: ["500", "unlimited"],
       enterprise: ["unlimited", "unlimited"],
-      lab_partner: ["(no row)", "off"],
     });
   });
 });
@@ -40,14 +39,14 @@ describe("planTierLimitChanges", () => {
     expect(unchanged).toHaveLength(1);
   });
 
-  it("writes a missing row and switches photos off for the lab", () => {
+  it("writes a missing row, and leaves the retired lab tier alone", () => {
     const { changes } = planTierLimitChanges([
       tier("lab_partner", [{ featureKey: "animals.photos", enabled: true, limitValue: null }]),
       tier("hobby"),
     ]);
+    expect(changes.some((change) => change.tierKey === "lab_partner")).toBe(false);
     expect(changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ tierKey: "lab_partner", featureKey: "animals.photos", after: { enabled: false, limit: null } }),
-      expect.objectContaining({ tierKey: "hobby", featureKey: "animals.create", before: null, after: { enabled: true, limit: 50 } }),
+      expect.objectContaining({ tierKey: "hobby", featureKey: "animals.create", before: null, after: { enabled: true, limit: 25 } }),
       expect.objectContaining({ tierKey: "hobby", featureKey: "animals.photos", before: null, after: { enabled: true, limit: 5 } }),
     ]));
   });

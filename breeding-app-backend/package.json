@@ -26,6 +26,7 @@
     "photos:bucket": "tsx scripts/createPhotoBucket.ts",
     "photos:purge": "tsx scripts/purgeDeletedPhotos.ts",
     "tiers:limits": "tsx scripts/applyTierLimits.ts",
+    "tiers:retire-lab": "tsx scripts/retireLabTier.ts",
     "breeding:migrate-legacy": "tsx scripts/migrateLegacyPairingsToBreedingCycles.ts"
   },
   "prisma": {

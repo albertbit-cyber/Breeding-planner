@@ -11,12 +11,15 @@ import {
   getSubscriptionTier,
   getUserSubscriptionPanel,
   listFeatureCatalog,
+  listPublicAddons,
   listPublicSubscriptionTiers,
   listSubscriptionTiers,
   removeFeatureOverride,
   resetUsageTracking,
+  updateFeatureAddon,
   updateSubscriptionTier,
 } from "../services/subscriptionService";
+import { getSuggestions, updateSuggestions } from "../services/platformSettingsService";
 
 export const adminFeatures = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listFeatureCatalog());
@@ -24,6 +27,24 @@ export const adminFeatures = async (_req: Request, res: Response): Promise<void>
 
 export const adminTiers = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json(await listSubscriptionTiers(req.query));
+};
+
+export const updateFeature = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await updateFeatureAddon(req.user, req.params.featureKey, req.body || {}));
+};
+
+export const publicAddons = async (_req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await listPublicAddons());
+};
+
+export const adminSuggestions = async (_req: Request, res: Response): Promise<void> => {
+  res.status(200).json(await getSuggestions());
+};
+
+export const saveSuggestions = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await updateSuggestions(req.user, req.body || {}));
 };
 
 export const publicTiers = async (_req: Request, res: Response): Promise<void> => {

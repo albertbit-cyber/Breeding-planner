@@ -14,6 +14,7 @@ export const gettingStarted = {
   'nav-quarantine': topic('getting-started', { title: 'common:nav.quarantine', see: ['main-nav'] }),
   'nav-calendar': topic('getting-started', { title: 'common:nav.calendar', see: ['main-nav'] }),
   'nav-lab-tests': topic('getting-started', { title: 'common:nav.shedTerminal', see: ['main-nav'] }),
+  'nav-messages': topic('getting-started', { title: 'common:nav.messages', see: ['main-nav', 'record-network'] }),
   'nav-setup': topic('getting-started', { title: 'common:nav.setup', see: ['saving', 'main-nav'] }),
   'nav-more': topic('getting-started', { title: 'common:nav.more', see: ['main-nav'] }),
   'scroll-top': topic('getting-started', { see: ['main-nav'] }),

@@ -217,6 +217,40 @@ const EXPORT_ENTRIES: ExportEntry[] = [
         },
       }),
   },
+  // The breeder network: conversations the user is in, animals handed over, joint projects.
+  {
+    key: "networkConversations",
+    section: "shared",
+    group: "messages",
+    query: (userId) =>
+      (prisma as any).networkThread.findMany({
+        where: { participants: { some: { userId } } },
+        include: {
+          participants: { select: { userId: true, status: true, lastReadAt: true } },
+          messages: {
+            select: { id: true, senderUserId: true, kind: true, body: true, attachment: true, createdAt: true, deletedAt: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      }),
+  },
+  {
+    key: "animalTransfers",
+    section: "shared",
+    group: "messages",
+    query: (userId) =>
+      (prisma as any).animalTransfer.findMany({ where: { OR: [{ senderUserId: userId }, { receiverUserId: userId }] } }),
+  },
+  {
+    key: "jointProjects",
+    section: "shared",
+    group: "messages",
+    query: (userId) =>
+      (prisma as any).jointProject.findMany({
+        where: { OR: [{ proposedById: userId }, { invitedUserId: userId }] },
+        include: { splitProposals: true },
+      }),
+  },
   {
     key: "inquiriesSent",
     section: "shared",

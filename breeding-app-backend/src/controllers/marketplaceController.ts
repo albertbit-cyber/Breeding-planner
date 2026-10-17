@@ -1,4 +1,11 @@
 import type { Request, Response } from "express";
+import {
+  getMarketplaceStats,
+  listAdminListings,
+  listAdminStores,
+  moderateListing,
+  refreshListingPhotos,
+} from "../services/marketplaceAdminService";
 import { HttpError } from "../utils/errors";
 import { listAcquiredAnimals, markSold } from "../services/marketplaceSaleService";
 import {
@@ -145,6 +152,31 @@ export const createReview = async (req: Request, res: Response): Promise<void> =
 export const adminMarketplace = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new HttpError(401, "Unauthorized");
   res.status(200).json(await listAdminMarketplace(req.user));
+};
+
+export const adminStats = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await getMarketplaceStats(req.user));
+};
+
+export const adminListings = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listAdminListings(req.user, req.query as Record<string, unknown>));
+};
+
+export const adminModerateListing = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await moderateListing(req.user, req.params.id, req.body || {}));
+};
+
+export const adminRefreshPhotos = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await refreshListingPhotos(req.user, req.body || {}));
+};
+
+export const adminStores = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new HttpError(401, "Unauthorized");
+  res.status(200).json(await listAdminStores(req.user));
 };
 
 export const adminStore = async (req: Request, res: Response): Promise<void> => {

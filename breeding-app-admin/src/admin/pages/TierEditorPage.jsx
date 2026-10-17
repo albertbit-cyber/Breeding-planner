@@ -9,6 +9,7 @@ import {
 } from "../../shared/apiClient";
 import { EMPTY_TIER_FORM, featuresToMap, formToPayload, tierToForm } from "./tierForm";
 import { AnimalPhotoLimits, FeatureMatrix, TierBasicsFields, useFeatureMapSetters } from "./TierFields.jsx";
+import { tierFeaturesOnly } from "./TierMatrixGrid.jsx";
 
 export default function TierEditorPage() {
   const { id } = useParams();
@@ -26,7 +27,7 @@ export default function TierEditorPage() {
 
   useEffect(() => {
     fetchFeatureCatalog()
-      .then((data) => setAllFeatures(Array.isArray(data.features) ? data.features : []))
+      .then((data) => setAllFeatures(tierFeaturesOnly(Array.isArray(data.features) ? data.features : [])))
       .catch(() => {});
     if (!isNew) {
       setLoading(true);
@@ -71,12 +72,20 @@ export default function TierEditorPage() {
   return (
     <AdminLayout breadcrumbs={[{ label: "Tiers", href: "/admin/tiers" }, { label: isNew ? "New Tier" : form.name }]}>
       <div className="admin-section">
-        <button type="button" className="admin-back" onClick={() => navigate("/admin/tiers")}>← Back to Tiers</button>
+        {/* Save and Cancel sit with Back, so they are reachable without scrolling past the
+            feature matrix. Save submits the form below (form attribute) and returns to the list. */}
+        <div className="admin-editor-bar">
+          <button type="button" className="admin-back" onClick={() => navigate("/admin/tiers")}>← Back to Tiers</button>
+          <button type="submit" form="tier-editor-form" className="admin-back admin-back--primary" disabled={busy}>
+            {busy ? "Saving…" : isNew ? "Create tier" : "Save changes"}
+          </button>
+          <button type="button" className="admin-back" onClick={() => navigate("/admin/tiers")}>Cancel</button>
+        </div>
         <h2 style={{ marginBottom: 4 }}>{isNew ? "Create Tier" : `Edit: ${form.name}`}</h2>
 
         {error && <div className="admin-error">{error}</div>}
 
-        <form onSubmit={save}>
+        <form id="tier-editor-form" onSubmit={save}>
           <div className="admin-detail-grid">
             <div className="admin-panel">
               <h3>Basic Info</h3>
@@ -93,10 +102,6 @@ export default function TierEditorPage() {
             <FeatureMatrix features={allFeatures} featureMap={featureMap} onToggle={onToggle} onLimit={onLimit} />
           </div>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-            <button type="submit" disabled={busy}>{busy ? "Saving…" : isNew ? "Create tier" : "Save changes"}</button>
-            <button type="button" onClick={() => navigate("/admin/tiers")}>Cancel</button>
-          </div>
         </form>
       </div>
     </AdminLayout>

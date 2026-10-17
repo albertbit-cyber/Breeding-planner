@@ -24,19 +24,34 @@ const ARCHIVED_STATUS_SPELLINGS = ARCHIVED_ANIMAL_STATUSES.flatMap((status) => [
   status.toUpperCase(),
 ]);
 
+/**
+ * A joint project's partner record: the other breeder's male, kept read-only in the keeper's
+ * account for the breeding card and the pedigree. It is not the keeper's animal, so it does not
+ * count toward their limit, but it is not archived either -- it stays in the collection.
+ */
+export const PARTNER_ANIMAL_STATUS = "Partner";
+
+const UNCOUNTED_STATUS_SPELLINGS = [
+  ...ARCHIVED_STATUS_SPELLINGS,
+  PARTNER_ANIMAL_STATUS,
+  PARTNER_ANIMAL_STATUS.toLowerCase(),
+  PARTNER_ANIMAL_STATUS.toUpperCase(),
+];
+
 export const isArchivedAnimalStatus = (status: unknown): boolean => {
   if (status === undefined || status === null) return false;
   return (ARCHIVED_ANIMAL_STATUSES as readonly string[]).includes(String(status).trim().toLowerCase());
 };
 
 /**
- * Prisma `where` for the animals that count toward the limit: not deleted, not archived.
+ * Prisma `where` for the animals that count toward the limit: not deleted, not archived, not a
+ * partner record.
  * A null status is a live animal, and `notIn` alone would drop it (SQL `NULL NOT IN (...)` is
  * not true), hence the OR.
  */
 export const countedAnimalWhere = (ownerId: string, extra: Record<string, unknown> = {}) => ({
   ownerId,
   deletedAt: null,
-  OR: [{ status: null }, { status: { notIn: ARCHIVED_STATUS_SPELLINGS } }],
+  OR: [{ status: null }, { status: { notIn: UNCOUNTED_STATUS_SPELLINGS } }],
   ...extra,
 });
