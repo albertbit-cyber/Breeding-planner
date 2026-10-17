@@ -185,7 +185,7 @@ const logsOf = (payload: JsonRecord) => {
  * reference is the seller's stored photo, readable by its owner alone, so it would be a broken
  * picture on the buyer's card; it stays behind too until photos can be handed over with the sale.
  */
-const photosOf = (payload: JsonRecord): JsonRecord[] =>
+export const photosOf = (payload: JsonRecord): JsonRecord[] =>
   asArray(payload.photos)
     .map((photo) => (typeof photo === "string" ? { url: photo } : asRecord(photo)))
     .filter((photo) => typeof photo.url === "string" && photo.url && !photo.url.startsWith("data:") && !photo.url.startsWith("photo:"))
@@ -219,7 +219,7 @@ export const buildTransferredRecord = async (listing: any, animal: any | null): 
 };
 
 /** An id the buyer does not already use: the seller's own id when free, so the animal keeps its name. */
-const freeAppAnimalId = async (tx: any, buyerUserId: string, preferred: string) => {
+export const freeAppAnimalId = async (tx: any, buyerUserId: string, preferred: string) => {
   const base = preferred.replace(/[^\w.-]+/g, "-").slice(0, 60) || "acquired";
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;

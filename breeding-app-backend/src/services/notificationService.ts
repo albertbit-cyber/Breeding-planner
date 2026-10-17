@@ -18,6 +18,8 @@ const textValue = (value: unknown, maxLength = 1000): string => {
   return text.slice(0, maxLength);
 };
 
+// The actor's email is deliberately not here: a notification goes to another user, and an
+// address is not theirs to see.
 const toPublicNotification = (row: any) => ({
   id: row.id,
   type: row.type,
@@ -30,7 +32,6 @@ const toPublicNotification = (row: any) => ({
     ? {
         id: row.actor.id,
         fullName: row.actor.fullName,
-        email: row.actor.email,
         role: row.actor.role,
       }
     : undefined,
@@ -53,7 +54,7 @@ export const createNotification = async (input: NotificationInput) => {
       metadata: input.metadata || {},
     },
     include: {
-      actor: { select: { id: true, fullName: true, email: true, role: true } },
+      actor: { select: { id: true, fullName: true, role: true } },
     },
   });
 
@@ -64,7 +65,7 @@ export const listMyNotifications = async (actor: { id: string; role: AppRole }) 
   const rows = await db.notification.findMany({
     where: { recipientId: actor.id },
     include: {
-      actor: { select: { id: true, fullName: true, email: true, role: true } },
+      actor: { select: { id: true, fullName: true, role: true } },
     },
     orderBy: [{ createdAt: "desc" }],
     take: 50,
@@ -89,7 +90,7 @@ export const markNotificationRead = async (
     where: { id },
     data: { readAt: existing.readAt || new Date() },
     include: {
-      actor: { select: { id: true, fullName: true, email: true, role: true } },
+      actor: { select: { id: true, fullName: true, role: true } },
     },
   });
 

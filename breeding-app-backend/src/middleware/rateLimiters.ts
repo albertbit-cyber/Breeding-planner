@@ -56,6 +56,26 @@ export const marketplaceMessageLimiter = rateLimit({
   message: { message: "Too many marketplace messages, please try again later." },
 });
 
+// The breeder network's messages, transfers and projects. A message request is capped per
+// thread in the service; this caps volume across threads.
+export const networkMessageLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many messages, please try again in a few minutes." },
+});
+
+export const networkMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  skip: productionOnly,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many changes, please try again later." },
+});
+
 export const marketplaceQrLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 60,

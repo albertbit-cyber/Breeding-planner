@@ -9,6 +9,7 @@ export const record = {
   'record-delete': topic('animal-record', { title: 'common:actions.delete', see: ['record-delete-dialog', 'record-save'] }),
   'record-more': topic('animal-record', { title: 'common:actions.moreActions', see: ['record-family-tree', 'record-export-pdf', 'record-archive', 'record-delete'] }),
   'record-archive': topic('animal-record', { see: ['archive-dialog', 'animals-archive-view', 'record-delete'] }),
+  'record-network': topic('animal-record', { see: ['nav-messages', 'record-archive'] }),
   'record-family-tree': topic('animal-record', { title: 'common:actions.openFamilyTree', see: ['record-parentage', 'nav-family-tree', 'record-save'] }),
   'record-export-pdf': topic('animal-record', { title: 'common:actions.exportPdf', see: ['record-qr-label', 'record-window'] }),
   'record-qr-label': topic('animal-record', { title: 'common:actions.qrLabel', see: ['record-id', 'record-export-pdf'] }),

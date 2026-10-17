@@ -33,6 +33,9 @@ vi.mock("../lib/prisma", () => {
     mobileScanLog: listModel(),
     userSubscription: listModel(),
     marketplaceConversation: listModel(),
+    networkThread: listModel(),
+    animalTransfer: listModel(),
+    jointProject: listModel(),
     marketplaceSale: listModel(),
     marketplaceReview: listModel(),
     listingInquiry: listModel(),
@@ -184,6 +187,7 @@ describe("GET /api/auth/me/export?groups=", () => {
     expect(db.animal.findMany).toHaveBeenCalled();
     expect(db.marketplaceListing.findMany).not.toHaveBeenCalled();
     expect(db.marketplaceConversation.findMany).not.toHaveBeenCalled();
+    expect(db.networkThread.findMany).not.toHaveBeenCalled();
     expect(db.marketplaceReview.findMany).not.toHaveBeenCalled();
     expect(db.shedTestOrder.findMany).not.toHaveBeenCalled();
     expect(db.userDeviceSession.findMany).not.toHaveBeenCalled();

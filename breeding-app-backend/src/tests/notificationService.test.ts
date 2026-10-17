@@ -64,6 +64,18 @@ describe("notificationService", () => {
     });
   });
 
+  it("never shows the recipient the actor's email address", async () => {
+    const notification = await createNotification({
+      recipientId: "breeder-1",
+      actorId: "buyer-1",
+      type: "listing_inquiry",
+      title: "New listing inquiry",
+      message: "Buyer asked about Banana Clown.",
+    });
+    expect(notification?.actor).toBeDefined();
+    expect(notification?.actor).not.toHaveProperty("email");
+  });
+
   it("lists notifications for the actor", async () => {
     vi.mocked((prisma as any).notification.findMany).mockResolvedValue([
       {
