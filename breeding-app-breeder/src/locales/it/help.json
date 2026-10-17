@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Elenca cosa tirare fuori dal congelatore, raggruppato per tipo di cibo, taglia o classe di peso, e peso, con la quantità di ciascuno.",
-      "more": "Qui contano solo gli animali spuntati con un profilo alimentare completo.",
+      "more": "Qui contano solo gli animali spuntati con un profilo alimentare completo. I tipi di alimento vanno dalla A alla Z e, per ciascuno, prima la taglia più piccola.",
       "words": "scongelamento report elenco"
+    },
+    "feed-prep-group": {
+      "short": "Dà a tutti gli animali di un gruppo lo stesso tipo di alimento e la stessa taglia in un solo passo, così una covata di neonati non va impostata scheda per scheda.",
+      "more": "I gruppi di neonati sono in cima alla lista. Cambiano solo tipo di alimento e taglia: ogni animale mantiene quantità, intervallo, peso e note. Anche gli animali già su un altro alimento vengono cambiati, e la riga sotto la barra dice quanti.",
+      "tips": [
+        "I gruppi di riproduttori di solito mescolano maschi e femmine con taglie diverse: meglio impostarli su ogni scheda."
+      ],
+      "words": "gruppo in blocco neonati covata tutti insieme alimento taglia"
+    },
+    "feed-prep-group-apply": {
+      "short": "Salva il tipo di alimento e la taglia scelti su ogni animale del gruppo.",
+      "more": "Resta grigio finché non scegli gruppo, tipo di alimento e taglia. Anche le femmine escluse per ovulazione vengono aggiornate; restano fuori dai totali di oggi.",
+      "words": "applica salva gruppo"
     },
     "feed-prep-selection": {
       "short": "Elenca tutti gli animali con la loro preda, così puoi spuntare quelli da nutrire.",

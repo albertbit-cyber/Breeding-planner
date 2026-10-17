@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Toont wat je uit de vriezer moet halen, gegroepeerd per voertype, maat of gewichtsklasse en gewicht, met het aantal van elk.",
-      "more": "Alleen aangevinkte dieren met een volledig voerprofiel tellen hier mee.",
+      "more": "Alleen aangevinkte dieren met een volledig voerprofiel tellen hier mee. Voertypes staan van A tot Z, en per type komt de kleinste maat eerst.",
       "words": "ontdooirapport ontdooien lijst vriezer"
+    },
+    "feed-prep-group": {
+      "short": "Geeft alle dieren in een groep in één keer hetzelfde voertype en dezelfde maat, zodat je een legsel jongen niet kaart voor kaart hoeft in te stellen.",
+      "more": "Groepen jongen staan bovenaan. Alleen voertype en maat veranderen: elk dier houdt zijn eigen aantal, interval, gewicht en notities. Dieren die al op ander voer staan worden ook gewijzigd; de regel onder de balk zegt hoeveel.",
+      "tips": [
+        "Kweekgroepen mengen meestal mannen en vrouwen op verschillende maten, stel die liever per kaart in."
+      ],
+      "words": "groep in bulk jongen legsel allemaal tegelijk voer maat"
+    },
+    "feed-prep-group-apply": {
+      "short": "Slaat het gekozen voertype en de maat op bij elk dier in de groep.",
+      "more": "Grijs tot er een groep, een voertype en een maat gekozen zijn. Vrouwtjes die wegens ovulatie zijn uitgesloten worden ook bijgewerkt; ze blijven buiten de totalen van vandaag.",
+      "words": "toepassen opslaan groep"
     },
     "feed-prep-selection": {
       "short": "Toont elk dier met zijn voerdier, zodat je de dieren kunt aanvinken die je voert.",

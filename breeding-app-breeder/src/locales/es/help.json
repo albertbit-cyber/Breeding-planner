@@ -1845,8 +1845,21 @@
     },
     "feed-prep-report": {
       "short": "Lista lo que hay que sacar del congelador, agrupado por tipo de alimento, talla o clase de peso y peso, con cuántas de cada.",
-      "more": "Aquí solo cuentan los animales marcados con un perfil de alimentación completo.",
+      "more": "Aquí solo cuentan los animales marcados con un perfil de alimentación completo. Los tipos de alimento van de la A a la Z y, dentro de cada uno, primero la talla más pequeña.",
       "words": "informe descongelado descongelar lista"
+    },
+    "feed-prep-group": {
+      "short": "Da a todos los animales de un grupo el mismo tipo de alimento y la misma talla de una vez, para no configurar una puesta de crías ficha por ficha.",
+      "more": "Los grupos de crías aparecen primero. Solo cambian el tipo de alimento y la talla: cada animal conserva su cantidad, intervalo, peso y notas. Los animales que ya tienen otro alimento también se cambian, y la línea bajo la barra indica cuántos.",
+      "tips": [
+        "Los grupos de reproductores suelen mezclar machos y hembras con tallas distintas, así que es mejor configurarlos en cada ficha."
+      ],
+      "words": "grupo masivo crías puesta todos a la vez alimento talla"
+    },
+    "feed-prep-group-apply": {
+      "short": "Guarda el tipo de alimento y la talla elegidos en cada animal del grupo.",
+      "more": "Está en gris hasta elegir un grupo, un tipo de alimento y una talla. Las hembras excluidas por ovulación también se actualizan; siguen fuera de los totales de hoy.",
+      "words": "aplicar guardar grupo"
     },
     "feed-prep-selection": {
       "short": "Lista todos los animales con su presa, para que marques los que vas a alimentar.",
