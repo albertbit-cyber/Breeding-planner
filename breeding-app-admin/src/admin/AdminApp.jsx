@@ -18,7 +18,9 @@ import NotificationsPage from "./pages/NotificationsPage.jsx";
 import EmailsPage from "./pages/EmailsPage.jsx";
 import GdprPage from "./pages/GdprPage.jsx";
 import TeamPage from "./pages/TeamPage.jsx";
-import MarketplacePage from "../features/marketplace/MarketplacePage.jsx";
+import MarketplaceAdminPage from "./pages/MarketplaceAdminPage.jsx";
+import TierMatrixPage from "./pages/TierMatrixPage.jsx";
+import SuggestionsPage from "./pages/SuggestionsPage.jsx";
 
 export default function AdminApp() {
   return (
@@ -35,9 +37,11 @@ export default function AdminApp() {
             <Route path="/admin/labs" element={<LabsPage />} />
             <Route path="/admin/gene-submissions" element={<GeneSubmissionsPage />} />
             <Route path="/admin/tiers" element={<TiersPage />} />
+            <Route path="/admin/tiers/matrix" element={<TierMatrixPage />} />
             <Route path="/admin/tiers/new" element={<TierEditorPage />} />
             <Route path="/admin/tiers/:id" element={<TierEditorPage />} />
-            <Route path="/admin/marketplace" element={<MarketplacePage adminMode />} />
+            <Route path="/admin/marketplace" element={<MarketplaceAdminPage />} />
+            <Route path="/admin/suggestions" element={<SuggestionsPage />} />
             <Route path="/admin/notifications" element={<NotificationsPage />} />
             <Route path="/admin/emails" element={<EmailsPage />} />
             <Route path="/admin/gdpr" element={<GdprPage />} />

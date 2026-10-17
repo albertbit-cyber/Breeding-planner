@@ -25,13 +25,20 @@ const NAV = [
     items: [
       { href: "/admin/reports", label: "Reports", icon: "⚑" },
       { href: "/admin/escalations", label: "Escalations", icon: "▲" },
+    ],
+  },
+  {
+    label: "Marketplace",
+    items: [
       { href: "/admin/marketplace", label: "Marketplace", icon: "⊕" },
     ],
   },
   {
     label: "Subscriptions",
     items: [
-      { href: "/admin/tiers", label: "Tiers", icon: "◇" },
+      { href: "/admin/tiers", label: "Tiers", icon: "◇", exact: true },
+      { href: "/admin/tiers/matrix", label: "Tier matrix", icon: "▦" },
+      { href: "/admin/suggestions", label: "Suggestions", icon: "✎" },
     ],
   },
   {
