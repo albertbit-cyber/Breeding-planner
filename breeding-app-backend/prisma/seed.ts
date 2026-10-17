@@ -2,7 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { LAB_TEST_CATALOG_SEEDS } from "../../src/data/testCatalog";
-import { FEATURE_CATALOG } from "../src/services/subscriptionCatalog";
+import { FEATURE_CATALOG, featureAudience } from "../src/services/subscriptionCatalog";
+import { DEFAULT_TIER_RECOMMENDATIONS } from "../src/services/tierRecommendations";
 
 const { assertSeedAllowed } = require("../scripts/seedGuard.js");
 
@@ -111,29 +112,24 @@ async function main() {
   }
 
   const featureKeys = FEATURE_CATALOG.map((item) => item.featureKey);
-  const basicAnimal = featureKeys.filter((key) => key.startsWith("animals."));
-  const breedingBasic = ["breeding.pairings", "breeding.clutches", "breeding.calendar"];
-  const geneticsBasic = ["genetics.basic_calculator", "genetics.het_probability"];
-  const qrBasic = ["qr.generate", "qr.pdf_export"];
-  const spaces = featureKeys.filter((key) => key.startsWith("spaces."));
-  const communication = featureKeys.filter((key) => key.startsWith("communication."));
-  const lab = featureKeys.filter((key) => key.startsWith("lab."));
-  const sales = featureKeys.filter((key) => key.startsWith("sales."));
-  const ai = featureKeys.filter((key) => key.startsWith("ai."));
-  const mobileBasic = ["mobile.scan", "mobile.profile", "mobile.quick_feed", "mobile.quick_weight", "mobile.quick_shed", "mobile.notes"];
-  const mobileHobbyPlus = [...mobileBasic, "mobile.quick_clean", "mobile.quick_water", "mobile.tasks", "mobile.rack_mode", "mobile.communication", "mobile.offline_sync"];
-  const dataBasic = ["data.csv_export", "data.pdf_export", "data.backup"];
-  const allBreederFeatures = featureKeys.filter((key) => !key.startsWith("admin."));
-  const labFeatures = [...lab, "data.csv_export", "data.pdf_export", "team.members"];
+  // Features and limits come from the recommended tier set (src/services/tierRecommendations.ts),
+  // so a fresh database starts where the admin's tier matrix suggests. A lab is a vendor, not a
+  // tier: there is no lab tier here.
+  const fromRecommendation = (key: string) => {
+    const rec = DEFAULT_TIER_RECOMMENDATIONS[key] || {};
+    const enabled = Object.entries(rec).filter(([, value]) => value.enabled).map(([featureKey]) => featureKey);
+    const limits = Object.fromEntries(Object.entries(rec).filter(([, value]) => value.enabled && value.limit !== null).map(([featureKey, value]) => [featureKey, value.limit as number]));
+    return { features: enabled, limits };
+  };
 
   const tiers = [
-    { key: "free", name: "Free", shortDescription: "Basic records for small collections.", monthlyPrice: 0, yearlyPrice: 0, trialDays: 0, sortOrder: 1, features: [...basicAnimal.filter((key) => !["animals.delete", "animals.documents"].includes(key)), "animals.feeding_logs", "animals.weight_logs", "animals.shedding_logs", ...mobileBasic, "marketplace.view", "marketplace.favorite"], limits: { "animals.create": 10, "animals.photos": 3, "qr.pdf_export": 0, "ai.breeding_advisor": 0, "communication.telegram_updates": 0, "marketplace.create_listing": 0 } },
-    { key: "hobby", name: "Hobby", shortDescription: "Animal management, basic breeding, basic genetics, and QR export.", monthlyPrice: 9, yearlyPrice: 90, trialDays: 14, sortOrder: 2, features: [...basicAnimal, ...breedingBasic, ...geneticsBasic, ...qrBasic, ...mobileBasic, ...dataBasic, "marketplace.view", "marketplace.favorite", "marketplace.contact_seller", "marketplace.create_listing", "marketplace.edit_listing"], limits: { "animals.create": 50, "animals.photos": 5, "qr.pdf_export": 25, "marketplace.create_listing": 5 } },
-    { key: "hobby_plus", name: "Hobby Plus", shortDescription: "More capacity, spaces, communication basics, and limited AI.", monthlyPrice: 15, yearlyPrice: 150, trialDays: 14, sortOrder: 3, features: [...basicAnimal, ...breedingBasic, ...geneticsBasic, ...qrBasic, ...spaces, ...mobileHobbyPlus, "communication.inbox", "communication.activity_log", "ai.breeding_advisor", ...dataBasic, "marketplace.view", "marketplace.favorite", "marketplace.contact_seller", "marketplace.create_listing", "marketplace.edit_listing", "marketplace.store_page"], limits: { "animals.create": 100, "animals.photos": 7, "qr.pdf_export": 100, "ai.breeding_advisor": 25, "marketplace.create_listing": 15 } },
-    { key: "breeder", name: "Breeder", shortDescription: "Advanced breeding, full genetics, Telegram, shed testing, and sales tools.", monthlyPrice: 29, yearlyPrice: 290, trialDays: 14, sortOrder: 4, isRecommended: true, features: [...allBreederFeatures.filter((key) => !key.startsWith("admin.") && !key.includes("api_access") && !key.includes("webhooks"))], limits: { "animals.create": 250, "animals.photos": 9, "qr.pdf_export": 500, "communication.telegram_updates": 500, "ai.breeding_advisor": 100, "lab.orders": 50, "sales.morphmarket_export": 50, "marketplace.create_listing": 50 } },
-    { key: "professional_breeder", name: "Professional Breeder", shortDescription: "Full app access, AI advisor, MorphMarket export, teams, and priority support.", monthlyPrice: 59, yearlyPrice: 590, trialDays: 14, sortOrder: 5, features: allBreederFeatures, limits: { "animals.create": 500 } },
-    { key: "lab_partner", name: "Lab / Testing Partner", shortDescription: "Lab portal, catalog management, order scanning, result upload, and certificates.", monthlyPrice: 99, yearlyPrice: 990, trialDays: 30, sortOrder: 6, features: [...labFeatures, "mobile.scan", "mobile.lab", "mobile.offline_sync"], limits: { "lab.orders": 1000, "team.members": 10 } },
-    { key: "enterprise", name: "Enterprise / Custom", shortDescription: "Custom features, team access, API access, white label options, and direct support.", monthlyPrice: 0, yearlyPrice: 0, customPrice: true, isPublic: true, trialDays: 0, sortOrder: 7, features: featureKeys, limits: {} },
+    { key: "free", name: "Free", shortDescription: "Basic records for small collections.", monthlyPrice: 0, yearlyPrice: 0, trialDays: 0, sortOrder: 1, ...fromRecommendation("free") },
+    { key: "hobby", name: "Hobby Keeper", shortDescription: "Husbandry, spaces and labels for a growing collection, with the breeding basics.", monthlyPrice: 9, yearlyPrice: 90, trialDays: 14, sortOrder: 2, ...fromRecommendation("hobby") },
+    { key: "hobby_plus", name: "Hobby Breeder", shortDescription: "The full breeding season: lock, ovulation and egg tracking, advanced genetics.", monthlyPrice: 15, yearlyPrice: 150, trialDays: 14, sortOrder: 3, ...fromRecommendation("hobby_plus") },
+    { key: "breeder", name: "Breeder", shortDescription: "Everything for breeding and pedigree, extended pedigree included.", monthlyPrice: 29, yearlyPrice: 290, trialDays: 14, sortOrder: 4, isRecommended: true, ...fromRecommendation("breeder") },
+    { key: "professional_breeder", name: "Professional Breeder", shortDescription: "Full app access, teams, AI tools and integrations.", monthlyPrice: 59, yearlyPrice: 590, trialDays: 14, sortOrder: 5, ...fromRecommendation("professional_breeder") },
+    { key: "enterprise", name: "Enterprise", shortDescription: "Everything, with team access, API access and direct support.", monthlyPrice: 0, yearlyPrice: 0, customPrice: true, isPublic: true, trialDays: 0, sortOrder: 6, features: featureKeys.filter((key) => featureAudience(key) === "tier"), limits: {} },
+    { key: "custom", name: "Build My Own", shortDescription: "Start from Free and add the features you need, each at its own price.", monthlyPrice: 0, yearlyPrice: 0, customPrice: true, isPublic: true, trialDays: 0, sortOrder: 7, ...fromRecommendation("custom") },
   ];
 
   for (const tier of tiers) {

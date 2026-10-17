@@ -13,6 +13,7 @@ import {
 import { buildListingRecord, buildListingRecords, findUnpublishedEvidence } from "./marketplaceRecordService";
 import { geneticsMatchToken, parseGeneToken } from "./marketplaceGenetics";
 import { markSold } from "./marketplaceSaleService";
+import { syncListingPhotosFromAnimal } from "./marketplaceListingPhotos";
 import { assertAdminActor, assertStaffActor, assertOwnerOrAdmin, assertSellerActor } from "./permissionHelpers";
 import { isStaffRole } from "../auth/identity";
 import { LISTED_AVAILABILITY, LISTED_STATUSES, PUBLIC_STATUSES, isListingPublic, listedWhere } from "./marketplaceVisibility";
@@ -126,17 +127,28 @@ const listingData = (payload: Record<string, unknown>) => ({
       },
 });
 
+/**
+ * An image address a buyer's browser can load. Inline `data:` pictures and device-only `blob:` /
+ * `file:` addresses used to be stored cut at 2000 characters, a broken image on every card; they
+ * are dropped instead (the animal's stored photos replace them, see marketplaceListingPhotos).
+ */
+const imageUrlOrNull = (value: unknown): string | null => {
+  const raw = value === undefined || value === null ? "" : String(value).trim();
+  if (!raw || /^(data|blob|file):/i.test(raw) || raw.length > 2000) return null;
+  return raw;
+};
+
 const imageInputs = (payload: Record<string, unknown>): Array<{ imageUrl: string; isPrimary: boolean; sortOrder: number }> => {
   const images = Array.isArray(payload.images) ? payload.images : [];
   const normalized = images.map((item, index) => {
     const record: Record<string, unknown> = item && typeof item === "object" ? item as Record<string, unknown> : { imageUrl: item };
     return {
-      imageUrl: text(record.imageUrl || record.url || record.src, 2000) || "",
+      imageUrl: imageUrlOrNull(record.imageUrl || record.url || record.src) || "",
       isPrimary: bool(record.isPrimary) || index === 0,
       sortOrder: Number(record.sortOrder || index),
     };
   }).filter((item) => item.imageUrl);
-  const single = text(payload.imageUrl || payload.photoUrl, 2000);
+  const single = imageUrlOrNull(payload.imageUrl || payload.photoUrl);
   if (single && !normalized.some((item) => item.imageUrl === single)) normalized.unshift({ imageUrl: single, isPrimary: true, sortOrder: 0 });
   return normalized;
 };
@@ -650,6 +662,22 @@ export const getMarketplaceStore = async (userId: string) => {
 };
 
 /**
+ * After a save, the listing takes its animal's stored photos. A photo problem never fails the save:
+ * the listing is returned as saved, and the next save (or the admin's refresh) tries again.
+ */
+const withAnimalPhotos = async (listing: any) => {
+  if (!listing?.animalId) return listing;
+  try {
+    const result = await syncListingPhotosFromAnimal(listing);
+    if (!result.changed) return listing;
+    return (await db.marketplaceListing.findUnique({ where: { id: listing.id }, include: LISTING_INCLUDE })) || listing;
+  } catch (error) {
+    console.warn(`[marketplace] photo sync failed for listing ${listing.id}:`, (error as Error)?.message || error);
+    return listing;
+  }
+};
+
+/**
  * Publishing the same animal twice is a re-publish, not a second animal. The
  * breeder app re-sends a listing every time the seller saves the animal, so an
  * unarchived listing for this seller and animal is updated in place; without
@@ -684,7 +712,7 @@ export const createMarketplaceListing = async (actor: AuthenticatedUser, payload
     await attachMedia(tx, actor, row.id, mediaIds);
     return tx.marketplaceListing.findUnique({ where: { id: row.id }, include: LISTING_INCLUDE });
   });
-  return { listing: toMarketplaceListingDto(listing) };
+  return { listing: toMarketplaceListingDto(await withAnimalPhotos(listing)) };
 };
 
 export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: string, payload: Record<string, unknown>) => {
@@ -706,7 +734,7 @@ export const updateMarketplaceListing = async (actor: AuthenticatedUser, id: str
     await attachMedia(tx, actor, id, mediaIds);
     return tx.marketplaceListing.findUnique({ where: { id }, include: LISTING_INCLUDE });
   });
-  return { listing: toMarketplaceListingDto(listing) };
+  return { listing: toMarketplaceListingDto(await withAnimalPhotos(listing)) };
 };
 
 export const updateMarketplaceListingStatus = async (actor: AuthenticatedUser, id: string, payload: Record<string, unknown>) => {

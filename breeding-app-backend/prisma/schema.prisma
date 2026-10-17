@@ -944,12 +944,28 @@ model FeatureCatalog {
   description      String?       @db.Text
   defaultLimitType String?       @map("default_limit_type")
   sortOrder        Int           @default(0) @map("sort_order")
+  /// "Build My Own": whether a customer can add this feature to their plan on its own, and for how much.
+  addonAvailable    Boolean      @default(false) @map("addon_available")
+  addonMonthlyPrice Decimal?     @map("addon_monthly_price") @db.Decimal(10, 2)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
   tierFeatures     TierFeature[]
 
   @@index([featureGroup])
   @@map("feature_catalog")
+}
+
+/// Settings the owner edits in the admin rather than in code: the per-tier feature recommendations,
+/// which fields cross between breeders in an extended pedigree. One JSON value per key; code holds
+/// the defaults, so a missing row means "use the default".
+model PlatformSetting {
+  key             String   @id
+  value           Json
+  updatedByUserId String?  @map("updated_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }
 
 model TierFeature {

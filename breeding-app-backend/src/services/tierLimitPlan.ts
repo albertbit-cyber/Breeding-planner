@@ -1,11 +1,13 @@
 import { PHOTOS_PER_ANIMAL_FEATURE } from "./subscriptionCatalog";
 
 /**
- * The animal and photo limits per tier, as the owner set them on 16 Oct 2026.
+ * The animal and photo limits per tier, as the owner set them on 16 Oct 2026, with Hobby Keeper
+ * (key "hobby") brought to 25 animals on 17 Oct. Hobby Breeder ("hobby_plus") is the owner's to
+ * decide (50 or 100) and stays at 100 until they do.
  *
  * `limit: null` is no tier limit (photos still stop at the technical cap, PHOTO_MAX_PER_ANIMAL,
- * 60 by default). `enabled: false` switches the feature off for the tier: a lab has no animals to
- * photograph.
+ * 60 by default). A lab is a vendor, not a tier, so the old lab_partner tier is not in the plan:
+ * scripts/retireLabTier.ts archives it.
  *
  * prisma/seed.ts carries the same numbers for fresh databases; scripts/applyTierLimits.ts brings
  * an existing database (staging, production) to them without touching anything else.
@@ -20,7 +22,7 @@ export const TIER_LIMIT_PLAN: Record<string, Record<string, TierLimitTarget>> = 
     [PHOTOS_PER_ANIMAL_FEATURE]: { enabled: true, limit: 3 },
   },
   hobby: {
-    [ANIMALS_FEATURE]: { enabled: true, limit: 50 },
+    [ANIMALS_FEATURE]: { enabled: true, limit: 25 },
     [PHOTOS_PER_ANIMAL_FEATURE]: { enabled: true, limit: 5 },
   },
   hobby_plus: {
@@ -38,9 +40,6 @@ export const TIER_LIMIT_PLAN: Record<string, Record<string, TierLimitTarget>> = 
   enterprise: {
     [ANIMALS_FEATURE]: { enabled: true, limit: null },
     [PHOTOS_PER_ANIMAL_FEATURE]: { enabled: true, limit: null },
-  },
-  lab_partner: {
-    [PHOTOS_PER_ANIMAL_FEATURE]: { enabled: false, limit: null },
   },
 };
 
