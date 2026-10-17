@@ -1022,3 +1022,34 @@
 [data-motion-preference='reduced'] .bn-btn {
   transition: none;
 }
+
+/* Modal entrance from VISUAL_LANGUAGE.md §6: a short fade and lift; a sheet rises on a phone. */
+@keyframes bn-dialog-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes bn-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bn-dialog__panel {
+  animation: bn-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bn-dialog__scrim {
+  animation: bn-scrim-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn-dialog__panel,
+  .bn-dialog__scrim {
+    animation: none;
+  }
+}
+
+[data-motion-preference='reduced'] .bn-dialog__panel,
+[data-motion-preference='reduced'] .bn-dialog__scrim {
+  animation: none;
+}
