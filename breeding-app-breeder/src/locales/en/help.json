@@ -85,6 +85,11 @@
       "short": "Collects genetic test orders for your animals and shows the past orders and their results.",
       "words": "genetic tests shed test lab orders terminal"
     },
+    "nav-messages": {
+      "short": "Talk to other breeders by their @handle, send them snake cards and marketplace links, hand animals over, and breed together in joint projects.",
+      "more": "Nobody can find you until you choose a handle, and then only by that handle. A first message from someone new waits under Requests until you accept, ignore or block them. Messages need a connection and a signed-in account.",
+      "words": "messages chat inbox contact breeders handle transfer loan joint project split clutch"
+    },
     "nav-setup": {
       "short": "Holds your breeder details, ID format, exports, appearance, language, backups and account.",
       "words": "settings preferences options setup configuration"
@@ -3229,6 +3234,12 @@
       "short": "Takes an animal that was sold, died or left in another way out of your collection, and keeps its full record.",
       "more": "It opens a short form for the reason, the date and the details. Afterwards the record can only be read, and the animal is listed under Archive on the Animals screen. It can be returned to the collection later. Example animals cannot be archived.",
       "words": "archive sold died gone left given away"
+    },
+    "record-network": {
+      "title": "Breeder network",
+      "short": "Shows how this animal moved between breeders: who it came from or went to, the reason given, a loan, or the joint project it was bred in.",
+      "more": "From here you can send its card in a message, transfer it (sale, gift or trade moves your animal to the archive once the other breeder accepts) or lend it, which keeps it in your collection as On loan. A sexed animal can start a joint project.",
+      "words": "transfer loan lend sell give trade share joint project partner"
     },
     "record-delete-reason": {
       "title": "Why did it leave?",
