@@ -85,6 +85,11 @@
       "short": "Zbiera zamówienia testów genetycznych dla twoich zwierząt i pokazuje wcześniejsze zamówienia oraz ich wyniki.",
       "words": "testy genetyczne test z wylinki laboratorium zamowienia zamówienia terminal"
     },
+    "nav-messages": {
+      "short": "Pisz do innych hodowców przez ich @handle, wysyłaj karty węży i linki z marketplace, przekazuj zwierzęta i hodujcie razem we wspólnych projektach.",
+      "more": "Nikt cię nie znajdzie, dopóki nie wybierzesz handle, a potem tylko po tym handle. Pierwsza wiadomość od nowej osoby czeka w Prośbach, aż ją zaakceptujesz, zignorujesz lub zablokujesz. Wiadomości wymagają połączenia i zalogowanego konta.",
+      "words": "wiadomości wiadomosci czat skrzynka kontakt hodowcy handle przekazanie wypożyczenie wypozyczenie wspólny wspolny projekt podział podzial zniesienie"
+    },
     "nav-setup": {
       "short": "Zawiera dane hodowcy, format ID, eksporty, wygląd, język, kopie zapasowe i konto.",
       "words": "ustawienia preferencje opcje konfiguracja"
@@ -3229,6 +3234,12 @@
       "short": "Wyjmuje z kolekcji zwierzę, które zostało sprzedane, padło lub odeszło w inny sposób, i zachowuje jego pełną kartę.",
       "more": "Otwiera krótki formularz z powodem, datą i szczegółami. Potem kartę można tylko czytać, a zwierzę jest wyświetlane w Archiwum na ekranie Zwierzęta. Później można je przywrócić do kolekcji. Zwierząt przykładowych nie można archiwizować.",
       "words": "archiwum archiwizuj sprzedany padl padł odszedl odszedł oddany"
+    },
+    "record-network": {
+      "title": "Sieć hodowców",
+      "short": "Pokazuje, jak to zwierzę przechodziło między hodowcami: od kogo przyszło lub do kogo trafiło, podany powód, wypożyczenie albo wspólny projekt, z którego pochodzi.",
+      "more": "Stąd możesz wysłać jego kartę w wiadomości, przekazać je (sprzedaż, prezent lub wymiana przenosi twoje zwierzę do archiwum, gdy drugi hodowca zaakceptuje) albo wypożyczyć, a wtedy zostaje w twojej kolekcji jako Wypożyczony. Zwierzę o znanej płci może rozpocząć wspólny projekt.",
+      "words": "przekazanie wypożyczenie wypozyczenie wypożyczyć sprzedać sprzedac podarować wymienić udostępnić wspólny wspolny projekt partner sieć siec"
     },
     "record-delete-reason": {
       "title": "Dlaczego opuścił kolekcję?",

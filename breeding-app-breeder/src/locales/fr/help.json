@@ -85,6 +85,11 @@
       "short": "Regroupe les commandes de tests génétiques pour vos animaux et affiche les commandes passées et leurs résultats.",
       "words": "tests génétiques genetiques test de mue labo laboratoire commandes"
     },
+    "nav-messages": {
+      "short": "Écrivez à d'autres éleveurs via leur @identifiant, envoyez-leur des fiches serpent et des liens du marketplace, transférez des animaux et élevez ensemble dans des projets communs.",
+      "more": "Personne ne peut vous trouver avant que vous ayez choisi un identifiant, et ensuite uniquement par cet identifiant. Le premier message d'une nouvelle personne attend dans Demandes jusqu'à ce que vous l'acceptiez, l'ignoriez ou la bloquiez. Les messages nécessitent une connexion et un compte connecté.",
+      "words": "messages chat boîte boite réception reception contact éleveurs eleveurs identifiant handle transfert prêt pret projet commun partage ponte"
+    },
     "nav-setup": {
       "short": "Contient vos infos éleveur, le format des ID, les exports, l'apparence, la langue, les sauvegardes et le compte.",
       "words": "paramètres parametres préférences options réglages configuration"
@@ -3229,6 +3234,12 @@
       "short": "Retire de votre collection un animal vendu, mort ou parti d'une autre façon, en conservant sa fiche complète.",
       "more": "Ouvre un court formulaire pour le motif, la date et les détails. Ensuite, la fiche n'est plus qu'en lecture, et l'animal est listé sous Archives sur l'écran Animaux. Il peut être remis dans la collection plus tard. Les animaux d'exemple ne peuvent pas être archivés.",
       "words": "archiver archives vendu mort décédé parti donné"
+    },
+    "record-network": {
+      "title": "Réseau d'éleveurs",
+      "short": "Montre comment cet animal est passé d'un éleveur à l'autre : de qui il vient ou à qui il est parti, le motif indiqué, un prêt ou le projet commun dont il est issu.",
+      "more": "D'ici, vous pouvez envoyer sa fiche dans un message, le transférer (une vente, un don ou un échange place votre animal aux archives dès que l'autre éleveur accepte) ou le prêter : il reste alors dans votre collection avec le statut En prêt. Un animal dont le sexe est connu peut lancer un projet commun.",
+      "words": "transfert prêt pret prêter preter vendre donner échanger echanger partager projet commun partenaire réseau reseau"
     },
     "record-delete-reason": {
       "title": "Pourquoi a-t-il quitté la collection ?",

@@ -85,6 +85,11 @@
       "short": "Reúne pedidos de testes genéticos para os teus animais e mostra os pedidos anteriores e os seus resultados.",
       "words": "testes geneticos genéticos teste de muda laboratorio laboratório pedidos terminal"
     },
+    "nav-messages": {
+      "short": "Fale com outros criadores pelo @nome de utilizador, envie fichas de serpente e links do marketplace, transfira animais e criem juntos em projetos conjuntos.",
+      "more": "Ninguém o encontra até escolher um nome de utilizador, e depois só por esse nome. A primeira mensagem de alguém novo espera em Pedidos até a aceitar, ignorar ou bloquear. As mensagens precisam de ligação e de uma conta com sessão iniciada.",
+      "words": "mensagens chat caixa entrada contacto contato criadores utilizador usuário usuario handle transferência transferencia empréstimo emprestimo projeto conjunto divisão divisao postura"
+    },
     "nav-setup": {
       "short": "Contém os teus dados de criador, formato de ID, exportações, aparência, idioma, cópias de segurança e conta.",
       "words": "configuracoes configurações definicoes definições preferencias preferências opcoes opções"
@@ -3229,6 +3234,12 @@
       "short": "Retira da tua coleção um animal que foi vendido, morreu ou saiu de outra forma, e mantém a ficha completa.",
       "more": "Abre um pequeno formulário para o motivo, a data e os detalhes. Depois disso, a ficha só pode ser lida, e o animal aparece em Arquivo no ecrã Animais. Pode voltar à coleção mais tarde. Os animais de exemplo não podem ser arquivados.",
       "words": "arquivo arquivar vendido morreu saiu oferecido"
+    },
+    "record-network": {
+      "title": "Rede de criadores",
+      "short": "Mostra como este animal passou entre criadores: de quem veio ou para quem foi, o motivo indicado, um empréstimo ou o projeto conjunto em que nasceu.",
+      "more": "A partir daqui pode enviar a ficha numa mensagem, transferi-lo (venda, oferta ou troca passa o seu animal para o arquivo quando o outro criador aceita) ou emprestá-lo, ficando na sua coleção como Emprestado. Um animal com sexo conhecido pode iniciar um projeto conjunto.",
+      "words": "transferência transferencia empréstimo emprestimo emprestar vender oferecer trocar partilhar compartilhar projeto conjunto parceiro rede"
     },
     "record-delete-reason": {
       "title": "Porque saiu da coleção?",

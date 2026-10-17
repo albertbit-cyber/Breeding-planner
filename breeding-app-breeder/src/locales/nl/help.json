@@ -85,6 +85,11 @@
       "short": "Verzamelt bestellingen voor genetische tests van je dieren en toont eerdere bestellingen met hun uitslagen.",
       "words": "genetische tests dna vervellingstest lab labtest bestellingen uitslag"
     },
+    "nav-messages": {
+      "short": "Praat met andere kwekers via hun @handle, stuur ze slangenkaarten en marketplace-links, draag dieren over en kweek samen in gezamenlijke projecten.",
+      "more": "Niemand kan je vinden voordat je een handle kiest, en dan alleen via die handle. Een eerste bericht van iemand nieuw wacht onder Verzoeken tot je het accepteert, negeert of blokkeert. Berichten hebben een verbinding en een ingelogd account nodig.",
+      "words": "berichten chat inbox contact kwekers handle overdracht uitlenen lening gezamenlijk project verdeling legsel"
+    },
     "nav-setup": {
       "short": "Bevat je kwekersgegevens, ID-formaat, exports, weergave, taal, back-ups en account.",
       "words": "instellingen voorkeuren opties configuratie setup"
@@ -3229,6 +3234,12 @@
       "short": "Haalt een dier dat verkocht, overleden of op een andere manier vertrokken is uit je collectie, en bewaart de volledige dierkaart.",
       "more": "Er opent een kort formulier voor de reden, de datum en de details. Daarna kan de dierkaart alleen nog worden gelezen, en het dier staat onder Archief op het scherm Dieren. Het kan later terug in de collectie. Voorbeelddieren kunnen niet worden gearchiveerd.",
       "words": "archief archiveren verkocht overleden weg vertrokken weggegeven"
+    },
+    "record-network": {
+      "title": "Kwekersnetwerk",
+      "short": "Toont hoe dit dier tussen kwekers is gegaan: van wie het kwam of naar wie het ging, de opgegeven reden, een uitlening of het gezamenlijke project waaruit het komt.",
+      "more": "Vanaf hier kun je de kaart in een bericht sturen, het dier overdragen (verkoop, cadeau of ruil zet je dier in het archief zodra de andere kweker accepteert) of uitlenen, waarna het als Uitgeleend in je collectie blijft. Een dier met bekend geslacht kan een gezamenlijk project starten.",
+      "words": "overdracht overdragen uitlenen verkopen weggeven ruilen delen gezamenlijk project partner netwerk"
     },
     "record-delete-reason": {
       "title": "Waarom heeft het de collectie verlaten?",

@@ -85,6 +85,11 @@
       "short": "Shromažďuje objednávky genetických testů pro vaše zvířata a ukazuje dřívější objednávky a jejich výsledky.",
       "words": "genetické testy test ze svlečky laboratoř objednávky terminál geneticke laborator objednavky lab"
     },
+    "nav-messages": {
+      "short": "Pište ostatním chovatelům přes jejich @přezdívku, posílejte jim karty hadů a odkazy z marketplace, předávejte zvířata a chovejte společně ve společných projektech.",
+      "more": "Nikdo vás nenajde, dokud si nezvolíte přezdívku, a pak jen podle ní. První zpráva od někoho nového čeká v Žádostech, dokud ji nepřijmete, neignorujete nebo nezablokujete. Zprávy vyžadují připojení a přihlášený účet.",
+      "words": "zprávy zpravy chat doručené dorucene kontakt chovatelé chovatele přezdívka prezdivka handle převod prevod zápůjčka zapujcka společný spolecny projekt rozdělení snůška snuska"
+    },
     "nav-setup": {
       "short": "Obsahuje údaje o chovateli, formát ID, exporty, vzhled, jazyk, zálohy a účet.",
       "words": "nastavení předvolby možnosti konfigurace nastaveni predvolby"
@@ -3229,6 +3234,12 @@
       "short": "Vyřadí ze sbírky zvíře, které bylo prodáno, uhynulo nebo odešlo jinak, a zachová jeho celý záznam.",
       "more": "Otevře krátký formulář pro důvod, datum a podrobnosti. Poté lze záznam jen číst a zvíře je uvedeno pod Archiv na obrazovce Zvířata. Později ho lze vrátit do sbírky. Ukázková zvířata archivovat nelze.",
       "words": "archiv prodáno uhynulo pryč odešlo darováno prodano pryc odeslo darovano"
+    },
+    "record-network": {
+      "title": "Síť chovatelů",
+      "short": "Ukazuje, jak toto zvíře přecházelo mezi chovateli: od koho přišlo nebo ke komu odešlo, uvedený důvod, zápůjčku nebo společný projekt, ze kterého pochází.",
+      "more": "Odtud můžete poslat jeho kartu ve zprávě, převést ho (prodej, dar nebo výměna přesune vaše zvíře do archivu, jakmile druhý chovatel přijme) nebo zapůjčit, a pak zůstane ve vaší sbírce jako Zapůjčené. Zvíře se známým pohlavím může založit společný projekt.",
+      "words": "převod prevod zápůjčka zapujcka zapůjčit prodat darovat vyměnit sdílet společný spolecny projekt partner síť sit"
     },
     "record-delete-reason": {
       "title": "Proč opustil sbírku?",

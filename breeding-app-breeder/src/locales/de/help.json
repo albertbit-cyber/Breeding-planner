@@ -85,6 +85,11 @@
       "short": "Sammelt Aufträge für Gentests deiner Tiere und zeigt frühere Aufträge und ihre Ergebnisse.",
       "words": "labortests gentest gentests labor häutungstest aufträge terminal"
     },
+    "nav-messages": {
+      "short": "Schreib anderen Züchtern über ihr @Handle, schick ihnen Schlangenkarten und Marketplace-Links, übergib Tiere und züchtet gemeinsam in Gemeinschaftsprojekten.",
+      "more": "Niemand findet dich, bevor du ein Handle wählst, und dann nur über dieses Handle. Die erste Nachricht von jemand Neuem wartet unter Anfragen, bis du sie annimmst, ignorierst oder blockierst. Nachrichten brauchen eine Verbindung und ein angemeldetes Konto.",
+      "words": "nachrichten chat posteingang kontakt züchter zuechter handle übergabe uebergabe leihe verleihen gemeinschaftsprojekt projekt aufteilung gelege messages"
+    },
     "nav-setup": {
       "short": "Enthält deine Züchterdaten, das ID-Format, Exporte, Erscheinungsbild, Sprache, Backups und dein Konto.",
       "words": "einstellungen optionen konfiguration setup"
@@ -3229,6 +3234,12 @@
       "short": "Nimmt ein Tier, das verkauft wurde, gestorben ist oder auf andere Weise gegangen ist, aus deinem Bestand und behält seine vollständige Akte.",
       "more": "Es öffnet ein kurzes Formular für Grund, Datum und Details. Danach ist die Akte nur noch lesbar, und das Tier steht unter Archiv im Tiere-Bildschirm. Später kann es in den Bestand zurückgeholt werden. Beispieltiere lassen sich nicht archivieren.",
       "words": "archiv archivieren verkauft gestorben weg abgegeben verschenkt"
+    },
+    "record-network": {
+      "title": "Züchternetzwerk",
+      "short": "Zeigt, wie dieses Tier zwischen Züchtern gewechselt ist: von wem es kam oder zu wem es ging, den angegebenen Grund, eine Leihe oder das Gemeinschaftsprojekt, aus dem es stammt.",
+      "more": "Von hier aus kannst du seine Karte in einer Nachricht schicken, es übergeben (Verkauf, Geschenk oder Tausch verschiebt dein Tier ins Archiv, sobald der andere Züchter annimmt) oder verleihen. Dann bleibt es als Verliehen in deinem Bestand. Ein Tier mit bekanntem Geschlecht kann ein Gemeinschaftsprojekt starten.",
+      "words": "übergabe uebergabe leihe verleihen verkaufen verschenken tauschen teilen gemeinschaftsprojekt partner netzwerk transfer"
     },
     "record-delete-reason": {
       "title": "Warum hat es den Bestand verlassen?",

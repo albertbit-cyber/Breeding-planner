@@ -85,6 +85,11 @@
       "short": "Reúne los pedidos de pruebas genéticas de tus animales y muestra los pedidos anteriores y sus resultados.",
       "words": "pruebas geneticas genéticas muda test laboratorio pedidos terminal"
     },
+    "nav-messages": {
+      "short": "Habla con otros criadores por su @usuario, envíales fichas de serpiente y enlaces del marketplace, transfiere animales y criad juntos en proyectos conjuntos.",
+      "more": "Nadie puede encontrarte hasta que eliges un usuario, y entonces solo por ese usuario. El primer mensaje de alguien nuevo espera en Solicitudes hasta que lo aceptes, lo ignores o lo bloquees. Los mensajes necesitan conexión y una cuenta con sesión iniciada.",
+      "words": "mensajes chat bandeja contacto criadores usuario handle transferencia préstamo prestamo proyecto conjunto reparto puesta"
+    },
     "nav-setup": {
       "short": "Contiene tus datos de criador, el formato de ID, exportaciones, apariencia, idioma, copias de seguridad y cuenta.",
       "words": "configuracion configuración ajustes preferencias opciones"
@@ -3229,6 +3234,12 @@
       "short": "Saca de tu colección un animal que se vendió, murió o se fue de otra forma, y conserva su ficha completa.",
       "more": "Abre un formulario breve para el motivo, la fecha y los detalles. Después, la ficha solo se puede leer, y el animal aparece en Archivo en la pantalla Animales. Más tarde se puede devolver a la colección. Los animales de ejemplo no se pueden archivar.",
       "words": "archivar archivo vendido muerto fallecido se fue regalado"
+    },
+    "record-network": {
+      "title": "Red de criadores",
+      "short": "Muestra cómo ha pasado este animal entre criadores: de quién vino o a quién fue, el motivo indicado, un préstamo o el proyecto conjunto en el que nació.",
+      "more": "Desde aquí puedes enviar su ficha en un mensaje, transferirlo (una venta, un regalo o un intercambio pasa tu animal al archivo cuando el otro criador acepta) o prestarlo, y entonces sigue en tu colección como Prestado. Un animal con sexo conocido puede iniciar un proyecto conjunto.",
+      "words": "transferencia préstamo prestamo prestar vender regalar intercambiar compartir proyecto conjunto socio red"
     },
     "record-delete-reason": {
       "title": "¿Por qué salió de la colección?",

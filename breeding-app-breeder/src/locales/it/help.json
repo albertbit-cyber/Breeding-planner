@@ -85,6 +85,11 @@
       "short": "Raccoglie gli ordini di test genetici per i tuoi animali e mostra gli ordini passati e i loro risultati.",
       "words": "test genetici muta test laboratorio ordini terminale analisi dna"
     },
+    "nav-messages": {
+      "short": "Scrivi ad altri allevatori tramite il loro @nome utente, invia schede serpente e link del marketplace, trasferisci animali e allevate insieme nei progetti condivisi.",
+      "more": "Nessuno può trovarti finché non scegli un nome utente, e poi solo tramite quel nome. Il primo messaggio di una persona nuova aspetta in Richieste finché non lo accetti, lo ignori o lo blocchi. I messaggi richiedono una connessione e un account con accesso effettuato.",
+      "words": "messaggi chat in arrivo contatto allevatori nome utente handle trasferimento prestito progetto condiviso divisione covata"
+    },
     "nav-setup": {
       "short": "Contiene i tuoi dati da allevatore, formato ID, esportazioni, aspetto, lingua, backup e account.",
       "words": "impostazioni preferenze opzioni configurazione setup"
@@ -3229,6 +3234,12 @@
       "short": "Toglie dalla collezione un animale venduto, morto o uscito in altro modo, e ne conserva il record completo.",
       "more": "Apre un breve modulo per motivo, data e dettagli. Dopo, il record si può solo leggere, e l'animale compare sotto Archivio nella schermata Animali. Può essere riportato nella collezione in seguito. Gli animali di esempio non si possono archiviare.",
       "words": "archivio venduto morto uscito ceduto regalato"
+    },
+    "record-network": {
+      "title": "Rete degli allevatori",
+      "short": "Mostra come questo animale è passato tra allevatori: da chi è arrivato o a chi è andato, il motivo indicato, un prestito o il progetto condiviso da cui è nato.",
+      "more": "Da qui puoi inviare la sua scheda in un messaggio, trasferirlo (vendita, regalo o scambio spostano il tuo animale nell'archivio quando l'altro allevatore accetta) o prestarlo, e allora resta nella tua collezione come In prestito. Un animale con sesso noto può avviare un progetto condiviso.",
+      "words": "trasferimento prestito prestare vendere regalare scambiare condividere progetto condiviso partner rete"
     },
     "record-delete-reason": {
       "title": "Perché ha lasciato la collezione?",
