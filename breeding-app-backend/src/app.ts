@@ -31,6 +31,7 @@ import { publicRoutes } from "./routes/publicRoutes";
 import { emailWebhookRoutes } from "./routes/emailWebhookRoutes";
 import { billingRoutes, billingWebhookRoutes } from "./routes/billingRoutes";
 import { photoRoutes } from "./routes/photoRoutes";
+import { networkRoutes } from "./routes/networkRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { resolveStorageDriver } from "./services/uploadStorageService";
 
@@ -162,6 +163,7 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/photos", photoRoutes);
+app.use("/api/network", networkRoutes);
 app.use("/api/mobile", mobileRoutes);
 // Ahead of adminRoutes on purpose: these are the endpoints a read-only
 // moderator may write to, and the router below refuses moderator writes
