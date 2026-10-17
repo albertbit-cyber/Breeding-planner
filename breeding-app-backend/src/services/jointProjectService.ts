@@ -435,7 +435,6 @@ export const respondToProject = async (
       needed === "F"
         ? { femaleOwnerId: actor.id, femaleAnimalId: row.id, femaleSnapshot: card }
         : { maleOwnerId: actor.id, maleAnimalId: row.id, maleSnapshot: card };
-    const maleOwnerId = needed === "M" ? actor.id : fresh.maleOwnerId;
     const keeperId = needed === "F" ? actor.id : fresh.femaleOwnerId;
     const maleRow = needed === "M" ? row : await tx.animal.findUnique({ where: { id: fresh.maleAnimalId } });
     if (!maleRow || maleRow.deletedAt) throw new HttpError(409, "The male is no longer in his owner's collection.");
