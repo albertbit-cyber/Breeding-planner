@@ -21,7 +21,11 @@ const bannerTitles = (t) => ({
   unauthorized: t("auth:sharedBackend.titleUnauthorized", { defaultValue: "Unauthorized session" }),
 });
 
-export default function SharedBackendBanner() {
+// Production builds pass `quiet`: the banner then appears only when the portal
+// cannot reach the backend, and never offers the diagnostics dump to the public.
+const QUIET_STATES = new Set(["disconnected", "config-error"]);
+
+export default function SharedBackendBanner({ quiet = false }) {
   const { t } = useTranslation();
   const { snapshot, retry } = useSharedBackend();
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -53,6 +57,8 @@ export default function SharedBackendBanner() {
     };
   }, [snapshot, t]);
 
+  if (quiet && !QUIET_STATES.has(snapshot.state)) return null;
+
   return (
     <div className={`border-b px-4 py-3 text-sm ${toneClass}`}>
       <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-3">
@@ -64,11 +70,13 @@ export default function SharedBackendBanner() {
           <button type="button" className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={retry}>
             {t("auth:sharedBackend.retry", { defaultValue: "Retry" })}
           </button>
-          <button type="button" className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={() => setShowDiagnostics((prev) => !prev)}>
-            {showDiagnostics
-              ? t("auth:sharedBackend.hideDiagnostics", { defaultValue: "Hide Diagnostics" })
-              : t("auth:sharedBackend.diagnostics", { defaultValue: "Diagnostics" })}
-          </button>
+          {quiet ? null : (
+            <button type="button" className="rounded-lg border border-current/25 bg-white/70 px-2.5 py-1 text-xs" onClick={() => setShowDiagnostics((prev) => !prev)}>
+              {showDiagnostics
+                ? t("auth:sharedBackend.hideDiagnostics", { defaultValue: "Hide Diagnostics" })
+                : t("auth:sharedBackend.diagnostics", { defaultValue: "Diagnostics" })}
+            </button>
+          )}
         </div>
       </div>
       {showDiagnostics ? (

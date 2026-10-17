@@ -1150,6 +1150,7 @@
   display: grid;
   align-items: center;
   justify-content: center;
+  justify-items: center;
   padding: 2rem;
   z-index: 9999;
   color: var(--sk-text, #0f172a);

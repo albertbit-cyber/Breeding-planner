@@ -406,10 +406,7 @@ export default function AuthGate({ children }) {
         <h1 className="auth-card-title">{t("auth:title", { defaultValue: "Serpentora" })}</h1>
       </div>
       <p className="auth-subtitle">
-        {t("auth:subtitle", {
-          defaultValue:
-            "Keep your reptiles synced across desktop and mobile with one secure account.",
-        })}
+        {t("auth:admin.consoleSubtitle", { defaultValue: "Staff console for running Serpentora." })}
       </p>
       {/*
         No registration here, by design. This console used to carry the public

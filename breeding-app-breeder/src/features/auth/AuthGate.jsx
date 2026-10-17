@@ -720,7 +720,8 @@ export default function AuthGate({ children }) {
       <div className="auth-primary-actions">
         <button
           type="button"
-          className={`primary ${view === "register" ? "is-active" : ""}`}
+          className={`${view === "login" ? "ghost" : "primary"} ${view === "register" ? "is-active" : ""}`}
+          aria-pressed={view === "register"}
           onClick={() => {
             setView("register");
             setIsRecoveringPassword(false);
@@ -732,7 +733,8 @@ export default function AuthGate({ children }) {
         </button>
         <button
           type="button"
-          className={`ghost ${view === "login" ? "is-active" : ""}`}
+          className={view === "login" ? "primary is-active" : "ghost"}
+          aria-pressed={view === "login"}
           onClick={() => {
             setView("login");
             setIsRecoveringPassword(false);

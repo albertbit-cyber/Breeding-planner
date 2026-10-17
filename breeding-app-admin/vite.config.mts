@@ -57,13 +57,21 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
 const appVersion = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8")).version as string;
 
+/**
+ * The console serves real paths (`/admin/users`, `/admin/emails`), so the asset
+ * base has to be absolute. A relative `./` base resolves `assets/index.js`
+ * against the current path: refreshing `/admin/emails` asked for
+ * `/admin/assets/index.js`, got index.html back from `serve -s`, and rendered a
+ * blank page. Same fix the marketplace got. Electron keeps `./` for `file://`.
+ */
 const resolveBase = (publicUrl: string | undefined): string => {
   const ensureTrailingSlash = (value: string): string =>
     value.endsWith("/") ? value : `${value}/`;
-  if (!publicUrl || publicUrl === "/") return "./";
+  if (process.env.ELECTRON_BUILD === "true") return "./";
+  if (!publicUrl || publicUrl === "/") return "/";
   try {
     const { pathname } = new URL(publicUrl, "http://localhost");
-    if (!pathname || pathname === "/") return "./";
+    if (!pathname || pathname === "/") return "/";
     return ensureTrailingSlash(pathname);
   } catch {
     return ensureTrailingSlash(publicUrl);
