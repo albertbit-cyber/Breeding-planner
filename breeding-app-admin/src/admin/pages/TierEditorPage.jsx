@@ -9,6 +9,7 @@ import {
 } from "../../shared/apiClient";
 import { EMPTY_TIER_FORM, featuresToMap, formToPayload, tierToForm } from "./tierForm";
 import { AnimalPhotoLimits, FeatureMatrix, TierBasicsFields, useFeatureMapSetters } from "./TierFields.jsx";
+import { tierFeaturesOnly } from "./TierMatrixGrid.jsx";
 
 export default function TierEditorPage() {
   const { id } = useParams();
@@ -26,7 +27,7 @@ export default function TierEditorPage() {
 
   useEffect(() => {
     fetchFeatureCatalog()
-      .then((data) => setAllFeatures(Array.isArray(data.features) ? data.features : []))
+      .then((data) => setAllFeatures(tierFeaturesOnly(Array.isArray(data.features) ? data.features : [])))
       .catch(() => {});
     if (!isNew) {
       setLoading(true);

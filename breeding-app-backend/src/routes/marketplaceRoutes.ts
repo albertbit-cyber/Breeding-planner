@@ -3,7 +3,12 @@ import {
   acceptOffer,
   acquiredAnimals,
   addMessage,
+  adminListings,
   adminMarketplace,
+  adminModerateListing,
+  adminRefreshPhotos,
+  adminStats,
+  adminStores,
   adminStore,
   blockUser,
   completeSale,
@@ -90,4 +95,10 @@ marketplaceRoutes.post("/reviews", marketplaceMutationLimiter, requireAuth, asyn
 marketplaceRoutes.get("/reviews/pending", requireAuth, asyncHandler(reviewableSales));
 
 marketplaceRoutes.get("/admin", requireAuth, requireRole("admin"), asyncHandler(adminMarketplace));
+// The admin console: numbers, the ads table, moderation, and the photo backfill.
+marketplaceRoutes.get("/admin/stats", requireAuth, requireRole("admin"), asyncHandler(adminStats));
+marketplaceRoutes.get("/admin/listings", requireAuth, requireRole("admin"), asyncHandler(adminListings));
+marketplaceRoutes.patch("/admin/listings/:id", marketplaceMutationLimiter, requireAuth, requireRole("admin"), asyncHandler(adminModerateListing));
+marketplaceRoutes.post("/admin/listings/refresh-photos", requireAuth, requireRole("admin"), asyncHandler(adminRefreshPhotos));
+marketplaceRoutes.get("/admin/stores", requireAuth, requireRole("admin"), asyncHandler(adminStores));
 marketplaceRoutes.patch("/admin/stores/:userId", marketplaceMutationLimiter, requireAuth, requireRole("admin"), asyncHandler(adminStore));

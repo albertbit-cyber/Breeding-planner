@@ -99,6 +99,7 @@ export default function TiersPage() {
           </div>
           <div className="admin-row-actions">
             <button type="button" onClick={load}>Refresh</button>
+            <button type="button" onClick={() => navigate("/admin/tiers/matrix")}>Tier matrix</button>
             <button type="button" onClick={() => navigate("/admin/tiers/new")}>Create tier</button>
           </div>
         </div>

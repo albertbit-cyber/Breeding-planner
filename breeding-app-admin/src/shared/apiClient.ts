@@ -802,6 +802,50 @@ export const createMarketplaceReview = async (payload: Record<string, unknown>) 
 export const fetchAdminMarketplace = async () =>
   request<{ listings: unknown[]; stores: unknown[]; disputes: unknown[] }>("/marketplace/admin");
 
+export const fetchMarketplaceStats = async () =>
+  request<Record<string, any>>("/marketplace/admin/stats");
+
+export const fetchAdminMarketplaceListings = async (params: Record<string, string | number | undefined> = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ listings: any[]; total: number; page: number; pageSize: number }>(`/marketplace/admin/listings${suffix}`);
+};
+
+export const moderateMarketplaceListing = async (id: string, payload: { status?: string; isFeatured?: boolean; reason?: string }) =>
+  request<{ listing: unknown }>(`/marketplace/admin/listings/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const refreshMarketplaceListingPhotos = async (listingId?: string) =>
+  request<{ checked: number; updated: number; withPhotos: number; skipped: Record<string, number> }>("/marketplace/admin/listings/refresh-photos", {
+    method: "POST",
+    body: JSON.stringify(listingId ? { listingId } : {}),
+  });
+
+export const fetchAdminMarketplaceStores = async () =>
+  request<{ stores: any[] }>("/marketplace/admin/stores");
+
+export const verifyMarketplaceStore = async (userId: string, isVerified: boolean) =>
+  request<{ store: unknown }>(`/marketplace/admin/stores/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ isVerified }),
+  });
+
+/**
+ * Listing photos are served by the API (`/marketplace/media/:id`), so a relative address has to be
+ * read against the API's base, not this page's origin.
+ */
+export const resolveApiMediaUrl = (url: unknown): string => {
+  const value = String(url || "").trim();
+  if (!value || /^(https?:|data:|blob:)/i.test(value)) return value;
+  const base = String(getSharedApiConfig().baseUrl || "").replace(/\/+$/, "");
+  return base ? `${base}${value.startsWith("/") ? "" : "/"}${value}` : value;
+};
+
 export const fetchSavedSearches = async () =>
   request<{ searches: unknown[] }>("/searches");
 
@@ -852,6 +896,21 @@ export const fetchAdminDashboard = async () =>
 
 export const fetchFeatureCatalog = async () =>
   request<{ features: unknown[] }>("/subscriptions/admin/features");
+
+export const updateFeatureAddon = async (featureKey: string, payload: { addonAvailable?: boolean; addonMonthlyPrice?: number | null }) =>
+  request<{ feature: unknown }>(`/subscriptions/admin/features/${encodeURIComponent(featureKey)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const fetchAdminSuggestions = async () =>
+  request<{ tierRecommendations: any; pedigreeSharing: any; defaults: any }>("/subscriptions/admin/suggestions");
+
+export const saveAdminSuggestions = async (payload: { tierRecommendations?: unknown; pedigreeSharedFields?: unknown }) =>
+  request<{ tierRecommendations: any; pedigreeSharing: any; defaults: any }>("/subscriptions/admin/suggestions", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 
 export const fetchPublicSubscriptionTiers = async () =>
   request<{ tiers: unknown[] }>("/subscriptions/public/tiers");

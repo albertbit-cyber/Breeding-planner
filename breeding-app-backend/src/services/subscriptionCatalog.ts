@@ -6,6 +6,23 @@ export type FeatureCatalogSeed = {
   defaultLimitType?: string | null;
 };
 
+/**
+ * Who a feature is for. Only "tier" features belong in the tier matrix and the "Build My Own" list:
+ * "staff" ones are admin-console permissions, and "vendor" ones are what a laboratory does inside
+ * the lab portal. A lab is a vendor serving Serpentora, not a customer on a plan.
+ */
+export type FeatureAudience = "tier" | "staff" | "vendor";
+
+const STAFF_FEATURE_KEYS = new Set(["admin.users", "admin.tiers", "admin.payments", "admin.overrides", "admin.activity_log"]);
+const VENDOR_FEATURE_KEYS = new Set(["lab.portal", "lab.results"]);
+
+export const featureAudience = (featureKey: string): FeatureAudience =>
+  STAFF_FEATURE_KEYS.has(featureKey) ? "staff" : VENDOR_FEATURE_KEYS.has(featureKey) ? "vendor" : "tier";
+
+/** The family tree: own records for every tier, every known connection across breeders for the upper tiers. */
+export const PEDIGREE_FEATURE = "pedigree.family_tree";
+export const EXTENDED_PEDIGREE_FEATURE = "pedigree.extended";
+
 const feature = (
   featureGroup: string,
   featureKey: string,
@@ -46,6 +63,8 @@ export const FEATURE_CATALOG: FeatureCatalogSeed[] = [
   feature("Breeding", "breeding.multi_generation_planner", "Multi-generation breeding planner"),
   feature("Breeding", "breeding.advisor", "Breeding goal advisor"),
   feature("Breeding", "breeding.pairing_recommendations", "Pairing recommendations"),
+  feature("Pedigree / Family Tree", PEDIGREE_FEATURE, "Family tree (own records)", null, "The pedigree built from the animals and parents in this account."),
+  feature("Pedigree / Family Tree", EXTENDED_PEDIGREE_FEATURE, "Extended pedigree", null, "Every connection Serpentora knows about: animals bought from other breeders and their lines, across accounts."),
   feature("Genetics", "genetics.basic_calculator", "Basic genetics calculator"),
   feature("Genetics", "genetics.advanced_calculator", "Advanced genetics calculator"),
   feature("Genetics", "genetics.het_probability", "Het probability calculator"),
