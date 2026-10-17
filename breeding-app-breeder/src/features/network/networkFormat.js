@@ -92,22 +92,22 @@ export function isPermanentKind(kind) {
   return kind === 'sale' || kind === 'gift' || kind === 'trade' || kind === 'split';
 }
 
+// i18n-namespace: common
+/** English with the {{placeholders}} filled, for callers without i18n (tests, helpers). */
+const englishT = (key, opts = {}) => String(opts.defaultValue || key).replace(/\{\{(\w+)\}\}/g, (_, name) => String(opts[name] ?? ''));
+
 /** The split in one sentence, the way the server writes it into the hatchlings' records. */
-export function describeSplit(terms, maleOwner, keeper, t) {
+export function describeSplit(terms, maleOwner, keeper, t = englishT) {
   if (!terms) return '';
-  // Without i18n (tests, a helper caller) the English default is used, filled in the same way.
-  const tr = typeof t === 'function'
-    ? t
-    : (key, opts = {}) => String(opts.defaultValue || key).replace(/\{\{(\w+)\}\}/g, (_, name) => String(opts[name] ?? ''));
   const note = terms.note ? ` ${terms.note}` : '';
   switch (terms.method) {
     case 'alternate_picks':
-      return tr('network.split.sentence.alternate', {
+      return t('network.split.sentence.alternate', {
         defaultValue: 'Alternate picks, {{first}} first.',
         first: terms.firstPick === 'male_owner' ? maleOwner : keeper,
       }) + note;
     case 'percentage':
-      return tr('network.split.sentence.percentage', {
+      return t('network.split.sentence.percentage', {
         defaultValue: '{{male}} {{maleShare}}%, {{keeper}} {{keeperShare}}%.',
         male: maleOwner,
         keeper,
@@ -115,14 +115,14 @@ export function describeSplit(terms, maleOwner, keeper, t) {
         keeperShare: 100 - Number(terms.maleOwnerShare || 0),
       }) + note;
     case 'fixed_count':
-      return tr('network.split.sentence.count', {
-        defaultValue: '{{male}} receives {{count}} hatchlings, {{keeper}} keeps the rest.',
+      return t('network.split.sentence.fixed', {
+        defaultValue: '{{male}} receives {{n}} of the hatchlings, {{keeper}} keeps the rest.',
         male: maleOwner,
         keeper,
-        count: terms.maleOwnerShare,
+        n: terms.maleOwnerShare,
       }) + note;
     default:
-      return terms.note || tr('network.split.sentence.custom', { defaultValue: 'Own terms.' });
+      return terms.note || t('network.split.sentence.custom', { defaultValue: 'Own terms.' });
   }
 }
 

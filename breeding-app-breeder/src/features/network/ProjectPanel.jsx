@@ -197,10 +197,10 @@ function Progress({ project, role, locale }) {
     );
   }
   const steps = [
-    { done: p.sessions > 0, label: t('network.project.step.paired', { defaultValue: 'Paired' }), value: p.locks ? t('network.project.locks', { defaultValue: '{{count}} locks', count: p.locks }) : p.sessions ? t('network.project.sessions', { defaultValue: '{{count}} introductions', count: p.sessions }) : '–' },
+    { done: p.sessions > 0, label: t('network.project.step.paired', { defaultValue: 'Paired' }), value: p.locks ? t('network.project.locks', { defaultValue: 'Locks: {{n}}', n: p.locks }) : p.sessions ? t('network.project.sessions', { defaultValue: 'Introductions: {{n}}', n: p.sessions }) : '–' },
     { done: Boolean(p.ovulationDate), label: t('network.project.step.ovulation', { defaultValue: 'Ovulation' }), value: shortDate(p.ovulationDate, locale) || '–' },
     { done: Boolean(p.eggLayingDate), label: t('network.project.step.eggs', { defaultValue: 'Eggs laid' }), value: p.eggLayingDate ? `${shortDate(p.eggLayingDate, locale)}${p.eggsTotal != null ? ` · ${p.eggsTotal}` : ''}` : '–' },
-    { done: Boolean(p.firstHatchDate || p.hatchlingsRecorded), label: t('network.project.step.hatched', { defaultValue: 'Hatched' }), value: p.hatchlingsRecorded != null ? t('network.project.hatchlingCount', { defaultValue: '{{count}} hatchlings', count: p.hatchlingsRecorded }) : '–' },
+    { done: Boolean(p.firstHatchDate || p.hatchlingsRecorded), label: t('network.project.step.hatched', { defaultValue: 'Hatched' }), value: p.hatchlingsRecorded != null ? t('network.project.hatchlingCount', { defaultValue: 'Hatchlings: {{n}}', n: p.hatchlingsRecorded }) : '–' },
   ];
   return (
     <div>
@@ -228,7 +228,7 @@ function Split({ project, maleOwner, keeper, busy, run }) {
       {project.splitTerms ? (
         <p className="bn-reason">
           {describeSplit(project.splitTerms, maleOwner, keeper, t)}
-          {shareCount != null ? ` ${t('network.split.forThisClutch', { defaultValue: 'For this clutch: {{count}} to {{male}}.', count: shareCount, male: maleOwner })}` : ''}
+          {shareCount != null ? ` ${t('network.split.forThisClutch', { defaultValue: 'For this clutch: {{n}} to {{male}}.', n: shareCount, male: maleOwner })}` : ''}
         </p>
       ) : (
         <p className="bn-note">{t('network.split.none', { defaultValue: 'No split agreed yet. Talk it over below, then one of you proposes terms and the other accepts.' })}</p>
@@ -369,7 +369,7 @@ function Hatchlings({ project, role, maleOwner, busy, run }) {
               setPicked(new Set());
             }}
           >
-            {t('network.project.sendShares', { defaultValue: 'Send {{count}} to {{who}}', count: picked.size, who: maleOwner })}
+            {t('network.project.sendShares', { defaultValue: 'Send to {{who}} ({{n}})', n: picked.size, who: maleOwner })}
           </button>
           <p className="bn-note" style={{ flex: '1 1 12rem' }}>
             {t('network.project.sendHint', { defaultValue: 'Each one is a transfer they accept. Sent hatchlings move to your archive and arrive with both parents named.' })}
