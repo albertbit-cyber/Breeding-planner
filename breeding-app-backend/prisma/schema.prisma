@@ -70,6 +70,8 @@ enum ShedResultStatus {
 model User {
   id                             String                     @id @default(cuid())
   email                          String                     @unique
+  /// The public @handle other breeders find you by, stored lower-case. Null until chosen.
+  handle                         String?                    @unique
   passwordHash                   String
   fullName                       String
   role                           UserRole
@@ -167,6 +169,12 @@ model User {
   membership                     Membership?
   organizationInvitesSent        OrganizationInvite[]       @relation("OrganizationInviteInviter")
   organizationInvitesAccepted    OrganizationInvite[]       @relation("OrganizationInviteAcceptedBy")
+  networkThreads                 NetworkThreadParticipant[]
+  networkMessagesSent            NetworkMessage[]           @relation("NetworkMessageSender")
+  animalTransfersSent            AnimalTransfer[]           @relation("AnimalTransferSender")
+  animalTransfersReceived        AnimalTransfer[]           @relation("AnimalTransferReceiver")
+  jointProjectsAsMaleOwner       JointProject[]             @relation("JointProjectMaleOwner")
+  jointProjectsAsFemaleOwner     JointProject[]             @relation("JointProjectFemaleOwner")
 
   @@index([deletionScheduledAt])
 }
@@ -2067,4 +2075,161 @@ model Photo {
   @@index([ownerUserId, animalAppId])
   @@index([status, deletedAt])
   @@map("photos")
+}
+
+// ── Breeder network: messages, transfers, joint projects ──────────────────────
+// Server-authoritative on purpose: none of this travels in the breeder snapshot. A conversation
+// is not something two offline devices should merge, and a transfer must be a live, confirmed
+// server action. What reaches the breeder app's own records (a received animal, an archived one,
+// a partner record) is written as ordinary Animal rows and arrives with the next sync pull.
+
+/// A conversation. `direct` is the one thread between two people (`pairKey` = both user ids,
+/// sorted, joined by ":"); `project` is the thread of one joint project.
+model NetworkThread {
+  id            String                     @id @default(cuid())
+  kind          String                     @default("direct")
+  pairKey       String?                    @unique @map("pair_key")
+  createdById   String?                    @map("created_by_id")
+  lastMessageAt DateTime?                  @map("last_message_at")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
+  participants  NetworkThreadParticipant[]
+  messages      NetworkMessage[]
+  project       JointProject?
+
+  @@index([lastMessageAt])
+  @@map("network_threads")
+}
+
+/// One person's place in a thread. status: accepted (in the inbox) | request (someone wrote
+/// first and they have not answered yet) | ignored (hidden; nothing notifies them).
+model NetworkThreadParticipant {
+  id         String        @id @default(cuid())
+  threadId   String        @map("thread_id")
+  thread     NetworkThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId     String        @map("user_id")
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     String        @default("accepted")
+  lastReadAt DateTime?     @map("last_read_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  @@unique([threadId, userId])
+  @@index([userId, status])
+  @@map("network_thread_participants")
+}
+
+/// kind: text | animal (a snake card) | listing (a marketplace link) | transfer | project | split
+/// | system. `attachment` holds the card as it stood when sent, so the thread still reads after
+/// the animal changes or leaves.
+model NetworkMessage {
+  id           String        @id @default(cuid())
+  threadId     String        @map("thread_id")
+  thread       NetworkThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderUserId String?       @map("sender_user_id")
+  sender       User?         @relation("NetworkMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  kind         String        @default("text")
+  body         String        @db.Text
+  attachment   Json?
+  deletedAt    DateTime?     @map("deleted_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([threadId, createdAt])
+  @@index([senderUserId])
+  @@map("network_messages")
+}
+
+/// One animal handed from one account to another. The receiver gets a copy of the record; the
+/// sender keeps theirs. kind: sale | gift | trade (permanent: the sender's animal moves to the
+/// archive) | loan (temporary: the sender's animal is On loan until it is returned) | split (a
+/// hatchling from a joint project's clutch, permanent).
+/// status: pending | accepted | declined | cancelled | returned
+model AnimalTransfer {
+  id                String    @id @default(cuid())
+  senderUserId      String    @map("sender_user_id")
+  sender            User      @relation("AnimalTransferSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  receiverUserId    String    @map("receiver_user_id")
+  receiver          User      @relation("AnimalTransferReceiver", fields: [receiverUserId], references: [id], onDelete: Cascade)
+  /// Animal.id of the sender's row, and its app id at the time of sending.
+  senderAnimalId    String    @map("sender_animal_id")
+  senderAppAnimalId String    @map("sender_app_animal_id")
+  /// Animal.id of the receiver's copy once accepted.
+  receiverAnimalId  String?   @map("receiver_animal_id")
+  kind              String
+  /// Why the animal is changing hands. Shown on both animals' cards.
+  reason            String    @db.Text
+  status            String    @default("pending")
+  loanUntil         DateTime? @map("loan_until")
+  threadId          String?   @map("thread_id")
+  messageId         String?   @map("message_id")
+  projectId         String?   @map("project_id")
+  /// The animal card as the sender offered it.
+  snapshot          Json
+  respondedAt       DateTime? @map("responded_at")
+  returnedAt        DateTime? @map("returned_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([senderUserId, status])
+  @@index([receiverUserId, status])
+  @@index([senderAnimalId])
+  @@index([projectId])
+  @@map("animal_transfers")
+}
+
+/// Two breeders breeding together: one brings the male, the other the female. Whoever keeps the
+/// female through her cycle incubates the eggs, so the female's owner is the keeper. The keeper
+/// gets a read-only partner record of the male, pairs on an ordinary breeding card, and the split
+/// of the clutch is negotiated in the project thread.
+/// status: proposed | active | completed | cancelled | declined
+model JointProject {
+  id               String                      @id @default(cuid())
+  threadId         String                      @unique @map("thread_id")
+  thread           NetworkThread               @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  title            String
+  note             String?                     @db.Text
+  status           String                      @default("proposed")
+  proposedById     String                      @map("proposed_by_id")
+  /// The invited breeder, who still has to choose their animal while the project is proposed.
+  invitedUserId    String                      @map("invited_user_id")
+  maleOwnerId      String?                     @map("male_owner_id")
+  maleOwner        User?                       @relation("JointProjectMaleOwner", fields: [maleOwnerId], references: [id], onDelete: Cascade)
+  femaleOwnerId    String?                     @map("female_owner_id")
+  femaleOwner      User?                       @relation("JointProjectFemaleOwner", fields: [femaleOwnerId], references: [id], onDelete: Cascade)
+  /// Animal.id of each owner's own row; null for the side not chosen yet.
+  maleAnimalId     String?                     @map("male_animal_id")
+  femaleAnimalId   String?                     @map("female_animal_id")
+  maleSnapshot     Json?                       @map("male_snapshot")
+  femaleSnapshot   Json?                       @map("female_snapshot")
+  /// The partner record of the male in the keeper's account (Animal.appAnimalId there).
+  partnerMaleAppId String?                     @map("partner_male_app_id")
+  /// The agreed split, from the accepted proposal.
+  splitTerms       Json?                       @map("split_terms")
+  splitAgreedAt    DateTime?                   @map("split_agreed_at")
+  activatedAt      DateTime?                   @map("activated_at")
+  completedAt      DateTime?                   @map("completed_at")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+  splitProposals   JointProjectSplitProposal[]
+
+  @@index([maleOwnerId, status])
+  @@index([femaleOwnerId, status])
+  @@index([invitedUserId, status])
+  @@map("joint_projects")
+}
+
+/// A proposed split of the clutch. status: open | accepted | rejected | superseded
+model JointProjectSplitProposal {
+  id           String       @id @default(cuid())
+  projectId    String       @map("project_id")
+  project      JointProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proposedById String       @map("proposed_by_id")
+  terms        Json
+  status       String       @default("open")
+  messageId    String?      @map("message_id")
+  respondedAt  DateTime?    @map("responded_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([projectId, status])
+  @@map("joint_project_split_proposals")
 }
