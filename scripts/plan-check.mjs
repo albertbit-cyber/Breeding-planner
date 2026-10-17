@@ -5,7 +5,7 @@
 // data/plan-status.json, which it writes every run.
 //
 //   node scripts/plan-check.mjs            full run (typecheck, tests, i18n verify included)
-//   node scripts/plan-check.mjs --quick    skip the slow commands; those items report "unknown"
+//   node scripts/plan-check.mjs --quick    skip the slow commands (typecheck, tests, i18n verify, npm audit); those items report "unknown"
 //   node scripts/plan-check.mjs --json     print only the JSON
 //
 // Statuses: pass | fail | manual | unknown. "manual" means only a person can
@@ -50,6 +50,8 @@ function grep(pattern, paths, extended = false) {
     return []; // exit 1 = no matches
   }
 }
+
+const sh = (cmd) => { try { return execSync(cmd, { cwd: root, stdio: 'pipe' }).toString().trim(); } catch { return ''; } };
 
 function pkg(dir) {
   try { return JSON.parse(readFileSync(path.join(root, dir, 'package.json'), 'utf8')); }
@@ -229,6 +231,90 @@ const checks = {
   },
   't-user-test': () => manual('tick when five keepers reached a confirmed import unaided and the notes are saved'),
   't-device-test': () => manual('tick when the breeder and lab APKs were exercised on real hardware'),
+
+  // ---- Part 4 · Launch gates (added 12 October; checks added 17 October) ----
+  // Manual: the four October branches (help system, retire command, wishlist, comment fix)
+  // are on main and no stale pull request remains.
+  'g-merge-train': () => manual('tick when main holds the help system, the retire command, the wishlist and the comment fix, and no stale PR is open'),
+  // Pass when the three legal pages carry no Fill or "[Legal entity" placeholder, the
+  // public footer names the company with its suffix, and LICENSE and COPYRIGHT are
+  // tracked at the root with no "HOLDER" left in them.
+  'g-legal-entity': () => {
+    const problems = [];
+    const pages = ['ImpressumPage.jsx', 'PrivacyPage.jsx', 'TermsPage.jsx'].map((p) => `breeding-app-public/src/pages/${p}`);
+    const placeholders = grep('<Fill>', pages).concat(grep('[Legal entity', pages));
+    if (placeholders.length) problems.push(`placeholders in ${[...new Set(placeholders)].map((f) => path.basename(f)).join(', ')}`);
+    if (grep('Qinti UG (haftungsbeschränkt)', ['breeding-app-public/src/components/Footer.jsx']).length === 0) problems.push('Footer.jsx does not name Qinti UG (haftungsbeschränkt)');
+    for (const f of ['LICENSE', 'COPYRIGHT']) {
+      if (!sh(`git ls-files ${f}`)) problems.push(`${f} not tracked`);
+      else if (grep('HOLDER', [f]).length) problems.push(`${f} still says HOLDER`);
+    }
+    return problems.length ? fail(problems.join('; ')) : pass('legal pages filled, footer names Qinti UG, LICENSE and COPYRIGHT complete');
+  },
+  // Pass when .env.example documents the two Stripe secrets, the billing runbook
+  // exists, and the schema stores processed webhook events (replay safety).
+  'g-payments-live': () => {
+    const missing = [];
+    const envEx = 'breeding-app-backend/.env.example';
+    for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']) if (grep(k, [envEx]).length === 0) missing.push(`${k} in .env.example`);
+    if (!existsSync(path.join(root, 'docs/runbooks/billing.md'))) missing.push('docs/runbooks/billing.md');
+    if (grep('model (BillingEvent|ProcessedWebhookEvent|StripeEvent|ProcessedStripeEvent)', ['breeding-app-backend/prisma/schema.prisma'], true).length === 0) missing.push('a processed-webhook-event model');
+    return missing.length ? fail(`missing: ${missing.join(', ')}`) : pass('Stripe variables documented, billing runbook and processed-event store exist');
+  },
+  // Pass when the lab entry no longer calls the demo seeder unguarded and the
+  // delete-all-orders client call is gone.
+  'g-lab-footguns': () => {
+    const problems = [];
+    try {
+      const idx = readFileSync(path.join(root, 'breeding-app-lab/src/index.jsx'), 'utf8');
+      if (/^\s*seedDemoUsersIfNeeded\(\)/m.test(idx) && !/import\.meta\.env\.DEV/.test(idx)) problems.push('index.jsx calls seedDemoUsersIfNeeded() with no DEV guard');
+    } catch { problems.push('breeding-app-lab/src/index.jsx unreadable'); }
+    const del = grep('deleteAllLabOrders', ['breeding-app-lab/src']);
+    if (del.length) problems.push(`deleteAllLabOrders still in ${del.map((f) => path.basename(f)).join(', ')}`);
+    return problems.length ? fail(problems.join('; ')) : pass('no unguarded demo seeding and no delete-all button in the lab app');
+  },
+  // Pass when the backend trusts one proxy hop, no limiter is skipped outside
+  // production, /health touches the database, and breeder, lab and admin pin
+  // VITE_API_URL in their netlify.toml.
+  'g-backend-ops': () => {
+    const problems = [];
+    const be = 'breeding-app-backend/src';
+    if (grep('trust proxy', [be]).length === 0) problems.push('no trust proxy');
+    if (grep('skip: productionOnly', [`${be}/middleware/rateLimiters.ts`]).length) problems.push('limiters skipped outside production');
+    try {
+      const sys = readFileSync(path.join(root, be, 'routes/systemRoutes.ts'), 'utf8');
+      const health = (sys.split(/systemRoutes\.get\(\s*["']\/health["']/)[1] || '').split(/systemRoutes\.get\(/)[0];
+      if (!/checkDatabaseConnection|\$queryRaw|SELECT 1/.test(health)) problems.push('/health does not query the database');
+    } catch { problems.push('systemRoutes.ts unreadable'); }
+    const unpinned = ['breeder', 'lab', 'admin'].filter((a) => {
+      try { return !/VITE_API_URL\s*=/.test(readFileSync(path.join(root, `breeding-app-${a}/netlify.toml`), 'utf8')); } catch { return true; }
+    });
+    if (unpinned.length) problems.push(`VITE_API_URL not pinned in ${unpinned.join(', ')} netlify.toml`);
+    return problems.length ? fail(problems.join('; ')) : pass('trust proxy, live rate limits, database-aware health and pinned backends');
+  },
+  // Slow: npm audit of production dependencies reports no critical or high finding.
+  'g-deps-clean': () => slow('npm audit --omit=dev in six packages', () => {
+    const pkgs = [...APPS, 'breeding-app-shared'];
+    const bad = [];
+    for (const a of pkgs) {
+      let report;
+      try { report = execSync('npm audit --omit=dev --json', { cwd: path.join(root, a), stdio: 'pipe', timeout: 120000 }).toString(); }
+      catch (e) { report = `${e.stdout || ''}`; }
+      try {
+        const v = JSON.parse(report).metadata?.vulnerabilities || {};
+        if ((v.critical || 0) + (v.high || 0) > 0) bad.push(`${a.replace('breeding-app-', '')} ${v.critical || 0} critical ${v.high || 0} high`);
+      } catch { bad.push(`${a.replace('breeding-app-', '')} audit unreadable`); }
+    }
+    return bad.length ? fail(bad.join('; ')) : pass('no critical or high production findings in six packages');
+  }),
+
+  // ---- Part 5 · Deploy follow-ups from the work merged 13 to 17 October (owner steps) ----
+  'g-migrations-live': () => manual('tick when the Railway deploy log shows 20261017120000_breeder_network and 20261017130000_feature_addons_platform_settings applied and /api/health answers'),
+  'g-photo-storage-live': () => manual('tick when Railway runs STORAGE_DRIVER=supabase with the Supabase variables set and a photo added in one browser shows in another'),
+  'g-tiers-applied': () => manual('tick when npm run tiers:limits -- --apply and npm run tiers:retire-lab have run against the live backend and the admin tier matrix shows the intended limits'),
+  'g-photo-recovery': () => manual('tick when the 72 hatchling photos lost on 13 October are restored from the recovery file, or the loss is accepted'),
+  'g-sync-live-test': () => manual('tick when the multi-device sync live test (phases 1 to 4, two browsers on one account) passes against the deployed backend'),
+  'g-apk-current': () => manual('tick when an APK built from current main (help system, photo storage, breeder network onward) is installed and opened on a real phone'),
 };
 
 // ---- run ----
@@ -238,7 +324,6 @@ for (const [id, fn] of Object.entries(checks)) {
   catch (e) { items[id] = unknown(`check crashed: ${String(e).slice(0, 120)}`); }
 }
 
-const sh = (cmd) => { try { return execSync(cmd, { cwd: root, stdio: 'pipe' }).toString().trim(); } catch { return ''; } };
 const summary = { pass: 0, fail: 0, manual: 0, unknown: 0, total: Object.keys(items).length };
 for (const it of Object.values(items)) summary[it.status]++;
 
