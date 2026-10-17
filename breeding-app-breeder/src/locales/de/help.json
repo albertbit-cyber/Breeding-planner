@@ -1701,7 +1701,7 @@
     },
     "rack-name": {
       "short": "Benennt das Rack, damit du es von anderen im Raum unterscheiden kannst. Ein Name ist Pflicht.",
-      "words": "rack name"
+      "words": "rack name rackname regalname"
     },
     "rack-tub-size": {
       "short": "Wählt die Boxgröße aus der Liste oder Individuell, um eine eigene Bezeichnung und Maße einzugeben.",
@@ -1732,7 +1732,7 @@
     },
     "terrarium-name": {
       "short": "Benennt das Terrarium. Ein Name ist Pflicht.",
-      "words": "terrarium name"
+      "words": "terrarium terrarienname terrariumname"
     },
     "terrarium-dimensions": {
       "title": "Breite, Tiefe, Höhe",
@@ -2145,7 +2145,7 @@
     "quarantine-reference-test": {
       "title": "Test",
       "short": "Öffnet einen Test mit Methode, Probe, üblichem Zeitpunkt, Grenzen und Anbietern.",
-      "words": "test details"
+      "words": "test details testdetails testangaben"
     },
     "quarantine-reference-lab": {
       "title": "Labor",
@@ -2988,7 +2988,7 @@
     },
     "export-pairings-status": {
       "short": "Beschränkt den Export Nach Verpaarung auf Verpaarungen mit den gewählten Status. Statusauswahl löschen hebt die Beschränkung auf.",
-      "words": "status filter"
+      "words": "status filter statusfilter"
     },
     "export-pairings-unpaired": {
       "short": "Fügt Männchen ohne Verpaarung als eigene Zeilen in den Export Nach Verpaarung ein.",
@@ -3785,7 +3785,7 @@
     "bfield-lock-status": {
       "title": "Status",
       "short": "Lock beobachtet, Nicht beobachtet oder Unbekannt. Nur Lock beobachtet zählt als beobachteter Lock.",
-      "words": "lock status"
+      "words": "lock status lockstatus verriegelung kopulation"
     },
     "bfield-observation-date": {
       "title": "Beobachtungsdatum",
