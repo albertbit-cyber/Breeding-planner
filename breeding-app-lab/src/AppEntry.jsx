@@ -20,7 +20,8 @@ export default function AppEntry() {
     <AppearanceProvider>
       <SharedBackendProvider>
         <BatchOrderProvider>
-          <SharedBackendBanner />
+          {/* Full diagnostics in dev; production only speaks up when the backend is unreachable. */}
+          <SharedBackendBanner quiet={!import.meta.env.DEV} />
           <AuthGate>
             <LabAppShell />
           </AuthGate>
